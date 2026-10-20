@@ -64,11 +64,12 @@ export interface PlayerView {
     // the caller to fall back to a full reparse.
     setNodeChannel(index: number, channel: string, value: string): boolean;
 
-    // StateMachine input hooks (playground interaction testing). All three return false when
-    // the default timeline is not a state machine or the input name/type does not match.
-    setSMInputBool(name: string, value: boolean): boolean;
-    setSMInputNumber(name: string, value: number): boolean;
-    fireSMInputTrigger(name: string): boolean;
+    // StateMachine input hooks (playground interaction testing). smId selects the machine: an
+    // empty id means the document's default timeline. All three return false when the id does
+    // not resolve to a state machine or the input name/type does not match.
+    setSMInputBool(smId: string, name: string, value: boolean): boolean;
+    setSMInputNumber(smId: string, name: string, value: number): boolean;
+    fireSMInputTrigger(smId: string, name: string): boolean;
 
     // Animation-unit tree export (diagnostics / future timeline panel). Definitions plus <Timelines>
     // mount points, nested by composition reference; see TimelineTreeNode.
@@ -80,9 +81,10 @@ export interface PlayerView {
     selectTimelineUnit(kind: string, id: string): boolean;
     getSelectedTimelineUnit(): { kind: string; id: string } | null;
 
-    // Live { regionName: currentStateName } of the default state machine timeline (empty object
-    // when the default timeline is not a state machine). Polling endpoint for the blueprint view.
-    getSMCurrentStates(): Record<string, string>;
+    // Live { regionName: currentStateName } of the state machine named by smId - an empty id
+    // means the document's default timeline (empty object when that id is not a state machine).
+    // Polling endpoint for the blueprint view.
+    getSMCurrentStates(smId: string): Record<string, string>;
 
     // Lifetime
     destroy(): void;
@@ -158,8 +160,9 @@ export interface TimelineTreeNode {
     /** Mount and compositionGroup: id of the layer carrying the <Timelines> / referencing the
      *  composition. */
     layerId?: string;
-    /** stateMachine only: declared inputs. */
-    inputs?: { name: string; type: string }[];
+    /** stateMachine only: declared inputs. `defaultValue` is the value the machine starts from
+     *  (the `default` attribute); absent for trigger inputs and for exports that predate it. */
+    inputs?: { name: string; type: string; defaultValue?: boolean | number }[];
     /** stateMachine only: regions with their states, transitions, and the runtime current state
      *  (empty string when the runtime instance is unreachable, e.g. a nested mount). */
     regions?: {

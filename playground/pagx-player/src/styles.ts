@@ -37,6 +37,17 @@ const CSS = `
     width: 100%;
     height: 100%;
     overflow: hidden;
+    /* How far the bottom-anchored controls (playback bar and, through it, the chip strip) have to
+       lift to clear the state-machine panel. Zero while the panel is closed. */
+    --sm-panel-offset: 0px;
+    /* Panel height declared once here: .sm-blueprint consumes it, and the offset above is derived
+       from it (panel height + its bottom inset + a gap). Keeping it a variable stops the two from
+       drifting apart when the height changes. */
+    --sm-panel-height: 280px;
+}
+
+.pagx-player-root.with-sm-panel {
+    --sm-panel-offset: calc(var(--sm-panel-height) + 28px);
 }
 
 .pagx-player-root.with-editor {
@@ -145,7 +156,7 @@ const CSS = `
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 16px;
+    bottom: calc(16px + var(--sm-panel-offset, 0px));
     z-index: 150;
     display: flex;
     align-items: center;
@@ -402,41 +413,127 @@ const CSS = `
 
 /* --- State-machine blueprint (default SM timeline) --- */
 
-/* Content-driven panel: width and height follow the graph inside, so a two-state SM shows a
-   compact card and a big SM grows into a large canvas (Rive / Stately Inspector convention).
-   min-width keeps the header readable; max-width/max-height cap the growth and hand off to
-   wheel panning inside the viewport for anything larger. */
+/* Docked across the bottom of the canvas and opened from the toolbar: a fixed-height row of three
+   columns - playback + machine picker, the graph canvas, and the inputs. Height is fixed rather
+   than content-driven so opening the panel never reflows the canvas, and the canvas is never
+   resized behind it (the panel floats over it). */
 .sm-blueprint {
     position: absolute;
-    top: 16px;
     left: 16px;
-    width: fit-content;
-    min-width: 220px;
-    /* Hard cap in addition to the canvas-relative one: a wide graph must not let the panel eat
-       the whole canvas, so past this width the graph overflows and the mouse wheel pans it
-       (shift + wheel horizontally). */
-    max-width: min(calc(100% - 32px), 560px);
-    max-height: calc(100% - 120px);
+    right: 16px;
+    bottom: 16px;
+    height: var(--sm-panel-height, 280px);
     z-index: 150;
     box-sizing: border-box;
     display: flex;
-    flex-direction: column;
-    /* Clips overflowing content at the rounded card: without it a flex column's items keep
-       min-height:auto and grow past max-height, painting over the canvas. */
+    flex-direction: row;
     overflow: hidden;
-    background: rgba(32, 32, 42, 0.92);
+    background: rgba(32, 32, 42, 0.96);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px;
     backdrop-filter: blur(12px);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+    /* Drawer: closed by default, parked just below the viewport edge. Hiding it with display:none
+       was not possible - that cannot animate, and it measured zero, so the graph had to re-fit
+       every time the panel reopened. Pointer events are off while closed so the hidden panel
+       cannot swallow clicks meant for the canvas. */
+    transform: translateY(calc(100% + 16px));
+    opacity: 0;
+    /* Also hides the buttons and inputs inside from Tab focus, which opacity alone does not - a
+       closed drawer that is only transparent would still be keyboard-reachable. visibility is a
+       discrete property, so it is delayed by the slide duration when closing (staying visible for
+       the whole animation) and applied immediately when opening. */
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 180ms ease,
+        visibility 0s linear 240ms;
+    will-change: transform;
 }
 
-.sm-header {
+.sm-blueprint.sm-blueprint-open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 180ms ease,
+        visibility 0s linear 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sm-blueprint {
+        transition: none;
+    }
+}
+
+/* Left column: playback on top, state-machine picker below it. */
+.sm-panel-left {
+    flex: 0 0 176px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sm-panel-header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    /* No border-bottom: the first collapsible section below already carries its own top
-       border, so two borders would double-draw at the same line. */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sm-machine-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 4px 6px 8px;
+}
+
+/* Rows read as content, not as headings: smaller and dimmer than the section label above them,
+   which is what keeps the three bands of the column distinguishable at a glance. */
+.sm-list-item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* The declared name is what the row leads with; the id it can be driven by trails behind. */
+.sm-list-item-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-list-item-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-list-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sm-list-item-active {
+    color: #7db8ff;
+    background: rgba(77, 159, 255, 0.16);
+}
+
+.sm-list-item-active .sm-list-item-id {
+    color: rgba(125, 184, 255, 0.6);
 }
 
 .sm-title {
@@ -479,79 +576,48 @@ const CSS = `
     height: 32px;
 }
 
-/* Collapsible sections stacked below the panel header. Each section has a clickable header
-   (chevron + title) and a body that hides via .sm-section-collapsed. Multiple sections are
-   separated by a subtle top border so they read as distinct panels. */
-.sm-section {
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+/* Centre column: the graph canvas. Darker than the panel chrome so the graph reads as a drawing
+   surface rather than as another panel. */
+.sm-panel-center {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    /* Keeps the section's own height fixed at content height: only the graph section
-       (.sm-section-graph) absorbs the panel's max-height compression, so the animation list
-       is never squeezed when the panel runs out of room. */
-    flex: 0 0 auto;
-    /* Lets the section shrink below its content inside the panel's flex column, so the panel's
-       max-height actually constrains the graph section instead of being overridden by the
-       flex items' default min-height:auto. */
-    min-height: 0;
+    background: #1b1b23;
 }
 
-/* The graph section absorbs the panel's remaining height so its viewport gets a bounded
-   height; other sections (animation list) keep their content height. */
-.sm-section-graph {
-    flex: 1 1 auto;
-}
-
-.sm-section-graph .sm-section-body {
-    flex: 1 1 auto;
-    /* Critical: without min-height: 0 the flex item's automatic minimum size keeps the body at
-       the content height, so the flex chain (blueprint max-height -> section -> body) never
-       actually compresses the body, the viewport's max-height: 100% resolves against the full
-       content height, and both pan axes end up with zero range. */
-    min-height: 0;
-    overflow: hidden;
-}
-
-.sm-section-header {
+/* Right column: the inputs that drive the machine. */
+.sm-panel-right {
+    flex: 0 0 208px;
     display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 11px;
+    flex-direction: column;
+    min-height: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sm-panel-title {
+    padding: 10px 12px 6px;
+    font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    cursor: pointer;
-    user-select: none;
+    color: rgba(255, 255, 255, 0.42);
 }
 
-.sm-section-header:hover {
-    color: #eee;
+/* Sits directly under the playback block's rule; no rule of its own, so the label reads as the
+   heading of the list that follows it rather than as a band of its own. */
+.sm-machines-title {
+    padding: 8px 12px 6px;
 }
 
-.sm-section-chevron {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
-    width: 12px;
-    display: inline-block;
-    text-align: center;
-}
-
-.sm-section-body {
-    padding-bottom: 4px;
-}
-
-.sm-section-body.sm-section-collapsed {
-    display: none;
-}
-
-/* Inputs section: one row per declared <Input>, carrying the control that matches its type. */
+/* Inputs column: one row per declared <Input>, carrying the control that matches its type. */
 .sm-input-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
     display: flex;
     flex-direction: column;
-    padding: 0 6px;
-    min-width: 200px;
+    padding: 0 6px 8px;
 }
 
 .sm-input-row {
@@ -661,7 +727,9 @@ const CSS = `
 }
 
 /* number: a plain field, right-aligned so the digits line up across rows. No slider - <Input>
-   declares no range, and threshold boundaries are verified by typing them exactly. */
+   declares no range, and threshold boundaries are verified by typing them exactly. The native
+   spinner is hidden as well: the browser draws its arrows with its own light chrome, which cannot
+   be themed to this panel, and typing is the whole interaction here. */
 .sm-number {
     flex-shrink: 0;
     width: 58px;
@@ -672,6 +740,14 @@ const CSS = `
     color: #eee;
     font-size: 11px;
     text-align: right;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.sm-number::-webkit-outer-spin-button,
+.sm-number::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .sm-number:focus {
@@ -679,26 +755,32 @@ const CSS = `
     border-color: #4d9fff;
 }
 
+/* The graph canvas: a definite-size box inside the centre column, so both pan axes measure
+   against it directly (applyGraphTransform). Whatever overflows is panned with the wheel. */
 .sm-viewport {
     position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
-    /* Content-driven: the region canvas inside dictates width and height; the panel's own
-       max-width / max-height do the clamping and the mouse wheel pans what overflows. */
-    width: fit-content;
-    /* NOTE: deliberately no max-width / max-height here. Percentages do not resolve against the
-       auto-sized flex body, so they would silently be none. The pan range is instead measured
-       against the compressed section body in applyContentOffset (sm-blueprint.ts), and the
-       body's overflow: hidden clips the overflow visually. */
+    cursor: grab;
+    touch-action: none;
+}
+
+.sm-viewport.sm-viewport-panning {
+    cursor: grabbing;
 }
 
 .sm-content {
-    /* Static positioning so the viewport can measure content height for the content-driven
-       panel size. Wheel panning is achieved via the transform property set inline (see
-       applyContentOffset), not via absolute positioning. */
     padding: 6px;
     display: flex;
     flex-direction: row;
-    will-change: transform;
+    align-items: flex-start;
+    width: fit-content;
+    /* Zoom is applied about the content's own top-left, which is what keeps a wheel zoom pinned to
+       the cursor (see zoomAt in sm-blueprint.ts). Deliberately no will-change: promoting the graph
+       to its own composited layer makes the browser scale a cached bitmap, which turns the node
+       text and edge strokes blurry as soon as the zoom goes above 100%. */
+    transform-origin: 0 0;
 }
 
 .sm-region {
@@ -737,8 +819,10 @@ const CSS = `
     stroke-width: 1.2;
 }
 
+/* Opaque so the head keeps its shape where it overlaps a node's border, instead of picking up
+   whatever is behind it. */
 .sm-edge-arrow {
-    fill: rgba(255, 255, 255, 0.38);
+    fill: #6c6e74;
 }
 
 .sm-edge-label {
@@ -749,9 +833,9 @@ const CSS = `
     user-select: none;
 }
 
-/* Solid backdrop rendered under the label so the edge path doesn't visually cross the
-   glyphs. Fully opaque near-black tone (the panel body is #20202A over a checkerboard) so
-   the stroke behind is completely masked; a subtle stroke gives the pill a defined edge. */
+/* Solid backdrop rendered under the label so the edge path doesn't visually cross the glyphs.
+   The label itself sits ABOVE the line (see LABEL_LIFT in sm-blueprint), so the backdrop only has
+   to keep the stroke from grazing the text rather than mask a line running through it. */
 .sm-edge-label-bg {
     fill: #20202A;
     stroke: rgba(255, 255, 255, 0.12);
@@ -963,14 +1047,9 @@ const CSS = `
     padding: 6px 8px 6px 14px;
     font-size: 12px;
     color: rgba(255, 255, 255, 0.55);
-    /* Chips share the bar width evenly: when there are N chips the strip carves into N equal
-       segments. flex-basis 0 makes flex-grow purely proportional to available width. */
+    /* One label for the whole strip, so it spans the bar exactly like the preview it names. */
     flex: 1 1 0;
     min-width: 0;
-}
-
-.sm-chip + .sm-chip {
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sm-chip-active {
@@ -978,12 +1057,20 @@ const CSS = `
 }
 
 .sm-chip-label {
-    cursor: pointer;
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* A parked preview's label is the way back into it, so only then does it look clickable. */
+.sm-chip-label-parked {
+    cursor: pointer;
+}
+
+.sm-chip-label-parked:hover {
+    text-decoration: underline;
 }
 
 .sm-chip-close {

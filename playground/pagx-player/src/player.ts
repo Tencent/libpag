@@ -40,7 +40,7 @@ import type {
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
 import { SMBlueprint, PreviewChipBar, type SMBlueprintHost } from './sm-blueprint';
-import { buildToolbar, setToolbarVisible } from './toolbar';
+import { buildToolbar, setToolbarBlueprintVisible, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
 import type { DraftLineChange } from './editor/SourceEditor';
 import { classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries } from './incremental-apply';
@@ -74,6 +74,10 @@ export class PAGXPlayer extends EventTarget {
     private view: PlayerView | null = null;
     private detachCanvasEvents: (() => void) | null = null;
     private statusHideTimer: number | null = null;
+    // Whether the user has opened the state-machine panel from the toolbar. Only documents whose
+    // default timeline is a state machine offer the toggle, and the panel starts closed so it
+    // never covers the canvas unasked.
+    private blueprintEnabled = false;
     // Preview id that was on stage when the user hit the SM panel play button. While non-null,
     // the SM runs and the playback bar is dimmed, but the chip stays visually active so the
     // user can un-park with one click. Cleared by selectTimelineUnit (chip click / dbl-click).
@@ -206,6 +210,7 @@ export class PAGXPlayer extends EventTarget {
             {
                 onResetView: () => this.resetView(),
                 onToggleEditor: options.enableEditor ? () => this.editor?.toggle() : undefined,
+                onToggleBlueprint: () => this.toggleBlueprintPanel(),
             },
             options.extraMenuItems ?? {},
         );
@@ -385,17 +390,21 @@ export class PAGXPlayer extends EventTarget {
     private createSMHost(): SMBlueprintHost {
         return {
             getTimelineTree: () => this.view?.getTimelineTree() ?? [],
-            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSMCurrentStates: (smId) => this.view?.getSMCurrentStates(smId) ?? {},
             getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
             selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
             togglePlayback: () => this.toggleRawPlayback(),
+            pause: () => this.pause(),
             isPlaying: () => this.view?.isPlaying() ?? false,
             parkPreview: () => this.parkPreview(),
             getParkedPreviewId: () => this.parkedPreviewId,
             ensureSMDriving: () => this.ensureSMDriving(),
-            setSMInputBool: (name, value) => this.setSMInputBool(name, value),
-            setSMInputNumber: (name, value) => this.setSMInputNumber(name, value),
-            fireSMInputTrigger: (name) => this.fireSMInputTrigger(name),
+            showStatus: (text, autoHideMs) => {
+                this.showStatus(text, { autoHideMs });
+            },
+            setSMInputBool: (smId, name, value) => this.setSMInputBool(smId, name, value),
+            setSMInputNumber: (smId, name, value) => this.setSMInputNumber(smId, name, value),
+            fireSMInputTrigger: (smId, name) => this.fireSMInputTrigger(smId, name),
         };
     }
 
@@ -552,15 +561,23 @@ export class PAGXPlayer extends EventTarget {
             // updatePlaybackBarMode() reads the sm-default class it toggles to decide whether
             // the playback bar should yield its spot to the blueprint panel. Polling keeps the
             // active-state highlight and the panel play icon live across reloads.
-            const hasDefaultSM = this.blueprint.refresh();
-            this.root.classList.toggle('sm-default', hasDefaultSM);
-            if (hasDefaultSM) {
-                // Polling is only meaningful for SM-default documents: the blueprint and chip
-                // queries are cross-wasm-boundary embind calls, and a non-SM document never
-                // shows those panels.
-                this.blueprint.startPolling();
+            this.blueprint.refresh();
+            // Two facts, so two classes. `sm-default`: the DEFAULT timeline is a state machine, so
+            // the document has no time axis - the playback bar yields and the keyboard drives
+            // states. `sm-available`: the document declares any top-level machine the panel can
+            // inspect, which is what makes the toolbar button appear. Collapsing them into one
+            // flag marked documents that merely HAVE a machine as SM-default, and hid the button
+            // on documents that were inspectable without being SM-default.
+            const defaultIsSM = this.blueprint.defaultIsStateMachine();
+            this.root.classList.toggle('sm-default', defaultIsSM);
+            this.root.classList.toggle('sm-available', this.blueprint.hasInspectableMachine());
+            if (defaultIsSM) {
+                // Polling is only meaningful for SM-default documents: the chip queries are
+                // cross-wasm-boundary embind calls, and a non-SM document never shows those
+                // panels. The blueprint's own polling follows the panel's visibility instead.
                 this.chipBar.startPolling();
             }
+            this.applyBlueprintVisibility();
             this.updatePlaybackBarMode();
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
@@ -617,7 +634,7 @@ export class PAGXPlayer extends EventTarget {
             // and their polling was already stopped at load() entry, so leaving them visible
             // would strand a zombie panel that ignores every interaction. Hide them like the
             // other surfaces; a successful load re-shows them via refresh()/setVisible.
-            this.blueprint.setVisible(false);
+            this.applyBlueprintVisibility(true);
             this.chipBar.setVisible(false);
             this.editor?.setDocumentXml(null);
             this.destroyView();
@@ -628,18 +645,54 @@ export class PAGXPlayer extends EventTarget {
         }
     }
 
+    /** Toggles the state-machine panel below the canvas (toolbar entry point). Documents that
+     *  declare no top-level state machine never show the toggle, so this is a no-op there. */
+    private toggleBlueprintPanel(): void {
+        // Must test the same thing the button's visibility is driven by. Guarding on `sm-default`
+        // made the button appear - and then silently do nothing - on documents that merely HAVE a
+        // machine without that machine being the default.
+        if (!this.root.classList.contains('sm-available')) {
+            return;
+        }
+        this.blueprintEnabled = !this.blueprintEnabled;
+        this.applyBlueprintVisibility();
+    }
+
+    /** Single place deciding whether the panel is on screen, keeping everything that reacts to it
+     *  in step: the panel itself, the toolbar toggle's active state, the lift applied to the
+     *  bottom-anchored controls, and the panel's polling - which is pointless while it is closed.
+     *  `forceHidden` covers hide(), where the whole player is going off-screen regardless of the
+     *  toggle. */
+    private applyBlueprintVisibility(forceHidden = false): void {
+        // Inspectability, not defaultness: the panel can open on any document that declares a
+        // top-level machine, whether or not that machine is the one the scene drives by default.
+        const available = this.root.classList.contains('sm-available');
+        const shown = this.blueprintEnabled && available && !forceHidden;
+        this.blueprint.setVisible(shown);
+        this.root.classList.toggle('with-sm-panel', shown);
+        // The chip strip mirrors the playback bar's bottom edge, so lifting the bar has to be
+        // pushed to it explicitly: the lift is a class toggle on the root, which the strip's
+        // ResizeObserver never sees because the bar's own size did not change.
+        this.chipBar.setBarAnchor(this.playbackBar.getElement());
+        setToolbarBlueprintVisible(this.toolbarRoot, available, this.blueprintEnabled);
+        if (shown) {
+            this.blueprint.startPolling();
+        } else {
+            this.blueprint.stopPolling();
+        }
+    }
+
     /** Show the player DOM subtree (canvas / toolbar / playback bar). Editor visibility is
      *  driven independently by user action. */
     public show(): void {
         this.canvas.classList.remove('hidden');
         setToolbarVisible(this.toolbarRoot, true);
-        this.blueprint.setVisible(true);
         this.chipBar.setVisible(true);
         if (this.root.classList.contains('sm-default')) {
             // Restore the polling that hide() stopped (only SM-default documents poll).
-            this.blueprint.startPolling();
             this.chipBar.startPolling();
         }
+        this.applyBlueprintVisibility();
         this.updatePlaybackBarMode();
     }
 
@@ -654,14 +707,13 @@ export class PAGXPlayer extends EventTarget {
         this.canvas.classList.add('hidden');
         setToolbarVisible(this.toolbarRoot, false);
         this.playbackBar.setVisible(false);
-        this.blueprint.setVisible(false);
+        this.applyBlueprintVisibility(true);
         this.chipBar.setVisible(false);
         this.editor?.close();
         this.hideStatus();
         this.view?.pause();
         // Off-screen panels must not keep polling across the wasm boundary; show() restores
         // polling when the SM-default document becomes visible again.
-        this.blueprint.stopPolling();
         this.chipBar.stopPolling();
     }
 
@@ -1280,26 +1332,36 @@ export class PAGXPlayer extends EventTarget {
             // A parked preview already means the SM is the one running; nothing to resume.
             return;
         }
-        if (!view.isPlaying()) {
-            this.toggleRawPlayback();
+        if (view.isPlaying()) {
+            return;
         }
+        // Paused. Resume WITHOUT re-selecting: selectTimelineUnit resets a state machine to its
+        // initial states, so re-selecting on every write would throw away whatever the previous
+        // write had just achieved - breaking exactly the flow this exists for, pausing and then
+        // firing triggers one at a time to watch the transitions. Re-selection is only needed when
+        // nothing is selected yet and the view still has to be told which machine to run.
+        if (selection != null && selection.kind === 'stateMachine') {
+            view.play();
+            return;
+        }
+        this.toggleRawPlayback();
     }
 
-    /** Sets a bool input on the default state machine timeline (playground hook for testing
-     *  interactive state machines from the console). Returns false when the loaded document's
-     *  default timeline is not a state machine or the input is unknown/wrong-typed. */
-    public setSMInputBool(name: string, value: boolean): boolean {
-        return this.view?.setSMInputBool(name, value) ?? false;
+    /** Sets a bool input on a state machine (playground hook for testing interactive state
+     *  machines from the console). An empty smId targets the document's default timeline. Returns
+     *  false when the id is not a state machine or the input is unknown/wrong-typed. */
+    public setSMInputBool(smId: string, name: string, value: boolean): boolean {
+        return this.view?.setSMInputBool(smId, name, value) ?? false;
     }
 
     /** Number-input counterpart of setSMInputBool. */
-    public setSMInputNumber(name: string, value: number): boolean {
-        return this.view?.setSMInputNumber(name, value) ?? false;
+    public setSMInputNumber(smId: string, name: string, value: number): boolean {
+        return this.view?.setSMInputNumber(smId, name, value) ?? false;
     }
 
     /** Trigger-input counterpart of setSMInputBool. */
-    public fireSMInputTrigger(name: string): boolean {
-        return this.view?.fireSMInputTrigger(name) ?? false;
+    public fireSMInputTrigger(smId: string, name: string): boolean {
+        return this.view?.fireSMInputTrigger(smId, name) ?? false;
     }
 
     /**
@@ -1322,6 +1384,9 @@ export class PAGXPlayer extends EventTarget {
         this.playbackBar.setFrozen(null);
         this.updatePlaybackBarMode();
         this.playbackBar.updateAll();
+        // The bar reacts synchronously above; the chip strip would wait for its next poll tick, so
+        // nudge it to keep the two appearing on the same frame.
+        this.chipBar.syncNow();
         return true;
     }
 

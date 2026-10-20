@@ -37,6 +37,8 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
@@ -139,6 +141,15 @@ void PAGXView::parsePAGX(const val& pagxData) {
   defaultAnimation = nullptr;
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
+  // The solo selection belongs to the document being replaced, so it goes with it. Leaving it set
+  // would keep advanceTimelines() on the solo branch, which advances neither the new default
+  // timeline nor the scene - and so never advances anything mounted in <Timelines> either - while
+  // the cached preview instance still pointed at the previous document's runtime.
+  selectedUnitKind.clear();
+  selectedUnitId.clear();
+  previewAnimation = nullptr;
+  previewStateMachine = nullptr;
+  fallbackClockUs = 0;
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -684,7 +695,7 @@ static double StateAnimationDurationUs(const AnimationState* state, PAGXDocument
 // scene->getAnimation() would tick internally but not update the stage. Used by the UI to grey
 // out unpreviewable rows before M2 wires up mount-scoped preview instances.
 static bool AnimationTargetsInRoot(const Animation* anim,
-                                   const std::unordered_set<std::string>& rootLayerIds) {
+                                   const std::unordered_set<std::string>& rootScopeIds) {
   if (anim == nullptr) {
     return false;
   }
@@ -692,7 +703,7 @@ static bool AnimationTargetsInRoot(const Animation* anim,
     if (obj == nullptr || obj->target.empty()) {
       continue;
     }
-    if (rootLayerIds.find(obj->target) == rootLayerIds.end()) {
+    if (rootScopeIds.find(obj->target) == rootScopeIds.end()) {
       return false;
     }
   }
@@ -718,7 +729,7 @@ static emscripten::val MakeAnimationNode(const Animation* anim, const std::strin
 static emscripten::val MakeStateMachineNode(const StateMachine* sm, PAGXDocument* doc,
                                             const std::shared_ptr<PAGScene>& scene,
                                             const std::string& path, bool isDefault,
-                                            const std::unordered_set<std::string>& rootLayerIds) {
+                                            const std::unordered_set<std::string>& rootScopeIds) {
   auto node = emscripten::val::object();
   node.set("path", path);
   node.set("kind", "stateMachine");
@@ -736,6 +747,14 @@ static emscripten::val MakeStateMachineNode(const StateMachine* sm, PAGXDocument
     auto inputVal = emscripten::val::object();
     inputVal.set("name", input->name);
     inputVal.set("type", InputTypeName(input->type));
+    // The declared start value travels with the declaration. Without it the panel's controls
+    // could only guess (they showed a hard-coded 0), which disagreed with the engine - and with
+    // the region's initial state - as soon as a document declared a non-zero default.
+    if (input->type == StateMachineInputType::Bool) {
+      inputVal.set("defaultValue", input->defaultBool);
+    } else if (input->type == StateMachineInputType::Number) {
+      inputVal.set("defaultValue", input->defaultNumber);
+    }
     inputs.call<void>("push", inputVal);
   }
   node.set("inputs", inputs);
@@ -768,7 +787,7 @@ static emscripten::val MakeStateMachineNode(const StateMachine* sm, PAGXDocument
         stateVal.set(
             "previewSupported",
             animDef != nullptr && animDef->nodeType() == NodeType::Animation &&
-                AnimationTargetsInRoot(static_cast<const Animation*>(animDef), rootLayerIds));
+                AnimationTargetsInRoot(static_cast<const Animation*>(animDef), rootScopeIds));
       } else {
         stateVal.set("animationId", std::string());
         stateVal.set("durationUs", -1.0);
@@ -833,7 +852,29 @@ static emscripten::val MakeMountNode(const Layer* layer, const Timeline* driver,
 // Collects the ids of every layer in the root binding scope (the layer tree excluding any layers
 // reachable only through a `composition` reference), used to check whether an animation's targets
 // stay inside the root binding.
-static void CollectRootLayerIds(const std::vector<Layer*>& layers,
+// Collects the id of every element inside a layer's contents, nested groups included. Painters
+// (Fill / Stroke) carry their own id and are addressable from the root binding exactly like a
+// layer, so an animation targeting a painter is just as previewable as one targeting a layer;
+// leaving them out mis-reported those animations as unpreviewable.
+static void CollectElementIds(const std::vector<Element*>& elements,
+                              std::unordered_set<std::string>* out) {
+  for (const auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (!element->id.empty()) {
+      out->insert(element->id);
+    }
+    if (element->nodeType() == NodeType::Group) {
+      CollectElementIds(static_cast<const Group*>(element)->elements, out);
+    }
+  }
+}
+
+// Collects every id the root binding can reach: layers at any depth plus the elements inside their
+// contents. Do NOT recurse into layer->composition - those nodes live in the composition's own
+// scope, not the root binding, and the root-binding apply cannot reach them.
+static void CollectRootScopeIds(const std::vector<Layer*>& layers,
                                 std::unordered_set<std::string>* out) {
   for (const auto* layer : layers) {
     if (layer == nullptr) {
@@ -842,9 +883,8 @@ static void CollectRootLayerIds(const std::vector<Layer*>& layers,
     if (!layer->id.empty()) {
       out->insert(layer->id);
     }
-    CollectRootLayerIds(layer->children, out);
-    // Do NOT recurse into layer->composition: those layers live in the composition scope, not the
-    // root binding, and the root-binding apply cannot reach them.
+    CollectElementIds(layer->contents, out);
+    CollectRootScopeIds(layer->children, out);
   }
 }
 
@@ -928,8 +968,8 @@ emscripten::val PAGXView::getTimelineTree() {
   }
   const std::string defaultId =
       defaultTimeline != nullptr ? defaultTimeline->getId() : std::string();
-  std::unordered_set<std::string> rootLayerIds = {};
-  CollectRootLayerIds(document->layers, &rootLayerIds);
+  std::unordered_set<std::string> rootScopeIds = {};
+  CollectRootScopeIds(document->layers, &rootScopeIds);
   int topIndex = 1;
   for (const auto* node : document->animations) {
     if (node == nullptr) {
@@ -939,11 +979,11 @@ emscripten::val PAGXView::getTimelineTree() {
     if (node->nodeType() == NodeType::Animation) {
       auto* anim = static_cast<const Animation*>(node);
       result.call<void>("push", MakeAnimationNode(anim, path, anim->id == defaultId,
-                                                  AnimationTargetsInRoot(anim, rootLayerIds)));
+                                                  AnimationTargetsInRoot(anim, rootScopeIds)));
     } else if (node->nodeType() == NodeType::StateMachine) {
       auto* sm = static_cast<const StateMachine*>(node);
       result.call<void>("push", MakeStateMachineNode(sm, document.get(), scene, path,
-                                                     sm->id == defaultId, rootLayerIds));
+                                                     sm->id == defaultId, rootScopeIds));
     }
   }
   std::unordered_set<const Composition*> visited = {};
@@ -962,11 +1002,14 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   }
   if (playing) {
     if (!selectedUnitId.empty()) {
-      // Solo mode: a selected animation is the only clock that runs; a selected state machine has
-      // no clock at all. Either way the default timeline and the scene stay frozen at their
-      // current phase until the selection is cleared.
+      // Solo mode: a selected animation is the only clock that runs; a selected state machine is
+      // likewise the only timeline advanced, so the machine being inspected actually runs. Either
+      // way the default timeline and the scene stay frozen at their current phase until the
+      // selection is cleared.
       if (previewAnimation != nullptr) {
         advanceAnimationUnit(previewAnimation, deltaUs);
+      } else if (previewStateMachine != nullptr) {
+        previewStateMachine->advanceAndApply(deltaUs);
       }
       return;
     }
@@ -1460,25 +1503,32 @@ bool PAGXView::isLoop() const {
   return loopEnabled;
 }
 
-bool PAGXView::setSMInputBool(const std::string& name, bool value) {
-  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
-    return false;
+std::shared_ptr<PAGStateMachine> PAGXView::resolveStateMachine(const std::string& smId) const {
+  if (smId.empty()) {
+    if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
+      return nullptr;
+    }
+    return std::static_pointer_cast<PAGStateMachine>(defaultTimeline);
   }
-  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->setBool(name, value);
+  if (scene == nullptr) {
+    return nullptr;
+  }
+  return scene->getStateMachineTimeline(smId);
 }
 
-bool PAGXView::setSMInputNumber(const std::string& name, float value) {
-  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
-    return false;
-  }
-  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->setNumber(name, value);
+bool PAGXView::setSMInputBool(const std::string& smId, const std::string& name, bool value) {
+  auto stateMachine = resolveStateMachine(smId);
+  return stateMachine != nullptr && stateMachine->setBool(name, value);
 }
 
-bool PAGXView::fireSMInputTrigger(const std::string& name) {
-  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
-    return false;
-  }
-  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->fireTrigger(name);
+bool PAGXView::setSMInputNumber(const std::string& smId, const std::string& name, float value) {
+  auto stateMachine = resolveStateMachine(smId);
+  return stateMachine != nullptr && stateMachine->setNumber(name, value);
+}
+
+bool PAGXView::fireSMInputTrigger(const std::string& smId, const std::string& name) {
+  auto stateMachine = resolveStateMachine(smId);
+  return stateMachine != nullptr && stateMachine->fireTrigger(name);
 }
 
 bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id) {
@@ -1488,6 +1538,7 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
   if (id.empty() || kind.empty()) {
     const bool hadSelection = !selectedUnitId.empty();
     previewAnimation = nullptr;
+    previewStateMachine = nullptr;
     selectedUnitKind.clear();
     selectedUnitId.clear();
     if (hadSelection) {
@@ -1512,6 +1563,7 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
       ((kind == "animation" && defaultTimeline->type() == TimelineType::Animation) ||
        (kind == "stateMachine" && defaultTimeline->type() == TimelineType::StateMachine));
   if (kind == "animation") {
+    previewStateMachine = nullptr;
     // Lazily instantiate the requested top-level animation. This instance is independent of any
     // state-machine-owned runtime of the same definition (verified by the diagnostics dump), so
     // driving it never disturbs the SM runtime. Mounted (nested) units reuse the same lazy
@@ -1530,9 +1582,9 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
     // mount-preview path that instantiates the animation with the mount's own binding scope.
     if (auto* def = document->findNode(id);
         def != nullptr && def->nodeType() == NodeType::Animation) {
-      std::unordered_set<std::string> rootLayerIds = {};
-      CollectRootLayerIds(document->layers, &rootLayerIds);
-      if (!AnimationTargetsInRoot(static_cast<const Animation*>(def), rootLayerIds)) {
+      std::unordered_set<std::string> rootScopeIds = {};
+      CollectRootScopeIds(document->layers, &rootScopeIds);
+      if (!AnimationTargetsInRoot(static_cast<const Animation*>(def), rootScopeIds)) {
         // Target defined inside a nested composition; preview would not update the stage. M2
         // will handle mount-scoped previews.
         return false;
@@ -1569,24 +1621,31 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
       playing = true;
     }
   } else if (kind == "stateMachine") {
-    // Selecting a state machine shows its structure only (regions/states/inputs); it has no time
-    // axis and all clocks stay frozen while selected. Nested (mounted) state machines cannot be
-    // instantiated through the scene's top-level registry, so the lookup fails for them.
-    if (scene->getStateMachineTimeline(id) == nullptr) {
+    // Selecting a state machine makes it the timeline the view advances, so the machine on screen
+    // is the one that runs - that is what lets the panel inspect (and drive) a machine other than
+    // the document's default. It still exposes no time axis: there is no playable duration to
+    // report. Nested (mounted) state machines cannot be instantiated through the scene's top-level
+    // registry, so the lookup fails for them.
+    auto stateMachine = scene->getStateMachineTimeline(id);
+    if (stateMachine == nullptr) {
       return false;
     }
     previewAnimation = nullptr;
+    // Start from the initial states either way: a machine lazily created by this very call already
+    // sits there, and one left mid-run by an earlier visit would otherwise resume from a phase that
+    // has nothing to do with what the panel is about to show.
+    stateMachine->reset();
+    stateMachine->apply();
     if (isDefaultUnit) {
       // Same default-replay semantics as animations: reset to the initial states at frame 0 and
       // wait for the user to press play (once regions that already finished cannot be resumed by
       // advancing, reset() is the only way back).
-      std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->reset();
-      defaultTimeline->apply();
       fallbackClockUs = 0;
       playing = false;
     } else {
       playing = true;
     }
+    previewStateMachine = std::move(stateMachine);
   } else {
     return false;
   }
@@ -1608,23 +1667,19 @@ emscripten::val PAGXView::getSelectedTimelineUnit() const {
   return result;
 }
 
-emscripten::val PAGXView::getSMCurrentStates() const {
+emscripten::val PAGXView::getSMCurrentStates(const std::string& smId) const {
   auto result = emscripten::val::object();
-  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine ||
-      document == nullptr) {
+  auto smTimeline = resolveStateMachine(smId);
+  if (smTimeline == nullptr) {
     return result;
   }
-  auto* node = document->findNode(defaultTimeline->getId());
-  if (node == nullptr || node->nodeType() != NodeType::StateMachine) {
-    return result;
-  }
-  auto* sm = static_cast<const StateMachine*>(node);
-  auto smTimeline = std::static_pointer_cast<PAGStateMachine>(defaultTimeline);
-  for (const auto* region : sm->regions) {
-    if (region == nullptr || region->name.empty()) {
+  // Region names come from the runtime instead of the definition node, so any machine - not just
+  // the document's default - can report its regions without a document lookup.
+  for (const auto& regionId : smTimeline->getRegionIds()) {
+    if (regionId.empty()) {
       continue;
     }
-    result.set(region->name, smTimeline->getCurrentState(region->name));
+    result.set(regionId, smTimeline->getCurrentState(regionId));
   }
   return result;
 }

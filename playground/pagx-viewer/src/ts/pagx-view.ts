@@ -430,26 +430,27 @@ export class PAGXView {
   }
 
   /**
-   * Sets a bool input on the default state machine timeline (playground hook for testing
-   * interactive state machines from the console). Returns false when the loaded document's
-   * default timeline is not a state machine or the input is unknown/wrong-typed.
+   * Sets a bool input on a state machine (playground hook for testing interactive state machines
+   * from the console). smId selects the machine - an empty id means the document's default
+   * timeline, which is what a single-machine document has always used. Returns false when the id
+   * does not resolve to a state machine or the input is unknown/wrong-typed.
    */
-  public setSMInputBool(name: string, value: boolean): boolean {
-    return this.nativeView._setSMInputBool(name, value);
+  public setSMInputBool(smId: string, name: string, value: boolean): boolean {
+    return this.nativeView._setSMInputBool(smId, name, value);
   }
 
   /**
    * Number-input counterpart of setSMInputBool.
    */
-  public setSMInputNumber(name: string, value: number): boolean {
-    return this.nativeView._setSMInputNumber(name, value);
+  public setSMInputNumber(smId: string, name: string, value: number): boolean {
+    return this.nativeView._setSMInputNumber(smId, name, value);
   }
 
   /**
    * Trigger-input counterpart of setSMInputBool.
    */
-  public fireSMInputTrigger(name: string): boolean {
-    return this.nativeView._fireSMInputTrigger(name);
+  public fireSMInputTrigger(smId: string, name: string): boolean {
+    return this.nativeView._fireSMInputTrigger(smId, name);
   }
 
   /**
@@ -463,7 +464,8 @@ export class PAGXView {
   /**
    * Selects one unit of the timeline tree for solo preview (empty id clears the selection):
    * playback values route to the selected animation while every other clock freezes; a selected
-   * state machine freezes the clocks and exposes no time axis.
+   * state machine becomes the only timeline the view advances - the machine on screen is the one
+   * that runs - and exposes no time axis.
    */
   public selectTimelineUnit(kind: string, id: string): boolean {
     return this.nativeView._selectTimelineUnit(kind, id);
@@ -475,12 +477,12 @@ export class PAGXView {
   }
 
   /**
-   * Returns the live { regionName: currentStateName } map of the default state machine timeline,
-   * or an empty object when the default timeline is not a state machine. Polling endpoint for the
-   * blueprint view's active-state highlight.
+   * Returns the live { regionName: currentStateName } map of the state machine named by smId (an
+   * empty id means the document's default timeline), or an empty object when that id is not a
+   * state machine. Polling endpoint for the blueprint view's active-state highlight.
    */
-  public getSMCurrentStates(): Record<string, string> {
-    return this.nativeView._getSMCurrentStates();
+  public getSMCurrentStates(smId: string): Record<string, string> {
+    return this.nativeView._getSMCurrentStates(smId);
   }
 
   /**

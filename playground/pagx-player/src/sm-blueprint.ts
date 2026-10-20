@@ -24,12 +24,17 @@ import { iconUrl } from './playback-bar';
  *  stay backend-agnostic. */
 export interface SMBlueprintHost {
   getTimelineTree(): TimelineTreeNode[];
-  getSMCurrentStates(): Record<string, string>;
+  /** Live { regionName: currentStateName } of the state machine named by `smId`. An empty id
+   *  means the document's default timeline, which is what a single-machine document uses. */
+  getSMCurrentStates(smId: string): Record<string, string>;
   getSelectedTimelineUnit(): { kind: string; id: string } | null;
   selectTimelineUnit(kind: string, id: string): boolean;
   /** Toggles play/pause of the SM itself (no timed-timeline guards - a default SM reports no
    *  duration). Only meaningful when no preview is active. */
   togglePlayback(): void;
+  /** Pauses without touching the selection: switching machines leaves the inspected one paused at
+   *  its initial states so the play button decides when it runs. */
+  pause(): void;
   /** Whether the underlying view is currently playing; drives the panel play-button icon. */
   isPlaying(): boolean;
   /** While previewing, this "parks" the preview: the SM resets and starts playing, the preview
@@ -47,11 +52,16 @@ export interface SMBlueprintHost {
    *  why the caller has to write the input AFTER calling this - a write before it would be
    *  cleared. */
   ensureSMDriving(): void;
-  /** Writes one state-machine input. All three return false when the document's default timeline
-   *  is not a state machine or the name/type does not match. */
-  setSMInputBool(name: string, value: boolean): boolean;
-  setSMInputNumber(name: string, value: number): boolean;
-  fireSMInputTrigger(name: string): boolean;
+  /** Transient message in the player's own status pill above the canvas. The panel reports its
+   *  "this click cannot move the machine" cases through it, because that is where every other
+   *  player-level notice appears - the panel title is already taken by the machine's name. */
+  showStatus(text: string, autoHideMs: number): void;
+  /** Writes one input on the state machine named by `smId` (empty id = the document's default).
+   *  All three return false when that id is not a state machine or the name/type does not
+   *  match. */
+  setSMInputBool(smId: string, name: string, value: boolean): boolean;
+  setSMInputNumber(smId: string, name: string, value: number): boolean;
+  fireSMInputTrigger(smId: string, name: string): boolean;
 }
 
 // One uniform node height for every node in the graph (Rive / Unity Mecanim convention): a
@@ -64,7 +74,14 @@ const NODE_H = 36;
 // deliberately wide (about the size of a full node) so multi-line label backdrops fit
 // between adjacent columns without spilling onto the next node.
 const GAP_X = 140;
-const GAP_Y = 20;
+// Row spacing holds a lifted caption in the band between two rows: at 20px a caption sitting above
+// one row's run came within a couple of pixels of the node in the row above.
+const GAP_Y = 28;
+
+// Fixed distance from a source node's right edge to the x where a cross-row fan forks. It is a
+// constant because the run the fork LEAVES BEHIND is the one sized from the caption; making the
+// fork depend on the gutter instead let an unrelated caption drag it away from the source.
+const FORK_GAP = 30;
 const PADDING_X = 20;
 const PADDING_Y = 20;
 const POLL_INTERVAL_MS = 250;
@@ -75,8 +92,17 @@ const SINGLE_CLICK_DELAY_MS = 220;
 // Lifetime of the "this row was just driven" highlight and of the edge-fire flash.
 const HIGHLIGHT_DURATION_MS = 1600;
 const EDGE_FIRE_DURATION_MS = 700;
-// Lifetime of a transient note in the panel header.
+// Lifetime of a transient notice surfaced in the player's status pill.
 const NOTE_DURATION_MS = 2400;
+// Source name the importer writes for a transition that leaves "whatever the current state is".
+const ANY_STATE_NAME = 'any';
+// Zoom limits of the graph canvas, and how far a wheel notch moves the scale.
+const GRAPH_SCALE_MIN = 0.4;
+const GRAPH_SCALE_MAX = 2.5;
+const GRAPH_ZOOM_SPEED = 0.0015;
+// How much of the graph has to stay inside the viewport while the user pans it. A graph smaller
+// than its viewport is otherwise pinned dead centre and every wheel or drag silently does nothing.
+const GRAPH_PAN_MARGIN = 48;
 
 // Module-level marker id sequence: SVG ids resolve document-wide, so two PAGXPlayer instances on
 // the same page must never mint the same "sm-arrow-N" (url(#...) would resolve to whichever
@@ -87,17 +113,69 @@ let nextMarkerSeq = 0;
 // the blueprint renders a dedicated "any" pseudo-node as their shared source column.
 const ANY_NODE_KEY = '__any__';
 
+// Condition labels ride ABOVE their line rather than sitting on top of it: the pill is lifted by
+// this much, so its lower edge clears the stroke. A label centred ON the line hides the line behind
+// it, which reads as the line being interrupted rather than as a caption hanging over it. The lift
+// leaves a 3px gap under the pill and is kept just under half of PARALLEL_EDGE_STEP so that, on
+// stacked parallel edges, a lower label's top edge still stays clear of the line running above it.
+const LABEL_LIFT = 12;
+
+
+
+// A label whose preferred spot would cover a node steps up by this much at a time until it clears.
+// The cap keeps a cramped graph from pushing a caption off the top of the viewBox.
+const LABEL_NUDGE_STEP = 4;
+const LABEL_NUDGE_ATTEMPTS = 16;
+
+// Safety valve only: column spacing is derived from the actual caption text (see
+// buildRegionElement), so a normal multi-clause condition fits whole and never reaches this. It
+// exists for pathological documents whose conditions would otherwise widen the graph without
+// bound.
+const MAX_LABEL_CHARS = 48;
+
 // Vertical geometry of the lanes that carry any-source edges over the grid: the first lane sits
 // ANY_LANE_GAP above the grid's top edge and each additional edge stacks ANY_LANE_STEP higher.
-// The step must exceed a label's box height (text 12 + 2x3 padding = 18) so stacked lanes keep
-// their labels legible.
-const ANY_LANE_GAP = 14;
-const ANY_LANE_STEP = 24;
+// The step has to clear the lifted label's box (text 12 + 2x3 padding = 18, lifted 14) plus a
+// little air, otherwise consecutive lanes' captions collide.
+const ANY_LANE_GAP = 22;
+const ANY_LANE_STEP = 30;
+
+// Vertical distance between two edges that connect the same pair of nodes. It has to exceed the
+// label box plus its lift, or the lower label grows up into the line above it - the two runs were
+// one label-height apart while the labels are lifted most of a label-height, leaving no room.
+const PARALLEL_EDGE_STEP = 30;
+// A pair of parallel edges uses a narrower step: 30px is sized for three edges, where the outer
+// pair must also clear the middle one. A pair only needs its own two captions apart, and hugging
+// the narrower step keeps both lines near the centre line instead of at the node's edges.
+const PARALLEL_EDGE_STEP_COMPACT = 24;
+
+// Translated straight lines are only safe while the outermost port still lands on the node: at four
+// edges the outer offsets are ±45 against a node half-height of 18, so the line would leave the
+// node from thin air. Past that count the edges fan out as arcs instead - the ports stay on the node
+// and the CURVATURE does the separating, which is how rive and Unity Mecanim draw them.
+const PARALLEL_STRAIGHT_LIMIT = 3;
+// How far the ports spread on the node when fanning out: small enough to stay inside the node.
+const PARALLEL_PORT_STEP = 9;
+// How far the arc's control point moves per slot. This is what actually pulls the edges apart.
+const PARALLEL_ARC_STEP = 46;
+// Where the caption sits relative to the arc's apex: inside the arc, so a wide fan does not push
+// captions off the canvas.
+const PARALLEL_ARC_LABEL = 16;
+
+// How far right of the source a branch starts climbing, and the extra run each lower branch adds.
+// The HIGHEST branch climbs FIRST (smallest x) and the lowest one last, which keeps the fan's
+// verticals ordered and clear of the runs that start further right.
+const ANY_RISE_STUB = 14;
+const ANY_RISE_STEP = 12;
+// Vertical spacing of the fan's exit ports, laid out in lane order for the same reason: the branch
+// heading to the highest target also leaves from the highest point of the source's edge.
+const ANY_PORT_STEP = 10;
 
 // Same idea for back edges (target left of source): they travel in horizontal lanes BELOW the
-// grid, one lane per edge, so the run back to the left never crosses the node rows.
-const BACK_LANE_GAP = 18;
-const BACK_LANE_STEP = 26;
+// grid, one lane per edge, so the run back to the left never crosses the node rows. The gap
+// clears a lifted label so the caption does not reach back up into the grid.
+const BACK_LANE_GAP = 30;
+const BACK_LANE_STEP = 30;
 
 // A lane-routed edge leaves its source's RIGHT edge and enters its target's LEFT edge, so one
 // starting in the last column has no gutter to its right to descend in, and one ending in the
@@ -173,24 +251,54 @@ function IsStraightEdge(fromAny: boolean, fromCell: { col: number; row: number }
   return false;
 }
 
-/** Midpoint of an orthogonal "run in -> run across -> run out" path, found by walking its
- *  accumulated length so the point lands on whichever run holds the halfway mark; pinning it to
- *  the first run (the obvious alternative) puts the mark a quarter along the path instead.
- *  Shared by the Entry fan-out edges and the forward edges of the region graph, which are the
- *  same shape. */
-function OrthogonalMidpoint(x1: number, y1: number, turnX: number, y2: number, x2: number,
-                            sweep: number): { x: number; y: number } {
-  const runIn = turnX - x1;
-  const runAcross = Math.abs(y2 - y1);
-  const runOut = x2 - turnX;
-  const half = (runIn + runAcross + runOut) / 2;
-  if (half <= runIn) {
-    return { x: x1 + half, y: y1 };
+/** An axis-aligned box in canvas coordinates. Used both for node footprints and for the label
+ *  boxes tested against them. */
+interface LabelRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function RectsOverlap(a: LabelRect, b: LabelRect): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x &&
+    a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+/** Final position of one condition label, as the box's top-left corner. This is the single place
+ *  that decides where a caption may sit, so no drawing branch can invent its own rule:
+ *
+ *  - horizontally, the box stays inside the window its edge allows: a lane branch climbs at one
+ *    known x and a back branch descends at another, and both cross the band the caption occupies;
+ *  - vertically, it starts at the spot the branch asked for (already lifted above its own line)
+ *    and steps UP until it covers neither a node nor a caption already placed. Captions belong to
+ *    the same layer and are just as opaque, so treating them as obstacles is what keeps two
+ *    branches whose targets sit one row apart from stacking their conditions into one block.
+ *
+ *  Up rather than down is deliberate: every branch's preferred spot is above its line, and the
+ *  space below a line is the row of nodes the line is heading into. */
+function PlaceLabel(centreX: number, centreY: number, width: number, height: number,
+                    leftMin: number, rightMax: number, occupied: LabelRect[]): LabelRect {
+  let x = centreX - width / 2;
+  if (x < leftMin) {
+    x = leftMin;
   }
-  if (half <= runIn + runAcross) {
-    return { x: turnX, y: y1 + sweep * (half - runIn) };
+  if (x + width > rightMax) {
+    x = rightMax - width;
   }
-  return { x: turnX + (half - runIn - runAcross), y: y2 };
+  // A window narrower than the caption (long condition, short run): the left bound wins, so the
+  // caption grows rightwards along its own run rather than leftwards across another branch.
+  if (x < leftMin) {
+    x = leftMin;
+  }
+  const box: LabelRect = { x, y: centreY - height / 2, width, height };
+  for (let attempt = 0; attempt < LABEL_NUDGE_ATTEMPTS; attempt++) {
+    if (!occupied.some((other) => RectsOverlap(box, other))) {
+      break;
+    }
+    box.y -= LABEL_NUDGE_STEP;
+  }
+  return box;
 }
 
 /** Whether the whole state machine is a set of independent one-state regions: every region holds
@@ -225,6 +333,16 @@ interface GridMetrics {
   /** y of the bottom of the last row; back-edge lanes stack below it. */
   bottom: number;
   cols: number;
+  /** Width of the empty gutter between two columns. Sized from the widest condition caption so
+   *  no caption has to be truncated to fit. */
+  gap: number;
+  /** Distance from a source node's right edge to the x where a cross-row fan forks (FORK_GAP).
+   *  Zero when no branch changes rows */
+  forkInset: number;
+  /** Length of the run a cross-row branch's caption is centred on: the widest such caption plus
+   *  10px of air on each side. The run continues past it to the target, so the caption sits over
+   *  the part of the line it describes rather than being stretched across the whole gutter. */
+  branchRun: number;
   /** Widths of the corridors reserved outside the first / last column for lane-routed edges. */
   leftBand: number;
   rightBand: number;
@@ -240,16 +358,29 @@ interface GridMetrics {
 function AssignVerticalTracks(
     transitions: { from: string; fromAny: boolean; to: string }[],
     cells: Map<string, { col: number; row: number }>,
-    grid: GridMetrics): EdgeTracks[] {
+    grid: GridMetrics,
+    slots: EdgeSlots[]): EdgeTracks[] {
   const result: EdgeTracks[] = transitions.map(() => ({
     turnX: null,
     backDownX: null,
     backUpX: null,
   }));
-  const requests = new Map<number, { index: number; kind: 'turn' | 'down' | 'up' }[]>();
-  const request = (col: number, index: number, kind: 'turn' | 'down' | 'up'): void => {
+  // `lane` is set only for any-source edges and lets a corridor that carries nothing but this
+  // fan order its tracks by lane: the branch in the lowest lane descends on the leftmost track and
+  // the one in the highest lane on the rightmost, so no branch's run has to reach across a
+  // sibling's descent. Ordering them by declaration instead is what let a lower lane's long run
+  // cut through the descent of a higher one.
+  const requests = new Map<number, { index: number; kind: 'turn' | 'down' | 'up';
+                                     lane: number | null; dir: number; any: boolean }[]>();
+  // `dir` is +1 for a turn that heads down the canvas, -1 for one heading up. Only forward turns
+  // carry it: it is what lets a fan that splits up and down turn both halves at the same x.
+  // `any` marks a request coming from the any-source fan - that is what decides whether the
+  // corridor uses the fan's shared fork inset. It cannot be derived from `lane`: a branch that
+  // only reaches the next column needs no lane and still belongs to the fan.
+  const request = (col: number, index: number, kind: 'turn' | 'down' | 'up',
+                   lane: number | null, any: boolean, dir = 0): void => {
     const bucket = requests.get(col) ?? [];
-    bucket.push({ index, kind });
+    bucket.push({ index, kind, lane, dir, any });
     requests.set(col, bucket);
   };
   transitions.forEach((transition, index) => {
@@ -258,22 +389,32 @@ function AssignVerticalTracks(
     if (fromCell == null || toCell == null) {
       return;
     }
+    const laneIndex = slots[index]?.laneIndex ?? -1;
+    const lane = transition.fromAny && laneIndex >= 0 ? laneIndex : null;
     if (NeedsLaneRouting(fromCell, toCell)) {
       // Leaves the source's right edge, so it descends in the corridor to the RIGHT of the source
       // column and climbs in the one left of the target column — keeping exit ports on the right
       // of every node and entry ports on its left.
-      request(fromCell.col + 1, index, 'down');
-      request(toCell.col, index, 'up');
+      request(fromCell.col + 1, index, 'down', lane, transition.fromAny);
+      request(toCell.col, index, 'up', lane, transition.fromAny);
       return;
     }
-    // Forward edge: one turn, in the gutter left of the target column. Same-row forward edges and
-    // same-column neighbours run straight and need no track at all.
-    if (toCell.col > fromCell.col && (transition.fromAny || toCell.row !== fromCell.row)) {
-      request(toCell.col, index, 'turn');
+    // Forward edge: one turn, in the gutter left of the target column. Same-row edges run straight
+    // and must NOT reserve a track: a straight any-branch was taking a slot here, which pushed the
+    // next downward branch one step to the right and left the fan forking at two different x.
+    if (toCell.col > fromCell.col && toCell.row !== fromCell.row) {
+      request(toCell.col, index, 'turn', lane, transition.fromAny,
+        toCell.row < fromCell.row ? -1 : 1);
     }
   });
-  const gridRight = grid.left + grid.cols * NODE_W + Math.max(0, grid.cols - 1) * GAP_X;
+  const gridRight = grid.left + grid.cols * NODE_W + Math.max(0, grid.cols - 1) * grid.gap;
   for (const [col, bucket] of requests) {
+    // A corridor shared with ordinary edges keeps its declaration order; only a corridor that
+    // carries the any-source fan alone is re-sorted, so this never disturbs the routing of the
+    // forward / back edges it happens to share a gutter with.
+    if (bucket.every((entry) => entry.lane != null)) {
+      bucket.sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0));
+    }
     let corridorLeft: number;
     let corridorRight: number;
     if (col <= 0) {
@@ -285,17 +426,48 @@ function AssignVerticalTracks(
       corridorLeft = gridRight + SIDE_BAND_GAP * 0.3;
       corridorRight = gridRight + band - SIDE_BAND_GAP * 0.3;
     } else {
-      const columnX = grid.left + col * (NODE_W + GAP_X);
-      corridorLeft = columnX - GAP_X + TRACK_MARGIN;
-      corridorRight = columnX - TRACK_MARGIN;
+      const columnX = grid.left + col * (NODE_W + grid.gap);
+      // A corridor carrying only the any-source fan starts at the fan's shared fork inset, which
+      // is sized from the widest caption on a cross-row branch. Every branch of that fan then
+      // forks at the same x and has the same run left to its target - symmetric by construction,
+      // and wide enough for its own caption. Corridors shared with ordinary edges keep the plain
+      // margin: their captions are laid out on their own rows, not in this gutter.
+      // ANY branch in this corridor is enough: the whole gutter has to start at the fan's fork
+      // point, otherwise a straight branch (which places its caption at fork inset + run) and a
+      // cross-row branch (which places it at corridor left + run) disagree by the difference
+      // between the two offsets - exactly the misalignment of `pause == true` vs `hide trigger`.
+      // A back edge sharing the corridor only loses a little clamping range, which it does not use.
+      const isAnyFan = grid.forkInset > 0 && bucket.some((entry) => entry.any);
+      corridorLeft = columnX - grid.gap + (isAnyFan ? grid.forkInset : TRACK_MARGIN);
+      corridorRight = columnX - (isAnyFan ? 2 : TRACK_MARGIN);
     }
     const centre = (corridorLeft + corridorRight) / 2;
     // Wide gutters space tracks at the nominal step; a band narrower than the whole fan spreads
     // its tracks across whatever width it has.
     const step = Math.min(TRACK_STEP, (corridorRight - corridorLeft) / Math.max(1, bucket.length));
-    bucket.forEach((req, slot) => {
-      const centred = slot - (bucket.length - 1) / 2;
-      const x = Math.min(Math.max(centre + centred * step, corridorLeft), corridorRight);
+    // A forward turn is placed against the LEFT wall of its corridor, leaving the rest of the
+    // gutter to the run that follows it. That run is where the caption goes, and a caption is far
+    // wider than a vertical is thick: centred tracks left every turn sitting in the middle of its
+    // own gutter, with only half the width available on either side.
+    //
+    // Turns are counted PER DIRECTION, each direction starting again at the left wall. A fan that
+    // splits up and down therefore turns both halves at the same x: the two verticals lie on one
+    // line, one above the source and one below it, so the split reads symmetric - and they cannot
+    // overlap, because their y ranges are disjoint by construction.
+    let upSlot = 0;
+    let downSlot = 0;
+    let otherSlot = 0;
+    const otherCount = bucket.filter((req) => req.kind !== 'turn').length;
+    bucket.forEach((req) => {
+      let x: number;
+      if (req.kind === 'turn') {
+        const slot = req.dir < 0 ? upSlot++ : downSlot++;
+        x = Math.min(corridorLeft + slot * step, corridorRight);
+      } else {
+        const centred = otherSlot - (otherCount - 1) / 2;
+        otherSlot++;
+        x = Math.min(Math.max(centre + centred * step, corridorLeft), corridorRight);
+      }
       if (req.kind === 'turn') {
         result[req.index].turnX = x;
       } else if (req.kind === 'down') {
@@ -323,10 +495,15 @@ interface EdgeSlots {
    *  group with the ordinary ones because they enter through the same left edge. */
   entryIndex: number;
   entryCount: number;
-  /** Any-source edges only: which horizontal lane above the grid this edge travels in (unique
-   *  per any-edge within the region). Vertical tracks are handled separately by
-   *  AssignVerticalTracks, which allocates them across every row-changing edge. */
+  /** Which horizontal lane above the grid this edge travels in, or -1 when it needs none (not an
+   *  any-edge, or an any-edge that reaches only the next column). Lanes are unique per
+   *  participating any-edge and ordered by target column, then by height. Vertical tracks are
+   *  handled separately by AssignVerticalTracks, which allocates them across every row-changing
+   *  edge. */
   laneIndex: number;
+  /** How many any-source edges this region has, so one of them can place itself within the fan
+   *  without the whole region's transition list. */
+  anyCount: number;
   /** Which horizontal lane below the grid this edge travels in (unique per lane-routed edge
    *  within the region), or -1 when the edge is not lane-routed. Doubles as drawEdge's test for
    *  the lane-routed shape, so the NeedsLaneRouting predicate is evaluated exactly once. */
@@ -498,16 +675,11 @@ export class SMBlueprint {
   private titleEl: HTMLElement;
   private viewport: HTMLElement;
   private content: HTMLElement;
-  // The graph section's body: the flex-compressed visible window. applyContentOffset measures
-  // pan range against this element (see the comment there for why not the viewport).
-  private sectionBody: HTMLElement | null = null;
   private tooltip: HTMLElement;
-  // "Blueprint" collapsible section wrapping the graph viewport, and "Inputs" section holding the
-  // controls that drive it (one row per declared <Input>). Body elements toggle
-  // .sm-section-collapsed when the user clicks the header (which owns its own chevron via
-  // closure).
-  private blueprintSection: HTMLElement;
-  private inputsSection: HTMLElement;
+  // Three fixed columns: playback + state-machine picker, the graph canvas, and the inputs that
+  // drive it. Fixed rather than collapsible, because the layout this follows keeps all three in
+  // view at once instead of stacking them in a narrow side panel.
+  private machineList: HTMLElement;
   private inputList: HTMLElement;
   // name -> declared type, which decides which control a condition drives.
   private inputTypes = new Map<string, string>();
@@ -524,7 +696,17 @@ export class SMBlueprint {
   private pollTimer: number | null = null;
   private regions: SMRegionData[] = [];
   private smTitle = '';
-  private noteTimer: number | null = null;
+  // Id of the machine the panel is showing. Empty means the document's default timeline, which is
+  // the only machine a single-machine document has and the one every read/write fell back to
+  // before the picker existed.
+  private currentSMId = '';
+  // Two facts refresh() derives and the player needs separately. They answer different questions:
+  // `hasInspectable` is "can this panel open at all", `defaultIsSM` is "does the default timeline
+  // drive the playback bar". Treating them as one flag made a document that merely HAS a machine
+  // look like an SM-default one, and hid the toolbar button on documents that were inspectable
+  // but not SM-default.
+  private hasInspectable = false;
+  private defaultIsSM = false;
   private nodeEls = new Map<string, HTMLElement>();
   private animationEls = new Map<string, HTMLElement[]>();
   private currentStates: Record<string, string> = {};
@@ -532,8 +714,19 @@ export class SMBlueprint {
   private iconBaseUrl: string;
   private lastPlayIcon = 'play.png';
   private lastPreviewId: string | null = null;
-  private contentX = 0;
-  private contentY = 0;
+  // Graph canvas transform, applied with transform-origin at the content's top-left, so a zoom
+  // about the cursor is offset = cursor - (cursor - offset) * (nextScale / scale).
+  private graphScale = 1;
+  private graphX = 0;
+  private graphY = 0;
+  // Blank-canvas pan state. Only a press that misses the nodes and condition pills starts a pan,
+  // so clicking a state or a pill never turns into a drag.
+  private dragPointerId: number | null = null;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private dragOriginX = 0;
+  private dragOriginY = 0;
+  private viewportObserver: ResizeObserver | null = null;
   // Cached 2D canvas used to measure label widths without depending on SVG layout (getBBox
   // returns zeros when the panel is still display:none during refresh()). Created lazily so
   // SSR / non-DOM contexts don't crash.
@@ -543,11 +736,17 @@ export class SMBlueprint {
     this.host = host;
     this.iconBaseUrl = iconBaseUrl;
     this.root = document.createElement('div');
+    // Closed state is a CSS transform, not `display: none`: the panel slides out of view instead
+    // of vanishing, so both the open and the close are animated.
     this.root.className = 'sm-blueprint';
-    this.root.style.display = 'none';
+    this.root.setAttribute('aria-hidden', 'true');
 
+    // Left column: playback on top (Rive puts it in the same spot) and the state-machine picker
+    // underneath it.
+    const left = document.createElement('div');
+    left.className = 'sm-panel-left';
     const header = document.createElement('div');
-    header.className = 'sm-header';
+    header.className = 'sm-panel-header';
     this.playBtn = document.createElement('button');
     this.playBtn.className = 'sm-play-btn';
     this.playBtn.type = 'button';
@@ -556,91 +755,216 @@ export class SMBlueprint {
     this.playBtnImg.src = iconUrl(iconBaseUrl, 'play.png');
     this.playBtnImg.alt = '';
     this.playBtn.appendChild(this.playBtnImg);
-    this.playBtn.addEventListener('click', () => {
-      this.playBtn.blur();
-      const selection = this.host.getSelectedTimelineUnit();
-      const activePreview = selection != null && selection.kind === 'animation';
-      if (activePreview) {
-        // Preview is on stage: pressing play here parks it (SM resets and runs, preview
-        // rewinds and its progress bar dims). Chip stays highlighted via getParkedPreviewId.
-        this.host.parkPreview();
-      } else {
-        // Either no preview ever, or already parked. Both mean the SM is (or should be)
-        // driving the render loop, so just toggle its play state.
-        this.host.togglePlayback();
-      }
-      this.updatePlayIcon();
-    });
+    this.playBtn.addEventListener('click', () => this.onPlayButton());
     this.titleEl = document.createElement('span');
     this.titleEl.className = 'sm-title';
     header.appendChild(this.playBtn);
     header.appendChild(this.titleEl);
+    this.machineList = document.createElement('div');
+    this.machineList.className = 'sm-machine-list';
+    // Names the picker, so the column reads as "playback" / "which machine" / "the pick list"
+    // rather than as one undifferentiated stack of rows.
+    const machinesTitle = document.createElement('div');
+    machinesTitle.className = 'sm-panel-title sm-machines-title';
+    machinesTitle.textContent = 'State Machines';
+    left.appendChild(header);
+    left.appendChild(machinesTitle);
+    left.appendChild(this.machineList);
 
+    // Centre column: the graph canvas. Panning happens here and only here - the wheel handler
+    // cancels the event so a scroll over the panel never reaches the player canvas underneath.
+    const center = document.createElement('div');
+    center.className = 'sm-panel-center';
     this.viewport = document.createElement('div');
     this.viewport.className = 'sm-viewport';
     this.content = document.createElement('div');
     this.content.className = 'sm-content';
     this.viewport.appendChild(this.content);
+    // Wheel zooms about the cursor, dragging the blank canvas pans. Both cancel the event so a
+    // gesture over the panel never reaches the player canvas underneath.
     this.viewport.addEventListener('wheel', (event) => {
       event.preventDefault();
-      this.contentX -= event.deltaX;
-      this.contentY -= event.deltaY;
-      this.applyContentOffset();
+      event.stopPropagation();
+      if (event.ctrlKey || event.metaKey) {
+        // Ctrl / Cmd + wheel zooms - also what a trackpad pinch reports on macOS.
+        this.zoomAt(event.clientX, event.clientY, Math.exp(-event.deltaY * GRAPH_ZOOM_SPEED));
+        return;
+      }
+      // Plain wheel pans vertically, shift + wheel horizontally: the convention graph editors use,
+      // and what a trackpad's own two-finger scroll already produces. Browsers do not agree where
+      // the horizontal intent lands - some swap it into deltaX, others leave it in deltaY - so the
+      // horizontal gesture takes whichever of the two actually carries movement.
+      if (event.shiftKey) {
+        this.graphX -= event.deltaX !== 0 ? event.deltaX : event.deltaY;
+      } else {
+        this.graphX -= event.deltaX;
+        this.graphY -= event.deltaY;
+      }
+      this.applyGraphTransform(true);
     }, { passive: false });
+    this.viewport.addEventListener('pointerdown', (event) => {
+      if (this.isInteractiveTarget(event.target)) {
+        return;
+      }
+      this.dragPointerId = event.pointerId;
+      this.dragStartX = event.clientX;
+      this.dragStartY = event.clientY;
+      this.dragOriginX = this.graphX;
+      this.dragOriginY = this.graphY;
+      this.viewport.setPointerCapture(event.pointerId);
+      this.viewport.classList.add('sm-viewport-panning');
+    });
+    this.viewport.addEventListener('pointermove', (event) => {
+      if (this.dragPointerId !== event.pointerId) {
+        return;
+      }
+      this.graphX = this.dragOriginX + (event.clientX - this.dragStartX);
+      this.graphY = this.dragOriginY + (event.clientY - this.dragStartY);
+      this.applyGraphTransform(true);
+    });
+    const endPan = (event: PointerEvent): void => {
+      if (this.dragPointerId !== event.pointerId) {
+        return;
+      }
+      this.dragPointerId = null;
+      this.viewport.classList.remove('sm-viewport-panning');
+    };
+    this.viewport.addEventListener('pointerup', endPan);
+    this.viewport.addEventListener('pointercancel', endPan);
+    // The viewport is resized by things the graph never sees directly - opening the source editor
+    // shrinks the player root, which narrows this panel. Re-applying the transform re-centres (or
+    // re-clamps) the graph; without it the graph keeps the offset it was centred at for the old
+    // width and sits outside the visible area until the next pan or zoom.
+    if (typeof ResizeObserver !== 'undefined') {
+      // Re-fit, not re-clamp. Opening the source editor shrinks the player root and therefore this
+      // panel; clamping kept the old offset and left the graph sitting against one edge at its old
+      // size. Fitting shrinks what no longer fits and re-centres, which is the behaviour a canvas
+      // resize has.
+      this.viewportObserver = new ResizeObserver(() => this.fitGraphView());
+      this.viewportObserver.observe(this.viewport);
+    }
+    center.appendChild(this.viewport);
 
-    // Collapsible sections: Blueprint (the graph) and Inputs (the controls that drive it). Both
-    // default to expanded; clicking the header toggles collapse. State is not persisted across
-    // reloads (per product decision, keep it simple).
-    const blueprint = this.buildSection('Blueprint');
-    this.blueprintSection = blueprint.section;
-    // Marks the graph section as the panel's flexible part: it absorbs the remaining panel
-    // height so the viewport inside gets a bounded height (see .sm-section-graph in styles).
-    blueprint.section.classList.add('sm-section-graph');
-    this.sectionBody = blueprint.body;
-    blueprint.body.appendChild(this.viewport);
-
-    const inputs = this.buildSection('Inputs');
-    this.inputsSection = inputs.section;
+    // Right column: the inputs that drive the machine.
+    const right = document.createElement('div');
+    right.className = 'sm-panel-right';
+    const inputsTitle = document.createElement('div');
+    inputsTitle.className = 'sm-panel-title';
+    inputsTitle.textContent = 'Inputs';
     this.inputList = document.createElement('div');
     this.inputList.className = 'sm-input-list';
-    inputs.body.appendChild(this.inputList);
+    right.appendChild(inputsTitle);
+    right.appendChild(this.inputList);
 
     this.tooltip = document.createElement('div');
     this.tooltip.className = 'sm-tooltip';
     this.tooltip.style.display = 'none';
 
-    this.root.appendChild(header);
-    this.root.appendChild(this.blueprintSection);
-    this.root.appendChild(this.inputsSection);
+    this.root.appendChild(left);
+    this.root.appendChild(center);
+    this.root.appendChild(right);
     // this.tooltip is intentionally NOT appended here — attach() mounts it as a sibling of the
     // panel so the panel's overflow: hidden cannot clip it.
   }
 
-  /** Builds one collapsible section. Header row (chevron + title) toggles the body's
-   *  .sm-section-collapsed class on click; the caller populates the returned body element
-   *  with its own content. */
-  private buildSection(title: string): { section: HTMLElement; body: HTMLElement } {
-    const section = document.createElement('div');
-    section.className = 'sm-section';
-    const headerEl = document.createElement('div');
-    headerEl.className = 'sm-section-header';
-    const chevron = document.createElement('span');
-    chevron.className = 'sm-section-chevron';
-    chevron.textContent = '\u25BE'; // ▾ expanded
-    const titleEl = document.createElement('span');
-    titleEl.className = 'sm-section-title';
-    titleEl.textContent = title;
-    headerEl.appendChild(chevron);
-    headerEl.appendChild(titleEl);
-    const body = document.createElement('div');
-    body.className = 'sm-section-body';
-    headerEl.addEventListener('click', () => {
-      const collapsed = body.classList.toggle('sm-section-collapsed');
-      chevron.textContent = collapsed ? '\u25B8' : '\u25BE'; // ▸ / ▾
-    });
-    section.appendChild(headerEl);
-    section.appendChild(body);
-    return { section, body };
+  /** Fills the left column's picker with every top-level state machine in the document. The panel
+   *  shows one at a time and driving follows the shown one: selecting a machine hands the render
+   *  loop to it, so the machine on screen is also the one that runs. */
+  private buildMachineList(machines: TimelineTreeNode[]): void {
+    for (const machine of machines) {
+      const shown = this.currentSMId === machine.id ||
+        (this.currentSMId === '' && machine.isDefault === true);
+      const item = document.createElement('div');
+      item.className = shown ? 'sm-list-item sm-list-item-active' : 'sm-list-item';
+      // The declared name leads; the id - the identifier a host actually writes to - trails in
+      // grey. Documents that only declare an id fall back to it, so the row is never empty.
+      const nameEl = document.createElement('span');
+      nameEl.className = 'sm-list-item-name';
+      nameEl.textContent = machine.name || machine.id;
+      item.appendChild(nameEl);
+      if (machine.name && machine.id && machine.name !== machine.id) {
+        const idEl = document.createElement('span');
+        idEl.className = 'sm-list-item-id';
+        idEl.textContent = machine.id;
+        item.appendChild(idEl);
+      }
+      item.title = machine.id;
+      item.addEventListener('click', () => {
+        if (machine.isDefault === true) {
+          // The default machine is what the scene drives while nothing is selected, so picking it
+          // clears the selection.
+          this.showMachine('');
+          return;
+        }
+        // Selecting another machine hands it the render loop and starts it. Selecting the one
+        // already on screen RESTARTS it - selectTimelineUnit resets a state machine to its initial
+        // states - rather than silently switching back to the default, which is what a second
+        // click on the shown row used to do.
+        this.showMachine(machine.id);
+      });
+      this.machineList.appendChild(item);
+    }
+  }
+
+  /** Shows one machine (an empty id means the document's default). Selecting a machine hands it
+   *  the render loop, resets it to its initial states and STARTS it: the panel and the stage must
+   *  describe the same thing, otherwise the graph reports states for a machine that is not the one
+   *  animating the screen. Pausing after the switch - the previous behaviour - left the stage on
+   *  the old machine's last frame while the panel had already moved on to the new one.
+   *
+   *  Selecting the document's DEFAULT stays paused: the view rewinds it to its head and waits for
+   *  the play button, which is the established "pause then play = replay" semantics. */
+  private showMachine(smId: string): void {
+    // Deliberately no `currentSMId = smId` here: refresh() re-derives the pick from the view's
+    // live selection, so assigning it would be overwritten - and would leave the panel claiming a
+    // machine the view had refused to select.
+    if (smId === '') {
+      // Switching back resets the default: clearing the selection restarts it from its initial
+      // states rather than resuming wherever it had got to.
+      this.host.selectTimelineUnit('', '');
+    } else {
+      this.host.selectTimelineUnit('stateMachine', smId);
+    }
+    this.refresh();
+  }
+
+  /** The play button drives the machine the panel is showing, which is not always the document's
+   *  default. While a solo animation preview is on stage it parks the preview instead, handing the
+   *  render loop back to a state machine. */
+  private onPlayButton(): void {
+    this.playBtn.blur();
+    const selection = this.host.getSelectedTimelineUnit();
+    if (selection != null && selection.kind === 'animation') {
+      // Preview is on stage: pressing play here parks it (SM resets and runs, preview rewinds and
+      // its progress bar dims). Chip stays highlighted via getParkedPreviewId.
+      this.host.parkPreview();
+    } else if (this.currentSMId !== '') {
+      // Inspecting another machine: a state machine keeps no phase worth resuming, so starting it
+      // means restarting it from its initial states.
+      if (this.host.isPlaying()) {
+        this.host.pause();
+      } else {
+        this.host.selectTimelineUnit('stateMachine', this.currentSMId);
+      }
+    } else {
+      this.host.togglePlayback();
+    }
+    this.updatePlayIcon();
+  }
+
+  /** The machine the panel is showing: the picked one, or the document's default while the picker
+   *  sits on it. */
+  private currentMachine(machines: TimelineTreeNode[]): TimelineTreeNode | null {
+    if (this.currentSMId !== '') {
+      return machines.find((machine) => machine.id === this.currentSMId) ?? null;
+    }
+    return machines.find((machine) => machine.isDefault === true) ?? machines[0] ?? null;
+  }
+
+  /** Every top-level state machine definition. Mounted ones are left out: they are not
+   *  instantiable through the scene's registry, so they can be neither driven nor selected. */
+  private topLevelMachines(tree: TimelineTreeNode[]): TimelineTreeNode[] {
+    return tree.filter((node) => node.kind === 'stateMachine');
   }
 
   attach(parent: HTMLElement): void {
@@ -656,25 +980,62 @@ export class SMBlueprint {
     this.updateVisibility();
   }
 
-  private updateVisibility(): void {
-    const shown = this.visible && this.regions.length > 0;
-    this.root.style.display = shown ? '' : 'none';
-    // The tooltip is a sibling of the panel, so hiding the panel no longer hides it implicitly.
-    if (!shown) {
-      this.tooltip.style.display = 'none';
-    }
+  /** Whether the document declares any top-level state machine the panel could inspect. This is
+   *  what decides whether the toolbar button exists - not whether the machine is the default one. */
+  public hasInspectableMachine(): boolean {
+    return this.hasInspectable;
   }
 
-  /** Rebuilds the blueprint from the timeline tree. Returns whether a default state machine was
-   *  found (the caller can use this to switch the surrounding player into SM mode). */
-  refresh(): boolean {
-    const tree = this.host.getTimelineTree();
-    const smNode = tree.find((node) => node.kind === 'stateMachine' && node.isDefault) ?? null;
-    this.regions = [];
-    if (this.noteTimer != null) {
-      window.clearTimeout(this.noteTimer);
-      this.noteTimer = null;
+  /** Whether the document's DEFAULT timeline is a state machine. Separate from
+   *  hasInspectableMachine(): a document can declare machines without any of them being the
+   *  default, and only an SM default has no time axis worth a playback bar. */
+  public defaultIsStateMachine(): boolean {
+    return this.defaultIsSM;
+  }
+
+  private updateVisibility(): void {
+    const shown = this.visible && this.regions.length > 0;
+    // Toggling a class rather than `display` so the drawer can transition. The closed state keeps
+    // the panel out of the way with a transform and pointer-events: none, and - unlike
+    // display: none - still has measurable dimensions, which is what lets the graph re-fit as it
+    // slides in.
+    this.root.classList.toggle('sm-blueprint-open', shown);
+    this.root.setAttribute('aria-hidden', shown ? 'false' : 'true');
+    if (shown) {
+      // Revealing the panel restores the default view: the graph comes back fitted and centred,
+      // never mid-pan or mid-zoom from the last time it was open.
+      this.resetGraphView();
+      return;
     }
+    // The tooltip is a sibling of the panel, so hiding the panel no longer hides it implicitly.
+    this.tooltip.style.display = 'none';
+  }
+
+  /** Rebuilds the blueprint from the timeline tree. Afterwards the player reads
+   *  defaultIsStateMachine() and hasInspectableMachine() rather than any return value: the two
+   *  questions are separate and were never well served by one boolean. */
+  refresh(): void {
+    const tree = this.host.getTimelineTree();
+    const machines = this.topLevelMachines(tree);
+    // The view is the single source of truth for which machine is on stage, so the panel derives
+    // its pick from the live selection instead of remembering one. A reparse clears the view's
+    // selection; keeping a stale id meant the panel described one machine while the view advanced
+    // a different one, and a machine whose id happens to recur in the NEXT document made that
+    // mismatch survive the switch. Deriving also picks up selections made elsewhere.
+    const selection = this.host.getSelectedTimelineUnit();
+    this.currentSMId = selection != null && selection.kind === 'stateMachine' ? selection.id : '';
+    if (this.currentSMId !== '' && !machines.some((machine) => machine.id === this.currentSMId)) {
+      this.currentSMId = '';
+    }
+    const smNode = this.currentMachine(machines);
+    // "Inspectable" means there is something to DRAW, not merely that a declaration exists: a
+    // machine with no regions cannot be shown, and pressing the button on such a document would
+    // only lift the bottom controls over an empty panel. The value already accounts for that - it
+    // comes from the node's regions rather than from the list of declarations - so it is assigned
+    // right here, before the early return below that bails out when there is nothing to draw.
+    this.hasInspectable = smNode != null && (smNode.regions?.length ?? 0) > 0;
+    this.defaultIsSM = machines.some((machine) => machine.isDefault === true);
+    this.regions = [];
     this.smTitle = '';
     this.nodeEls.clear();
     this.animationEls.clear();
@@ -684,14 +1045,13 @@ export class SMBlueprint {
     this.inputTypes.clear();
     this.edgePaths.clear();
     this.currentStates = {};
-    this.contentX = 0;
-    this.contentY = 0;
-    this.applyContentOffset();
+    this.graphScale = 1;
     this.content.innerHTML = '';
+    this.machineList.innerHTML = '';
     this.inputList.innerHTML = '';
     if (smNode == null || smNode.regions == null || smNode.regions.length === 0) {
       this.updateVisibility();
-      return false;
+      return;
     }
     this.smTitle = smNode.name || smNode.id;
     this.titleEl.textContent = this.smTitle;
@@ -743,11 +1103,11 @@ export class SMBlueprint {
       });
     }
     this.buildInputsList(smNode.inputs ?? []);
+    this.buildMachineList(machines);
     this.updateVisibility();
     this.lastPreviewId = this.refreshSelectionState();
     this.refreshHighlight(true);
     this.updatePlayIcon();
-    return true;
   }
 
   startPolling(): void {
@@ -764,6 +1124,8 @@ export class SMBlueprint {
 
   destroy(): void {
     this.stopPolling();
+    this.viewportObserver?.disconnect();
+    this.viewportObserver = null;
     if (this.root.parentElement != null) {
       this.root.parentElement.removeChild(this.root);
     }
@@ -774,39 +1136,93 @@ export class SMBlueprint {
     }
   }
 
-  private isPreviewing(): boolean {
-    const selection = this.host.getSelectedTimelineUnit();
-    if (selection != null && selection.kind === 'animation') {
-      return true;
-    }
-    // A "parked" preview counts as previewing for the panel play button: pressing it while
-    // parked would toggle the SM instead, which is exactly the same visual state so the icon
-    // stays a play glyph either way.
-    return this.host.getParkedPreviewId() != null;
+  /** Applies the canvas transform. `free` marks a user-driven move (wheel, drag, viewport
+   *  resize), where the graph may be pushed partly out of the viewport as long as a margin of it
+   *  stays visible; the centring path passes false. */
+  private applyGraphTransform(free: boolean): void {
+    this.graphX = this.clampAxis(this.graphX, this.viewport.clientWidth,
+      this.content.offsetWidth * this.graphScale, free);
+    this.graphY = this.clampAxis(this.graphY, this.viewport.clientHeight,
+      this.content.offsetHeight * this.graphScale, free);
+    this.content.style.transform =
+      `translate(${this.graphX}px, ${this.graphY}px) scale(${this.graphScale})`;
   }
 
-  private applyContentOffset(): void {
-    if (this.contentX > 0) {
-      this.contentX = 0;
+  /** Clamps one axis. A graph smaller than its viewport would be pinned dead centre by the
+   *  non-free branch, which is what made panning look broken, so the free branch instead allows
+   *  the full range that keeps GRAPH_PAN_MARGIN of the graph on screen. */
+  private clampAxis(offset: number, viewportSize: number, graphSize: number,
+                    free: boolean): number {
+    if (viewportSize <= 0) {
+      return offset;
     }
-    if (this.contentY > 0) {
-      this.contentY = 0;
+    if (!free) {
+      return graphSize <= viewportSize
+        ? (viewportSize - graphSize) / 2
+        : Math.min(0, Math.max(viewportSize - graphSize, offset));
     }
-    // Clamp against the section body, not the viewport. The body is the flex-compressed visible
-    // window (its size is definite via the blueprint max-height -> section -> body min-height:0
-    // chain), while the viewport grows with the content: a percentage max-height on the viewport
-    // does not resolve against an auto-sized flex parent, so viewport-based measuring always
-    // yields a zero pan range. The body's overflow: hidden provides the actual visual clipping.
-    const panBounds = this.sectionBody ?? this.viewport;
-    const maxX = panBounds.clientWidth - this.content.offsetWidth;
-    const maxY = panBounds.clientHeight - this.content.offsetHeight;
-    if (this.contentX < maxX) {
-      this.contentX = Math.min(0, maxX);
+    const margin = Math.min(GRAPH_PAN_MARGIN, graphSize);
+    return Math.min(viewportSize - margin, Math.max(margin - graphSize, offset));
+  }
+
+  /** Back to 100% and centred: the view the panel opens with, and the one the state-machine
+   *  picker returns to after the user has panned or zoomed the graph. */
+  private resetGraphView(): void {
+    this.fitGraphView();
+  }
+
+  /** Scales the graph down so it fits the viewport, then centres it. Never enlarges past 100 %:
+   *  a compact graph keeps its natural size instead of being blown up to fill the panel.
+   *
+   *  This is what runs whenever the viewport changes size - opening the source editor narrows the
+   *  player root, which narrows this panel. Centring alone was not enough: the graph kept its old
+   *  scale and spilled off the visible area. */
+  private fitGraphView(): void {
+    if (this.viewport.clientWidth === 0 || this.viewport.clientHeight === 0) {
+      return;
     }
-    if (this.contentY < maxY) {
-      this.contentY = Math.min(0, maxY);
+    const width = this.content.offsetWidth;
+    const height = this.content.offsetHeight;
+    if (width === 0 || height === 0) {
+      return;
     }
-    this.content.style.transform = `translate(${this.contentX}px, ${this.contentY}px)`;
+    const fit = Math.min(1, this.viewport.clientWidth / width, this.viewport.clientHeight / height);
+    this.graphScale = Math.max(GRAPH_SCALE_MIN, fit);
+    this.centerGraphView();
+  }
+
+  private centerGraphView(): void {
+    // Meaningless while the panel is display:none - both axes measure zero and centring would
+    // compute against nothing. updateVisibility re-centres when the panel is revealed.
+    if (this.viewport.clientWidth === 0 || this.viewport.clientHeight === 0) {
+      return;
+    }
+    this.graphX = (this.viewport.clientWidth - this.content.offsetWidth * this.graphScale) / 2;
+    this.graphY = (this.viewport.clientHeight - this.content.offsetHeight * this.graphScale) / 2;
+    this.applyGraphTransform(false);
+  }
+
+  /** Zooms about a viewport-relative point, pinning the graph pixel under the cursor there. */
+  private zoomAt(clientX: number, clientY: number, factor: number): void {
+    const next = Math.min(GRAPH_SCALE_MAX, Math.max(GRAPH_SCALE_MIN, this.graphScale * factor));
+    if (next === this.graphScale) {
+      return;
+    }
+    const rect = this.viewport.getBoundingClientRect();
+    const ratio = next / this.graphScale;
+    this.graphX = (clientX - rect.left) - ((clientX - rect.left) - this.graphX) * ratio;
+    this.graphY = (clientY - rect.top) - ((clientY - rect.top) - this.graphY) * ratio;
+    this.graphScale = next;
+    this.applyGraphTransform(true);
+  }
+
+  /** Whether a press landed on something that handles its own clicks - a state node or a
+   *  condition pill - rather than on the canvas background. */
+  private isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return target.closest('.sm-state') != null || target.closest('.sm-edge-label-group') != null;
   }
 
   private onPollTick = (): void => {
@@ -861,13 +1277,49 @@ export class SMBlueprint {
         }
       }
     }
-    const bottomPad = laneEdgeCount > 0 ? BACK_LANE_GAP + laneEdgeCount * BACK_LANE_STEP : 0;
+    // Parallel edges need vertical room that neither selfLoopPad nor anyLanePad accounts for: up to
+    // three are translated straight lines, more than that fan out as arcs that bulge further still.
+    // Without reserving it the outermost edge is clipped by the viewport.
+    let maxParallel = 1;
+    const parallelTotals = new Map<string, number>();
+    for (const transition of region.transitions) {
+      const fromCell = layout.cells.get(transition.fromAny ? ANY_NODE_KEY : transition.from);
+      const toCell = layout.cells.get(transition.to);
+      if (fromCell == null || toCell == null ||
+          !IsStraightEdge(transition.fromAny, fromCell, toCell)) {
+        continue;
+      }
+      const key = `${transition.fromAny ? ANY_NODE_KEY : transition.from}|${transition.to}`;
+      const count = (parallelTotals.get(key) ?? 0) + 1;
+      parallelTotals.set(key, count);
+      maxParallel = Math.max(maxParallel, count);
+    }
+    const parallelSpread = (maxParallel - 1) / 2;
+    const straightStep = maxParallel <= 2 ? PARALLEL_EDGE_STEP_COMPACT : PARALLEL_EDGE_STEP;
+    const parallelPad = maxParallel <= 1 ? 0
+      : maxParallel > PARALLEL_STRAIGHT_LIMIT
+        ? parallelSpread * PARALLEL_PORT_STEP +
+          parallelSpread * PARALLEL_ARC_STEP / 2 + PARALLEL_ARC_LABEL + 8
+        : parallelSpread * straightStep + 12;
+    const bottomPad = (laneEdgeCount > 0 ? BACK_LANE_GAP + laneEdgeCount * BACK_LANE_STEP : 0) +
+      parallelPad;
     const rightPad = rightBandTracks > 0 ? SIDE_BAND_GAP + rightBandTracks * TRACK_STEP : 0;
     const leftPad = leftBandTracks > 0 ? SIDE_BAND_GAP + leftBandTracks * TRACK_STEP : 0;
     // Any-source edges travel over the grid in their own horizontal lanes (one per edge) so they
     // never cut through the states between the any node and their targets. Reserve a band above
     // the grid for those lanes, stacked on top of the self-loop bump so the two never collide.
-    const anyEdgeCount = region.transitions.filter((transition) => transition.fromAny).length;
+    // Only branches that both leave the any node's row AND reach past the next column need a
+    // lane. A straight-across branch is a single run; one whose target sits in the very next
+    // column turns inside the neighbouring gutter. Reserving a lane for either would pad the
+    // graph with an empty band.
+    const anyCell = layout.cells.get(ANY_NODE_KEY);
+    const anyEdgeCount = region.transitions.filter((transition) => {
+      if (!transition.fromAny || anyCell == null) {
+        return false;
+      }
+      const toCell = layout.cells.get(transition.to);
+      return toCell != null && toCell.row !== anyCell.row && toCell.col > anyCell.col + 1;
+    }).length;
     const anyLanePad = anyEdgeCount > 0 ? ANY_LANE_GAP + anyEdgeCount * ANY_LANE_STEP : 0;
     // Derived from the same constants drawEdge bumps its arcs by, plus room for the label that
     // sits inside the outermost arc — a fixed reservation was too small once a node carried two
@@ -875,9 +1327,34 @@ export class SMBlueprint {
     const maxSelfLoops = Math.max(0, ...selfLoopCounts.values());
     const selfLoopPad = maxSelfLoops > 0
       ? SELF_LOOP_BUMP + (maxSelfLoops - 1) * SELF_LOOP_STEP + 14 : 0;
-    const topPad = selfLoopPad + anyLanePad;
+    const topPad = selfLoopPad + anyLanePad + parallelPad;
+    // An any-source fan is laid out in two independent pieces:
+    //   1. the fork, a FIXED FORK_GAP from the source - every branch leaves at the same point;
+    //   2. the run after it, sized from the WIDEST caption in the whole fan (+ 32: pill padding
+    //      plus 10px of air on each side), so every caption is centred on the same stretch.
+    // Sizing the run from each branch separately would give the fan lines of different lengths,
+    // and sizing it from only the cross-row branches left the straight branch - which does not
+    // fork but still ends at the same column - centred on the full gutter instead, visibly out of
+    // line with the others.
+    let anyCaptionMax = 0;
+    let anyCrossesRow = false;
+    for (const transition of region.transitions) {
+      if (!transition.fromAny || anyCell == null) {
+        continue;
+      }
+      anyCaptionMax = Math.max(anyCaptionMax,
+        this.measureLabelWidth(this.captionOf(transition.conditions)));
+      const toCell = layout.cells.get(transition.to);
+      if (toCell != null && toCell.row !== anyCell.row) {
+        anyCrossesRow = true;
+      }
+    }
+    // A caption of width W needs W + 12 (pill padding) + 10 * 2 (air) of run.
+    const branchRun = anyCaptionMax > 0 ? Math.ceil(anyCaptionMax) + 32 : 0;
+    const forkInset = anyCrossesRow ? FORK_GAP : 0;
+    const columnGap = Math.max(GAP_X, forkInset + branchRun);
     const canvasWidth = PADDING_X * 2 + leftPad + rightPad + layout.cols * NODE_W +
-      Math.max(0, layout.cols - 1) * GAP_X;
+      Math.max(0, layout.cols - 1) * columnGap;
     const canvasHeight = PADDING_Y * 2 + layout.rows * NODE_H +
       Math.max(0, layout.rows - 1) * GAP_Y + topPad + bottomPad;
     canvas.style.width = `${canvasWidth}px`;
@@ -898,7 +1375,7 @@ export class SMBlueprint {
     const gridLeft = PADDING_X + leftPad;
     const positions = new Map<string, { x: number; y: number }>();
     for (const [name, cell] of layout.cells) {
-      const x = gridLeft + cell.col * (NODE_W + GAP_X);
+      const x = gridLeft + cell.col * (NODE_W + columnGap);
       const y = gridTop + cell.row * (NODE_H + GAP_Y);
       positions.set(name, { x, y });
       if (name === ANY_NODE_KEY) {
@@ -925,34 +1402,54 @@ export class SMBlueprint {
         this.animationEls.set(state.animationId, list);
       }
     }
-    const edgeSlots = this.computeEdgeSlots(region, layout.cells);
+    // Condition labels get a layer of their own, appended after the nodes: nodes are DOM
+    // siblings painted above the edge SVG, so a caption overhanging one was clipped by the node's
+    // own fill. Strokes stay in the lower layer, which keeps an arrow head that lands on a node's
+    // border tucked underneath it.
+    const labelsSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    labelsSvg.setAttribute('class', 'sm-edges sm-edge-labels');
+    labelsSvg.setAttribute('width', String(canvasWidth));
+    labelsSvg.setAttribute('height', String(canvasHeight));
+    canvas.appendChild(labelsSvg);
+    // Footprints every caption has to stay off. Seeded with the nodes and then extended with each
+    // caption as it is placed: a later label tests against the earlier ones, so two conditions
+    // whose targets sit one row apart cannot end up sharing the same band of space.
+    const occupied: LabelRect[] = [];
+    for (const position of positions.values()) {
+      occupied.push({ x: position.x, y: position.y, width: NODE_W, height: NODE_H });
+    }
+    const edgeSlots = this.computeEdgeSlots(region, layout.cells, positions, columnGap);
     const gridBottom = gridTop + layout.rows * NODE_H + Math.max(0, layout.rows - 1) * GAP_Y;
     const grid: GridMetrics = {
       left: gridLeft,
       top: gridTop,
       bottom: gridBottom,
       cols: layout.cols,
+      gap: columnGap,
+      forkInset,
+      branchRun,
       leftBand: leftPad,
       rightBand: rightPad,
     };
     // Every vertical track the region needs, allocated region-wide so that edges sharing a
     // corridor (an any-source descent, a forward edge's turn and a lane-routed edge's climb) can
     // never pick the same x and cross each other.
-    const gutterTracks = AssignVerticalTracks(region.transitions, layout.cells, grid);
+    const gutterTracks = AssignVerticalTracks(region.transitions, layout.cells, grid, edgeSlots);
     const edgePaths = new Map<string, SVGPathElement>();
     this.edgePaths.set(region.name, edgePaths);
     region.transitions.forEach((transition, index) => {
       const drawn = this.drawEdge(svg, positions, transition, markerId, edgeSlots[index], grid,
-        gutterTracks[index]);
+        gutterTracks[index], occupied);
       if (drawn == null) {
         return;
       }
       edgePaths.set(EdgeKey(region.name, index), drawn.path);
       const label = drawn.label;
       if (label != null) {
+        labelsSvg.appendChild(label);
         // The pill drives the transition it belongs to; the edge itself stays click-through so
         // dragging on the graph area is never swallowed.
-        label.addEventListener('click', () => this.onConditionClick(transition));
+        label.addEventListener('click', () => this.onConditionClick(region, transition));
         label.addEventListener('mouseenter', () => {
           this.showTooltipAt(label, `${transition.conditions}\nclick to drive this input`);
         });
@@ -1062,7 +1559,9 @@ export class SMBlueprint {
    *  no sibling edge occupies. The vertical tracks inside those corridors are allocated separately
    *  by AssignVerticalTracks. */
   private computeEdgeSlots(region: SMRegionData,
-                           cells: Map<string, { col: number; row: number }>): EdgeSlots[] {
+                           cells: Map<string, { col: number; row: number }>,
+                           positions: Map<string, { x: number; y: number }>,
+                           gap: number): EdgeSlots[] {
     const pairTotals = new Map<string, number>();
     const exitTotals = new Map<string, number>();
     const entryTotals = new Map<string, number>();
@@ -1098,7 +1597,35 @@ export class SMBlueprint {
     const pairSeen = new Map<string, number>();
     const exitSeen = new Map<string, number>();
     const entrySeen = new Map<string, number>();
-    let laneCursor = 0;
+    // Lanes are ordered by TARGET COLUMN first and by height within that column. A branch's run
+    // ends in its target's gutter, so the branch that turns off earliest must own the LOWEST lane:
+    // its run is then the shortest and can never reach back across the descent of a sibling that
+    // travels further right. Ordering by height alone produced exactly that crossing whenever a
+    // near-column target sat higher than a far-column one. Within a column the lower target takes
+    // the lower lane, which keeps the sibling descents themselves in order too.
+    const anyNodeY = positions.get(ANY_NODE_KEY)?.y;
+    const anyNodeX = positions.get(ANY_NODE_KEY)?.x ?? 0;
+    const anyOrder = region.transitions
+      .map((transition, index) => ({
+        index,
+        x: positions.get(transition.to)?.x ?? 0,
+        y: positions.get(transition.to)?.y ?? 0,
+      }))
+      .filter(({ index }) => region.transitions[index].fromAny)
+      // A branch whose target shares the any node's row is drawn as one straight run, so it must
+      // not reserve a lane: counting it would leave a permanently empty lane at the bottom of the
+      // fan and push every real branch one step higher for nothing.
+      .filter(({ y }) => anyNodeY == null || Math.abs(y - anyNodeY) > 0.5)
+      // Likewise a target in the very next column needs no lane - its branch is a run plus one
+      // vertical inside the neighbouring gutter. Only a fan reaching past an intervening column
+      // has to travel above the grid.
+      .filter(({ x }) => x - anyNodeX > NODE_W + gap + 1)
+      .sort((a, b) => (a.x !== b.x ? a.x - b.x : b.y - a.y));
+    const laneByIndex = new Map<number, number>();
+    anyOrder.forEach(({ index }, rank) => {
+      laneByIndex.set(index, rank);
+    });
+    const anyCount = anyOrder.length;
     let backLaneCursor = 0;
     return region.transitions.map((transition, index) => {
       const pairKey = pairKeys[index];
@@ -1125,7 +1652,8 @@ export class SMBlueprint {
         exitCount: exitTotals.get(exitKey) ?? 1,
         entryIndex,
         entryCount: entryTotals.get(entryKey) ?? 1,
-        laneIndex: transition.fromAny ? laneCursor++ : 0,
+        laneIndex: laneByIndex.get(index) ?? -1,
+        anyCount,
         backLaneIndex: laneRouted ? backLaneCursor++ : -1,
         straight,
       };
@@ -1184,6 +1712,17 @@ export class SMBlueprint {
         depth.set(state.name, maxDepth + 1);
       }
     }
+    // Any-source transitions short-circuit from a virtual common source: their targets are
+    // ALTERNATIVES of one decision and belong side by side in the single column right of it.
+    // Leaving them at the depths the ordinary edges gave them scattered the fan across columns,
+    // and reaching a target that sits behind another column forced its branch to detour up over
+    // the whole grid. Pulling them to depth 0 puts the fan in one column - where each branch is a
+    // short run plus one vertical - and lets the any node sit alone in the column to its left.
+    for (const transition of region.transitions) {
+      if (transition.fromAny) {
+        depth.set(transition.to, 0);
+      }
+    }
     // Group by column; row order preserves declaration order for stable output.
     const columns = new Map<number, string[]>();
     for (const state of region.states) {
@@ -1210,7 +1749,10 @@ export class SMBlueprint {
       for (const cell of cells.values()) {
         cell.col += 1;
       }
-      cells.set(ANY_NODE_KEY, { col: 0, row: 0 });
+      // Vertically centred on the column it feeds, so the fan reads as one source splitting into
+      // alternatives instead of as the top row of a chain. A branch heading to the middle target
+      // is then a straight run; only the outer two turn.
+      cells.set(ANY_NODE_KEY, { col: 0, row: Math.floor((rows - 1) / 2) });
       cols += 1;
       rows = Math.max(rows, 1);
     }
@@ -1328,7 +1870,8 @@ export class SMBlueprint {
                   markerId: string,
                   slots: EdgeSlots,
                   grid: GridMetrics,
-                  tracks: EdgeTracks): DrawnEdge | null {
+                  tracks: EdgeTracks,
+                  occupied: LabelRect[]): DrawnEdge | null {
     const fromPos = positions.get(transition.fromAny ? ANY_NODE_KEY : transition.from);
     const toPos = positions.get(transition.to);
     if (fromPos == null || toPos == null) {
@@ -1338,7 +1881,11 @@ export class SMBlueprint {
     // the same pair of nodes. The centered slot is 0; siblings step out symmetrically. Step
     // size is wider than the label line-height so parallel labels get their own row instead
     // of visually merging with the neighbor.
-    const offset = (slots.pairIndex - (slots.pairCount - 1) / 2) * 24;
+    // Two edges only have to clear each other's captions; the wider step exists so the OUTER pair
+    // of a three-edge bundle also clears the middle one. Using the narrow step for a pair keeps
+    // them closer to the node's centre line instead of hugging its edges.
+    const pairStep = slots.pairCount <= 2 ? PARALLEL_EDGE_STEP_COMPACT : PARALLEL_EDGE_STEP;
+    const offset = (slots.pairIndex - (slots.pairCount - 1) / 2) * pairStep;
     // Exit-port fan for edges sharing a source but heading to different targets: without it
     // they all leave the source's right edge at the same point and overlap until they diverge.
     // Smaller step than the parallel fan since these curves separate on their own further out.
@@ -1355,48 +1902,108 @@ export class SMBlueprint {
     path.setAttribute('marker-end', `url(#${markerId})`);
     let midX = 0;
     let midY = 0;
+    // Horizontal window a caption may occupy, set only by the shapes whose verticals cross the
+    // caption's own band: a lane-routed edge climbs at a known x, so its caption is pinned to the
+    // right of that climb; a back edge descends at a known x, so its caption stops short of it.
+    // Infinity means "no constraint" - the common case, where the caption sits over its target
+    // node and nothing else shares that band.
+    let labelLeftMin = Number.NEGATIVE_INFINITY;
+    let labelRightMax = Number.POSITIVE_INFINITY;
     const sameSpot = fromPos.x === toPos.x && fromPos.y === toPos.y;
     const forward = toPos.x > fromPos.x;
     if (transition.fromAny) {
-      // Any-source edge, routed orthogonally through node-free corridors only (the convention
-      // used by graph layout engines such as dagre / ELK):
-      //   1. leave the any node's right edge,
-      //   2. climb into a horizontal lane above the grid that belongs to this edge alone,
-      //   3. run right to the GUTTER separating the target's column from the previous one,
-      //   4. descend inside that gutter, and
-      //   5. turn into the target's left edge, so the arrow reads like every other incoming edge.
-      // Descending in the gutter rather than in the target's own column is the essential part:
-      // a column holds nodes, so a descent aimed at a lower row would cut straight through every
-      // node stacked above the target (the earlier "drop onto the target" routing did exactly
-      // that). Gutters hold no nodes by construction, so the descent is always collision-free.
-      const laneY = grid.top - ANY_LANE_GAP - slots.laneIndex * ANY_LANE_STEP;
       const x1 = fromPos.x + NODE_W;
-      const y1 = fromPos.y + NODE_H / 2 + sourceOffset;
       const entryY = toPos.y + NODE_H / 2 + targetOffset;
-      // Descend on the track the region-wide allocator reserved for this edge (see
-      // AssignVerticalTracks): the gutter holds no nodes by construction, and no sibling edge was
-      // given the same track, so the descent can cross neither a node nor another edge's turn.
-      const descendX = tracks.turnX ?? toPos.x - GAP_X / 2;
-      // Climb right after the exit port, staggered per lane so sibling any-edges do not share the
-      // same vertical, and never placed past the descent line.
-      const riseX = Math.min(x1 + 26 + slots.laneIndex * 12, descendX - EDGE_CORNER * 2);
-      const corner = Math.max(2, Math.min(EDGE_CORNER, Math.abs(riseX - x1) / 2,
-        Math.abs(descendX - riseX) / 2, Math.abs(y1 - laneY) / 2, Math.abs(entryY - laneY) / 2,
-        Math.abs(toPos.x - descendX) / 2));
-      path.setAttribute('d',
-        `M ${x1} ${y1} L ${riseX - corner} ${y1}` +
-        ` Q ${riseX} ${y1} ${riseX} ${y1 - corner}` +
-        ` L ${riseX} ${laneY + corner}` +
-        ` Q ${riseX} ${laneY} ${riseX + corner} ${laneY}` +
-        ` L ${descendX - corner} ${laneY}` +
-        ` Q ${descendX} ${laneY} ${descendX} ${laneY + corner}` +
-        ` L ${descendX} ${entryY - corner}` +
-        ` Q ${descendX} ${entryY} ${descendX + corner} ${entryY}` +
-        ` L ${toPos.x} ${entryY}`);
-      // Label sits on this edge's own lane, so lanes being a label-height apart is enough to
-      // keep every any-edge label legible without further biasing.
-      midX = (riseX + descendX) / 2;
-      midY = laneY;
+      if (Math.abs(fromPos.y - toPos.y) < 0.5) {
+        // The any node and this target sit on the same row, so the route is horizontal the whole
+        // way. Sending it up into a lane and back down - what the generic shape does - draws two
+        // needless corners and a hump on an edge that has nothing to climb over. Such an edge is
+        // also kept out of the lane allocation (see computeEdgeSlots), so skipping this branch
+        // would leave an empty lane behind in the fan.
+        const y = fromPos.y + NODE_H / 2 + offset;
+        path.setAttribute('d', `M ${x1} ${y} L ${toPos.x} ${y}`);
+        // Same stretch as every other branch of the fan - from the fork point to the target - so
+        // this caption lines up with the ones on the branches that do change rows. Centring it on
+        // the full gutter instead left it visibly shifted left of its siblings.
+        midX = x1 + grid.forkInset + grid.branchRun / 2;
+        midY = y - LABEL_LIFT;
+      } else if (toPos.x - fromPos.x <= NODE_W + grid.gap + 1) {
+        // The target is in the very next column, so the route never has to pass another column of
+        // nodes: run across the gutter, turn once, and enter the target's left edge. This is the
+        // whole reason the palette keeps a single column for the fan - climbing above the grid is
+        // only needed when something sits in between.
+        const y1 = fromPos.y + NODE_H / 2 + offset;
+        const turnX = tracks.turnX ?? (x1 + toPos.x) / 2;
+        const sweep = entryY > y1 ? 1 : -1;
+        const corner = Math.max(2, Math.min(EDGE_CORNER, Math.abs(entryY - y1) / 2,
+          Math.abs(turnX - x1), Math.abs(toPos.x - turnX)));
+        path.setAttribute('d',
+          `M ${x1} ${y1} L ${turnX - corner} ${y1}` +
+          ` Q ${turnX} ${y1} ${turnX} ${y1 + sweep * corner}` +
+          ` L ${turnX} ${entryY - sweep * corner}` +
+          ` Q ${turnX} ${entryY} ${turnX + corner} ${entryY}` +
+          ` L ${toPos.x} ${entryY}`);
+        // Centred on the run the fork leaves behind - caption width plus 10px of air on each side -
+        // rather than on the whole stretch to the target. Centring on the whole stretch made the
+        // air depend on how much gutter an unrelated caption had claimed, so identical conditions
+        // ended up with different padding.
+        midX = grid.branchRun > 0 ? turnX + grid.branchRun / 2 : (turnX + toPos.x) / 2;
+        midY = entryY - LABEL_LIFT;
+        labelRightMax = toPos.x - 4;
+      } else {
+        // Any-source edge, routed orthogonally through node-free corridors only (the convention
+        // used by graph layout engines such as dagre / ELK):
+        //   1. leave the any node's right edge,
+        //   2. climb into a horizontal lane above the grid that belongs to this edge alone,
+        //   3. run right to the GUTTER separating the target's column from the previous one,
+        //   4. descend inside that gutter, and
+        //   5. turn into the target's left edge, so the arrow reads like every other incoming edge.
+        // Descending in the gutter rather than in the target's own column is the essential part:
+        // a column holds nodes, so a descent aimed at a lower row would cut straight through every
+        // node stacked above the target (the earlier "drop onto the target" routing did exactly
+        // that). Gutters hold no nodes by construction, so the descent is always collision-free.
+        const laneY = grid.top - ANY_LANE_GAP - slots.laneIndex * ANY_LANE_STEP;
+        // Exit ports follow the lane order: the branch heading to the highest target also leaves
+        // from the highest point of the source's edge, so the fan reads as an ordered stack.
+        // Clamped inside the node so a wide fan cannot start a branch off the edge of its source.
+        const portOffset = slots.anyCount > 1
+          ? Math.max(-NODE_H / 2 + 4, Math.min(NODE_H / 2 - 4,
+            ((slots.anyCount - 1) / 2 - slots.laneIndex) * ANY_PORT_STEP)) : 0;
+        const y1 = fromPos.y + NODE_H / 2 + portOffset;
+        // Descend on the track the region-wide allocator reserved for this edge (see
+        // AssignVerticalTracks): the gutter holds no nodes by construction, and no sibling edge
+        // was given the same track, so the descent can cross neither a node nor another edge's
+        // turn.
+        const descendX = tracks.turnX ?? toPos.x - grid.gap / 2;
+        // The highest lane climbs FIRST, i.e. at the smallest x, and each lower lane adds a step.
+        // A branch therefore rises only through the space below its own lane and never crosses a
+        // sibling's horizontal run or its condition label - the web the reverse order produced.
+        // Clamping stays clear of the descent line for the same reason.
+        const riseX = Math.max(x1 + 4, Math.min(
+          x1 + ANY_RISE_STUB + (slots.anyCount - 1 - slots.laneIndex) * ANY_RISE_STEP,
+          descendX - EDGE_CORNER * 2));
+        const corner = Math.max(2, Math.min(EDGE_CORNER, Math.abs(riseX - x1) / 2,
+          Math.abs(descendX - riseX) / 2, Math.abs(y1 - laneY) / 2, Math.abs(entryY - laneY) / 2,
+          Math.abs(toPos.x - descendX) / 2));
+        path.setAttribute('d',
+          `M ${x1} ${y1} L ${riseX - corner} ${y1}` +
+          ` Q ${riseX} ${y1} ${riseX} ${y1 - corner}` +
+          ` L ${riseX} ${laneY + corner}` +
+          ` Q ${riseX} ${laneY} ${riseX + corner} ${laneY}` +
+          ` L ${descendX - corner} ${laneY}` +
+          ` Q ${descendX} ${laneY} ${descendX} ${laneY + corner}` +
+          ` L ${descendX} ${entryY - corner}` +
+          ` Q ${descendX} ${entryY} ${descendX + corner} ${entryY}` +
+          ` L ${toPos.x} ${entryY}`);
+        // Label hangs ABOVE this edge's own lane: lifted clear of the stroke, so neither the lane
+        // itself nor the verticals that turn off it can run through the text. Its left edge is
+        // pinned to this branch's climb: a higher lane climbs further left, and that vertical
+        // spans the whole height between its lane and the source - exactly the band this label
+        // occupies. Centring a wide caption over a short run pushed its left end onto that line.
+        midX = (riseX + descendX) / 2;
+        midY = laneY - LABEL_LIFT;
+        labelLeftMin = riseX + 6;
+      }
     } else if (sameSpot) {
       // Self-loop: an arc sitting above the node, radius grows with pairIndex so multiple
       // self-loops stack outward without overlapping. buildRegionElement reserves the top band
@@ -1423,7 +2030,7 @@ export class SMBlueprint {
       const x1 = fromPos.x + NODE_W;
       const y1 = fromPos.y + NODE_H / 2 + sourceOffset;
       const entryY = toPos.y + NODE_H / 2 + targetOffset;
-      const downX = tracks.backDownX ?? x1 + GAP_X / 2;
+      const downX = tracks.backDownX ?? x1 + grid.gap / 2;
       const upX = tracks.backUpX ?? toPos.x - PADDING_X / 2;
       const laneY = grid.bottom + BACK_LANE_GAP + slots.backLaneIndex * BACK_LANE_STEP;
       const corner = Math.max(2, Math.min(EDGE_CORNER, Math.abs(downX - x1) / 2,
@@ -1439,9 +2046,12 @@ export class SMBlueprint {
         ` L ${upX} ${entryY + corner}` +
         ` Q ${upX} ${entryY} ${upX + corner} ${entryY}` +
         ` L ${toPos.x} ${entryY}`);
-      // Label rides this edge's own lane, centred on the run below the grid.
+      // Label hangs above this edge's own lane, clear of the run and of the two verticals. The
+      // descent on the right reaches back up to the source, so a wide caption is not allowed to
+      // grow past it.
       midX = (downX + upX) / 2;
-      midY = laneY;
+      midY = laneY - LABEL_LIFT;
+      labelRightMax = downX - 6;
     } else if (forward) {
       // Forward edge. When source and target share a row the edge is a single straight horizontal
       // run (BFS bounds a forward edge to one column, so it crosses only the node-free gutter) and
@@ -1456,12 +2066,28 @@ export class SMBlueprint {
       const x2 = toPos.x;
       const y1 = fromPos.y + NODE_H / 2 + offset + (slots.straight ? 0 : sourceOffset);
       if (slots.straight) {
-        path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y1}`);
-        // Label rides the middle OF THE LINE, not above it: the backdrop is opaque, so the stroke
-        // it masks shows up as two stubs of equal length leaving the label on either side — the
-        // reading that makes "halfway along this edge" obvious.
-        midX = (x1 + x2) / 2;
-        midY = y1;
+        if (slots.pairCount > PARALLEL_STRAIGHT_LIMIT) {
+          // Fan out as arcs. Both ends use the same port Y, so the edges leave and arrive on the
+          // node no matter how many there are; the control point is what spreads them.
+          const k = slots.pairIndex - (slots.pairCount - 1) / 2;
+          const portY = fromPos.y + NODE_H / 2 + k * PARALLEL_PORT_STEP;
+          const bulge = k * PARALLEL_ARC_STEP;
+          const cx = (x1 + x2) / 2;
+          path.setAttribute('d',
+            `M ${x1} ${portY} Q ${cx} ${portY + bulge} ${x2} ${portY}`);
+          // Quadratic at t = 0.5 is 0.25*P0 + 0.5*C + 0.25*P2; both ends share portY, so the apex
+          // is portY + half the bulge.
+          const apexY = portY + bulge / 2;
+          midX = cx;
+          // Inside the arc, so a wide fan never pushes a caption past the canvas edge.
+          midY = apexY + (k >= 0 ? -PARALLEL_ARC_LABEL : PARALLEL_ARC_LABEL);
+        } else {
+          path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y1}`);
+          // Label floats just above the line, horizontally centred on it so it still reads as
+          // belonging to this edge rather than to the neighbouring one.
+          midX = (x1 + x2) / 2;
+          midY = y1 - LABEL_LIFT;
+        }
       } else {
         const y2 = toPos.y + NODE_H / 2 + offset + targetOffset;
         const turnX = tracks.turnX ?? (x1 + x2) / 2;
@@ -1474,13 +2100,11 @@ export class SMBlueprint {
           ` L ${turnX} ${y2 - sweep * corner}` +
           ` Q ${turnX} ${y2} ${turnX + corner} ${y2}` +
           ` L ${x2} ${y2}`);
-        // Label sits at the middle of the WHOLE path, found by walking its accumulated length, so
-        // it lands on whichever run holds the halfway point and the edge sticks out of the backdrop
-        // by the same length on both ends. Pinning it to the source-side run (the previous shape)
-        // put every label at the first quarter of its edge, next to the source node.
-        const mid = OrthogonalMidpoint(x1, y1, turnX, y2, x2, sweep);
-        midX = mid.x;
-        midY = mid.y;
+        // Same rule as the fan branches: above the target-side run, sitting in the row-gap the
+        // run occupies so it can never touch a node.
+        midX = (turnX + x2) / 2;
+        midY = y2 - LABEL_LIFT;
+        labelRightMax = x2 - 4;
       }
     } else {
       // Same-column neighbours (adjacent rows): a straight vertical line between the facing
@@ -1493,7 +2117,11 @@ export class SMBlueprint {
       const y1 = goingDown ? fromPos.y + NODE_H : fromPos.y;
       const y2 = goingDown ? toPos.y : toPos.y + NODE_H;
       path.setAttribute('d', `M ${x} ${y1} L ${x} ${y2}`);
-      midX = x + 8;
+      // A vertical edge has no "above" to lift the label into, so the caption sits centred ON the
+      // line, in the gap between the two nodes. The pill's own opaque backdrop masks the stroke
+      // underneath, which is what makes it read as a label attached to that edge - pushing it
+      // beside the line left it floating in empty space between neighbouring columns.
+      midX = x;
       midY = (y1 + y2) / 2;
     }
     group.appendChild(path);
@@ -1503,10 +2131,7 @@ export class SMBlueprint {
       // slice through the glyphs. Measure the label with a canvas 2D context (not getBBox,
       // which returns zeros when the panel is still display:none during refresh()) so the
       // backdrop is exactly the width the rendered text will occupy.
-      let caption = transition.conditions;
-      if (caption.length > 18) {
-        caption = `${caption.slice(0, 17)}\u2026`;
-      }
+      const caption = this.captionOf(transition.conditions);
       const textWidth = this.measureLabelWidth(caption);
       const textHeight = 12;
       const paddingX = 6;
@@ -1516,24 +2141,44 @@ export class SMBlueprint {
       // exactly the pill rather than to the whole edge.
       labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       labelGroup.setAttribute('class', 'sm-edge-label-group');
+      // One placer decides the final box for every branch: clamped into the window its shape
+      // allows, then lifted until it clears the nodes. Branches only supply the preferred point.
+      const labelWidth = textWidth + paddingX * 2;
+      const labelHeight = textHeight + paddingY * 2;
+      const placed = PlaceLabel(midX, midY, labelWidth, labelHeight, labelLeftMin, labelRightMax,
+        occupied);
+      // Reserve the band for the captions that follow, so two labels never share space.
+      occupied.push(placed);
       const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       backdrop.setAttribute('class', 'sm-edge-label-bg');
-      backdrop.setAttribute('x', String(midX - textWidth / 2 - paddingX));
-      backdrop.setAttribute('y', String(midY - textHeight / 2 - paddingY));
-      backdrop.setAttribute('width', String(textWidth + paddingX * 2));
-      backdrop.setAttribute('height', String(textHeight + paddingY * 2));
+      backdrop.setAttribute('x', String(placed.x));
+      backdrop.setAttribute('y', String(placed.y));
+      backdrop.setAttribute('width', String(labelWidth));
+      backdrop.setAttribute('height', String(labelHeight));
       backdrop.setAttribute('rx', '3');
       labelGroup.appendChild(backdrop);
       const captionEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       captionEl.setAttribute('class', 'sm-edge-label');
-      captionEl.setAttribute('x', String(midX));
-      captionEl.setAttribute('y', String(midY));
+      captionEl.setAttribute('x', String(placed.x + labelWidth / 2));
+      captionEl.setAttribute('y', String(placed.y + labelHeight / 2));
       captionEl.textContent = caption;
       labelGroup.appendChild(captionEl);
-      group.appendChild(labelGroup);
+      // Intentionally NOT appended to `group`: the caller mounts it on the labels layer, which
+      // paints above the nodes. See buildRegionElement.
     }
     svg.appendChild(group);
     return { path, label: labelGroup };
+  }
+
+  /** The text a condition is drawn as. Truncation lives here so the layout pass and the drawing
+   *  pass measure the SAME string - a caption sized from the untruncated text left the run wider
+   *  than the label it was supposed to hold. */
+  private captionOf(conditions: string): string {
+    if (!conditions || conditions === 'always') {
+      return '';
+    }
+    return conditions.length > MAX_LABEL_CHARS
+      ? `${conditions.slice(0, MAX_LABEL_CHARS - 1)}\u2026` : conditions;
   }
 
   private measureLabelWidth(label: string): number {
@@ -1607,7 +2252,7 @@ export class SMBlueprint {
   }
 
   private refreshHighlight(force: boolean): void {
-    const next = this.host.getSMCurrentStates();
+    const next = this.host.getSMCurrentStates(this.currentSMId);
     let changed = force;
     for (const region of this.regions) {
       const previousName = this.currentStates[region.name] ?? '';
@@ -1654,9 +2299,17 @@ export class SMBlueprint {
   /** Builds the Inputs section from the declarations on the state machine. A document with no
    *  <Inputs> says so plainly instead of showing an empty list: nothing outside the document can
    *  move such a machine, and the graph alone cannot either. */
-  private buildInputsList(inputs: { name: string; type: string }[]): void {
+  private buildInputsList(inputs: { name: string; type: string;
+                                    defaultValue?: boolean | number }[]): void {
     for (const input of inputs) {
       this.inputTypes.set(input.name, input.type);
+      // Seed the mirror from the declaration. The panel has no getter into the engine, so this is
+      // the only way its controls can show the value the machine actually starts with - without
+      // it a number input read 0 even when the document declared (and the engine used) another
+      // value, which made the panel contradict both the engine and the initial state.
+      if (input.defaultValue !== undefined) {
+        this.inputValues.set(input.name, input.defaultValue);
+      }
     }
     if (inputs.length === 0) {
       const empty = document.createElement('div');
@@ -1674,7 +2327,8 @@ export class SMBlueprint {
   }
 
   /** One input row: the name (with its declared type) plus the control matching that type. */
-  private buildInputRow(input: { name: string; type: string }): HTMLElement {
+  private buildInputRow(input: { name: string; type: string;
+                                 defaultValue?: boolean | number }): HTMLElement {
     const row = document.createElement('div');
     row.className = 'sm-input-row';
     const nameEl = document.createElement('span');
@@ -1765,7 +2419,7 @@ export class SMBlueprint {
   /** Writes one bool input, mirrors the value for the controls and lights the row up. */
   private writeBoolInput(name: string, value: boolean): void {
     this.host.ensureSMDriving();
-    if (!this.host.setSMInputBool(name, value)) {
+    if (!this.host.setSMInputBool(this.currentSMId, name, value)) {
       return;
     }
     this.inputValues.set(name, value);
@@ -1775,7 +2429,7 @@ export class SMBlueprint {
   /** Number counterpart of writeBoolInput. */
   private writeNumberInput(name: string, value: number): void {
     this.host.ensureSMDriving();
-    if (!this.host.setSMInputNumber(name, value)) {
+    if (!this.host.setSMInputNumber(this.currentSMId, name, value)) {
       return;
     }
     this.inputValues.set(name, value);
@@ -1786,10 +2440,62 @@ export class SMBlueprint {
    *  the whole interaction - there is no value to mirror. */
   private fireInput(name: string): void {
     this.host.ensureSMDriving();
-    if (!this.host.fireSMInputTrigger(name)) {
+    if (!this.host.fireSMInputTrigger(this.currentSMId, name)) {
       return;
     }
+    // A trigger only moves a region where a transition leaves that region's CURRENT state; from
+    // anywhere else it is consumed at the end of the advance without changing anything, which
+    // reads as a dead button. Name the states it does work from.
+    const sources = this.triggerSources(name);
+    if (sources.length === 0) {
+      this.showNote(`${name} is not used by any transition`);
+    } else if (!sources.some((source) => this.isLiveSource(source))) {
+      this.showNote(`${name} only fires from ${sources.join(' / ')} ` +
+        `(now in ${this.liveStateNames().join(' / ')})`);
+    }
     this.highlightInputRow(name);
+  }
+
+  /** Every state a transition naming `input` leaves from, "any" included. Transitions that land
+   *  back on their own source are skipped - they never move the region. */
+  private triggerSources(input: string): string[] {
+    const sources: string[] = [];
+    for (const region of this.regions) {
+      for (const transition of region.transitions) {
+        if (transition.from === transition.to) {
+          continue;
+        }
+        const clauses = ParseConditions(transition.conditions, this.inputTypes);
+        if (!clauses.some((clause) => clause.kind === 'trigger' && clause.input === input)) {
+          continue;
+        }
+        if (!sources.includes(transition.from)) {
+          sources.push(transition.from);
+        }
+      }
+    }
+    return sources;
+  }
+
+  /** Whether `from` is a source the regions can leave right now: "any" always matches, otherwise
+   *  some region has to actually sit in that state. */
+  private isLiveSource(from: string): boolean {
+    if (from === ANY_STATE_NAME) {
+      return true;
+    }
+    return this.liveStateNames().includes(from);
+  }
+
+  /** The state each region is currently in, empty regions omitted. */
+  private liveStateNames(): string[] {
+    const names: string[] = [];
+    for (const region of this.regions) {
+      const name = this.currentStates[region.name] ?? '';
+      if (name !== '' && !names.includes(name)) {
+        names.push(name);
+      }
+    }
+    return names;
   }
 
   /** Marks the row an input was just written through, so "which parameter did that" stays obvious
@@ -1838,16 +2544,16 @@ export class SMBlueprint {
     for (const [name, list] of byInput) {
       const value = numbers.get(name);
       if (value != null) {
-        if (!this.host.setSMInputNumber(name, value)) {
+        if (!this.host.setSMInputNumber(this.currentSMId, name, value)) {
           return false;
         }
         this.inputValues.set(name, value);
       } else if (list[0].kind === 'bool') {
-        if (!this.host.setSMInputBool(name, list[0].boolValue)) {
+        if (!this.host.setSMInputBool(this.currentSMId, name, list[0].boolValue)) {
           return false;
         }
         this.inputValues.set(name, list[0].boolValue);
-      } else if (!this.host.fireSMInputTrigger(name)) {
+      } else if (!this.host.fireSMInputTrigger(this.currentSMId, name)) {
         return false;
       }
       const sync = this.inputSyncFns.get(name);
@@ -1861,14 +2567,21 @@ export class SMBlueprint {
 
   /** An edge's condition pill is a control, not a caption: clicking it writes the inputs that
    *  condition needs, so the machine walks that transition and its target animation plays. */
-  private onConditionClick(transition: SMTransitionData): void {
+  private onConditionClick(region: SMRegionData, transition: SMTransitionData): void {
+    // A transition is only walkable from the state it leaves. Writing its inputs from anywhere
+    // else would move the parameters without moving the machine, so name the mismatch instead.
+    if (!transition.fromAny && transition.from !== (this.currentStates[region.name] ?? '')) {
+      this.showNote(`${region.name} is in ${this.currentStates[region.name] ?? '?'}, ` +
+        `this transition starts from ${transition.from}`);
+      return;
+    }
     const clauses = ParseConditions(transition.conditions, this.inputTypes);
     if (clauses.length === 0) {
-      this.showNote('always: this transition fires on its own, nothing to drive');
+      this.showNote('This transition fires on its own');
       return;
     }
     if (!this.driveClauses(clauses)) {
-      this.showNote('no input value can satisfy this condition');
+      this.showNote('No input value satisfies this condition');
     }
   }
 
@@ -1876,18 +2589,23 @@ export class SMBlueprint {
    *  transition needs. The graph and the Inputs section are two views of one machine, and this is
    *  what makes the graph itself a control. */
   private focusState(region: SMRegionData, stateName: string): void {
-    if ((this.currentStates[region.name] ?? '') === stateName) {
+    const current = this.currentStates[region.name] ?? '';
+    if (current === stateName) {
       return;
     }
     for (const transition of region.transitions) {
       if (transition.to !== stateName) {
         continue;
       }
+      // Only a transition leaving the region's current state can get it there.
+      if (!transition.fromAny && transition.from !== current) {
+        continue;
+      }
       if (this.driveClauses(ParseConditions(transition.conditions, this.inputTypes))) {
         return;
       }
     }
-    this.showNote(`${stateName}: no input can drive into this state`);
+    this.showNote(`No input can drive into ${stateName}`);
   }
 
   /** Flags the edge a region just walked. The 250ms poll coalesces two fast hops into a single
@@ -1912,40 +2630,39 @@ export class SMBlueprint {
     window.setTimeout(() => path.classList.remove('sm-edge-fire'), EDGE_FIRE_DURATION_MS);
   }
 
-  /** Transient message in the panel header, which is always visible and otherwise only shows the
-   *  machine's name. Used for the "nothing can drive this" cases, where a silent no-op would look
-   *  like a bug. */
+  /** Reports a click that could not move the machine, through the player's status pill above the
+   *  canvas. A silent no-op would look like a bug, and the pill is where the player already
+   *  surfaces every other transient notice. */
   private showNote(text: string): void {
-    this.titleEl.textContent = text;
-    if (this.noteTimer != null) {
-      window.clearTimeout(this.noteTimer);
-    }
-    this.noteTimer = window.setTimeout(() => {
-      this.noteTimer = null;
-      this.titleEl.textContent = this.smTitle;
-    }, NOTE_DURATION_MS);
+    this.host.showStatus(text, NOTE_DURATION_MS);
   }
 }
 
 /**
- * Floating operations row that sits just above the playback bar, holding one chip per animation
- * that has been previewed. Clicking a chip switches the preview to its animation; the chip's
- * close button removes it (and exits the preview when removing the active one). The bar is NOT
- * part of the blueprint panel - it is a sibling element that lives inside the player root,
- * positioned independently. It shows only when at least one chip exists, otherwise it is hidden.
+ * Floating label row that sits just above the playback bar and names the animation currently on
+ * stage - live, or parked while the state machine drives the scene. Exactly one label at a time:
+ * this is a caption for the live preview, not a history of what was previewed, so switching
+ * previews replaces it instead of stacking another chip. Its close button exits the preview. The
+ * bar is NOT part of the blueprint panel - it is a sibling element inside the player root,
+ * positioned independently, and it hides whenever nothing is being previewed.
  */
 export class PreviewChipBar {
   private host: SMBlueprintHost;
   private root: HTMLElement;
   private pollTimer: number | null = null;
-  private chips: string[] = [];
-  private activeChip: string | null = null;
+  // The animation currently on stage, or the parked one while the state machine has the render
+  // loop back. At most one at a time: the strip labels the live preview instead of keeping a
+  // history of everything that was ever previewed.
+  private currentId: string | null = null;
+  // Whether the labelled preview is parked - the state machine has the render loop and the preview
+  // is only remembered. Part of the redraw test below because buildChip() renders a different DOM
+  // for it (the label becomes the way back into the preview).
+  private isParked = false;
   // Snapshot of what render() last drew. The poll tick calls refresh() every 250ms; without the
-  // snapshot each tick would wipe and rebuild the DOM (innerHTML = ''), losing slow clicks that
-  // straddle a tick and any keyboard focus inside the strip, and forcing a reflow. render() runs
-  // only when the chip sequence or the active chip actually changed since the last draw.
-  private lastRenderedChips: string[] | null = null;
-  private lastRenderedActive: string | null = null;
+  // snapshot each tick would wipe and rebuild the label, and forcing a reflow four times a second
+  // for an unchanged label is pure waste. `undefined` means "nothing drawn yet".
+  private lastRenderedId: string | null | undefined = undefined;
+  private lastRenderedParked: boolean | undefined = undefined;
   private visible = false;
   // Reference to the playback bar DOM so we can mirror its width; the strip is meant to look
   // like it's glued on top of the bar, so any width change (window resize, mode switch) must
@@ -2022,23 +2739,29 @@ export class PreviewChipBar {
     }
   }
 
-  /** Wipes chip history. Called when the player loads a new document so chips from the
-   *  previous file don't linger. */
+  /** Re-reads the selection right away. The poll tick would otherwise take up to
+   *  POLL_INTERVAL_MS to show the chip for a preview the user just started, which makes the strip
+   *  visibly lag behind the playback bar it is glued to. */
+  syncNow(): void {
+    this.refresh();
+  }
+
+  /** Drops the label. Called when the player loads a new document so a preview from the previous
+   *  file doesn't linger. */
   clear(): void {
-    this.chips = [];
-    this.activeChip = null;
+    this.currentId = null;
+    this.isParked = false;
     this.render();
   }
 
   private refreshVisibility(): void {
-    // Only show when there is at least one chip AND a preview is currently in play (either
-    // actively rendered or parked). Without a live preview + playback bar to attach to, the
-    // strip would float above nothing.
+    // Only show while a preview is actually on stage (live or parked): without one there is no
+    // playback bar to attach to, and the strip would float above nothing.
     const selection = this.host.getSelectedTimelineUnit();
     const activePreview = selection != null && selection.kind === 'animation';
     const parked = this.host.getParkedPreviewId() != null;
     const inPreview = activePreview || parked;
-    this.root.style.display = this.visible && inPreview && this.chips.length > 0 ? '' : 'none';
+    this.root.style.display = this.visible && inPreview && this.currentId != null ? '' : 'none';
   }
 
   private onPollTick = (): void => {
@@ -2049,94 +2772,63 @@ export class PreviewChipBar {
     const selection = this.host.getSelectedTimelineUnit();
     const parked = this.host.getParkedPreviewId();
     if (selection != null && selection.kind === 'animation') {
-      // Fresh preview: chip is the live selection.
-      this.activeChip = selection.id;
-      if (!this.chips.includes(selection.id)) {
-        this.chips.push(selection.id);
-      }
+      this.currentId = selection.id;
     } else if (parked != null) {
-      // Preview was parked (SM is running, playback bar is dimmed): keep the chip marked as
-      // active so the user still sees which one they can un-park with a single click.
-      this.activeChip = parked;
+      // Parked: the state machine drives the scene, but the label keeps naming what is parked so
+      // the strip does not blank out above a playback bar that is still visible.
+      this.currentId = parked;
     } else {
-      this.activeChip = null;
+      this.currentId = null;
     }
-    this.renderChipsIfChanged();
-  }
-
-  private renderChipsIfChanged(): void {
-    const chipsUnchanged =
-        this.lastRenderedChips != null &&
-        this.lastRenderedChips.length === this.chips.length &&
-        this.lastRenderedChips.every((id, i) => id === this.chips[i]);
-    if (chipsUnchanged && this.lastRenderedActive === this.activeChip) {
+    // Parking clears the selection and sets the parked id in the same step, so currentId never
+    // changes during the whole transition. Comparing it alone would leave the live chip on screen
+    // and the parked one - the only route back into the preview - would never be built.
+    this.isParked = parked != null && selection == null;
+    if (this.currentId !== this.lastRenderedId || this.isParked !== this.lastRenderedParked) {
+      this.render();
       return;
     }
-    this.render();
+    this.refreshVisibility();
   }
 
   private render(): void {
     this.root.innerHTML = '';
-    for (const animationId of this.chips) {
-      this.root.appendChild(this.buildChip(animationId));
+    this.lastRenderedId = this.currentId;
+    this.lastRenderedParked = this.isParked;
+    if (this.currentId != null) {
+      this.root.appendChild(this.buildChip(this.currentId));
     }
-    this.lastRenderedChips = [...this.chips];
-    this.lastRenderedActive = this.activeChip;
     this.refreshVisibility();
   }
 
+  /** The single label for whatever is on stage. Closing it exits the preview entirely: the state
+   *  machine resumes from its initial states and the playback bar goes away. */
   private buildChip(animationId: string): HTMLElement {
     const chip = document.createElement('div');
-    chip.className = 'sm-chip';
-    if (animationId === this.activeChip) {
-      chip.classList.add('sm-chip-active');
-    }
+    chip.className = 'sm-chip sm-chip-active';
     const label = document.createElement('span');
     label.className = 'sm-chip-label';
     label.textContent = animationId;
-    label.title = 'Preview this animation';
-    label.addEventListener('click', () => {
-      // Two cases share the "select this animation" path:
-      //   1. clicking an inactive chip switches the preview to it (engine resets the previous
-      //      preview and starts this one from frame 0);
-      //   2. clicking the active chip while the preview is *parked* un-parks it (the engine
-      //      selectTimelineUnit path resets and plays this animation from frame 0).
-      // Clicking an already-active, non-parked chip is a no-op: the animation is already
-      // playing.
-      const selection = this.host.getSelectedTimelineUnit();
-      const activePreview = selection != null && selection.kind === 'animation';
-      if (activePreview && selection.id === animationId) {
-        return;
-      }
-      this.host.selectTimelineUnit('animation', animationId);
-      // Refresh the strip immediately so the click target flips to "active" without waiting
-      // for the next poll tick (which runs at POLL_INTERVAL_MS cadence).
-      this.refresh();
-    });
+    // Clicking the label puts a PARKED preview back on stage. Parking hands the render loop to the
+    // state machine, so without this the strip would keep naming a preview the user can no longer
+    // reach - the close button exits instead of returning. A live preview needs no such affordance:
+    // it is already on stage, and re-selecting it would restart it from frame 0.
+    if (this.isParked) {
+      label.classList.add('sm-chip-label-parked');
+      label.title = 'Back to this preview';
+      label.addEventListener('click', () => {
+        this.host.selectTimelineUnit('animation', animationId);
+        this.refresh();
+      });
+    }
     const closeButton = document.createElement('button');
     closeButton.className = 'sm-chip-close';
     closeButton.type = 'button';
     closeButton.textContent = '\u00d7';
-    closeButton.title = 'Close';
+    closeButton.title = 'Close preview';
     closeButton.addEventListener('click', () => {
-      // Browser-tab semantics: closing the active chip advances to its right neighbor (or
-      // falls back to the left one when it was the rightmost). Closing an inactive chip has
-      // no effect on the current preview. Closing the last remaining chip clears the preview
-      // entirely - the SM resumes from its initial states, playback bar goes away.
-      const index = this.chips.indexOf(animationId);
-      const wasActive = this.activeChip === animationId;
-      this.chips = this.chips.filter((id) => id !== animationId);
-      if (wasActive) {
-        if (this.chips.length === 0) {
-          this.host.selectTimelineUnit('', '');
-        } else {
-          const nextIndex = Math.min(index, this.chips.length - 1);
-          this.host.selectTimelineUnit('animation', this.chips[nextIndex]);
-        }
-      }
-      // Force an immediate render even if the selection change hasn't propagated through the
-      // poll tick yet, so the removed chip disappears on the same event.
-      this.render();
+      this.host.selectTimelineUnit('', '');
+      this.refresh();
     });
     chip.appendChild(label);
     chip.appendChild(closeButton);

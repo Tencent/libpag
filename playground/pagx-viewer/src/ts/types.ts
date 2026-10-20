@@ -337,22 +337,23 @@ export interface _PAGXView {
   _setNodeChannel(index: number, channel: string, value: string): boolean;
 
   /**
-   * StateMachine input hooks (playground interaction testing). Return false when the default
-   * timeline is not a state machine or the input name/type does not match.
+   * StateMachine input hooks (playground interaction testing). smId selects the machine: an empty
+   * id means the document's default timeline. Return false when the id does not resolve to a state
+   * machine or the input name/type does not match.
    */
-  _setSMInputBool(name: string, value: boolean): boolean;
-  _setSMInputNumber(name: string, value: number): boolean;
-  _fireSMInputTrigger(name: string): boolean;
+  _setSMInputBool(smId: string, name: string, value: boolean): boolean;
+  _setSMInputNumber(smId: string, name: string, value: number): boolean;
+  _fireSMInputTrigger(smId: string, name: string): boolean;
 
   _selectTimelineUnit(kind: string, id: string): boolean;
   _getSelectedTimelineUnit(): { kind: string; id: string } | null;
 
   /**
-   * Returns the live { regionName: currentStateName } map of the default state machine timeline,
-   * or an empty object when the default timeline is not a state machine. Polling endpoint for the
-   * blueprint view's active-state highlight.
+   * Returns the live { regionName: currentStateName } map of the state machine named by smId - an
+   * empty id means the document's default timeline. Returns an empty object when that id does not
+   * resolve to a state machine. Polling endpoint for the blueprint view's active-state highlight.
    */
-  _getSMCurrentStates(): Record<string, string>;
+  _getSMCurrentStates(smId: string): Record<string, string>;
 
   /**
    * Exports the animation-unit tree of the loaded document: every top-level Animation/StateMachine

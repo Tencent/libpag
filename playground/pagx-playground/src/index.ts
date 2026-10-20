@@ -552,7 +552,8 @@ function ensurePlayer(): PAGXPlayer {
         extraMenuItems: slots,
     });
     // Expose the player on window for DevTools-driven manual testing, e.g. driving state machine
-    // inputs of an interactive pagx: pagx.setSMInputBool('hover', true).
+    // inputs of an interactive pagx: pagx.setSMInputBool('', 'hover', true) - the empty first
+    // argument targets the document's default state machine.
     (window as Window & { pagx?: PAGXPlayer }).pagx = player;
     return player;
 }

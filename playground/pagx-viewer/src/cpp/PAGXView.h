@@ -24,6 +24,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
@@ -136,13 +137,15 @@ class PAGXView {
 
   // --- StateMachine input hooks (playground interaction testing) ---
 
-  // Sets a bool/number input or fires a trigger on the default state machine timeline; the scene
-  // picks the new value up on the next advance(). Returns false when the default timeline is not
-  // a state machine or the input name/type does not match. Exposed through the binding so a
-  // tester can drive interactive state machines from the browser console.
-  bool setSMInputBool(const std::string& name, bool value);
-  bool setSMInputNumber(const std::string& name, float value);
-  bool fireSMInputTrigger(const std::string& name);
+  // Sets a bool/number input or fires a trigger on a state machine timeline; the scene picks the
+  // new value up on the next advance(). smId selects which machine - an empty id means the
+  // document's default timeline, so a document with a single machine behaves exactly as before.
+  // Returns false when the id does not resolve to a state machine or the input name/type does not
+  // match. Exposed through the binding so a tester can drive interactive state machines from the
+  // browser console.
+  bool setSMInputBool(const std::string& smId, const std::string& name, bool value);
+  bool setSMInputNumber(const std::string& smId, const std::string& name, float value);
+  bool fireSMInputTrigger(const std::string& smId, const std::string& name);
 
   // Exports the animation-unit tree of the loaded document as a JS array: every top-level
   // Animation/StateMachine definition plus every <Timelines> mount point, nested by composition
@@ -157,8 +160,9 @@ class PAGXView {
    * Selects one unit of the timeline tree for solo preview, or clears the selection when id is
    * empty. Selecting an animation routes all playback values (current/duration/frameRate/seek)
    * to a lazily instantiated runtime of that definition and freezes every other clock (default
-   * timeline and scene) until the selection is cleared. Selecting a state machine freezes the
-   * clocks as well but exposes no time axis (durationMicros() reports 0 while selected).
+   * timeline and scene) until the selection is cleared. Selecting a state machine makes that
+   * machine the only timeline the view advances - it is the machine on screen, so it is the one
+   * that runs - and likewise exposes no time axis (durationMicros() reports 0 while selected).
    * @param kind "animation" or "stateMachine"; mount entries reuse these by their refKind.
    * @param id Definition id from getTimelineTree(); empty clears the selection.
    * @return false when the unit cannot be instantiated (unknown id or kind).
@@ -168,12 +172,18 @@ class PAGXView {
   // Returns the current solo-preview selection as {kind, id}, or null when none is selected.
   emscripten::val getSelectedTimelineUnit() const;
 
-  // Returns the live {regionName: currentStateName} map of the default state machine timeline, or
-  // an empty object when the default timeline is not a state machine. Lightweight polling endpoint
-  // for the blueprint view to refresh the active-state highlight (250ms cadence).
-  emscripten::val getSMCurrentStates() const;
+  // Returns the live {regionName: currentStateName} map of the state machine named by smId (an
+  // empty id means the document's default timeline), or an empty object when that id is not a
+  // state machine. Lightweight polling endpoint for the blueprint view to refresh the active-state
+  // highlight (250ms cadence).
+  emscripten::val getSMCurrentStates(const std::string& smId) const;
 
  private:
+  // Resolves a state machine runtime by id: an empty id means the document's default timeline, any
+  // other id goes through the scene's registry, which keeps one instance per definition. That
+  // registry is the same one getDefaultTimeline() draws from, so asking for the default machine by
+  // id returns the very instance the view drives - never a second, dormant copy.
+  std::shared_ptr<PAGStateMachine> resolveStateMachine(const std::string& smId) const;
   void updateContentTransform();
   void applyDisplayTransform();
   void applySceneDisplayOptions();
@@ -208,9 +218,12 @@ class PAGXView {
   // view gates advancement on this flag.
   bool playing = true;
   // Solo-preview selection (unit selected from the timeline tree): previewAnimation is the lazily
-  // instantiated runtime the playback values route to while selected; a selected state machine has
-  // no runtime here (no time axis) — both cases freeze the default/scene clocks until cleared.
+  // instantiated runtime the playback values route to while selected, previewStateMachine the
+  // equivalent for a selected state machine - it becomes the only timeline the view advances, so
+  // the machine being inspected is also the one that runs. Both freeze the default/scene clocks
+  // until cleared.
   std::shared_ptr<PAGAnimation> previewAnimation = nullptr;
+  std::shared_ptr<PAGStateMachine> previewStateMachine = nullptr;
   std::string selectedUnitKind = {};
   std::string selectedUnitId = {};
   // Player-level loop switch that overrides the file's loop mode at cycle boundaries: the engine

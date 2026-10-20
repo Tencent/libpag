@@ -22,12 +22,16 @@
 // (see styles.ts) reaches every element without special-casing.
 
 import type { ToolbarSlot } from './types';
-import { RESET_VIEW_ICON_SVG, SOURCE_EDITOR_ICON_SVG } from './icons';
+import { RESET_VIEW_ICON_SVG, SOURCE_EDITOR_ICON_SVG, STATE_MACHINE_ICON_SVG } from './icons';
 
 export interface ToolbarCallbacks {
     onResetView: () => void;
     /** Called when the Source Editor button is clicked. When absent, the button is omitted. */
     onToggleEditor?: () => void;
+    /** Called when the state-machine blueprint button is clicked. The button appears for any
+     *  document that declares a top-level state machine, whether or not that machine is the scene's
+     *  default - see setToolbarBlueprintVisible. */
+    onToggleBlueprint: () => void;
 }
 
 export function buildToolbar(
@@ -67,6 +71,19 @@ export function buildToolbar(
         root.appendChild(sourceEditorBtn);
     }
 
+    const blueprintBtn = document.createElement('button');
+    blueprintBtn.id = 'blueprint-btn';
+    blueprintBtn.className = 'toolbar-btn';
+    blueprintBtn.title = 'State Machine Blueprint';
+    blueprintBtn.innerHTML = STATE_MACHINE_ICON_SVG;
+    const toggleBlueprint = callbacks.onToggleBlueprint;
+    blueprintBtn.addEventListener('click', () => {
+        toggleBlueprint();
+        blueprintBtn.blur();
+    });
+    blueprintBtn.style.display = 'none';
+    root.appendChild(blueprintBtn);
+
     for (const slot of slots.after ?? []) {
         appendSlot(root, slot);
     }
@@ -105,4 +122,16 @@ function appendSlot(root: HTMLDivElement, slot: ToolbarSlot): void {
 
 export function setToolbarVisible(root: HTMLDivElement, visible: boolean): void {
     root.classList.toggle('hidden', !visible);
+}
+
+/** Shows the blueprint toggle only for documents that actually have a state machine, and marks it
+ *  active while the panel is open. */
+export function setToolbarBlueprintVisible(root: HTMLDivElement, available: boolean,
+                                           active: boolean): void {
+    const btn = root.querySelector('#blueprint-btn') as HTMLButtonElement | null;
+    if (btn == null) {
+        return;
+    }
+    btn.style.display = available ? '' : 'none';
+    btn.classList.toggle('active', active);
 }

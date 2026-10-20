@@ -45,6 +45,20 @@ export const LOOP_SEQUENCE_ICON_SVG = `
 </svg>
 `;
 
+// Mind-map glyph for the state-machine panel toggle: one square hub fanning out to two squares,
+// which is what the blueprint graph looks like at a glance. Squares rather than dots so the nodes
+// read like the graph's own state boxes, and only two branches so both stay far enough apart to
+// stay legible at 24px.
+export const STATE_MACHINE_ICON_SVG = `
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="2.5" y="9.5" width="5" height="5" rx="1"/>
+    <rect x="16.5" y="5" width="5" height="5" rx="1"/>
+    <rect x="16.5" y="14" width="5" height="5" rx="1"/>
+    <path d="M7.5 12 L12 12 L12 7.5 L16.5 7.5"/>
+    <path d="M7.5 12 L12 12 L12 16.5 L16.5 16.5"/>
+</svg>
+`;
+
 export const LOOP_SINGLE_ICON_SVG = `
 <svg class="loop-icon-single" viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M20 6v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h14"></path>
