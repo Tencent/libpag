@@ -1443,12 +1443,20 @@ Text is a geometry element that contributes glyphs (rather than a path) to the g
 | `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
+| `inlinePositions` | float[] | [] | Optional physical inline positions in pixels, one per Unicode scalar, relative to the start of this Text run. X for horizontal text, Y for vertical text. |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the linebox top (based on font metrics line height); `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 
 Child elements: `CDATA` text, `GlyphRun`*
+
+`inlinePositions` preserves externally laid-out single-line text without splitting it into individual
+characters before shaping. Each shaping cluster uses the minimum position of its source characters;
+the glyphs within that cluster retain their shaping offsets. Explicit positions disable automatic
+wrapping and justification in the containing text layout. A list with a non-finite value, invalid
+UTF-8, a mismatched character count, or text containing newlines or tabs is inactive. Positions scale
+with the text. Pre-shaped `GlyphRun` children take precedence.
 
 **Text Content**: Typically use the `text` attribute to specify text content. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
 

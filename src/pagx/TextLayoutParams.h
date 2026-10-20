@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/TextAlign.h"
@@ -39,6 +40,7 @@ struct TextGlyphParams {
   std::string fontStyle;
   float fontSize = 12.0f;
   float letterSpacing = 0.0f;
+  std::vector<float> inlinePositions = {};
   bool fauxBold = false;
   bool fauxItalic = false;
 };

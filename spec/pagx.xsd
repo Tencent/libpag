@@ -594,6 +594,7 @@
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
     <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>
+    <xs:attribute name="inlinePositions" type="FloatListType"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>

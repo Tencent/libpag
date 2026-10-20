@@ -20,9 +20,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <map>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
+#include "hb.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -114,6 +116,8 @@ class TextLayoutContext {
     // measures exactly as wide as its squashed line.
     float squashedAdvance = 0;
     float xPosition = 0;
+    // Physical position supplied by the source layout, including the cluster's internal advance.
+    float inlinePosition = NAN;
     int32_t unichar = 0;
     float fontSize = 0;
     float ascent = 0;
@@ -421,6 +425,18 @@ class TextLayoutContext {
     const std::string& content = glyph.text;
     float effectiveLetterSpacing = glyph.letterSpacing * textScale;
     bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
+    std::map<size_t, float> inlinePositions;
+    if (!glyph.inlinePositions.empty() && content.find_first_of("\r\n\t") == std::string::npos &&
+        tgfx::UTF::CountUTF8(content.data(), content.size()) ==
+            static_cast<int>(glyph.inlinePositions.size()) &&
+        std::all_of(glyph.inlinePositions.begin(), glyph.inlinePositions.end(),
+                    [textScale](float p) { return std::isfinite(p * textScale); })) {
+      const char* ptr = content.data();
+      for (float position : glyph.inlinePositions) {
+        inlinePositions[static_cast<size_t>(ptr - content.data())] = position * textScale;
+        tgfx::UTF::NextUTF8(&ptr, content.data() + content.size());
+      }
+    }
 
     // Collect newline and tab positions, then shape non-special segments.
     std::vector<TextSegment> segments = {};
@@ -455,6 +471,39 @@ class TextLayoutContext {
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = seg.bidiLevel & 1;
       auto shapedGlyphs = TextShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
+      // Resolve source scalar positions against UTF-8 HarfBuzz cluster boundaries. The minimum
+      // handles RTL clusters and ligatures whose source characters have distinct visual boxes.
+      std::map<uint32_t, float> clusterPositions;
+      std::map<uint32_t, float> clusterAdvances;
+      std::map<uint32_t, uint32_t> positionClusters;
+      if (!inlinePositions.empty()) {
+        for (const auto& sg : shapedGlyphs) positionClusters.emplace(sg.cluster, sg.cluster);
+        uint32_t previousCluster = 0;
+        bool hasPrevious = false;
+        for (auto& entry : positionClusters) {
+          int32_t character = 0;
+          DecodeUTF8Char(substring.data() + entry.first, substring.size() - entry.first,
+                         &character);
+          auto category = hb_unicode_general_category(hb_unicode_funcs_get_default(), character);
+          // Character-level font fallback can split a mark from its base before HarfBuzz sees
+          // the run. Keep the original relative advances across that font boundary as well.
+          bool mark = category == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK ||
+                      category == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK ||
+                      category == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK;
+          if (hasPrevious && mark) entry.second = previousCluster;
+          previousCluster = entry.second;
+          hasPrevious = true;
+          clusterPositions.emplace(entry.second, NAN);
+        }
+        for (auto it = clusterPositions.begin(); it != clusterPositions.end(); ++it) {
+          auto next = std::next(it);
+          size_t end = seg.start + (next == clusterPositions.end() ? seg.length : next->first);
+          for (auto p = inlinePositions.lower_bound(seg.start + it->first);
+               p != inlinePositions.end() && p->first < end; ++p) {
+            it->second = std::isnan(it->second) ? p->second : std::min(it->second, p->second);
+          }
+        }
+      }
 
       // HarfBuzz returns RTL glyphs in visual order (left-to-right). Sort them by cluster
       // to restore logical order so that allGlyphs is always in logical order. Simple reverse
@@ -462,7 +511,7 @@ class TextLayoutContext {
       // visual positions that don't correspond to a simple reversal of the logical sequence.
       // Visual reordering is done later via the UAX#9 L2 algorithm when building the TextBlob.
       if (rtl) {
-        std::sort(shapedGlyphs.begin(), shapedGlyphs.end(), CompareByCluster);
+        std::stable_sort(shapedGlyphs.begin(), shapedGlyphs.end(), CompareByCluster);
       }
 
       for (auto& sg : shapedGlyphs) {
@@ -489,6 +538,14 @@ class TextLayoutContext {
         gi.font = sg.font;
         gi.advance = sg.xAdvance;
         gi.xPosition = currentX;
+        auto positionCluster = positionClusters.find(sg.cluster);
+        auto anchor = positionCluster == positionClusters.end()
+                          ? clusterPositions.end()
+                          : clusterPositions.find(positionCluster->second);
+        if (anchor != clusterPositions.end()) {
+          gi.inlinePosition = anchor->second + clusterAdvances[anchor->first];
+          clusterAdvances[anchor->first] += vertical ? std::fabs(sg.yAdvance) : sg.xAdvance;
+        }
         gi.unichar = unichar;
         gi.fontSize = effectiveFontSize;
         gi.ascent = metrics.ascent;
@@ -521,7 +578,8 @@ class TextLayoutContext {
     auto* currentLine = &lines.back();
     float currentLineWidth = 0;
     int lastBreakIndex = -1;
-    bool doWrap = params.wordWrap && !std::isnan(params.boxWidth) && params.boxWidth > 0;
+    bool doWrap = params.wordWrap && !std::isnan(params.boxWidth) && params.boxWidth > 0 &&
+                  !HasInlinePositions(allGlyphs);
     // Tracks the fontLineHeight of the \n that created the current line.
     // Used as the fallback height for empty lines (e.g. consecutive \n\n).
     float pendingNewlineFontLineHeight = 0.0f;
@@ -642,8 +700,41 @@ class TextLayoutContext {
 
     // Apply punctuation squash to all lines.
     ApplyPunctuationSquashToLines(lines);
+    for (auto& line : lines) {
+      if (HasInlinePositions(line.glyphs)) line.width = ApplyInlinePositions(line.glyphs);
+    }
 
     return lines;
+  }
+
+  static bool HasInlinePositions(const std::vector<GlyphInfo>& glyphs) {
+    return std::any_of(glyphs.begin(), glyphs.end(),
+                       [](const GlyphInfo& g) { return std::isfinite(g.inlinePosition); });
+  }
+
+  // Text runs are still in logical/source order here. An explicitly positioned run occupies its
+  // measured extent; subsequent runs start after that extent instead of after its natural width.
+  static float ApplyInlinePositions(std::vector<GlyphInfo>& glyphs) {
+    float shift = 0;
+    float width = 0;
+    for (size_t start = 0; start < glyphs.size();) {
+      size_t end = start + 1;
+      while (end < glyphs.size() && glyphs[end].sourceText == glyphs[start].sourceText) end++;
+      float origin = glyphs[start].xPosition;
+      float naturalEnd = origin;
+      float positionedEnd = origin + shift;
+      for (size_t i = start; i < end; i++) {
+        auto& g = glyphs[i];
+        naturalEnd = std::max(naturalEnd, g.xPosition + g.squashedAdvance);
+        g.xPosition = std::isfinite(g.inlinePosition) ? origin + shift + g.inlinePosition
+                                                      : g.xPosition + shift;
+        positionedEnd = std::max(positionedEnd, g.xPosition + g.squashedAdvance);
+      }
+      width = std::max(width, positionedEnd);
+      shift = positionedEnd - naturalEnd;
+      start = end;
+    }
+    return width;
   }
 
   static void ApplyPunctuationSquashToLines(std::vector<LineInfo>& lines) {
@@ -712,6 +803,11 @@ class TextLayoutContext {
       // Trailing squash reduces the effective advance (removes space after the glyph).
       float xPos = 0;
       for (size_t i = 0; i < glyphCount; i++) {
+        // The external layout already includes punctuation spacing.
+        if (std::isfinite(line.glyphs[i].inlinePosition)) {
+          leadingSquash[i] = 0;
+          trailingSquash[i] = 0;
+        }
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
         line.glyphs[i].squashedAdvance = effectiveAdvance;
@@ -1113,11 +1209,12 @@ class TextLayoutContext {
           float letterSpacing = g.letterSpacing;
           xPos += g.squashedAdvance + letterSpacing;
         }
+        if (HasInlinePositions(visualGlyphs)) ApplyInlinePositions(visualGlyphs);
       }
       // Compute justify gap count on visual-order glyphs so that counting and application use
       // the same adjacency pairs. This avoids mismatch when BiDi L2 reorder changes neighbors.
       if (params.textAlign == TextAlign::Justify && lineIdx < lines.size() - 1 &&
-          line.glyphs.size() > 1) {
+          line.glyphs.size() > 1 && !HasInlinePositions(line.glyphs)) {
         int gapCount = 0;
         for (size_t i = 0; i + 1 < visualGlyphs.size(); i++) {
           if (LineBreaker::CanBreakBetween(visualGlyphs[i].unichar, visualGlyphs[i + 1].unichar)) {
@@ -1254,7 +1351,8 @@ class TextLayoutContext {
     columns.emplace_back();
     auto* currentColumn = &columns.back();
     float currentColumnHeight = 0;
-    bool doWrap = params.wordWrap && !std::isnan(params.boxHeight) && params.boxHeight > 0;
+    bool doWrap = params.wordWrap && !std::isnan(params.boxHeight) && params.boxHeight > 0 &&
+                  !HasInlinePositions(allGlyphs);
     int lastBreakIndex = -1;
     // Tracks the fontLineHeight of the \n that created the current column.
     // Used as the fallback width for empty columns (e.g. consecutive \n\n).
@@ -1418,11 +1516,36 @@ class TextLayoutContext {
       // Apply squash to glyph heights and record leadingSquash for position adjustment.
       float totalHeight = 0;
       for (size_t i = 0; i < glyphCount; i++) {
+        if (std::isfinite(column.glyphs[i].glyphs.front().inlinePosition)) {
+          leadingSquash[i] = 0;
+          trailingSquash[i] = 0;
+        }
         column.glyphs[i].leadingSquash = leadingSquash[i];
         column.glyphs[i].height -= leadingSquash[i] + trailingSquash[i];
         totalHeight += column.glyphs[i].height;
       }
       column.height = totalHeight;
+      bool positioned =
+          std::any_of(column.glyphs.begin(), column.glyphs.end(), [](const VerticalGlyphInfo& vg) {
+            return std::isfinite(vg.glyphs.front().inlinePosition);
+          });
+      if (!positioned) continue;
+      float origin = 0;
+      float current = 0;
+      Text* source = nullptr;
+      for (auto& vg : column.glyphs) {
+        const auto& g = vg.glyphs.front();
+        if (g.sourceText != source) {
+          source = g.sourceText;
+          origin = current;
+        }
+        if (std::isfinite(g.inlinePosition)) {
+          current = std::max(current, origin + g.inlinePosition + vg.height);
+        } else {
+          current += vg.height;
+        }
+      }
+      column.height = current;
     }
   }
 
@@ -1497,6 +1620,10 @@ class TextLayoutContext {
       // Compute per-column vertical offset based on TextAlign.
       float inlineOffset = 0;
       float justifyGap = 0;
+      bool positioned =
+          std::any_of(column.glyphs.begin(), column.glyphs.end(), [](const VerticalGlyphInfo& vg) {
+            return std::isfinite(vg.glyphs.front().inlinePosition);
+          });
       float effectiveBoxHeight = std::isnan(params.boxHeight) ? 0.0f : params.boxHeight;
       switch (params.textAlign) {
         case TextAlign::Start:
@@ -1509,7 +1636,7 @@ class TextLayoutContext {
           break;
         case TextAlign::Justify: {
           // Justify: distribute extra space evenly at word boundaries. Last column uses Start.
-          if (!std::isnan(params.boxHeight) && colIdx < columns.size() - 1) {
+          if (!positioned && !std::isnan(params.boxHeight) && colIdx < columns.size() - 1) {
             size_t breakCount = 0;
             for (size_t gi = 0; gi < column.glyphs.size(); gi++) {
               if (column.glyphs[gi].canBreakBefore) {
@@ -1526,13 +1653,24 @@ class TextLayoutContext {
       }
 
       float currentY = inlineOffset;
+      float runOrigin = currentY;
+      float runEnd = currentY;
+      Text* currentSource = nullptr;
 
       for (size_t glyphIdx = 0; glyphIdx < column.glyphs.size(); glyphIdx++) {
         auto& vg = column.glyphs[glyphIdx];
+        const auto& first = vg.glyphs.front();
+        if (positioned && first.sourceText != currentSource) {
+          currentSource = first.sourceText;
+          runOrigin = runEnd;
+          currentY = runEnd;
+        }
+        if (std::isfinite(first.inlinePosition)) currentY = runOrigin + first.inlinePosition;
 
         // Skip tab glyphs: they only occupy space, not rendered.
         if (vg.glyphs.front().unichar == '\t') {
           currentY += vg.height;
+          runEnd = std::max(runEnd, currentY);
           continue;
         }
 
@@ -1564,6 +1702,7 @@ class TextLayoutContext {
         }
 
         currentY += vg.height;
+        runEnd = std::max(runEnd, currentY);
         // Update per-Text linebox bounds in layout coordinate system for vertical layout.
         auto* sourceText = vg.glyphs.front().sourceText;
         if (sourceText != nullptr) {
@@ -1584,6 +1723,7 @@ class TextLayoutContext {
         if (justifyGap != 0 && glyphIdx + 1 < column.glyphs.size() &&
             column.glyphs[glyphIdx + 1].canBreakBefore) {
           currentY += justifyGap;
+          runEnd = std::max(runEnd, currentY);
         }
       }
     }

@@ -5,6 +5,21 @@ absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
 fed directly to `pagx import --format html`.
 
+Text capture uses Chromium layout text fragments for source boundaries and effective styles
+(including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
+This preserves drop caps, columns, and overlapping line boxes without relying on global
+Y ordering. Justified runs carry `data-pagx-inline-positions`; the PAGX importer applies
+them after shaping, preserving ligatures and combining clusters. The browser-only bundle
+accepts the same metadata through `HtmlSnapshot.installTextLayout(data)` from
+`lib/text-layout.ts`; without a provider, it uses DOM fragment measurements.
+First letters originating in generated content/shadow trees without a DOM Range are
+diagnosed. Length-changing text transforms use measured source fragments and natural
+cluster spacing when the browser cannot expose individual output-character positions.
+
+Use `--embed-fonts` for portable output with the page's web fonts. Font capture includes
+inline `data:` sources, resolves CSS family aliases to the saved font's internal family,
+and copies WOFF2 decoder memory before another decode can reuse it.
+
 ## Why
 
 The PAGX `HTMLImporter` (`src/pagx/html/HTMLImporter.cpp`) and its

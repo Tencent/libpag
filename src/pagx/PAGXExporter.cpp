@@ -803,6 +803,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       xml.addAttribute("fontSize", text->fontSize, Default<Text>().fontSize);
       xml.addAttribute("letterSpacing", text->letterSpacing, Default<Text>().letterSpacing);
+      if (!text->inlinePositions.empty()) {
+        xml.addAttribute("inlinePositions", FloatListToString(text->inlinePositions));
+      }
       xml.addAttribute("fauxBold", text->fauxBold, Default<Text>().fauxBold);
       xml.addAttribute("fauxItalic", text->fauxItalic, Default<Text>().fauxItalic);
       if (text->textAnchor != Default<Text>().textAnchor) {

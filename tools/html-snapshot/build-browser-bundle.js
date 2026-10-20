@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { installTextLayout } = require('./dist/lib/text-layout');
 
 const {
   inlineExternalImages,
@@ -47,6 +48,7 @@ const {
 // comes from HELPERS_SRC, not from a Node-side require), so it is not in
 // this list.
 const BROWSER_EXPORTS = [
+  { name: 'installTextLayout',     fn: installTextLayout },
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
