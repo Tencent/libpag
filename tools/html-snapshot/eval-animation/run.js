@@ -68,7 +68,8 @@ const USAGE = `Usage: node run.js [options]
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus
   --concurrency, -j N Process N cases in parallel (default: 1)
-  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js`;
+  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js
+  --roundtrip         Also evaluate PAGX -> HTML -> browser & roundtrip PAGX`;
 
 function parseArgs(argv) {
   const opts = {
@@ -93,6 +94,7 @@ function parseArgs(argv) {
     recursive: false,
     concurrency: 1,
     browserEngine: '',
+    roundtrip: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -127,6 +129,7 @@ function parseArgs(argv) {
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--browser-engine') opts.browserEngine = argv[++i];
+    else if (a === '--roundtrip') opts.roundtrip = true;
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -243,6 +246,16 @@ async function runPagxRenderAtTime(opts) {
   return spawnCapture(opts.pagxBin, args, { stderrPath: opts.stderrPath });
 }
 
+async function runPagxExportHtml(opts) {
+  const args = [
+    'export',
+    '--input', opts.pagxFile,
+    '--output', opts.htmlFile,
+    '--format', 'html',
+  ];
+  return spawnCapture(opts.pagxBin, args, { stderrPath: opts.stderrPath });
+}
+
 async function processCase(entry, outDir, opts) {
   const htmlPath = entry.path;
   const base = entry.name;
@@ -266,6 +279,10 @@ async function processCase(entry, outDir, opts) {
     frames: 0,
     ssimMean: NaN,
     pixelDiffMean: NaN,
+    exportBrowserSsimMean: NaN,
+    exportBrowserVsPagxSsimMean: NaN,
+    roundtripPagxSsimMean: NaN,
+    roundtripVsPagxSsimMean: NaN,
     motion: NaN,
     animCaptured: 0,
     animWarnings: 0,
@@ -276,6 +293,7 @@ async function processCase(entry, outDir, opts) {
     // the captured frames back as an animation on the real timeline clock (dynamic playback mode).
     times: [],
     globalDurationMs: 0,
+    roundtrip: !!opts.roundtrip,
     error: '',
   };
 
@@ -419,13 +437,150 @@ async function processCase(entry, outDir, opts) {
   row.ssimMean = mean(ssims);
   row.pixelDiffMean = mean(pdiffs);
   row.motion = baselineMotion(baselineFrames);
+
+  // 7. Optional round-trip evaluation:
+  //    subset.pagx -> exported.html -> (A) browser frames via baseline-frames.js
+  //                                 -> (B) roundtrip.pagx -> render frames
+  if (opts.roundtrip) {
+    const exportedHtml = path.join(caseDir, 'exported.html');
+    const roundtripPagx = path.join(caseDir, 'roundtrip.pagx');
+    const exportedBrowserDir = path.join(caseDir, 'exported-browser');
+    const roundtripRenderDir = path.join(caseDir, 'roundtrip-render');
+    ensureDir(exportedBrowserDir);
+    ensureDir(roundtripRenderDir);
+
+    if (!opts.skipExisting || !fs.existsSync(exportedHtml)) {
+      const r = await runPagxExportHtml({
+        pagxBin: opts.pagxBin,
+        pagxFile: subsetPagx,
+        htmlFile: exportedHtml,
+        stderrPath: path.join(caseDir, 'export.stderr.txt'),
+      });
+      if (r.code !== 0 || !fs.existsSync(exportedHtml)) {
+        row.error = 'export-html-failed';
+        return row;
+      }
+    }
+
+    // 7A. Render exported.html in headless Chromium at the exact same sample timestamps
+    const exportedSamplesJson = path.join(exportedBrowserDir, 'samples.json');
+    if (!opts.skipExisting || !fs.existsSync(exportedSamplesJson)) {
+      const r = await spawnCapture(
+        process.execPath,
+        [
+          path.join(SCRIPT_DIR, 'baseline-frames.js'), exportedHtml,
+          '-o', exportedBrowserDir,
+          '--samples', String(opts.samples),
+          '--times-json', samplesJson,
+          ...engineArgs,
+        ],
+        { stderrPath: path.join(caseDir, 'exported-browser.stderr.txt') },
+      );
+      if (r.code !== 0 || !fs.existsSync(exportedSamplesJson)) {
+        row.error = 'exported-browser-failed';
+        return row;
+      }
+    }
+
+    // 7B. Snapshot exported.html -> roundtrip.subset.html -> roundtrip.pagx -> resolve -> render frames
+    const roundtripSubsetHtml = path.join(caseDir, 'roundtrip.subset.html');
+    if (!opts.skipExisting || !fs.existsSync(roundtripPagx)) {
+      const rSnap = await forkSnapshotCli({
+        input: exportedHtml,
+        output: roundtripSubsetHtml,
+        scriptDir: TOOL_DIR,
+        browserEngine: opts.browserEngine || undefined,
+        captureAnimations: true,
+        downloadImages: opts.downloadImages,
+        imageDir: opts.downloadImages ? opts.imageCacheDir : '',
+        stderrPath: path.join(caseDir, 'roundtrip-snapshot.stderr.txt'),
+      });
+      if (rSnap.code !== 0 || !fs.existsSync(roundtripSubsetHtml)) {
+        row.error = 'roundtrip-snapshot-failed';
+        return row;
+      }
+      const rImp = await runPagxImportToFile({
+        pagxBin: opts.pagxBin,
+        subsetHtml: roundtripSubsetHtml,
+        pagxFile: roundtripPagx,
+        inferFlex: opts.inferFlex,
+        stderrPath: path.join(caseDir, 'roundtrip-import.stderr.txt'),
+      });
+      if (rImp.code !== 0 || !fs.existsSync(roundtripPagx)) {
+        row.error = 'roundtrip-import-failed';
+        return row;
+      }
+      const rRes = await runPagxResolve({
+        pagxBin: opts.pagxBin,
+        pagxFile: roundtripPagx,
+        imageStorage: opts.pagxImages,
+        imageBaseDir: caseDir,
+        stderrPath: path.join(caseDir, 'roundtrip-resolve.stderr.txt'),
+      });
+      if (rRes.code !== 0) {
+        row.error = 'roundtrip-resolve-failed';
+        return row;
+      }
+    }
+
+    const expBrowserVsBaseSsims = [];
+    const expBrowserVsPagxSsims = [];
+    const rtPagxVsBaseSsims = [];
+    const rtPagxVsPagxSsims = [];
+
+    for (const s of samples) {
+      const idx = String(s.index).padStart(3, '0');
+      const baselinePng = path.join(baselineDir, `frame-${idx}.png`);
+      const renderPng = path.join(renderDir, `frame-${idx}.png`);
+      const expBrowserPng = path.join(exportedBrowserDir, `frame-${idx}.png`);
+      const rtRenderPng = path.join(roundtripRenderDir, `frame-${idx}.png`);
+
+      if (!opts.skipExisting || !fs.existsSync(rtRenderPng)) {
+        const r = await runPagxRenderAtTime({
+          pagxBin: opts.pagxBin,
+          pagxFile: roundtripPagx,
+          output: rtRenderPng,
+          scale: opts.scale,
+          timeSec: s.timeSec,
+          stderrPath: path.join(caseDir, `roundtrip-render.${idx}.stderr.txt`),
+        });
+        if (r.code !== 0 || !fs.existsSync(rtRenderPng)) {
+          row.error = `roundtrip-render-failed@${idx}`;
+          return row;
+        }
+      }
+
+      try {
+        expBrowserVsBaseSsims.push(compare.pixelMetrics(baselinePng, expBrowserPng, null).ssim);
+        expBrowserVsPagxSsims.push(compare.pixelMetrics(renderPng, expBrowserPng, null).ssim);
+        rtPagxVsBaseSsims.push(compare.pixelMetrics(baselinePng, rtRenderPng, null).ssim);
+        rtPagxVsPagxSsims.push(compare.pixelMetrics(renderPng, rtRenderPng, null).ssim);
+      } catch (err) {
+        row.error = `roundtrip-compare-failed@${idx}: ${err.message}`;
+        return row;
+      }
+    }
+
+    row.exportBrowserSsimMean = mean(expBrowserVsBaseSsims);
+    row.exportBrowserVsPagxSsimMean = mean(expBrowserVsPagxSsims);
+    row.roundtripPagxSsimMean = mean(rtPagxVsBaseSsims);
+    row.roundtripVsPagxSsimMean = mean(rtPagxVsPagxSsims);
+  }
+
   return row;
 }
 
 function writeCsv(rows, outPath) {
+  const hasRt = rows.some((r) => r && r.roundtrip);
   const headers = [
-    'name', 'frames', 'ssimMean', 'pixelDiffMean', 'motion',
-    'animCaptured', 'animWarnings', 'animDropped', 'width', 'height', 'error',
+    'name', 'frames', 'ssimMean', 'pixelDiffMean',
+    ...(hasRt ? [
+      'exportBrowserSsimMean',
+      'exportBrowserVsPagxSsimMean',
+      'roundtripPagxSsimMean',
+      'roundtripVsPagxSsimMean',
+    ] : []),
+    'motion', 'animCaptured', 'animWarnings', 'animDropped', 'width', 'height', 'error',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -455,6 +610,10 @@ function summarize(rows) {
     ssimMean: mean(ok.map((r) => r.ssimMean)),
     ssimMovingMean: mean(moving.map((r) => r.ssimMean)),
     pdMean: mean(ok.map((r) => r.pixelDiffMean)),
+    exportBrowserSsimMean: mean(ok.map((r) => r.exportBrowserSsimMean)),
+    exportBrowserVsPagxSsimMean: mean(ok.map((r) => r.exportBrowserVsPagxSsimMean)),
+    roundtripPagxSsimMean: mean(ok.map((r) => r.roundtripPagxSsimMean)),
+    roundtripVsPagxSsimMean: mean(ok.map((r) => r.roundtripVsPagxSsimMean)),
     animCaptured: ok.reduce((a, r) => a + (r.animCaptured || 0), 0),
     animDropped: ok.reduce((a, r) => a + (r.animDropped || 0), 0),
   };
@@ -462,30 +621,52 @@ function summarize(rows) {
 
 function writeMarkdown(rows, outPath, label) {
   const s = summarize(rows);
-  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'error'];
+  const hasRt = rows.some((r) => r && r.roundtrip);
+  const headers = hasRt
+    ? ['name', 'frames', 'ssim(pagx/base)', 'expHtml/base', 'expHtml/pagx', 'rtPagx/base', 'rtPagx/pagx', 'motion', 'animCap', 'error']
+    : ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'error'];
   const lines = [];
   lines.push(`# Animation eval report — ${label}`);
   lines.push('');
   lines.push(`Cases: ${s.cases} (ok ${s.ok}, errored ${s.errored}, with motion ${s.moving})`);
   lines.push('');
-  lines.push(`- SSIM (per-frame mean) — all cases ${fmt(s.ssimMean)}, moving cases only ${fmt(s.ssimMovingMean)}`);
+  lines.push(`- SSIM (pagx vs baseline) — all cases ${fmt(s.ssimMean)}, moving cases only ${fmt(s.ssimMovingMean)}`);
   lines.push(`- pixel diff (per-frame mean) — ${fmt(s.pdMean)}`);
+  if (hasRt) {
+    lines.push(`- exported.html (browser) vs baseline SSIM — ${fmt(s.exportBrowserSsimMean)}`);
+    lines.push(`- exported.html (browser) vs pagx SSIM — ${fmt(s.exportBrowserVsPagxSsimMean)}`);
+    lines.push(`- roundtrip.pagx vs baseline SSIM — ${fmt(s.roundtripPagxSsimMean)}`);
+    lines.push(`- roundtrip.pagx vs pagx SSIM — ${fmt(s.roundtripVsPagxSsimMean)}`);
+  }
   lines.push(`- animations captured: ${s.animCaptured} (dropped at import: ${s.animDropped})`);
   lines.push('');
   lines.push('| ' + headers.join(' | ') + ' |');
   lines.push('| ' + headers.map(() => '---').join(' | ') + ' |');
   for (const r of rows) {
-    const cells = [
-      r.name,
-      String(r.frames),
-      fmt(r.ssimMean, 4),
-      isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) : '-',
-      fmt(r.motion, 3),
-      String(r.animCaptured),
-      String(r.animWarnings),
-      String(r.animDropped),
-      r.error || '',
-    ];
+    const cells = hasRt
+      ? [
+          r.name,
+          String(r.frames),
+          fmt(r.ssimMean, 4),
+          fmt(r.exportBrowserSsimMean, 4),
+          fmt(r.exportBrowserVsPagxSsimMean, 4),
+          fmt(r.roundtripPagxSsimMean, 4),
+          fmt(r.roundtripVsPagxSsimMean, 4),
+          fmt(r.motion, 3),
+          String(r.animCaptured),
+          r.error || '',
+        ]
+      : [
+          r.name,
+          String(r.frames),
+          fmt(r.ssimMean, 4),
+          isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) : '-',
+          fmt(r.motion, 3),
+          String(r.animCaptured),
+          String(r.animWarnings),
+          String(r.animDropped),
+          r.error || '',
+        ];
     lines.push('| ' + cells.join(' | ') + ' |');
   }
   fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
@@ -519,11 +700,14 @@ function writeIndexHtml(rows, outDir, label) {
     if (!r.error && r.frames > 0) {
       // Dynamic playback: one larger frame per channel that the JS swaps in time. The static strips
       // stay below it (collapsed by default) for frame-by-frame inspection.
+      const rtFigures = r.roundtrip ? `
+      <figure><figcaption>exported.html (browser)</figcaption><img class="play-img" data-sub="exported-browser" src="${dir}/exported-browser/frame-000.png"/></figure>
+      <figure><figcaption>roundtrip.pagx</figcaption><img class="play-img" data-sub="roundtrip-render" src="${dir}/roundtrip-render/frame-000.png"/></figure>` : '';
       const player = `
   <div class="player" data-case="${ci}">
     <div class="stage">
       <figure><figcaption>baseline</figcaption><img class="play-img" data-sub="baseline" src="${dir}/baseline/frame-000.png"/></figure>
-      <figure><figcaption>pagx</figcaption><img class="play-img" data-sub="render" src="${dir}/render/frame-000.png"/></figure>
+      <figure><figcaption>pagx</figcaption><img class="play-img" data-sub="render" src="${dir}/render/frame-000.png"/></figure>${rtFigures}
       <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${dir}/diff/frame-000.png"/></figure>
     </div>
     <div class="controls">
@@ -545,7 +729,15 @@ function writeIndexHtml(rows, outDir, label) {
       // One column per frame: the frame number once (shared by all three channels), then the
       // baseline / pagx / diff thumbnails stacked. A single scroll container holds every column, so
       // there is exactly one scrollbar and one number row driving all three channels.
-      const subs = [['baseline', 'baseline'], ['render', 'pagx'], ['diff', 'diff']];
+      const subs = r.roundtrip
+        ? [
+            ['baseline', 'baseline'],
+            ['render', 'pagx'],
+            ['exported-browser', 'exp.html'],
+            ['roundtrip-render', 'rt.pagx'],
+            ['diff', 'diff'],
+          ]
+        : [['baseline', 'baseline'], ['render', 'pagx'], ['diff', 'diff']];
       let cells = '';
       for (let i = 0; i < r.frames; i++) {
         const idx = String(i).padStart(3, '0');
@@ -561,9 +753,13 @@ function writeIndexHtml(rows, outDir, label) {
     ${strips}
   </details>`;
     }
+    const rtTags = r.roundtrip
+      ? ` <span class="ssim-tag ${ssimClass(r.exportBrowserSsimMean)}">expHtml/base ${fmt(r.exportBrowserSsimMean, 4)}</span>` +
+        ` <span class="ssim-tag ${ssimClass(r.roundtripVsPagxSsimMean)}">rtPagx/pagx ${fmt(r.roundtripVsPagxSsimMean, 4)}</span>`
+      : '';
     return `
 <section class="case">
-  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span></h2>
+  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span>${rtTags}</h2>
   <p>
     frames <b>${r.frames}</b> &middot; pixel diff <b>${isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) + '%' : '-'}</b>
     &middot; motion <b>${fmt(r.motion, 3)}</b>
@@ -574,6 +770,11 @@ function writeIndexHtml(rows, outDir, label) {
   ${body}
 </section>`;
   }).join('\n');
+
+  const hasRt = rows.some((r) => r && r.roundtrip);
+  const rtSummaryItems = hasRt ? `
+    <li>exported.html (browser) vs baseline SSIM — <b>${fmt(s.exportBrowserSsimMean, 4)}</b>, vs pagx — <b>${fmt(s.exportBrowserVsPagxSsimMean, 4)}</b></li>
+    <li>roundtrip.pagx vs baseline SSIM — <b>${fmt(s.roundtripPagxSsimMean, 4)}</b>, vs pagx — <b>${fmt(s.roundtripVsPagxSsimMean, 4)}</b></li>` : '';
 
   const html = `<!DOCTYPE html>
 <html>
@@ -629,7 +830,7 @@ function writeIndexHtml(rows, outDir, label) {
 <div class="summary">
   <ul>
     <li>SSIM (per-frame mean) — all <b>${fmt(s.ssimMean, 4)}</b>, moving cases only <b>${fmt(s.ssimMovingMean, 4)}</b></li>
-    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>
+    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>${rtSummaryItems}
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
   </ul>
 </div>
@@ -872,6 +1073,8 @@ async function main() {
       doneCount += 1;
       if (row.error) {
         console.log(`[${doneCount}/${total}] ${c.name}  ERROR ${row.error} (${dur} ms)`);
+      } else if (row.roundtrip) {
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  expHtml/pagx ${fmt(row.exportBrowserVsPagxSsimMean, 4)}  rtPagx/pagx ${fmt(row.roundtripVsPagxSsimMean, 4)}  anim ${row.animCaptured}  (${dur} ms)`);
       } else {
         console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  diff ${fmt(row.pixelDiffMean * 100, 2)}%  motion ${fmt(row.motion, 3)}  anim ${row.animCaptured}  (${dur} ms)`);
       }
