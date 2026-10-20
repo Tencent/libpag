@@ -28,9 +28,6 @@ namespace pagx {
 
 class HTMLWriterContext;
 class Layer;
-class Group;
-class Fill;
-class Stroke;
 class SolidColor;
 class LayerFilter;
 class Path;
@@ -69,7 +66,6 @@ class HTMLAnimationSession {
 
   std::vector<std::pair<Node*, std::string>> _restoredNodeIds = {};
   std::vector<std::pair<Layer*, bool>> _restoredGroupOpacity = {};
-  std::vector<std::pair<Group*, float>> _restoredGroupAlpha = {};
 
   std::unordered_map<const SolidColor*, const Node*> _solidToPainter = {};
   std::unordered_map<const LayerFilter*, const Layer*> _filterToLayer = {};
