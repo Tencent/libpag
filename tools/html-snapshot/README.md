@@ -669,8 +669,11 @@ independently of property order. Different axes or languages remain separate rec
 The inventory describes text requests in the captured HTML, including inline runs, line splits
 and materialized pseudo/first-letter text. Native conversion failures do not prevent an already
 captured inventory from being available. It never substitutes Linux fallback or
-mapped editor font names for the source request. Snapshot text runs without an HTML request (for example,
-some inline SVG text) are counted in `missingRequests`; their fonts are not guessed. Original text,
+mapped editor font names for the source request. Requests are read from standard CSS and `lang`
+attributes, without private request attributes. Snapshot text runs without a CSS family are
+counted in `missingRequests`; their fonts are not guessed. Inline SVG retains authored markup
+rather than computed text styles and remains outside HTML font matching; its text also counts
+as `missingRequests`. Original text,
 coordinates, glyph data and Text IDs are not copied into this file.
 
 Use the inventory to prepare the explicit `from` / `to` rules below: serialize `families` as
@@ -678,7 +681,7 @@ the `from.font-family` CSS stack, copy `weight` and `style` to `from.font-weight
 `from.font-style`, and choose the exact `to` family/face from the editor's available fonts.
 The inventory contains no inferred target. Ardot still imports the final PAGX directly.
 Module callers receive the absolute JSON path as `runHtmlToPagx(...).fontMetadataPath`.
-An old PAGX without source requests cannot recover this information; convert the original HTML.
+The inventory is collected from the HTML snapshot, not reconstructed from a PAGX.
 Service integrations can call `collectSnapshotFontMetadata(snapshotHtml)` from `lib/snapshot-fonts`
 to return this JSON before conversion, persist the same snapshot and its inlined resources, then
 accept an external `from` / `to` map to resume conversion. `validateSnapshotFontMap` rejects map
@@ -689,7 +692,7 @@ sources that are absent from that snapshot. The CLI continues directly through t
 Pass a JSON array of `from` / `to` rules with `--font-map`:
 
 ```sh
-./html2pagx page.html --embed-fonts --font-map font-map.json --no-render
+./html2pagx page.html --font-map font-map.json --no-render
 ```
 
 ```json
@@ -713,21 +716,22 @@ Pass a JSON array of `from` / `to` rules with `--font-map`:
 
 The matcher compares the original ordered family stack, numeric CSS weight and CSS style.
 Quoting, separator whitespace and family case do not affect the comparison. The source face
-label is descriptive; the target `font-weight-style` is copied verbatim, so 600 can explicitly
-map to Bold. Unmatched fonts remain unchanged; no default font is inferred. Conflicting rules
-are rejected before conversion. The caller supplies targets already available in its editor.
+label is descriptive. The target `font-weight-style` selects the exact face and takes precedence
+over the target numeric weight: the example above selects Bold, not SemiBold. Unmatched fonts
+retain normal resolution; no default target is inferred. Conflicting rules are rejected before
+conversion. The converter must have the target fonts available to shape and embed their glyphs.
 
-Source requests travel with text fragments through import/resolve/embed, keeping distinct
-requests separate even when PAGX rounds them to the same face. After embedding, each Text is
-matched directly and only its family/style is replaced. Temporary requests are removed;
-no Text IDs, document IDs or per-Text JSON sidecars are generated. Glyph resources and the
-original conversion layout are preserved. Existing authored IDs remain untouched.
-The snapshot inventory is produced independently before import; mapping never overwrites it.
-The deduplicated `.fonts.json` inventory above always keeps the source requests, including
-when a replacement map changes the final PAGX font names.
+Matching runs before native import, using the original CSS values before face rounding.
+`prepareSnapshotFontReplacements(snapshotHtml, fontMap)` produces conversion options passed to
+`HTMLImporter::Options::fontReplacements`. The native CLI accepts the same options through the
+repeatable `--font-replacement <families> <weight> <style> <target-family> <target-face>` flag.
+The importer applies the target family and exact face before layout and embedding, so glyphs
+and text metrics come from the target font. There is no post-conversion PAGX rewrite and no
+source-request metadata in subset HTML or PAGX. The snapshot and `.fonts.json` keep the original
+CSS requests and are not overwritten by mapping.
 
 Both single-file and batch runs support the flag. Module callers pass the same JSON array
-as `runHtmlToPagx({ fontMap, embedFonts: true, ... })` (or `runBatch`). Mapping requires resolve
-and embedding, and still runs when PNG rendering is disabled. The returned `fontMapping`
-counts replaced, unmatched and request-less texts. Request-less conversion paths are left
-unchanged and reported in the log; they are never matched by guessed Linux font names.
+as `runHtmlToPagx({ fontMap, ... })` (or `runBatch`). Mapping is independent of resolve, embedding
+and PNG rendering. The returned `fontMapping` counts matched, unmatched and request-less
+snapshot text runs. Request-less runs are left unchanged and reported in the log; they are
+never matched by guessed Linux font names.

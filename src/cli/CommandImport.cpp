@@ -406,8 +406,8 @@ static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOpti
   HTMLImporter::Options options = {};
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
-  options.emitFontRequestMetadata = formatOptions.fontRequestMetadata;
   options.emitFontFileResources = formatOptions.emitFontFileResources;
+  options.fontReplacements = formatOptions.fontReplacements;
   return options;
 }
 
@@ -567,9 +567,9 @@ static void PrintUsage() {
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
       << "                                 @keyframes, Web Animations, GSAP, anime.js) into the\n"
       << "                                 output so they replay in PAGX. Default: a static frame\n"
-      << "  --font-request-metadata        HTML only: preserve source font requests on Text\n"
-      << "                                 nodes for post-embedding replacement. No ids are\n"
-      << "                                 generated. Default: off\n"
+      << "  --font-replacement <families> <weight> <style> <target-family> <target-face>\n"
+      << "                                 HTML only: apply an exact font match before layout.\n"
+      << "                                 Repeat for additional source requests.\n"
       << "  --images <mode>                How image resources are stored: 'external' (default;\n"
       << "                                 write image files next to the output PAGX and keep the\n"
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
@@ -612,8 +612,6 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->resolve = false;
     } else if (arg == "--capture-animations") {
       options->formatOptions.captureAnimations = true;
-    } else if (arg == "--font-request-metadata") {
-      options->formatOptions.fontRequestMetadata = true;
     } else if (arg == "--images" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseImageStorageMode(mode, &options->imageStorage)) {
@@ -623,6 +621,23 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       }
     } else if (arg == "--image-base-dir" && i + 1 < argc) {
       options->imageBaseDir = argv[++i];
+    } else if (arg == "--font-replacement" && i + 5 < argc) {
+      HTMLImporter::FontReplacement replacement = {};
+      replacement.families = argv[++i];
+      char* end = nullptr;
+      replacement.weight = std::strtof(argv[++i], &end);
+      replacement.style = argv[++i];
+      replacement.targetFamily = argv[++i];
+      replacement.targetStyle = argv[++i];
+      if (*end != '\0' || !std::isfinite(replacement.weight) || replacement.weight < 1 ||
+          replacement.weight > 1000 || replacement.families.empty() ||
+          replacement.targetFamily.empty() || replacement.targetStyle.empty() ||
+          (replacement.style != "normal" && replacement.style != "italic" &&
+           replacement.style != "oblique")) {
+        std::cerr << "pagx import: error: invalid --font-replacement values\n";
+        return 1;
+      }
+      options->formatOptions.fontReplacements.push_back(std::move(replacement));
     } else if (arg == "--font-alias" && i + 1 < argc) {
       FontAlias alias = {};
       if (!ParseFontAlias(argv[++i], &alias, "pagx import")) {

@@ -27,9 +27,8 @@ import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import type { CapturedFontRef } from './font-download';
 import { FontMappingError, FontMappingErrorCode, validateFontMap } from './font-metadata';
 import type { FontMapRule } from './font-metadata';
-import { rewritePagxFonts } from './pagx-font-writer';
-import { collectSnapshotFontMetadata } from './snapshot-fonts';
-import type { FontRewriteResult } from './pagx-font-writer';
+import { collectSnapshotFontMetadata, prepareSnapshotFontReplacements } from './snapshot-fonts';
+import type { FontMappingResult, FontReplacement } from './snapshot-fonts';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -197,10 +196,10 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
 }
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
+  fontReplacements?: FontReplacement[];
   pagxBin?: string;
   subsetHtml?: string;
   pagxFile?: string;
-  fontRequestMetadata?: boolean;
   // Font files the snapshot downloaded rather than carried inside the subset. Import bakes glyphs
   // by default, so it needs them registered under the authored CSS families to shape with.
   fonts?: CapturedFontRef[];
@@ -211,7 +210,7 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
 export async function runPagxImportToFile(
   opts: RunPagxImportToFileOptions = {},
 ): Promise<SpawnCaptureResult> {
-  const { pagxBin, subsetHtml, pagxFile, fontRequestMetadata, fonts = [], stderrPath, log,
+  const { pagxBin, subsetHtml, pagxFile, fontReplacements = [], fonts = [], stderrPath, log,
     timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
@@ -221,7 +220,10 @@ export async function runPagxImportToFile(
   // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
     '--no-resolve'];
-  if (fontRequestMetadata) args.push('--font-request-metadata');
+  for (const replacement of fontReplacements) {
+    args.push('--font-replacement', replacement.families, String(replacement.weight),
+      replacement.style, replacement.targetFamily, replacement.targetStyle);
+  }
   // Import bakes the page's glyphs by default, so the fonts it cannot find on its own — the ones
   // the snapshot downloaded rather than carried inside the subset — have to be named here.
   appendFontArgs(args, fonts);
@@ -391,7 +393,7 @@ export interface RunHtmlToPagxOptions {
   selector?: string;
   snapshotImpl?: SnapshotImpl;
   snapshotExtraArgs?: string[];
-  /** Explicit from/to rules, applied after resolve/embed. Unmatched fonts stay unchanged. */
+  /** Explicit from/to rules, applied during native import before layout and embedding. Unmatched fonts stay unchanged. */
   fontMap?: FontMapRule[];
 }
 
@@ -402,7 +404,7 @@ export interface RunHtmlToPagxResult {
   fonts: CapturedFontRef[];
   /** Deduplicated original HTML font requests, written even without fontMap or embedding. */
   fontMetadataPath: string;
-  fontMapping?: FontRewriteResult;
+  fontMapping?: FontMappingResult;
 }
 
 // End-to-end orchestrator. Runs snapshot → import → optional resolve →
@@ -462,10 +464,6 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   if (opts.fontMap !== undefined) {
     const errors = validateFontMap(opts.fontMap);
     if (errors.length) throw new FontMappingError(FontMappingErrorCode.InvalidFontMap, errors.join('; '));
-    if (!doResolve || !embedFonts) {
-      throw new FontMappingError(FontMappingErrorCode.UnsupportedMappingOptions,
-        '--font-map requires resolve and --embed-fonts');
-    }
   }
 
 
@@ -518,10 +516,21 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     });
     assertStepOk('snapshot', snapshotResult);
 
-    const fontMetadata = collectSnapshotFontMetadata(fs.readFileSync(subsetHtml, 'utf8'));
+    const snapshotHtml = fs.readFileSync(subsetHtml, 'utf8');
+    const fontMetadata = collectSnapshotFontMetadata(snapshotHtml);
     fs.writeFileSync(fontMetadataPath, JSON.stringify(fontMetadata, null, 2) + '\n', 'utf8');
     log(`[font-metadata] ${fontMetadata.fonts.length} source request(s), ` +
       `${fontMetadata.missingRequests} without source requests -> ${fontMetadataPath}`);
+
+    let fontMapping: FontMappingResult | undefined;
+    let fontReplacements: FontReplacement[] = [];
+    if (opts.fontMap !== undefined) {
+      const mapped = prepareSnapshotFontReplacements(snapshotHtml, opts.fontMap);
+      fontReplacements = mapped.replacements;
+      fontMapping = mapped.mapping;
+      log(`[font-map] ${fontMapping.replaced} replaced, ${fontMapping.unmatched} unmatched`);
+    }
+    const fontResult = { fontMetadataPath, ...(fontMapping ? { fontMapping } : {}) };
 
     let fonts: CapturedFontRef[] = [];
     if (downloadFonts) {
@@ -536,7 +545,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       pagxBin,
       subsetHtml,
       pagxFile,
-      fontRequestMetadata: true,
+      fontReplacements,
       fonts,
       log: (line: string) => process.stderr.write(line + '\n'),
     });
@@ -547,20 +556,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
         stderr: importResult.stderr,
       });
     }
-
-    const finishFonts = (): Pick<RunHtmlToPagxResult, 'fontMetadataPath' | 'fontMapping'> => {
-      const mapping = rewritePagxFonts({
-        inputPath: pagxFile, outputPath: pagxFile, fontMap: opts.fontMap,
-      });
-      if (opts.fontMap !== undefined) {
-        const { replaced, unmatched, missingRequests } = mapping;
-        log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
-      }
-      return { fontMetadataPath, ...(opts.fontMap !== undefined ? { fontMapping: mapping } : {}) };
-    };
-
     if (!doResolve) {
-      const fontResult = finishFonts();
       log(`[done] wrote ${pagxFile} (skipped resolve+render)`);
       return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
     }
@@ -588,9 +584,6 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fonts });
       assertStepOk('pagx embed', embedResult);
     }
-
-    const fontResult = finishFonts();
-
     if (!doRender) {
       log(`[done] wrote ${pagxFile} (skipped render)`);
       return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };

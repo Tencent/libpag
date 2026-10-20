@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/HTMLImporter.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
 
@@ -45,6 +46,11 @@ class HTMLValueParser;
  */
 class HTMLStyleCascade {
  public:
+  /** Supplies font matching results for conversion, without modifying the source DOM. */
+  void setFontReplacements(const std::vector<HTMLImporter::FontReplacement>& replacements) {
+    _fontReplacements = replacements;
+  }
+
   using PropertyMap = std::unordered_map<std::string, std::string>;
   // Receives concrete font-family chains. `userData` is the pointer registered alongside the
   // thunk via `setFontFallbackSink`. The function-pointer + opaque-pointer shape avoids
@@ -117,6 +123,9 @@ class HTMLStyleCascade {
   }
 
  private:
+  bool applyFontReplacement(HTMLInheritedStyle& style);
+  std::vector<HTMLImporter::FontReplacement> _fontReplacements = {};
+
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
   void mergeClassRules(const std::string& classAttribute, PropertyMap& out);
 

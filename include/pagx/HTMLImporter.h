@@ -21,6 +21,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
@@ -44,6 +45,20 @@ class FontConfig;
  */
 class HTMLImporter {
  public:
+  /** A conversion-time replacement for one ordered CSS family stack, weight and style. */
+  struct FontReplacement {
+    /** Source CSS font-family value, including its ordered fallback families. */
+    std::string families = {};
+    /** Source numeric CSS weight, before rounding to a named face. */
+    float weight = 400;
+    /** Source CSS slant: normal, italic or oblique. */
+    std::string style = "normal";
+    /** Target family name used to shape the imported text. */
+    std::string targetFamily = {};
+    /** Exact target face name. Takes precedence over the source numeric CSS weight. */
+    std::string targetStyle = {};
+  };
+
   struct Options {
     /**
      * Target document width. When not NaN, overrides the canvas size implied by the HTML
@@ -121,13 +136,6 @@ class HTMLImporter {
     std::string basePath = {};
 
     /**
-     * Preserves each source font request on its Text as data-html-font-request for direct
-     * post-embedding from/to replacement. No Text or document ids are generated.
-     * Default false: source requests do not affect legacy fragment merging or output.
-     */
-    bool emitFontRequestMetadata = false;
-
-    /**
      * Emits one `<Font file>` resource per `@font-face` source that resolves to a file on disk.
      * The sources are loaded and registered into the document's font config either way, so
      * turning this off keeps layout intact while leaving the output free of font file references
@@ -135,6 +143,13 @@ class HTMLImporter {
      * Default true.
      */
     bool emitFontFileResources = true;
+
+    /**
+     * Font matching results applied during import, before text layout and embedding.
+     * Unmatched CSS requests retain normal font resolution. No source metadata is written
+     * to the returned document. Source keys must be unique. Inline SVG is not affected.
+     */
+    std::vector<FontReplacement> fontReplacements = {};
 
     Options() {
     }

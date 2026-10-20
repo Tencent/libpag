@@ -44,8 +44,6 @@ export interface FontTarget {
 export const FontMappingErrorCode = {
   InvalidFontMap: 'INVALID_FONT_MAP',
   FontMetadataMismatch: 'FONT_METADATA_MISMATCH',
-  UnsupportedMappingOptions: 'UNSUPPORTED_MAPPING_OPTIONS',
-  PagxFontRewriteFailed: 'PAGX_FONT_REWRITE_FAILED',
 } as const;
 
 export class FontMappingError extends Error {

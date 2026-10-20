@@ -1642,6 +1642,27 @@ static std::string WebFontIndexHTML() {
          "font-size:20px;white-space:nowrap\">&#xE000;&#xE001;</span></body></html>";
 }
 
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto input = TempDir() + "/font-replacement.html";
+  auto output = TempDir() + "/font-replacement.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style='font-family:Source;font-size:20px;font-weight:600'>A</span>"
+                          "</body></html>";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--fonts", "external",
+                     "--font-replacement", "Source", "600", "normal", "Target", "Bold"}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+  EXPECT_EQ(xml.find("font-request"), std::string::npos);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--font-replacement", "Source",
+                     "NaN", "normal", "Target", "Bold"}),
+            0);
+}
+
 // A zipped HTML export is extracted, imported from its index.html, and with `--fonts external` the
 // font file its @font-face names is copied next to the output, where the PAGX references it by
 // relative path instead of embedding glyphs. The reloaded document registers that file for layout.

@@ -13493,42 +13493,58 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsFlexGrowChil
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
 }
 
-TEST(PAGXFontMappingTest, SourceRequestsRemainSeparateWithoutGeneratedIds) {
-  const std::string html = R"(<html><body style="width:400px;height:200px">
-    <span style="font-family:Arial;font-size:20px">
-      <span style="font-weight:650" data-pagx-font-request='{"families":["Arial"],"weight":650,"style":"normal"}'>A</span><span style="font-weight:700" data-pagx-font-request='{"families":["Arial"],"weight":700,"style":"normal"}'>B</span>
-    </span></body></html>)";
+TEST(PAGXFontMappingTest, AppliesExactTargetFaceBeforeLayoutWithoutSourceAttributes) {
+  pagx::FontConfig config;
+  config.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, "Target",
+                      "Bold");
+  config.registerFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0, "Target",
+                      "SemiBold");
   pagx::HTMLImporter::Options options;
-  options.emitFontRequestMetadata = true;
-  auto doc = pagx::HTMLImporter::ParseString(html, options);
+  options.fontConfig = &config;
+  options.fontReplacements.push_back({"Source, sans-serif", 600, "normal", "Target", "Bold"});
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><body style='width:200px;height:100px'>"
+      "<div style='font-family:Source,sans-serif;font-size:20px;font-weight:600'>"
+      "<span>A</span><span style='font-weight:700'>B</span></div></body></html>",
+      options);
   ASSERT_NE(doc, nullptr);
-  std::vector<pagx::Text*> texts;
+  pagx::Text* mapped = nullptr;
+  pagx::Text* unmatched = nullptr;
   for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Text) {
-      texts.push_back(static_cast<pagx::Text*>(node.get()));
-    }
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    if (text->text == "A") mapped = text;
+    if (text->text == "B") unmatched = text;
+    EXPECT_EQ(text->customData.count("html-font-request"), 0u);
   }
-  ASSERT_EQ(texts.size(), 2u);
-  EXPECT_EQ(texts[0]->text, "A");
-  EXPECT_EQ(texts[1]->text, "B");
-  EXPECT_TRUE(texts[0]->id.empty());
-  EXPECT_TRUE(texts[1]->id.empty());
-  EXPECT_NE(texts[0]->customData.at("html-font-request").find("650"), std::string::npos);
-  EXPECT_NE(texts[1]->customData.at("html-font-request").find("700"), std::string::npos);
-  EXPECT_EQ(doc->customData.count("font-document-id"), 0u);
+  ASSERT_NE(mapped, nullptr);
+  ASSERT_NE(unmatched, nullptr);
+  EXPECT_EQ(mapped->fontFamily, "Target");
+  EXPECT_EQ(mapped->fontStyle, "Bold");
+  EXPECT_NE(unmatched->fontFamily, "Target");
+  doc->applyLayout();
+  ASSERT_FALSE(mapped->glyphData->layoutRuns.empty());
+  EXPECT_EQ(mapped->glyphData->layoutRuns[0].font.getTypeface()->fontFamily(), "Noto Sans SC");
+  EXPECT_EQ(mapped->fontStyle, "Bold");
+  ASSERT_TRUE(doc->embed());
+  EXPECT_FALSE(mapped->glyphRuns.empty());
+}
 
-  auto legacy = pagx::HTMLImporter::ParseString(html);
-  ASSERT_NE(legacy, nullptr);
-  size_t count = 0;
-  for (const auto& node : legacy->nodes) {
-    if (node->nodeType() == pagx::NodeType::Text) {
-      auto* text = static_cast<pagx::Text*>(node.get());
-      EXPECT_EQ(text->text, "AB");
-      EXPECT_EQ(text->customData.count("html-font-request"), 0u);
-      count++;
-    }
-  }
-  EXPECT_EQ(count, 1u);
+TEST(PAGXFontMappingTest, MatchesExactNumericWeightBeforeFaceRounding) {
+  pagx::HTMLImporter::Options options;
+  options.fontReplacements.push_back({"Source", 650, "normal", "Target", "Book"});
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><body style='width:200px;height:100px'>"
+      "<span style='font-family:Source;font-size:20px'>"
+      "<span style='font-weight:650'>A</span><span style='font-weight:700'>B</span>"
+      "</span></body></html>",
+      options);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "A");
+  EXPECT_EQ(text->fontFamily, "Target");
+  EXPECT_EQ(text->fontStyle, "Book");
 }
 
 }  // namespace pag

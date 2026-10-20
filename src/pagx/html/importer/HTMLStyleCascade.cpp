@@ -551,24 +551,41 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
   return fallback;
 }
 
+bool HTMLStyleCascade::applyFontReplacement(HTMLInheritedStyle& style) {
+  if (_fontReplacements.empty()) return false;
+  auto families = html::ParseFontFamilyTokens(style.fontFamily);
+  for (auto& family : families) family = ToLower(family);
+  auto cssWeight = ToLower(style.fontWeight);
+  float weight = cssWeight.empty() || cssWeight == "normal" ? 400
+                 : cssWeight == "bold"                      ? 700
+                                       : std::strtof(cssWeight.c_str(), nullptr);
+  auto slant = ToLower(style.fontStyle);
+  slant = slant.find("oblique") == 0 ? "oblique" : slant == "italic" ? "italic" : "normal";
+  for (const auto& replacement : _fontReplacements) {
+    if (weight != replacement.weight || slant != replacement.style) continue;
+    auto expected = html::ParseFontFamilyTokens(replacement.families);
+    for (auto& family : expected) family = ToLower(family);
+    if (families != expected) continue;
+    style.primaryFontFamily = replacement.targetFamily;
+    style.fontStyleName = replacement.targetStyle;
+    style.fauxBold = false;
+    style.fauxItalic = false;
+    return true;
+  }
+  return false;
+}
+
 HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                            const HTMLInheritedStyle& parent,
                                                            bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
-  // The font-request handshake attribute (html-snapshot -> importer) is not a CSS property, but
-  // it rides the same traversal: the nearest annotated element stamps its request onto the
-  // resolved style and descendants inherit it verbatim. The value is opaque here — validation
-  // happens on the consuming side (`font-metadata` in tools/html-snapshot).
-  if (const std::string* request = element->findAttribute("data-pagx-font-request")) {
-    out.fontRequest = *request;
-  }
+
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
-  // Re-parse the CSS font-family stack only when the raw value actually changed at this
-  // element. The cascade (`out = parent`) already carries the parent's parsed stack
-  // through unchanged in the common case where descendants inherit verbatim.
-  if (out.fontFamily != parent.fontFamily ||
+  // A replacement may have changed the parent's resolved family without changing its CSS.
+  // Rebuild from source CSS so an unmatched child cannot inherit the mapped family.
+  if (!_fontReplacements.empty() || out.fontFamily != parent.fontFamily ||
       (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
     out.fontFamilyChain.clear();
     out.primaryFontFamily.clear();
@@ -645,7 +662,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;
   out.fauxItalic = fontSynthesis.fauxItalic;
-  applyFontFaceNames(out, parent);
+  if (ToLower(element->name) == "svg" || !applyFontReplacement(out)) {
+    applyFontFaceNames(out, parent);
+  }
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",

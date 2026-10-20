@@ -283,17 +283,7 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;
   t->letterSpacing = fragment.letterSpacing;
-  applyFontRequestMetadata(t, fragment);
   return t;
-}
-
-void HTMLTextFragmentBuilder::applyFontRequestMetadata(Text* text, const TextFragment& fragment) {
-  if (!_emitFontRequestMetadata || fragment.fontRequest.empty()) {
-    return;
-  }
-  // Serialised as `data-html-font-request` by the PAGX exporter (Node::customData keys gain the
-  // `data-` prefix on write and lose it on read).
-  text->customData["html-font-request"] = fragment.fontRequest;
 }
 
 Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
@@ -450,7 +440,6 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.fontFamily =
       inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.primaryFontFamily;
   frag.fontStyleName = inherited.fontStyleName;
-  if (_emitFontRequestMetadata) frag.fontRequest = inherited.fontRequest;
   frag.fauxBold = inherited.fauxBold;
   frag.fauxItalic = inherited.fauxItalic;
   frag.fontSize = inherited.fontSizePx;
@@ -487,12 +476,9 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
   // prevent two same-styled inline runs from merging. Use a small absolute tolerance for
   // the float fields. The tolerance is well below any visually-meaningful step.
   constexpr float epsilon = 1e-3f;
-  // The raw font requests must match too: font-weight 650 and 700 both resolve to the "Bold"
-  // face label, but merging them would keep only one numeric request and the external font
-  // mapper could never tell the two runs apart.
   return a.fontFamily == b.fontFamily && a.fontStyleName == b.fontStyleName &&
-         a.fontRequest == b.fontRequest && a.fauxBold == b.fauxBold &&
-         a.fauxItalic == b.fauxItalic && std::fabs(a.fontSize - b.fontSize) < epsilon &&
+         a.fauxBold == b.fauxBold && a.fauxItalic == b.fauxItalic &&
+         std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
          a.fillSolidSet == b.fillSolidSet && a.fillSolid == b.fillSolid &&
@@ -513,7 +499,6 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
   bool incomingPreserveNewlines = false;
   ResolveWhiteSpaceFlags(inherited.whiteSpace, incomingCollapse, incomingPreserveNewlines);
   return familyMatch && a.fontStyleName == inherited.fontStyleName &&
-         (!_emitFontRequestMetadata || a.fontRequest == inherited.fontRequest) &&
          a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&

@@ -39,8 +39,6 @@
 // @ts-nocheck
 
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
-import { parseFontFamilyStack as parseFontFamilies } from './font-metadata';
-const parseFontFamilyStack = parseFontFamilies;
 // Imported under a distinct name because the value is only embedded as a
 // literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
 // `MAX_CAPTURE_HEIGHT_PX` that `snapshotMain` references is the const defined
@@ -62,16 +60,6 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // the subset transformer recovers flex geometry, but must not become an authored PAGX width.
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
-
-// The html-snapshot -> importer font-request handshake attribute. Every emitted text span
-// carries the page's original font request (full family stack, numeric weight, CSS style,
-// explicit variation axes, language) as single-quoted JSON BEFORE any normalisation or PAGX
-// weight bucketing, so the downstream editor font-mapping step matches against what the page
-// actually asked for instead of the Linux host's fallback resolution. The C++ importer reads
-// this attribute (HTMLStyleCascade::resolveInheritedStyle), copies it onto the Text node as
-// `data-html-font-request`, and never interprets it. Re-declared in PAYLOAD_CONSTANTS_SRC for
-// the browser payload (same pattern as BOUNDARY_SPACE).
-const FONT_REQUEST_ATTR = 'data-pagx-font-request';
 
 // Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
 // pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
@@ -113,56 +101,9 @@ function normalizeFontFamily(value: string): string {
   return value.replace(/"/g, "'");
 }
 
-// ===== Font-request capture (html2pagx font-mapping handshake) =====
-//
-// Everything below collects the page's *original* font request for one text run. The values
-// are captured from the computed style BEFORE any PAGX-facing normalisation (family quote
-// rewriting above, weight bucketing in the C++ importer) so the request the editor font
-// matcher sees is what the page authored: 650 stays 650, the family stack keeps its order,
-// and the numeric weight/style semantics survive. See `FONT_REQUEST_ATTR`.
-
-// Numeric weight straight from the computed style. Chromium already resolves
-// normal/bold/bolder/lighter to numbers; the keywords stay as a defensive fallback for
-// non-browser callers. Never buckets — 650 must stay 650.
-function normalizeCssFontWeight(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return 400;
-  const lower = raw.toLowerCase();
-  if (lower === 'normal') return 400;
-  if (lower === 'bold' || lower === 'bolder') return 700;
-  if (lower === 'lighter') return 300;
-  const parsed = parseFloat(raw);
-  if (!isFinite(parsed) || parsed <= 0) return 400;
-  return parsed;
-}
-
-// CSS font-style collapsed to the protocol enum. An angled `oblique 14deg` keeps the
-// oblique label; the angle itself is outside the family/style binding capability.
-function normalizeCssFontStyle(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw.indexOf('italic') === 0) return 'italic';
-  if (raw.indexOf('oblique') === 0) return 'oblique';
-  return 'normal';
-}
-
-// Explicit font-variation-settings axis values ("wght" 650, "wdth" 100). Returns null for
-// the computed `normal` / empty value so the protocol omits the field entirely.
-function parseVariationAxisValues(value) {
-  const raw = String(value || '').trim();
-  if (!raw || raw === 'normal') return null;
-  const result = {};
-  const pattern = /["']([A-Za-z0-9]{4})["']\s+(-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)/g;
-  let match;
-  while ((match = pattern.exec(raw)) !== null) {
-    const parsed = parseFloat(match[2]);
-    if (isFinite(parsed)) result[match[1]] = parsed;
-  }
-  return Object.keys(result).length > 0 ? result : null;
-}
-
 // Nearest ancestor (or document root) `lang` value; empty when none is declared. Never
 // guessed from the content.
-function collectFontRequestLang(el) {
+function collectLanguage(el) {
   try {
     const holder = el && typeof el.closest === 'function' ? el.closest('[lang]') : null;
     if (holder) {
@@ -179,9 +120,7 @@ function collectFontRequestLang(el) {
   }
 }
 
-// Escapes a JSON payload for a single-quoted XML attribute. Single quotes keep the JSON's
-// own double quotes readable and short; `&`, `'`, `<`, `>` must be entity-encoded so the
-// attribute survives the subset transformer and the XML parser.
+// Escapes text for a single-quoted XML attribute.
 function escapeSingleQuotedAttr(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -190,28 +129,9 @@ function escapeSingleQuotedAttr(value) {
     .replace(/>/g, '&gt;');
 }
 
-// Builds the `data-pagx-font-request` attribute for one text run — or '' when the run has
-// no usable family (defensive; a rendered text run always has one). The payload is the
-// compact JSON the importer copies verbatim and the font mapper parses back.
-function buildFontRequestAttribute(computed, el) {
-  try {
-    const families = parseFontFamilyStack(computed.getPropertyValue('font-family'));
-    if (families.length === 0) return '';
-    const request = {
-      families: families,
-      weight: normalizeCssFontWeight(computed.getPropertyValue('font-weight')),
-      style: normalizeCssFontStyle(computed.getPropertyValue('font-style')),
-    };
-    const variations = parseVariationAxisValues(
-      computed.getPropertyValue('font-variation-settings'),
-    );
-    if (variations) request.variations = variations;
-    const lang = collectFontRequestLang(el);
-    if (lang) request.lang = lang;
-    return ` ${FONT_REQUEST_ATTR}='${escapeSingleQuotedAttr(JSON.stringify(request))}'`;
-  } catch (err) {
-    return '';
-  }
+function buildLanguageAttribute(el) {
+  const lang = collectLanguage(el);
+  return lang ? ` lang='${escapeSingleQuotedAttr(lang)}'` : '';
 }
 
 // PAGX only models `overflow: hidden`. `clip`, `auto`, and `scroll` all map to
@@ -3111,9 +3031,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
     return emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve);
   }
-  // One request for every line span of this text node: the payload describes the run's
-  // authored font request, not a measurement.
-  const fontRequestAttr = buildFontRequestAttribute(computed, textNode.parentElement);
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
@@ -3157,7 +3075,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
       : '';
-    out.push(`<span${intrinsicWidth}${fontRequestAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${intrinsicWidth}${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3185,7 +3103,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
   const ws = computed.getPropertyValue('white-space');
   const columns = splitTextNodeIntoLines(textNode, ws, axis);
   const lineHeightPx = readNum(computed, 'line-height');
-  const fontRequestAttr = buildFontRequestAttribute(computed, textNode.parentElement);
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const out = [];
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
@@ -3208,7 +3126,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     let transformed = applyTextTransform(col.text, computed);
     if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
-    out.push(`<span${fontRequestAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3828,7 +3746,7 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     textStyle = withNowrap(textStyle);
   }
   const innerLayout = `display: flex; align-items: ${alignItems}` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span${buildFontRequestAttribute(computed, el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  const inner = `<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   if (String(el.tagName || '').toLowerCase() === 'select') {
     // Place the chevron on the control's own (unpadded) box rather than inside the padded flex
     // host — see selectArrowMarkup for why the host's padding would drift the two renderings
@@ -4037,7 +3955,7 @@ function renderDateControl(el, kind, rect, left, top, computed, opts) {
   const textStyle = withNowrap(buildStyle(0, 0, 0, 0, computed, {
     box: false, text: true, positioned: false,
   }));
-  let inner = text ? `<span${buildFontRequestAttribute(computed, el)} style="${textStyle}">${escapeHtml(text)}</span>` : '';
+  let inner = text ? `<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(text)}</span>` : '';
   inner += svgCalendarGlyph();
   const layout = 'display: flex; align-items: center; justify-content: space-between'
     + (padShort === '0px' ? '' : `; padding: ${padShort}`);
@@ -4499,12 +4417,12 @@ function emitInlineRunMarkup(el, parentComputed) {
       deltaParts.push(`-webkit-text-stroke: ${stroke}`);
     }
     const inner = emitInlineRunMarkup(c, cs);
-    const request = buildFontRequestAttribute(cs, c);
-    const parentRequest = buildFontRequestAttribute(parentComputed, el);
-    if (deltaParts.length === 0 && request === parentRequest) {
+    const language = buildLanguageAttribute(c);
+    const parentLanguage = buildLanguageAttribute(el);
+    if (deltaParts.length === 0 && language === parentLanguage) {
       out += inner;
     } else {
-      out += `<span${request} style="${deltaParts.join('; ')}">${inner}</span>`;
+      out += `<span${language} style="${deltaParts.join('; ')}">${inner}</span>`;
     }
   }
   return out;
@@ -4679,7 +4597,7 @@ function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
   // phantom wrap when the natural advance crowds the wrapper width.
   const style = withNowrap(boxStyle);
   const inner = emitInlineRunMarkup(el, computed);
-  return `<span${buildFontRequestAttribute(computed, el)} style="${style}">${inner}${overlays}</span>`;
+  return `<span${buildLanguageAttribute(el)} style="${style}">${inner}${overlays}</span>`;
 }
 
 // Pure-text leaf (no element children): emit one outer <div> carrying the
@@ -4768,7 +4686,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       } else {
         parts.push('flex-shrink: 0');
       }
-      return `<span${buildFontRequestAttribute(computed, el)} style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
+      return `<span${buildLanguageAttribute(el)} style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
     }
     // Mirror the source's own flex / padding declaration onto the wrapper
     // so the inline span lands where the browser painted it. A text-only
@@ -4806,7 +4724,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
                    { box: true, ...opts, flexContentSized: true })
       : boxStyle;
     const wrapperStyle = joinStyles(wrapperBox, innerLayout);
-    return `<div style="${wrapperStyle}"><span${buildFontRequestAttribute(computed, el)} style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
+    return `<div style="${wrapperStyle}"><span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
 
   // Inline `transform` on the host (e.g. `<h1 style="transform: skewX(-5deg)">`)
@@ -4929,7 +4847,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
     const textStyle = withNowrap(buildStyle(0, 0, 0, 0, pseudoComputed, {
       box: false, text: true, positioned: false,
     }));
-    spans.push(`<span${buildFontRequestAttribute(pseudoComputed, el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
+    spans.push(`<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
   }
   if (spans.length === 0) {
     return `<div style="${boxStyle}">${overlays}</div>`;
@@ -4983,7 +4901,7 @@ function renderFlexTextItem(child, parentComputed) {
   });
   const flexBits = `height: ${px(height)}; flex-shrink: 0`;
   const style = withNowrap([baseStyle, flexBits].filter(Boolean).join('; '));
-  return `<span${buildFontRequestAttribute(parentComputed, child.node.parentElement)} style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
+  return `<span${buildLanguageAttribute(child.node.parentElement)} style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
 }
 
 // Render an element + its subtree as a flex container. The container itself
@@ -5973,10 +5891,6 @@ const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
 
 const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
 
-// Browser-scope twin of the module-level FONT_REQUEST_ATTR (the html2pagx font-request
-// handshake attribute; see the module-level declaration for the rationale).
-const FONT_REQUEST_ATTR = '${FONT_REQUEST_ATTR}';
-
 // Browser-scope twin of the module-level COLLAPSIBLE_WS (whitespace collapse
 // that spares NBSP; see the module-level declaration for the rationale). The
 // raw-JS helpers below run inside this IIFE, so they resolve this payload-side
@@ -6067,8 +5981,9 @@ const STYLE_SCHEMA = [
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
-  { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
-  { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
+  { prop: 'font-variation-settings', scope: 'text', normalize: normalizeFontFamily },
+  { prop: 'font-weight',           scope: 'text' },
+  { prop: 'font-style',            scope: 'text' },
   { prop: 'letter-spacing',        scope: 'text', defaults: ['normal', '0px'] },
   { prop: 'line-height',           scope: 'text' },
   { prop: 'text-align',            scope: 'text', defaults: ['start', 'left'] },
@@ -6243,13 +6158,9 @@ const HELPER_FNS = [
   renderNativeControl,
   textLeafInnerLayout,
   renderTextLeaf,
-  parseFontFamilyStack,
-  normalizeCssFontWeight,
-  normalizeCssFontStyle,
-  parseVariationAxisValues,
-  collectFontRequestLang,
+  collectLanguage,
   escapeSingleQuotedAttr,
-  buildFontRequestAttribute,
+  buildLanguageAttribute,
   renderPseudoTextLeaf,
   renderFlexTextItem,
   renderFlexContainer,

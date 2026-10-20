@@ -111,8 +111,8 @@ Options (any unknown flag is forwarded to snapshot.js):
   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
   --font-map <file>          JSON array of explicit from/to font replacement rules.
                              Matches original CSS family stack, weight and style;
-                             writes the exact target family/face after embedding.
-                             Unmatched fonts stay unchanged. Requires --embed-fonts.
+                             applies the exact target family/face before layout.
+                             Unmatched fonts stay unchanged.
   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
                              or 'playwright'. Forwarded to snapshot.js.
                              Honours $HTML_SNAPSHOT_BROWSER.
