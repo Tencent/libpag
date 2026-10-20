@@ -53,11 +53,9 @@ struct PPTFeatureFlags {
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
-  // The Layer carries a perspective row, so the projection divides by a w that depends on z and no
-  // 2D affine can represent it. The whole layer bakes, which also keeps descendants at another z at
-  // the size the renderer gives them. The projected matrix stays axis aligned, so the shear probe
-  // above cannot see it. A layer that preserves 3D is not flagged.
+  // Perspective and shared 3D depth compositing require rasterization of the entire layer subtree.
   bool hasPerspectiveTransform = false;
+  bool hasPreserve3D = false;
   bool hasBackdropStyle = false;  // A backdrop-sampling layer style (BackgroundBlurStyle or
                                   // GlassStyle). Both are shader-based effects that sample the
                                   // pixels behind the layer (frosted blur for BackgroundBlur;
@@ -69,14 +67,14 @@ struct PPTFeatureFlags {
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
-   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms, perspective)
+   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear, perspective, preserve3D)
    * always trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported
    * blend modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
   bool needsRasterization(bool bakeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
-        hasDiamondGradient || hasShearTransform || hasPerspectiveTransform) {
+        hasDiamondGradient || hasShearTransform || hasPerspectiveTransform || hasPreserve3D) {
       return true;
     }
     if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackdropStyle)) {

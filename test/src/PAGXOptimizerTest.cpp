@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstring>
 #include <string>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
@@ -42,6 +43,11 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/VerifyUtils.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Surface.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
@@ -280,6 +286,77 @@ CLI_TEST(PAGXOptimizerTest, RectMaskWithTranslatedOwnerIsKept) {
   EXPECT_FALSE(user->hasScrollRect);
   EXPECT_EQ(user->mask, mask);
   EXPECT_FLOAT_EQ(user->x, 20);
+}
+
+static tgfx::Bitmap RenderMaskLayoutDocument(PAGXDocument* doc, tgfx::Context* context) {
+  doc->applyLayout();
+  auto root = pagx::LayerBuilder::Build(doc);
+  auto surface = tgfx::Surface::Make(context, 200, 100);
+  if (root == nullptr || surface == nullptr) {
+    return {};
+  }
+  root->draw(surface->getCanvas());
+  tgfx::Bitmap bitmap(200, 100, false, false);
+  tgfx::Pixmap pixels(bitmap);
+  if (!surface->readPixels(pixels.info(), pixels.writablePixels())) {
+    return {};
+  }
+  return bitmap;
+}
+
+PAGX_TEST(PAGXMaskLayoutTest, ParentPaddingPreservesMaskPixels) {
+  const std::string xml =
+      "<pagx width=\"200\" height=\"100\">"
+      "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "<Fill color=\"#FFFFFF\"/></Layer>"
+      "<Layer layout=\"horizontal\" width=\"200\" height=\"100\" padding=\"20,0,0,0\">"
+      "<Layer id=\"owner\" mask=\"@m\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#FF0000\"/></Layer></Layer></pagx>";
+  auto reference = PAGXImporter::FromXML(xml);
+  auto optimized = PAGXImporter::FromXML(xml);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(optimized, nullptr);
+  auto options = OnlyRuleOptions();
+  options.rectMaskToScrollRect = true;
+  pagx::OptimizeWithOptions(optimized.get(), options);
+  auto* owner = static_cast<Layer*>(optimized->findNode("owner"));
+  ASSERT_NE(owner, nullptr);
+  EXPECT_NE(owner->mask, nullptr);
+  EXPECT_FALSE(owner->hasScrollRect);
+  auto before = RenderMaskLayoutDocument(reference.get(), context);
+  auto after = RenderMaskLayoutDocument(optimized.get(), context);
+  ASSERT_FALSE(before.isEmpty());
+  ASSERT_FALSE(after.isEmpty());
+  tgfx::Pixmap beforePixels(before);
+  tgfx::Pixmap afterPixels(after);
+  EXPECT_EQ(
+      std::memcmp(beforePixels.pixels(), afterPixels.pixels(), beforePixels.info().byteSize()), 0);
+}
+
+PAGX_TEST(PAGXMaskLayoutTest, ChildMaskPaddingPreservesPixels) {
+  const std::string xml =
+      "<pagx width=\"200\" height=\"100\"><Layer id=\"owner\" padding=\"20\" mask=\"@m\">"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+      "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "<Fill color=\"#FFFFFF\"/></Layer></Layer></pagx>";
+  auto reference = PAGXImporter::FromXML(xml);
+  auto optimized = PAGXImporter::FromXML(xml);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(optimized, nullptr);
+  auto options = OnlyRuleOptions();
+  options.rectMaskToScrollRect = true;
+  pagx::OptimizeWithOptions(optimized.get(), options);
+  auto* owner = static_cast<Layer*>(optimized->findNode("owner"));
+  ASSERT_NE(owner, nullptr);
+  EXPECT_NE(owner->mask, nullptr);
+  auto before = RenderMaskLayoutDocument(reference.get(), context);
+  auto after = RenderMaskLayoutDocument(optimized.get(), context);
+  ASSERT_FALSE(before.isEmpty());
+  ASSERT_FALSE(after.isEmpty());
+  tgfx::Pixmap beforePixels(before);
+  tgfx::Pixmap afterPixels(after);
+  EXPECT_EQ(
+      std::memcmp(beforePixels.pixels(), afterPixels.pixels(), beforePixels.info().byteSize()), 0);
 }
 
 CLI_TEST(PAGXOptimizerTest, RectMaskWithRoundnessIsKept) {

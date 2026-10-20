@@ -30,6 +30,7 @@ static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextPath |= src.hasTextPath;
   dst->hasTextModifier |= src.hasTextModifier;
   dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
+  dst->hasPreserve3D |= src.hasPreserve3D;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
 }
@@ -93,13 +94,8 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // output size and turns surrounding native content into non-editable raster. Composition
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
-  // A perspective cannot be expressed by any SVG transform. The whole layer bakes so that
-  // descendants placed at a different z keep the projected size the renderer gives them. A layer
-  // that preserves 3D keeps its vector output: the bake replays it inside a 3D context, which
-  // applies the layer matrix a second time.
-  if (!layer->preserve3D && HasPerspective(BuildLayerLocalMatrix3D(layer))) {
-    out.hasPerspectiveTransform = true;
-  }
+  out.hasPreserve3D = layer->preserve3D;
+  out.hasPerspectiveTransform = HasPerspective(BuildLayerLocalMatrix3D(layer));
   return out;
 }
 

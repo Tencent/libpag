@@ -80,8 +80,10 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
 Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
                              const std::unordered_set<std::string>& animatedTargets);
 
-bool TryConvertRectMaskToScrollRect(Layer* layer);
-bool RectMaskToScrollRectInLayer(Layer* layer);
+bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
+                                    const std::vector<Layer*>& siblings);
+bool RectMaskToScrollRectInLayer(Layer* layer, const Layer* parent,
+                                 const std::vector<Layer*>& siblings);
 
 bool ColorSourcesEqual(const ColorSource* a, const ColorSource* b);
 bool FillsEqual(const Fill* a, const Fill* b);
@@ -478,7 +480,8 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
 // when the layer doesn't already declare a frame.
 // ----------------------------------------------------------------------------
 
-bool TryConvertRectMaskToScrollRect(Layer* layer) {
+bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
+                                    const std::vector<Layer*>& siblings) {
   if (layer->mask == nullptr) {
     return false;
   }
@@ -489,6 +492,24 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   auto* m = layer->mask;
+  if (!m->children.empty() || m->composition != nullptr) {
+    return false;
+  }
+  // Layout has not run yet. Keep masks whose relative placement can be changed by container
+  // layout or padding, and only rewrite masks in the same parent space or directly inside the owner.
+  if (parent != nullptr && (parent->layout != LayoutMode::None || !parent->padding.isZero())) {
+    return false;
+  }
+  if (layer->layout != LayoutMode::None || !layer->padding.isZero() ||
+      m->layout != LayoutMode::None || !m->padding.isZero() || LayoutNodeHasConstraints(m)) {
+    return false;
+  }
+  bool sharesParent = std::find(siblings.begin(), siblings.end(), m) != siblings.end();
+  bool isChild =
+      std::find(layer->children.begin(), layer->children.end(), m) != layer->children.end();
+  if (!sharesParent && !isChild) {
+    return false;
+  }
   if (m->x != 0 || m->y != 0) {
     return false;
   }
@@ -590,10 +611,11 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   return true;
 }
 
-bool RectMaskToScrollRectInLayer(Layer* layer) {
-  bool changed = TryConvertRectMaskToScrollRect(layer);
+bool RectMaskToScrollRectInLayer(Layer* layer, const Layer* parent,
+                                 const std::vector<Layer*>& siblings) {
+  bool changed = TryConvertRectMaskToScrollRect(layer, parent, siblings);
   for (auto* child : layer->children) {
-    changed |= RectMaskToScrollRectInLayer(child);
+    changed |= RectMaskToScrollRectInLayer(child, layer, layer->children);
   }
   return changed;
 }
@@ -1751,7 +1773,7 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
     if (options.rectMaskToScrollRect) {
       bool rmChanged = false;
       for (auto* layer : layers) {
-        rmChanged |= RectMaskToScrollRectInLayer(layer);
+        rmChanged |= RectMaskToScrollRectInLayer(layer, nullptr, layers);
       }
       if (rmChanged) {
         RecomputeMaskRefs(doc, maskRefs);

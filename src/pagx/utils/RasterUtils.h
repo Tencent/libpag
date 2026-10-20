@@ -78,9 +78,9 @@ tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer
  * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
  * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
  * the logical bounds when placing the PNG so that consumers scale it back up on display.
- * If the layer has its own scrollRect, the output is clipped to and sized by the scrollRect's
- * visible window in `root`'s coordinates (since tgfx's Layer::draw deliberately skips applying
- * the layer's own scrollRect).
+ * The target is composited through a temporary parent in the exporter-owned tree, applying its
+ * matrix, alpha, mask and scrollRect once. The original parent and child order are restored.
+ * A scrollRect clips and sizes the output to its visible window in `root`'s coordinates.
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,

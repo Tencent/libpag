@@ -864,7 +864,19 @@ CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCostGlassStyle) {
 }
 
 CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
+  // The mask is 100x50 while the layer frame is 150x75, so replacing it with clipToBounds would
+  // change the rendered area and no such advice may be emitted.
   auto inputPath = TestResourcePath("verify_c13_simple_rect_mask.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_EQ(oss.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_RectMaskMatchingFrameSuggestsClipToBounds) {
+  auto inputPath = TestResourcePath("verify_rect_mask_matching_frame.pagx");
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
@@ -873,6 +885,25 @@ CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_MaskWithAuthoredOffsetDoesNotSuggestBoundsClip) {
+  auto inputPath = TempDir() + "/mask_authored_offset.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"200\" height=\"100\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"100,50\" size=\"200,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer left=\"0\" top=\"0\" x=\"20\" width=\"200\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"100,50\" size=\"200,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_EQ(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+  EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_ValidFile) {
@@ -1141,7 +1172,7 @@ CLI_TEST(PAGXCliTest, Verify_FullCanvasClipMask) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
+  EXPECT_TRUE(output.find("mask covers entire canvas") != std::string::npos);
 }
 
 //==============================================================================

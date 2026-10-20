@@ -95,6 +95,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
   dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
+  dst->hasPreserve3D |= src.hasPreserve3D;
   dst->hasBackdropStyle |= src.hasBackdropStyle;
 }
 
@@ -207,14 +208,8 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   if (MatrixHasShear(BuildLayerMatrix(layer))) {
     out.hasShearTransform = true;
   }
-  // A perspective cannot be flattened into any 2D affine, and the projected x / y rows stay axis
-  // aligned, so the shear probe above cannot see it. The whole layer bakes so that descendants
-  // placed at a different z, which the perspective rescales, keep their projected size. A layer
-  // that preserves 3D keeps its vector output: the bake replays it inside a 3D context, which
-  // applies the layer matrix a second time.
-  if (!layer->preserve3D && HasPerspective(BuildLayerLocalMatrix3D(layer))) {
-    out.hasPerspectiveTransform = true;
-  }
+  out.hasPreserve3D = layer->preserve3D;
+  out.hasPerspectiveTransform = HasPerspective(BuildLayerLocalMatrix3D(layer));
   for (const auto* filter : layer->filters) {
     if (filter == nullptr) {
       continue;

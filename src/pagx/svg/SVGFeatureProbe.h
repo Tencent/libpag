@@ -39,10 +39,9 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
-  // The layer carries a perspective row, so the projection is not affine and no SVG transform can
-  // express it; the whole layer bakes, keeping descendants at another z at the size the renderer
-  // gives them. A layer that preserves 3D is not flagged.
+  // Perspective and shared 3D depth compositing require rasterization of the entire layer subtree.
   bool hasPerspectiveTransform = false;
+  bool hasPreserve3D = false;
 
   /**
    * Returns true when at least one feature is present.

@@ -4942,14 +4942,12 @@ PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
   EXPECT_FALSE(features.hasPerspectiveTransform);
   EXPECT_FALSE(features.needsRasterization(false));
 
-  // A layer that preserves 3D keeps its vector output: the bake replays it inside a 3D context,
-  // which applies the layer matrix twice.
   layer->z = 0;
   layer->perspective = 500;
   layer->preserve3D = true;
   features = pagx::ProbeLayerFeatures(layer);
-  EXPECT_FALSE(features.hasPerspectiveTransform);
-  EXPECT_FALSE(features.needsRasterization(false));
+  EXPECT_TRUE(features.hasPreserve3D);
+  EXPECT_TRUE(features.needsRasterization(false));
 }
 
 PAGX_TEST(PAGXPPTTest, MultipleShadowStylesAndFilters) {

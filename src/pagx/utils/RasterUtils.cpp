@@ -84,29 +84,53 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
 
 namespace {
 
-// Draws `targetLayer` (and only that layer) into the off-screen canvas, with
-// the global bounds origin mapped to (0,0) so the emitted PNG is tightly
-// cropped. Used for mask / scrollRect bakes where the layer's visual result
-// does not depend on the backdrop.
-//
-// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own
-// scrollRect (see Layer.h doc on draw()) — only children's scrollRects are
-// honoured during the recursive walk. Without this drawer applying the clip
-// itself the baked PNG would contain the target's full unclipped content. The
-// scrollRect lives in layer-local coordinates, so we clip after concatenating
-// the layer's relative matrix while the canvas is still in layer-local space.
+// Inserts a content-free parent in the exporter-owned tree so normal child compositing applies
+// the target's transform, alpha, mask and scrollRect exactly once. The original tree is restored
+// before returning to the exporter.
+class RasterLayerParent {
+ public:
+  explicit RasterLayerParent(const std::shared_ptr<tgfx::Layer>& target)
+      : target(target), parent(target->parent()), wrapper(tgfx::Layer::Make()) {
+    if (parent != nullptr) {
+      parent->replaceChild(target, wrapper);
+    }
+    wrapper->addChild(target);
+  }
+
+  ~RasterLayerParent() {
+    if (parent != nullptr) {
+      parent->replaceChild(wrapper, target);
+    } else {
+      target->removeFromParent();
+    }
+  }
+
+  std::shared_ptr<tgfx::Layer> layer() const {
+    return wrapper;
+  }
+
+ private:
+  std::shared_ptr<tgfx::Layer> target;
+  tgfx::Layer* parent = nullptr;
+  std::shared_ptr<tgfx::Layer> wrapper;
+};
+
 struct MaskedLayerDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Rect& globalBounds;
+  const tgfx::Layer* coordinateSpace;
+  const tgfx::Rect& bounds;
+
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-globalBounds.left, -globalBounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(root.get()));
-    auto scrollRect = targetLayer->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
+    canvas->translate(-bounds.left, -bounds.top);
+    if (targetLayer == root) {
+      root->draw(canvas);
+      return;
     }
-    targetLayer->draw(canvas);
+    RasterLayerParent parent(targetLayer);
+    auto wrapper = parent.layer();
+    canvas->concat(wrapper->getRelativeMatrix(coordinateSpace));
+    wrapper->draw(canvas);
   }
 };
 
@@ -270,45 +294,10 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(globalBounds.width()));
   int height = static_cast<int>(ceilf(globalBounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawer{root, targetLayer, globalBounds});
+                            MaskedLayerDrawer{root, targetLayer, root.get(), globalBounds});
   gpu->unlock();
   return result;
 }
-
-namespace {
-
-// Draws `targetLayer` (and only that layer) into the off-screen canvas using the supplied
-// coordinate space rather than the document root. The bounds origin is mapped to (0,0) so the
-// PNG is tightly cropped and can be placed at `bounds.left/top` inside any container whose
-// transform chain matches `coordinateSpace`. Used by the SVG path where the enclosing `<g>`
-// already carries the parent transform.
-//
-// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own scrollRect (see
-// Layer.h doc on draw()) — only children's scrollRects are honoured during the recursive walk.
-// This drawer applies the clip itself so the baked PNG honours the scrollRect window even when
-// the visual content overflows it (e.g. a layer with both a scrollRect and SVG-unsupported
-// features such as TextPath / TextModifier / Conic / Diamond gradient that triggers the SVG
-// rasterize fallback). Without this clip the PNG would contain out-of-window pixels and the
-// SVG `<image>` placement at `bounds` would still leak them since `writeLayer` returns early
-// after a successful rasterize and skips the enclosing scrollRect `<g>` wrapper. The scrollRect
-// lives in layer-local coordinates, so we clip after concatenating the layer's relative matrix
-// while the canvas is still in layer-local space.
-struct MaskedLayerDrawerInSpace {
-  const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Layer* coordinateSpace;
-  const tgfx::Rect& bounds;
-  void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-bounds.left, -bounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
-    auto scrollRect = targetLayer->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
-    }
-    targetLayer->draw(canvas);
-  }
-};
-
-}  // namespace
 
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
@@ -327,7 +316,7 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(bounds.width()));
   int height = static_cast<int>(ceilf(bounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawerInSpace{targetLayer, coordinateSpace, bounds});
+                            MaskedLayerDrawer{root, targetLayer, coordinateSpace, bounds});
   gpu->unlock();
   return result;
 }

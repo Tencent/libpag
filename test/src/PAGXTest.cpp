@@ -10661,7 +10661,7 @@ PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
 /**
  * Test case: a static non-identity matrix3D rejects x / y / z / matrix and transform component
  * writes, a static non-identity matrix rejects x / y writes, and a singular matrix3D write is
- * published as-is because the renderer draws nothing for a zero-area transform.
+ * published as-is rather than leaving the previous pose on screen.
  */
 PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10699,8 +10699,7 @@ PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(1, 3), 6);
   EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 20);
 
-  // A singular pose is a frame the animation is supposed to show, so it is published instead of
-  // being rejected; the renderer draws nothing for a zero-area transform.
+  // The finite singular sample replaces the previous pose; its X scale collapses the content plane.
   pagx::Matrix3D singular = {};
   singular.values[0] = 0;
   EXPECT_TRUE(binding->apply(layer2D, "matrix3D", pagx::KeyValue{singular}, 1.0f));

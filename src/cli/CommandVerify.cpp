@@ -66,6 +66,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateMachineTimeline.h"
@@ -200,13 +201,12 @@ static void DetectZeroStrokeWidth(const Stroke* stroke,
 // Static Detection: Full Canvas Clip Mask
 // ============================================================================
 
-// Returns true if the layer maps its local space onto its parent space unchanged, so a mask at the
-// layer origin clips exactly the rect it authors. renderPosition() resolves both the authored x / y
-// and any position layout generated for the layer.
+// Checks the authored local transform separately from the position produced by layout.
 static bool HasIdentityLayerTransform(const Layer* layer) {
-  auto position = layer->renderPosition();
-  return position.x == 0 && position.y == 0 && layer->z == 0 && layer->matrix.isIdentity() &&
-         layer->matrix3D.isIdentity() && !HasLayerTransformComponents(layer);
+  auto position = layer->layoutPosition();
+  return layer->x == 0 && layer->y == 0 && layer->z == 0 && layer->matrix.isIdentity() &&
+         layer->matrix3D.isIdentity() && !HasLayerTransformComponents(layer) &&
+         (std::isnan(position.x) || position.x == 0) && (std::isnan(position.y) || position.y == 0);
 }
 
 static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, float canvasHeight,
@@ -220,17 +220,25 @@ static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, floa
     return;
   }
   auto* maskLayer = layer->mask;
-  if (maskLayer->contents.size() != 1) {
-    return;
-  }
-  if (maskLayer->contents[0]->nodeType() != NodeType::Rectangle) {
+  if (layer->maskType != MaskType::Alpha || maskLayer->alpha != 1 || !maskLayer->children.empty() ||
+      maskLayer->composition != nullptr || !maskLayer->filters.empty() ||
+      !maskLayer->styles.empty() || maskLayer->contents.size() != 2 ||
+      maskLayer->contents[0]->nodeType() != NodeType::Rectangle ||
+      maskLayer->contents[1]->nodeType() != NodeType::Fill) {
     return;
   }
   auto* rect = static_cast<Rectangle*>(maskLayer->contents[0]);
-  float left = rect->position.x - rect->size.width * 0.5f;
-  float top = rect->position.y - rect->size.height * 0.5f;
-  float right = rect->position.x + rect->size.width * 0.5f;
-  float bottom = rect->position.y + rect->size.height * 0.5f;
+  auto* fill = static_cast<Fill*>(maskLayer->contents[1]);
+  if (rect->roundness != 0 || rect->reversed || fill->alpha != 1 || fill->color == nullptr ||
+      fill->color->nodeType() != NodeType::SolidColor ||
+      static_cast<const SolidColor*>(fill->color)->color.alpha != 1) {
+    return;
+  }
+  auto bounds = rect->layoutBounds();
+  float left = bounds.x;
+  float top = bounds.y;
+  float right = left + bounds.width;
+  float bottom = top + bounds.height;
   if (left <= 0 && top <= 0 && right >= canvasWidth && bottom >= canvasHeight) {
     AddDiagnostic(
         diagnostics, layer->sourceLine,
@@ -1697,7 +1705,20 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   if (fill->alpha < 0.999f) {
     return;
   }
-  if (fill->color != nullptr && fill->color->nodeType() != NodeType::SolidColor) {
+  if (fill->color == nullptr || fill->color->nodeType() != NodeType::SolidColor) {
+    return;
+  }
+  auto* color = static_cast<const SolidColor*>(fill->color);
+  if (color->color.alpha != 1 || maskLayer->alpha != 1 || !maskLayer->children.empty() ||
+      maskLayer->composition != nullptr || !maskLayer->filters.empty() ||
+      !maskLayer->styles.empty()) {
+    return;
+  }
+  // clipToBounds clips the local frame, not an arbitrary rectangular window.
+  auto maskBounds = rect->layoutBounds();
+  auto ownerBounds = layer->layoutBounds();
+  if (maskBounds.x != 0 || maskBounds.y != 0 || maskBounds.width != ownerBounds.width ||
+      maskBounds.height != ownerBounds.height) {
     return;
   }
   AddDiagnostic(diagnostics, layer->sourceLine,
