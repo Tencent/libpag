@@ -1247,9 +1247,6 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   for (auto& kv : _restoredGroupOpacity) {
     kv.first->groupOpacity = kv.second;
   }
-  for (auto& kv : _restoredGroupAlpha) {
-    kv.first->alpha = kv.second;
-  }
   _ctx.animatedElementIds.clear();
 }
 
