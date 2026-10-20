@@ -589,7 +589,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // is not something we can fold into the geos vector). Without writeGroup the TextBox
         // would be silently dropped — pagx_features Pipeline buttons (".pagx", ".pag",
         // "Production" labels) symptom: button background renders, label text disappears.
-        if ((hasPainter && hasText && groupHasTransform) || hasTextBox) {
+        if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
+            _ctx->animatedElementIds.count(group) > 0) {
           writeGroup(out, group, alpha, distribute);
         } else {
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
@@ -1212,6 +1213,18 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         continue;
       }
       out.openTag("span");
+      {
+        auto animIdIt = _ctx->animatedElementIds.end();
+        if (span.fill) {
+          animIdIt = _ctx->animatedElementIds.find(span.fill);
+        }
+        if (animIdIt == _ctx->animatedElementIds.end() && span.text) {
+          animIdIt = _ctx->animatedElementIds.find(span.text);
+        }
+        if (animIdIt != _ctx->animatedElementIds.end()) {
+          out.addAttr("id", animIdIt->second);
+        }
+      }
       out.addAttr("style", spanStyle);
       // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
       // lineHeight that exceeds the glyph's natural advance), emit per-CJK-character
@@ -1339,6 +1352,18 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       continue;
     }
     out.openTag("span");
+    {
+      auto animIdIt = _ctx->animatedElementIds.end();
+      if (span.fill) {
+        animIdIt = _ctx->animatedElementIds.find(span.fill);
+      }
+      if (animIdIt == _ctx->animatedElementIds.end() && span.text) {
+        animIdIt = _ctx->animatedElementIds.find(span.text);
+      }
+      if (animIdIt != _ctx->animatedElementIds.end()) {
+        out.addAttr("id", animIdIt->second);
+      }
+    }
     out.addAttr("style", spanStyle);
     std::string rtSpanText = span.text->text;
     out.closeTagWithTextBreaks(rtSpanText);

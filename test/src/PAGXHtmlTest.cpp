@@ -3243,4 +3243,371 @@ PAGX_TEST(PAGXHtmlWriterTest, Matrix3DToCSSKeepsSmallPerspectiveTerms) {
   EXPECT_FLOAT_EQ(std::strtof(parts[11].c_str(), nullptr), -2.5e-05f);
 }
 
+// =============================================================================
+// Keyframe Animation Export Tests
+// =============================================================================
+
+CLI_TEST(PAGXHtmlTest, AnimationSwitchOffIsolation) {
+  auto samplePath = ProjectPath::Absolute("spec/samples/animation.pagx");
+  auto docWithAnim = pagx::PAGXImporter::FromFile(samplePath);
+  ASSERT_NE(docWithAnim, nullptr);
+  ASSERT_FALSE(docWithAnim->animations.empty());
+
+  pagx::HTMLExportOptions offOptions;
+  offOptions.exportAnimations = false;
+  auto htmlWithFlagOff = ConvertToHTML(docWithAnim, offOptions);
+  ASSERT_FALSE(htmlWithFlagOff.empty());
+  EXPECT_EQ(htmlWithFlagOff.find("@keyframes"), std::string::npos);
+  EXPECT_EQ(htmlWithFlagOff.find("animation:"), std::string::npos);
+
+  auto docWithoutAnim = pagx::PAGXImporter::FromFile(samplePath);
+  ASSERT_NE(docWithoutAnim, nullptr);
+  docWithoutAnim->animations.clear();
+  auto htmlWithoutAnim = ConvertToHTML(docWithoutAnim);
+  EXPECT_EQ(htmlWithFlagOff, htmlWithoutAnim);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerAlphaLinearAndLoop) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="box" width="100" height="100">
+      <Rectangle width="100" height="100"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Animations>
+      <Animation id="fade" duration="120" frameRate="60" loop="loop">
+        <Object target="box">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1" interpolation="linear"/>
+            <Key time="120" value="0.2"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@keyframes pagx_box_0"), std::string::npos);
+  EXPECT_NE(html.find("0% { opacity: 0.2; }"), std::string::npos);
+  EXPECT_NE(html.find("50% { opacity: 1; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { opacity: 0.2; }"), std::string::npos);
+
+  auto boxTag = FindTagContaining(html, "id=\"box\"");
+  ASSERT_FALSE(boxTag.empty());
+  EXPECT_NE(boxTag.find("animation:pagx_box_0 2s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationInterpolationBezierAndHold) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="holdDot" width="20" height="20">
+      <Ellipse width="20" height="20"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+    <Layer id="bezierDot" left="50" width="20" height="20">
+      <Ellipse width="20" height="20"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+    <Animations>
+      <Animation id="easeAnim" duration="120" frameRate="60" loop="loop">
+        <Object target="holdDot">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="hold"/>
+            <Key time="60" value="0.2" interpolation="hold"/>
+            <Key time="120" value="1"/>
+          </Channel>
+        </Object>
+        <Object target="bezierDot">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.1" interpolation="bezier" bezierOut="0.42,0"/>
+            <Key time="60" value="1" interpolation="bezier" bezierIn="0.58,1" bezierOut="0.42,0"/>
+            <Key time="120" value="0.1" bezierIn="0.58,1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("animation-timing-function: steps(1, end)"), std::string::npos);
+  EXPECT_NE(html.find("animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1)"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLoopModesAndDelay) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="onceBox" width="40" height="40">
+      <Rectangle width="40" height="40"/>
+      <Fill color="#FF0000"/>
+      <Timelines>
+        <Animation ref="@onceAnim" evaluationOffset="30"/>
+      </Timelines>
+    </Layer>
+    <Layer id="pongBox" left="60" width="40" height="40">
+      <Rectangle width="40" height="40"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+    <Animations>
+      <Animation id="onceAnim" duration="120" frameRate="60" loop="once">
+        <Object target="onceBox">
+          <Channel name="alpha" type="float">
+            <Key time="30" value="0.2" interpolation="linear"/>
+            <Key time="120" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+      <Animation id="pongAnim" duration="60" frameRate="60" loop="pingPong">
+        <Object target="pongBox">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.3" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("25% { opacity: 0.2; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { opacity: 1; }"), std::string::npos);
+
+  auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
+  ASSERT_FALSE(onceTag.empty());
+  EXPECT_NE(onceTag.find("2s linear 0.5s 1 forwards"), std::string::npos);
+
+  auto pongTag = FindTagContaining(html, "id=\"pongBox\"");
+  ASSERT_FALSE(pongTag.empty());
+  EXPECT_NE(pongTag.find("1s linear infinite alternate"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationXY) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer id="slider" left="20" top="50" width="24" height="24">
+      <Rectangle width="24" height="24"/>
+      <Fill color="#22D3EE"/>
+    </Layer>
+    <Animations>
+      <Animation id="slideAnim" duration="120" frameRate="60" loop="loop">
+        <Object target="slider">
+          <Channel name="x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="360" interpolation="linear"/>
+            <Key time="120" value="20"/>
+          </Channel>
+          <Channel name="y" type="float">
+            <Key time="0" value="50" interpolation="linear"/>
+            <Key time="30" value="80" interpolation="linear"/>
+            <Key time="60" value="50" interpolation="linear"/>
+            <Key time="120" value="50"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto sliderTag = FindTagContaining(html, "id=\"slider\"");
+  ASSERT_FALSE(sliderTag.empty());
+  EXPECT_NE(sliderTag.find("left:20px"), std::string::npos);
+  EXPECT_NE(sliderTag.find("top:50px"), std::string::npos);
+
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("25% { transform: translate(170px, 30px); }"), std::string::npos);
+  EXPECT_NE(html.find("50% { transform: translate(340px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(0px, 0px); }"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerMatrixAndRotationScale) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="matLayer" width="50" height="50">
+      <Rectangle width="50" height="50"/>
+      <Fill color="#FF8800"/>
+    </Layer>
+    <Layer id="hostLayer" left="100" width="60" height="60">
+      <Group id="rotGrp">
+        <Rectangle width="60" height="60"/>
+        <Fill color="#8800FF"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="tfAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="matLayer">
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+            <Key time="60" value="2,0,0,2,10,20"/>
+          </Channel>
+        </Object>
+        <Object target="rotGrp">
+          <Channel name="rotation" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="180"/>
+          </Channel>
+          <Channel name="scale.x" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="1.5"/>
+          </Channel>
+          <Channel name="scale.y" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="1.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { transform: matrix(1,0,0,1,0,0); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: matrix(2,0,0,2,10,20); }"), std::string::npos);
+  EXPECT_NE(html.find("0% { transform: rotate(0deg) scale(1); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: rotate(180deg) scale(1.5); }"), std::string::npos);
+
+  auto matTag = FindTagContaining(html, "id=\"matLayer\"");
+  ASSERT_FALSE(matTag.empty());
+  EXPECT_NE(matTag.find("transform-origin:0 0"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="rectLayer" width="80" height="80">
+      <Rectangle width="80" height="80"/>
+      <Fill>
+        <SolidColor id="bgCol" color="#FF0000"/>
+      </Fill>
+    </Layer>
+    <Layer id="txtLayer" top="100" width="200" height="40">
+      <TextBox width="200" height="40">
+        <Text text="ColorText" fontFamily="Arial" fontSize="20"/>
+        <Fill>
+          <SolidColor id="txtCol" color="#00FF00"/>
+        </Fill>
+      </TextBox>
+    </Layer>
+    <Animations>
+      <Animation id="colAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="bgCol">
+          <Channel name="color" type="color">
+            <Key time="0" value="#FF0000" interpolation="linear"/>
+            <Key time="60" value="#0000FF"/>
+          </Channel>
+        </Object>
+        <Object target="txtCol">
+          <Channel name="color" type="color">
+            <Key time="0" value="#00FF00" interpolation="linear"/>
+            <Key time="60" value="#FFFF00"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { background-color: #FF0000; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { background-color: #0000FF; }"), std::string::npos);
+  EXPECT_NE(html.find("0% { color: #00FF00; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { color: #FFFF00; }"), std::string::npos);
+
+  auto bgTag = FindTagContaining(html, "id=\"bgCol\"");
+  ASSERT_FALSE(bgTag.empty());
+  EXPECT_NE(bgTag.find("animation:"), std::string::npos);
+
+  auto txtTag = FindTagContaining(html, "id=\"txtCol\"");
+  ASSERT_FALSE(txtTag.empty());
+  EXPECT_NE(txtTag.find("animation:"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSVGStrokeAndDashOffset) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="strokeLayer" width="200" height="200">
+      <Path data="M 10 10 L 190 10 L 190 190"/>
+      <Stroke id="st" color="#00FF00" width="4" dashes="10,5"/>
+    </Layer>
+    <Animations>
+      <Animation id="dashAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="st">
+          <Channel name="dashOffset" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="30"/>
+          </Channel>
+          <Channel name="color" type="color">
+            <Key time="0" value="#00FF00" interpolation="linear"/>
+            <Key time="60" value="#FF00FF"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto pathTag = FindTagContaining(html, "id=\"st\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_EQ(pathTag.rfind("<path", 0), 0u);
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos);
+
+  EXPECT_NE(html.find("0% { stroke: #00FF00; stroke-dashoffset: 0; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { stroke: #FF00FF; stroke-dashoffset: 30; }"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupPreservation) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="parentLayer" width="200" height="200">
+      <Group id="grp">
+        <Rectangle width="60" height="60"/>
+        <Fill color="#FF0000"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="grpAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="grp">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto grpTag = FindTagContaining(html, "id=\"grp\"");
+  ASSERT_FALSE(grpTag.empty());
+  EXPECT_NE(grpTag.find("pagx-group"), std::string::npos);
+  EXPECT_NE(grpTag.find("animation:pagx_grp_0 1s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSampleFileExport) {
+  auto samplePath = ProjectPath::Absolute("spec/samples/animation.pagx");
+  auto html = LoadAndConvert(samplePath);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 6u);
+  EXPECT_NE(html.find("@keyframes pagx_pulseCircle_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot1_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot2_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot3_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_slidingBar_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_labelText_"), std::string::npos);
+
+  for (const char* id : {"pulseCircle", "dot1", "dot2", "dot3", "slidingBar", "labelText"}) {
+    auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
+    EXPECT_FALSE(tag.empty()) << "Missing element id=" << id;
+  }
+}
+
 }  // namespace pag
