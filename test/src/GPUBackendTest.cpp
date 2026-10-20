@@ -19,8 +19,52 @@
 #include "base/PAGTest.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
+#include "tgfx/gpu/Context.h"
 
 namespace pag {
+
+/**
+ * Verifies that a scope with no device remains empty and does not acquire a lock.
+ */
+PAG_TEST(DeviceLockScopeTest, NullDeviceIsEmpty) {
+  DeviceLockScope scope(nullptr);
+  EXPECT_FALSE(static_cast<bool>(scope));
+  EXPECT_EQ(scope.context(), nullptr);
+}
+
+/**
+ * Verifies that sequential scopes lock the requested device and release it on destruction.
+ */
+PAG_TEST(DeviceLockScopeTest, SequentialLocksReleaseDevice) {
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  for (int index = 0; index < 3; index++) {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    EXPECT_EQ(scope.context()->device(), device.get());
+  }
+}
+
+/**
+ * Verifies that a scope retains its device until the lock is released, even if the caller drops
+ * the original device reference.
+ */
+PAG_TEST(DeviceLockScopeTest, RetainsLockedDevice) {
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  std::weak_ptr<tgfx::Device> weakDevice = device;
+  std::shared_ptr<tgfx::Device> retainedDevice;
+  {
+    DeviceLockScope scope(std::move(device));
+    ASSERT_TRUE(static_cast<bool>(scope));
+    retainedDevice = weakDevice.lock();
+    ASSERT_TRUE(retainedDevice != nullptr);
+    EXPECT_EQ(scope.context()->device(), retainedDevice.get());
+  }
+  DeviceLockScope scope(retainedDevice);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  EXPECT_EQ(scope.context()->device(), retainedDevice.get());
+}
 
 /**
  * 用例描述: BackendSemaphore 跨后端 getter 守卫与复位语义（纯逻辑，无需 GPU 设备）

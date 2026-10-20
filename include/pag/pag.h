@@ -1179,6 +1179,11 @@ class Composition;
 
 class PAGPlayer;
 
+/**
+ * A GPU-backed render target that manages its device's context lock internally. Callers must not
+ * hold the same GPU device's context lock while calling methods that access its GPU resources,
+ * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ */
 class PAG_API PAGSurface {
  public:
   /**
@@ -1295,6 +1300,11 @@ class PAG_API PAGSurface {
 
 class FileReporter;
 
+/**
+ * Renders a composition into a PAGSurface and manages its device's context lock internally.
+ * Callers must not hold the same GPU device's context lock while calling methods that access GPU
+ * resources, including flush(), flushAndSignalSemaphore(), wait(), prepare(), and pixel hit tests.
+ */
 class PAG_API PAGPlayer {
  public:
   PAGPlayer();

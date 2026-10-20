@@ -189,8 +189,6 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     return;
   }
 
-  // Reentrancy-safe lock: HTMLExporter::ToData can be invoked while the caller already holds
-  // the default device; the scope then reuses that context instead of deadlocking.
   pag::DeviceLockScope deviceLock;
   if (!deviceLock) {
     return;
