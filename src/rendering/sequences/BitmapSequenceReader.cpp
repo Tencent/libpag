@@ -49,7 +49,8 @@ BitmapSequenceReader::~BitmapSequenceReader() {
   }
 }
 
-std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(
+    Frame targetFrame, const std::shared_ptr<SequenceReadResult>&) {
   // a locker is required here because decodeFrame() could be called from multiple threads.
   std::lock_guard<std::mutex> autoLock(locker);
   if (lastDecodeFrame == targetFrame) {

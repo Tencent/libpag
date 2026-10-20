@@ -258,9 +258,8 @@ std::shared_ptr<tgfx::ImageBuffer> SoftwareDecoderWrapper::onRenderFrame() {
         videoFormat.width, videoFormat.height, static_cast<int>(videoFormat.colorSpace));
   }
 #endif
-  auto yuvData =
-      SoftwareData<SoftwareDecoder>::Make(videoFormat.width, videoFormat.height, frame->data,
-                                          frame->lineSize, I420_PLANE_COUNT, softwareDecoder);
+  auto yuvData = CopiedYUVData::Make(videoFormat.width, videoFormat.height, frame->data,
+                                     frame->lineSize, I420_PLANE_COUNT);
   return tgfx::ImageBuffer::MakeI420(std::move(yuvData), videoFormat.colorSpace);
 }
 

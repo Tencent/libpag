@@ -45,6 +45,13 @@ class SequenceImageQueue {
   std::shared_ptr<tgfx::Image> getImage(Frame targetFrame,
                                         std::shared_ptr<SequenceReadResult>* result = nullptr);
 
+  /**
+   * Returns the last cached Image without triggering any decoding. This is used while the sequence
+   * is in a retry cooldown, so the last decoded frame (which may be a fallback frame from a failed
+   * decode) can stay on screen instead of flashing a transparent frame.
+   */
+  std::shared_ptr<tgfx::Image> getCachedImage(Frame targetFrame);
+
   void invalidateFailedRequest(uint64_t requestID, Frame targetFrame);
 
   /**

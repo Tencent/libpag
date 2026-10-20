@@ -19,6 +19,7 @@
  * resampling so the structural signal doesn't get smoothed away.
  */
 'use strict';
+// Keep the shared pixelmatch, SSIM and RGB delta math aligned with ../../ppt-eval/compare.js.
 
 const fs = require('fs');
 const path = require('path');

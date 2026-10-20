@@ -626,6 +626,13 @@ inline EffectSources CollectEffectSources(const std::vector<LayerFilter*>& filte
         break;
     }
   }
+  // Match the emission rules so no-op or unsupported effects do not create empty groups.
+  if (sources.blur && !((sources.blur->blurX + sources.blur->blurY) / 2.0f > 0)) {
+    sources.blur = nullptr;
+  }
+  if (sources.blend && !BlendModeToPPT(sources.blend->blendMode)) {
+    sources.blend = nullptr;
+  }
   return sources;
 }
 
@@ -686,8 +693,7 @@ class PPTWriter {
 
   void writeLayer(XMLBuilder& out, const Layer* layer,
                   const std::shared_ptr<tgfx::Layer>& tgfxLayer, const Matrix& parentMatrix = {},
-                  float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
-                  const std::vector<LayerStyle*>& inheritedStyles = {});
+                  float parentAlpha = 1.0f);
 
  private:
   // Returns true iff the layer was successfully rasterized and emitted as p:pic.
@@ -745,38 +751,27 @@ class PPTWriter {
   };
 
   void writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
-                     const Matrix& transform, float alpha, const std::vector<LayerFilter*>& filters,
-                     const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox = nullptr,
+                     const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr,
                      LayerPlacement targetPlacement = LayerPlacement::Background);
 
   void processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
-                          const Matrix& transform, float alpha,
-                          const std::vector<LayerFilter*>& filters,
-                          const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox,
+                          const Matrix& transform, float alpha, const TextBox* parentTextBox,
                           std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
                           LayerPlacement targetPlacement);
 
   void emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
-                          const FillStrokeInfo& fs, float alpha,
-                          const std::vector<LayerFilter*>& filters,
-                          const std::vector<LayerStyle*>& styles);
+                          const FillStrokeInfo& fs, float alpha);
 
   void writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
-                      const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
-                      const std::vector<LayerStyle*>& styles);
+                      const Matrix& m, float alpha);
   void writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                    const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
-                    const std::vector<LayerStyle*>& styles);
+                    const Matrix& m, float alpha);
   void writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs, const Matrix& m,
-                 float alpha, const std::vector<LayerFilter*>& filters,
-                 const std::vector<LayerStyle*>& styles);
+                 float alpha);
   void writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
-                       float alpha, const std::vector<LayerFilter*>& filters,
-                       const std::vector<LayerStyle*>& styles);
+                       float alpha);
   void writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
-                       float alpha, const std::vector<LayerFilter*>& filters,
-                       const std::vector<LayerStyle*>& styles,
-                       const TextLayoutResult* precomputed = nullptr);
+                       float alpha, const TextLayoutResult* precomputed = nullptr);
 
   // Geometry inputs needed to build the native-text shape frame: the shape's
   // top-left, its estimated content size, and whether the source has a text
@@ -807,16 +802,10 @@ class PPTWriter {
                                 const TextBox* textBox, bool disableAutoWrap);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
-                          int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU,
-                          const std::vector<LayerFilter*>& filters,
-                          const std::vector<LayerStyle*>& styles);
+                          int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU);
   void writeParagraph(XMLBuilder& out, const std::string& lineText, const PPTRunStyle& style,
-                      const std::vector<LayerFilter*>& filters,
-                      const std::vector<LayerStyle*>& styles, int64_t lnSpcPts = 0,
-                      bool rtl = false, int64_t defTabSzEMU = 0);
-  void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style,
-                         const std::vector<LayerFilter*>& filters,
-                         const std::vector<LayerStyle*>& styles);
+                      int64_t lnSpcPts = 0, bool rtl = false, int64_t defTabSzEMU = 0);
+  void writeParagraphRun(XMLBuilder& out, const std::string& runText, const PPTRunStyle& style);
   // Soft line break inside an a:p. The rPr is needed so the line break inherits
   // the same font/size as the following run (otherwise PowerPoint uses its
   // default size and the line-height of that break is wrong).
@@ -832,8 +821,7 @@ class PPTWriter {
                                    size_t end, const PPTRunStyle& style);
   void writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                          const std::vector<Element*>& elements, const Matrix& transform,
-                         float alpha, const std::vector<LayerFilter*>& filters,
-                         const std::vector<LayerStyle*>& styles);
+                         float alpha);
 
   // Tracks the open/close state of an <a:p> element while writeTextBoxGroup
   // streams runs into paragraphs. Replaces the previous lambda-based approach
@@ -847,8 +835,6 @@ class PPTWriter {
     int64_t lnSpcPts;
     bool rtl;
     int64_t defTabSzEMU;
-    const std::vector<LayerFilter*>& filters;
-    const std::vector<LayerStyle*>& styles;
     bool paragraphOpen = false;
 
     void writePPr();
@@ -892,8 +878,7 @@ class PPTWriter {
                              const Rect& shapeBounds);
   void writeGradientStops(XMLBuilder& out, const std::vector<ColorStop*>& stops, float alpha);
   void writeStroke(XMLBuilder& out, const Stroke* stroke, float alpha);
-  void writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
-                    const std::vector<LayerStyle*>& styles = {});
+  void writeEffects(XMLBuilder& out, const EffectSources& sources);
   void writeShadowElement(XMLBuilder& out, const char* tag, float blurX, float blurY, float offsetX,
                           float offsetY, const Color& color, bool includeAlign);
 
@@ -903,9 +888,7 @@ class PPTWriter {
   void writeGlyphShape(XMLBuilder& out, const Fill* fill, float alpha);
 
   void writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
-                      const Rect& shapeBounds, bool imageWritten,
-                      const std::vector<LayerFilter*>& filters,
-                      const std::vector<LayerStyle*>& styles = {});
+                      const Rect& shapeBounds, bool imageWritten);
 
   // Shared contour-to-custGeom emitter used by writePath and writeTextAsPath
   // for the non-bridged or single-group case (when callers haven't already

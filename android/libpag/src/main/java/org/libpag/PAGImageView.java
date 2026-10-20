@@ -214,6 +214,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
 
     private int _scaleMode = PAGScaleMode.LetterBox;
     private volatile Matrix _matrix;
+    private volatile boolean matrixDrivenByScaleMode = true;
 
     /**
      * Returns the current scale mode.
@@ -227,10 +228,11 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
      * current matrix of the PAGImageView changes when this method is called.
      */
     public void setScaleMode(int scaleMode) {
-        if (scaleMode == _scaleMode) {
+        if (scaleMode == _scaleMode && matrixDrivenByScaleMode) {
             return;
         }
         _scaleMode = scaleMode;
+        matrixDrivenByScaleMode = true;
         if (hasSize()) {
             refreshMatrixFromScaleMode();
             postInvalidate();
@@ -253,6 +255,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     public void setMatrix(Matrix matrix) {
         _matrix = matrix;
         _scaleMode = PAGScaleMode.None;
+        matrixDrivenByScaleMode = false;
         if (hasSize()) {
             postInvalidate();
         }
@@ -764,6 +767,13 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
 
     private void refreshMatrixFromScaleMode() {
         if (_scaleMode == PAGScaleMode.None) {
+            if (matrixDrivenByScaleMode && decoderInfo.isValid() && _composition != null) {
+                // The decoder pre-scales frames to roughly the view size, so undo that scaling to
+                // display the composition at its original size, matching the PAGView None semantics.
+                _matrix = new Matrix();
+                _matrix.postScale(_composition.width() * _renderScale / decoderInfo._width,
+                        _composition.height() * _renderScale / decoderInfo._height);
+            }
             return;
         }
         _matrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width, decoderInfo._height, width, height);

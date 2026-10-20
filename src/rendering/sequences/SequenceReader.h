@@ -29,6 +29,10 @@ enum class SequenceReadStatus {
   Pending,
   Succeeded,
   Failed,
+  // The reader returned a previously decoded buffer for the requested frame because decoding
+  // failed. Consumers must not treat the read as a real success (for example, the frame should
+  // not be persisted into a disk cache), while the display can still show the stale content.
+  Fallback,
 };
 
 struct SequenceReadResult {
@@ -61,9 +65,13 @@ class SequenceReader {
 
  protected:
   /**
-   * Return the decoded ImageBuffer of the specified frame.
+   * Return the decoded ImageBuffer of the specified frame. Implementations that synthesize a
+   * buffer for the requested frame (instead of really decoding it) should store the
+   * SequenceReadStatus::Fallback status into the result, which is otherwise filled in by
+   * readBuffer().
    */
-  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) = 0;
+  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(
+      Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) = 0;
 
   /**
    * Reports the decoding performance data.

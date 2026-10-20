@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { TGFX } from '@tgfx/types';
+import { EmscriptenGL, TGFX } from '@tgfx/types';
 import { PAGXView } from './pagx-view';
 
 /**
@@ -371,7 +371,12 @@ export interface _PAGXView {
 /**
  * The PAGX Viewer WebAssembly module.
  */
-export interface PAGXModule extends TGFX {
+export type PAGXModule = TGFX & {
+  /**
+   * The WebGL backend runtime. Declared explicitly because TGFX is a union type: without
+   * pinning an arm, GL would degrade to EmscriptenGL | undefined for single-backend builds.
+   */
+  GL: EmscriptenGL;
   _PAGXView: {
     /**
      * Creates a native PAGXView instance from a canvas element.
@@ -381,4 +386,4 @@ export interface PAGXModule extends TGFX {
     _MakeFrom: (canvasID: string) => _PAGXView | null;
   };
   PAGXView: typeof PAGXView;
-}
+};
