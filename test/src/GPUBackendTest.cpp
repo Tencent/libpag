@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
+#include <type_traits>
 #include "base/PAGTest.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
@@ -67,51 +69,67 @@ PAG_TEST(DeviceLockScopeTest, RetainsLockedDevice) {
 }
 
 /**
- * 用例描述: BackendSemaphore 跨后端 getter 守卫与复位语义（纯逻辑，无需 GPU 设备）
+ * Verifies GL semaphore initialization, null-handle behavior, conversion, and explicit reset.
  */
-PAG_TEST(BackendSemaphoreTest, CrossBackendGuards) {
+PAG_TEST(BackendSemaphoreTest, GLInitializationAndReset) {
   BackendSemaphore semaphore = {};
-  EXPECT_FALSE(semaphore.isInitialized());
-  EXPECT_EQ(semaphore.backend(), Backend::MOCK);
-
-  semaphore.initGL(reinterpret_cast<void*>(1));
-  EXPECT_TRUE(semaphore.isInitialized());
-  EXPECT_EQ(semaphore.backend(), Backend::OPENGL);
-  EXPECT_EQ(semaphore.glSync(), reinterpret_cast<void*>(1));
-  // Reading Metal accessors on a GL semaphore must not leak the union.
-  MtlEventInfo crossInfo = {};
-  crossInfo.event = reinterpret_cast<void*>(9);
-  crossInfo.value = 9;
-  EXPECT_FALSE(semaphore.getMtlEventInfo(&crossInfo));
-  EXPECT_EQ(crossInfo.event, reinterpret_cast<void*>(9));
-
-  semaphore = {};
-  MtlEventInfo info = {};
-  info.event = reinterpret_cast<void*>(2);
-  info.value = 5;
-  semaphore.initMetal(info);
-  EXPECT_TRUE(semaphore.isInitialized());
-  EXPECT_EQ(semaphore.backend(), Backend::METAL);
-  MtlEventInfo readBack = {};
-  EXPECT_TRUE(semaphore.getMtlEventInfo(&readBack));
-  EXPECT_EQ(readBack.event, reinterpret_cast<void*>(2));
-  EXPECT_EQ(readBack.value, 5u);
-  // Reading the GL accessor on a Metal semaphore must not leak the union.
-  EXPECT_EQ(semaphore.glSync(), nullptr);
-
-  // A null handle leaves the semaphore uninitialized.
-  semaphore = {};
   semaphore.initGL(nullptr);
   EXPECT_FALSE(semaphore.isInitialized());
-  MtlEventInfo nullInfo = {};
-  semaphore.initMetal(nullInfo);
-  EXPECT_FALSE(semaphore.isInitialized());
-
-  // initMetal with a null event resets the semaphore instead of keeping the previous GL state.
-  semaphore.initGL(reinterpret_cast<void*>(1));
-  semaphore.initMetal(nullInfo);
-  EXPECT_FALSE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::MOCK);
   EXPECT_EQ(semaphore.glSync(), nullptr);
+  EXPECT_FALSE(ToTGFX(semaphore).isInitialized());
+
+  auto sync = reinterpret_cast<void*>(1);
+  semaphore.initGL(sync);
+  EXPECT_TRUE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::OPENGL);
+  EXPECT_EQ(semaphore.glSync(), sync);
+  tgfx::GLSyncInfo syncInfo = {};
+  ASSERT_TRUE(ToTGFX(semaphore).getGLSync(&syncInfo));
+  EXPECT_EQ(syncInfo.sync, sync);
+
+  semaphore.initGL(nullptr);
+  EXPECT_TRUE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.glSync(), sync);
+
+  semaphore = {};
+  EXPECT_FALSE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::MOCK);
+  EXPECT_EQ(semaphore.glSync(), nullptr);
+  EXPECT_FALSE(ToTGFX(semaphore).isInitialized());
+}
+
+/**
+ * Verifies that legacy headers can still read the backend, GL handle, and initialized flag.
+ */
+PAG_TEST(BackendSemaphoreTest, LegacyLayoutCompatibility) {
+  struct LegacyLayout {
+    Backend backend;
+    union {
+      void* glSync;
+    };
+    bool initialized;
+  };
+  static_assert(std::is_standard_layout<BackendSemaphore>::value,
+                "Semaphore must be standard layout");
+  static_assert(std::is_trivially_copyable<BackendSemaphore>::value, "Semaphore must be copyable");
+  static_assert(sizeof(BackendSemaphore) == sizeof(LegacyLayout), "Semaphore size must not change");
+  static_assert(alignof(BackendSemaphore) == alignof(LegacyLayout),
+                "Semaphore alignment must not change");
+
+  BackendSemaphore semaphore = {};
+  auto checkLayout = [&semaphore]() {
+    LegacyLayout legacy = {};
+    std::memcpy(&legacy, &semaphore, sizeof(legacy));
+    EXPECT_EQ(legacy.backend, semaphore.backend());
+    EXPECT_EQ(legacy.glSync, semaphore.glSync());
+    EXPECT_EQ(legacy.initialized, semaphore.isInitialized());
+  };
+  checkLayout();
+  semaphore.initGL(reinterpret_cast<void*>(1));
+  checkLayout();
+  semaphore = {};
+  checkLayout();
 }
 
 /**

@@ -230,6 +230,35 @@ PAG_TEST(PAGMetalSurfaceTest, OffscreenReadbackAfterFlush) {
 }
 
 /**
+ * Verifies that requesting an unsupported Metal signal semaphore still draws each frame without
+ * exporting an event handle or making the output usable for a wait.
+ */
+PAG_TEST(PAGMetalSurfaceTest, FlushDoesNotExportSignalSemaphore) {
+  @autoreleasepool {
+    auto device = pag::Devices::MakeDefault();
+    if (device == nullptr) {
+      GTEST_SKIP() << "Metal device unavailable";
+    }
+    auto surface = [PAGSurface MakeOffscreen:CGSizeMake(SURFACE_SIZE, SURFACE_SIZE)];
+    ASSERT_TRUE(surface != nil);
+    auto solid = pag::PAGSolidLayer::Make(1000000, SURFACE_SIZE, SURFACE_SIZE, pag::Red);
+    auto player = MakeTestPlayer(surface, solid);
+    ASSERT_TRUE(player != nullptr);
+    pag::BackendSemaphore semaphore = {};
+    const pag::Color colors[] = {pag::Red, pag::Green, pag::Blue};
+    for (const auto& color : colors) {
+      solid->setSolidColor(color);
+      ASSERT_TRUE(player->flushAndSignalSemaphore(&semaphore));
+      EXPECT_FALSE(semaphore.isInitialized());
+      EXPECT_EQ(semaphore.backend(), pag::Backend::MOCK);
+      EXPECT_EQ(semaphore.glSync(), nullptr);
+      EXPECT_FALSE(player->wait(semaphore));
+      EXPECT_TRUE(SnapshotMatches([surface makeSnapshot], color));
+    }
+  }
+}
+
+/**
  * Verifies that textures and render targets resolve to the owning Metal device and that captured
  * device identities remain compatible with the same device.
  */

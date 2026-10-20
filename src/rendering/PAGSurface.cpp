@@ -248,19 +248,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         }
         break;
       }
-      case tgfx::Backend::Metal: {
-        tgfx::MetalSyncInfo mtlInfo = {};
-        if (semaphore.getMetalSync(&mtlInfo)) {
-          // tgfx::MetalSyncInfo::event is const void*; pag::MtlEventInfo uses void*. The handle
-          // is treated as opaque by libpag — the const_cast is safe because no writer path
-          // exists downstream.
-          MtlEventInfo eventInfo = {};
-          eventInfo.event = const_cast<void*>(mtlInfo.event);
-          eventInfo.value = mtlInfo.value;
-          signalSemaphore->initMetal(eventInfo);
-        }
+      case tgfx::Backend::Metal:
         break;
-      }
       case tgfx::Backend::Unknown:
         // The flush produced nothing to synchronize on, so the context left the semaphore
         // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
