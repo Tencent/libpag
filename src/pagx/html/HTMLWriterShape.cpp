@@ -2002,13 +2002,19 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
   }
 
+  size_t emittedSvgAnimCount = 0;
   for (size_t geoIdx = 0; geoIdx < geos.size(); geoIdx++) {
     auto& g = geos[geoIdx];
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
-    std::string geoAnimId = svgAnimId;
-    if (geoAnimId.empty() && g.element && !_ctx->animatedElementIds.empty()) {
+    std::string geoAnimId;
+    if (!svgAnimId.empty()) {
+      geoAnimId = (emittedSvgAnimCount == 0)
+                      ? svgAnimId
+                      : (svgAnimId + "__" + std::to_string(emittedSvgAnimCount));
+      emittedSvgAnimCount++;
+    } else if (g.element && !_ctx->animatedElementIds.empty()) {
       auto it = _ctx->animatedElementIds.find(g.element);
       if (it != _ctx->animatedElementIds.end()) {
         geoAnimId = it->second;
