@@ -165,8 +165,14 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
 }
 
 static FrameType GetFrameType(bool currentFrameIsStatic, bool lastFrameIsStatic,
-                              bool currentFrameIsVisible, bool lastFrameIsVisible) {
-  if (!currentFrameIsStatic && lastFrameIsStatic) {
+                              bool currentFrameIsVisible, bool lastFrameIsVisible,
+                              bool forceKeyAllowed) {
+  // Only force a key frame at a "static -> motion" transition when the just-finished static run
+  // is long enough (half of the key frame interval). Low-frame-rate content produces frequent
+  // short static runs, and forcing an IDR at every resume bloats the file (libpag issue #2486).
+  // Short runs fall back to the encoder's keyint/scenecut decisions, while long-pause resumes
+  // still get a random-access key frame.
+  if (!currentFrameIsStatic && lastFrameIsStatic && forceKeyAllowed) {
     return FrameType::FRAME_TYPE_I;
   }
   if (currentFrameIsVisible != lastFrameIsVisible) {
@@ -286,6 +292,10 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
     auto lastFrameIsVisible = false;
     auto lastFrameIsStatic = true;
+    // Length of the static run that ended at the previous frame, used to decide whether a
+    // "static -> motion" resume deserves a forced key frame.
+    auto staticRunLength = 0;
+    auto minStaticRunForKeyFrame = session->configParam.bitmapKeyFrameInterval / 2;
     pag::TimeRange staticTimeRange = {-1, -1};
     for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
       if (!IsFrameExport(maxVisibleRange, frame, mainComposition->frameRate / frameRate)) {
@@ -337,8 +347,9 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
         auto currentFrameIsStatic = frame > 0 ? ImageIsStatic(curData->data(), preData->data(),
                                                               seqWidth, seqHeight, seqStride)
                                               : false;
-        auto frameType = GetFrameType(currentFrameIsStatic, lastFrameIsStatic,
-                                      currentFrameIsVisible, lastFrameIsVisible);
+        auto frameType = GetFrameType(
+            currentFrameIsStatic, lastFrameIsStatic, currentFrameIsVisible, lastFrameIsVisible,
+            firstExportFrame == frame || staticRunLength >= minStaticRunForKeyFrame);
         pagEncodeThread->encodeFrame(curData, frameType, seqStride);
         exportFrameNum++;
 
@@ -353,6 +364,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
           sequence->staticTimeRanges.push_back(staticTimeRange);
         }
         lastFrameIsStatic = currentFrameIsStatic;
+        staticRunLength = currentFrameIsStatic ? staticRunLength + 1 : 0;
         lastFrameIsVisible = currentFrameIsVisible;
       } else {
         session->pushWarning(AlertInfoType::ExportRenderError);
