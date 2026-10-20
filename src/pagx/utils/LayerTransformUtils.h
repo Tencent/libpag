@@ -33,6 +33,15 @@ Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z);
 // Returns true if all values of the 2D matrix are finite.
 bool IsFiniteMatrix(const Matrix& matrix);
 
+// Returns true if the matrix carries a perspective row other than [0, 0, 0, 1]. Such a transform
+// can project a flat point with a w other than 1, which no 2D affine can express.
+bool HasPerspective(const Matrix3D& matrix);
+
+// Returns true if constraint or container layout generated a position for the layer. A generated
+// position is applied outside the layer's local transform, as T(layoutPosition) * local, so it is
+// only meaningful after applyLayout has run.
+bool HasGeneratedLayoutPosition(const Layer* layer);
+
 // Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from
 // its default value.
 bool HasLayerTransformComponents(const Layer* layer);

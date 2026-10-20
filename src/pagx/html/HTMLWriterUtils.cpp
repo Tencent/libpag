@@ -576,15 +576,16 @@ std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D)) {
     return Matrix3DToCSS(layer->matrix3D);
   }
+  bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
   // Transform components compose with the complete authored x / y / z (the perspective applies
   // outside the translation), so the caller emits only the generated layout slot as left / top.
-  if (layer->matrix.isIdentity() && HasLayerTransformComponents(layer)) {
+  if (!hasMatrix && HasLayerTransformComponents(layer)) {
     return Matrix3DToCSS(BuildLayerLocalMatrix3D(layer));
   }
   // Generated layout is emitted as the outer left/top slot. Keep authored x/y in the local
   // transform only on axes where layout supplied a separate position.
-  Matrix m = layer->matrix;
-  if (layer->matrix.isIdentity()) {
+  Matrix m = hasMatrix ? layer->matrix : Matrix::Identity();
+  if (!hasMatrix) {
     auto layoutPosition = layer->layoutPosition();
     float x = std::isnan(layoutPosition.x) ? 0 : layer->x;
     float y = std::isnan(layoutPosition.y) ? 0 : layer->y;

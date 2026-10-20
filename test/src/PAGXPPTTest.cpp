@@ -4930,7 +4930,13 @@ PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
   EXPECT_TRUE(features.hasPerspectiveTransform);
   EXPECT_TRUE(features.needsRasterization(false));
 
+  // A perspective on its own still bakes: a descendant at another z would otherwise lose the
+  // projection scale the renderer applies to it.
   layer->rotationY = 0;
+  features = pagx::ProbeLayerFeatures(layer);
+  EXPECT_TRUE(features.hasPerspectiveTransform);
+
+  layer->perspective = 0;
   layer->z = -500;
   features = pagx::ProbeLayerFeatures(layer);
   EXPECT_FALSE(features.hasPerspectiveTransform);

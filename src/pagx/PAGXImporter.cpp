@@ -86,6 +86,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -509,19 +510,28 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
+    auto parsed = MatrixFromString(matrixStr);
     if (ParseFloatList(matrixStr).size() < 6) {
       ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+    } else if (!IsFiniteMatrix(parsed)) {
+      ReportError(doc, node, "'matrix' must contain finite values.");
     } else {
-      layer->matrix = MatrixFromString(matrixStr);
+      layer->matrix = parsed;
     }
   }
   auto matrix3DStr = GetAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
     auto floats = ParseFloatList(matrix3DStr);
-    if (floats.size() == 16) {
-      memcpy(layer->matrix3D.values, floats.data(), 16 * sizeof(float));
-    } else {
+    Matrix3D parsed = {};
+    for (size_t i = 0; i < 16 && i < floats.size(); ++i) {
+      parsed.values[i] = floats[i];
+    }
+    if (floats.size() != 16) {
       ReportError(doc, node, "Invalid 'matrix3D' value (expected 16 numbers).");
+    } else if (!IsInvertibleMatrix3D(parsed)) {
+      ReportError(doc, node, "'matrix3D' must be finite and invertible.");
+    } else {
+      layer->matrix3D = parsed;
     }
   }
   layer->preserve3D = GetBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);

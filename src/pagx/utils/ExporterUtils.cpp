@@ -19,6 +19,7 @@
 #include "pagx/utils/ExporterUtils.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
 
@@ -99,9 +100,12 @@ Matrix BuildLayerMatrix(const Layer* layer) {
   auto layoutPosition = layer->layoutPosition();
   float layoutX = std::isnan(layoutPosition.x) ? 0 : layoutPosition.x;
   float layoutY = std::isnan(layoutPosition.y) ? 0 : layoutPosition.y;
-  Matrix m = layer->matrix;
-  if (!layer->matrix3D.isIdentity() ||
-      (layer->matrix.isIdentity() && HasLayerTransformComponents(layer))) {
+  // A non-finite matrix is ignored by the renderer (see BuildLayerLocalMatrix3D), so it must not
+  // reach the exporters either.
+  bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
+  bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
+  Matrix m = hasMatrix ? layer->matrix : Matrix::Identity();
+  if (hasMatrix3D || (!hasMatrix && HasLayerTransformComponents(layer))) {
     auto local = BuildLayerLocalMatrix3D(layer);
     const float* v = local.values;
     float w = 1.0f;
@@ -114,7 +118,7 @@ Matrix BuildLayerMatrix(const Layer* layer) {
     m.d = v[5] / w;
     m.tx = v[12] / w;
     m.ty = v[13] / w;
-  } else if (layer->matrix.isIdentity()) {
+  } else if (!hasMatrix) {
     m.tx += layer->x;
     m.ty += layer->y;
   }

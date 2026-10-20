@@ -28,6 +28,19 @@ bool IsFiniteMatrix(const Matrix& matrix) {
          std::isfinite(matrix.d) && std::isfinite(matrix.tx) && std::isfinite(matrix.ty);
 }
 
+bool HasPerspective(const Matrix3D& matrix) {
+  return matrix.getRowColumn(3, 0) != 0 || matrix.getRowColumn(3, 1) != 0 ||
+         matrix.getRowColumn(3, 2) != 0 || matrix.getRowColumn(3, 3) != 1;
+}
+
+bool HasGeneratedLayoutPosition(const Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  auto position = layer->layoutPosition();
+  return !std::isnan(position.x) || !std::isnan(position.y);
+}
+
 Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z) {
   Matrix3D result = {};
   result.setRowColumn(0, 0, matrix.a);

@@ -93,10 +93,9 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // output size and turns surrounding native content into non-editable raster. Composition
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
-  // The perspective row of the layer's own transform is the only place a non-affine projection can
-  // come from this layer; BuildLayerLocalMatrix3D applies the same transform the writer emits.
-  auto local = BuildLayerLocalMatrix3D(layer);
-  if (local.getRowColumn(3, 0) != 0 || local.getRowColumn(3, 1) != 0) {
+  // A perspective cannot be expressed by any SVG transform. The whole layer bakes so that
+  // descendants placed at a different z keep the projected size the renderer gives them.
+  if (HasPerspective(BuildLayerLocalMatrix3D(layer))) {
     out.hasPerspectiveTransform = true;
   }
   return out;

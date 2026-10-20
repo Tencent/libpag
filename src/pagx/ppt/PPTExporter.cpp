@@ -754,18 +754,6 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // and produced obviously wrong slides for documents with TextPath, complex
   // blends, ColorMatrix filters, or wide-gamut colors.
   auto features = ProbeLayerFeatures(layer);
-  // A perspective inherited from an ancestor never appears in the layer's own transform, so probe
-  // the built layer's global matrix as well: when w depends on x / y, no 2D affine for this layer
-  // can reproduce the projection and only a bake can.
-  if (tgfxLayer != nullptr) {
-    auto& buildResult = ensureBuildResult();
-    if (buildResult.root != nullptr) {
-      auto global = tgfxLayer->getRelativeMatrix3D(buildResult.root.get());
-      if (global.getRowColumn(3, 0) != 0 || global.getRowColumn(3, 1) != 0) {
-        features.hasPerspectiveTransform = true;
-      }
-    }
-  }
   if (features.needsRasterization(_bakeUnsupported)) {
     // Backdrop-aware features (non-Normal blend mode, backdrop styles)
     // require rendering the whole scene clipped to the layer's bounds —

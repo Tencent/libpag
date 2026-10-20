@@ -169,11 +169,6 @@ static bool IsPlanarAffine(const Matrix3D& matrix) {
          matrix.getRowColumn(3, 3) == 1;
 }
 
-static bool HasPerspective(const Matrix3D& matrix) {
-  return matrix.getRowColumn(3, 0) != 0 || matrix.getRowColumn(3, 1) != 0 ||
-         matrix.getRowColumn(3, 2) != 0 || matrix.getRowColumn(3, 3) != 1;
-}
-
 static tgfx::Matrix PlanarMatrix(const Matrix3D& matrix) {
   return tgfx::Matrix::MakeAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
                                matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),

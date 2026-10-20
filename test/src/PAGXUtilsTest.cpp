@@ -197,6 +197,21 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_PerspectiveWithZDividesByW) {
   EXPECT_FLOAT_EQ(m.ty, 20);
 }
 
+// The renderer ignores a non-finite matrix, so the exporters must too instead of turning it into
+// a degenerate affine.
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_IgnoresNonFiniteMatrix) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 10;
+  layer->y = 20;
+  layer->matrix.a = std::nanf("");
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 1);
+  EXPECT_FLOAT_EQ(m.d, 1);
+  EXPECT_FLOAT_EQ(m.tx, 10);
+  EXPECT_FLOAT_EQ(m.ty, 20);
+}
+
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
