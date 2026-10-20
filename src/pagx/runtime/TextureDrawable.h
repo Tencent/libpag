@@ -24,8 +24,9 @@ namespace pagx {
 
 /**
  * TextureDrawable backs a PAGSurface with an externally created backend texture. The device is
- * obtained from GLDevice::Current() so that the PAGSurface shares the same GPU context as the
- * caller. The texture must not be bound to any framebuffer when passed in.
+ * adopted from the host thread's current GPU context (via pag::Devices::AdoptCurrent()) so that
+ * the PAGSurface shares the same GPU context as the caller. The texture must not be bound to any
+ * framebuffer when passed in.
  */
 class TextureDrawable : public Drawable {
  public:
@@ -41,17 +42,12 @@ class TextureDrawable : public Drawable {
     return _texture.height();
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() override {
-    return _device;
-  }
-
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
   TextureDrawable(std::shared_ptr<tgfx::Device> device, const tgfx::BackendTexture& texture,
                   tgfx::ImageOrigin origin);
 
-  std::shared_ptr<tgfx::Device> _device = nullptr;
   tgfx::BackendTexture _texture = {};
   tgfx::ImageOrigin _origin = tgfx::ImageOrigin::TopLeft;
 };

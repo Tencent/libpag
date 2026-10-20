@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,9 +25,9 @@ namespace pag {
 
 extern NSString* const AsyncSurfacePreparedNotification;
 
-class GPUDrawable : public Drawable {
+class CGLDrawable : public Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromView(NSView* view);
+  static std::shared_ptr<CGLDrawable> FromView(NSView* view);
 
   int width() const override {
     return _width;
@@ -49,14 +49,14 @@ class GPUDrawable : public Drawable {
   void onFreeSurface() override;
 
  private:
-  std::weak_ptr<GPUDrawable> weakThis;
+  std::weak_ptr<CGLDrawable> weakThis;
   int _width = 0;
   int _height = 0;
   NSView* view = nil;
   std::shared_ptr<tgfx::CGLWindow> window = nullptr;
   std::atomic<bool> bufferPreparing = false;
 
-  explicit GPUDrawable(NSView* view);
+  explicit CGLDrawable(NSView* view);
 
   void tryCreateSurface();
 };

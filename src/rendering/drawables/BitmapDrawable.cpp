@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 std::shared_ptr<BitmapDrawable> BitmapDrawable::Make(int width, int height,
-                                                     std::shared_ptr<tgfx::GLDevice> sharedDevice) {
-  std::shared_ptr<tgfx::GLDevice> device = std::move(sharedDevice);
+                                                     std::shared_ptr<tgfx::Device> sharedDevice) {
+  auto device = std::move(sharedDevice);
   if (device == nullptr) {
-    device = tgfx::GLDevice::MakeWithFallback();
+    device = Devices::MakeDefault();
   }
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;

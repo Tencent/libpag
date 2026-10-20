@@ -9,34 +9,40 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPUDrawable.h"
+// Uses CAEAGLLayer, deprecated since iOS 12. libpag's own build defines
+// GLES_SILENCE_DEPRECATION (see CMakeLists); define it locally too so IDE indexing without the
+// build flags stays clean.
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
+#include "platform/ios/private/opengl/EAGLDrawable.h"
 
 namespace pag {
 NSString* const AsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
 
-std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
+std::shared_ptr<EAGLDrawable> EAGLDrawable::FromLayer(CAEAGLLayer* layer) {
   if (layer == nil) {
     return nullptr;
   }
-  auto drawable = std::shared_ptr<GPUDrawable>(new GPUDrawable(layer));
+  auto drawable = std::shared_ptr<EAGLDrawable>(new EAGLDrawable(layer));
   drawable->weakThis = drawable;
   return drawable;
 }
 
-GPUDrawable::GPUDrawable(CAEAGLLayer* layer) : layer(layer) {
+EAGLDrawable::EAGLDrawable(CAEAGLLayer* layer) : layer(layer) {
   // do not retain layer here, otherwise it can cause circular reference.
   updateSize();
   tryCreateSurface();
 }
 
-void GPUDrawable::tryCreateSurface() {
+void EAGLDrawable::tryCreateSurface() {
   // try to create the surface if the layer is ready, because some devices may require the surface
   // to be created on the main thread.
   if (!NSThread.isMainThread || _width <= 0 || _height <= 0) {
@@ -51,22 +57,22 @@ void GPUDrawable::tryCreateSurface() {
   }
 }
 
-int GPUDrawable::width() const {
+int EAGLDrawable::width() const {
   return _width;
 }
 
-int GPUDrawable::height() const {
+int EAGLDrawable::height() const {
   return _height;
 }
 
-void GPUDrawable::updateSize() {
+void EAGLDrawable::updateSize() {
   auto width = layer.bounds.size.width * layer.contentsScale;
   auto height = layer.bounds.size.height * layer.contentsScale;
   _width = static_cast<int>(roundf(width));
   _height = static_cast<int>(roundf(height));
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> EAGLDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -76,7 +82,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   return window ? window->getDevice() : nullptr;
 }
 
-std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> EAGLDrawable::onCreateSurface(tgfx::Context* context) {
   if (window == nullptr || bufferPreparing) {
     return nullptr;
   }
@@ -113,10 +119,10 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   }
 }
 
-void GPUDrawable::onFreeSurface() {
+void EAGLDrawable::onFreeSurface() {
 }
 
-void GPUDrawable::present(tgfx::Context*) {
+void EAGLDrawable::present(tgfx::Context*) {
   if (window == nullptr) {
     return;
   }

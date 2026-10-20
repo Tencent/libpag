@@ -9,14 +9,21 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+// The CAEAGLLayer declarations below are deprecated since iOS 12 but remain part of the published
+// GL-backend API surface. Silence the deprecation warnings locally: this header is included from
+// platform files compiled without libpag's GLES_SILENCE_DEPRECATION build define, and defining
+// that macro here would leak into the whole including translation unit.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
@@ -25,9 +32,9 @@ namespace pag {
 
 extern NSString* const AsyncSurfacePreparedNotification;
 
-class GPUDrawable : public Drawable {
+class EAGLDrawable : public Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
+  static std::shared_ptr<EAGLDrawable> FromLayer(CAEAGLLayer* layer);
 
   int width() const override;
 
@@ -45,15 +52,17 @@ class GPUDrawable : public Drawable {
   void onFreeSurface() override;
 
  private:
-  std::weak_ptr<GPUDrawable> weakThis;
+  std::weak_ptr<EAGLDrawable> weakThis;
   int _width = 0;
   int _height = 0;
   CAEAGLLayer* layer = nil;
   std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
   std::atomic<bool> bufferPreparing = false;
 
-  explicit GPUDrawable(CAEAGLLayer* layer);
+  explicit EAGLDrawable(CAEAGLLayer* layer);
 
   void tryCreateSurface();
 };
 }  // namespace pag
+
+#pragma clang diagnostic pop

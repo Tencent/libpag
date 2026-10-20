@@ -23,7 +23,7 @@
 #include "rendering/drawables/OffscreenDrawable.h"
 #include "rendering/drawables/RenderTargetDrawable.h"
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
@@ -35,31 +35,24 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
-  auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));
+  auto tgfxRenderTarget = ToTGFX(renderTarget);
+  auto adopted = Devices::ResolveForExternalResource(tgfxRenderTarget);
+  auto drawable = RenderTargetDrawable::MakeFrom(adopted.device, tgfxRenderTarget, ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
-  std::shared_ptr<tgfx::Device> device = nullptr;
-  bool externalContext = false;
-  if (forAsyncThread) {
-    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
-    device = tgfx::GLDevice::Make(sharedContext);
-  }
-  if (device == nullptr) {
-    device = tgfx::GLDevice::Current();
-    externalContext = true;
-  }
-  auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
+  auto tgfxTexture = ToTGFX(texture);
+  auto adopted = Devices::ResolveForExternalResource(tgfxTexture, forAsyncThread);
+  auto drawable = TextureDrawable::MakeFrom(adopted.device, tgfxTexture, ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
