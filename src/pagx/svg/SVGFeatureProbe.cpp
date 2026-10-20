@@ -93,7 +93,10 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // output size and turns surrounding native content into non-editable raster. Composition
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
-  out.hasPreserve3D = layer->preserve3D;
+  // Mirrors tgfx Layer::canPreserve3D(): effects, a mask or a scrollRect flatten the subtree, so
+  // such a layer keeps its vector output.
+  out.hasPreserve3D = layer->preserve3D && layer->filters.empty() && layer->styles.empty() &&
+                      layer->mask == nullptr && !layer->hasScrollRect;
   out.hasPerspectiveTransform = HasPerspective(BuildLayerLocalMatrix3D(layer));
   return out;
 }

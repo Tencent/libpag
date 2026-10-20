@@ -207,7 +207,10 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   if (MatrixHasShear(BuildLayerMatrix(layer))) {
     out.hasShearTransform = true;
   }
-  out.hasPreserve3D = layer->preserve3D;
+  // Mirrors tgfx Layer::canPreserve3D(): effects, a mask or a scrollRect flatten the subtree, so
+  // such a layer keeps its vector output.
+  out.hasPreserve3D = layer->preserve3D && layer->filters.empty() && layer->styles.empty() &&
+                      layer->mask == nullptr && !layer->hasScrollRect;
   out.hasPerspectiveTransform = HasPerspective(BuildLayerLocalMatrix3D(layer));
   for (const auto* filter : layer->filters) {
     if (filter == nullptr) {
