@@ -70,8 +70,8 @@ struct PPTFeatureFlags {
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
    * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms, perspective)
-   * always trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
-   * modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
+   * always trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported
+   * blend modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
   bool needsRasterization(bool bakeUnsupported) const {

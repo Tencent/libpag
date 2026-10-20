@@ -4916,9 +4916,9 @@ PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
   ASSERT_TRUE(ExportAndVerify(*doc, "glass_style_with_backdrop", options));
 }
 
-// A perspective that makes w depend on x / y cannot be flattened into any 2D affine, so the layer
-// must bake even when the caller did not opt into baking unsupported features. A perspective that
-// only shifts the projection by a constant is still affine and stays on the vector path.
+// A perspective cannot be flattened into any 2D affine, so the layer must bake even when the caller
+// did not opt into baking unsupported features. A Z translation on its own is still affine and
+// stays on the vector path.
 PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
