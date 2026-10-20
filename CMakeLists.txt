@@ -527,12 +527,11 @@ function(find_include_dirs out)
     set(${out} ${include_dirs} PARENT_SCOPE)
 endfunction()
 
-# Apple platform files are organized per GPU backend, mirroring tgfx's src/gpu/opengl and
-# src/gpu/metal layout: backend implementations live under private/opengl/ and private/metal/,
-# and the public PAGSurface factories live in the PAGSurface+OpenGL / PAGSurface+Metal
-# categories. Only the built backend's files are compiled and exported. Both categories declare
-# the same ObjC selector (FromLayer:), and framework consumers have no TGFX_USE_* build macros,
-# so the selection has to happen here at configuration time rather than in the public headers.
+# Apple drawable implementations and surface category headers are selected per GPU backend.
+# Surface category implementations share a translation unit with their class so ordinary static
+# linking retains them without -ObjC. Both public categories declare the same ObjC selector
+# (FromLayer:), and framework consumers have no TGFX_USE_* build macros, so only the selected
+# backend's category header is exported.
 if (APPLE)
     if (PAG_USE_METAL)
         set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
@@ -1100,10 +1099,10 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    if (NOT PAG_USE_METAL)
+    if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(MetalSurface|CocoaSurface)Test\\.mm$")
+    elseif (NOT PAG_USE_METAL)
         list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetalSurfaceTest\\.mm$")
-    elseif (APPLE)
-        list(APPEND PAG_TEST_LINK_OPTIONS -ObjC)
     endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
@@ -1158,7 +1157,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(UpdateBaseline PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
@@ -1166,7 +1164,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
     target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGUnitTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
 
     add_executable(PAGFullTest ${PAG_TEST_FILES})
@@ -1174,7 +1171,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
 
 endif ()

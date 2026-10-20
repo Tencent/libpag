@@ -19,9 +19,8 @@
 #import "PAGSurfaceImpl.h"
 #include "pag/pag.h"
 
-// Constructors and the pag::PAGSurface accessor used by the backend factory categories and the
-// cocoa PAGPlayer bridge. The declarations used to live in a class extension inside
-// PAGSurfaceImpl.mm; they moved here when the factories were split into per-backend files.
+// C++ constructors and the surface accessor shared by the backend factory categories and the
+// Cocoa PAGPlayer bridge. Their implementations live with the PAGSurfaceImpl class.
 @interface PAGSurfaceImpl (Internal)
 
 - (instancetype)initWithSurface:(std::shared_ptr<pag::PAGSurface>)value;

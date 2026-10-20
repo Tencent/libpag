@@ -22,6 +22,14 @@
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 
+#if defined(TGFX_USE_OPENGL)
+#import "platform/mac/private/opengl/CGLDrawable.h"
+#import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
+#elif defined(TGFX_USE_METAL)
+#import "platform/cocoa/private/metal/MetalLayerDrawable.h"
+#import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
+#endif
+
 @interface PAGSurfaceImpl ()
 
 @property(nonatomic) std::shared_ptr<pag::PAGSurface> pagSurface;
@@ -100,3 +108,32 @@
 }
 
 @end
+
+// Keep the backend factory with its class so it is retained by ordinary static linking.
+#if defined(TGFX_USE_OPENGL)
+@implementation PAGSurfaceImpl (OpenGL)
+
++ (PAGSurfaceImpl*)FromView:(NSView*)view {
+  auto drawable = pag::CGLDrawable::FromView(view);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
+@end
+#elif defined(TGFX_USE_METAL)
+@implementation PAGSurfaceImpl (Metal)
+
++ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer {
+  auto drawable = pag::MetalLayerDrawable::FromLayer(layer);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
+@end
+#endif
