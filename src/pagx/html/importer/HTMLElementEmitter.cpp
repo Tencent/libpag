@@ -789,6 +789,7 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   // is the *element's own* colour after applying any `style="color: …"` on the
   // SVG itself — exactly what `currentColor` should resolve to at the SVG root.
   HTMLInheritedStyle svgStyle = _styleCascade->resolveInheritedStyle(element, inherited);
+  _svgEmitter->inheritTextStyle(element, svgStyle);
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 

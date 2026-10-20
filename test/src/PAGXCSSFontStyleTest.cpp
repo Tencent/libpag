@@ -21,6 +21,15 @@
 
 namespace pag {
 
+CLI_TEST(PAGXCSSFontStyleTest, MatchAvailableWeightAndSlant) {
+  EXPECT_EQ(pagx::MatchCSSFontStyle({"Regular", "Medium", "Semibold"}, "Bold"), "Semibold");
+  EXPECT_EQ(pagx::MatchCSSFontStyle({"Light", "Medium", "Semibold"}, "Regular"), "Medium");
+  EXPECT_EQ(pagx::MatchCSSFontStyle({"Light", "Semibold"}, "Regular"), "Light");
+  EXPECT_EQ(pagx::MatchCSSFontStyle({"Bold", "Regular Italic"}, "Bold Italic"), "Regular Italic");
+  EXPECT_EQ(pagx::MatchCSSFontStyle({"Regular", "Bold"}, "MissingStyle"), "Regular");
+}
+
+
 // ResolveFontStyleName: maps a CSS font-weight + font-style pair onto a PAGX `fontStyle` label.
 // Regular (400) collapses to an empty weight portion; italic/oblique fold onto the result.
 

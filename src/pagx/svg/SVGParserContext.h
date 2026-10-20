@@ -71,6 +71,7 @@ enum class ShadowOnlyType {
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
+  std::string color = {};
   std::string fill = {};              // Empty means not set, "none" means no fill.
   std::string stroke = {};            // Empty means not set.
   std::string fillOpacity = {};       // Empty means not set.
@@ -90,6 +91,17 @@ struct InheritedStyle {
   std::string fontStyle = {};      // Empty means not set (normal/italic/oblique).
   std::string letterSpacing = {};  // Empty means not set.
   std::string textAnchor = {};     // Empty means not set (start/middle/end).
+};
+
+struct SVGTextRun {
+  std::string text = {};
+  InheritedStyle style = {};
+  std::shared_ptr<DOMNode> element = nullptr;
+  std::shared_ptr<DOMNode> path = nullptr;
+  float x = NAN;
+  float y = NAN;
+  float dx = 0;
+  float dy = 0;
 };
 
 /**
@@ -131,6 +143,10 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  void collectTextRuns(const std::shared_ptr<DOMNode>& element, SVGTextRun& pending,
+                       const InheritedStyle& style, const std::shared_ptr<DOMNode>& path,
+                       std::vector<SVGTextRun>& runs, bool& previousSpace, int depth = 0);
+  Text* makeTextRun(const SVGTextRun& run);
   TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);

@@ -24,6 +24,9 @@
 #include <sstream>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/LayoutContext.h"
+#include "pagx/SystemFonts.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -984,170 +987,159 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) 
   }
   return path;
 }
-Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
-                                     const InheritedStyle& inheritedStyle) {
-  auto group = _document->makeNode<Group>();
+static bool SameTextStyle(const InheritedStyle& a, const InheritedStyle& b) {
+  return a.color == b.color && a.fontFamily == b.fontFamily && a.fontSize == b.fontSize &&
+         a.fontWeight == b.fontWeight && a.fontStyle == b.fontStyle &&
+         a.letterSpacing == b.letterSpacing && a.textAnchor == b.textAnchor &&
+         a.fill == b.fill && a.stroke == b.stroke && a.fillOpacity == b.fillOpacity &&
+         a.strokeOpacity == b.strokeOpacity && a.strokeWidth == b.strokeWidth &&
+         a.strokeDasharray == b.strokeDasharray && a.strokeDashoffset == b.strokeDashoffset &&
+         a.strokeLinecap == b.strokeLinecap && a.strokeLinejoin == b.strokeLinejoin &&
+         a.strokeMiterlimit == b.strokeMiterlimit && a.fillRule == b.fillRule;
+}
 
-  float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
-  float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
-
-  // Resolve font size early so that em-based dx/dy can be computed correctly.
-  std::string fontSizeStr = getAttribute(element, "font-size");
-  if (fontSizeStr.empty()) {
-    fontSizeStr = inheritedStyle.fontSize;
-  }
-  float currentFontSize =
-      fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
-
-  // Parse dx/dy offsets. SVG dx/dy provide relative offsets to the text position.
-  x += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, currentFontSize);
-  y += parseLengthEm(getAttribute(element, "dy"), _viewBoxHeight, currentFontSize);
-
-  // Parse text-anchor attribute for horizontal alignment (use inherited if not set).
-  // SVG values: start (default), middle, end.
-  std::string anchor = getAttribute(element, "text-anchor");
-  if (anchor.empty()) {
-    anchor = inheritedStyle.textAnchor;
-  }
-
-  // Get text content from child text nodes and tspan elements.
-  std::string textContent;
-  std::shared_ptr<DOMNode> textPathElement = nullptr;
-  auto child = element->getFirstChild();
-  while (child) {
+void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element, SVGTextRun& pending,
+                                      const InheritedStyle& style,
+                                      const std::shared_ptr<DOMNode>& path,
+                                      std::vector<SVGTextRun>& runs, bool& previousSpace, int depth) {
+  if (depth >= MAX_SVG_RECURSION_DEPTH || getAttribute(element, "display") == "none") return;
+  float fontSize = style.fontSize.empty() ? DEFAULT_FONT_SIZE : parseLength(style.fontSize, 1);
+  auto x = getAttribute(element, "x");
+  auto y = getAttribute(element, "y");
+  if (!x.empty()) pending.x = parseLength(x, _viewBoxWidth);
+  if (!y.empty()) pending.y = parseLength(y, _viewBoxHeight);
+  pending.dx += parseLengthEm(getAttribute(element, "dx"), _viewBoxWidth, fontSize);
+  pending.dy += parseLengthEm(getAttribute(element, "dy"), _viewBoxHeight, fontSize);
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
     if (child->type == DOMNodeType::Text) {
-      textContent += child->name;
-    } else if (child->name == "tspan") {
-      // Handle tspan element: parse dx/dy offsets for positioning.
-      x += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, currentFontSize);
-      y += parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, currentFontSize);
-      // Extract text content from tspan children.
-      auto tspanChild = child->getFirstChild();
-      while (tspanChild) {
-        if (tspanChild->type == DOMNodeType::Text) {
-          textContent += tspanChild->name;
-        }
-        tspanChild = tspanChild->getNextSibling();
+      std::string text;
+      for (char c : child->name) {
+        if (c == '\t' || c == '\r' || c == '\n') c = ' ';
+        if (c != ' ' || !previousSpace) text += c;
+        previousSpace = c == ' ';
       }
-    } else if (child->name == "textPath") {
-      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
-      // text into the same content buffer the Text node consumes; the path geometry and offset
-      // descriptors are converted separately into a TextPath modifier sibling below.
-      textPathElement = child;
-      auto pathChild = child->getFirstChild();
-      while (pathChild) {
-        if (pathChild->type == DOMNodeType::Text) {
-          textContent += pathChild->name;
-        } else if (pathChild->name == "tspan") {
-          auto tspanChild = pathChild->getFirstChild();
-          while (tspanChild) {
-            if (tspanChild->type == DOMNodeType::Text) {
-              textContent += tspanChild->name;
-            }
-            tspanChild = tspanChild->getNextSibling();
-          }
-        }
-        pathChild = pathChild->getNextSibling();
+      if (text.empty()) continue;
+      SVGTextRun run = pending;
+      run.text = std::move(text);
+      run.element = element;
+      run.style = style;
+      run.path = path;
+      pending = {};
+      // Keep shaping across semantically neutral nested tspans, including ligatures.
+      if (!runs.empty() && std::isnan(run.x) && std::isnan(run.y) && run.dx == 0 && run.dy == 0 &&
+          run.path == runs.back().path && SameTextStyle(run.style, runs.back().style)) {
+        runs.back().text += run.text;
+      } else {
+        runs.push_back(std::move(run));
       }
+    } else if (child->name == "tspan" || child->name == "textPath" || child->name == "a") {
+      auto childStyle = computeInheritedStyle(child, style);
+      collectTextRuns(child, pending, childStyle, child->name == "textPath" ? child : path,
+                      runs, previousSpace, depth + 1);
     }
-    child = child->getNextSibling();
   }
+}
 
-  // SVG whitespace normalization: replace newlines and tabs with spaces,
-  // collapse consecutive spaces, and trim leading/trailing spaces.
-  for (auto& ch : textContent) {
-    if (ch == '\n' || ch == '\r' || ch == '\t') {
-      ch = ' ';
+Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
+  auto text = _document->makeNode<Text>();
+  text->text = run.text;
+  text->baseline = TextBaseline::Alphabetic;
+  text->fontSize = run.style.fontSize.empty() ? DEFAULT_FONT_SIZE :
+                       parseLength(run.style.fontSize, _viewBoxHeight);
+  auto synthesis = ResolveFontStyleSynthesis(run.style.fontWeight, run.style.fontStyle);
+  text->fontStyle = synthesis.fontStyleName;
+  text->fauxItalic = synthesis.fauxItalic;
+  auto families = ParseCSSFontFamilyList(run.style.fontFamily.empty() ? "serif" :
+                                                                         run.style.fontFamily);
+  bool firstFamily = true;
+  for (const auto& family : families) {
+    auto resolved = ResolveCSSGenericFontFamily(family);
+    if (resolved.empty()) continue;
+    if (firstFamily) text->fontFamily = resolved;
+    firstFamily = false;
+    auto typeface = SystemFonts::ResolveTypeface(resolved, text->fontStyle);
+    if (typeface != nullptr) {
+      text->fontFamily = typeface->fontFamily();
+      text->fontStyle = typeface->fontStyle();
+      break;
     }
   }
-  std::string normalized;
-  normalized.reserve(textContent.size());
-  bool previousWasSpace = true;
-  for (char ch : textContent) {
-    if (ch == ' ') {
-      if (!previousWasSpace) {
-        normalized += ch;
-      }
-      previousWasSpace = true;
+  text->letterSpacing = parseLengthEm(run.style.letterSpacing, _viewBoxWidth, text->fontSize);
+  return text;
+}
+
+Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
+                                    const InheritedStyle& inheritedStyle) {
+  std::vector<SVGTextRun> runs;
+  SVGTextRun pending;
+  bool previousSpace = true;
+  collectTextRuns(element, pending, inheritedStyle, nullptr, runs, previousSpace);
+  while (!runs.empty() && !runs.back().text.empty() && runs.back().text.back() == ' ') {
+    runs.back().text.pop_back();
+    if (runs.back().text.empty()) runs.pop_back();
+  }
+  auto group = _document->makeNode<Group>();
+  LayoutContext context(&_document->fontConfig());
+  Point cursor = {};
+  for (size_t start = 0; start < runs.size();) {
+    size_t end = start + 1;
+    while (end < runs.size() && std::isnan(runs[end].x) && std::isnan(runs[end].y) &&
+           runs[end].path == runs[start].path) ++end;
+    if (!std::isnan(runs[start].x)) cursor.x = runs[start].x;
+    if (!std::isnan(runs[start].y)) cursor.y = runs[start].y;
+    std::vector<Text*> texts;
+    for (size_t i = start; i < end; ++i) texts.push_back(makeTextRun(runs[i]));
+    TextLayoutParams params = {};
+    params.wordWrap = false;
+    params.baseline = TextBaseline::Alphabetic;
+    auto layout = TextLayout::Layout(TextLayout::MakeElements(texts), params, &context);
+    float advance = layout.bounds.width;
+    float dx = 0;
+    float dy = 0;
+    for (size_t i = start; i < end; ++i) dx += runs[i].dx;
+    // SVG includes the final character's letter spacing in chunk anchoring.
+    float anchorAdvance = advance + dx + texts.back()->letterSpacing;
+    float anchorShift = runs[start].style.textAnchor == "middle" ? anchorAdvance * .5f :
+                        runs[start].style.textAnchor == "end" ? anchorAdvance : 0;
+    auto chunk = _document->makeNode<Group>();
+    dx = 0;
+    for (size_t i = start; i < end; ++i) {
+      auto text = texts[i - start];
+      dx += runs[i].dx;
+      dy += runs[i].dy;
+      auto bounds = layout.getTextBounds(text);
+      auto standalone = TextLayout::Layout(TextLayout::MakeElements({text}), params, &context);
+      text->position = {cursor.x + bounds.x - standalone.bounds.x + dx - anchorShift, cursor.y + dy};
+      auto runGroup = _document->makeNode<Group>();
+      runGroup->elements.push_back(text);
+      addFillStroke(runs[i].element, runGroup->elements, runs[i].style);
+      chunk->elements.push_back(runGroup);
+    }
+    auto path = runs[start].path ? convertTextPath(runs[start].path, element) : nullptr;
+    if (runs[start].path && path == nullptr) {
+      _document->errors.push_back("svg: unresolved or empty textPath reference");
     } else {
-      normalized += ch;
-      previousWasSpace = false;
-    }
-  }
-  if (!normalized.empty() && normalized.back() == ' ') {
-    normalized.pop_back();
-  }
-  textContent = std::move(normalized);
-
-  if (!textContent.empty()) {
-    auto text = _document->makeNode<Text>();
-    text->position = {x, y};
-    text->text = textContent;
-
-    // Font family: element attribute > inherited style.
-    std::string fontFamily = getAttribute(element, "font-family");
-    if (fontFamily.empty()) {
-      fontFamily = inheritedStyle.fontFamily;
-    }
-    if (!fontFamily.empty()) {
-      text->fontFamily = fontFamily;
-    }
-
-    // Font size already resolved above.
-    text->fontSize = currentFontSize;
-    // SVG <text> y attribute specifies the alphabetic baseline position.
-    text->baseline = TextBaseline::Alphabetic;
-
-    // Font weight: element attribute > inherited style.
-    // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light", "Black").
-    std::string fontWeight = getAttribute(element, "font-weight");
-    if (fontWeight.empty()) {
-      fontWeight = inheritedStyle.fontWeight;
-    }
-    // Font style: element attribute > inherited style.
-    std::string fontStyleAttr = getAttribute(element, "font-style");
-    if (fontStyleAttr.empty()) {
-      fontStyleAttr = inheritedStyle.fontStyle;
-    }
-    // Combine font-weight and font-style into the PAGX fontStyle attribute. Numeric
-    // weights are rounded to the nearest 100 and mapped to OpenType keywords (Thin,
-    // Light, Medium, SemiBold, Bold, ExtraBold, Black) so that 900 does not collapse
-    // to 700.
-    text->fontStyle = ResolveFontStyleName(fontWeight, fontStyleAttr);
-
-    // Letter spacing: element attribute > inherited style.
-    std::string letterSpacing = getAttribute(element, "letter-spacing");
-    if (letterSpacing.empty()) {
-      letterSpacing = inheritedStyle.letterSpacing;
-    }
-    if (!letterSpacing.empty()) {
-      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
-    }
-
-    group->elements.push_back(text);
-
-    // Map SVG text-anchor to PAGX TextAnchor on the Text node directly.
-    // SVG text-anchor: start (default), middle, end.
-    if (anchor == "middle") {
-      text->textAnchor = TextAnchor::Center;
-    } else if (anchor == "end") {
-      text->textAnchor = TextAnchor::End;
-    }
-
-    // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
-    // right after the Text so the resulting [Text, TextPath, Fill] ordering matches what the
-    // PAGX renderer and HTML exporter expect for path text.
-    if (textPathElement) {
-      auto textPath = convertTextPath(textPathElement, element);
-      if (textPath) {
-        group->elements.push_back(textPath);
+      // Apply one modifier to the whole text chunk, including glyphs with different paints.
+      // forceAlignment must distribute spacing across all runs rather than stretching each run.
+      if (path != nullptr) {
+        if (path->forceAlignment) {
+          float span = parseLength(getAttribute(element, "textLength"), _viewBoxWidth);
+          float shift = runs[start].style.textAnchor == "middle" ? span * .5f :
+                        runs[start].style.textAnchor == "end" ? span : 0;
+          path->firstMargin -= shift;
+          path->lastMargin -= shift;
+        }
+        chunk->elements.push_back(path);
       }
+      group->elements.push_back(chunk);
     }
+    cursor.x += advance + dx + texts.back()->letterSpacing;
+    cursor.y += dy;
+    start = end;
   }
-
-  addFillStroke(element, group->elements, inheritedStyle);
   return group;
 }
+
 TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                                             const std::shared_ptr<DOMNode>& textElement) {
   std::string refId = resolveUrl(getHrefAttribute(textPathElement));
@@ -1164,6 +1156,7 @@ TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& text
   }
   auto pathData = _document->makeNode<PathData>();
   *pathData = PathDataFromSVGString(d);
+  pathData->transform(parseTransform(getAttribute(it->second, "transform")));
   if (pathData->isEmpty()) {
     return nullptr;
   }
@@ -1175,9 +1168,14 @@ TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& text
   // startOffset shifts the text start along the path. SVG allows a length or a percentage of
   // the total path length; parseLength resolves the percentage against the measured length.
   std::string startOffset = getAttribute(textPathElement, "startOffset");
-  float pathLength = computePathTotalLength(it->second);
+  auto measure = tgfx::PathMeasure::MakeFrom(ToTGFX(*pathData));
+  float pathLength = measure == nullptr ? 0 : measure->getLength();
   if (!startOffset.empty()) {
     textPath->firstMargin = parseLength(startOffset, pathLength);
+    float authorLength = parseLength(getAttribute(it->second, "pathLength"), 0);
+    if (authorLength > 0 && startOffset.find('%') == std::string::npos) {
+      textPath->firstMargin *= pathLength / authorLength;
+    }
   }
 
   // textLength + lengthAdjust="spacing" stretches the run to fill a fixed span: PAGX models this
@@ -1189,10 +1187,7 @@ TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& text
     textPath->forceAlignment = true;
     float span = parseLength(textLength, pathLength);
     if (span > 0 && pathLength > 0) {
-      float lastMargin = pathLength - textPath->firstMargin - span;
-      if (lastMargin > 0) {
-        textPath->lastMargin = lastMargin;
-      }
+      textPath->lastMargin = textPath->firstMargin + span - pathLength;
     }
   }
 
@@ -1993,10 +1988,8 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   Rect shapeBounds = {};
 
   // Determine effective fill value (element attribute overrides inherited).
-  std::string fill = getAttribute(element, "fill");
-  if (fill.empty()) {
-    fill = inheritedStyle.fill;
-  }
+  std::string fill = inheritedStyle.fill;
+  if (fill == "currentColor" || fill == "currentcolor") fill = inheritedStyle.color;
 
   // Determine the effective fill-rule once so it applies to every fill branch below. Inside a
   // <clipPath> the winding rule is carried by `clip-rule` rather than `fill-rule`, and a clip
@@ -2080,9 +2073,9 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
 
   // Determine effective stroke value (element attribute overrides inherited).
-  std::string stroke = getAttribute(element, "stroke");
-  if (stroke.empty()) {
-    stroke = inheritedStyle.stroke;
+  std::string stroke = inheritedStyle.stroke;
+  if (stroke == "currentColor" || stroke == "currentcolor") {
+    stroke = inheritedStyle.color.empty() ? "black" : inheritedStyle.color;
   }
 
   if (!stroke.empty() && stroke != "none") {
@@ -2337,6 +2330,7 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
   InheritedStyle style = parentStyle;
 
   static const std::pair<const char*, std::string InheritedStyle::*> StyleProperties[] = {
+      {"color", &InheritedStyle::color},
       {"fill", &InheritedStyle::fill},
       {"stroke", &InheritedStyle::stroke},
       {"fill-opacity", &InheritedStyle::fillOpacity},
@@ -2359,11 +2353,16 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
 
   for (const auto& [propName, memberPtr] : StyleProperties) {
     auto value = getAttribute(element, propName);
-    if (!value.empty()) {
-      style.*memberPtr = value;
+    if (!value.empty() && value != "inherit" && value != "unset") {
+      style.*memberPtr = value == "initial" ? "" : value;
     }
   }
-
+  auto fontSize = getAttribute(element, "font-size");
+  if (!fontSize.empty() && fontSize != "inherit" && fontSize != "unset" && fontSize != "initial") {
+    float parentSize = parentStyle.fontSize.empty() ? DEFAULT_FONT_SIZE :
+                          parseLength(parentStyle.fontSize, DEFAULT_FONT_SIZE);
+    style.fontSize = std::to_string(parseLengthEm(fontSize, parentSize, parentSize));
+  }
   return style;
 }
 static void SkipWhitespace(const char*& ptr, const char* end) {

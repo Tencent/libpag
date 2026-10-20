@@ -2091,9 +2091,8 @@ function isSvgSource(src) {
 //      below as a function-local constant so it ships into the browser
 //      payload via `fn.toString()`) whose resolved value differs from what
 //      the cloned ancestor chain already provides gets written as an
-//      attribute on the clone. Author-emitted attributes (preserved by
-//      `cloneNode(true)`) are kept as-is — we only add what would otherwise
-//      be lost when the page's stylesheet is dropped.
+//      attribute on the clone. Computed values also replace presentation
+//      attributes overridden by CSS.
 //
 // The clone is detached from the document, so `getComputedStyle` can't
 // resolve it directly; we walk the *original* subtree (where the cascade is
@@ -2110,11 +2109,14 @@ function freezeSvg(svgEl, rect) {
   // properties (width, height, x, y, transform) are left to the SVG's own
   // attributes.
   const SVG_PRESENTATION_ATTRS = [
-    'fill', 'fill-opacity', 'fill-rule',
+    'color', 'fill', 'fill-opacity', 'fill-rule',
     'stroke', 'stroke-opacity', 'stroke-width',
     'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
     'stroke-dasharray', 'stroke-dashoffset',
     'opacity', 'visibility', 'clip-rule', 'vector-effect',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'letter-spacing',
+    'text-anchor', 'marker-start', 'marker-mid', 'marker-end',
+    'stop-color', 'stop-opacity',
   ];
   // SVG-spec defaults for the attributes above. Used as the inheritance
   // root so the top-level <svg>'s computed values only get serialised when
@@ -2136,6 +2138,9 @@ function freezeSvg(svgEl, rect) {
     'visibility': 'visible',
     'clip-rule': 'nonzero',
     'vector-effect': 'none',
+    'text-anchor': 'start',
+    'marker-start': 'none', 'marker-mid': 'none', 'marker-end': 'none',
+    'stop-color': 'rgb(0, 0, 0)', 'stop-opacity': '1',
   };
   const readPresentation = (cs) => {
     const out = {};
@@ -2216,7 +2221,12 @@ function freezeSvg(svgEl, rect) {
     clone.style.setProperty('height', `${Math.round(rect.height * 1000) / 1000}px`);
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot) => {
+  const useTargets = new Set(Array.from(svgEl.querySelectorAll('use')).map(use => {
+    const href = use.getAttribute('href') || use.getAttribute('xlink:href') || '';
+    return href.startsWith('#') ? svgEl.ownerDocument.getElementById(href.slice(1)) : null;
+  }));
+  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot, inTemplate = false) => {
+    inTemplate = inTemplate || orig.localName === 'symbol' || useTargets.has(orig);
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
@@ -2237,14 +2247,14 @@ function freezeSvg(svgEl, rect) {
       // resolved value stays the literal keyword (there is no colour to read),
       // and the browser paints nothing without a context element, so freezing
       // the element's `color` here would invent a paint the page never had.
-      if (stroke === 'currentColor') {
+      if (stroke === 'currentColor' && !inTemplate) {
         dst.setAttribute('stroke', resolvedAttrs['stroke'] || here);
       }
-      if (fill === 'currentColor') {
+      if (fill === 'currentColor' && !inTemplate) {
         dst.setAttribute('fill', resolvedAttrs['fill'] || here);
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
-      if (dst.style) {
+      if (dst.style && !inTemplate) {
         if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
         if (dst.style.fill === 'currentColor') dst.style.fill = here;
         if (dst.style.color === 'currentColor') dst.style.color = here;
@@ -2258,18 +2268,38 @@ function freezeSvg(svgEl, rect) {
         // strip above), so never freeze it back onto the root. Descendants still freeze
         // their opacity normally — it composites under the wrapper exactly once.
         if (isRoot && name === 'opacity') continue;
-        if (dst.hasAttribute(name)) continue;
-        const value = resolvedAttrs[name];
+        const specified = dst.style.getPropertyValue(name) || dst.getAttribute(name) || '';
+        // Referenced templates inherit in the use instance. Keep symbolic paints and relative
+        // font lengths until that context exists, rather than baking the definition's defaults.
+        if (inTemplate && (/^(inherit|unset|currentcolor)$/i.test(specified.trim()) ||
+            (name === 'font-size' && /(?:em|ex|%)$/i.test(specified.trim())))) continue;
+        let value = resolvedAttrs[name];
         if (!value) continue;
         const inherited = inheritedAttrs[name] || SVG_PRESENTATION_DEFAULTS[name] || '';
-        if (value === inherited) continue;
+        if (value === inherited && !dst.hasAttribute(name) && !dst.style.getPropertyValue(name)) continue;
+        // Computed local URL references can be absolute. They must still resolve inside the
+        // detached SVG, even after the snapshot is written to another directory.
+        value = value.replace(/url\(["']?([^"')]+)["']?\)/g, (match, url) => {
+          try {
+            const resolved = new URL(url, document.baseURI);
+            const current = new URL(document.URL);
+            if (resolved.hash && resolved.origin === current.origin &&
+                resolved.pathname === current.pathname && resolved.search === current.search) {
+              return `url(${resolved.hash})`;
+            }
+          } catch {}
+          return match;
+        });
+        // Inline the computed value too: retained <style> rules must not override the frozen
+        // attribute again in consumers with a smaller CSS cascade.
+        dst.style.setProperty(name, value);
         dst.setAttribute(name, value);
       }
     }
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false, inTemplate);
   };
   walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS, true);
   // outerHTML serialises U+00A0 as the named entity &nbsp;, which the importer's

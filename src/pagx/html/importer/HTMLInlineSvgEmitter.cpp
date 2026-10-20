@@ -149,6 +149,8 @@ void ResolveCurrentColorRecursive(const std::shared_ptr<DOMNode>& node,
                                   const std::string& inheritedColor, int depth, bool isRoot) {
   if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
   if (node->type != DOMNodeType::Element) return;
+  // Referenced definitions obtain their colour in the SVG instance's own cascade.
+  if (node->name == "symbol" || node->name == "defs") return;
 
   std::string here = inheritedColor;
   if (!isRoot) {
@@ -403,6 +405,24 @@ Color SampleConicOverBox(const std::vector<ColorStop*>& stops, float cssStartDeg
 }
 
 }  // namespace
+
+void HTMLInlineSvgEmitter::inheritTextStyle(const std::shared_ptr<DOMNode>& svgRoot,
+                                           const HTMLInheritedStyle& style) {
+  // Write only absent attributes. Authored SVG attributes and inline CSS retain their precedence.
+  const std::pair<const char*, std::string> values[] = {
+      {"font-family", style.fontFamily},
+      {"font-size", style.fontSize},
+      {"font-weight", style.fontWeight},
+      {"font-style", style.fontStyle},
+      {"letter-spacing", style.letterSpacing},
+      {"color", formatColorForAttribute(style.resolvedTextColor)},
+  };
+  for (const auto& value : values) {
+    if (!value.second.empty() && svgRoot->findAttribute(value.first) == nullptr) {
+      SetAttribute(svgRoot, value.first, value.second);
+    }
+  }
+}
 
 void HTMLInlineSvgEmitter::stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot) {
   if (!svgRoot || svgRoot->type != DOMNodeType::Element) return;
