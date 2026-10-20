@@ -33,6 +33,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -570,7 +571,9 @@ const char* BlendModeToMixBlendMode(BlendMode mode) {
 }
 
 std::string LayerTransformCSS(const Layer* layer) {
-  if (!layer->matrix3D.isIdentity()) {
+  // A non-finite matrix3D is ignored by the renderer, so it must not reach the CSS either;
+  // BuildLayerLocalMatrix3D below applies the same rule.
+  if (!layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D)) {
     return Matrix3DToCSS(layer->matrix3D);
   }
   // Transform components compose with the complete authored x / y / z (the perspective applies

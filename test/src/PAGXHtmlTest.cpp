@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -28,6 +29,7 @@
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -3213,6 +3215,32 @@ CLI_TEST(PAGXHtmlTest, Woff2HostWinsWhenBothMarkersPresent) {
   ASSERT_EQ(texts.size(), 1u);
   EXPECT_EQ(texts[0]->text, "Both");
   EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+// The projection row of a perspective distance d holds -1/d, which four decimals would round to 0
+// for d >= 40000 and silently drop the perspective.
+PAGX_TEST(PAGXHtmlWriterTest, Matrix3DToCSSKeepsSmallPerspectiveTerms) {
+  pagx::Matrix3D matrix = {};
+  matrix.values[11] = -2.5e-05f;
+  auto css = pagx::Matrix3DToCSS(matrix);
+  const std::string prefix = "matrix3d(";
+  ASSERT_EQ(css.rfind(prefix, 0), 0u);
+  ASSERT_EQ(css.back(), ')');
+  auto body = css.substr(prefix.size(), css.size() - prefix.size() - 1);
+  std::vector<std::string> parts = {};
+  size_t start = 0;
+  while (true) {
+    auto comma = body.find(',', start);
+    parts.push_back(
+        body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  ASSERT_EQ(parts.size(), 16u);
+  EXPECT_FLOAT_EQ(std::strtof(parts[0].c_str(), nullptr), 1.0f);
+  EXPECT_FLOAT_EQ(std::strtof(parts[11].c_str(), nullptr), -2.5e-05f);
 }
 
 }  // namespace pag

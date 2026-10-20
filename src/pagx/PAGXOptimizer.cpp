@@ -489,7 +489,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   auto* m = layer->mask;
-  if (m->x != 0 || m->y != 0 || HasGeneratedLayoutPosition(m)) {
+  if (m->x != 0 || m->y != 0) {
     return false;
   }
   if (!m->matrix.isIdentity()) {
@@ -569,6 +569,11 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   if (LayoutNodeHasConstraints(layer)) {
+    return false;
+  }
+  // scrollRect clips in the layer's own coordinate space, so the rewrite can only reproduce a mask
+  // window that starts at the parent origin. A translated layer moves the window with it.
+  if (layer->x != 0.0f || layer->y != 0.0f) {
     return false;
   }
   // If the layer already declares an explicit frame size, leave it alone — overwriting an

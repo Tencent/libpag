@@ -22,12 +22,14 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
 
 static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextPath |= src.hasTextPath;
   dst->hasTextModifier |= src.hasTextModifier;
+  dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
 }
@@ -91,6 +93,12 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // output size and turns surrounding native content into non-editable raster. Composition
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
+  // The perspective row of the layer's own transform is the only place a non-affine projection can
+  // come from this layer; BuildLayerLocalMatrix3D applies the same transform the writer emits.
+  auto local = BuildLayerLocalMatrix3D(layer);
+  if (local.getRowColumn(3, 0) != 0 || local.getRowColumn(3, 1) != 0) {
+    out.hasPerspectiveTransform = true;
+  }
   return out;
 }
 

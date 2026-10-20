@@ -206,7 +206,7 @@ static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, floa
     return;
   }
   auto* maskLayer = layer->mask;
-  if (maskLayer->x != 0 || maskLayer->y != 0 || HasGeneratedLayoutPosition(maskLayer)) {
+  if (maskLayer->x != 0 || maskLayer->y != 0) {
     return;
   }
   if (!maskLayer->matrix.isIdentity()) {
@@ -1672,7 +1672,7 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   }
   auto* maskLayer = layer->mask;
   // The rectangle replaces the layer's whole bounds, so the mask must sit at the layer origin.
-  if (maskLayer->x != 0 || maskLayer->y != 0 || HasGeneratedLayoutPosition(maskLayer)) {
+  if (maskLayer->x != 0 || maskLayer->y != 0) {
     return;
   }
   if (maskLayer->contents.size() != 2) {

@@ -132,31 +132,69 @@ inline double Determinant4(const double source[4][4]) {
   return determinant;
 }
 
-// Returns true if the matrix is finite and invertible. The translation is moved out of the last
-// column first, by a column operation that leaves the determinant unchanged, so a large translation
-// cannot make a well-conditioned matrix look singular. Each column is then divided by its Euclidean
-// norm, so the determinant becomes the Hadamard ratio |det(M)| / (product of the column norms) in
-// [0, 1] and the threshold depends neither on the overall scale nor on the translation.
+// Returns the determinant of a [row][column] 3x3 matrix.
+inline double Determinant3(const double source[3][3]) {
+  return source[0][0] * (source[1][1] * source[2][2] - source[1][2] * source[2][1]) -
+         source[0][1] * (source[1][0] * source[2][2] - source[1][2] * source[2][0]) +
+         source[0][2] * (source[1][0] * source[2][1] - source[1][1] * source[2][0]);
+}
+
+// Returns true if the matrix is finite and invertible. With an invertible linear part the
+// determinant factors as det(L) * (m33 - r * L^-1 * t) for the block form [[L, t], [r, m33]], so the
+// linear part is measured by its column-normalized determinant (the Hadamard ratio) and the scalar by
+// the Schur complement, which the translation reaches only through the perspective row. A pure
+// translation therefore never makes an otherwise well-conditioned matrix look singular, and neither
+// does its scale. A singular linear part falls back to the column-normalized determinant of the whole
+// matrix, which is the only case where the 2D block alone cannot decide.
 inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   if (!IsFiniteMatrix3D(matrix)) {
     return false;
   }
-  double values[4][4] = {};
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      values[row][column] = matrix.getRowColumn(row, column);
+  double linear[3][3] = {};
+  for (int column = 0; column < 3; ++column) {
+    for (int row = 0; row < 3; ++row) {
+      linear[row][column] = matrix.getRowColumn(row, column);
     }
   }
-  double translateX = values[0][3];
-  double translateY = values[1][3];
-  double translateZ = values[2][3];
-  for (int row = 0; row < 4; ++row) {
-    values[row][3] -=
-        translateX * values[row][0] + translateY * values[row][1] + translateZ * values[row][2];
+  double scaled[3][3] = {};
+  bool linearInvertible = true;
+  for (int column = 0; column < 3 && linearInvertible; ++column) {
+    double norm = 0;
+    for (int row = 0; row < 3; ++row) {
+      norm += linear[row][column] * linear[row][column];
+    }
+    norm = std::sqrt(norm);
+    linearInvertible = std::isfinite(norm) && norm != 0;
+    for (int row = 0; row < 3 && linearInvertible; ++row) {
+      scaled[row][column] = linear[row][column] / norm;
+    }
   }
+  if (linearInvertible && std::abs(Determinant3(scaled)) > 1.0e-9) {
+    // Solve L * u = t with Cramer's rule and compare the Schur complement m33 - r * u with the terms
+    // it is made of, so the threshold is relative to the perspective strength.
+    double translate[3] = {matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 3),
+                           matrix.getRowColumn(2, 3)};
+    double linearDeterminant = Determinant3(linear);
+    double projection = 0;
+    for (int column = 0; column < 3; ++column) {
+      double replaced[3][3] = {};
+      for (int row = 0; row < 3; ++row) {
+        for (int i = 0; i < 3; ++i) {
+          replaced[row][i] = i == column ? translate[row] : linear[row][i];
+        }
+      }
+      projection += matrix.getRowColumn(3, column) * (Determinant3(replaced) / linearDeterminant);
+    }
+    double scalarValue = matrix.getRowColumn(3, 3);
+    double scalar = scalarValue - projection;
+    double scale = std::max(1.0, std::max(std::abs(scalarValue), std::abs(projection)));
+    return std::isfinite(scalar) && std::abs(scalar) > 1.0e-9 * scale;
+  }
+  double values[4][4] = {};
   for (int column = 0; column < 4; ++column) {
     double norm = 0;
     for (int row = 0; row < 4; ++row) {
+      values[row][column] = matrix.getRowColumn(row, column);
       norm += values[row][column] * values[row][column];
     }
     norm = std::sqrt(norm);

@@ -637,8 +637,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmptyDocument) {
 PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
   std::string svg =
       "<svg width=\"100\" height=\"100\">"
-      "<style>.moved{transform:translate(10px,20px)}.shifted{transform:translate(1px,1px)}</style>"
+      "<style>.moved{transform:translate(10px,20px)}.shifted{transform:translate(1px,1px)}"
+      ".first{opacity:0.5;}.second{transform:translate(15px,25px);}</style>"
       "<rect id=\"classOnly\" class=\"moved\" width=\"10\" height=\"10\"/>"
+      "<rect id=\"twoClasses\" class=\"first second\" width=\"10\" height=\"10\"/>"
       "<rect id=\"inlineWins\" class=\"moved\" width=\"10\" height=\"10\" "
       "style=\"transform:translate(30px,40px)\"/>"
       "<defs><style>.deep{transform:translate(5px,6px)}</style></defs>"
@@ -651,6 +653,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
   pagx::Layer* classOnly = nullptr;
   pagx::Layer* inlineWins = nullptr;
   pagx::Layer* defsClass = nullptr;
+  pagx::Layer* twoClasses = nullptr;
   for (auto* layer : doc->layers) {
     if (layer->id == "classOnly") {
       classOnly = layer;
@@ -658,17 +661,25 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
       inlineWins = layer;
     } else if (layer->id == "defsClass") {
       defsClass = layer;
+    } else if (layer->id == "twoClasses") {
+      twoClasses = layer;
     }
   }
   ASSERT_NE(classOnly, nullptr);
   ASSERT_NE(inlineWins, nullptr);
   ASSERT_NE(defsClass, nullptr);
+  ASSERT_NE(twoClasses, nullptr);
   EXPECT_FLOAT_EQ(classOnly->matrix.tx, 10);
   EXPECT_FLOAT_EQ(classOnly->matrix.ty, 20);
   EXPECT_FLOAT_EQ(inlineWins->matrix.tx, 30);
   EXPECT_FLOAT_EQ(inlineWins->matrix.ty, 40);
   EXPECT_FLOAT_EQ(defsClass->matrix.tx, 5);
   EXPECT_FLOAT_EQ(defsClass->matrix.ty, 6);
+  // The first rule ends with a semicolon, so joining the two class bodies must not produce an empty
+  // declaration that swallows the second class' transform.
+  EXPECT_FLOAT_EQ(twoClasses->matrix.tx, 15);
+  EXPECT_FLOAT_EQ(twoClasses->matrix.ty, 25);
+  EXPECT_FLOAT_EQ(twoClasses->alpha, 0.5f);
 }
 
 /**

@@ -39,12 +39,16 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
+  bool hasPerspectiveTransform = false;  // The layer's perspective makes w depend on x / y, so the
+      // projection is not affine and no SVG transform can express
+      // it; the shape must be baked.
 
   /**
    * Returns true when at least one feature is present.
    */
   bool needsRasterization() const {
-    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient;
+    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient ||
+           hasPerspectiveTransform;
   }
 };
 

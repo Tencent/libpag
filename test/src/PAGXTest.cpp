@@ -9844,6 +9844,10 @@ PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
   pagx::KeyValue matrixOut;
   EXPECT_TRUE(pagx::GetNodeChannel(layer, "matrix", &matrixOut));
   EXPECT_EQ(std::get<pagx::Matrix>(matrixOut), authoredMatrix);
+  auto notFiniteMatrix = authoredMatrix;
+  notFiniteMatrix.a = std::nanf("");
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "matrix", pagx::KeyValue(notFiniteMatrix)));
+  EXPECT_EQ(layer->matrix, authoredMatrix);
 
   pagx::Matrix3D authoredMatrix3D = {};
   authoredMatrix3D.values[12] = 10;
@@ -10502,6 +10506,20 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   auto fallback = pagx::LerpMatrix3D(nonStandard, pagx::Matrix3D{}, 0.5);
   EXPECT_FLOAT_EQ(fallback.values[3], 0.5f);
   EXPECT_FLOAT_EQ(fallback.values[12], 0.5f);
+
+  // A large translation must not make a well-conditioned transform look singular: a mirrored
+  // transform and a rotation both stay invertible at the same translation.
+  pagx::Matrix3D mirrored = {};
+  mirrored.values[0] = -1;
+  mirrored.values[12] = 9.0e8f;
+  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(mirrored));
+  pagx::Matrix3D rotated = {};
+  rotated.values[0] = 0;
+  rotated.values[1] = 1;
+  rotated.values[4] = -1;
+  rotated.values[5] = 0;
+  rotated.values[12] = 9.0e8f;
+  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(rotated));
 }
 
 static pagx::Matrix3D ToPAGXMatrix3D(const tgfx::Matrix3D& matrix) {
@@ -10620,7 +10638,7 @@ PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
 /**
  * Test case: a static non-identity matrix3D rejects x / y / z / matrix and transform component
  * writes, a static non-identity matrix rejects x / y writes, and a singular matrix3D write is
- * rejected without changing the transform.
+ * published as-is because the renderer draws nothing for a zero-area transform.
  */
 PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   auto doc = pagx::PAGXDocument::Make(200, 200);

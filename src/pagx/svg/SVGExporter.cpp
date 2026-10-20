@@ -3255,20 +3255,19 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // Note: the SVG feature probe only covers layer->contents; layer styles (including
   // BackgroundBlurStyle and GlassStyle, which SVG has no portable primitive for) are handled
   // separately by the explicit skip in writeStyleList / writeFilterAndStyleDefs.
+  auto features = ProbeLayerFeaturesForSVG(layer);
   if (_bakeUnsupported) {
-    auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {
       if (rasterizeLayerAsImage(out, layer)) {
         return;
       }
     }
   } else {
-    auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {
       addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
                  "' uses SVG-unsupported features (TextPath / TextModifier / diamond or conic "
-                 "gradient) and bakeUnsupported is false; emitting as best-effort vector with "
-                 "those features dropped or downgraded to radial.");
+                 "gradient / non-affine perspective) and bakeUnsupported is false; emitting as "
+                 "best-effort vector with those features dropped or downgraded.");
     }
   }
 
