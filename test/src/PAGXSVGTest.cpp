@@ -799,6 +799,24 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MarkerCubicEndUserSpaceUnits) {
   ASSERT_FALSE(doc->layers.empty());
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_ArcMarkerUsesAuthoredVertices) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="100"><defs>
+      <marker id="m" markerWidth="4" markerHeight="4"><path d="M0 0H4V4H0Z"/></marker>
+    </defs><g marker-mid="url(#m)">
+      <path d="M10 50A40 40 0 1 1 90 50L150 50" fill="none" stroke="black"/>
+    </g></svg>)SVG");
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  // One source path and one marker at the arc-to-line join, regardless of arc subdivision.
+  EXPECT_EQ(paths.size(), 2u);
+  std::vector<size_t> commands;
+  auto path = pagx::PathDataFromSVGString("M10 50A40 40 0 1 1 90 50L150 50", &commands);
+  ASSERT_EQ(commands.size(), 3u);
+  EXPECT_GT(commands[1], 2u);
+  EXPECT_EQ(commands.back(), path.verbs().size());
+}
+
 /**
  * Test SVG import: `stroke-dasharray` combined with `pathLength` normalises the dash values back
  * into user units using the real measured length. Exercising it across a polyline, line, circle,

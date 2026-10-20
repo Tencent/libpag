@@ -165,4 +165,66 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
       <use href="#s" x="130" y="100" fill="#2040d0" color="#e02020" font-size="28"/>`,
     { meanLimit: 1.5, flatTolerance: 8 });
   });
+
+  it('inherits markers and honors none, marker viewBox and auto-start-reverse', async () => {
+    await compare('marker-viewport', `<defs>
+      <marker id="a" markerWidth="12" markerHeight="8" viewBox="0 0 6 4"
+        refX="5" refY="2" orient="auto-start-reverse" markerUnits="userSpaceOnUse" fill="#e02020">
+        <path d="M0 0L6 2L0 4Z"/>
+      </marker></defs>
+      <g fill="none" stroke="#2040d0" stroke-width="3" marker-start="url(#a)" marker-end="url(#a)">
+        <path d="M30 40H210"/>
+        <line x1="30" y1="90" x2="210" y2="90" marker-start="none"/>
+        <path d="M30 140C30 140 150 140 210 140" marker-end="none"/>
+      </g>`);
+  });
+
+  it('places markers only at authored vertices including arcs and closed subpaths', async () => {
+    await compare('marker-vertices', `<defs>
+      <marker id="m" markerWidth="7" markerHeight="5" refX="3" refY="2"
+        orient="auto" markerUnits="userSpaceOnUse" overflow="visible">
+        <path d="M0 0L6 2L0 4Z" fill="#e02020"/>
+      </marker></defs>
+      <path d="M30 60A45 35 0 0 1 120 60L180 60L180 60Q210 60 210 100
+               M35 120H90L60 160Z" fill="none" stroke="#2040d0" stroke-width="2"
+        marker-start="url(#m)" marker-mid="url(#m)" marker-end="url(#m)"/>`,
+    { meanLimit: 1.5 });
+  });
+
+  it('keeps marker definition paint separate from the referencing path', async () => {
+    await compare('marker-paint', `<defs>
+      <marker id="a" markerWidth="12" markerHeight="12" refX="8" refY="6"
+        orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 0L12 6L0 12Z"/>
+      </marker>
+      <marker id="b" markerWidth="12" markerHeight="12" refX="8" refY="6"
+        orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0 0L12 6L0 12Z" fill="context-stroke"/>
+      </marker></defs>
+      <path d="M30 50H200" fill="none" stroke="#e02020" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M30 120H200" fill="none" stroke="#2040d0" stroke-width="2" marker-end="url(#b)"/>`);
+  });
+
+  it('keeps context gradients continuous across transformed marker contents', async () => {
+    await compare('marker-context-gradient', `<defs>
+      <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0%" x2="100%">
+        <stop stop-color="#e02020"/><stop offset="1" stop-color="#2040d0"/>
+      </linearGradient>
+      <marker id="m" markerWidth="40" markerHeight="30" viewBox="0 0 20 15"
+        refX="15" refY="7.5" orient="auto" markerUnits="userSpaceOnUse">
+        <g transform="translate(2 1)"><path d="M0 0L18 6.5L0 13Z" fill="context-stroke"/></g>
+      </marker></defs>
+      <path d="M30 35L200 150" fill="none" stroke="url(#g)" stroke-width="6"
+        marker-start="url(#m)" marker-end="url(#m)"/>`);
+  });
+
+  it('maps gradients through non-square bounding boxes and gradient transforms', async () => {
+    await compare('gradient-mapping', `<defs>
+      <linearGradient id="l" x2="1" y2="1" gradientTransform="rotate(15 .5 .5)">
+        <stop stop-color="#e02020"/><stop offset="1" stop-color="#2040d0"/>
+      </linearGradient>
+      <radialGradient id="r"><stop stop-color="white"/><stop offset="1" stop-color="#2040d0"/></radialGradient>
+      </defs><rect x="20" y="20" width="200" height="50" fill="url(#l)"/>
+      <rect x="20" y="100" width="200" height="60" fill="url(#r)"/>`);
+  });
 });

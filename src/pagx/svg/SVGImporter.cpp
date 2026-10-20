@@ -23,8 +23,8 @@
 #include <cstring>
 #include <sstream>
 #include "base/utils/MathUtil.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Image.h"
@@ -45,8 +45,22 @@ using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
+template <typename T>
+class SVGValueScope {
+ public:
+  explicit SVGValueScope(T& value) : value(value), saved(value) {
+  }
+  ~SVGValueScope() {
+    value = saved;
+  }
+
+ private:
+  T& value;
+  T saved;
+};
+
 static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW, float vpH,
-                                  const std::string& preserveAspectRatio);
+                                   const std::string& preserveAspectRatio);
 
 static bool ParseInternalFloat(const std::string& value, float* result) {
   if (value.empty() || result == nullptr) return false;
@@ -218,8 +232,8 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // This handles viewBox origin offset, uniform scaling, and centering in one matrix.
   Matrix contentMatrix = Matrix::Identity();
   if (viewBox.size() >= 4) {
-    contentMatrix = ComputeViewBoxMatrix(viewBox, targetW, targetH,
-                                         getAttribute(root, "preserveAspectRatio"));
+    contentMatrix =
+        ComputeViewBoxMatrix(viewBox, targetW, targetH, getAttribute(root, "preserveAspectRatio"));
   }
   bool needsContentTransform = !contentMatrix.isIdentity();
 
@@ -428,6 +442,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   if (!transform.empty()) {
     layer->matrix = parseTransform(transform);
   }
+  SVGValueScope<Matrix> contextScope(_contextPaintTransform);
+  _contextPaintTransform = _contextPaintTransform * layer->matrix;
 
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty() && !_convertingClipPath) {
@@ -467,10 +483,13 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   if (tag == "svg") {
     float width = parseLength(getAttribute(element, "width", "100%"), _viewBoxWidth);
     float height = parseLength(getAttribute(element, "height", "100%"), _viewBoxHeight);
+    auto origin = Matrix::Translate(parseLength(getAttribute(element, "x"), _viewBoxWidth),
+                                    parseLength(getAttribute(element, "y"), _viewBoxHeight));
+    SVGValueScope<Matrix> viewportContextScope(_contextPaintTransform);
+    _contextPaintTransform = _contextPaintTransform * origin;
     auto viewport = convertViewport(element, inheritedStyle, width, height, depth);
     if (viewport == nullptr) return nullptr;
-    viewport->matrix = Matrix::Translate(parseLength(getAttribute(element, "x"), _viewBoxWidth),
-                                         parseLength(getAttribute(element, "y"), _viewBoxHeight));
+    viewport->matrix = origin;
     layer->children.push_back(viewport);
   } else if (tag == "g") {
     // Group: convert children as child layers.
@@ -533,10 +552,9 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   }
 
   // Expand SVG marker references into additional child layers.
-  std::string markerStart = getAttribute(element, "marker-start");
-  std::string markerMid = getAttribute(element, "marker-mid");
-  std::string markerEnd = getAttribute(element, "marker-end");
-  if (!markerStart.empty() || !markerMid.empty() || !markerEnd.empty()) {
+  if (!_convertingClipPath &&
+      (!inheritedStyle.markerStart.empty() || !inheritedStyle.markerMid.empty() ||
+       !inheritedStyle.markerEnd.empty())) {
     auto markerLayers = expandMarkers(element, inheritedStyle);
     if (!markerLayers.empty()) {
       // Wrap the shape layer and marker layers in a group layer.
@@ -566,242 +584,205 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   return applyMaskReferences(layer, element, depth);
 }
-// Extract the start point and tangent angle from a path.
-static MarkerPoint GetPathStartPoint(const PathData* pathData) {
-  MarkerPoint result = {};
-  if (!pathData || pathData->verbs().empty()) {
-    return result;
-  }
-  const auto& verbs = pathData->verbs();
-  const auto& points = pathData->points();
-  if (points.empty()) {
-    return result;
-  }
-  result.x = points[0].x;
-  result.y = points[0].y;
-  // Compute tangent at start: direction from first point to next point.
-  if (verbs.size() >= 2 && points.size() >= 2) {
-    float dx = points[1].x - points[0].x;
-    float dy = points[1].y - points[0].y;
-    result.angle = std::atan2(dy, dx);
-  }
-  return result;
+struct SVGMarkerVertex {
+  Point point = {};
+  Point incoming = {};
+  Point outgoing = {};
+  size_t subpath = 0;
+};
+
+static Point Direction(const Point& from, const Point& to) {
+  float x = to.x - from.x;
+  float y = to.y - from.y;
+  float length = std::hypot(x, y);
+  return length == 0 ? Point{} : Point{x / length, y / length};
 }
 
-// Extract the end point and tangent angle from a path.
-static MarkerPoint GetPathEndPoint(const PathData* pathData) {
-  MarkerPoint result = {};
-  if (!pathData || pathData->verbs().empty()) {
-    return result;
-  }
-  const auto& verbs = pathData->verbs();
-  const auto& points = pathData->points();
-  if (points.empty()) {
-    return result;
-  }
-  // The end point is the last point in the path.
-  result.x = points.back().x;
-  result.y = points.back().y;
-  // Compute tangent at end: direction into the last point.
-  size_t lastVerb = verbs.size() - 1;
-  // Skip trailing Close verb.
-  if (verbs[lastVerb] == PathVerb::Close && lastVerb > 0) {
-    lastVerb--;
-  }
-  size_t pointCount = points.size();
-  if (pointCount >= 2) {
-    // For the tangent at end, use the direction from the second-to-last relevant point.
-    size_t endIdx = pointCount - 1;
-    size_t prevIdx = endIdx - 1;
-    // For cubic, the tangent comes from the last control point to the endpoint.
-    if (verbs[lastVerb] == PathVerb::Cubic && pointCount >= 4) {
-      prevIdx = endIdx - 1;  // Last control point of cubic.
-    } else if (verbs[lastVerb] == PathVerb::Quad && pointCount >= 3) {
-      prevIdx = endIdx - 1;  // Control point of quad.
-    }
-    float dx = points[endIdx].x - points[prevIdx].x;
-    float dy = points[endIdx].y - points[prevIdx].y;
-    result.angle = std::atan2(dy, dx);
-  }
-  return result;
+static bool NoDirection(const Point& direction) {
+  return direction.x == 0 && direction.y == 0;
 }
 
-// Extract mid points and tangent angles from a path (vertices between start and end).
-static std::vector<MarkerPoint> GetPathMidPoints(const PathData* pathData) {
-  std::vector<MarkerPoint> midPoints = {};
-  if (!pathData || pathData->verbs().size() < 3) {
-    return midPoints;
-  }
-  const auto& verbs = pathData->verbs();
-  const auto& points = pathData->points();
+static std::vector<MarkerPoint> MarkerVertices(const PathData& path,
+                                               const std::vector<size_t>& commandEnds) {
+  std::vector<SVGMarkerVertex> vertices;
+  const auto& verbs = path.verbs();
+  const auto& points = path.points();
+  size_t verbIndex = 0;
   size_t pointIndex = 0;
-  size_t verbCount = verbs.size();
-  for (size_t i = 0; i < verbCount; i++) {
-    auto verb = verbs[i];
-    if (verb == PathVerb::Move) {
-      pointIndex += 1;
-    } else if (verb == PathVerb::Line) {
-      // Mid points are all line endpoints except the first move and the last segment.
-      if (i > 0 && i < verbCount - 1 && verbs[i + 1] != PathVerb::Close) {
-        MarkerPoint mp = {};
-        mp.x = points[pointIndex].x;
-        mp.y = points[pointIndex].y;
-        // Tangent: average of incoming and outgoing directions.
-        float inDx = points[pointIndex].x - points[pointIndex - 1].x;
-        float inDy = points[pointIndex].y - points[pointIndex - 1].y;
-        if (i + 1 < verbCount && pointIndex + 1 < points.size()) {
-          float outDx = points[pointIndex + 1].x - points[pointIndex].x;
-          float outDy = points[pointIndex + 1].y - points[pointIndex].y;
-          mp.angle = std::atan2(inDy + outDy, inDx + outDx);
-        } else {
-          mp.angle = std::atan2(inDy, inDx);
-        }
-        midPoints.push_back(mp);
+  size_t subpath = 0;
+  for (size_t end : commandEnds) {
+    if (verbIndex >= verbs.size() || end > verbs.size()) break;
+    if (verbs[verbIndex] == PathVerb::Move) {
+      subpath = vertices.size();
+      vertices.push_back({points[pointIndex], {}, {}, subpath});
+      ++pointIndex;
+      ++verbIndex;
+      continue;
+    }
+    if (vertices.empty()) break;
+    Point start = vertices.back().point;
+    std::vector<Point> segmentPoints = {start};
+    while (verbIndex < end) {
+      auto verb = verbs[verbIndex++];
+      if (verb == PathVerb::Close) {
+        segmentPoints.push_back(vertices[subpath].point);
+      } else {
+        int count = PathData::PointsPerVerb(verb);
+        for (int i = 0; i < count; ++i) segmentPoints.push_back(points[pointIndex++]);
       }
-      pointIndex += 1;
-    } else if (verb == PathVerb::Quad) {
-      pointIndex += 2;
-    } else if (verb == PathVerb::Cubic) {
-      pointIndex += 3;
-    } else if (verb == PathVerb::Close) {
-      // No points consumed.
+    }
+    Point finish = segmentPoints.back();
+    Point outgoing = {};
+    Point incoming = {};
+    for (size_t i = 1; i < segmentPoints.size() && NoDirection(outgoing); ++i) {
+      outgoing = Direction(start, segmentPoints[i]);
+    }
+    for (size_t i = segmentPoints.size() - 1; i > 0 && NoDirection(incoming); --i) {
+      incoming = Direction(segmentPoints[i - 1], finish);
+    }
+    vertices.back().outgoing = outgoing;
+    vertices.push_back({finish, incoming, {}, subpath});
+    if (verbs[end - 1] == PathVerb::Close) {
+      vertices[subpath].incoming = incoming;
+      vertices.back().outgoing = vertices[subpath].outgoing;
     }
   }
-  return midPoints;
+  std::vector<MarkerPoint> result;
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    auto in = vertices[i].incoming;
+    auto out = vertices[i].outgoing;
+    // SVG borrows directionality from adjacent non-zero segments in the same subpath.
+    for (size_t j = i; NoDirection(in) && j > vertices[i].subpath; --j) {
+      in = vertices[j - 1].incoming;
+    }
+    for (size_t j = i + 1;
+         NoDirection(out) && j < vertices.size() && vertices[j].subpath == vertices[i].subpath;
+         ++j) {
+      out = vertices[j].outgoing;
+    }
+    if (NoDirection(in)) in = out;
+    if (NoDirection(out)) out = in;
+    float a = std::atan2(in.y, in.x);
+    float b = std::atan2(out.y, out.x);
+    if (std::abs(a - b) > static_cast<float>(M_PI)) {
+      if (a < b) a += 2 * static_cast<float>(M_PI);
+      else
+        b += 2 * static_cast<float>(M_PI);
+    }
+    result.push_back({vertices[i].point.x, vertices[i].point.y, (a + b) * .5f});
+  }
+  return result;
 }
 
 std::vector<Layer*> SVGParserContext::expandMarkers(const std::shared_ptr<DOMNode>& element,
                                                     const InheritedStyle& inheritedStyle) {
-  std::vector<Layer*> markerLayers = {};
-
-  // Resolve marker references.
-  std::string markerStartRef = resolveUrl(getAttribute(element, "marker-start"));
-  std::string markerMidRef = resolveUrl(getAttribute(element, "marker-mid"));
-  std::string markerEndRef = resolveUrl(getAttribute(element, "marker-end"));
-
-  // Get the path data from the element to extract endpoint positions.
-  auto shapeElement = convertElement(element);
-  PathData* pathData = nullptr;
-  if (shapeElement && shapeElement->nodeType() == NodeType::Path) {
-    pathData = static_cast<Path*>(shapeElement)->data;
+  std::vector<Layer*> layers;
+  std::vector<size_t> commands;
+  PathData data;
+  if (element->name == "path") {
+    data = PathDataFromSVGString(getAttribute(element, "d"), &commands);
+  } else if (element->name == "polyline" || element->name == "polygon") {
+    data = parsePoints(getAttribute(element, "points"), element->name == "polygon");
+  } else if (element->name == "line") {
+    data.moveTo(parseLength(getAttribute(element, "x1"), _viewBoxWidth),
+                parseLength(getAttribute(element, "y1"), _viewBoxHeight));
+    data.lineTo(parseLength(getAttribute(element, "x2"), _viewBoxWidth),
+                parseLength(getAttribute(element, "y2"), _viewBoxHeight));
+  } else {
+    return layers;
   }
-  if (!pathData) {
-    return markerLayers;
+  if (commands.empty()) {
+    for (size_t i = 0; i < data.verbs().size(); ++i) commands.push_back(i + 1);
   }
-
-  // Get the stroke width from the referencing element for markerUnits="strokeWidth".
-  std::string strokeWidthStr = getAttribute(element, "stroke-width");
-  if (strokeWidthStr.empty()) {
-    strokeWidthStr = inheritedStyle.strokeWidth;
+  auto vertices = MarkerVertices(data, commands);
+  if (vertices.empty()) return layers;
+  float strokeWidth =
+      inheritedStyle.strokeWidth.empty()
+          ? 1
+          : parseLength(inheritedStyle.strokeWidth,
+                        std::hypot(_viewBoxWidth, _viewBoxHeight) / std::sqrt(2.0f));
+  auto start = resolveUrl(inheritedStyle.markerStart);
+  auto mid = resolveUrl(inheritedStyle.markerMid);
+  auto end = resolveUrl(inheritedStyle.markerEnd);
+  auto bounds = getShapeBounds(element);
+  if (!start.empty()) {
+    auto marker =
+        createMarkerLayer(start, vertices.front(), strokeWidth, inheritedStyle, bounds, true);
+    if (marker != nullptr) layers.push_back(marker);
   }
-  float strokeWidth = strokeWidthStr.empty() ? 1.0f : parseLength(strokeWidthStr, _viewBoxWidth);
-
-  // Create marker-start layer.
-  if (!markerStartRef.empty()) {
-    auto startPoint = GetPathStartPoint(pathData);
-    auto* markerLayer = createMarkerLayer(markerStartRef, startPoint, strokeWidth, inheritedStyle);
-    if (markerLayer) {
-      markerLayers.push_back(markerLayer);
+  if (!mid.empty()) {
+    for (size_t i = 1; i + 1 < vertices.size(); ++i) {
+      auto marker = createMarkerLayer(mid, vertices[i], strokeWidth, inheritedStyle, bounds, false);
+      if (marker != nullptr) layers.push_back(marker);
     }
   }
-
-  // Create marker-mid layers.
-  if (!markerMidRef.empty()) {
-    auto midPoints = GetPathMidPoints(pathData);
-    for (const auto& mp : midPoints) {
-      auto* markerLayer = createMarkerLayer(markerMidRef, mp, strokeWidth, inheritedStyle);
-      if (markerLayer) {
-        markerLayers.push_back(markerLayer);
-      }
-    }
+  if (!end.empty()) {
+    auto marker =
+        createMarkerLayer(end, vertices.back(), strokeWidth, inheritedStyle, bounds, false);
+    if (marker != nullptr) layers.push_back(marker);
   }
-
-  // Create marker-end layer.
-  if (!markerEndRef.empty()) {
-    auto endPoint = GetPathEndPoint(pathData);
-    auto* markerLayer = createMarkerLayer(markerEndRef, endPoint, strokeWidth, inheritedStyle);
-    if (markerLayer) {
-      markerLayers.push_back(markerLayer);
-    }
-  }
-
-  return markerLayers;
+  return layers;
 }
 
 Layer* SVGParserContext::createMarkerLayer(const std::string& markerId, const MarkerPoint& point,
-                                           float strokeWidth,
-                                           const InheritedStyle& inheritedStyle) {
-  auto markerIt = _defs.find(markerId);
-  if (markerIt == _defs.end()) {
+                                           float strokeWidth, const InheritedStyle& inheritedStyle,
+                                           const Rect& bounds, bool isStart) {
+  auto it = _defs.find(markerId);
+  if (it == _defs.end() || it->second->name != "marker") return nullptr;
+  auto def = it->second;
+  if (_effectStack.count(def.get()) || _effectStack.size() >= MAX_SVG_RECURSION_DEPTH) {
+    _document->errors.push_back("svg: cyclic or excessively nested marker reference");
     return nullptr;
   }
-  auto markerDef = markerIt->second;
-  if (markerDef->name != "marker") {
-    return nullptr;
+  float width = parseLength(getAttribute(def, "markerWidth", "3"), _viewBoxWidth);
+  float height = parseLength(getAttribute(def, "markerHeight", "3"), _viewBoxHeight);
+  auto viewBox = parseViewBox(getAttribute(def, "viewBox"));
+  auto mapping = Matrix::Identity();
+  if (viewBox.size() == 4 && viewBox[2] > 0 && viewBox[3] > 0) {
+    mapping =
+        ComputeViewBoxMatrix(viewBox, width, height, getAttribute(def, "preserveAspectRatio"));
   }
-
-  float markerWidth = parseLength(getAttribute(markerDef, "markerWidth", "3"), _viewBoxWidth);
-  float markerHeight = parseLength(getAttribute(markerDef, "markerHeight", "3"), _viewBoxHeight);
-  float refX = parseLength(getAttribute(markerDef, "refX", "0"), markerWidth);
-  float refY = parseLength(getAttribute(markerDef, "refY", "0"), markerHeight);
-  std::string orientStr = getAttribute(markerDef, "orient", "0");
-  std::string markerUnitsStr = getAttribute(markerDef, "markerUnits", "strokeWidth");
-
-  float angle = 0;
-  if (orientStr == "auto" || orientStr == "auto-start-reverse") {
-    angle = point.angle;
-  } else {
-    angle = strtof(orientStr.c_str(), nullptr) * 3.14159265358979323846f / 180.0f;
+  Point ref = {parseLength(getAttribute(def, "refX"), viewBox.size() == 4 ? viewBox[2] : width),
+               parseLength(getAttribute(def, "refY"), viewBox.size() == 4 ? viewBox[3] : height)};
+  ref = mapping.mapPoint(ref);
+  auto orient = getAttribute(def, "orient", "0");
+  float angle = parseLength(orient, 1);
+  if (orient == "auto" || orient == "auto-start-reverse") {
+    angle = point.angle * 180 / static_cast<float>(M_PI);
+    if (isStart && orient == "auto-start-reverse") angle += 180;
+  } else if (orient.find("rad") != std::string::npos && orient.find("grad") == std::string::npos) {
+    angle *= 180 / static_cast<float>(M_PI);
+  } else if (orient.find("grad") != std::string::npos) {
+    angle *= .9f;
+  } else if (orient.find("turn") != std::string::npos) {
+    angle *= 360;
   }
-
-  float cosA = std::cos(angle);
-  float sinA = std::sin(angle);
-
-  // Build marker transform: translate(point) * rotate(angle) * scale * translate(-refX, -refY)
-  // For markerUnits="strokeWidth" (default), scale by strokeWidth.
-  float scale = (markerUnitsStr != "userSpaceOnUse") ? strokeWidth : 1.0f;
-
-  Matrix markerMatrix = {};
-  markerMatrix.a = cosA * scale;
-  markerMatrix.b = sinA * scale;
-  markerMatrix.c = -sinA * scale;
-  markerMatrix.d = cosA * scale;
-  markerMatrix.tx = point.x - (cosA * scale * refX - sinA * scale * refY);
-  markerMatrix.ty = point.y - (sinA * scale * refX + cosA * scale * refY);
-
-  auto markerLayer = _document->makeNode<Layer>();
-  markerLayer->matrix = markerMatrix;
-
-  // Clear stroke-related inherited styles so marker children don't inherit the referencing
-  // element's stroke properties (e.g., dashed stroke would cause visual artifacts on marker
-  // triangles).
-  InheritedStyle markerStyle = inheritedStyle;
-  markerStyle.stroke = "none";
-  markerStyle.strokeWidth = {};
-  markerStyle.strokeDasharray = {};
-  markerStyle.strokeDashoffset = {};
-  markerStyle.strokeLinecap = {};
-  markerStyle.strokeLinejoin = {};
-  markerStyle.strokeMiterlimit = {};
-  markerStyle.strokeOpacity = {};
-
-  // Convert the marker's children as layers.
-  auto child = markerDef->getFirstChild();
-  while (child) {
-    if (child->type == DOMNodeType::Element) {
-      auto childLayer = convertToLayer(child, markerStyle);
-      if (childLayer) {
-        markerLayer->children.push_back(childLayer);
-      }
-    }
-    child = child->getNextSibling();
-  }
-
-  if (markerLayer->children.empty() && markerLayer->contents.empty()) {
-    return nullptr;
-  }
-
-  return markerLayer;
+  float scale =
+      getAttribute(def, "markerUnits", "strokeWidth") == "userSpaceOnUse" ? 1 : strokeWidth;
+  if (scale <= 0 || width <= 0 || height <= 0) return nullptr;
+  auto savedFill = _contextFill;
+  auto savedStroke = _contextStroke;
+  SVGValueScope<Rect> boundsScope(_contextBounds);
+  SVGValueScope<Point> viewportScope(_contextViewport);
+  SVGValueScope<Matrix> contextScope(_contextPaintTransform);
+  _contextBounds = bounds;
+  _contextViewport = {_viewBoxWidth, _viewBoxHeight};
+  auto markerMatrix = Matrix::Translate(point.x, point.y) * Matrix::Rotate(angle) *
+                      Matrix::Scale(scale, scale) * Matrix::Translate(-ref.x, -ref.y);
+  _contextPaintTransform = markerMatrix;
+  _contextFill = inheritedStyle.fill.empty() ? "black" : inheritedStyle.fill;
+  _contextStroke = inheritedStyle.stroke.empty() ? "none" : inheritedStyle.stroke;
+  if (_contextFill == "currentColor") _contextFill = inheritedStyle.color;
+  if (_contextStroke == "currentColor") _contextStroke = inheritedStyle.color;
+  _effectStack.insert(def.get());
+  auto viewport = convertViewport(def, definitionStyle(def), width, height,
+                                  static_cast<int>(_effectStack.size()));
+  _effectStack.erase(def.get());
+  _contextFill = savedFill;
+  _contextStroke = savedStroke;
+  if (viewport == nullptr) return nullptr;
+  viewport->matrix = markerMatrix;
+  return viewport;
 }
 
 void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
@@ -990,8 +971,8 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) 
 static bool SameTextStyle(const InheritedStyle& a, const InheritedStyle& b) {
   return a.color == b.color && a.fontFamily == b.fontFamily && a.fontSize == b.fontSize &&
          a.fontWeight == b.fontWeight && a.fontStyle == b.fontStyle &&
-         a.letterSpacing == b.letterSpacing && a.textAnchor == b.textAnchor &&
-         a.fill == b.fill && a.stroke == b.stroke && a.fillOpacity == b.fillOpacity &&
+         a.letterSpacing == b.letterSpacing && a.textAnchor == b.textAnchor && a.fill == b.fill &&
+         a.stroke == b.stroke && a.fillOpacity == b.fillOpacity &&
          a.strokeOpacity == b.strokeOpacity && a.strokeWidth == b.strokeWidth &&
          a.strokeDasharray == b.strokeDasharray && a.strokeDashoffset == b.strokeDashoffset &&
          a.strokeLinecap == b.strokeLinecap && a.strokeLinejoin == b.strokeLinejoin &&
@@ -999,9 +980,10 @@ static bool SameTextStyle(const InheritedStyle& a, const InheritedStyle& b) {
 }
 
 void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element, SVGTextRun& pending,
-                                      const InheritedStyle& style,
-                                      const std::shared_ptr<DOMNode>& path,
-                                      std::vector<SVGTextRun>& runs, bool& previousSpace, int depth) {
+                                       const InheritedStyle& style,
+                                       const std::shared_ptr<DOMNode>& path,
+                                       std::vector<SVGTextRun>& runs, bool& previousSpace,
+                                       int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH || getAttribute(element, "display") == "none") return;
   float fontSize = style.fontSize.empty() ? DEFAULT_FONT_SIZE : parseLength(style.fontSize, 1);
   auto x = getAttribute(element, "x");
@@ -1034,8 +1016,8 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element, 
       }
     } else if (child->name == "tspan" || child->name == "textPath" || child->name == "a") {
       auto childStyle = computeInheritedStyle(child, style);
-      collectTextRuns(child, pending, childStyle, child->name == "textPath" ? child : path,
-                      runs, previousSpace, depth + 1);
+      collectTextRuns(child, pending, childStyle, child->name == "textPath" ? child : path, runs,
+                      previousSpace, depth + 1);
     }
   }
 }
@@ -1044,13 +1026,13 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
   auto text = _document->makeNode<Text>();
   text->text = run.text;
   text->baseline = TextBaseline::Alphabetic;
-  text->fontSize = run.style.fontSize.empty() ? DEFAULT_FONT_SIZE :
-                       parseLength(run.style.fontSize, _viewBoxHeight);
+  text->fontSize = run.style.fontSize.empty() ? DEFAULT_FONT_SIZE
+                                              : parseLength(run.style.fontSize, _viewBoxHeight);
   auto synthesis = ResolveFontStyleSynthesis(run.style.fontWeight, run.style.fontStyle);
   text->fontStyle = synthesis.fontStyleName;
   text->fauxItalic = synthesis.fauxItalic;
-  auto families = ParseCSSFontFamilyList(run.style.fontFamily.empty() ? "serif" :
-                                                                         run.style.fontFamily);
+  auto families =
+      ParseCSSFontFamilyList(run.style.fontFamily.empty() ? "serif" : run.style.fontFamily);
   bool firstFamily = true;
   for (const auto& family : families) {
     auto resolved = ResolveCSSGenericFontFamily(family);
@@ -1069,7 +1051,7 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
 }
 
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
-                                    const InheritedStyle& inheritedStyle) {
+                                     const InheritedStyle& inheritedStyle) {
   std::vector<SVGTextRun> runs;
   SVGTextRun pending;
   bool previousSpace = true;
@@ -1084,7 +1066,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   for (size_t start = 0; start < runs.size();) {
     size_t end = start + 1;
     while (end < runs.size() && std::isnan(runs[end].x) && std::isnan(runs[end].y) &&
-           runs[end].path == runs[start].path) ++end;
+           runs[end].path == runs[start].path)
+      ++end;
     if (!std::isnan(runs[start].x)) cursor.x = runs[start].x;
     if (!std::isnan(runs[start].y)) cursor.y = runs[start].y;
     std::vector<Text*> texts;
@@ -1099,8 +1082,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     for (size_t i = start; i < end; ++i) dx += runs[i].dx;
     // SVG includes the final character's letter spacing in chunk anchoring.
     float anchorAdvance = advance + dx + texts.back()->letterSpacing;
-    float anchorShift = runs[start].style.textAnchor == "middle" ? anchorAdvance * .5f :
-                        runs[start].style.textAnchor == "end" ? anchorAdvance : 0;
+    float anchorShift = runs[start].style.textAnchor == "middle" ? anchorAdvance * .5f
+                        : runs[start].style.textAnchor == "end"  ? anchorAdvance
+                                                                 : 0;
     auto chunk = _document->makeNode<Group>();
     dx = 0;
     for (size_t i = start; i < end; ++i) {
@@ -1109,7 +1093,8 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       dy += runs[i].dy;
       auto bounds = layout.getTextBounds(text);
       auto standalone = TextLayout::Layout(TextLayout::MakeElements({text}), params, &context);
-      text->position = {cursor.x + bounds.x - standalone.bounds.x + dx - anchorShift, cursor.y + dy};
+      text->position = {cursor.x + bounds.x - standalone.bounds.x + dx - anchorShift,
+                        cursor.y + dy};
       auto runGroup = _document->makeNode<Group>();
       runGroup->elements.push_back(text);
       addFillStroke(runs[i].element, runGroup->elements, runs[i].style);
@@ -1124,8 +1109,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       if (path != nullptr) {
         if (path->forceAlignment) {
           float span = parseLength(getAttribute(element, "textLength"), _viewBoxWidth);
-          float shift = runs[start].style.textAnchor == "middle" ? span * .5f :
-                        runs[start].style.textAnchor == "end" ? span : 0;
+          float shift = runs[start].style.textAnchor == "middle" ? span * .5f
+                        : runs[start].style.textAnchor == "end"  ? span
+                                                                 : 0;
           path->firstMargin -= shift;
           path->lastMargin -= shift;
         }
@@ -1299,11 +1285,10 @@ static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW,
 }
 
 Layer* SVGParserContext::convertViewport(const std::shared_ptr<DOMNode>& element,
-                                        const InheritedStyle& inheritedStyle, float width,
-                                        float height, int depth) {
+                                         const InheritedStyle& inheritedStyle, float width,
+                                         float height, int depth) {
   auto viewBox = parseViewBox(getAttribute(element, "viewBox"));
-  if (width <= 0 || height <= 0 ||
-      (viewBox.size() == 4 && (viewBox[2] <= 0 || viewBox[3] <= 0))) {
+  if (width <= 0 || height <= 0 || (viewBox.size() == 4 && (viewBox[2] <= 0 || viewBox[3] <= 0))) {
     return nullptr;
   }
   auto viewport = _document->makeNode<Layer>();
@@ -1312,9 +1297,11 @@ Layer* SVGParserContext::convertViewport(const std::shared_ptr<DOMNode>& element
   viewport->clipToBounds = getAttribute(element, "overflow") != "visible";
   auto content = _document->makeNode<Layer>();
   if (viewBox.size() == 4) {
-    content->matrix = ComputeViewBoxMatrix(viewBox, width, height,
-                                          getAttribute(element, "preserveAspectRatio"));
+    content->matrix =
+        ComputeViewBoxMatrix(viewBox, width, height, getAttribute(element, "preserveAspectRatio"));
   }
+  SVGValueScope<Matrix> contextScope(_contextPaintTransform);
+  _contextPaintTransform = _contextPaintTransform * content->matrix;
   float savedWidth = _viewBoxWidth;
   float savedHeight = _viewBoxHeight;
   _viewBoxWidth = viewBox.size() == 4 ? viewBox[2] : width;
@@ -1335,6 +1322,9 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   std::string refId = resolveUrl(getHrefAttribute(useElement));
   float x = parseLength(getAttribute(useElement, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(useElement, "y"), _viewBoxHeight);
+  auto placement = Matrix::Translate(x, y) * parseTransform(getAttribute(refElement, "transform"));
+  SVGValueScope<Matrix> contextScope(_contextPaintTransform);
+  _contextPaintTransform = _contextPaintTransform * placement;
 
   // The use's x/y establishes the referenced content's origin. For <symbol>/<svg> the use's
   // width/height define a viewport that the referenced viewBox is fitted into (per
@@ -1342,14 +1332,16 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
   _useStack.insert(refId);
   if (refElement->name == "symbol" || refElement->name == "svg") {
-    float width = parseLength(getAttribute(useElement, "width",
-                                getAttribute(refElement, "width", "100%")), _viewBoxWidth);
-    float height = parseLength(getAttribute(useElement, "height",
-                                 getAttribute(refElement, "height", "100%")), _viewBoxHeight);
+    float width =
+        parseLength(getAttribute(useElement, "width", getAttribute(refElement, "width", "100%")),
+                    _viewBoxWidth);
+    float height =
+        parseLength(getAttribute(useElement, "height", getAttribute(refElement, "height", "100%")),
+                    _viewBoxHeight);
     auto viewport = convertViewport(refElement, refStyle, width, height, depth);
     if (viewport != nullptr) {
-      viewport->matrix = Matrix::Translate(x, y) *
-                         parseTransform(getAttribute(refElement, "transform"));
+      viewport->matrix =
+          Matrix::Translate(x, y) * parseTransform(getAttribute(refElement, "transform"));
     }
     _useStack.erase(refId);
     return viewport;
@@ -1430,28 +1422,29 @@ LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DO
   bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
-  float x1 = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
-  float y1 = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
-  float x2 = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
-  float y2 = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
+  float x1 =
+      parseLength(getAttribute(element, "x1", "0%"), useObjectBoundingBox ? 1 : _viewBoxWidth);
+  float y1 =
+      parseLength(getAttribute(element, "y1", "0%"), useObjectBoundingBox ? 1 : _viewBoxHeight);
+  float x2 =
+      parseLength(getAttribute(element, "x2", "100%"), useObjectBoundingBox ? 1 : _viewBoxWidth);
+  float y2 =
+      parseLength(getAttribute(element, "y2", "0%"), useObjectBoundingBox ? 1 : _viewBoxHeight);
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
   Matrix transformMatrix =
       gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
 
-  Point start = useObjectBoundingBox ? Point{shapeBounds.x + x1 * shapeBounds.width,
-                                             shapeBounds.y + y1 * shapeBounds.height}
-                                     : Point{x1, y1};
-  Point end = useObjectBoundingBox ? Point{shapeBounds.x + x2 * shapeBounds.width,
-                                           shapeBounds.y + y2 * shapeBounds.height}
-                                   : Point{x2, y2};
-  gradient->startPoint = transformMatrix.mapPoint(start);
-  gradient->endPoint = transformMatrix.mapPoint(end);
-
-  // SVG gradients are already resolved into absolute coordinates above (the parent container's
-  // (Layer or Group) coordinate space in PAGX), so disable per-geometry fitting instead of
-  // using the default normalized 0-1 space.
+  gradient->startPoint = {x1, y1};
+  gradient->endPoint = {x2, y2};
+  // Preserve the complete paint-space mapping. Transforming only the endpoints changes the
+  // gradient's perpendicular lines under non-uniform scale and skew.
+  gradient->matrix = useObjectBoundingBox
+                         ? Matrix::Translate(shapeBounds.x, shapeBounds.y) *
+                               Matrix::Scale(shapeBounds.width, shapeBounds.height) *
+                               transformMatrix
+                         : transformMatrix;
   gradient->fitsToGeometry = false;
 
   // Parse stops.
@@ -1470,34 +1463,26 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
   bool useObjectBoundingBox = (gradientUnits == "objectBoundingBox");
 
   // Parse gradient coordinates.
-  float cx = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
-  float cy = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
-  float r = parseLength(getAttribute(element, "r", "50%"), 1.0f);
+  float cx =
+      parseLength(getAttribute(element, "cx", "50%"), useObjectBoundingBox ? 1 : _viewBoxWidth);
+  float cy =
+      parseLength(getAttribute(element, "cy", "50%"), useObjectBoundingBox ? 1 : _viewBoxHeight);
+  float r = parseLength(
+      getAttribute(element, "r", "50%"),
+      useObjectBoundingBox ? 1 : std::hypot(_viewBoxWidth, _viewBoxHeight) / std::sqrt(2.0f));
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
   Matrix transformMatrix =
       gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
 
-  if (useObjectBoundingBox) {
-    // For objectBoundingBox, convert normalized coordinates to actual coordinates.
-    gradient->center = {shapeBounds.x + cx * shapeBounds.width,
-                        shapeBounds.y + cy * shapeBounds.height};
-    // Radius is scaled by the average of width and height.
-    gradient->radius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
-  } else {
-    // For userSpaceOnUse, coordinates are in user space.
-    gradient->center = {cx, cy};
-    gradient->radius = r;
-  }
-
-  if (!transformMatrix.isIdentity()) {
-    gradient->matrix = transformMatrix;
-  }
-
-  // SVG gradients are already resolved into absolute coordinates above (the parent container's
-  // (Layer or Group) coordinate space in PAGX), so disable per-geometry fitting instead of
-  // using the default normalized 0-1 space.
+  gradient->center = {cx, cy};
+  gradient->radius = r;
+  gradient->matrix = useObjectBoundingBox
+                         ? Matrix::Translate(shapeBounds.x, shapeBounds.y) *
+                               Matrix::Scale(shapeBounds.width, shapeBounds.height) *
+                               transformMatrix
+                         : transformMatrix;
   gradient->fitsToGeometry = false;
 
   // Parse stops.
@@ -1616,16 +1601,17 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
   return pattern;
 }
-InheritedStyle SVGParserContext::definitionStyle(const std::shared_ptr<DOMNode>& element, int depth) {
+InheritedStyle SVGParserContext::definitionStyle(const std::shared_ptr<DOMNode>& element,
+                                                 int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH) return {};
   auto parent = _parents.find(element.get());
-  auto inherited = parent == _parents.end() ? InheritedStyle{} :
-                       definitionStyle(parent->second, depth + 1);
+  auto inherited =
+      parent == _parents.end() ? InheritedStyle{} : definitionStyle(parent->second, depth + 1);
   return computeInheritedStyle(element, inherited);
 }
 
-Layer* SVGParserContext::applyMaskReferences(Layer* layer,
-                                            const std::shared_ptr<DOMNode>& element, int depth) {
+Layer* SVGParserContext::applyMaskReferences(Layer* layer, const std::shared_ptr<DOMNode>& element,
+                                             int depth) {
   // Filter the source first, then clip, then mask, and finally apply group opacity. Each effect
   // instance and its owner share a parent coordinate system, including singular/reflected CTMs.
   // A definition is a template: sharing its Layer would give it multiple owners in tgfx.
@@ -1650,8 +1636,9 @@ Layer* SVGParserContext::applyMaskReferences(Layer* layer,
     layer->alpha = 1;
     layer->blendMode = BlendMode::Normal;
     layer->mask = mask;
-    layer->maskType = isClip || getAttribute(ref->second, "mask-type") == "alpha" ?
-                          MaskType::Alpha : MaskType::Luminance;
+    layer->maskType = isClip || getAttribute(ref->second, "mask-type") == "alpha"
+                          ? MaskType::Alpha
+                          : MaskType::Luminance;
     wrapper->children = {mask, layer};
     layer = wrapper;
   }
@@ -1659,7 +1646,7 @@ Layer* SVGParserContext::applyMaskReferences(Layer* layer,
 }
 
 Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
-                                           const Rect& bounds, int depth) {
+                                            const Rect& bounds, int depth) {
   bool isClip = maskElement->name == "clipPath";
   auto maskLayer = _document->makeNode<Layer>();
   maskLayer->id = generateUniqueId(isClip ? "clip" : "mask");
@@ -1667,18 +1654,18 @@ Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& mask
   maskLayer->visible = false;
   maskLayer->includeInLayout = false;
   bool objectContent = getAttribute(maskElement, isClip ? "clipPathUnits" : "maskContentUnits",
-                                     "userSpaceOnUse") == "objectBoundingBox";
+                                    "userSpaceOnUse") == "objectBoundingBox";
   auto content = _document->makeNode<Layer>();
   if (objectContent) {
     if (bounds.isEmpty()) return maskLayer;
-    content->matrix = Matrix::Translate(bounds.x, bounds.y) *
-                      Matrix::Scale(bounds.width, bounds.height);
+    content->matrix =
+        Matrix::Translate(bounds.x, bounds.y) * Matrix::Scale(bounds.width, bounds.height);
   }
   content->matrix = content->matrix * parseTransform(getAttribute(maskElement, "transform"));
   Layer* contentParent = maskLayer;
   if (!isClip) {
-    bool objectRegion = getAttribute(maskElement, "maskUnits", "objectBoundingBox") ==
-                        "objectBoundingBox";
+    bool objectRegion =
+        getAttribute(maskElement, "maskUnits", "objectBoundingBox") == "objectBoundingBox";
     float unitW = objectRegion ? 1 : _viewBoxWidth;
     float unitH = objectRegion ? 1 : _viewBoxHeight;
     float x = parseLength(getAttribute(maskElement, "x", "-10%"), unitW);
@@ -1989,7 +1976,10 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
   // Determine effective fill value (element attribute overrides inherited).
   std::string fill = inheritedStyle.fill;
+  bool contextFill = fill == "context-fill" || fill == "context-stroke";
   if (fill == "currentColor" || fill == "currentcolor") fill = inheritedStyle.color;
+  if (fill == "context-fill") fill = _contextFill;
+  if (fill == "context-stroke") fill = _contextStroke;
 
   // Determine the effective fill-rule once so it applies to every fill branch below. Inside a
   // <clipPath> the winding rule is carried by `clip-rule` rather than `fill-rule`, and a clip
@@ -2036,7 +2026,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         shapeBounds = getShapeBounds(element);
         boundsComputed = true;
       }
-      fillNode->color = getColorSourceForRef(refId, shapeBounds);
+      fillNode->color = getColorSourceForRef(refId, shapeBounds, contextFill);
       // Apply fill-opacity even for url() fills.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
       if (fillOpacity.empty()) {
@@ -2074,9 +2064,12 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
   // Determine effective stroke value (element attribute overrides inherited).
   std::string stroke = inheritedStyle.stroke;
+  bool contextStroke = stroke == "context-fill" || stroke == "context-stroke";
   if (stroke == "currentColor" || stroke == "currentcolor") {
     stroke = inheritedStyle.color.empty() ? "black" : inheritedStyle.color;
   }
+  if (stroke == "context-fill") stroke = _contextFill;
+  if (stroke == "context-stroke") stroke = _contextStroke;
 
   if (!stroke.empty() && stroke != "none") {
     // Check stroke width first. A zero-width stroke is invisible and should be skipped.
@@ -2112,7 +2105,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
         shapeBounds = getShapeBounds(element);
         boundsComputed = true;
       }
-      strokeNode->color = getColorSourceForRef(refId, shapeBounds);
+      strokeNode->color = getColorSourceForRef(refId, shapeBounds, contextStroke);
     } else {
       // Convert color to SolidColor for PAGX compatibility.
       // SolidColor is always inlined (no id).
@@ -2250,12 +2243,14 @@ tgfx::Path SVGParserContext::geometryPath(const std::shared_ptr<DOMNode>& elemen
       auto matrix = Matrix::Translate(parseLength(getAttribute(element, "x"), _viewBoxWidth),
                                       parseLength(getAttribute(element, "y"), _viewBoxHeight));
       auto viewBox = parseViewBox(getAttribute(ref->second, "viewBox"));
-      if ((ref->second->name == "symbol" || ref->second->name == "svg") &&
-          viewBox.size() == 4 && viewBox[2] > 0 && viewBox[3] > 0) {
-        auto width = parseLength(getAttribute(element, "width",
-                                   getAttribute(ref->second, "width", "100%")), _viewBoxWidth);
-        auto height = parseLength(getAttribute(element, "height",
-                                    getAttribute(ref->second, "height", "100%")), _viewBoxHeight);
+      if ((ref->second->name == "symbol" || ref->second->name == "svg") && viewBox.size() == 4 &&
+          viewBox[2] > 0 && viewBox[3] > 0) {
+        auto width =
+            parseLength(getAttribute(element, "width", getAttribute(ref->second, "width", "100%")),
+                        _viewBoxWidth);
+        auto height = parseLength(
+            getAttribute(element, "height", getAttribute(ref->second, "height", "100%")),
+            _viewBoxHeight);
         matrix = matrix * ComputeViewBoxMatrix(viewBox, width, height,
                                                getAttribute(ref->second, "preserveAspectRatio"));
       }
@@ -2328,6 +2323,10 @@ float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& e
 InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                        const InheritedStyle& parentStyle) {
   InheritedStyle style = parentStyle;
+  auto marker = getAttribute(element, "marker");
+  if (!marker.empty() && marker != "inherit" && marker != "unset") {
+    style.markerStart = style.markerMid = style.markerEnd = marker;
+  }
 
   static const std::pair<const char*, std::string InheritedStyle::*> StyleProperties[] = {
       {"color", &InheritedStyle::color},
@@ -2337,6 +2336,9 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
       {"stroke-opacity", &InheritedStyle::strokeOpacity},
       {"fill-rule", &InheritedStyle::fillRule},
       {"clip-rule", &InheritedStyle::clipRule},
+      {"marker-start", &InheritedStyle::markerStart},
+      {"marker-mid", &InheritedStyle::markerMid},
+      {"marker-end", &InheritedStyle::markerEnd},
       {"stroke-dasharray", &InheritedStyle::strokeDasharray},
       {"stroke-dashoffset", &InheritedStyle::strokeDashoffset},
       {"stroke-width", &InheritedStyle::strokeWidth},
@@ -2359,8 +2361,9 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
   }
   auto fontSize = getAttribute(element, "font-size");
   if (!fontSize.empty() && fontSize != "inherit" && fontSize != "unset" && fontSize != "initial") {
-    float parentSize = parentStyle.fontSize.empty() ? DEFAULT_FONT_SIZE :
-                          parseLength(parentStyle.fontSize, DEFAULT_FONT_SIZE);
+    float parentSize = parentStyle.fontSize.empty()
+                           ? DEFAULT_FONT_SIZE
+                           : parseLength(parentStyle.fontSize, DEFAULT_FONT_SIZE);
     style.fontSize = std::to_string(parseLengthEm(fontSize, parentSize, parentSize));
   }
   return style;
@@ -3360,7 +3363,7 @@ void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, 
   }
 }
 ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
-                                                    const Rect& shapeBounds) {
+                                                    const Rect& shapeBounds, bool contextPaint) {
   auto defIt = _defs.find(refId);
   if (defIt == _defs.end()) {
     return nullptr;
@@ -3368,6 +3371,13 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
 
   const auto& defNode = defIt->second;
   const auto& defName = defNode->name;
+  SVGValueScope<float> widthScope(_viewBoxWidth);
+  SVGValueScope<float> heightScope(_viewBoxHeight);
+  if (contextPaint) {
+    _viewBoxWidth = _contextViewport.x;
+    _viewBoxHeight = _contextViewport.y;
+  }
+  const auto& bounds = contextPaint ? _contextBounds : shapeBounds;
 
   // Check if this reference is used multiple times.
   int refCount = 0;
@@ -3375,6 +3385,7 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   if (countIt != _colorSourceRefCount.end()) {
     refCount = countIt->second;
   }
+  if (contextPaint) refCount = 1;
 
   // Don't cache gradients/patterns that use objectBoundingBox units, because their coordinates
   // depend on the referencing shape's bounds and differ for each usage.
@@ -3391,7 +3402,8 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   }
 
   // User-space percentages are relative to the current viewport, which may differ between uses.
-  auto cacheKey = refId + ":" + std::to_string(_viewBoxWidth) + ":" + std::to_string(_viewBoxHeight);
+  auto cacheKey =
+      refId + ":" + std::to_string(_viewBoxWidth) + ":" + std::to_string(_viewBoxHeight);
   // If refCount > 1, check if we already created a resource for this ref and viewport.
   if (refCount > 1) {
     auto cacheIt = _colorSourceCache.find(cacheKey);
@@ -3403,15 +3415,28 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
   // Convert the SVG def to a ColorSource.
   ColorSource* colorSource = nullptr;
   if (defName == "linearGradient") {
-    colorSource = convertLinearGradient(defNode, shapeBounds);
+    colorSource = convertLinearGradient(defNode, bounds);
   } else if (defName == "radialGradient") {
-    colorSource = convertRadialGradient(defNode, shapeBounds);
+    colorSource = convertRadialGradient(defNode, bounds);
   } else if (defName == "pattern") {
-    colorSource = convertPattern(defNode, shapeBounds);
+    colorSource = convertPattern(defNode, bounds);
   }
 
   if (!colorSource) {
     return nullptr;
+  }
+  if (contextPaint) {
+    tgfx::Matrix inverse;
+    if (!ToTGFX(_contextPaintTransform).invert(&inverse)) return nullptr;
+    Matrix matrix = {inverse.getScaleX(), inverse.getSkewY(), inverse.getSkewX(),
+                     inverse.getScaleY(), inverse.getTranslateX(), inverse.getTranslateY()};
+    if (defName == "linearGradient" || defName == "radialGradient") {
+      auto gradient = static_cast<Gradient*>(colorSource);
+      gradient->matrix = matrix * gradient->matrix;
+    } else if (defName == "pattern") {
+      auto pattern = static_cast<ImagePattern*>(colorSource);
+      pattern->matrix = matrix * pattern->matrix;
+    }
   }
 
   parseCustomData(defNode, colorSource);

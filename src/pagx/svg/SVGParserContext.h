@@ -72,12 +72,15 @@ enum class ShadowOnlyType {
  */
 struct InheritedStyle {
   std::string color = {};
-  std::string fill = {};              // Empty means not set, "none" means no fill.
-  std::string stroke = {};            // Empty means not set.
-  std::string fillOpacity = {};       // Empty means not set.
-  std::string strokeOpacity = {};     // Empty means not set.
-  std::string fillRule = {};          // Empty means not set.
+  std::string fill = {};           // Empty means not set, "none" means no fill.
+  std::string stroke = {};         // Empty means not set.
+  std::string fillOpacity = {};    // Empty means not set.
+  std::string strokeOpacity = {};  // Empty means not set.
+  std::string fillRule = {};       // Empty means not set.
   std::string clipRule = {};
+  std::string markerStart = {};
+  std::string markerMid = {};
+  std::string markerEnd = {};
   std::string strokeDasharray = {};   // Empty means not set, "none" means solid line.
   std::string strokeDashoffset = {};  // Empty means not set.
   std::string strokeWidth = {};       // Empty means not set.
@@ -130,7 +133,8 @@ class SVGParserContext {
                              const std::shared_ptr<DOMNode>& refElement,
                              const InheritedStyle& inheritedStyle, int depth);
   Layer* convertViewport(const std::shared_ptr<DOMNode>& element,
-                         const InheritedStyle& inheritedStyle, float width, float height, int depth);
+                         const InheritedStyle& inheritedStyle, float width, float height,
+                         int depth);
   void convertChildren(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
@@ -233,7 +237,7 @@ class SVGParserContext {
 
   // Create a single marker layer at the given position and angle.
   Layer* createMarkerLayer(const std::string& markerId, const MarkerPoint& point, float strokeWidth,
-                           const InheritedStyle& inheritedStyle);
+                           const InheritedStyle& inheritedStyle, const Rect& bounds, bool isStart);
 
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
@@ -261,7 +265,8 @@ class SVGParserContext {
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
-  ColorSource* getColorSourceForRef(const std::string& refId, const Rect& shapeBounds);
+  ColorSource* getColorSourceForRef(const std::string& refId, const Rect& shapeBounds,
+                                    bool contextPaint = false);
 
   SVGImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
@@ -275,6 +280,11 @@ class SVGParserContext {
   std::unordered_map<const DOMNode*, std::shared_ptr<DOMNode>> _parents = {};
   std::unordered_set<const DOMNode*> _effectStack = {};
   bool _convertingClipPath = false;
+  std::string _contextFill = "none";
+  std::string _contextStroke = "none";
+  Rect _contextBounds = {};
+  Point _contextViewport = {};
+  Matrix _contextPaintTransform = {};
   std::unordered_map<std::string, Image*> _imageSourceToId =
       {};                                             // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
