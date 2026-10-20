@@ -384,6 +384,11 @@ static void ResolveResourcePaths(pagx::PAGXDocument* document, const std::string
     return;
   }
   auto basePath = pagxFilePath.substr(0, lastSlash + 1);
+  // basePath comes from the local-encoded pagxFilePath, while the relative path is UTF-8 from the
+  // XML. Join them in the QString layer and convert the result back to the local encoding tgfx's
+  // narrow-char file APIs expect, so a non-ASCII pagx directory or resource name resolves on
+  // Windows instead of producing a mixed-encoding path.
+  const auto baseDir = QString::fromLocal8Bit(basePath.c_str());
   for (auto& node : document->nodes) {
     std::string* path = nullptr;
     if (node->nodeType() == pagx::NodeType::Image) {
@@ -392,7 +397,8 @@ static void ResolveResourcePaths(pagx::PAGXDocument* document, const std::string
       path = &static_cast<pagx::Font*>(node.get())->file;
     }
     if (path != nullptr && !IsAbsolutePathOrUrl(*path)) {
-      *path = basePath + *path;
+      const auto relative = QString::fromUtf8(path->data(), static_cast<qsizetype>(path->size()));
+      *path = std::string((baseDir + relative).toLocal8Bit());
     }
   }
 }
@@ -424,12 +430,14 @@ static void RegisterDocumentFonts(pagx::PAGXDocument* document) {
 }
 
 bool PAGXViewModel::loadFile(const QString& filePath) {
-  // Keep paths UTF-8 end to end: XML resource paths are UTF-8, so basePath (derived here) and
-  // tgfx's ByteData::FromPath / Typeface::MakeFromPath must use the same encoding, otherwise a
-  // non-ASCII pagx directory or resource name produces a mixed-encoding path that fails to open.
-  auto strPath = std::string(filePath.toUtf8());
+  // Keep the file-system path in the local 8-bit encoding: tgfx's ByteData::FromPath ultimately
+  // opens the file through narrow-char fopen(), which interprets the path in the system ANSI code
+  // page on Windows, so a non-ASCII pagx path must stay local-encoded here (UTF-8 would fail to
+  // open the file). The UTF-8 XML resource paths are reconciled with this encoding in
+  // ResolveResourcePaths(), which converts each relative path before joining it to basePath.
+  auto strPath = std::string(filePath.toLocal8Bit());
   if (filePath.startsWith("file://")) {
-    strPath = std::string(QUrl(filePath).toLocalFile().toUtf8());
+    strPath = std::string(QUrl(filePath).toLocalFile().toLocal8Bit());
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
@@ -723,13 +731,18 @@ void PAGXViewModel::rebuildEditorGeometry() {
     editorGeometryTimer->stop();
   }
   QVector<qreal> tops = {};
+  qreal minLineHeight = 0;
   if (editorDocument != nullptr) {
     auto* layout = editorDocument->documentLayout();
     tops.reserve(editorDocument->blockCount() + 1);
     qreal y = 0;
     for (auto block = editorDocument->begin(); block.isValid(); block = block.next()) {
       tops.append(y);
-      y += layout->blockBoundingRect(block).height();
+      const auto blockHeight = layout->blockBoundingRect(block).height();
+      if (blockHeight > 0 && (minLineHeight == 0 || blockHeight < minLineHeight)) {
+        minLineHeight = blockHeight;
+      }
+      y += blockHeight;
     }
     tops.append(y);
   }
@@ -737,11 +750,16 @@ void PAGXViewModel::rebuildEditorGeometry() {
     return;
   }
   editorBlockTops = std::move(tops);
+  editorBaseLineHeight = minLineHeight;
   Q_EMIT editorGeometryChanged();
 }
 
 qreal PAGXViewModel::editorContentHeight() const {
   return editorBlockTops.isEmpty() ? 0 : editorBlockTops.last();
+}
+
+qreal PAGXViewModel::editorLineHeight() const {
+  return editorBaseLineHeight;
 }
 
 int PAGXViewModel::editorLineCount() const {
@@ -827,12 +845,23 @@ bool PAGXViewModel::eventFilter(QObject* watched, QEvent* event) {
     pixelDelta.setY(0);
     angleDelta.setY(0);
   }
+  // Preserve the pointing device so the trackpad gesture is not misread as a mouse wheel, and
+  // copy the original timestamp: QQuickFlickable derives scroll velocity from inter-event time,
+  // and a zero timestamp makes it fall back to its own clock on a different time base, which
+  // either drops a frame's displacement or produces wrong flick inertia when locked and
+  // untouched events interleave within one gesture.
   QWheelEvent locked(wheel->position(), wheel->globalPosition(), pixelDelta, angleDelta,
                      wheel->buttons(), wheel->modifiers(), wheel->phase(), wheel->isInverted(),
-                     wheel->source());
+                     wheel->source(), wheel->pointingDevice());
+  locked.setTimestamp(wheel->timestamp());
   forwardingLockedWheelEvent = true;
   QCoreApplication::sendEvent(watched, &locked);
   forwardingLockedWheelEvent = false;
+  // Mirror the replacement event's accepted state onto the original so Flickable can still
+  // decline it at a content edge and let an outer handler take over, instead of the lock
+  // swallowing it unconditionally. Still return true: the original must not fall through to
+  // Flickable a second time, or the minor-axis delta would be reprocessed.
+  wheel->setAccepted(locked.isAccepted());
   return true;
 }
 

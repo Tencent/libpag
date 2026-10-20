@@ -6,10 +6,11 @@ import QtQuick.Controls
 // validation on Apply, an always-visible Discard/Apply/Save bar, and per-block syntax
 // highlighting provided by the C++ XmlDocumentHighlighter attached through the viewModel.
 //
-// Performance notes for large documents: content width/height are estimated from
-// lineCount * lineHeight and a pre-measured maxLineWidth instead of the document layout
-// (whose size queries force a full layout of every block), and modified state is tracked
-// with a dirty flag instead of comparing the full text on every change notification.
+// Performance notes for large documents: the content width comes from a pre-measured
+// maxLineWidth and the content height from the view model's per-block height table, both
+// instead of the document layout (whose size queries force a full layout of every block), and
+// modified state is tracked with a dirty flag instead of comparing the full text on every
+// change notification.
 Rectangle {
     id: root
 
@@ -84,10 +85,18 @@ Rectangle {
     readonly property real layoutWidth: width > 0 ? width : (cachedWidth > 0 ? cachedWidth : 1)
     readonly property real layoutHeight: height > 0 ? height : (cachedHeight > 0 ? cachedHeight : 1)
 
-    // Single-line height in pixels, measured from the editor font metrics (not the caret
-    // rectangle, whose height follows the caret's line and would shrink visibleLineCount when
-    // the caret sits on a taller CJK line). Constant for the fixed-pitch NoWrap editor.
-    readonly property real lineHeight: editorFontMetrics.height > 0 ? editorFontMetrics.height : 17
+    // Real height of a plain ASCII line, pulled from the C++ height table (see editorLineHeight).
+    // Updated on load finish and on every geometry rebuild, 0 until the first table is built.
+    property real baseLineHeight: 0
+
+    // Single-line height in pixels. Prefers the layout height from the C++ table, which matches
+    // the editor's real line height; FontMetrics.height (the font line spacing) underestimates it
+    // and is only used as a fallback before the table exists or when no geometry helper is
+    // present. Not the caret rectangle, whose height follows the caret's line and would shrink
+    // visibleLineCount when the caret sits on a taller CJK line. Constant for the fixed-pitch
+    // NoWrap editor.
+    readonly property real lineHeight: root.baseLineHeight > 0 ? root.baseLineHeight
+        : (editorFontMetrics.height > 0 ? editorFontMetrics.height : 17)
 
     FontMetrics {
         id: editorFontMetrics
@@ -271,6 +280,7 @@ Rectangle {
             root.maxLineWidth = maxLineWidth;
             if (typeof viewModel.editorContentHeight === "function") {
                 root.realContentHeight = viewModel.editorContentHeight();
+                root.baseLineHeight = viewModel.editorLineHeight();
             }
             // Clearing the document pulls the caret to position 0, which drags the viewport
             // to the top-left; restore the saved position after the content is complete.
@@ -283,6 +293,7 @@ Rectangle {
         function onEditorGeometryChanged() {
             if (typeof viewModel.editorContentHeight === "function") {
                 root.realContentHeight = viewModel.editorContentHeight();
+                root.baseLineHeight = viewModel.editorLineHeight();
             }
             root.geometryRevision++;
         }

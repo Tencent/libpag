@@ -106,9 +106,13 @@ class PAGXViewModel : public ContentViewModel {
    * than ASCII lines under font fallback, so a uniform line height underestimates the content
    * height (bottom lines become unreachable by scrolling) and desynchronizes the gutter line
    * numbers from the text. The height table is rebuilt debounced after edits and refreshed
-   * before editorLoadFinished, so these queries are O(1) on the QML side.
+   * before editorLoadFinished, so these queries are O(1) on the QML side. editorLineHeight()
+   * returns the real height of a plain ASCII line (the shortest entry in the table), which the
+   * gutter uses to size the line-number pool and position numbers; it is more accurate than the
+   * font-metrics line spacing, which underestimates the layout line height.
    */
   Q_INVOKABLE qreal editorContentHeight() const;
+  Q_INVOKABLE qreal editorLineHeight() const;
   Q_INVOKABLE qreal editorLineTopY(int line) const;
   Q_INVOKABLE int editorLineAtY(qreal y) const;
 
@@ -287,6 +291,9 @@ class PAGXViewModel : public ContentViewModel {
   // Prefix sums of real block heights: editorBlockTops[i] is the content-space y of line i's
   // top; the last element is the total content height. Empty when no document is attached.
   QVector<qreal> editorBlockTops = {};
+  // Height of the shortest block (a plain ASCII line), captured while building editorBlockTops
+  // so editorLineHeight() is O(1). 0 when no document is attached.
+  qreal editorBaseLineHeight = 0;
   QTimer* editorGeometryTimer = nullptr;
   // Guards eventFilter against re-entering on the axis-locked wheel event it redelivers itself.
   bool forwardingLockedWheelEvent = false;

@@ -611,8 +611,10 @@ PAGWindow {
 
     // Applies screen bounds and window minimums to a seed canvas already sized at the file
     // aspect ratio, reverse-deriving the paired dimension whenever a bound binds so the ratio
-    // survives every clamp. Shared by the load path (seeded from preferredSize) and the panel
-    // toggle (seeded from the current canvas).
+    // survives every clamp. Only the load path (computeWindowGeometry) calls this; the panel
+    // toggle keeps the canvas fixed rather than reseeding from the ratio, so it has its own
+    // inline clamp that shares the panelReservedWidth()/canvasFloorWidth() helpers to agree on
+    // the minimum window width for a given panel state.
     function clampWindowGeometry(canvasWidth, canvasHeight, ratio, panelOpen) {
         let availW = Screen.desktopAvailableWidth;
         let availH = Screen.desktopAvailableHeight;
