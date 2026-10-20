@@ -23,9 +23,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <unordered_set>
+#include <vector>
 #include "pagx/html/HTMLBuilder.h"
-#include "pagx/html/HTMLDeckWriter.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
@@ -280,7 +279,7 @@ bool ExportVectorFontGroup(const std::vector<const Font*>& fonts, HTMLWriterCont
 }
 
 std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter::Options& options,
-                      HTMLWriterContext& ctx, const std::string& sharedFontFaceRules = {}) {
+                      HTMLWriterContext& ctx) {
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
@@ -292,7 +291,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
 
   // Vector font resources share one WOFF2 with disjoint private-use character ranges. Bitmap
   // fonts retain their own WOFF2 because their image tables use different font metrics.
-  std::string fontFaceRules = sharedFontFaceRules;
+  std::string fontFaceRules;
   std::vector<const Font*> vectorFonts;
   for (auto& node : doc.nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -374,7 +373,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   std::string nativeHTML = RoundCoordinatesInHTML(html.release());
 
   if (options.extractStyleSheet) {
-    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML, ctx.idPrefix);
+    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
   }
 
   std::string result = nativeHTML;
@@ -519,111 +518,6 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   return zipWriter.finish(errorMsg);
 #else
   (void)document;
-  (void)options;
-  if (errorMsg) {
-    *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
-  }
-  return nullptr;
-#endif
-}
-
-std::shared_ptr<Data> HTMLExporter::ToData(const std::vector<PAGXDocument*>& documents,
-                                           const Options& options, std::string* errorMsg) {
-#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-  if (documents.empty()) {
-    if (errorMsg) {
-      *errorMsg = "documents must not be empty.";
-    }
-    return nullptr;
-  }
-  HTMLZipWriter zipWriter;
-  std::vector<std::string> fragments = {};
-  std::vector<std::pair<float, float>> pageSizes = {};
-  fragments.reserve(documents.size());
-  pageSizes.reserve(documents.size());
-  HTMLWriterContext fontContext;
-  fontContext.zipWriter = &zipWriter;
-  fontContext.staticImgUrlPrefix = "assets/";
-  std::string sharedFontFaceRules;
-  std::vector<const Font*> vectorFonts;
-  std::unordered_set<const Font*> seenFonts;
-  for (auto* document : documents) {
-    if (document == nullptr) {
-      continue;
-    }
-    for (auto& node : document->nodes) {
-      if (node->nodeType() == NodeType::Font) {
-        auto* font = static_cast<const Font*>(node.get());
-        if (IsVectorFont(font) && seenFonts.insert(font).second) {
-          vectorFonts.push_back(font);
-        }
-      }
-    }
-  }
-  ExportVectorFontGroup(vectorFonts, fontContext, sharedFontFaceRules);
-  for (size_t i = 0; i < documents.size(); i++) {
-    auto page = std::to_string(i + 1);
-    auto* document = documents[i];
-    if (document == nullptr) {
-      if (errorMsg) {
-        *errorMsg = "documents[" + std::to_string(i) + "] is null.";
-      }
-      return nullptr;
-    }
-    if (document->hasUnresolvedImports()) {
-      if (errorMsg) {
-        *errorMsg = "page " + page + " has unresolved imports.";
-      }
-      return nullptr;
-    }
-    // applyLayout reports structural failures (for example, a cyclic external composition)
-    // through the document's error list. Fail the whole deck instead of silently turning the
-    // page into a blank one, matching PPTExporter's all-or-nothing deck semantics.
-    auto errorCount = document->errors.size();
-    if (!document->isLayoutApplied()) {
-      document->applyLayout();
-    }
-    if (!document->isLayoutApplied() || document->errors.size() != errorCount) {
-      if (errorMsg) {
-        *errorMsg = "page " + page + " failed to apply layout.";
-      }
-      return nullptr;
-    }
-    HTMLWriterContext ctx;
-    ctx.docWidth = document->width;
-    ctx.docHeight = document->height;
-    ctx.zipWriter = &zipWriter;
-    ctx.staticImgUrlPrefix = "assets/";
-    ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
-    // Namespace page-specific ids, classes and assets. Shared font resources keep their global
-    // names so every page uses the same character mapping.
-    ctx.idPrefix = "s" + std::to_string(i) + "-";
-    ctx.woff2Fonts = fontContext.woff2Fonts;
-    ctx.woff2GlyphOffsets = fontContext.woff2GlyphOffsets;
-    auto fragment = BuildHTML(*document, HTMLOutputMode::Fragment, options, ctx,
-                              i == 0 ? sharedFontFaceRules : std::string());
-    if (fragment.empty()) {
-      if (errorMsg) {
-        *errorMsg = "page " + page + " produced no HTML output.";
-      }
-      return nullptr;
-    }
-    if (!ctx.zipWriteError.empty()) {
-      if (errorMsg) {
-        *errorMsg = "failed to write resource into archive: " + ctx.zipWriteError;
-      }
-      return nullptr;
-    }
-    fragments.push_back(std::move(fragment));
-    pageSizes.emplace_back(document->width, document->height);
-  }
-  auto deck = BuildDeckHTML(fragments, pageSizes);
-  if (!zipWriter.write("index.html", deck.data(), deck.size(), errorMsg)) {
-    return nullptr;
-  }
-  return zipWriter.finish(errorMsg);
-#else
-  (void)documents;
   (void)options;
   if (errorMsg) {
     *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
