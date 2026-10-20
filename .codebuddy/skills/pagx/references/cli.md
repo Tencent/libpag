@@ -385,6 +385,8 @@ pagx import --input export.zip                    # zipped HTML export (page + a
 | `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
 | `--fonts <mode>` | HTML only: how web fonts are carried into the output — `embed` (default) or `external`. See [Font files](#font-files) |
+| `--font-alias <family>=<file>` | HTML only, requires `--fonts embed`: register a font file under an explicit family name while baking (repeatable) |
+| `--fallback <path\|name>` | HTML only, requires `--fonts embed`: add a fallback font file or system font name while baking (repeatable) |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### Image storage
@@ -434,7 +436,8 @@ Remote (`http(s)://`) font sources are never carried over.
 
 A `fontFamily` that resolves to no available face is reported as a warning: the text is baked
 from whatever substitute the platform picked, and the conversion still succeeds. Install the font,
-or pass it to `pagx embed` / `pagx render` with `--font-alias <family>=<file>`.
+or pass it to `pagx import` / `pagx embed` / `pagx render` with `--font-alias <family>=<file>`
+(or `--fallback <file>` when the family it serves is unknown).
 
 ### Zip input
 

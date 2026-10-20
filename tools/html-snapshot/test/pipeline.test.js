@@ -260,6 +260,31 @@ describe('runPagxImportToFile', () => {
     expect(joined).toMatch(/real warning: keep me/);
     expect(joined).not.toMatch(/position: absolute on text leaf/);
   });
+
+  test('forwards captured fonts so baking shapes with them', async () => {
+    const argvPath = path.join(dir, 'argv.bin');
+    const wrapper = makeArgvCapturingScript({ argvPath });
+    await runPagxImportToFile({
+      pagxBin: wrapper,
+      subsetHtml: '/in.html',
+      pagxFile: '/out.pagx',
+      fonts: [
+        { path: '/a.ttf', family: 'MaShanZheng' },
+        { path: '/b.otf', family: '' },
+      ],
+    });
+    // Import bakes glyphs, so it takes the same font flags as embed/render: a bare file can only
+    // join the fallback chain.
+    expect(readArgv(argvPath)).toEqual([
+      'import',
+      '--input', '/in.html',
+      '--output', '/out.pagx',
+      '--format', 'html',
+      '--no-resolve',
+      '--font-alias', 'MaShanZheng=/a.ttf',
+      '--fallback', '/b.otf',
+    ]);
+  });
 });
 
 describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {

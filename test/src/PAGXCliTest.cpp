@@ -1750,6 +1750,35 @@ CLI_TEST(PAGXCliTest, Import_BakesAliasedWebFontUnderCssFamily) {
   EXPECT_EQ(xml.find("file=\""), std::string::npos);
 }
 
+// A font downloaded without its @font-face rule (a stylesheet the snapshot could not read) has no
+// family to register under. Passed as --fallback it still covers the characters no available
+// family provides, so baking keeps its outlines. Without baking there is nothing to shape with it.
+CLI_TEST(PAGXCliTest, Import_BakesWithFallbackFont) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportFallbackFont";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto htmlPath = dir + "/fallback.html";
+  std::ofstream(htmlPath) << "<html><body style=\"width:60px;height:30px\">"
+                             "<span style=\"position:absolute;left:0px;top:0px;"
+                             "font-family:UnreadableIconFont;font-size:20px;white-space:nowrap\">"
+                             "&#xE000;&#xE001;</span></body></html>";
+  auto outputPath = dir + "/fallback.pagx";
+  auto fontPath = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
+                                           "--fallback", fontPath}),
+            0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_NE(xml.find(R"(glyphs="1,2")"), std::string::npos);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+
+  StreamCapture errCapture(std::cerr);
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
+                                           "--fonts", "external", "--fallback", fontPath}),
+            1);
+  EXPECT_NE(errCapture.str().find("--fallback require --fonts embed"), std::string::npos);
+}
+
 // Without --output, a zip input writes `<archive>.pagx` next to the archive, with its assets.
 CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
   ScopedSnapshotDisabled snapshotOff;

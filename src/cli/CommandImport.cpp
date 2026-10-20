@@ -549,6 +549,10 @@ struct ImportOptions {
   // saves network fonts to disk rather than carrying them into the subset, so a caller that
   // downloaded them names them here; otherwise their family resolves to nothing.
   std::vector<FontAlias> fontAliases = {};
+  // Fallback font files or system font names to shape with before baking. A network font the
+  // snapshot downloaded without its @font-face rule has no family to register under, so it can
+  // only cover the page's characters through the fallback chain.
+  std::vector<std::string> fontFallbacks = {};
 };
 
 static void PrintUsage() {
@@ -581,6 +585,8 @@ static void PrintUsage() {
       << "                                 <Font file> references and leaves text runtime-shaped\n"
       << "  --font-alias <family>=<file>   Register a font file under an explicit family name\n"
       << "                                 while baking (repeatable; HTML only)\n"
+      << "  --fallback <path|name>         Add a fallback font file or system font name while\n"
+      << "                                 baking (repeatable; HTML only)\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -644,6 +650,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
         return 1;
       }
       options->fontAliases.push_back(alias);
+    } else if (arg == "--fallback" && i + 1 < argc) {
+      options->fontFallbacks.push_back(argv[++i]);
     } else if (arg == "--fonts" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseFontStorageMode(mode, &options->fontStorage)) {
@@ -683,8 +691,9 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
 
   ParseFormatOptions(argc, argv, &options->formatOptions);
-  if (options->fontStorage == FontStorageMode::External && !options->fontAliases.empty()) {
-    std::cerr << "pagx import: error: --font-alias requires --fonts embed\n";
+  if (options->fontStorage == FontStorageMode::External &&
+      (!options->fontAliases.empty() || !options->fontFallbacks.empty())) {
+    std::cerr << "pagx import: error: --font-alias and --fallback require --fonts embed\n";
     return 1;
   }
   // Baking replaces the font sources with the glyphs they produced, so the references are dropped
@@ -768,7 +777,8 @@ int RunImport(int argc, char* argv[]) {
   // have installed: a Font node reloaded from disk re-registers under the family stored inside the
   // font file, which a page that aliases a face never matches.
   if (result.format == "html" && options.fontStorage == FontStorageMode::Embed) {
-    if (!EmbedFonts(result.document.get(), {}, options.fontAliases, "pagx import")) {
+    if (!EmbedFonts(result.document.get(), options.fontFallbacks, options.fontAliases,
+                    "pagx import")) {
       return 1;
     }
   }
