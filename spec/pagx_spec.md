@@ -3049,7 +3049,7 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `y` ^Layout^ | float | Local Y translation |
 | `z` | float | Local Z translation |
 | `matrix` | matrix | 2D local transform; animation-only |
-| `matrix3D` | matrix3D | 4×4 local transform; animation-only. Interpolates by decomposition with quaternion slerp, falling back to element-wise interpolation; singular results are rejected |
+| `matrix3D` | matrix3D | 4×4 local transform; animation-only. Keyframes must be invertible; interpolates by decomposition with quaternion slerp, falling back to element-wise interpolation. A singular interpolated pose is still published, and the layer is not drawn for that frame |
 | `rotation.x` / `rotation.y` / `rotation.z` | float | Rotation in degrees (`rotationX`/`rotationY`/`rotationZ`) |
 | `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
 | `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |

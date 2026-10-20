@@ -382,9 +382,13 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (v == nullptr) {
       return false;
     }
+    // A singular pose is published rather than rejected: a flip folds the mirror into the Z scale,
+    // so interpolating between scale 1 and -1 passes through a zero-area pose. The renderer draws
+    // nothing for it, which is the frame the animation is supposed to show, while keeping the
+    // previous pose would leave a stale sliver on screen.
     auto mixed = LerpMatrix3D(pose, *v, mix);
-    if (!IsInvertibleMatrix3D(mixed)) {
-      LOGE("LayerRuntimeTarget: rejected a non-finite or singular matrix3D value.");
+    if (!IsFiniteMatrix3D(mixed)) {
+      LOGE("LayerRuntimeTarget: rejected a non-finite matrix3D value.");
       return false;
     }
     pose = mixed;

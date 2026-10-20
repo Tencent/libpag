@@ -3041,7 +3041,7 @@ Layer / Group
 | `y` ^Layout^ | float | 局部 Y 平移 |
 | `z` | float | 局部 Z 平移 |
 | `matrix` | matrix | 2D 局部变换；仅用于动画 |
-| `matrix3D` | matrix3D | 4×4 局部变换；仅用于动画。通过矩阵分解和四元数球面插值进行插值，无法分解时逐项插值；奇异结果会被拒绝 |
+| `matrix3D` | matrix3D | 4×4 局部变换；仅用于动画。关键帧必须可逆；通过矩阵分解和四元数球面插值进行插值，无法分解时逐项插值。插值得到的奇异姿态仍然发布，该帧不绘制 |
 | `rotation.x` / `rotation.y` / `rotation.z` | float | 旋转角，单位为度（`rotationX`/`rotationY`/`rotationZ`） |
 | `scale.x` / `scale.y` / `scale.z` | float | 缩放（`scaleX`/`scaleY`/`scaleZ`） |
 | `skew.x` / `skew.y` | float | 剪切角，单位为度（`skewX`/`skewY`） |

@@ -10658,11 +10658,13 @@ PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(1, 3), 6);
   EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 20);
 
+  // A singular pose is a frame the animation is supposed to show, so it is published instead of
+  // being rejected; the renderer draws nothing for a zero-area transform.
   pagx::Matrix3D singular = {};
   singular.values[0] = 0;
-  EXPECT_FALSE(binding->apply(layer2D, "matrix3D", pagx::KeyValue{singular}, 1.0f));
-  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 0), 1);
-  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 20);
+  EXPECT_TRUE(binding->apply(layer2D, "matrix3D", pagx::KeyValue{singular}, 1.0f));
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 0), 0);
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 0);
 }
 
 /**
