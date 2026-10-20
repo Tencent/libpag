@@ -19,6 +19,7 @@
 #pragma once
 
 #import <CoreGraphics/CoreGraphics.h>
+#import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 
 namespace pag {
