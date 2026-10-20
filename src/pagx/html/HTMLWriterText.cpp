@@ -1070,15 +1070,6 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       if (woff2It == _ctx->woff2Fonts.end()) {
         continue;
       }
-      const auto& fontResult = woff2It->second;
-      float fontSize = text->glyphRuns[0]->fontSize;
-      if (embeddedFont->unitsPerEm == 0) {
-        continue;
-      }
-      float scale = fontSize / static_cast<float>(embeddedFont->unitsPerEm);
-      bool isBitmapFont =
-          !embeddedFont->glyphs.empty() && embeddedFont->glyphs[0]->image != nullptr;
-
       // Container div positioned at the text's render origin.
       std::string containerStyle = "position:absolute;left:0;top:0";
       if (alpha < 1.0f) {
@@ -1091,9 +1082,19 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
 
       size_t glyphIdx = 0;
       for (auto* run : text->glyphRuns) {
-        if (!run->font) {
+        if (!run->font || run->font->unitsPerEm == 0) {
+          glyphIdx += run->glyphs.size();
           continue;
         }
+        auto runFont = _ctx->woff2Fonts.find(run->font);
+        if (runFont == _ctx->woff2Fonts.end()) {
+          glyphIdx += run->glyphs.size();
+          continue;
+        }
+        const auto& fontResult = runFont->second;
+        float fontSize = run->fontSize;
+        float scale = fontSize / static_cast<float>(run->font->unitsPerEm);
+        bool isBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image != nullptr;
         for (size_t i = 0; i < run->glyphs.size(); i++) {
           uint16_t glyphId = run->glyphs[i];
           if (glyphId == 0) {
@@ -1195,7 +1196,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
 
           std::string puaChar;
-          AppendUTF8(puaChar, 0xE000 + (glyphId - 1));
+          AppendUTF8(puaChar, _ctx->fontGlyphCodepoint(run->font, glyphId));
           out.openTag("span");
           out.addAttr("style", charStyle);
           EmitPagxTextPartMarker(out);
@@ -1585,22 +1586,16 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       if (it == _ctx->woff2Fonts.end()) {
         continue;
       }
-      auto& fontResult = it->second;
-      float fontSize = text->glyphRuns[0]->fontSize;
-
-      bool isBitmapFont = !font->glyphs.empty() && font->glyphs[0]->image;
-
       // Build fill CSS (same logic as writeEmbeddedShapeGlyphsAsFont).
       std::string colorCss;
-      if (!isBitmapFont && fill && fill->color) {
+      if (fill && fill->color) {
         if (fill->color->nodeType() == NodeType::SolidColor) {
           auto sc = static_cast<const SolidColor*>(fill->color);
           colorCss = ";color:" + ColorToRGBA(sc->color, fill->alpha);
         }
       }
       std::string strokeCss;
-      if (!isBitmapFont && stroke && stroke->color &&
-          stroke->color->nodeType() == NodeType::SolidColor) {
+      if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
         auto sc = static_cast<const SolidColor*>(stroke->color);
         bool hasFill = fill && fill->color;
         auto resolved = ResolveTextStrokeCss(stroke->width, stroke->align, hasFill);
@@ -1669,6 +1664,13 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
         if (!run->font || run->font->unitsPerEm == 0) {
           continue;
         }
+        auto runFont = _ctx->woff2Fonts.find(run->font);
+        if (runFont == _ctx->woff2Fonts.end()) {
+          continue;
+        }
+        const auto& fontResult = runFont->second;
+        float fontSize = run->fontSize;
+        bool isBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image != nullptr;
         float scale = run->fontSize / run->font->unitsPerEm;
         for (size_t i = 0; i < run->glyphs.size(); i++) {
           uint16_t glyphId = run->glyphs[i];
@@ -1725,7 +1727,9 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
                                   "px;top:" + CssFloatToString(cssTop) +
                                   "px;line-height:1;font-family:'" + fontResult.familyName + "'";
           charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
-          charStyle += colorCss + strokeCss;
+          if (!isBitmapFont) {
+            charStyle += colorCss + strokeCss;
+          }
 
           // Rotation: align glyph perpendicular to the curve tangent.
           if (textPath->perpendicular) {
@@ -1738,7 +1742,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           }
 
           std::string puaChar;
-          AppendUTF8(puaChar, 0xE000 + glyphId - 1);
+          AppendUTF8(puaChar, _ctx->fontGlyphCodepoint(run->font, glyphId));
           out.openTag("span");
           out.addAttr("style", charStyle);
           EmitPagxTextPartMarker(out);
@@ -2263,7 +2267,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
         if (glyphID == 0) {
           continue;
         }
-        uint32_t codepoint = 0xE000 + (glyphID - 1);
+        uint32_t codepoint = _ctx->fontGlyphCodepoint(run->font, glyphID);
         AppendUTF8(puaText, codepoint);
       }
       if (puaText.empty()) {
@@ -2485,7 +2489,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
         }
 
         std::string puaChar;
-        AppendUTF8(puaChar, 0xE000 + (glyphID - 1));
+        AppendUTF8(puaChar, _ctx->fontGlyphCodepoint(run->font, glyphID));
         out.openTag("span");
         out.addAttr("style", charStyle);
         EmitPagxTextPartMarker(out);

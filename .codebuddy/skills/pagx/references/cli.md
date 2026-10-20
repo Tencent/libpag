@@ -476,10 +476,19 @@ output file extension. If neither `--format` nor an output file with a recogniza
 provided, the command reports an error (there is no implicit default format — `--input icon.pagx`
 alone fails). Once the format is known, `--output` defaults to `<first input>.<format>`.
 
-For **PPTX only**, `--input` may be repeated to build a multi-slide deck — each `--input` becomes one
-slide, in the order given, and the deck adopts the first document's canvas size (PPTX stores a single
-slide size for the whole presentation). SVG and HTML take a single document, so passing more than one
-`--input` for those formats is rejected. If any input fails to load, the whole export aborts.
+For **PPTX and HTML**, `--input` may be repeated. PPTX creates one slide per input and adopts
+the first document's canvas size. HTML creates a ZIP presentation with one page per input,
+`index.html`, and resources under `assets/`; each page keeps its own canvas size. Use a `.zip`
+output path for this presentation. With `--format html` and multiple inputs, the default output
+is `<first input>.zip`. A `.zip` output also selects HTML presentation export for a single input;
+a single input with `.html` output keeps the plain HTML file and sibling resource directory.
+
+HTML presentations support keyboard, click, and touch paging, URL hash page links, and zoom/pan.
+Unzip the archive and open `index.html` in a browser. Eligible vector fonts share one WOFF2 across
+pages when the combined glyph count fits the 6400-glyph private-use range.
+
+SVG takes a single document, so passing more than one `--input` is rejected. If any input fails to
+load, the whole export aborts.
 
 ```bash
 pagx export --format svg --input icon.pagx       # PAGX to icon.svg
@@ -488,6 +497,7 @@ pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
 pagx export --input a.pagx --input b.pagx --output deck.pptx  # multi-slide deck (one slide per input)
+pagx export --input a.pagx --input b.pagx --output deck.zip   # multi-page HTML presentation
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported  # keep unsupported features editable
@@ -497,9 +507,9 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input PAGX file (required). Repeat to add more slides — **pptx only**; each `--input` becomes one slide in deck order |
-| `--output <file>` | Output file (default: `<first input>.<format>`) |
-| `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension). Required if output has no extension |
+| `--input <file>` | Input PAGX file (required). Repeat for **pptx or html**; each `--input` becomes one slide or page in display order |
+| `--output <file>` | Output file (default: `<first input>.<format>`, or `<first input>.zip` for multi-input HTML) |
+| `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension; `.zip` selects an HTML presentation). Required if output has no extension |
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--ppt-ignore-glyphruns` | Ignore the GlyphRun geometry carried by Text nodes and emit native, editable PowerPoint text derived from the `text` attribute instead. By default a Text that carries GlyphRun data is written as custom glyph paths, because `a:r` runs cannot express arbitrary glyph IDs, per-glyph offsets, anchors, or rotations; this flag trades that glyph-level fidelity for text the reader can still edit. Text nodes without GlyphRun data are unaffected. Opposite of `--text-to-path` — if both are passed, `--text-to-path` wins |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |

@@ -35,6 +35,9 @@ struct ExportOptions {
   std::vector<std::string> inputFiles = {};
   std::string outputFile = {};
   std::string format = {};
+  // True when the HTML output targets the ZIP deck container (a .zip output path) rather than
+  // the plain HTML file written by the single-document export.
+  bool htmlDeckZip = false;
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
@@ -49,9 +52,13 @@ static void PrintUsage() {
       << "Export a PAGX file to another format.\n"
       << "\n"
       << "Options:\n"
-      << "  --input <file>              Input PAGX file (required; repeat to add more slides,\n"
-      << "                              pptx only). Each --input becomes one slide in the deck.\n"
-      << "  --output <file>             Output file (default: <first input>.<format>)\n"
+      << "  --input <file>              Input PAGX file (required; repeat to add more slides or\n"
+      << "                              pages, pptx and html only). Each --input becomes one "
+         "slide\n"
+      << "                              in the pptx deck or one page in the html deck.\n"
+      << "  --output <file>             Output file (default: <first input>.<format>; a "
+         "multi-input\n"
+      << "                              html deck defaults to <first input>.zip)\n"
       << "  --format <format>           Output format (svg, pptx, html; inferred from --output "
          "extension)\n"
       << "  --text-to-path              Convert text to path geometry (default: native text)\n"
@@ -94,6 +101,9 @@ static void PrintUsage() {
       << "  pagx export --input a.pagx --input b.pagx --output deck.pptx\n"
       << "                                                   # multi-slide deck (one slide per "
          "input)\n"
+      << "  pagx export --input a.pagx --input b.pagx --output deck.zip\n"
+      << "                                                   # multi-page HTML deck (ZIP with "
+         "index.html + assets/)\n"
       << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
       << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
       << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
@@ -153,19 +163,35 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
   if (options->format.empty() && !options->outputFile.empty()) {
     options->format = GetFileExtension(options->outputFile);
   }
+  // A .zip output selects the HTML deck container — no other export format writes ZIP.
+  if (options->format == "zip") {
+    options->format = "html";
+  }
   if (options->format.empty()) {
     std::cerr << "pagx export: error: cannot infer output format, use --format or specify an "
                  "output file with a known extension\n";
     return 1;
   }
 
-  if (options->format != "pptx" && options->inputFiles.size() > 1) {
-    std::cerr << "pagx export: error: multiple --input files are only supported for pptx output\n";
+  if (options->format != "pptx" && options->format != "html" && options->inputFiles.size() > 1) {
+    std::cerr << "pagx export: error: multiple --input files are only supported for pptx and html "
+                 "output\n";
     return 1;
   }
 
   if (options->outputFile.empty()) {
-    options->outputFile = ReplaceExtension(options->inputFiles.front(), options->format);
+    // A multi-input HTML export produces a ZIP deck (index.html + assets/) rather than the
+    // plain HTML file written by the single-document export, so default to a .zip name.
+    auto extension = (options->format == "html" && options->inputFiles.size() > 1)
+                         ? std::string("zip")
+                         : options->format;
+    options->outputFile = ReplaceExtension(options->inputFiles.front(), extension);
+  }
+
+  // A .zip output path requests the deck container even for a single input, so the written
+  // archive matches the file name; a plain .html path keeps the single-document layout.
+  if (options->format == "html" && GetFileExtension(options->outputFile) == "zip") {
+    options->htmlDeckZip = true;
   }
 
   return 0;
@@ -196,27 +222,59 @@ static int ExportToSVG(const ExportOptions& options) {
 }
 
 static int ExportToHTML(const ExportOptions& options) {
-  const auto& inputFile = options.inputFiles.front();
-  auto document = PAGXImporter::FromFile(inputFile);
-  if (document == nullptr) {
-    std::cerr << "pagx export: error: failed to load '" << inputFile << "'\n";
-    return 1;
-  }
-  for (auto& error : document->errors) {
-    std::cerr << "pagx export: warning: " << error << "\n";
-  }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
-    return 1;
+  std::vector<std::shared_ptr<PAGXDocument>> documents = {};
+  documents.reserve(options.inputFiles.size());
+  for (const auto& inputFile : options.inputFiles) {
+    auto document = PAGXImporter::FromFile(inputFile);
+    if (document == nullptr) {
+      std::cerr << "pagx export: error: failed to load '" << inputFile << "'\n";
+      return 1;
+    }
+    for (auto& error : document->errors) {
+      std::cerr << "pagx export: warning: " << error << "\n";
+    }
+    if (document->hasUnresolvedImports()) {
+      std::cerr << "pagx export: error: unresolved import directive in '" << inputFile
+                << "', run 'pagx resolve' first\n";
+      return 1;
+    }
+    documents.emplace_back(std::move(document));
   }
 
   std::string errorMsg;
-  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+  if (documents.size() == 1 && !options.htmlDeckZip) {
+    if (!HTMLExporter::ToFile(*documents.front(), options.outputFile, {}, &errorMsg)) {
+      std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg)
+                << "\n";
+      return 1;
+    }
+    std::cout << "pagx export: wrote " << options.outputFile << "\n";
+    return 0;
+  }
+
+  std::vector<PAGXDocument*> documentPtrs = {};
+  documentPtrs.reserve(documents.size());
+  for (const auto& document : documents) {
+    documentPtrs.emplace_back(document.get());
+  }
+  auto archive = HTMLExporter::ToData(documentPtrs, {}, &errorMsg);
+  if (archive == nullptr) {
     std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
     return 1;
   }
-
-  std::cout << "pagx export: wrote " << options.outputFile << "\n";
+  std::ofstream file(options.outputFile, std::ios::binary);
+  if (!file) {
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+  file.write(reinterpret_cast<const char*>(archive->bytes()),
+             static_cast<std::streamsize>(archive->size()));
+  if (!file.good()) {
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+    return 1;
+  }
+  std::cout << "pagx export: wrote " << options.outputFile
+            << " (HTML deck ZIP: unzip it and open index.html)\n";
   return 0;
 }
 
