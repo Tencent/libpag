@@ -518,6 +518,10 @@ npm test             # run the suite
 npm run test:coverage # run with a coverage report (written to coverage/)
 ```
 
+Browser regressions in `test/browser/` run separately with `npm run test:browser`
+after `npm run build`. They launch Puppeteer's Chromium to check CSS cascade,
+pseudo-element paint order, layout, and animation behavior against the source page.
+
 The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
 only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
 are excluded from the coverage target — they are exercised end-to-end by the

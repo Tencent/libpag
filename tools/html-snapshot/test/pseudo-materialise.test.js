@@ -89,6 +89,10 @@ function makeHostWithAfter({ animated }) {
     bottom: '0px',
     width: '450px',
     height: '2px',
+    'z-index': 'auto',
+    opacity: '1',
+    transform: 'none',
+    'animation-name': 'none',
     'background-image':
       'linear-gradient(90deg, rgb(95, 255, 240), rgb(40, 224, 208) 55%, rgba(40, 224, 208, 0))',
   };
@@ -149,11 +153,12 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     // and the transient 0% phase (opacity: 0 / scaleX(0)) is NOT baked in —
     // those would drop or zero-size the box in the walker.
     expect(state.cancelled).toBe(true);
-    expect(style).not.toContain('opacity: 0');
+    expect(style).toContain('opacity: 1');
+    expect(style).toContain('transform: none');
     expect(style).not.toContain('matrix(0, 0, 0');
   });
 
-  test('a non-animated decorative pseudo still materialises without animation props', async () => {
+  test('a non-animated pseudo pins default styles against the host stylesheet', async () => {
     const { host, state } = makeHostWithAfter({ animated: false });
     await runOn(host);
 
@@ -161,10 +166,33 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     const style = host.children[0].getAttribute('style');
     expect(style).toContain('width: 450px');
     expect(style).toContain('height: 2px');
-    expect(style).not.toContain('animation-name');
+    expect(style).toContain('animation-name: none');
+    expect(style).toContain('z-index: auto');
+    expect(style).toContain('opacity: 1');
+    expect(style).toContain('transform: none');
     // No animation to cancel.
     expect(state.cancelled).toBe(false);
   });
+});
+
+test('copies live styles for all hosts before any stand-in is inserted', async () => {
+  const { host: first } = makeHostWithAfter({ animated: false });
+  const second = new FakeElement('div');
+  second.__cs = {
+    '::before': makeCs({
+      content: '""', position: 'absolute', height: '10px',
+      width: () => first.children.length ? '90px' : '20px',
+      'z-index': () => first.children.length ? '9' : 'auto',
+    }),
+    '::after': makeCs({ content: 'none' }),
+  };
+  global.document = {
+    querySelectorAll: () => [first, second],
+    createElement: (tag) => new FakeElement(tag),
+  };
+  await materializeDecorativePseudoElements();
+  expect(second.children[0].getAttribute('style')).toContain('width: 20px');
+  expect(second.children[0].getAttribute('style')).toContain('z-index: auto');
 });
 
 describe('materializeDecorativePseudoElements — in-flow decorative pseudo', () => {

@@ -15,6 +15,7 @@
     "clean": "rm -rf dist",
     "build:browser": "node build-browser-bundle.js",
     "test": "jest",
+    "test:browser": "node --test test/browser/*.browser.js",
     "test:coverage": "jest --coverage"
   },
   "jest": {

@@ -882,8 +882,8 @@ function hasAnyBorder(computed) {
 // capture the common "foreground decoration" pattern (a phone notch with
 // `z-index: 50` painted over the gradient header, a sticky tab bar painted
 // over the content beneath, …).
-function resolveZIndex(computed) {
-  const raw = (computed.getPropertyValue('z-index') || '').trim();
+function resolveZIndex(value) {
+  const raw = (value || '').trim();
   if (!raw || raw === 'auto') return 0;
   const v = parseInt(raw, 10);
   return isFinite(v) ? v : 0;
@@ -4332,11 +4332,17 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
-      const isPositioned = childComputed.position !== 'static';
+      // A materialised pseudo is a real div, so author selectors (including !important)
+      // can give it a different stacking identity. Use the original pseudo's resting
+      // position/z-index for ordering; the div remains the geometry/animation proxy.
+      // This non-DOM property is installed by materializeDecorativePseudoElements and
+      // never reaches the serialized HTML.
+      const paintStyle = n.__pagxSnapshotPseudoPaintStyle || childComputed;
+      const isPositioned = paintStyle.position !== 'static';
       const isStackable = isPositioned || flexOrGridParent;
       items.push({
         stackable: isStackable,
-        zIndex: isStackable ? resolveZIndex(childComputed) : 0,
+        zIndex: isStackable ? resolveZIndex(paintStyle.zIndex) : 0,
         domIndex: domIndex++,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
@@ -5762,28 +5768,17 @@ async function inlineCanvases() {
 // codepoint) but emits nothing for pseudos whose `content` resolves to an
 // empty string and whose visible box comes from width/height/background.
 //
-// This pass walks every element on the live page, asks Chromium for the
-// resolved style of each pseudo, and — when the pseudo carries a
-// `content` value but that value is the empty string — appends a real
-// `<div>` child to the host whose inline style mirrors the pseudo's own
-// box. The synthetic node carries `data-snapshot-pseudo` so authors can
+// This pass first collects each eligible pseudo's resolved style, then inserts a real
+// `<div>` child whose inline style mirrors the pseudo's own box. Collecting before any
+// DOM writes prevents newly matched selectors from changing later pseudos' source styles.
+// The synthetic node carries `data-snapshot-pseudo` so authors can
 // trace the emission, and a `data-snapshot-pseudo-host=""` attribute is
 // added to the host to suppress the `renderPseudoTextLeaf` fallback (which
 // would otherwise still try to emit the now-empty pseudo as inline text).
 //
-// Two scopes deliberately stay out:
-//
-//   - text-bearing pseudos (`content: "→"`, `content: "\\e123"`): handled
-//     by `renderPseudoTextLeaf`, which sizes the glyph against its own
-//     font metrics. Materialising those would double-paint the text.
-//
-//   - in-flow decorative pseudos (`position: static / relative / sticky`):
-//     pseudos in the host's flow take main/cross-axis space; injecting a
-//     real sibling would shift the host's other children. The pseudos that
-//     actually need this fix in practice are absolutely / fixed-positioned
-//     boxes (toggles, radios, checkboxes, dividers anchored with `inset`),
-//     so we limit materialisation to that case and skip the rest with a
-//     `data-snapshot-pseudo-skipped=in-flow` marker for diagnosability.
+// Out-of-flow text pseudos carry their text on the stand-in too. In-flow decorative
+// pseudos are replaced in their layout slot, with the original disabled to avoid taking
+// space twice. In-flow text stays on renderPseudoTextLeaf; sticky pseudos remain unsupported.
 //
 // The properties copied onto the synthetic div cover the ones the snapshot
 // walker (`STYLE_SCHEMA_BOX` + the `position/inset/transform/box-shadow`
@@ -5831,7 +5826,7 @@ async function materializeDecorativePseudoElements() {
     'z-index',
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
-    'line-height', 'letter-spacing', 'text-align',
+    'line-height', 'letter-spacing', 'text-align', 'white-space',
     // Animation longhands are forwarded so an *animated* decorative pseudo
     // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
     // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
@@ -5847,47 +5842,6 @@ async function materializeDecorativePseudoElements() {
     'animation-delay', 'animation-iteration-count', 'animation-direction',
     'animation-fill-mode',
   ];
-
-  // Defaults emitted by Chromium for properties that don't change anything.
-  // Suppressing them keeps the inline style readable and lines up with the
-  // snapshot walker's own default-skipping logic.
-  const DEFAULTS = new Map([
-    ['position', 'static'],
-    ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
-    // `display` is intentionally NOT default-suppressed: a `div` stand-in
-    // defaults to block, and an in-flow pseudo with `inline` / `inline-block`
-    // participation must keep it or the flow slot changes.
-    ['flex-grow', '0'], ['flex-shrink', '1'], ['flex-basis', 'auto'],
-    ['align-self', 'auto'], ['order', '0'],
-    ['min-width', 'auto'], ['min-height', 'auto'],
-    ['max-width', 'none'], ['max-height', 'none'],
-    ['margin-top', '0px'], ['margin-right', '0px'],
-    ['margin-bottom', '0px'], ['margin-left', '0px'],
-    ['padding-top', '0px'], ['padding-right', '0px'],
-    ['padding-bottom', '0px'], ['padding-left', '0px'],
-    ['background-color', 'rgba(0, 0, 0, 0)'],
-    ['background-image', 'none'],
-    ['background-clip', 'border-box'],
-    ['background-blend-mode', 'normal'],
-    ['background-size', 'auto'],
-    ['background-repeat', 'repeat'],
-    ['background-position', '0% 0%'],
-    ['border-top-width', '0px'], ['border-right-width', '0px'],
-    ['border-bottom-width', '0px'], ['border-left-width', '0px'],
-    ['border-top-style', 'none'], ['border-right-style', 'none'],
-    ['border-bottom-style', 'none'], ['border-left-style', 'none'],
-    ['border-top-left-radius', '0px'], ['border-top-right-radius', '0px'],
-    ['border-bottom-left-radius', '0px'], ['border-bottom-right-radius', '0px'],
-    ['box-shadow', 'none'], ['opacity', '1'], ['mix-blend-mode', 'normal'],
-    ['filter', 'none'], ['backdrop-filter', 'none'], ['overflow', 'visible'],
-    ['transform', 'none'],
-    ['z-index', 'auto'],
-    ['box-sizing', 'content-box'],
-    ['animation-name', 'none'], ['animation-duration', '0s'],
-    ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
-    ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
-    ['animation-fill-mode', 'none'],
-  ]);
 
   // A pseudo's `content` value reaches us with quotes preserved
   // ("\"\"" for content: ""). Strip surrounding ASCII quotes so the
@@ -5962,13 +5916,25 @@ async function materializeDecorativePseudoElements() {
     return { ok: true, inFlow: !outOfFlow };
   }
 
-  function emitInlineStyle(cs) {
+  // Computed style declarations are live. Copy strings while the original DOM is still
+  // intact, rather than retaining a CSSStyleDeclaration for the insertion phase.
+  function copyStyle(cs) {
+    const properties = {};
+    for (const prop of COPY_PROPS) {
+      properties[prop] = (cs.getPropertyValue(prop) || '').trim();
+    }
+    return properties;
+  }
+
+  function emitInlineStyle(properties) {
     const parts = [];
     for (const prop of COPY_PROPS) {
-      const raw = (cs.getPropertyValue(prop) || '').trim();
+      const raw = properties[prop];
       if (!raw) continue;
-      const def = DEFAULTS.get(prop);
-      if (def !== undefined && raw === def) continue;
+      // Keep defaults here: the stand-in still lives under the author's stylesheet.
+      // Omitting e.g. z-index:auto or opacity:1 lets a div/descendant rule replace it.
+      // Output serialization can compact defaults after the original CSS is gone.
+      // Normal priority also lets forwarded keyframes animate these resting values.
       // Rewrite embedded double quotes (e.g. `filter: url("#blur")`,
       // `font-family: "Inter"`) as single quotes — CSS treats them equivalently
       // — so the value embeds safely inside the surrounding style="…" attribute
@@ -6023,6 +5989,7 @@ async function materializeDecorativePseudoElements() {
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
   const pseudoOffRules = [];
+  const pendingHosts = [];
   const all = document.querySelectorAll('*');
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -6080,37 +6047,52 @@ async function materializeDecorativePseudoElements() {
       if (textLeftBehind) continue;
     }
 
-    let materialisedAny = false;
+    const pending = { el, pseudos: [], skippedReason: '' };
     for (let i = 0; i < pseudoData.length; i++) {
       const slot = pseudoData[i];
       if (!slot) continue;
       const decision = decisions[i];
       if (!decision.ok) {
         if (decision.reason !== 'text-content') {
-          el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
+          pending.skippedReason = decision.reason;
         }
         continue;
       }
 
-      const div = document.createElement('div');
-      div.setAttribute('data-snapshot-pseudo', slot.pseudo);
       // Read the pseudo's resting style (cancelling its own animation) so an
       // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
       // forwarded `animation-*` longhands (see COPY_PROPS) keep the motion.
       const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
-      const style = emitInlineStyle(restingCs);
+      pending.pseudos.push({
+        pseudo: slot.pseudo,
+        inFlow: decision.inFlow,
+        properties: copyStyle(restingCs),
+        text: applyPseudoTextTransform(slot.pseudoText, restingCs),
+      });
+    }
+    if (pending.pseudos.length > 0 || pending.skippedReason) pendingHosts.push(pending);
+  }
+
+  for (const pending of pendingHosts) {
+    const el = pending.el;
+    if (pending.skippedReason) {
+      el.setAttribute('data-snapshot-pseudo-skipped', pending.skippedReason);
+    }
+    for (const slot of pending.pseudos) {
+      const div = document.createElement('div');
+      div.setAttribute('data-snapshot-pseudo', slot.pseudo);
+      const style = emitInlineStyle(slot.properties);
       if (style) div.setAttribute('style', style);
-      // A text-bearing pseudo (see shouldMaterialise) rides the stand-in as its text content, so
-      // the glyphs inherit the pseudo's own box and text styles instead of the host's flow.
-      // `white-space` is not part of COPY_PROPS, so it is appended only when the pseudo states
-      // something other than the default — a box sized by the page for one line must not rewrap.
-      if (slot.pseudoText) {
-        div.textContent = applyPseudoTextTransform(slot.pseudoText, restingCs);
-        const whiteSpace = (restingCs.getPropertyValue('white-space') || '').trim();
-        if (whiteSpace && whiteSpace !== 'normal') {
-          const base = div.getAttribute('style') || '';
-          div.setAttribute('style', base ? base + '; white-space: ' + whiteSpace : 'white-space: ' + whiteSpace);
-        }
+      // Private JS metadata, shared with renderChildrenInto even when the materializer and
+      // walker are installed by separate page.evaluate calls. It is not an HTML attribute.
+      Object.defineProperty(div, '__pagxSnapshotPseudoPaintStyle', {
+        value: Object.freeze({
+          position: slot.properties.position,
+          zIndex: slot.properties['z-index'],
+        }),
+      });
+      if (slot.text) {
+        div.textContent = slot.text;
       }
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
@@ -6131,14 +6113,13 @@ async function materializeDecorativePseudoElements() {
       // inject all rules after the walk — injecting mid-walk would be safe
       // too (already-read styles are unaffected), but batching keeps the
       // DOM mutation profile flat and the markers deterministic.
-      if (decision.inFlow) {
+      if (slot.inFlow) {
         const marker = 'data-snapshot-pseudo-off-' + pseudoOffRules.length;
         el.setAttribute(marker, '');
         pseudoOffRules.push('[' + marker + ']' + slot.pseudo + ' { content: none !important; }');
       }
-      materialisedAny = true;
     }
-    if (materialisedAny) {
+    if (pending.pseudos.length > 0) {
       el.setAttribute('data-snapshot-pseudo-host', '');
     }
   }
