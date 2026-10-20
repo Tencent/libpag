@@ -20,25 +20,20 @@
 
 #import <TargetConditionals.h>
 #include "base/PAGTest.h"
+#import "platform/cocoa/PAGPlayer.h"
 
 #if TARGET_OS_IPHONE
-#import "platform/ios/PAGSurface.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
 #if defined(TGFX_USE_METAL)
-#import "platform/ios/PAGSurface+Metal.h"
 #import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
 #else
-#import "platform/ios/PAGSurface+OpenGL.h"
 #import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #endif
 #else
-#import "platform/mac/PAGSurface.h"
 #import "platform/mac/private/PAGSurfaceImpl.h"
 #if defined(TGFX_USE_METAL)
-#import "platform/mac/PAGSurface+Metal.h"
 #import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
 #else
-#import "platform/mac/PAGSurface+OpenGL.h"
 #import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #endif
 #endif

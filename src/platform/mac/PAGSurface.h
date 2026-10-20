@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreVideo/CoreVideo.h>
@@ -23,9 +25,9 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-// Backend-specific factory categories (PAGSurface+OpenGL.h / PAGSurface+Metal.h) are selected by
-// the libpag build and exported through the framework's umbrella header; only the
-// backend-agnostic surface entry points stay in this class interface.
+// Backend-specific factories are declared in separate category headers. The generated
+// PAGSurfaceBackend.h imports the selected category after this class declaration, so importing
+// PAGSurface.h alone exposes all factories supported by the framework.
 PAG_API @interface PAGSurface : NSObject
 
 /**
@@ -83,3 +85,5 @@ PAG_API @interface PAGSurface : NSObject
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end
+
+#import "PAGSurfaceBackend.h"
