@@ -43,6 +43,7 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/Path.h"
 
 namespace pagx {
 
@@ -75,6 +76,7 @@ struct InheritedStyle {
   std::string fillOpacity = {};       // Empty means not set.
   std::string strokeOpacity = {};     // Empty means not set.
   std::string fillRule = {};          // Empty means not set.
+  std::string clipRule = {};
   std::string strokeDasharray = {};   // Empty means not set, "none" means solid line.
   std::string strokeDashoffset = {};  // Empty means not set.
   std::string strokeWidth = {};       // Empty means not set.
@@ -141,10 +143,10 @@ class SVGParserContext {
                                         const Rect& shapeBounds);
   ImagePattern* convertPattern(const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
 
-  Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
-                            const InheritedStyle& parentStyle);
-  void parseMaskChildren(const std::shared_ptr<DOMNode>& parent, Layer* maskLayer,
-                         const InheritedStyle& parentStyle, const Matrix& parentMatrix);
+  Layer* applyMaskReferences(Layer* layer, const std::shared_ptr<DOMNode>& element, int depth);
+  Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement, const Rect& bounds,
+                            int depth);
+  InheritedStyle definitionStyle(const std::shared_ptr<DOMNode>& element, int depth = 0);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
   // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
@@ -157,6 +159,7 @@ class SVGParserContext {
                      const InheritedStyle& inheritedStyle);
 
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
+  tgfx::Path geometryPath(const std::shared_ptr<DOMNode>& element, int depth = 0);
 
   // Returns the total geometric length of the element's outline by building its tgfx::Path and
   // summing every contour via PathMeasure. Used to honour the SVG `pathLength` attribute when
@@ -253,7 +256,9 @@ class SVGParserContext {
   // Every id-bearing SVG element is addressable by href from <use> / <textPath>, regardless of
   // whether it lives in a root-level <defs>, a nested <defs>, or the rendered subtree.
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _elementsById = {};
-  std::vector<Layer*> _maskLayers = {};
+  std::unordered_map<const DOMNode*, std::shared_ptr<DOMNode>> _parents = {};
+  std::unordered_set<const DOMNode*> _effectStack = {};
+  bool _convertingClipPath = false;
   std::unordered_map<std::string, Image*> _imageSourceToId =
       {};                                             // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.

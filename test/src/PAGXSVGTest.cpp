@@ -963,6 +963,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClipPathUseResolvesNestedDefinition) {
   EXPECT_FALSE(path->data->isEmpty());
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_MasksAreLocalIndependentInstances) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="200"><defs>
+      <mask id="m" maskContentUnits="objectBoundingBox"><rect width=".5" height="1" fill="white"/></mask>
+    </defs>
+    <rect width="80" height="40" transform="translate(10 20)" mask="url(#m)"/>
+    <rect width="40" height="80" transform="translate(150 160) scale(-1)" mask="url(#m)"/>
+    </svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 2u);
+  auto* first = FindFirstMaskedLayer(doc->layers[0]);
+  auto* second = FindFirstMaskedLayer(doc->layers[1]);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_NE(first->mask, second->mask);
+  EXPECT_NE(first->mask->id, second->mask->id);
+  EXPECT_FALSE(first->mask->includeInLayout);
+  EXPECT_TRUE(first->matrix.isIdentity());
+  EXPECT_TRUE(second->matrix.isIdentity());
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.tx, 10);
+  EXPECT_FLOAT_EQ(doc->layers[1]->matrix.d, -1);
+  auto* region = first->mask->children.front();
+  EXPECT_FLOAT_EQ(region->width, 96);
+  EXPECT_FLOAT_EQ(region->height, 48);
+  EXPECT_FLOAT_EQ(region->children.front()->matrix.a, 80);
+  EXPECT_FLOAT_EQ(second->mask->children.front()->children.front()->matrix.a, 40);
+}
+
 /**
  * Test SVG import: a gradient referenced by more than one shape is counted and, for the default
  * objectBoundingBox units, re-resolved per shape rather than shared. The document imports cleanly

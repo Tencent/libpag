@@ -237,16 +237,6 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     child = child->getNextSibling();
   }
 
-  // Add collected mask layers (invisible, used as mask references) before other layers.
-  if (!_maskLayers.empty()) {
-    std::vector<Layer*> allLayers;
-    allLayers.reserve(_maskLayers.size() + convertedLayers.size());
-    allLayers.insert(allLayers.end(), _maskLayers.begin(), _maskLayers.end());
-    allLayers.insert(allLayers.end(), convertedLayers.begin(), convertedLayers.end());
-    convertedLayers = std::move(allLayers);
-    _maskLayers.clear();
-  }
-
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
 
@@ -424,6 +414,9 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   // Parse common layer attributes.
   layer->id = getAttribute(element, "id");
+  if (!_effectStack.empty() && !layer->id.empty()) {
+    layer->id = generateUniqueId(layer->id + "_");
+  }
 
   // Parse data-* custom attributes.
   parseCustomData(element, layer);
@@ -434,7 +427,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   }
 
   std::string opacity = getAttribute(element, "opacity");
-  if (!opacity.empty()) {
+  if (!opacity.empty() && !_convertingClipPath) {
     layer->alpha = strtof(opacity.c_str(), nullptr);
   }
 
@@ -443,84 +436,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     layer->blendMode = SVGBlendModeFromString(mixBlendMode);
   }
 
-  // Handle mask attribute.
-  std::string maskAttr = getAttribute(element, "mask");
-  if (!maskAttr.empty() && maskAttr != "none") {
-    std::string maskId = resolveUrl(maskAttr);
-    auto maskIt = _defs.find(maskId);
-    if (maskIt != _defs.end()) {
-      // Convert mask element to a mask layer.
-      auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
-      if (maskLayer) {
-        layer->mask = maskLayer;
-        // SVG mask-type property determines how the mask is computed.
-        // Default is "luminance" (uses luminance of mask content); "alpha" uses alpha channel.
-        std::string maskTypeStr = getAttribute(maskIt->second, "mask-type");
-        layer->maskType = (maskTypeStr == "alpha") ? MaskType::Alpha : MaskType::Luminance;
-        // Add mask layer as invisible layer to the document.
-        _maskLayers.push_back(maskLayer);
-      }
-    }
-  }
-
-  // Handle clip-path attribute (similar to mask but uses contour/alpha).
-  std::string clipPathAttr = getAttribute(element, "clip-path");
-  if (!clipPathAttr.empty() && clipPathAttr != "none") {
-    std::string clipId = resolveUrl(clipPathAttr);
-    auto clipIt = _defs.find(clipId);
-    if (clipIt != _defs.end()) {
-      // Check if the clipPath is a single full-canvas rect, which has no visual effect.
-      bool isFullCanvasClip = false;
-      auto clipElement = clipIt->second;
-      auto firstChild = clipElement->getFirstChild();
-      if (firstChild && !firstChild->getNextSibling() && firstChild->name == "rect") {
-        std::string rectTransform = getAttribute(firstChild, "transform");
-        if (rectTransform.empty()) {
-          float cx = parseLength(getAttribute(firstChild, "x"), _viewBoxWidth);
-          float cy = parseLength(getAttribute(firstChild, "y"), _viewBoxHeight);
-          float cw = parseLength(getAttribute(firstChild, "width"), _viewBoxWidth);
-          float ch = parseLength(getAttribute(firstChild, "height"), _viewBoxHeight);
-          if (cx <= 0 && cy <= 0 && cw >= _viewBoxWidth && ch >= _viewBoxHeight) {
-            isFullCanvasClip = true;
-          }
-        }
-      }
-      if (!isFullCanvasClip) {
-        // Convert clipPath element to a mask layer.
-        auto clipLayer = convertMaskElement(clipElement, inheritedStyle);
-        if (clipLayer) {
-          if (layer->mask != nullptr) {
-            // Both mask and clip-path are present. Wrap the current layer in a parent layer
-            // so that the mask stays on the inner layer and clip-path goes on the outer layer.
-            auto wrapperLayer = _document->makeNode<Layer>();
-            wrapperLayer->mask = clipLayer;
-            wrapperLayer->maskType = MaskType::Alpha;
-            // Move properties from layer to wrapper.
-            wrapperLayer->id = std::move(layer->id);
-            wrapperLayer->matrix = layer->matrix;
-            wrapperLayer->alpha = layer->alpha;
-            layer->id.clear();
-            layer->matrix = Matrix::Identity();
-            layer->alpha = 1.0f;
-            wrapperLayer->children.push_back(layer);
-            _maskLayers.push_back(clipLayer);
-            layer = wrapperLayer;
-          } else {
-            layer->mask = clipLayer;
-            // SVG clip-path uses alpha (shape outline) for clipping.
-            layer->maskType = MaskType::Alpha;
-            // Add clip layer as invisible layer to the document.
-            _maskLayers.push_back(clipLayer);
-          }
-        }
-      }
-    }
-  }
-
   // Handle filter attribute.
   std::string filterAttr = getAttribute(element, "filter");
   ShadowOnlyType shadowOnlyType = ShadowOnlyType::None;
-  if (!filterAttr.empty() && filterAttr != "none") {
+  if (!_convertingClipPath && !filterAttr.empty() && filterAttr != "none") {
     std::string filterId = resolveUrl(filterAttr);
     auto filterIt = _defs.find(filterId);
     if (filterIt != _defs.end()) {
@@ -642,7 +561,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     }
   }
 
-  return layer;
+  return applyMaskReferences(layer, element, depth);
 }
 // Extract the start point and tangent angle from a path.
 static MarkerPoint GetPathStartPoint(const PathData* pathData) {
@@ -1702,65 +1621,112 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
   return pattern;
 }
-Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
-                                            const InheritedStyle& parentStyle) {
-  auto maskLayer = _document->makeNode<Layer>();
-  maskLayer->id = getAttribute(maskElement, "id");
-  maskLayer->name = maskLayer->id;
-  maskLayer->visible = false;
-
-  // Compute inherited style from the mask element itself (it may have fill="white" etc.).
-  InheritedStyle maskStyle = computeInheritedStyle(maskElement, parentStyle);
-
-  // Parse mask contents recursively.
-  parseMaskChildren(maskElement, maskLayer, maskStyle, Matrix::Identity());
-
-  parseCustomData(maskElement, maskLayer);
-
-  return maskLayer;
+InheritedStyle SVGParserContext::definitionStyle(const std::shared_ptr<DOMNode>& element, int depth) {
+  if (depth >= MAX_SVG_RECURSION_DEPTH) return {};
+  auto parent = _parents.find(element.get());
+  auto inherited = parent == _parents.end() ? InheritedStyle{} :
+                       definitionStyle(parent->second, depth + 1);
+  return computeInheritedStyle(element, inherited);
 }
-void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent, Layer* maskLayer,
-                                         const InheritedStyle& parentStyle,
-                                         const Matrix& parentMatrix) {
-  auto child = parent->getFirstChild();
-  while (child) {
-    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
-        child->name == "path" || child->name == "polygon" || child->name == "polyline" ||
-        child->name == "use" || child->name == "image") {
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
-      std::string transformStr = getAttribute(child, "transform");
-      Matrix combinedMatrix = parentMatrix;
-      if (!transformStr.empty()) {
-        combinedMatrix = combinedMatrix * parseTransform(transformStr);
-      }
-      bool hasTransform = !combinedMatrix.isIdentity();
-      if (hasTransform) {
-        auto subLayer = _document->makeNode<Layer>();
-        subLayer->matrix = combinedMatrix;
-        convertChildren(child, subLayer->contents, inheritedStyle);
-        maskLayer->children.push_back(subLayer);
-      } else {
-        // Each SVG shape carries its own paint, so wrap it in a Group to isolate the fill/stroke.
-        // Otherwise multiple shapes sharing the mask layer's flat contents list would let a later
-        // shape's Fill paint all preceding geometry (e.g. a white rect followed by black holes
-        // would collapse into an all-black mask, blanking a luminance mask).
-        auto group = _document->makeNode<Group>();
-        convertChildren(child, group->elements, inheritedStyle);
-        if (!group->elements.empty()) {
-          maskLayer->contents.push_back(group);
-        }
-      }
-    } else if (child->name == "g") {
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
-      std::string groupTransform = getAttribute(child, "transform");
-      Matrix combinedMatrix = parentMatrix;
-      if (!groupTransform.empty()) {
-        combinedMatrix = combinedMatrix * parseTransform(groupTransform);
-      }
-      parseMaskChildren(child, maskLayer, inheritedStyle, combinedMatrix);
+
+Layer* SVGParserContext::applyMaskReferences(Layer* layer,
+                                            const std::shared_ptr<DOMNode>& element, int depth) {
+  // Filter the source first, then clip, then mask, and finally apply group opacity. Each effect
+  // instance and its owner share a parent coordinate system, including singular/reflected CTMs.
+  // A definition is a template: sharing its Layer would give it multiple owners in tgfx.
+  for (const char* property : {"clip-path", "mask"}) {
+    if (_convertingClipPath && std::strcmp(property, "mask") == 0) continue;
+    auto ref = _defs.find(resolveUrl(getAttribute(element, property)));
+    if (ref == _defs.end()) continue;
+    bool isClip = std::strcmp(property, "clip-path") == 0;
+    if (ref->second->name != (isClip ? "clipPath" : "mask")) continue;
+    if (_effectStack.count(ref->second.get()) || depth >= MAX_SVG_RECURSION_DEPTH) {
+      _document->errors.push_back("svg: cyclic or excessively nested " + std::string(property));
+      layer->visible = false;
+      continue;
     }
-    child = child->getNextSibling();
+    auto mask = convertMaskElement(ref->second, getShapeBounds(element), depth + 1);
+    auto wrapper = _document->makeNode<Layer>();
+    wrapper->id = std::move(layer->id);
+    wrapper->matrix = layer->matrix;
+    wrapper->alpha = layer->alpha;
+    wrapper->blendMode = layer->blendMode;
+    layer->matrix = Matrix::Identity();
+    layer->alpha = 1;
+    layer->blendMode = BlendMode::Normal;
+    layer->mask = mask;
+    layer->maskType = isClip || getAttribute(ref->second, "mask-type") == "alpha" ?
+                          MaskType::Alpha : MaskType::Luminance;
+    wrapper->children = {mask, layer};
+    layer = wrapper;
   }
+  return layer;
+}
+
+Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
+                                           const Rect& bounds, int depth) {
+  bool isClip = maskElement->name == "clipPath";
+  auto maskLayer = _document->makeNode<Layer>();
+  maskLayer->id = generateUniqueId(isClip ? "clip" : "mask");
+  maskLayer->name = getAttribute(maskElement, "id");
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  bool objectContent = getAttribute(maskElement, isClip ? "clipPathUnits" : "maskContentUnits",
+                                     "userSpaceOnUse") == "objectBoundingBox";
+  auto content = _document->makeNode<Layer>();
+  if (objectContent) {
+    if (bounds.isEmpty()) return maskLayer;
+    content->matrix = Matrix::Translate(bounds.x, bounds.y) *
+                      Matrix::Scale(bounds.width, bounds.height);
+  }
+  content->matrix = content->matrix * parseTransform(getAttribute(maskElement, "transform"));
+  Layer* contentParent = maskLayer;
+  if (!isClip) {
+    bool objectRegion = getAttribute(maskElement, "maskUnits", "objectBoundingBox") ==
+                        "objectBoundingBox";
+    float unitW = objectRegion ? 1 : _viewBoxWidth;
+    float unitH = objectRegion ? 1 : _viewBoxHeight;
+    float x = parseLength(getAttribute(maskElement, "x", "-10%"), unitW);
+    float y = parseLength(getAttribute(maskElement, "y", "-10%"), unitH);
+    float width = parseLength(getAttribute(maskElement, "width", "120%"), unitW);
+    float height = parseLength(getAttribute(maskElement, "height", "120%"), unitH);
+    if (objectRegion) {
+      x = bounds.x + x * bounds.width;
+      y = bounds.y + y * bounds.height;
+      width *= bounds.width;
+      height *= bounds.height;
+    }
+    if (width <= 0 || height <= 0) return maskLayer;
+    // scrollRect changes the local origin as well as clipping. Use a zero-origin viewport
+    // translated to the mask region, and counter-translate its content.
+    // tgfx draws a mask root directly, bypassing drawChild's scroll-rect clip. Keep the region
+    // on a child, with an explicit rect because the mask subtree is excluded from layout.
+    contentParent = _document->makeNode<Layer>();
+    contentParent->matrix = Matrix::Translate(x, y);
+    contentParent->width = width;
+    contentParent->height = height;
+    contentParent->hasScrollRect = true;
+    contentParent->scrollRect = Rect::MakeXYWH(0, 0, width, height);
+    maskLayer->children.push_back(contentParent);
+    content->matrix = Matrix::Translate(-x, -y) * content->matrix;
+  }
+  float savedWidth = _viewBoxWidth;
+  float savedHeight = _viewBoxHeight;
+  bool savedClip = _convertingClipPath;
+  if (objectContent) _viewBoxWidth = _viewBoxHeight = 1;
+  _convertingClipPath = isClip;
+  _effectStack.insert(maskElement.get());
+  auto style = definitionStyle(maskElement);
+  for (auto child = maskElement->getFirstChild(); child; child = child->getNextSibling()) {
+    auto converted = convertToLayer(child, style, depth + 1);
+    if (converted != nullptr) content->children.push_back(converted);
+  }
+  _effectStack.erase(maskElement.get());
+  _viewBoxWidth = savedWidth;
+  _viewBoxHeight = savedHeight;
+  _convertingClipPath = savedClip;
+  contentParent->children.push_back(content);
+  return maskLayer;
 }
 bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                                             std::vector<LayerFilter*>& filters,
@@ -2013,6 +1979,15 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                      std::vector<Element*>& contents,
                                      const InheritedStyle& inheritedStyle) {
+  if (_convertingClipPath) {
+    auto fill = _document->makeNode<Fill>();
+    auto color = _document->makeNode<SolidColor>();
+    color->color = {1, 1, 1, 1};
+    fill->color = color;
+    fill->fillRule = inheritedStyle.clipRule == "evenodd" ? FillRule::EvenOdd : FillRule::Winding;
+    contents.push_back(fill);
+    return;
+  }
   // Lazily compute shape bounds only when needed (for gradient/pattern references).
   bool boundsComputed = false;
   Rect shapeBounds = {};
@@ -2040,6 +2015,9 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   // deterministic painter ids so the pre-resolve animation objects can target its Fill / Stroke by
   // string. Empty when the shape has no id (the common static case), which leaves the node id blank.
   std::string elementId = getAttribute(element, "id");
+  if (!_effectStack.empty() && !elementId.empty()) {
+    elementId = generateUniqueId(elementId + "_");
+  }
   std::string fillId = elementId.empty() ? std::string() : elementId + "__fill";
   std::string strokeId = elementId.empty() ? std::string() : elementId + "__stroke";
 
@@ -2257,84 +2235,43 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
 }
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
-  const auto& tag = element->name;
-
-  if (tag == "rect") {
-    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
-    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
-    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
-    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
-    return Rect::MakeXYWH(x, y, width, height);
-  }
-
-  if (tag == "circle") {
-    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
-    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
-    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
-    return Rect::MakeXYWH(cx - r, cy - r, r * 2, r * 2);
-  }
-
-  if (tag == "ellipse") {
-    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
-    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
-    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
-    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
-    return Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2);
-  }
-
-  if (tag == "line") {
-    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
-    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
-    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
-    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
-    float minX = std::min(x1, x2);
-    float minY = std::min(y1, y2);
-    float maxX = std::max(x1, x2);
-    float maxY = std::max(y1, y2);
-    return Rect::MakeXYWH(minX, minY, maxX - minX, maxY - minY);
-  }
-
-  if (tag == "path") {
-    std::string d = getAttribute(element, "d");
-    if (!d.empty()) {
-      auto pathData = PathDataFromSVGString(d);
-      return pathData.getBounds();
-    }
-  }
-
-  // For polyline and polygon, parse points and compute bounds.
-  if (tag == "polyline" || tag == "polygon") {
-    std::string pointsStr = getAttribute(element, "points");
-    if (!pointsStr.empty()) {
-      auto pathData = parsePoints(pointsStr, tag == "polygon");
-      return pathData.getBounds();
-    }
-  }
-
-  // For use element, get bounds of the referenced element and apply x/y offset.
-  if (tag == "use") {
-    std::string refId = resolveUrl(getHrefAttribute(element));
-    if (refId.empty() || _useStack.count(refId) > 0) {
-      return Rect::MakeXYWH(0, 0, 0, 0);
-    }
-    auto it = _elementsById.find(refId);
-    if (it != _elementsById.end()) {
-      _useStack.insert(refId);
-      Rect refBounds = getShapeBounds(it->second);
-      _useStack.erase(refId);
-      float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
-      float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
-      return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
-    }
-  }
-
-  return Rect::MakeXYWH(0, 0, 0, 0);
+  // SVG objectBoundingBox excludes stroke, filters and clipping. Evaluate curve extrema in the
+  // owner's local coordinates; PathData::getBounds() intentionally remains a control-point box.
+  return FromTGFX(geometryPath(element).computeTightBounds());
 }
-float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& element) {
+tgfx::Path SVGParserContext::geometryPath(const std::shared_ptr<DOMNode>& element, int depth) {
   const auto& tag = element->name;
   tgfx::Path path = {};
-
-  if (tag == "path") {
+  if (depth >= MAX_SVG_RECURSION_DEPTH || getAttribute(element, "display") == "none") return path;
+  if (tag == "g" || tag == "symbol" || tag == "svg") {
+    for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+      auto childPath = geometryPath(child, depth + 1);
+      childPath.transform(ToTGFX(parseTransform(getAttribute(child, "transform"))));
+      path.addPath(childPath);
+    }
+  } else if (tag == "use") {
+    auto refId = resolveUrl(getHrefAttribute(element));
+    auto ref = _elementsById.find(refId);
+    if (ref != _elementsById.end() && _useStack.count(refId) == 0) {
+      _useStack.insert(refId);
+      auto matrix = Matrix::Translate(parseLength(getAttribute(element, "x"), _viewBoxWidth),
+                                      parseLength(getAttribute(element, "y"), _viewBoxHeight));
+      auto viewBox = parseViewBox(getAttribute(ref->second, "viewBox"));
+      if ((ref->second->name == "symbol" || ref->second->name == "svg") &&
+          viewBox.size() == 4 && viewBox[2] > 0 && viewBox[3] > 0) {
+        auto width = parseLength(getAttribute(element, "width",
+                                   getAttribute(ref->second, "width", "100%")), _viewBoxWidth);
+        auto height = parseLength(getAttribute(element, "height",
+                                    getAttribute(ref->second, "height", "100%")), _viewBoxHeight);
+        matrix = matrix * ComputeViewBoxMatrix(viewBox, width, height,
+                                               getAttribute(ref->second, "preserveAspectRatio"));
+      }
+      path = geometryPath(ref->second, depth + 1);
+      matrix = matrix * parseTransform(getAttribute(ref->second, "transform"));
+      path.transform(ToTGFX(matrix));
+      _useStack.erase(refId);
+    }
+  } else if (tag == "path") {
     std::string d = getAttribute(element, "d");
     if (!d.empty()) {
       path = ToTGFX(PathDataFromSVGString(d));
@@ -2377,7 +2314,11 @@ float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& e
     }
     path.addRoundRect(tgfx::Rect::MakeXYWH(x, y, width, height), rx, ry);
   }
+  return path;
+}
 
+float SVGParserContext::computePathTotalLength(const std::shared_ptr<DOMNode>& element) {
+  auto path = geometryPath(element);
   if (path.isEmpty()) {
     return 0.0f;
   }
@@ -2401,6 +2342,7 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
       {"fill-opacity", &InheritedStyle::fillOpacity},
       {"stroke-opacity", &InheritedStyle::strokeOpacity},
       {"fill-rule", &InheritedStyle::fillRule},
+      {"clip-rule", &InheritedStyle::clipRule},
       {"stroke-dasharray", &InheritedStyle::strokeDasharray},
       {"stroke-dashoffset", &InheritedStyle::strokeDashoffset},
       {"stroke-width", &InheritedStyle::strokeWidth},
@@ -3348,6 +3290,7 @@ void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   // Recursively collect from children.
   auto child = node->getFirstChild();
   while (child) {
+    _parents[child.get()] = node;
     collectAllIds(child);
     child = child->getNextSibling();
   }
@@ -3448,9 +3391,11 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
     }
   }
 
-  // If refCount > 1, check if we already created a resource for this ref.
+  // User-space percentages are relative to the current viewport, which may differ between uses.
+  auto cacheKey = refId + ":" + std::to_string(_viewBoxWidth) + ":" + std::to_string(_viewBoxHeight);
+  // If refCount > 1, check if we already created a resource for this ref and viewport.
   if (refCount > 1) {
-    auto cacheIt = _colorSourceCache.find(refId);
+    auto cacheIt = _colorSourceCache.find(cacheKey);
     if (cacheIt != _colorSourceCache.end()) {
       return cacheIt->second;
     }
@@ -3474,7 +3419,7 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
 
   if (refCount > 1) {
     colorSource->id = generateColorSourceId();
-    _colorSourceCache[refId] = colorSource;
+    _colorSourceCache[cacheKey] = colorSource;
   } else {
     colorSource->id.clear();
   }
