@@ -200,22 +200,26 @@ static void DetectZeroStrokeWidth(const Stroke* stroke,
 // Static Detection: Full Canvas Clip Mask
 // ============================================================================
 
+// Returns true if the layer maps its local space onto its parent space unchanged, so a mask at the
+// layer origin clips exactly the rect it authors. renderPosition() resolves both the authored x / y
+// and any position layout generated for the layer.
+static bool HasIdentityLayerTransform(const Layer* layer) {
+  auto position = layer->renderPosition();
+  return position.x == 0 && position.y == 0 && layer->z == 0 && layer->matrix.isIdentity() &&
+         layer->matrix3D.isIdentity() && !HasLayerTransformComponents(layer);
+}
+
 static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, float canvasHeight,
                                      std::vector<VerifyDiagnostic>& diagnostics) {
   if (layer->mask == nullptr) {
     return;
   }
+  // The mask is evaluated in the owner's parent space and the diagnostic compares its rect against
+  // the canvas, so neither layer may be transformed.
+  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask)) {
+    return;
+  }
   auto* maskLayer = layer->mask;
-  if (maskLayer->x != 0 || maskLayer->y != 0 || HasGeneratedLayoutPosition(maskLayer)) {
-    return;
-  }
-  if (!maskLayer->matrix.isIdentity()) {
-    return;
-  }
-  if (maskLayer->z != 0 || !maskLayer->matrix3D.isIdentity() ||
-      HasLayerTransformComponents(maskLayer)) {
-    return;
-  }
   if (maskLayer->contents.size() != 1) {
     return;
   }
@@ -1670,11 +1674,12 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
   if (layer->maskType != MaskType::Alpha) {
     return;
   }
-  auto* maskLayer = layer->mask;
-  // The rectangle replaces the layer's whole bounds, so the mask must sit at the layer origin.
-  if (maskLayer->x != 0 || maskLayer->y != 0 || HasGeneratedLayoutPosition(maskLayer)) {
+  // The rectangle replaces the layer's whole bounds, so both the owner and the mask must map their
+  // local space onto the parent space unchanged for the two to cover the same area.
+  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask)) {
     return;
   }
+  auto* maskLayer = layer->mask;
   if (maskLayer->contents.size() != 2) {
     return;
   }
@@ -1693,13 +1698,6 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
     return;
   }
   if (fill->color != nullptr && fill->color->nodeType() != NodeType::SolidColor) {
-    return;
-  }
-  if (!maskLayer->matrix.isIdentity()) {
-    return;
-  }
-  if (maskLayer->z != 0 || !maskLayer->matrix3D.isIdentity() ||
-      HasLayerTransformComponents(maskLayer)) {
     return;
   }
   AddDiagnostic(diagnostics, layer->sourceLine,

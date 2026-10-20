@@ -94,8 +94,10 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
   // A perspective cannot be expressed by any SVG transform. The whole layer bakes so that
-  // descendants placed at a different z keep the projected size the renderer gives them.
-  if (HasPerspective(BuildLayerLocalMatrix3D(layer))) {
+  // descendants placed at a different z keep the projected size the renderer gives them. A layer
+  // that preserves 3D keeps its vector output: the bake replays it inside a 3D context, which
+  // applies the layer matrix a second time.
+  if (!layer->preserve3D && HasPerspective(BuildLayerLocalMatrix3D(layer))) {
     out.hasPerspectiveTransform = true;
   }
   return out;

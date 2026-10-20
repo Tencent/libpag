@@ -209,8 +209,10 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   }
   // A perspective cannot be flattened into any 2D affine, and the projected x / y rows stay axis
   // aligned, so the shear probe above cannot see it. The whole layer bakes so that descendants
-  // placed at a different z, which the perspective rescales, keep their projected size.
-  if (HasPerspective(BuildLayerLocalMatrix3D(layer))) {
+  // placed at a different z, which the perspective rescales, keep their projected size. A layer
+  // that preserves 3D keeps its vector output: the bake replays it inside a 3D context, which
+  // applies the layer matrix a second time.
+  if (!layer->preserve3D && HasPerspective(BuildLayerLocalMatrix3D(layer))) {
     out.hasPerspectiveTransform = true;
   }
   for (const auto* filter : layer->filters) {

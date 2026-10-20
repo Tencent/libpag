@@ -41,6 +41,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MergePathMode.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -59,8 +60,11 @@ static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 // fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
 
 static Point LayerPositionForCSS(const Layer* layer) {
-  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity() &&
-      !HasLayerTransformComponents(layer)) {
+  // Mirror the finite checks LayerTransformCSS applies, so a non-finite matrix is treated as absent
+  // on both sides and the authored position still reaches left / top.
+  bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
+  bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
+  if (!hasMatrix3D && !hasMatrix && !HasLayerTransformComponents(layer)) {
     return layer->renderPosition();
   }
   auto layoutPosition = layer->layoutPosition();

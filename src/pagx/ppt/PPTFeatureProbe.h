@@ -56,7 +56,7 @@ struct PPTFeatureFlags {
   // The Layer carries a perspective row, so the projection divides by a w that depends on z and no
   // 2D affine can represent it. The whole layer bakes, which also keeps descendants at another z at
   // the size the renderer gives them. The projected matrix stays axis aligned, so the shear probe
-  // above cannot see it.
+  // above cannot see it. A layer that preserves 3D is not flagged.
   bool hasPerspectiveTransform = false;
   bool hasBackdropStyle = false;  // A backdrop-sampling layer style (BackgroundBlurStyle or
                                   // GlassStyle). Both are shader-based effects that sample the

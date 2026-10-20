@@ -41,7 +41,7 @@ struct SVGFeatureFlags {
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
   // The layer carries a perspective row, so the projection is not affine and no SVG transform can
   // express it; the whole layer bakes, keeping descendants at another z at the size the renderer
-  // gives them.
+  // gives them. A layer that preserves 3D is not flagged.
   bool hasPerspectiveTransform = false;
 
   /**

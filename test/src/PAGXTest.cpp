@@ -8011,6 +8011,25 @@ PAGX_TEST(PAGXTest, SameDocCompositionSelfReferenceCycle) {
  * through GetInt64Attribute; trailing garbage ("60abc") and a value past INT64_MAX both report a
  * parse error and fall back to the default rather than producing a bogus time.
  */
+// The Layer matrix attributes go through the same finite / invertible rule as the channel and
+// keyframe entry points, and a rejected value leaves the field at its default.
+PAGX_TEST(PAGXTest, LayerMatrixAttributesRejectNonFiniteAndSingular) {
+  std::string xml =
+      "<pagx width=\"50\" height=\"50\">\n"
+      "  <Layer id=\"nanMatrix\" matrix=\"nan,0,0,1,0,0\"/>\n"
+      "  <Layer id=\"singular3D\" matrix3D=\"1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->errors.size(), 2u);
+  auto* nanMatrix = static_cast<pagx::Layer*>(doc->findNode("nanMatrix"));
+  auto* singular3D = static_cast<pagx::Layer*>(doc->findNode("singular3D"));
+  ASSERT_NE(nanMatrix, nullptr);
+  ASSERT_NE(singular3D, nullptr);
+  EXPECT_TRUE(nanMatrix->matrix.isIdentity());
+  EXPECT_TRUE(singular3D->matrix3D.isIdentity());
+}
+
 PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
   // Trailing non-numeric characters after a valid prefix must be rejected (strtoll alone would
   // accept the "60" prefix and silently ignore "abc").
@@ -10511,15 +10530,19 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   // transform and a rotation both stay invertible at the same translation.
   pagx::Matrix3D mirrored = {};
   mirrored.values[0] = -1;
-  mirrored.values[12] = 9.0e8f;
+  mirrored.values[12] = 9.0e9f;
   EXPECT_TRUE(pagx::IsInvertibleMatrix3D(mirrored));
   pagx::Matrix3D rotated = {};
   rotated.values[0] = 0;
   rotated.values[1] = 1;
   rotated.values[4] = -1;
   rotated.values[5] = 0;
-  rotated.values[12] = 9.0e8f;
+  rotated.values[12] = 9.0e9f;
   EXPECT_TRUE(pagx::IsInvertibleMatrix3D(rotated));
+  // A uniformly scaled homogeneous row is still invertible.
+  pagx::Matrix3D scaledHomogeneous = {};
+  scaledHomogeneous.values[15] = 1.0e-10f;
+  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(scaledHomogeneous));
 }
 
 static pagx::Matrix3D ToPAGXMatrix3D(const tgfx::Matrix3D& matrix) {

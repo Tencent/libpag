@@ -299,6 +299,12 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return Matrix3DComponentsFromMatrix(pose, result);
   }
 
+  // The translation column holds the translation unscaled only for an affine pose whose homogeneous
+  // scale is 1; anything else has to go through decomposition.
+  bool storesTranslationInColumn() const {
+    return !HasPerspective(pose) && pose.getRowColumn(3, 3) == 1;
+  }
+
   // Reads the translation component of the pose. A matrix pose without perspective stores it in
   // the translation column, which is read directly to avoid decomposition round-off.
   bool readTranslation(int axis, float* value) const {
@@ -306,7 +312,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
       *value = static_cast<float>(components.translate[axis]);
       return true;
     }
-    if (!HasPerspective(pose)) {
+    if (storesTranslationInColumn()) {
       *value = pose.getRowColumn(axis, 3);
       return true;
     }
@@ -331,7 +337,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
       next.translate[axis] = MixFloat(static_cast<float>(next.translate[axis]), *v, mix);
       return commitComponents(next);
     }
-    if (!HasPerspective(pose)) {
+    if (storesTranslationInColumn()) {
       pose.setRowColumn(axis, 3, MixFloat(pose.getRowColumn(axis, 3), *v, mix));
       publish();
       return true;

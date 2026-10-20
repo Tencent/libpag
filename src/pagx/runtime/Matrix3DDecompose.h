@@ -168,7 +168,9 @@ inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
         linear[row][column] /= norm;
       }
     }
-    return std::abs(Determinant3(linear)) > 1.0e-9 && std::abs(matrix.getRowColumn(3, 3)) > 1.0e-9;
+    // m33 only has to be non-zero: it is the homogeneous scale, so comparing it against a fixed
+    // threshold would reject a uniformly scaled matrix such as diag(1, 1, 1, 1e-10).
+    return std::abs(Determinant3(linear)) > 1.0e-9 && matrix.getRowColumn(3, 3) != 0.0f;
   }
   double values[4][4] = {};
   for (int column = 0; column < 4; ++column) {

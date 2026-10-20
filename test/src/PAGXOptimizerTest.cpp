@@ -258,6 +258,30 @@ CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRect) {
   EXPECT_FLOAT_EQ(user->scrollRect.height, 50.0f);
 }
 
+// scrollRect clips in the owner's own space while the mask is evaluated in the parent space, so a
+// translated owner moves the window and the rewrite is not equivalent.
+CLI_TEST(PAGXOptimizerTest, RectMaskWithTranslatedOwnerIsKept) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->position = {25, 25};
+  maskRect->size = {50, 50};
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->x = 20;
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_FALSE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, mask);
+  EXPECT_FLOAT_EQ(user->x, 20);
+}
+
 CLI_TEST(PAGXOptimizerTest, RectMaskWithRoundnessIsKept) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* mask = AddTopLayer(doc.get());
