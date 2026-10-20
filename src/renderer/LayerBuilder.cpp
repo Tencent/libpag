@@ -368,10 +368,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
         !std::isfinite(v->ty)) {
       return false;
     }
-    float z = 0;
-    if (!readTranslation(2, &z)) {
-      return false;
-    }
+    // Keep the translation through the homogeneous scale when it can be read; a singular pose
+    // cannot be decomposed, and dropping the write would freeze the layer on that sample.
+    float z = pose.getRowColumn(2, 3);
+    readTranslation(2, &z);
     if (IsPlanarAffine(pose)) {
       auto mixed = MixTGFXMatrix(PlanarMatrix(pose), ToTGFX(*v), mix);
       pose = LiftMatrixToMatrix3D(FromTGFX(mixed), z);
