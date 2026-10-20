@@ -279,6 +279,12 @@ class HTMLWriterContext {
   // emission-site tag ("chain:", "dss:", "iss:", "issb:") so different sites never collide.
   std::unordered_map<std::string, std::string> filterDefIds = {};
 
+  // Populated by HTMLAnimationSession when keyframe animations are active. Maps an animated
+  // non-Layer element (Group, Fill, Stroke, Text, or geometry Element) to the DOM id that
+  // should be emitted on its corresponding HTML/SVG tag so the post-weaving pass can attach
+  // `animation` declarations. Empty when no animations are exported.
+  std::unordered_map<const Node*, std::string> animatedElementIds = {};
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }

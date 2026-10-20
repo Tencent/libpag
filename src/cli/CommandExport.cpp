@@ -51,6 +51,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
+  bool htmlExportAnimations = true;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
   // Sampling options shared with the render command. Zero frame rate means "use the document
@@ -100,6 +101,11 @@ Options:
 constexpr const char* kSVGUsage = R"(SVG options:
   --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)
   --svg-no-xml-declaration    Omit the <?xml ...?> declaration
+
+)";
+
+constexpr const char* kHTMLUsage = R"(HTML options:
+  --no-animations             Omit CSS @keyframes and animation declarations
 
 )";
 
@@ -178,7 +184,7 @@ constexpr const char* kExampleUsage = R"(Examples:
 )";
 
 static void PrintUsage() {
-  std::cout << kCommonUsage << kSVGUsage << kPPTUsage << kMP4Usage << kExampleUsage;
+  std::cout << kCommonUsage << kSVGUsage << kHTMLUsage << kPPTUsage << kMP4Usage << kExampleUsage;
 }
 
 static void MarkVideoOnlyOption(ExportOptions* options, const char* option) {
@@ -337,6 +343,9 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       }
       options->svgIndent = static_cast<int>(value);
       MarkNonVideoOption(options, "--svg-indent");
+    } else if (arg == "--no-animations") {
+      options->htmlExportAnimations = false;
+      MarkNonVideoOption(options, "--no-animations");
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
       MarkNonVideoOption(options, "--svg-no-xml-declaration");
@@ -587,8 +596,11 @@ static int ExportToHTML(const ExportOptions& options) {
     return 1;
   }
 
+  pagx::HTMLExportOptions htmlOptions = {};
+  htmlOptions.exportAnimations = options.htmlExportAnimations;
+
   std::string errorMsg;
-  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+  if (!HTMLExporter::ToFile(*document, options.outputFile, htmlOptions, &errorMsg)) {
     std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
     return 1;
   }

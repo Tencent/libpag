@@ -963,6 +963,16 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
+  auto animIdIt = _ctx->animatedElementIds.end();
+  if (fill) {
+    animIdIt = _ctx->animatedElementIds.find(fill);
+  }
+  if (animIdIt == _ctx->animatedElementIds.end() && text) {
+    animIdIt = _ctx->animatedElementIds.find(text);
+  }
+  if (animIdIt != _ctx->animatedElementIds.end()) {
+    out.addAttr("id", animIdIt->second);
+  }
   out.addAttr("style", style);
   // Inside a TextBox the container uses word-wrap not white-space:pre, so U+000A
   // newlines would be folded by the browser. Convert them to <br> explicitly.
