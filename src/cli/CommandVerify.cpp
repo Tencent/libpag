@@ -201,6 +201,34 @@ static void DetectZeroStrokeWidth(const Stroke* stroke,
 // Static Detection: Full Canvas Clip Mask
 // ============================================================================
 
+using LayerMatrixMap = std::unordered_map<const Layer*, Matrix>;
+
+// Indexes layer-to-document transforms without building a renderer. Three-dimensional or clipped
+// ancestor chains are omitted because their planar projection is not enough to compare mask spaces.
+static void CollectLayerMatrices(const std::vector<Layer*>& layers, const Matrix& parentMatrix,
+                                 LayerMatrixMap& matrices) {
+  for (const auto* layer : layers) {
+    if (layer->hasScrollRect || layer->preserve3D || layer->z != 0 ||
+        !layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
+      continue;
+    }
+    auto matrix = parentMatrix * BuildLayerMatrix(layer);
+    double determinant =
+        static_cast<double>(matrix.a) * matrix.d - static_cast<double>(matrix.b) * matrix.c;
+    if (!IsFiniteMatrix(matrix) || determinant == 0) {
+      continue;
+    }
+    matrices.emplace(layer, matrix);
+    CollectLayerMatrices(layer->children, matrix, matrices);
+  }
+}
+
+static bool MaskSharesOwnerSpace(const Layer* layer, const LayerMatrixMap& matrices) {
+  auto owner = matrices.find(layer);
+  auto mask = matrices.find(layer->mask);
+  return owner != matrices.end() && mask != matrices.end() && owner->second == mask->second;
+}
+
 // Checks the authored local transform separately from the position produced by layout.
 static bool HasIdentityLayerTransform(const Layer* layer) {
   auto position = layer->layoutPosition();
@@ -210,13 +238,17 @@ static bool HasIdentityLayerTransform(const Layer* layer) {
 }
 
 static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, float canvasHeight,
+                                     const LayerMatrixMap& matrices,
                                      std::vector<VerifyDiagnostic>& diagnostics) {
   if (layer->mask == nullptr) {
     return;
   }
-  // The mask is evaluated in the owner's parent space and the diagnostic compares its rect against
-  // the canvas, so neither layer may be transformed.
-  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask)) {
+  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask) ||
+      !MaskSharesOwnerSpace(layer, matrices)) {
+    return;
+  }
+  // The rectangle is compared to document bounds, not just the owner's local frame.
+  if (!matrices.at(layer).isIdentity()) {
     return;
   }
   auto* maskLayer = layer->mask;
@@ -1675,16 +1707,17 @@ static void DetectLowOpacityHighCost(const Layer* layer,
 // Static Detection: Rectangular Mask Can Use clipToBounds
 // ============================================================================
 
-static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnostic>& diagnostics) {
+static void DetectRectangularMask(const Layer* layer, const LayerMatrixMap& matrices,
+                                  std::vector<VerifyDiagnostic>& diagnostics) {
   if (layer->mask == nullptr) {
     return;
   }
   if (layer->maskType != MaskType::Alpha) {
     return;
   }
-  // The rectangle replaces the layer's whole bounds, so both the owner and the mask must map their
-  // local space onto the parent space unchanged for the two to cover the same area.
-  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask)) {
+  // Matching local rectangles are equivalent only when their complete ancestor transforms agree.
+  if (!HasIdentityLayerTransform(layer) || !HasIdentityLayerTransform(layer->mask) ||
+      !MaskSharesOwnerSpace(layer, matrices)) {
     return;
   }
   auto* maskLayer = layer->mask;
@@ -1789,10 +1822,11 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
+                                      const LayerMatrixMap& matrices,
                                       std::vector<VerifyDiagnostic>& diagnostics,
                                       bool isMaskLayer = false) {
   DetectEmptyLayer(layer, parentHasLayout, diagnostics);
-  DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
+  DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, matrices, diagnostics);
   // A mask layer is a synthetic, layout-excluded construct attached to its owner; its
   // `includeInLayout="false"` is required regardless of the owner's layout mode, so the
   // "ineffective layout attr" lint does not apply to it.
@@ -1805,7 +1839,7 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   DetectMergeableAdjacentLayers(layer->children, layer->layout != LayoutMode::None,
                                 dedupWithDowngrade, diagnostics);
   DetectLowOpacityHighCost(layer, diagnostics);
-  DetectRectangularMask(layer, diagnostics);
+  DetectRectangularMask(layer, matrices, diagnostics);
 
   for (auto* filter : layer->filters) {
     if (filter->nodeType() == NodeType::BlurFilter) {
@@ -1828,7 +1862,7 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
     RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
-                              diagnostics, /*isMaskLayer=*/child == layer->mask);
+                              matrices, diagnostics, /*isMaskLayer=*/child == layer->mask);
   }
 }
 
@@ -1875,6 +1909,8 @@ static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics,
                                const Layer* targetLayer = nullptr) {
+  LayerMatrixMap matrices;
+  CollectLayerMatrices(doc->layers, Matrix::Identity(), matrices);
   if (targetLayer == nullptr) {
     DetectUnreferencedResources(doc, diagnostics);
     WarnUnsupportedImageFormats(doc);
@@ -1885,10 +1921,11 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     // does not run at root level.
     DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
-      RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, diagnostics);
+      RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, matrices,
+                                diagnostics);
     }
   } else {
-    RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, false, lineNodeMap,
+    RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, false, lineNodeMap, matrices,
                               diagnostics);
   }
 

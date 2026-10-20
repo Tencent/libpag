@@ -906,6 +906,76 @@ CLI_TEST(PAGXCliTest, Verify_MaskWithAuthoredOffsetDoesNotSuggestBoundsClip) {
   EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Verify_RectMaskInDifferentAncestorSpaceDoesNotSuggestClip) {
+  auto inputPath = TempDir() + "/mask_different_ancestor_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer x=\"120\"><Layer id=\"owner\" width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  const std::vector<std::vector<std::string>> commands = {
+      {"verify", "--skip-render", "--skip-layout", inputPath},
+      {"verify", "--skip-render", "--skip-layout", "--id", "owner", inputPath}};
+  for (const auto& command : commands) {
+    std::ostringstream output;
+    auto* old = std::cerr.rdbuf(output.rdbuf());
+    CallRun(pagx::cli::RunVerify, command);
+    std::cerr.rdbuf(old);
+    EXPECT_EQ(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+    EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
+  }
+  std::vector<std::string> renderArgs = {"render", inputPath};
+  std::vector<char*> argv = {renderArgs[0].data(), renderArgs[1].data()};
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_FLOAT_EQ(bitmap.getColor(150, 50).alpha, 0);
+}
+
+CLI_TEST(PAGXCliTest, Verify_RectMaskInSharedTransformedSpaceSuggestsClip) {
+  auto inputPath = TempDir() + "/mask_shared_transformed_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\"><Layer x=\"120\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+  std::vector<std::string> renderArgs = {"render", inputPath};
+  std::vector<char*> argv = {renderArgs[0].data(), renderArgs[1].data()};
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_FLOAT_EQ(bitmap.getColor(150, 50).alpha, 1);
+}
+
+CLI_TEST(PAGXCliTest, Verify_FullCanvasMaskInTransformedSpaceIsNotRedundant) {
+  auto inputPath = TempDir() + "/mask_transformed_canvas_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\"><Layer x=\"120\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"120,50\" size=\"240,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Verify_ValidFile) {
   auto inputPath = TestResourcePath("verify_simple.pagx");
   auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});

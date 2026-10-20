@@ -751,7 +751,8 @@ inline bool Matrix3DComponentsFromMatrix(const Matrix3D& matrix, Matrix3DCompone
 
 // Interpolates two 4x4 transforms. t <= 0 returns first and t >= 1 returns second. Otherwise both
 // are decomposed and their components are interpolated, using slerp for rotation; if either
-// decomposition or the recomposition fails, the matrices are interpolated element-wise instead.
+// decomposition or the composition fails, the matrices are interpolated element-wise instead.
+// A finite singular interpolated pose is kept rather than switching interpolation algorithms.
 inline Matrix3D LerpMatrix3D(const Matrix3D& first, const Matrix3D& second, double t) {
   if (first == second || t <= 0) return first;
   if (t >= 1) return second;
@@ -769,7 +770,7 @@ inline Matrix3D LerpMatrix3D(const Matrix3D& first, const Matrix3D& second, doub
     }
     mixed.rotation = SlerpQuaternion(a.rotation, b.rotation, t);
     Matrix3D result = {};
-    if (RecomposeMatrix3D(mixed, &result)) {
+    if (ComposeMatrix3D(mixed, &result)) {
       return result;
     }
   }

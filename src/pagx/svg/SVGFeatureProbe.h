@@ -48,7 +48,7 @@ struct SVGFeatureFlags {
    */
   bool needsRasterization() const {
     return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient ||
-           hasPerspectiveTransform;
+           hasPerspectiveTransform || hasPreserve3D;
   }
 };
 

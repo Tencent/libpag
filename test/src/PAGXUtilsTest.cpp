@@ -134,6 +134,39 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
   EXPECT_EQ(parent->getChildIndex(target), index);
 }
 
+PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
+  const std::string xml =
+      "<pagx width=\"100\" height=\"100\"><Layer preserve3D=\"true\">"
+      "<Layer z=\"100\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#FF0000\"/></Layer>"
+      "<Layer><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#0000FF\"/></Layer></Layer></pagx>";
+  auto original = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(original, nullptr);
+  auto features = pagx::ProbeLayerFeaturesForSVG(original->layers[0]);
+  EXPECT_TRUE(features.hasPreserve3D);
+  EXPECT_FALSE(features.hasPerspectiveTransform);
+  EXPECT_TRUE(features.needsRasterization());
+  auto svg = pagx::SVGExporter::ToSVG(*original);
+  ASSERT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  auto imported = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(imported, nullptr);
+  imported->applyLayout();
+  auto originalRoot = pagx::LayerBuilder::Build(original.get());
+  auto importedRoot = pagx::LayerBuilder::Build(imported.get());
+  ASSERT_NE(originalRoot, nullptr);
+  ASSERT_NE(importedRoot, nullptr);
+  auto reference = tgfx::Surface::Make(context, 100, 100);
+  auto actual = tgfx::Surface::Make(context, 100, 100);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(actual, nullptr);
+  originalRoot->draw(reference->getCanvas());
+  importedRoot->draw(actual->getCanvas());
+  EXPECT_FLOAT_EQ(reference->getColor(50, 50).red, 1);
+  EXPECT_FLOAT_EQ(actual->getColor(50, 50).red, 1);
+  EXPECT_FLOAT_EQ(actual->getColor(50, 50).blue, 0);
+}
+
 PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
   const std::string xml =
       "<pagx width=\"240\" height=\"240\">"
@@ -198,6 +231,99 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
   EXPECT_EQ(
       std::memcmp(actualPixels.pixels(), referencePixels.pixels(), actualPixels.info().byteSize()),
       0);
+}
+
+PAGX_TEST(PAGXUtilsTest, Matrix3DReflectionMidpointRemainsContinuous) {
+  pagx::Matrix3DComponents firstComponents = {};
+  firstComponents.rotation[2] = 20;
+  firstComponents.scale[1] = 2;
+  firstComponents.translate[0] = 150;
+  firstComponents.translate[1] = 100;
+  pagx::Matrix3DComponents secondComponents = firstComponents;
+  secondComponents.rotation[2] = 110;
+  secondComponents.scale[0] = -1;
+  secondComponents.scale[1] = 3;
+  pagx::Matrix3D first = {};
+  pagx::Matrix3D second = {};
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(firstComponents, &first));
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(secondComponents, &second));
+  auto before = pagx::LerpMatrix3D(first, second, 0.499999);
+  auto midpoint = pagx::LerpMatrix3D(first, second, 0.5);
+  auto after = pagx::LerpMatrix3D(first, second, 0.500001);
+  EXPECT_FALSE(pagx::IsInvertibleMatrix3D(midpoint));
+  EXPECT_TRUE(pagx::IsFiniteMatrix3D(midpoint));
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_NEAR(midpoint.values[i], (before.values[i] + after.values[i]) * 0.5f, 0.0001f);
+  }
+
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {25, 25};
+  rect->size = {50, 50};
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 0, 0, 1};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = color;
+  layer->contents = {rect, fill};
+  doc->applyLayout();
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", midpoint, 1));
+  auto surface = tgfx::Surface::Make(context, 300, 300);
+  ASSERT_NE(surface, nullptr);
+  build.root->draw(surface->getCanvas());
+  tgfx::Bitmap pixels(300, 300, false, false);
+  tgfx::Pixmap pixmap(pixels);
+  ASSERT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
+  for (int y = 0; y < 300; ++y) {
+    for (int x = 0; x < 300; ++x) {
+      EXPECT_FLOAT_EQ(pixmap.getColor(x, y).alpha, 0);
+    }
+  }
+}
+
+PAGX_TEST(PAGXUtilsTest, MatrixWriteKeepsNormalizedZ) {
+  const std::string xml =
+      "<pagx width=\"160\" height=\"160\">"
+      "<Layer perspective=\"500\" preserve3D=\"true\"><Layer id=\"L\">"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+      "</Layer></Layer></pagx>";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("L"));
+  ASSERT_NE(layer, nullptr);
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  pagx::Matrix3D pose = {};
+  for (int i = 0; i < 16; ++i) {
+    pose.values[i] *= 2;
+  }
+  pose.values[14] = 60;
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", pose, 1));
+  pagx::KeyValue z;
+  ASSERT_TRUE(build.binding.read(layer, "z", &z));
+  EXPECT_FLOAT_EQ(std::get<float>(z), 30);
+  auto reference = tgfx::Surface::Make(context, 160, 160);
+  ASSERT_NE(reference, nullptr);
+  build.root->draw(reference->getCanvas());
+  ASSERT_TRUE(build.binding.apply(layer, "matrix", pagx::Matrix::Identity(), 1));
+  ASSERT_TRUE(build.binding.read(layer, "z", &z));
+  EXPECT_FLOAT_EQ(std::get<float>(z), 30);
+  auto actual = tgfx::Surface::Make(context, 160, 160);
+  ASSERT_NE(actual, nullptr);
+  build.root->draw(actual->getCanvas());
+  tgfx::Bitmap referenceBitmap(160, 160, false, false);
+  tgfx::Bitmap actualBitmap(160, 160, false, false);
+  tgfx::Pixmap referencePixels(referenceBitmap);
+  tgfx::Pixmap actualPixels(actualBitmap);
+  ASSERT_TRUE(reference->readPixels(referencePixels.info(), referencePixels.writablePixels()));
+  ASSERT_TRUE(actual->readPixels(actualPixels.info(), actualPixels.writablePixels()));
+  EXPECT_EQ(std::memcmp(referencePixels.pixels(), actualPixels.pixels(),
+                        referencePixels.info().byteSize()),
+            0);
 }
 
 PAGX_TEST(PAGXUtilsTest, SingularZScaleKeepsPlanarPixels) {

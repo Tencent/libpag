@@ -368,7 +368,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
         !std::isfinite(v->ty)) {
       return false;
     }
-    auto z = pose.getRowColumn(2, 3);
+    float z = 0;
+    if (!readTranslation(2, &z)) {
+      return false;
+    }
     if (IsPlanarAffine(pose)) {
       auto mixed = MixTGFXMatrix(PlanarMatrix(pose), ToTGFX(*v), mix);
       pose = LiftMatrixToMatrix3D(FromTGFX(mixed), z);
