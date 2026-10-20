@@ -817,6 +817,42 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ArcMarkerUsesAuthoredVertices) {
   EXPECT_EQ(commands.back(), path.verbs().size());
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_VectorPatternSharesOnlyImmutableGeometry) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="100"><defs>
+      <pattern id="p" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path id="tile" d="M2 2H12V12H2Z" fill="red"/>
+      </pattern>
+    </defs><rect width="200" height="100" fill="url(#p)"/></svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  ASSERT_EQ(paths.size(), 50u);
+  auto data = static_cast<pagx::Path*>(paths.front())->data;
+  std::set<std::string> ids;
+  for (auto& node : doc->nodes) {
+    if (!node->id.empty()) EXPECT_TRUE(ids.insert(node->id).second) << node->id;
+    EXPECT_NE(node->nodeType(), pagx::NodeType::ImagePattern);
+  }
+  for (auto path : paths) EXPECT_EQ(static_cast<pagx::Path*>(path)->data, data);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_PatternCyclesAndExpansionAreBounded) {
+  for (const auto& definition : {"<pattern id=\"p\" href=\"#q\"/><pattern id=\"q\" href=\"#p\"/>",
+                                 "<pattern id=\"p\" width=\".00001\" height=\".00001\"><rect "
+                                 "width=\"1\" height=\"1\"/></pattern>",
+                                 "<pattern id=\"p\" width=\"1\" height=\"1\"><rect width=\"100\" "
+                                 "height=\"100\" fill=\"url(#p)\"/></pattern>"}) {
+    auto doc = pagx::SVGImporter::ParseString(
+        std::string("<svg width=\"100\" height=\"100\"><defs>") + definition +
+        "</defs><rect width=\"100\" height=\"100\" fill=\"url(#p)\"/></svg>");
+    ASSERT_NE(doc, nullptr);
+    EXPECT_FALSE(doc->errors.empty());
+    EXPECT_LT(doc->nodes.size(), 100u);
+  }
+}
+
 /**
  * Test SVG import: `stroke-dasharray` combined with `pathLength` normalises the dash values back
  * into user units using the real measured length. Exercising it across a polyline, line, circle,

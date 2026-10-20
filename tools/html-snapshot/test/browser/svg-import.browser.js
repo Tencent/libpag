@@ -31,6 +31,7 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
     const reference = PNG.sync.read(Buffer.from(await page.screenshot({ omitBackground: true })));
     const snapshot = await page.evaluate(takeSnapshot);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), `pagx-svg-${name}-`));
+    fs.writeFileSync(path.join(dir, 'reference.png'), PNG.sync.write(reference));
     for (const [format, source] of [['svg', svg], ['html', snapshot.html]]) {
       const input = path.join(dir, `source.${format}`);
       const output = path.join(dir, `${format}.pagx`);
@@ -226,5 +227,95 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
       <radialGradient id="r"><stop stop-color="white"/><stop offset="1" stop-color="#2040d0"/></radialGradient>
       </defs><rect x="20" y="20" width="200" height="50" fill="url(#l)"/>
       <rect x="20" y="100" width="200" height="60" fill="url(#r)"/>`);
+  });
+
+  it('tiles vector paths with negative origins and rotated pattern transforms', async () => {
+    await compare('pattern-wave', `<defs>
+      <pattern id="p" patternUnits="userSpaceOnUse" x="-7" y="5" width="24" height="12"
+        patternTransform="rotate(12)">
+        <path d="M0 6Q6 0 12 6T24 6" fill="none" stroke="white" stroke-opacity=".4" stroke-width="2"/>
+      </pattern></defs><rect width="240" height="180" fill="#204070"/>
+      <path d="M20 30H220V150H20Z M90 60V120H150V60Z" fill-rule="evenodd"
+        fill="url(#p)" fill-opacity=".6"/>`, { meanLimit: 1.5 });
+  });
+
+  it('keeps pattern units and content units independent for non-square shapes', async () => {
+    await compare('pattern-units', `<defs>
+      <pattern id="a" width=".25" height=".5"><rect width="12" height="10" fill="#e02020"/></pattern>
+      <pattern id="b" x=".1" y=".2" width=".25" height=".5" patternContentUnits="objectBoundingBox">
+        <rect width=".1" height=".25" fill="#2040d0"/></pattern>
+      <pattern id="c" patternUnits="userSpaceOnUse" width="40" height="15" patternContentUnits="objectBoundingBox">
+        <rect width=".1" height=".2" fill="#008040"/></pattern>
+      </defs>
+      <rect x="20" y="10" width="200" height="40" fill="url(#a)"/>
+      <rect x="20" y="65" width="160" height="50" fill="url(#b)"/>
+      <rect x="20" y="130" width="200" height="40" fill="url(#c)"/>`);
+  });
+
+  it('transforms bounding-box pattern tiles in the referring user space', async () => {
+    await compare('pattern-box-transform', `<defs>
+      <pattern id="p" x=".1" y="-.2" width=".25" height=".5"
+        patternContentUnits="objectBoundingBox" patternTransform="rotate(12)">
+        <rect width=".15" height=".3" fill="#2040d0"/>
+      </pattern></defs><rect x="30" y="25" width="180" height="110" fill="url(#p)"/>`,
+    { meanLimit: 1.5 });
+  });
+
+  it('resolves pattern template chains and fits a viewBox into each tile', async () => {
+    await compare('pattern-template', `<defs>
+      <pattern id="base" width=".25" height=".5" viewBox="0 0 10 10" fill="#e02020">
+        <rect x="1" y="1" width="8" height="8"/></pattern>
+      <pattern id="middle" href="#base" preserveAspectRatio="xMaxYMid meet"/>
+      <pattern id="p" href="#middle" fill="#2040d0"/>
+      </defs><rect x="20" y="20" width="200" height="120" fill="url(#p)"/>`);
+  });
+
+  it('uses the stroke outline and applies paint opacity after tile compositing', async () => {
+    await compare('pattern-stroke', `<defs>
+      <pattern id="p" width="20" height="20" patternUnits="userSpaceOnUse">
+        <rect width="14" height="20" fill="#e02020"/><rect x="8" width="12" height="20" fill="#2040d0"/>
+      </pattern></defs><path d="M30 40L200 40L100 140" fill="none" stroke="url(#p)"
+        stroke-width="16" stroke-linecap="round" stroke-linejoin="miter"
+        stroke-dasharray="24 8" stroke-opacity=".5"/>`, { meanLimit: 1.5 });
+  });
+
+  it('instances masks independently inside repeated pattern tiles', async () => {
+    await compare('pattern-mask', `<defs>
+      <mask id="m" maskContentUnits="objectBoundingBox"><rect width=".5" height="1" fill="white"/></mask>
+      <pattern id="p" width="40" height="30" patternUnits="userSpaceOnUse">
+        <rect x="4" y="4" width="32" height="22" fill="#e02020" mask="url(#m)"/>
+      </pattern></defs><rect x="20" y="20" width="200" height="140" fill="url(#p)"/>`);
+  });
+
+  it('keeps referenced shape styles and effects inside pattern content', async () => {
+    await compare('pattern-use', `<defs>
+      <rect id="r" x="2" y="2" width="12" height="8" fill="#e02020" transform="translate(1 1)"/>
+      <g id="g" opacity=".5"><circle cx="8" cy="8" r="6" fill="#2040d0"/></g>
+      <pattern id="p" width="40" height="30" patternUnits="userSpaceOnUse" fill="none">
+        <use href="#r" x="3" y="2"/><use href="#g" x="20" y="10"/>
+      </pattern></defs><rect x="20" y="20" width="200" height="140" fill="url(#p)"/>`);
+  });
+
+  it('continues a context pattern into marker contents', async () => {
+    await compare('pattern-context', `<defs>
+      <pattern id="p" width="20" height="10" patternUnits="userSpaceOnUse">
+        <rect width="10" height="10" fill="#e02020"/><rect x="10" width="10" height="10" fill="#2040d0"/>
+      </pattern>
+      <marker id="m" markerUnits="userSpaceOnUse" markerWidth="40" markerHeight="30"
+        refX="30" refY="15" orient="auto"><path d="M0 0L40 15L0 30Z" fill="context-stroke"/></marker>
+      </defs><path d="M30 40L200 140" fill="none" stroke="url(#p)" stroke-width="8"
+        marker-end="url(#m)"/>`, { meanLimit: 1.5 });
+  });
+
+  it('honors the image geometry and spacing inside pattern tiles', async () => {
+    const bitmap = new PNG({ width: 2, height: 2 });
+    bitmap.data.fill(255);
+    for (let i = 0; i < 4; i++) bitmap.data[i * 4 + 1] = 32;
+    const data = PNG.sync.write(bitmap).toString('base64');
+    await compare('pattern-image', `<defs>
+      <image id="image" width="12" height="10" href="data:image/png;base64,${data}"/>
+      <pattern id="p" x="3" y="7" width="30" height="24" patternUnits="userSpaceOnUse">
+        <use href="#image" x="5" y="4"/>
+      </pattern></defs><rect x="20" y="20" width="200" height="140" fill="url(#p)"/>`);
   });
 });

@@ -125,13 +125,10 @@ class SVGParserContext {
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element, const InheritedStyle& parentStyle,
                         int depth = 0);
-  // Instantiates a <use> that references a container element (<symbol>/<g>/<svg>) as a group layer.
-  // convertElement/convertUse only produce leaf shapes and return null for containers, which would
-  // silently drop referenced sub-trees. Applies the use's x/y offset and, for <symbol>/<svg> with a
-  // viewBox, the preserveAspectRatio viewport fit. Returns null if nothing renderable is produced.
-  Layer* convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
-                             const std::shared_ptr<DOMNode>& refElement,
-                             const InheritedStyle& inheritedStyle, int depth);
+  // Instantiates a symbol or SVG reference with the use's viewport and preserveAspectRatio fit.
+  Layer* convertUseViewport(const std::shared_ptr<DOMNode>& useElement,
+                            const std::shared_ptr<DOMNode>& refElement,
+                            const InheritedStyle& inheritedStyle, int depth);
   Layer* convertViewport(const std::shared_ptr<DOMNode>& element,
                          const InheritedStyle& inheritedStyle, float width, float height,
                          int depth);
@@ -155,13 +152,17 @@ class SVGParserContext {
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
   Element* convertImage(const std::shared_ptr<DOMNode>& element);
-  Group* buildImageGroup(const std::string& imageHref, float x, float y, float width, float height);
+  Group* buildImageGroup(const std::string& imageHref, float x, float y, float width, float height,
+                         const std::string& preserveAspectRatio);
 
   LinearGradient* convertLinearGradient(const std::shared_ptr<DOMNode>& element,
                                         const Rect& shapeBounds);
   RadialGradient* convertRadialGradient(const std::shared_ptr<DOMNode>& element,
                                         const Rect& shapeBounds);
-  ImagePattern* convertPattern(const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
+  std::shared_ptr<DOMNode> patternForPaint(const std::string& paint);
+  Layer* convertPatternPaint(const std::shared_ptr<DOMNode>& element,
+                             const std::shared_ptr<DOMNode>& pattern, const InheritedStyle& style,
+                             bool stroke, int depth);
 
   Layer* applyMaskReferences(Layer* layer, const std::shared_ptr<DOMNode>& element, int depth);
   Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement, const Rect& bounds,
@@ -286,7 +287,9 @@ class SVGParserContext {
   Point _contextViewport = {};
   Matrix _contextPaintTransform = {};
   std::unordered_map<std::string, Image*> _imageSourceToId =
-      {};                                             // Maps image source to resource node.
+      {};  // Maps image source to resource node.
+  std::unordered_map<std::string, PathData*> _pathDataCache = {};
+  size_t _patternTileCount = 0;
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
   std::unordered_set<std::string> _useStack =
       {};  // Tracks <use> references being resolved to detect cycles.
