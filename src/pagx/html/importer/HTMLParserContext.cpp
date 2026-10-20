@@ -608,9 +608,10 @@ static bool IsLocalFontSource(const std::string& source) {
 
 void HTMLParserContext::registerMappedFontAliases(const void* bytes, size_t length) {
   if (_options.fontReplacements.empty()) return;
-  for (int index = 0; index < 64; index++) {
-    auto face = MakeTypefaceFromBytes(bytes, length, index);
-    if (face == nullptr) break;
+  auto faces = MakeTypefacesFromBytes(bytes, length);
+  for (size_t faceIndex = 0; faceIndex < faces.size(); faceIndex++) {
+    auto index = static_cast<int>(faceIndex);
+    auto& face = faces[faceIndex];
     for (const auto& replacement : _options.fontReplacements) {
       if (!SystemFonts::FontNamesMatch(replacement.targetFamily, face->fontFamily()) ||
           !SystemFonts::FontNamesMatch(replacement.targetStyle, face->fontStyle())) {

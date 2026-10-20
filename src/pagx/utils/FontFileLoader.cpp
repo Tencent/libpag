@@ -28,21 +28,25 @@
 
 namespace pagx {
 
-// Bounds face probing on a malformed collection whose face count cannot be trusted; real
-// collections hold far fewer faces.
+// Bounds the face count a malformed collection header may claim; real collections hold far fewer
+// faces.
 static constexpr int MAX_FONT_FACES = 64;
 
 static bool HasWOFF2Signature(const void* bytes, size_t length) {
   return bytes != nullptr && length >= 4 && std::memcmp(bytes, "wOF2", 4) == 0;
 }
 
-static bool FileHasWOFF2Signature(const std::string& path) {
+// The leading bytes of a file: enough for the WOFF2 signature and a collection's face count.
+static std::string ReadFileHeader(const std::string& path) {
   std::ifstream file(path, std::ios::binary);
-  char signature[4] = {};
-  if (!file.read(signature, sizeof(signature))) {
-    return false;
-  }
-  return HasWOFF2Signature(signature, sizeof(signature));
+  char header[12] = {};
+  file.read(header, sizeof(header));
+  return std::string(header, static_cast<size_t>(file.gcount()));
+}
+
+static bool FileHasWOFF2Signature(const std::string& path) {
+  auto header = ReadFileHeader(path);
+  return HasWOFF2Signature(header.data(), header.size());
 }
 
 static void ReleaseDecodedFont(const void*, void* context) {
@@ -89,24 +93,65 @@ std::shared_ptr<tgfx::Typeface> MakeTypefaceFromBytes(const void* bytes, size_t 
   return sfnt != nullptr ? tgfx::Typeface::MakeFromData(std::move(sfnt), ttcIndex) : nullptr;
 }
 
-std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromFile(const std::string& path) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> faces = {};
-  std::shared_ptr<tgfx::Data> sfnt = nullptr;
-  if (FileHasWOFF2Signature(path)) {
-    sfnt = DecodeWOFF2File(path);
-    if (sfnt == nullptr) {
-      return faces;
-    }
+int CountFontFaces(const void* bytes, size_t length) {
+  auto data = static_cast<const uint8_t*>(bytes);
+  if (data == nullptr || length < 4) {
+    return 0;
   }
-  for (int index = 0; index < MAX_FONT_FACES; index++) {
-    auto typeface = sfnt != nullptr ? tgfx::Typeface::MakeFromData(sfnt, index)
-                                    : tgfx::Typeface::MakeFromPath(path, index);
+  if (std::memcmp(data, "ttcf", 4) != 0) {
+    return 1;
+  }
+  if (length < 12) {
+    return 0;
+  }
+  auto numFonts = (static_cast<uint32_t>(data[8]) << 24) | (static_cast<uint32_t>(data[9]) << 16) |
+                  (static_cast<uint32_t>(data[10]) << 8) | static_cast<uint32_t>(data[11]);
+  return static_cast<int>(std::min(numFonts, static_cast<uint32_t>(MAX_FONT_FACES)));
+}
+
+static std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromSFNT(
+    const std::shared_ptr<tgfx::Data>& sfnt) {
+  std::vector<std::shared_ptr<tgfx::Typeface>> faces = {};
+  auto faceCount = CountFontFaces(sfnt->data(), sfnt->size());
+  for (int index = 0; index < faceCount; index++) {
+    auto typeface = tgfx::Typeface::MakeFromData(sfnt, index);
     if (typeface == nullptr) {
       break;
     }
     faces.push_back(std::move(typeface));
   }
   return faces;
+}
+
+std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromFile(const std::string& path) {
+  auto header = ReadFileHeader(path);
+  if (HasWOFF2Signature(header.data(), header.size())) {
+    auto sfnt = DecodeWOFF2File(path);
+    return sfnt != nullptr ? MakeTypefacesFromSFNT(sfnt)
+                           : std::vector<std::shared_ptr<tgfx::Typeface>>{};
+  }
+  std::vector<std::shared_ptr<tgfx::Typeface>> faces = {};
+  auto faceCount = CountFontFaces(header.data(), header.size());
+  for (int index = 0; index < faceCount; index++) {
+    auto typeface = tgfx::Typeface::MakeFromPath(path, index);
+    if (typeface == nullptr) {
+      break;
+    }
+    faces.push_back(std::move(typeface));
+  }
+  return faces;
+}
+
+std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromBytes(const void* bytes,
+                                                                    size_t length) {
+  std::shared_ptr<tgfx::Data> sfnt = nullptr;
+  if (HasWOFF2Signature(bytes, length)) {
+    sfnt = DecodeWOFF2(bytes, length);
+  } else if (bytes != nullptr && length > 0) {
+    sfnt = tgfx::Data::MakeWithCopy(bytes, length);
+  }
+  return sfnt != nullptr ? MakeTypefacesFromSFNT(sfnt)
+                         : std::vector<std::shared_ptr<tgfx::Typeface>>{};
 }
 
 int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
@@ -121,7 +166,8 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
     return 0;
   }
   int faceCount = 0;
-  for (int index = 0; index < MAX_FONT_FACES; index++) {
+  auto faceLimit = CountFontFaces(sfnt->data(), sfnt->size());
+  for (int index = 0; index < faceLimit; index++) {
     auto typeface = tgfx::Typeface::MakeFromData(sfnt, index);
     if (typeface == nullptr) {
       break;

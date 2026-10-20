@@ -870,6 +870,32 @@ PAGX_TEST(PAGXTest, FontFileLoaderDecodesWOFF2) {
 }
 
 /**
+ * Test case: the face count comes from the SFNT header — the number a collection's `ttcf` header
+ * records, or one for any other font — rather than from probing face indices until one fails,
+ * which the CoreGraphics backend answers with the first face for every index.
+ */
+PAGX_TEST(PAGXTest, FontFileLoaderCountsFacesFromHeader) {
+  auto path = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto otf = tgfx::Data::MakeFromFile(path);
+  ASSERT_NE(otf, nullptr);
+  EXPECT_EQ(pagx::CountFontFaces(otf->data(), otf->size()), 1);
+  EXPECT_EQ(pagx::MakeTypefacesFromFile(path).size(), 1u);
+  EXPECT_EQ(pagx::MakeTypefacesFromBytes(otf->data(), otf->size()).size(), 1u);
+  // A collection header: tag, version 1.0, then the face count.
+  const uint8_t collection[] = {'t', 't', 'c', 'f', 0, 1, 0, 0, 0, 0, 0, 3};
+  EXPECT_EQ(pagx::CountFontFaces(collection, sizeof(collection)), 3);
+  const uint8_t oversized[] = {'t', 't', 'c', 'f', 0, 1, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF};
+  EXPECT_EQ(pagx::CountFontFaces(oversized, sizeof(oversized)), 64);
+  EXPECT_EQ(pagx::CountFontFaces(collection, 8), 0);
+  EXPECT_EQ(pagx::CountFontFaces(nullptr, 0), 0);
+
+  auto woff2 = tgfx::Data::MakeFromFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_NE(woff2, nullptr);
+  EXPECT_EQ(pagx::MakeTypefacesFromBytes(woff2->data(), woff2->size()).size(), 1u);
+  EXPECT_TRUE(pagx::MakeTypefacesFromBytes(woff2->data(), 64).empty());
+}
+
+/**
  * Test case: applyLayout registers the file of a Font node, so Text naming the family inside a
  * WOFF2 file is shaped with that file without any embedded glyph data. Re-running layout, with or
  * without a new FontConfig, keeps exactly one fallback registration of the file.

@@ -47,11 +47,28 @@ std::shared_ptr<tgfx::Typeface> MakeTypefaceFromBytes(const void* bytes, size_t 
                                                       int ttcIndex = 0);
 
 /**
+ * Returns the number of faces SFNT font bytes hold: the count a TrueType collection records in its
+ * `ttcf` header (bounded, since a malformed header may claim any number), or 1 for any other font.
+ * Returns 0 when the bytes are too short to tell. WOFF2 data has to be decoded first. The font
+ * backend cannot be asked instead: the CoreGraphics backend ignores the face index and returns the
+ * first face for every one of them.
+ */
+int CountFontFaces(const void* bytes, size_t length);
+
+/**
  * Loads every face of a font file in face-index order: a single entry for a plain font, one per
  * face for a collection. A WOFF2 file is decoded once and shared by all of its faces. Returns an
  * empty list when the file cannot be read.
  */
 std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromFile(const std::string& path);
+
+/**
+ * Loads every face of in-memory font bytes the way MakeTypefacesFromFile loads a file. The bytes
+ * are copied (or decoded, for WOFF2) once and shared by all faces. Returns an empty list when the
+ * bytes hold no usable font.
+ */
+std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromBytes(const void* bytes,
+                                                                    size_t length);
 
 /**
  * Registers every face of a font file in fontConfig under the (family, style) its name table
