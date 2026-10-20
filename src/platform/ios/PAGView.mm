@@ -173,11 +173,21 @@
 - (void)didMoveToWindow {
   [super didMoveToWindow];
 #if defined(TGFX_USE_METAL)
-  // Landing on a window whose screen has a different scale leaves bounds untouched, and UIKit
-  // applies the new contentScaleFactor without necessarily routing through
-  // setContentScaleFactor:, so drawableSize would stay on the old scale (blurry or clipped
-  // content). This mirrors the macOS viewDidChangeBackingProperties path.
-  [self refreshSurfaceSize];
+  if (self.window != nil) {
+    std::lock_guard<std::mutex> autoLock(lock);
+    if (pagSurface != nil) {
+      auto size = self.bounds.size;
+      auto scale = self.contentScaleFactor;
+      auto drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+      auto layer = (CAMetalLayer*)self.layer;
+      // Window moves can change the scale without calling setContentScaleFactor:, but reattaching
+      // at the same size must not discard the rendering caches.
+      if (!CGSizeEqualToSize(layer.drawableSize, drawableSize)) {
+        [self updateLayerDrawableSize];
+        [pagSurface updateSize];
+      }
+    }
+  }
 #endif
   [self checkVisible];
 }

@@ -29,6 +29,7 @@
 
 #if TARGET_OS_IPHONE
 #import "platform/ios/PAGSurface+Metal.h"
+#import "platform/ios/PAGView.h"
 #import "platform/ios/private/PAGSurface+Internal.h"
 #import "platform/ios/private/PAGSurfaceImpl+Internal.h"
 #else
@@ -248,5 +249,63 @@ PAG_TEST(PAGMetalSurfaceTest, ExternalTextureDeviceResolutionRejectsInvalidResou
     EXPECT_TRUE(pag::Devices::MakeForTexture(target) == nullptr);
   }
 }
+
+#if TARGET_OS_IPHONE
+/**
+ * Verifies that detaching and reattaching a view preserves its cached surface unless the Metal
+ * drawable size is stale, in which case reattachment updates the size and invalidates the cache.
+ */
+PAG_TEST(PAGMetalSurfaceTest, ViewWindowMovesPreserveUnchangedSurface) {
+  @autoreleasepool {
+    ASSERT_TRUE([NSThread isMainThread]);
+    auto window = [[[UIWindow alloc] initWithFrame:CGRectMake(0, 0, 64, 64)] autorelease];
+    auto view = [[[PAGView alloc] initWithFrame:CGRectMake(0, 0, SURFACE_SIZE, SURFACE_SIZE)]
+        autorelease];
+    [view setSync:YES];
+    [window addSubview:view];
+    PAGSurface* surface = [view valueForKey:@"pagSurface"];
+    ASSERT_TRUE(surface != nil);
+    auto nativeSurface = [surface.surface pagSurface];
+    ASSERT_TRUE(nativeSurface != nullptr);
+    auto drawable = nativeSurface->drawable;
+    auto device = drawable->getDevice();
+    ASSERT_TRUE(device != nullptr);
+    std::shared_ptr<tgfx::Surface> cachedSurface;
+    {
+      pag::DeviceLockScope scope(device);
+      ASSERT_TRUE(static_cast<bool>(scope));
+      cachedSurface = drawable->getSurface(scope.context(), false);
+      ASSERT_TRUE(cachedSurface != nullptr);
+    }
+    [view removeFromSuperview];
+    EXPECT_TRUE(view.window == nil);
+    {
+      pag::DeviceLockScope scope(device);
+      ASSERT_TRUE(static_cast<bool>(scope));
+      EXPECT_EQ(drawable->getSurface(scope.context(), true), cachedSurface);
+    }
+    [window addSubview:view];
+    {
+      pag::DeviceLockScope scope(device);
+      ASSERT_TRUE(static_cast<bool>(scope));
+      EXPECT_EQ(drawable->getSurface(scope.context(), true), cachedSurface);
+    }
+    [view removeFromSuperview];
+    auto layer = (CAMetalLayer*)view.layer;
+    auto size = view.bounds.size;
+    auto scale = view.contentScaleFactor;
+    auto expectedSize = CGSizeMake(size.width * scale, size.height * scale);
+    layer.drawableSize = CGSizeMake(expectedSize.width + 16, expectedSize.height + 16);
+    [window addSubview:view];
+    EXPECT_TRUE(CGSizeEqualToSize(layer.drawableSize, expectedSize));
+    {
+      pag::DeviceLockScope scope(device);
+      ASSERT_TRUE(static_cast<bool>(scope));
+      EXPECT_TRUE(drawable->getSurface(scope.context(), true) == nullptr);
+    }
+    [view removeFromSuperview];
+  }
+}
+#endif
 
 #endif
