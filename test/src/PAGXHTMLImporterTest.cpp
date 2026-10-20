@@ -82,6 +82,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
@@ -13545,6 +13546,41 @@ TEST(PAGXFontMappingTest, MatchesExactNumericWeightBeforeFaceRounding) {
   EXPECT_EQ(text->text, "A");
   EXPECT_EQ(text->fontFamily, "Target");
   EXPECT_EQ(text->fontStyle, "Book");
+}
+
+TEST(PAGXFontMappingTest, CanonicalTargetNamesResolveCapturedFontFilesAndData) {
+  auto path = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  std::ifstream file(path, std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto dataURI = "data:font/otf;base64," +
+                 pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  for (const auto& source : {path, dataURI}) {
+    pagx::HTMLImporter::Options options;
+    options.fontReplacements.push_back({"SourceAlias", 400, "normal", "noto sans sc", "regular"});
+    options.fontReplacements.push_back({"Unrelated", 400, "normal", "Other Font", "Regular"});
+    auto doc = pagx::HTMLImporter::ParseString(
+        "<html><head><style>@font-face{font-family:SourceAlias;src:url('" + source +
+            "')}</style></head><body style='width:200px;height:100px'>"
+            "<span style='font-family:SourceAlias;font-size:20px'>ABC</span></body></html>",
+        options);
+    ASSERT_NE(doc, nullptr);
+    EXPECT_TRUE(doc->fontConfig().containsFamily("noto sans sc"));
+    EXPECT_FALSE(doc->fontConfig().containsFamily("Other Font"));
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->fontFamily, "noto sans sc");
+    EXPECT_EQ(text->fontStyle, "regular");
+    doc->applyLayout();
+    ASSERT_NE(text->glyphData, nullptr);
+    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+    EXPECT_EQ(text->glyphData->layoutRuns[0].font.getTypeface()->fontFamily(), "Noto Sans SC");
+    EXPECT_EQ(text->glyphData->layoutRuns[0].font.getTypeface()->fontStyle(), "Regular");
+    ASSERT_TRUE(doc->embed());
+    EXPECT_FALSE(text->glyphRuns.empty());
+    EXPECT_EQ(text->fontFamily, "noto sans sc");
+    EXPECT_EQ(text->fontStyle, "regular");
+  }
 }
 
 }  // namespace pag

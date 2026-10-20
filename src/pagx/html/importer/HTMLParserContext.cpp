@@ -37,8 +37,10 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -604,6 +606,25 @@ static bool IsLocalFontSource(const std::string& source) {
   return !IsInlineFontSource(source) && source.find("://") == std::string::npos;
 }
 
+void HTMLParserContext::registerMappedFontAliases(const void* bytes, size_t length) {
+  if (_options.fontReplacements.empty()) return;
+  for (int index = 0; index < 64; index++) {
+    auto face = MakeTypefaceFromBytes(bytes, length, index);
+    if (face == nullptr) break;
+    for (const auto& replacement : _options.fontReplacements) {
+      if (!SystemFonts::FontNamesMatch(replacement.targetFamily, face->fontFamily()) ||
+          !SystemFonts::FontNamesMatch(replacement.targetStyle, face->fontStyle())) {
+        continue;
+      }
+      // A caller's canonical spelling must resolve to the same face without renaming the output.
+      _document->fontConfig().registerFont(bytes, length, index, replacement.targetFamily,
+                                           replacement.targetStyle);
+      _document->fontConfig().addFallbackFont(bytes, length, index, replacement.targetFamily,
+                                              replacement.targetStyle);
+    }
+  }
+}
+
 void HTMLParserContext::loadWebFontFiles() {
   for (const auto& rule : _styleCascade->fontFaces()) {
     bool registered = false;
@@ -622,6 +643,7 @@ void HTMLParserContext::loadWebFontFiles() {
                "(subset:font-face-unloadable)");
           continue;
         }
+        registerMappedFontAliases(bytes->data(), bytes->size());
         registered = true;
         break;
       }
@@ -633,6 +655,10 @@ void HTMLParserContext::loadWebFontFiles() {
         warn("html: @font-face '" + rule.family + "' source '" + path +
              "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
         continue;
+      }
+      if (!_options.fontReplacements.empty()) {
+        auto bytes = tgfx::Data::MakeFromFile(path);
+        if (bytes != nullptr) registerMappedFontAliases(bytes->data(), bytes->size());
       }
       _webFontFiles.push_back({ToLower(rule.family), path});
       registered = true;

@@ -15,7 +15,7 @@
 //   - snapshot.js            (CLI driver, copied verbatim)
 //   - ensure-built.js        (preflight helper snapshot.js requires at startup)
 //   - dist/                  (compiled TypeScript: dist/lib/*.js)
-//   - node_modules/          (the pure-JS runtime deps: opentype.js, wawoff2)
+//   - node_modules/          (the pure-JS XML and font parsing dependencies)
 //   - package.json           (generated; declares only the pure-JS deps)
 //
 // What does NOT ship (installed lazily at first use by launch.js):
@@ -39,7 +39,7 @@ const DEST_DIR = path.join(NPM_PKG_DIR, 'html-snapshot');
 // Runtime npm dependencies the snapshot pipeline actually requires (puppeteer
 // is deliberately excluded — see header). Versions are read from the tool's
 // own package.json so they never drift.
-const RUNTIME_DEPS = ['opentype.js', 'wawoff2'];
+const RUNTIME_DEPS = ['@xmldom/xmldom', 'opentype.js', 'wawoff2'];
 
 function say(msg) {
   process.stderr.write(`build-html-snapshot: ${msg}\n`);

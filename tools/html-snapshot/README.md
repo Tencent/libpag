@@ -720,6 +720,10 @@ label is descriptive. The target `font-weight-style` selects the exact face and 
 over the target numeric weight: the example above selects Bold, not SemiBold. Unmatched fonts
 retain normal resolution; no default target is inferred. Conflicting rules are rejected before
 conversion. The converter must have the target fonts available to shape and embed their glyphs.
+For a captured font whose internal family and face match the target (ignoring case and redundant
+whitespace), the HTML importer registers that file under the exact target spelling. For example,
+CSS `LongCang` backed by a `Long Cang / Regular` font can output `long cang / Regular` while using
+the same glyphs. A different target font must be supplied or installed separately.
 
 Matching runs before native import, using the original CSS values before face rounding.
 `prepareSnapshotFontReplacements(snapshotHtml, fontMap)` produces conversion options passed to

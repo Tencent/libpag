@@ -418,6 +418,7 @@ class HTMLParserContext {
   // `_webFontFamilies`. Runs before the body walk so font-family stacks see those families as
   // available.
   void loadWebFontFiles();
+  void registerMappedFontAliases(const void* bytes, size_t length);
 
   // Emits one `<Font file>` resource per loaded web font file whose CSS family is named by some
   // font-family stack in the document. Unused faces are left out so they are neither written nor
