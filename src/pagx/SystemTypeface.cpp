@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cctype>
-#include <string>
-#include <vector>
 #include "SystemFonts.h"
-#include "pagx/utils/CSSFontStyle.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -64,41 +61,6 @@ static std::shared_ptr<tgfx::Typeface> LoadTypeface(const FontLocation& location
   return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
 }
 
-// Candidate weights for a missing face, in the order CSS Fonts 4 (5.2.2) picks one: the desired
-// weight first, then the weights on the preferred side in order of increasing distance, then the
-// opposite side. Targets in the 400..500 band check up to 500 before descending, and only reach
-// above 500 once both sides are exhausted.
-static std::vector<int> WeightSearchOrder(int target) {
-  std::vector<int> order = {};
-  order.reserve(9);
-  if (target < 400) {
-    for (int weight = target; weight >= 100; weight -= 100) {
-      order.push_back(weight);
-    }
-    for (int weight = target + 100; weight <= 900; weight += 100) {
-      order.push_back(weight);
-    }
-  } else if (target <= 500) {
-    for (int weight = target; weight <= 500; weight += 100) {
-      order.push_back(weight);
-    }
-    for (int weight = target - 100; weight >= 100; weight -= 100) {
-      order.push_back(weight);
-    }
-    for (int weight = 600; weight <= 900; weight += 100) {
-      order.push_back(weight);
-    }
-  } else {
-    for (int weight = target; weight <= 900; weight += 100) {
-      order.push_back(weight);
-    }
-    for (int weight = target - 100; weight >= 100; weight -= 100) {
-      order.push_back(weight);
-    }
-  }
-  return order;
-}
-
 std::shared_ptr<tgfx::Typeface> SystemFonts::ResolveTypeface(const std::string& family,
                                                              const std::string& style) {
   if (family.empty()) {
@@ -120,43 +82,19 @@ std::shared_ptr<tgfx::Typeface> SystemFonts::ResolveTypeface(const std::string& 
     return nullptr;
   }
 
-  // CSS selects another available face from the requested family when that family does not contain
-  // the requested style, so resolve the family's default face up front. This also rejects a family
-  // the platform would only substitute before the per-weight search below pays for a probe per
-  // candidate: that search can only reach faces of `family`, so a family that does not resolve at
-  // all cannot be rescued by it.
-  auto familyTypeface = tgfx::Typeface::MakeFromName(family, "");
-  if (!TypefaceMatches(familyTypeface, family, "", false)) {
-    familyTypeface = LoadTypeface(FindFont(family, ""));
-  }
-  if (!TypefaceMatches(familyTypeface, family, "", false)) {
-    return nullptr;
+  // CSS selects another available face from the requested family when that family does not
+  // contain the requested style. Match that behavior without accepting a different family.
+  typeface = tgfx::Typeface::MakeFromName(family, "");
+  if (TypefaceMatches(typeface, family, style, false)) {
+    return typeface;
   }
 
-  // The requested face is not installed in this family, but the family itself is. CSS resolves the
-  // nearest available weight, so a Bold request against a family that ships only
-  // Regular/Medium/Semibold (PingFang SC) must resolve to Semibold rather than silently dropping
-  // to Regular. Probe the candidate weights in CSS order.
-  auto requested = ParseFontStyleName(style);
-  auto candidates = WeightSearchOrder(requested.weight);
-  for (int weight : candidates) {
-    auto candidateStyle =
-        ResolveFontStyleName(std::to_string(weight), requested.italic ? "italic" : "");
-    if (FontNamesMatch(candidateStyle, style)) {
-      continue;
-    }
-    typeface = tgfx::Typeface::MakeFromName(family, candidateStyle);
-    if (TypefaceMatches(typeface, family, candidateStyle, true)) {
-      return typeface;
-    }
-    location = FindFont(family, candidateStyle);
-    typeface = LoadTypeface(location);
-    if (TypefaceMatches(typeface, family, candidateStyle, true)) {
-      return typeface;
-    }
+  location = FindFont(family, "");
+  typeface = LoadTypeface(location);
+  if (TypefaceMatches(typeface, family, style, false)) {
+    return typeface;
   }
-
-  return familyTypeface;
+  return nullptr;
 }
 
 }  // namespace pagx

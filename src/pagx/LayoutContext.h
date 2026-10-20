@@ -45,20 +45,9 @@ class LayoutContext {
                                                const std::string& fontStyle);
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
-  // fonts first, then system fallback fonts. Typefaces are created on demand. `fontStyle`
-  // is the style requested by the text being shaped; the system fallback list holds one
-  // face per family, so the family is re-resolved with that style to keep the authored
-  // weight instead of always taking the family's default face.
+  // fonts first, then system fallback fonts. Typefaces are created on demand.
   std::shared_ptr<tgfx::Typeface> fallbackTypeface(int32_t codepoint,
-                                                   const tgfx::Typeface* primaryTypeface,
-                                                   const std::string& fontStyle);
-
-  // Finds a fallback typeface that draws `codepoint` in colour, for codepoints that ask for emoji
-  // presentation. The search order matches `fallbackTypeface`, but only colour faces qualify.
-  // Returns nullptr when no colour face is installed, leaving the caller to take the ordinary
-  // (monochrome) lookup; the primary face is the caller's own business, so it is never returned.
-  std::shared_ptr<tgfx::Typeface> findColorTypeface(int32_t codepoint,
-                                                    const tgfx::Typeface* primaryTypeface);
+                                                   const tgfx::Typeface* primaryTypeface);
 
   FontConfig* getFontConfig() const {
     return fontConfig;

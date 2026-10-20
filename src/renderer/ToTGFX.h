@@ -80,8 +80,6 @@ Rect FromTGFX(const tgfx::Rect& rect);
 
 tgfx::Path ToTGFX(const PathData& pathData);
 
-void FromTGFX(const tgfx::Path& path, PathData* pathData, bool roundCoordinates = false);
-
 tgfx::LineCap ToTGFX(LineCap cap);
 
 tgfx::LineJoin ToTGFX(LineJoin join);

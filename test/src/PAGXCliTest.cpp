@@ -3866,16 +3866,18 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   EXPECT_FALSE(std::filesystem::exists(outPagx));
 }
 
-CLI_TEST(PAGXCliTest, Embed_ReferencedGlyphsPreserveOriginalTextAcrossRepeatedEmbed) {
-  auto fontPath =
-      ProjectPath::Absolute("resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2");
-  auto input = TempDir() + "/original_text_file_glyphs.pagx";
-  std::ofstream stream(input);
-  stream << "<pagx width='80' height='40'><Resources><Font id='source' file='" << fontPath
-         << "'/></Resources><Layer><Text text='搜索' fontFamily='pagx-font-f0' fontSize='20'>"
-            "<GlyphRun font='@source' fontSize='20' glyphs='1,2' positions='0,20,20,20' "
-            "bounds='0,0,40,20'/></Text><Fill color='#000000'/></Layer></pagx>";
+CLI_TEST(PAGXCliTest, Embed_HTMLGlyphsPreserveOriginalTextAcrossRepeatedEmbed) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto fontPath = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  auto html = TempDir() + "/original_text.html";
+  std::ofstream stream(html);
+  stream << "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" << fontPath
+         << "')}</style></head><body style='width:80px;height:40px'>"
+            "<span data-pagx-text='搜索' style='font-family:pagx-font-f0;font-size:20px'>"
+            "&#xE000;&#xE001;</span></body></html>";
   stream.close();
+  auto input = TempDir() + "/original_text_imported.pagx";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", html, "--output", input}), 0);
   auto first = TempDir() + "/original_text_embedded1.pagx";
   auto second = TempDir() + "/original_text_embedded2.pagx";
   ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", input, "-o", first}), 0);
@@ -3894,6 +3896,31 @@ CLI_TEST(PAGXCliTest, Embed_ReferencedGlyphsPreserveOriginalTextAcrossRepeatedEm
     found = true;
   }
   EXPECT_TRUE(found);
+}
+
+CLI_TEST(PAGXCliTest, Embed_PreservesEmbeddedRunsAlongsideRuntimeText) {
+  auto document = pagx::PAGXImporter::FromXML(
+      "<pagx width='80' height='40'><Resources>"
+      "<Font id='first'><Glyph advance='500' path='M0 0L500 0L250 -500Z'/></Font>"
+      "<Font id='second'><Glyph advance='500' path='M0 0L500 0L500 -500Z'/></Font>"
+      "</Resources><Layer><Text id='fixed' text='原文'>"
+      "<GlyphRun font='@first' fontSize='20' glyphs='1' positions='0,20'/>"
+      "<GlyphRun font='@second' fontSize='20' glyphs='1' positions='20,20'/>"
+      "<GlyphRun font='@first' fontSize='20' glyphs='1' positions='40,20'/>"
+      "</Text><Text id='runtime' text='A' fontFamily='TestFont' fontSize='20'/>"
+      "<Fill color='#000000'/></Layer></pagx>");
+  ASSERT_NE(document, nullptr);
+  document->fontConfig().registerFont(
+      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, "TestFont", "Regular");
+  auto* fixed = document->findNode<pagx::Text>("fixed");
+  auto originalRuns = fixed->glyphRuns;
+  ASSERT_TRUE(pagx::cli::EmbedFonts(document.get(), {}, {}, "test"));
+  EXPECT_EQ(fixed->glyphRuns, originalRuns);
+  EXPECT_EQ(fixed->text, "原文");
+  EXPECT_FALSE(document->findNode<pagx::Text>("runtime")->glyphRuns.empty());
+  auto firstXML = pagx::PAGXExporter::ToXML(*document);
+  ASSERT_TRUE(pagx::cli::EmbedFonts(document.get(), {}, {}, "test"));
+  EXPECT_EQ(pagx::PAGXExporter::ToXML(*document), firstXML);
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {

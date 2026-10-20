@@ -27,7 +27,6 @@
 namespace pagx {
 
 class GlyphRun;
-class Glyph;
 class Font;
 class Text;
 struct TextLayoutGlyphRun;
@@ -62,11 +61,8 @@ class GlyphRunRenderer {
   static std::shared_ptr<tgfx::TextBlob> BuildTextBlobFromLayoutRuns(
       const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
-  /** Returns the cached embedded or file-backed typeface for a font resource. */
+ private:
   static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(Font* fontNode);
-
-  /** Returns embedded glyph data, or a runtime-only outline extracted from the font file. */
-  static Glyph* GetGlyph(Font* fontNode, uint16_t glyphID);
 };
 
 }  // namespace pagx

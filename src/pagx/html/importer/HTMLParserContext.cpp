@@ -36,6 +36,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "tgfx/core/Typeface.h"
@@ -45,6 +46,58 @@ namespace pagx {
 using namespace pagx::html;
 
 namespace {
+
+// Candidate weights for a missing face, in the order CSS Fonts 4 (5.2.2) picks one: the desired
+// weight first, then the weights on the preferred side in order of increasing distance, then the
+// opposite side. Targets in the 400..500 band check up to 500 before descending, and only reach
+// above 500 once both sides are exhausted.
+std::vector<int> WeightSearchOrder(int target) {
+  std::vector<int> order = {};
+  order.reserve(9);
+  if (target < 400) {
+    for (int weight = target; weight >= 100; weight -= 100) {
+      order.push_back(weight);
+    }
+    for (int weight = target + 100; weight <= 900; weight += 100) {
+      order.push_back(weight);
+    }
+  } else if (target <= 500) {
+    for (int weight = target; weight <= 500; weight += 100) {
+      order.push_back(weight);
+    }
+    for (int weight = target - 100; weight >= 100; weight -= 100) {
+      order.push_back(weight);
+    }
+    for (int weight = 600; weight <= 900; weight += 100) {
+      order.push_back(weight);
+    }
+  } else {
+    for (int weight = target; weight <= 900; weight += 100) {
+      order.push_back(weight);
+    }
+    for (int weight = target - 100; weight >= 100; weight -= 100) {
+      order.push_back(weight);
+    }
+  }
+  return order;
+}
+
+std::shared_ptr<tgfx::Typeface> ResolveHTMLTypeface(const std::string& family,
+                                                    const std::string& style) {
+  auto face = SystemFonts::ResolveTypeface(family, style);
+  if (face == nullptr || SystemFonts::FontNamesMatch(face->fontStyle(), style)) return face;
+  auto requested = ParseFontStyleName(style);
+  for (int weight : WeightSearchOrder(requested.weight)) {
+    auto candidateStyle =
+        ResolveFontStyleName(std::to_string(weight), requested.italic ? "italic" : "");
+    auto candidate = SystemFonts::ResolveTypeface(family, candidateStyle);
+    if (candidate != nullptr &&
+        SystemFonts::FontNamesMatch(candidate->fontStyle(), candidateStyle)) {
+      return candidate;
+    }
+  }
+  return face;
+}
 
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
 // All importer-controlled transformer behaviour funnels through here so adding a new shared
@@ -224,7 +277,7 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   std::string resolvedFamily = family;
   std::string resolvedStyle = style;
-  auto typeface = SystemFonts::ResolveTypeface(family, style);
+  auto typeface = ResolveHTMLTypeface(family, style);
   // A family mismatch means the platform substituted a different face, so the authored name is
   // kept instead of baking the substitution into the exported document.
   if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {

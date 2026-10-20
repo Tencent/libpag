@@ -86,7 +86,6 @@
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
 #include "renderer/FontEmbedder.h"
-#include "renderer/GlyphRunRenderer.h"
 #include "tgfx/core/Font.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
@@ -7093,7 +7092,7 @@ static void ExpectWebFontImported(const std::shared_ptr<pagx::PAGXDocument>& doc
   }
 }
 
-PAG_TEST(PAGXHTMLImporterTest, TextMetadataPreservesReferencedGlyphs) {
+PAG_TEST(PAGXHTMLImporterTest, TextMetadataEmbedsGlyphsDuringImport) {
   auto path = PuaWoff2FontPath();
   for (bool normalize : {false, true}) {
     pagx::HTMLImporter::Options options;
@@ -7112,15 +7111,16 @@ PAG_TEST(PAGXHTMLImporterTest, TextMetadataPreservesReferencedGlyphs) {
     ASSERT_NE(text, nullptr);
     EXPECT_EQ(text->text, "搜索");
     EXPECT_FLOAT_EQ(text->fontSize, 20);
-    auto fonts = CollectFonts(doc.get());
-    ASSERT_EQ(fonts.size(), 1u);
-    EXPECT_EQ(fonts[0]->file, path);
-    EXPECT_TRUE(fonts[0]->glyphs.empty());
     ASSERT_EQ(text->glyphRuns.size(), 2u);
-    auto typeface = pagx::MakeTypefaceFromFile(path);
-    ASSERT_NE(typeface, nullptr);
-    EXPECT_EQ(text->glyphRuns[0]->glyphs[0], typeface->getGlyphID(0xE000));
-    EXPECT_EQ(text->glyphRuns[1]->glyphs[0], typeface->getGlyphID(0xE001));
+    for (auto* run : text->glyphRuns) {
+      ASSERT_NE(run->font, nullptr);
+      EXPECT_TRUE(run->font->file.empty());
+      ASSERT_FALSE(run->font->glyphs.empty());
+      ASSERT_EQ(run->glyphs.size(), 1u);
+      ASSERT_GT(run->glyphs[0], 0);
+      ASSERT_LE(run->glyphs[0], run->font->glyphs.size());
+      EXPECT_NE(run->font->glyphs[run->glyphs[0] - 1]->path, nullptr);
+    }
     EXPECT_FLOAT_EQ(text->glyphRuns[0]->positions[0].x, 0);
     EXPECT_FLOAT_EQ(text->glyphRuns[1]->positions[0].x, 17);
     auto positions = text->glyphRuns[1]->positions;
@@ -7131,10 +7131,8 @@ PAG_TEST(PAGXHTMLImporterTest, TextMetadataPreservesReferencedGlyphs) {
     auto restored = pagx::PAGXImporter::FromXML(xml);
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(FindFirstText(restored.get())->text, "搜索");
-    pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc.get());
-    ASSERT_EQ(text->glyphRuns.size(), 2u);
-    doc->applyLayout();
-    ASSERT_TRUE(doc->embed());
+    restored->applyLayout();
+    text = FindFirstText(restored.get());
     EXPECT_EQ(text->text, "搜索");
     ASSERT_EQ(text->glyphRuns.size(), 2u);
     EXPECT_FALSE(text->glyphRuns[0]->font->glyphs.empty());
@@ -7177,37 +7175,14 @@ PAG_TEST(PAGXHTMLImporterTest, TextMetadataPreservesGlyphColorsAndTransforms) {
   EXPECT_TRUE(found);
   auto scales = run->scales;
   doc->applyLayout();
-  ASSERT_TRUE(doc->embed());
+  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(restored, nullptr);
+  text = FindFirstText(restored.get());
   EXPECT_EQ(text->text, "样式");
   EXPECT_EQ(text->glyphRuns[1]->scales, scales);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, ReferencedAndEmbeddedRunsKeepTheirOrderDuringEmbed) {
-  auto xml = "<pagx width='80' height='40'><Resources><Font id='file' file='" + PuaWoff2FontPath() +
-             "'/><Font id='inline'><Glyph advance='500' path='M0 0L500 0L250 -500Z'/></Font>"
-             "</Resources><Layer><Text id='label' text='原始内容'>"
-             "<GlyphRun font='@file' fontSize='20' glyphs='1' positions='0,20' bounds='0,0,60,20'/>"
-             "<GlyphRun font='@inline' fontSize='20' glyphs='1' positions='20,20'/>"
-             "<GlyphRun font='@file' fontSize='20' glyphs='2' positions='40,20'/>"
-             "</Text><Fill color='#000000'/></Layer></pagx>";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(doc, nullptr);
-  auto* text = doc->findNode<pagx::Text>("label");
-  auto* middle = text->glyphRuns[1];
-  doc->applyLayout();
-  ASSERT_TRUE(doc->embed());
-  EXPECT_EQ(text->text, "原始内容");
-  ASSERT_EQ(text->glyphRuns.size(), 3u);
-  EXPECT_EQ(text->glyphRuns[1], middle);
-  EXPECT_FLOAT_EQ(text->glyphRuns[0]->positions[0].x, 0);
-  EXPECT_FLOAT_EQ(text->glyphRuns[2]->positions[0].x, 40);
-  for (auto* run : text->glyphRuns) {
-    EXPECT_TRUE(run->font->file.empty());
-    EXPECT_FALSE(run->font->glyphs.empty());
-  }
-}
-
-PAG_TEST(PAGXHTMLImporterTest, TextMetadataSpanPreservesFileDataGlyphs) {
+PAG_TEST(PAGXHTMLImporterTest, TextMetadataGlyphsNeedNoSourceFontAfterImport) {
   auto path = PuaWoff2FontPath();
   auto html = "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" + path +
               "')}</style></head><body style='width:60px;height:30px'>"
@@ -7219,15 +7194,14 @@ PAG_TEST(PAGXHTMLImporterTest, TextMetadataSpanPreservesFileDataGlyphs) {
   ASSERT_NE(text, nullptr);
   EXPECT_EQ(text->text, "原文");
   ASSERT_EQ(text->glyphRuns.size(), 1u);
-  auto* font = text->glyphRuns[0]->font;
-  std::ifstream input(path, std::ios::binary);
-  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
-  font->fileData = pagx::Data::MakeWithCopy(bytes.data(), bytes.size());
-  font->file = "/missing/original.woff2";
-  EXPECT_NE(pagx::GlyphRunRenderer::BuildTypefaceFromFont(font), nullptr);
-  EXPECT_NE(pagx::GlyphRunRenderer::GetGlyph(font, text->glyphRuns[0]->glyphs[0]), nullptr);
-  font->fileData = nullptr;
-  EXPECT_EQ(pagx::GlyphRunRenderer::BuildTypefaceFromFont(font), nullptr);
+  EXPECT_TRUE(text->glyphRuns[0]->font->file.empty());
+  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(restored, nullptr);
+  restored->applyLayout();
+  auto* restoredText = FindFirstText(restored.get());
+  ASSERT_NE(restoredText, nullptr);
+  EXPECT_EQ(restoredText->text, "原文");
+  EXPECT_EQ(pagx::ComputeGlyphPaths(*restoredText, 0, 0).size(), 2u);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileBecomesFontResource) {

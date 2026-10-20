@@ -87,8 +87,7 @@ class Font : public Node {
    * serves as a font source: layout registers every face of the file under the family and style
    * names stored inside it, so Text whose fontFamily / fontStyle match is shaped and rendered with
    * the file without embedded glyphs. Runtime-shaped Text does not reference the node by id.
-   * A pre-shaped GlyphRun can reference this node directly, using native glyph IDs from the
-   * first face without reshaping Text::text. A relative path is
+   * GlyphRun references require embedded glyph data. A relative path is
    * resolved against the PAGX file's directory. Hosts without file system access (e.g. the web)
    * supply the file's bytes via PAGXDocument::loadFileData; getExternalFilePaths reports the path
    * until then. `pagx embed` also shapes with this file and stores extracted glyph data in separate

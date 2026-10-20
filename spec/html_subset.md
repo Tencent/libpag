@@ -131,11 +131,12 @@ local disk or inlines the font as a `data:` URI:
 
 HTML exported by PAGX may render pre-shaped glyphs as private-use characters while keeping
 readable text in `data-pagx-text`. The snapshot bridge preserves this attribute and filters the
-other `data-pagx-*` attributes. Import restores it to `Text.text` while retaining the displayed
-glyph IDs, font-file references and positions in `GlyphRun` children. Restoring the original
-text does not reshape these runs. `pagx embed` embeds their referenced glyphs without changing
-the original text; already embedded runs are preserved unless font overrides explicitly request
-reshaping.
+other `data-pagx-*` attributes. Import shapes the displayed private-use characters with the
+registered web font and embeds their outlines or images into ordinary `Font` resources. It
+stores the remapped glyph IDs, positions and transforms in `GlyphRun` children, then restores
+`data-pagx-text` to `Text.text`. These runs need no external font at render time, including when
+`--fonts external` is selected for other text. `pagx embed` preserves already embedded runs
+without changing the original text unless font overrides explicitly request reshaping.
 
 ## 4. Allowed CSS Properties
 

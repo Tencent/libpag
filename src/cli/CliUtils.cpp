@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
+#include <cctype>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 #include <unordered_set>
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXImporter.h"
@@ -120,9 +122,41 @@ std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document) {
   return files;
 }
 
+static std::string DescribeText(const Text* text) {
+  std::string preview = text->text;
+  if (preview.size() > 32) {
+    size_t end = 32;
+    while (end > 0 && (static_cast<unsigned char>(preview[end]) & 0xC0) == 0x80) {
+      --end;
+    }
+    preview.resize(end);
+    preview += "...";
+  }
+  std::string label = text->fontFamily.empty() ? "(default family)" : text->fontFamily;
+  if (!text->fontStyle.empty()) label += "/" + text->fontStyle;
+  if (!text->id.empty()) label += " id=" + text->id;
+  return label + ": " + preview;
+}
+
+static std::vector<std::string> CollectUnembeddedTexts(PAGXDocument* document) {
+  std::vector<std::string> result;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) continue;
+    auto* text = static_cast<const Text*>(node.get());
+    if (!text->glyphRuns.empty()) continue;
+    for (auto ch : text->text) {
+      if (std::isspace(static_cast<unsigned char>(ch)) == 0) {
+        result.push_back(DescribeText(text));
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 // A text whose requested family resolves to nothing was shaped entirely with the substitute face
 // the platform picked, and those outlines are now baked into the document. Such a text still has
-// glyph runs, so FontEmbedder::unembeddedTexts() cannot see it; without this check the failure
+// glyph runs, so the empty-run check cannot see it; without this check the failure
 // ships silently and only shows up when the render is compared with the source page.
 //
 // "Resolves to nothing" means layout could not find a face for the family at all. A family that
@@ -151,7 +185,7 @@ static std::vector<std::string> CollectSubstitutedTexts(PAGXDocument* document) 
     if (!SystemFonts::FindFont(text->fontFamily, text->fontStyle).path.empty()) {
       continue;
     }
-    substituted.push_back(FontEmbedder::DescribeText(text));
+    substituted.push_back(DescribeText(text));
   }
   return substituted;
 }
@@ -197,18 +231,26 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   // Collected before embedding, while the difference between a runtime-shaped text and a
   // pre-shaped one is still visible.
   auto substituted = CollectSubstitutedTexts(document);
+  std::unordered_map<Text*, std::vector<GlyphRun*>> embeddedRuns;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) continue;
+    auto* text = static_cast<Text*>(node.get());
+    if (!text->glyphRuns.empty()) embeddedRuns[text] = text->glyphRuns;
+  }
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
     return false;
   }
+  for (auto& entry : embeddedRuns) entry.first->glyphRuns = std::move(entry.second);
   // A text that shaped to nothing means no font available here covered its characters. Writing the
   // document anyway would silently produce a file whose text is blank on every host lacking the
   // authored font, so fail loudly and name the texts instead.
-  if (!embedder.unembeddedTexts().empty()) {
-    std::cerr << command << ": " << embedder.unembeddedTexts().size()
+  auto unembedded = CollectUnembeddedTexts(document);
+  if (!unembedded.empty()) {
+    std::cerr << command << ": " << unembedded.size()
               << " text(s) produced no glyph run, no available font covers them:\n";
-    for (const auto& description : embedder.unembeddedTexts()) {
+    for (const auto& description : unembedded) {
       std::cerr << command << ":   " << description << "\n";
     }
     return false;

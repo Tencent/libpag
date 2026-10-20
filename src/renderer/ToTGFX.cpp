@@ -30,38 +30,6 @@
 
 namespace pagx {
 
-void FromTGFX(const tgfx::Path& path, PathData* pathData, bool roundCoordinates) {
-  for (auto segment : path) {
-    if (roundCoordinates) {
-      for (auto& point : segment.points) {
-        point.x = std::round(point.x);
-        point.y = std::round(point.y);
-      }
-    }
-    switch (segment.verb) {
-      case tgfx::PathVerb::Move:
-        pathData->moveTo(segment.points[0].x, segment.points[0].y);
-        break;
-      case tgfx::PathVerb::Line:
-        pathData->lineTo(segment.points[1].x, segment.points[1].y);
-        break;
-      case tgfx::PathVerb::Quad:
-        pathData->quadTo(segment.points[1].x, segment.points[1].y, segment.points[2].x,
-                         segment.points[2].y);
-        break;
-      case tgfx::PathVerb::Cubic:
-        pathData->cubicTo(segment.points[1].x, segment.points[1].y, segment.points[2].x,
-                          segment.points[2].y, segment.points[3].x, segment.points[3].y);
-        break;
-      case tgfx::PathVerb::Close:
-        pathData->close();
-        break;
-      default:
-        break;
-    }
-  }
-}
-
 tgfx::Path ToTGFX(const PathData& pathData) {
   tgfx::Path path = {};
   const auto& verbs = pathData.verbs();

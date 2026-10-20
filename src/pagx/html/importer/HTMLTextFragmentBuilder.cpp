@@ -22,10 +22,7 @@
 #include <cstdlib>
 #include <unordered_set>
 #include <utility>
-#include "pagx/LayoutContext.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/TextLayout.h"
-#include "pagx/TextLayoutParams.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -36,7 +33,9 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -86,20 +85,23 @@ bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const 
   if (RegisterFontFileFaces(&_document->fontConfig(), path, false, family) == 0) {
     return false;
   }
-  _fontFiles[ToLower(family)] = path;
+  _registeredFontFamilies.insert(ToLower(family));
   return true;
 }
 
 bool HTMLTextFragmentBuilder::registerFontData(const std::string& family, const Data& fontData) {
-  return RegisterFontDataFaces(&_document->fontConfig(), fontData.bytes(), fontData.size(), false,
-                               family) > 0;
+  if (RegisterFontDataFaces(&_document->fontConfig(), fontData.bytes(), fontData.size(), false,
+                            family) == 0)
+    return false;
+  _registeredFontFamilies.insert(ToLower(family));
+  return true;
 }
 
-bool HTMLTextFragmentBuilder::collectReferencedGlyphs(Text* text,
-                                                      const std::shared_ptr<DOMNode>& element,
-                                                      const HTMLInheritedStyle& inherited,
-                                                      const Matrix& matrix,
-                                                      TextFragment& firstStyle, int depth) {
+bool HTMLTextFragmentBuilder::collectEmbeddedGlyphs(Text* text,
+                                                    const std::shared_ptr<DOMNode>& element,
+                                                    const HTMLInheritedStyle& inherited,
+                                                    const Matrix& matrix, TextFragment& firstStyle,
+                                                    int depth) {
   if (depth >= MAX_HTML_RECURSION_DEPTH) return false;
   for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
     if (child->type == DOMNodeType::Element) {
@@ -118,44 +120,59 @@ bool HTMLTextFragmentBuilder::collectReferencedGlyphs(Text* text,
         childMatrix = childMatrix * Matrix::Translate(cx, cy) * box.transform.matrix *
                       Matrix::Translate(-cx, -cy);
       }
-      if (!collectReferencedGlyphs(text, child, style, matrix * childMatrix, firstStyle,
-                                   depth + 1)) {
+      if (!collectEmbeddedGlyphs(text, child, style, matrix * childMatrix, firstStyle, depth + 1)) {
         return false;
       }
       continue;
     }
     if (child->type != DOMNodeType::Text || IsBlankText(child->name)) continue;
-    auto file = _fontFiles.find(ToLower(inherited.primaryFontFamily));
-    if (file == _fontFiles.end()) return false;
+    if (_registeredFontFamilies.count(ToLower(inherited.primaryFontFamily)) == 0) return false;
     for (size_t offset = 0; offset < child->name.size();) {
       int32_t codepoint = 0;
       offset += DecodeUTF8(child->name.data() + offset, child->name.size() - offset, &codepoint);
       if (codepoint < 0xE000 || codepoint > 0xF8FF) return false;
     }
     auto fragment = makeFragment(inherited);
-    auto params = MakeGlyphParams(text);
-    params.text = child->name;
-    params.fontFamily = fragment.fontFamily;
-    params.fontStyle = ResolveHTMLFontStyleName(fragment.fontStyleName);
-    params.fontSize = fragment.fontSize;
-    params.letterSpacing = fragment.letterSpacing;
-    params.fauxBold = fragment.fauxBold;
-    params.fauxItalic = fragment.fauxItalic;
-    LayoutContext context(&_document->fontConfig());
-    TextLayoutParams layout;
-    auto result = TextLayout::Layout({{text, params}}, layout, &context, false);
-    auto* runs = result.getGlyphRuns(text);
-    if (runs == nullptr || runs->empty()) return false;
-    Font*& font = _fontResources[file->second];
-    if (font == nullptr) {
-      font = _document->makeNode<Font>(_idAllocator.generateUnique("font"));
-      font->file = file->second;
+    auto embedded = PAGXDocument::Make(0, 0);
+    auto* layer = embedded->makeNode<Layer>();
+    auto* sourceText = embedded->makeNode<Text>();
+    sourceText->text = child->name;
+    sourceText->fontFamily = fragment.fontFamily;
+    sourceText->fontStyle = ResolveHTMLFontStyleName(fragment.fontStyleName);
+    sourceText->fontSize = fragment.fontSize;
+    sourceText->letterSpacing = fragment.letterSpacing;
+    layer->contents.push_back(sourceText);
+    embedded->layers.push_back(layer);
+    embedded->applyLayout(&_document->fontConfig());
+    if (!embedded->embed() || sourceText->glyphRuns.empty()) return false;
+    auto sourceBounds = sourceText->glyphRuns.front()->bounds;
+    std::unordered_map<Font*, Font*> fonts;
+    for (auto* sourceRun : sourceText->glyphRuns) {
+      auto* sourceFont = sourceRun->font;
+      if (fonts.count(sourceFont) != 0) continue;
+      auto* font = _document->makeNode<Font>(_idAllocator.generateUnique("font"));
+      font->unitsPerEm = sourceFont->unitsPerEm;
+      for (auto* sourceGlyph : sourceFont->glyphs) {
+        auto* glyph = _document->makeNode<Glyph>();
+        glyph->advance = sourceGlyph->advance;
+        glyph->offset = sourceGlyph->offset;
+        if (sourceGlyph->path != nullptr) {
+          glyph->path = _document->makeNode<PathData>();
+          *glyph->path = *sourceGlyph->path;
+        }
+        if (sourceGlyph->image != nullptr) {
+          glyph->image = _document->makeNode<Image>();
+          glyph->image->data = sourceGlyph->image->data;
+        }
+        font->glyphs.push_back(glyph);
+      }
+      fonts[sourceFont] = font;
     }
     if (text->glyphRuns.empty()) firstStyle = fragment;
     size_t firstGlyph = 0;
     for (auto* run : text->glyphRuns) firstGlyph += run->glyphs.size();
     size_t lastGlyph = firstGlyph;
-    for (const auto& shaped : *runs) lastGlyph += shaped.glyphs.size();
+    for (auto* run : sourceText->glyphRuns) lastGlyph += run->glyphs.size();
     if (fragment.color != firstStyle.color ||
         !StrokesMatch(fragment.strokeWidth, fragment.strokeColor, firstStyle.strokeWidth,
                       firstStyle.strokeColor)) {
@@ -170,12 +187,12 @@ bool HTMLTextFragmentBuilder::collectReferencedGlyphs(Text* text,
       modifier->selectors.push_back(selector);
       _glyphModifiers.push_back(modifier);
     }
-    for (const auto& shaped : *runs) {
+    for (auto* sourceRun : sourceText->glyphRuns) {
       auto* run = _document->makeNode<GlyphRun>();
-      run->font = font;
-      run->fontSize = shaped.font.getSize();
-      run->glyphs = shaped.glyphs;
-      for (const auto& pos : shaped.positions) {
+      run->font = fonts.at(sourceRun->font);
+      run->fontSize = sourceRun->fontSize;
+      run->glyphs = sourceRun->glyphs;
+      for (const auto& pos : sourceRun->positions) {
         run->positions.push_back(matrix.mapPoint({pos.x, pos.y}));
       }
       float sx = std::hypot(matrix.a, matrix.b);
@@ -190,32 +207,32 @@ bool HTMLTextFragmentBuilder::collectReferencedGlyphs(Text* text,
         run->rotations.assign(run->glyphs.size(), rotation);
         run->skews.assign(run->glyphs.size(), skew);
         for (auto glyphID : run->glyphs) {
-          run->anchors.push_back({-shaped.font.getAdvance(glyphID) * 0.5f, 0});
+          auto* glyph = run->font->glyphs[glyphID - 1];
+          float advance = glyph->advance * run->fontSize / run->font->unitsPerEm;
+          run->anchors.push_back({-advance * 0.5f, 0});
         }
       }
-      auto topLeft = matrix.mapPoint({result.bounds.x, result.bounds.y});
-      run->bounds = {topLeft.x, topLeft.y, result.bounds.width * sx,
-                     result.bounds.height * std::fabs(sy)};
+      auto topLeft = matrix.mapPoint({sourceBounds.x, sourceBounds.y});
+      run->bounds = {topLeft.x, topLeft.y, sourceBounds.width * sx,
+                     sourceBounds.height * std::fabs(sy)};
       text->glyphRuns.push_back(run);
     }
   }
   return true;
 }
 
-Layer* HTMLTextFragmentBuilder::convertReferencedTextHost(const std::shared_ptr<DOMNode>& element,
-                                                          const HTMLInheritedStyle& inherited) {
-  if (_fontFiles.empty()) return nullptr;
+Layer* HTMLTextFragmentBuilder::convertEmbeddedTextHost(const std::shared_ptr<DOMNode>& element,
+                                                        const HTMLInheritedStyle& inherited) {
+  if (_registeredFontFamilies.empty()) return nullptr;
   auto style = _styleCascade.resolveInheritedStyle(element, inherited);
+  size_t firstNode = _document->nodes.size();
   auto* text = _document->makeNode<Text>();
   _glyphModifiers.clear();
   TextFragment fragment = makeFragment(style);
-  if (!collectReferencedGlyphs(text, element, style, Matrix{}, fragment) ||
-      text->glyphRuns.empty()) {
-    std::unordered_set<Node*> remove = {text};
-    for (auto* run : text->glyphRuns) remove.insert(run);
-    for (auto* modifier : _glyphModifiers) {
-      remove.insert(modifier);
-      for (auto* selector : modifier->selectors) remove.insert(selector);
+  if (!collectEmbeddedGlyphs(text, element, style, Matrix{}, fragment) || text->glyphRuns.empty()) {
+    std::unordered_set<Node*> remove;
+    for (size_t i = firstNode; i < _document->nodes.size(); ++i) {
+      remove.insert(_document->nodes[i].get());
     }
     _document->removeNodes(remove);
     return nullptr;
@@ -376,7 +393,7 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
 
 Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
                                                     const HTMLInheritedStyle& inherited) {
-  if (auto* layer = convertReferencedTextHost(element, inherited)) return layer;
+  if (auto* layer = convertEmbeddedTextHost(element, inherited)) return layer;
   // The generator emits glyph <span>s as direct children of the host container; the first one
   // carries the style (font size / colour) of the first rendered glyph.
   std::shared_ptr<DOMNode> firstSpan;
@@ -597,7 +614,7 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
                                                 const HTMLBoxAttributes& box,
                                                 const HTMLInheritedStyle& inherited) {
   if (element->findAttribute("data-pagx-text") != nullptr) {
-    if (auto* layer = convertReferencedTextHost(element, inherited)) return layer;
+    if (auto* layer = convertEmbeddedTextHost(element, inherited)) return layer;
     // WOFF2 round-trip span host: the DOM text nodes hold PUA glyph characters; restore the
     // original semantics from the data-pagx-* attributes instead of collecting them.
     TextFragment frag = makeFragment(inherited);

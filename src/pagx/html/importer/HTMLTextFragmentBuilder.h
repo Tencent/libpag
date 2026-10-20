@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Color.h"
@@ -32,7 +33,6 @@ namespace pagx {
 struct DOMNode;
 class Data;
 class Fill;
-class Font;
 class HTMLDiagnosticSink;
 class HTMLIdAllocator;
 class HTMLLayerBuilder;
@@ -167,11 +167,11 @@ class HTMLTextFragmentBuilder {
   Stroke* buildTextStroke(const TextFragment& fragment);
 
  private:
-  bool collectReferencedGlyphs(Text* text, const std::shared_ptr<DOMNode>& element,
-                               const HTMLInheritedStyle& inherited, const Matrix& matrix,
-                               TextFragment& firstStyle, int depth = 0);
-  Layer* convertReferencedTextHost(const std::shared_ptr<DOMNode>& element,
-                                   const HTMLInheritedStyle& inherited);
+  bool collectEmbeddedGlyphs(Text* text, const std::shared_ptr<DOMNode>& element,
+                             const HTMLInheritedStyle& inherited, const Matrix& matrix,
+                             TextFragment& firstStyle, int depth = 0);
+  Layer* convertEmbeddedTextHost(const std::shared_ptr<DOMNode>& element,
+                                 const HTMLInheritedStyle& inherited);
 
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
 
@@ -254,8 +254,7 @@ class HTMLTextFragmentBuilder {
   HTMLIdAllocator& _idAllocator;
   bool _emitFontRequestMetadata = false;
   PAGXDocument* _document = nullptr;
-  std::unordered_map<std::string, std::string> _fontFiles = {};
-  std::unordered_map<std::string, Font*> _fontResources = {};
+  std::unordered_set<std::string> _registeredFontFamilies = {};
   std::vector<TextModifier*> _glyphModifiers = {};
 };
 

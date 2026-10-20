@@ -406,7 +406,7 @@ class TextLayoutContext {
     // special characters (newline, tab) that do not go through per-character glyph fallback.
     auto metricsTypeface = primaryTypeface;
     if (metricsTypeface == nullptr && layoutContext_ != nullptr) {
-      metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr, std::string());
+      metricsTypeface = layoutContext_->fallbackTypeface('A', nullptr);
     }
 
     float effectiveFontSize = glyph.fontSize * textScale;
