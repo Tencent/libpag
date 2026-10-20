@@ -32,6 +32,7 @@
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
+#include <mutex>
 #import "PAGSurface+Metal.h"
 #include "platform/cocoa/private/metal/MetalLayerHelper.h"
 #endif
@@ -49,6 +50,9 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
+#if defined(TGFX_USE_METAL)
+  std::mutex renderLock;
+#endif
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -102,8 +106,15 @@
   [animator cancel];
   [animator release];
   [animatorListenerProxy release];
-  [pagPlayer release];
-  [pagSurface release];
+  {
+#if defined(TGFX_USE_METAL)
+    std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
+    [pagPlayer release];
+    pagPlayer = nil;
+    [pagSurface release];
+    pagSurface = nil;
+  }
   [pagFile release];
   [filePath release];
   [listeners release];
@@ -113,6 +124,11 @@
 }
 
 - (void)refreshSurfaceSize {
+#if defined(TGFX_USE_METAL)
+  // CVDisplayLink updates synchronously on its own thread, not the main thread. Keep the layer
+  // size write and the surface cache invalidation in the same critical section as rendering.
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   if (pagSurface == nil) {
     return;
   }
@@ -194,17 +210,21 @@
 }
 
 - (void)initPAGSurface {
+  {
 #if defined(TGFX_USE_METAL)
-  CAMetalLayer* layer = (CAMetalLayer*)self.layer;
-  pag::cocoa::SetUpPAGMetalLayer(layer);
-  // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
-  [self updateLayerDrawableSize];
-  pagSurface = [[PAGSurface FromLayer:layer] retain];
+    std::lock_guard<std::mutex> autoLock(renderLock);
+    CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+    pag::cocoa::SetUpPAGMetalLayer(layer);
+    // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
+    // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+    [self updateLayerDrawableSize];
+    pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else
-  pagSurface = [[PAGSurface FromView:self] retain];
+    pagSurface = [[PAGSurface FromView:self] retain];
 #endif
-  [pagPlayer setSurface:pagSurface];
+    [pagPlayer setSurface:pagSurface];
+  }
+  // Synchronous updates re-enter onAnimationFlush:, which acquires renderLock.
   [animator update];
 }
 
@@ -258,6 +278,9 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -384,6 +407,9 @@
 }
 
 - (BOOL)flush {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   return [pagPlayer flush];
 }
 

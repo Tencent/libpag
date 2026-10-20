@@ -33,9 +33,18 @@
 #import "platform/ios/private/PAGSurface+Internal.h"
 #import "platform/ios/private/PAGSurfaceImpl+Internal.h"
 #else
+#include <atomic>
+#include <thread>
+#import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/cocoa/private/PAGLayerImpl+Internal.h"
 #import "platform/mac/PAGSurface+Metal.h"
+#import "platform/mac/PAGView.h"
 #import "platform/mac/private/PAGSurface+Internal.h"
 #import "platform/mac/private/PAGSurfaceImpl+Internal.h"
+
+@interface PAGView (MetalSurfaceTests)
+- (void)initPAGSurface;
+@end
 #endif
 
 namespace {
@@ -133,6 +142,32 @@ static void CheckWindowReadback(BOOL framebufferOnly) {
     EXPECT_EQ(pixels, originalPixels);
   }
 }
+
+#if !TARGET_OS_IPHONE
+static constexpr int VIEW_RESIZE_COUNT = 64;
+
+struct ViewRenderState {
+  std::atomic<bool> started{false};
+  int animationUpdates = 0;
+  int manualFlushes = 0;
+};
+
+static void RenderViewDuringResize(PAGView* view, std::shared_ptr<pag::PAGSolidLayer> solid,
+                                   ViewRenderState* state) {
+  @autoreleasepool {
+    state->started.store(true);
+    for (int index = 0; index < VIEW_RESIZE_COUNT; index++) {
+      solid->setSolidColor(index % 2 == 0 ? pag::Red : pag::Blue);
+      if (index % 2 == 0) {
+        [(id<PAGAnimatorUpdater>)view onAnimationFlush:0];
+        state->animationUpdates++;
+      } else if ([view flush]) {
+        state->manualFlushes++;
+      }
+    }
+  }
+}
+#endif
 
 }  // namespace
 
@@ -249,6 +284,58 @@ PAG_TEST(PAGMetalSurfaceTest, ExternalTextureDeviceResolutionRejectsInvalidResou
     EXPECT_TRUE(pag::Devices::MakeForTexture(target) == nullptr);
   }
 }
+
+#if !TARGET_OS_IPHONE
+/**
+ * Verifies that main-thread resizing and background animation/manual rendering stay compatible,
+ * including synchronous redraw after growing a view from zero size.
+ */
+PAG_TEST(PAGMetalSurfaceTest, ViewResizeAndBackgroundRendering) {
+  @autoreleasepool {
+    ASSERT_TRUE([NSThread isMainThread]);
+    auto view = [[[PAGView alloc] initWithFrame:CGRectMake(0, 0, SURFACE_SIZE, SURFACE_SIZE)]
+        autorelease];
+    auto composition = [PAGComposition Make:CGSizeMake(SURFACE_SIZE, SURFACE_SIZE)];
+    ASSERT_TRUE(composition != nil);
+    auto solid = pag::PAGSolidLayer::Make(1000000, SURFACE_SIZE, SURFACE_SIZE, pag::Red);
+    ASSERT_TRUE(solid != nullptr);
+    ASSERT_TRUE([composition addLayer:[PAGLayerImpl ToPAGLayer:solid]]);
+    [view setComposition:composition];
+    [view initPAGSurface];
+    PAGSurface* surface = [view valueForKey:@"pagSurface"];
+    ASSERT_TRUE(surface != nil);
+    auto nativeSurface = [surface.surface pagSurface];
+    ASSERT_TRUE(nativeSurface != nullptr);
+
+    ViewRenderState state;
+    std::thread renderThread(RenderViewDuringResize, view, solid, &state);
+    while (!state.started.load()) {
+      std::this_thread::yield();
+    }
+    for (int index = 0; index < VIEW_RESIZE_COUNT; index++) {
+      int size = index % 2 == 0 ? SURFACE_SIZE : SURFACE_SIZE * 2;
+      [view setFrameSize:NSMakeSize(size, size)];
+      std::this_thread::yield();
+    }
+    renderThread.join();
+    EXPECT_EQ(state.animationUpdates, VIEW_RESIZE_COUNT / 2);
+    EXPECT_EQ(state.manualFlushes, VIEW_RESIZE_COUNT / 2);
+
+    [view setFrameSize:NSMakeSize(0, 0)];
+    [view setFrameSize:NSMakeSize(SURFACE_SIZE, SURFACE_SIZE)];
+    auto layer = (CAMetalLayer*)view.layer;
+    EXPECT_TRUE(CGSizeEqualToSize(layer.drawableSize, CGSizeMake(SURFACE_SIZE, SURFACE_SIZE)));
+    EXPECT_EQ(nativeSurface->width(), SURFACE_SIZE);
+    EXPECT_EQ(nativeSurface->height(), SURFACE_SIZE);
+    pag::DeviceLockScope scope(nativeSurface->drawable->getDevice());
+    ASSERT_TRUE(static_cast<bool>(scope));
+    auto gpuSurface = nativeSurface->drawable->getSurface(scope.context(), true);
+    ASSERT_TRUE(gpuSurface != nullptr);
+    EXPECT_EQ(gpuSurface->width(), SURFACE_SIZE);
+    EXPECT_EQ(gpuSurface->height(), SURFACE_SIZE);
+  }
+}
+#endif
 
 #if TARGET_OS_IPHONE
 /**
