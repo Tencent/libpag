@@ -61,6 +61,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -217,7 +218,7 @@ static bool AccessMatrix(Node* node, KeyValue* getOut, const KeyValue* setIn) {
     return true;
   }
   const auto* value = std::get_if<Matrix>(setIn);
-  if (value == nullptr) {
+  if (value == nullptr || !IsFiniteMatrix(*value)) {
     return false;
   }
   self->*Field = *value;

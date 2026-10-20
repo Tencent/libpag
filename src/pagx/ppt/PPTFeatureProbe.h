@@ -53,13 +53,17 @@ struct PPTFeatureFlags {
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
-  bool hasBackdropStyle = false;     // A backdrop-sampling layer style (BackgroundBlurStyle or
-                                     // GlassStyle). Both are shader-based effects that sample the
-                                     // pixels behind the layer (frosted blur for BackgroundBlur;
-                                     // refraction / dispersion / edge lighting for Glass). OOXML
-                                     // has no primitive that can reproduce either; on the vector
-                                     // path the style is silently dropped, and only the
-                                     // backdrop-aware raster fallback can reproduce it.
+  // The Layer's perspective makes w depend on x / y, so no 2D affine can represent the projection
+  // (a rectangle renders as a trapezoid). The projected matrix stays axis aligned, so the shear
+  // probe above cannot see it.
+  bool hasPerspectiveTransform = false;
+  bool hasBackdropStyle = false;  // A backdrop-sampling layer style (BackgroundBlurStyle or
+                                  // GlassStyle). Both are shader-based effects that sample the
+                                  // pixels behind the layer (frosted blur for BackgroundBlur;
+                                  // refraction / dispersion / edge lighting for Glass). OOXML
+                                  // has no primitive that can reproduce either; on the vector
+                                  // path the style is silently dropped, and only the
+                                  // backdrop-aware raster fallback can reproduce it.
 
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
@@ -71,7 +75,7 @@ struct PPTFeatureFlags {
    */
   bool needsRasterization(bool bakeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
-        hasDiamondGradient || hasShearTransform) {
+        hasDiamondGradient || hasShearTransform || hasPerspectiveTransform) {
       return true;
     }
     if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackdropStyle)) {

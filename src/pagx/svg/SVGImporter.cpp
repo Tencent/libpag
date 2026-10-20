@@ -2775,7 +2775,10 @@ static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-    while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
+    // Skip the separator of an empty declaration too: rule bodies collected from a <style> element
+    // may join with a semicolon that follows one the previous body already ended with.
+    while (pos < styleStr.size() &&
+           (std::isspace(static_cast<unsigned char>(styleStr[pos])) || styleStr[pos] == ';')) {
       ++pos;
     }
     // Skip CSS comments.

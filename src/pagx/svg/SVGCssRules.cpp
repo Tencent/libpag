@@ -22,6 +22,16 @@
 
 namespace pagx {
 
+// Appends declarations to target, adding the separator only when target does not already end with
+// one, so a rule body that ends with a semicolon does not produce an empty declaration that the
+// style parsers would read as part of the next property name.
+static void AppendDeclarations(std::string* target, const std::string& declarations) {
+  if (!target->empty() && target->back() != ';') {
+    *target += ';';
+  }
+  *target += declarations;
+}
+
 // Parses the text content of a <style> element into class rules: .name { property: value; }.
 // Comma-separated selector groups register every class they contain. Later rules for the same
 // class append their declarations with ";" so they win over earlier ones.
@@ -98,12 +108,7 @@ static void ParseStyleRuleText(const std::string& cssContent,
         if (!selector.empty() && selector[0] == '.') {
           std::string className = selector.substr(1);
           if (!className.empty()) {
-            auto it = rules->find(className);
-            if (it != rules->end()) {
-              it->second += ";" + styleContent;
-            } else {
-              (*rules)[className] = styleContent;
-            }
+            AppendDeclarations(&(*rules)[className], styleContent);
           }
         }
 
@@ -164,10 +169,7 @@ std::string CollectSvgClassDeclarations(const std::unordered_map<std::string, st
     }
     auto rule = rules.find(classNames.substr(pos, endPos - pos));
     if (rule != rules.end()) {
-      if (!declarations.empty()) {
-        declarations += ";";
-      }
-      declarations += rule->second;
+      AppendDeclarations(&declarations, rule->second);
     }
     pos = endPos;
   }

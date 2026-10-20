@@ -94,6 +94,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasDiamondGradient |= src.hasDiamondGradient;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
+  dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
   dst->hasBackdropStyle |= src.hasBackdropStyle;
 }
 
@@ -205,6 +206,12 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   // skew / perspective components) projected to 2D, which is what PPTExporter decomposes.
   if (MatrixHasShear(BuildLayerMatrix(layer))) {
     out.hasShearTransform = true;
+  }
+  // A perspective whose w varies with x / y cannot be flattened into any 2D affine, and the
+  // projected x / y rows stay axis aligned, so the shear probe above cannot see it.
+  auto local = BuildLayerLocalMatrix3D(layer);
+  if (local.getRowColumn(3, 0) != 0 || local.getRowColumn(3, 1) != 0) {
+    out.hasPerspectiveTransform = true;
   }
   for (const auto* filter : layer->filters) {
     if (filter == nullptr) {

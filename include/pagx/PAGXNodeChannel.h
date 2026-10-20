@@ -60,8 +60,8 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
  * @param channel  the channel name (see the encoding notes above).
  * @param value  the value to write; its KeyValue alternative must match the field's type.
  * @return true on success; false if node is null, the channel is unknown for the node type, the
- * KeyValue type does not match the field, an enum string is invalid, or a Matrix3D value is not
- * finite and invertible.
+ * KeyValue type does not match the field, an enum string is invalid, a Matrix value is not finite,
+ * or a Matrix3D value is not finite and invertible.
  */
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value);
 

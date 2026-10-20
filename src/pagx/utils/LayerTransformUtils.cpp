@@ -17,9 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/LayerTransformUtils.h"
+#include <cmath>
+#include "base/utils/Log.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
+
+bool IsFiniteMatrix(const Matrix& matrix) {
+  return std::isfinite(matrix.a) && std::isfinite(matrix.b) && std::isfinite(matrix.c) &&
+         std::isfinite(matrix.d) && std::isfinite(matrix.tx) && std::isfinite(matrix.ty);
+}
+
+bool HasGeneratedLayoutPosition(const Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  auto position = layer->layoutPosition();
+  return !std::isnan(position.x) || !std::isnan(position.y);
+}
 
 Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z) {
   Matrix3D result = {};
@@ -57,6 +72,7 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
   if (ComposeMatrix3DComponents(*components, matrix)) {
     return;
   }
+  LOGE("LayerTransformComponents: fell back to the translation only.");
   Matrix3DComponents translation = {};
   for (int i = 0; i < 3; ++i) {
     translation.translate[i] = components->translate[i];
@@ -68,10 +84,16 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
 
 Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
-    return layer->matrix3D;
+    if (IsFiniteMatrix3D(layer->matrix3D)) {
+      return layer->matrix3D;
+    }
+    LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix3D.");
   }
   if (!layer->matrix.isIdentity()) {
-    return LiftMatrixToMatrix3D(layer->matrix, layer->z);
+    if (IsFiniteMatrix(layer->matrix)) {
+      return LiftMatrixToMatrix3D(layer->matrix, layer->z);
+    }
+    LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix.");
   }
   Matrix3DComponents components = {};
   Matrix3D result = {};

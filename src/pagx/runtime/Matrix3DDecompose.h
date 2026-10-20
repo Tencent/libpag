@@ -132,19 +132,31 @@ inline double Determinant4(const double source[4][4]) {
   return determinant;
 }
 
-// Returns true if the matrix is finite and invertible. Each column is first divided by its
-// Euclidean norm, so the determinant becomes the Hadamard ratio |det(M)| / (product of the column
-// norms) in [0, 1]. The threshold then depends neither on the overall scale nor on how large the
-// translation is relative to the linear part.
+// Returns true if the matrix is finite and invertible. The translation is moved out of the last
+// column first, by a column operation that leaves the determinant unchanged, so a large translation
+// cannot make a well-conditioned matrix look singular. Each column is then divided by its Euclidean
+// norm, so the determinant becomes the Hadamard ratio |det(M)| / (product of the column norms) in
+// [0, 1] and the threshold depends neither on the overall scale nor on the translation.
 inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   if (!IsFiniteMatrix3D(matrix)) {
     return false;
   }
   double values[4][4] = {};
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      values[row][column] = matrix.getRowColumn(row, column);
+    }
+  }
+  double translateX = values[0][3];
+  double translateY = values[1][3];
+  double translateZ = values[2][3];
+  for (int row = 0; row < 4; ++row) {
+    values[row][3] -=
+        translateX * values[row][0] + translateY * values[row][1] + translateZ * values[row][2];
+  }
   for (int column = 0; column < 4; ++column) {
     double norm = 0;
     for (int row = 0; row < 4; ++row) {
-      values[row][column] = matrix.getRowColumn(row, column);
       norm += values[row][column] * values[row][column];
     }
     norm = std::sqrt(norm);

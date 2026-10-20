@@ -526,13 +526,25 @@ std::string MatrixTransformToCSS(const Matrix& m) {
          CssFloatToString(m.ty) + ')';
 }
 
+// Matrix3D values need more precision than the four decimals CssFloatToString keeps: the projection
+// row of a perspective distance d holds -1/d, which rounds to 0 for d >= 40000 and silently drops
+// the perspective in the browser.
+static std::string Matrix3DValueToString(float value) {
+  if (!std::isfinite(value)) {
+    return "0";
+  }
+  char buffer[32] = {};
+  std::snprintf(buffer, sizeof(buffer), "%.9g", value);
+  return buffer;
+}
+
 std::string Matrix3DToCSS(const Matrix3D& m) {
   std::string r = "matrix3d(";
   for (int i = 0; i < 16; i++) {
     if (i > 0) {
       r += ',';
     }
-    r += CssFloatToString(m.values[i]);
+    r += Matrix3DValueToString(m.values[i]);
   }
   r += ')';
   return r;

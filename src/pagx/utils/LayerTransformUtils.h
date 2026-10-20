@@ -30,6 +30,13 @@ struct Matrix3DComponents;
 // axis, leaving the Z axis otherwise untouched.
 Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z);
 
+// Returns true if all values of the 2D matrix are finite.
+bool IsFiniteMatrix(const Matrix& matrix);
+
+// Returns true if constraint or container layout generated a position for the layer. A generated
+// position is applied outside the layer's local transform, as T(layoutPosition) * local.
+bool HasGeneratedLayoutPosition(const Layer* layer);
+
 // Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from
 // its default value.
 bool HasLayerTransformComponents(const Layer* layer);

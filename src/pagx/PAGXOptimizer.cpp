@@ -489,7 +489,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   auto* m = layer->mask;
-  if (m->x != 0 || m->y != 0) {
+  if (m->x != 0 || m->y != 0 || HasGeneratedLayoutPosition(m)) {
     return false;
   }
   if (!m->matrix.isIdentity()) {
