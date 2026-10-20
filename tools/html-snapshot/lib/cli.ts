@@ -331,6 +331,11 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
       fail(`--font-manifest requires --download-fonts`);
     }
     opts.fontManifest = path.resolve(opts.fontManifest);
+  } else if (opts.downloadFonts) {
+    // The snapshot uses document-local aliases, so always retain their source bindings.
+    opts.fontManifest = opts.outputToStdout
+      ? path.join(opts.fontDir, 'fonts.json')
+      : opts.output + '.fonts.json';
   }
   return opts;
 }
@@ -376,10 +381,9 @@ Options:
                              scrolled into view.
   --download-fonts           Save every web font the page uses (each
                              unicode-range subset the browser fetched) to disk
-                             as a plain SFNT (TTF/OTF). Default: disabled. Hand
-                             the files to 'pagx render --fallback' or
-                             'pagx embed --fallback' so text in an
-                             uninstalled web font renders with the right face.
+                             as a plain SFNT (TTF/OTF). Default: disabled.
+                             Writes a manifest binding CSS aliases to these
+                             files; html2pagx passes it to embed and render.
   --font-dir <dir>           Destination for --download-fonts (default:
                              <output-without-ext>.fonts/). May be shared across
                              runs; identical faces are stored once (content-
@@ -393,11 +397,10 @@ Options:
                              <output-without-ext>.images/). May be shared across
                              runs; identical images are stored once (content-
                              addressed filenames).
-  --font-manifest <file>     Write the font files this page uses (one absolute
-                             path per line) to <file>. Requires
-                             --download-fonts. Lets callers pass only the fonts
-                             this page needs to 'pagx render' / 'pagx embed'
-                             when --font-dir is shared.
+  --font-manifest <file>     Write a versioned JSON manifest of font files and
+                             CSS face bindings to <file>. Requires
+                             --download-fonts. Defaults to <output>.fonts.json
+                             or <font-dir>/fonts.json for stdout output.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

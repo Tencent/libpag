@@ -42,7 +42,8 @@ class LayoutContext {
   // Finds a typeface for the given family/style. Searches user-registered fonts first,
   // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
-                                               const std::string& fontStyle);
+                                               const std::string& fontStyle,
+                                               int32_t codepoint = -1);
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
   // fonts first, then system fallback fonts. Typefaces are created on demand.

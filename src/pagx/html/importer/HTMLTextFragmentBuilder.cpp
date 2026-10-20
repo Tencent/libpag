@@ -35,6 +35,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/StringParser.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -84,6 +85,7 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   t->fontSize = fragment.fontSize;
   t->letterSpacing = fragment.letterSpacing;
   t->inlinePositions = fragment.inlinePositions;
+  t->textOrientation = fragment.textOrientation;
   return t;
 }
 
@@ -130,6 +132,9 @@ void HTMLTextFragmentBuilder::applyPagxTextMetadata(TextFragment& frag, const DO
   if (const std::string* value = element->findAttribute("data-pagx-font-style")) {
     frag.fontStyleName = *value;
     frag.exactFontStyle = true;
+  }
+  if (const auto* value = element->findAttribute("data-pagx-text-orientation")) {
+    frag.textOrientation = TextOrientationFromString(*value);
   }
   if (const auto* value = element->findAttribute("data-pagx-inline-positions")) {
     if (!ParseTextInlinePositions(frag.text, *value, &frag.inlinePositions)) {
@@ -249,6 +254,7 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.fauxItalic = inherited.fauxItalic;
   frag.fontSize = inherited.fontSizePx;
   frag.letterSpacing = inherited.letterSpacingPx;
+  frag.textOrientation = TextOrientationFromString(ToLower(Trim(inherited.textOrientation)));
   frag.color = inherited.resolvedTextColor;
   frag.textDecoration = inherited.textDecoration;
   frag.strokeWidth = inherited.textStrokeWidthPx;
@@ -281,9 +287,9 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
   // prevent two same-styled inline runs from merging. Use a small absolute tolerance for
   // the float fields. The tolerance is well below any visually-meaningful step.
   constexpr float epsilon = 1e-3f;
-  return a.fontFamily == b.fontFamily && a.fontStyleName == b.fontStyleName &&
-         a.fauxBold == b.fauxBold && a.fauxItalic == b.fauxItalic &&
-         std::fabs(a.fontSize - b.fontSize) < epsilon &&
+  return a.textOrientation == b.textOrientation && a.fontFamily == b.fontFamily &&
+         a.fontStyleName == b.fontStyleName && a.fauxBold == b.fauxBold &&
+         a.fauxItalic == b.fauxItalic && std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
          a.fillSolidSet == b.fillSolidSet && a.fillSolid == b.fillSolid &&
@@ -303,7 +309,8 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
   bool incomingCollapse = true;
   bool incomingPreserveNewlines = false;
   ResolveWhiteSpaceFlags(inherited.whiteSpace, incomingCollapse, incomingPreserveNewlines);
-  return familyMatch && a.fontStyleName == inherited.fontStyleName &&
+  return a.textOrientation == TextOrientationFromString(ToLower(Trim(inherited.textOrientation))) &&
+         familyMatch && a.fontStyleName == inherited.fontStyleName &&
          a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
@@ -511,7 +518,10 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   bool startAligned = textAlign.empty() || textAlign == "left" || textAlign == "start";
   bool shrinkToFit = inlineTag && hasNoWrap && !hasBgVisuals && notFlexGrow && startAligned;
   bool shrinkWidth = shrinkToFit && !isVertical && std::isnan(box.rightPx);
-  bool shrinkHeight = shrinkToFit && isVertical && std::isnan(box.bottomPx);
+  bool hasInlinePositions = std::any_of(fragments.begin(), fragments.end(), [](const auto& frag) {
+    return !frag.inlinePositions.empty();
+  });
+  bool shrinkHeight = shrinkToFit && isVertical && !hasInlinePositions && std::isnan(box.bottomPx);
 
   Layer* textHost = nullptr;
   Layer* wrapper =

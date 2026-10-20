@@ -92,6 +92,7 @@ struct HTMLInheritedStyle {
   std::string textDecorationColor = {};
   std::string whiteSpace = {};
   std::string writingMode = {};
+  std::string textOrientation = "mixed";
   // CSS `-webkit-text-stroke` resolved by HTMLStyleCascade into a stroke width (px) and a
   // concrete colour. `textStrokeWidthPx` is NaN when no stroke is authored (or the width is
   // zero, which paints nothing); a positive value drives an extra PAGX text `<Stroke>` emitted

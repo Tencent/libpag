@@ -33,6 +33,7 @@ struct EmbedOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   std::vector<std::string> fallbacks = {};
+  std::vector<FontFaceBinding> fontFaces = {};
   bool skipFonts = false;
   bool skipImages = false;
 };
@@ -45,6 +46,8 @@ static void PrintEmbedUsage() {
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
+      << "  --font-face <alias> <source> <index> <style> <ranges>\n"
+      << "                          Bind an ordered face (index -1 selects a system family)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
       << "  --skip-fonts                     Skip font embedding\n"
@@ -58,6 +61,14 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
     std::string arg = argv[i];
     if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
       options->outputFile = argv[++i];
+    } else if (arg == "--font-face" && i + 5 < argc) {
+      FontFaceBinding binding;
+      if (!ParseFontFaceBinding(argv + i + 1, &binding)) {
+        std::cerr << "Invalid --font-face binding\n";
+        return 1;
+      }
+      options->fontFaces.push_back(std::move(binding));
+      i += 5;
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
     } else if (arg == "--skip-fonts") {
@@ -99,8 +110,8 @@ int RunEmbed(int argc, char* argv[]) {
     std::cerr << "pagx embed: --skip-fonts and --skip-images cannot both be set\n";
     return 1;
   }
-  if (options.skipFonts && !options.fallbacks.empty()) {
-    std::cerr << "pagx embed: --skip-fonts and --fallback cannot both be set\n";
+  if (options.skipFonts && (!options.fallbacks.empty() || !options.fontFaces.empty())) {
+    std::cerr << "pagx embed: --skip-fonts cannot be combined with font options\n";
     return 1;
   }
 
@@ -114,7 +125,7 @@ int RunEmbed(int argc, char* argv[]) {
   }
 
   if (!options.skipFonts) {
-    if (!EmbedFonts(document.get(), options.fallbacks, "pagx embed")) {
+    if (!EmbedFonts(document.get(), options.fallbacks, "pagx embed", options.fontFaces)) {
       return 1;
     }
   }

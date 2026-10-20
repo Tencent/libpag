@@ -12,7 +12,7 @@ export const TEXT_LAYOUT_PROPERTIES = [
   'color', '-webkit-text-fill-color', '-webkit-text-stroke-width',
   '-webkit-text-stroke-color', 'line-height', 'letter-spacing', 'word-spacing',
   'text-transform', 'text-decoration', 'text-decoration-color', 'text-shadow',
-  'white-space', 'writing-mode', 'direction', 'float', 'background-color',
+  'white-space', 'writing-mode', 'text-orientation', 'direction', 'float', 'background-color',
   'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
 ];

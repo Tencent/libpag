@@ -1184,8 +1184,9 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
 // data-pagx-version and every other data-* attribute are still forwarded.
 static bool IsInternalPagxTextProtocolKey(const std::string& key) {
   static const char* const kProtocolKeys[] = {
-      "pagx-text",           "pagx-text-part", "pagx-font-family", "pagx-font-style",
-      "pagx-letter-spacing", "pagx-faux-bold", "pagx-faux-italic",
+      "pagx-text",        "pagx-text-part",        "pagx-font-family",
+      "pagx-font-style",  "pagx-letter-spacing",   "pagx-faux-bold",
+      "pagx-faux-italic", "pagx-text-orientation", "pagx-inline-positions",
   };
   for (const char* protocolKey : kProtocolKeys) {
     if (key == protocolKey) {

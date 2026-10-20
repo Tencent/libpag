@@ -66,6 +66,7 @@ struct RenderOptions {
   std::string xpath = {};
   std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
+  std::vector<FontFaceBinding> fontFaces = {};
   // When set, the document's animations are evaluated at this playback time (in seconds) and the
   // resulting frame is rendered through the runtime animation path (PAGScene + PAGTimeline) rather
   // than the static layer-tree path. Negative means "no time requested" (static render).
@@ -90,6 +91,8 @@ static void PrintRenderUsage() {
       << "  --quality <0-100>         Encoding quality (default: 100)\n"
       << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n"
       << "  --font <path>             Register a font file (can be specified multiple times)\n"
+      << "  --font-face <alias> <source> <index> <style> <ranges>\n"
+      << "                          Bind an ordered face (index -1 selects a system family)\n"
       << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
          "                            specified multiple times)\n";
 }
@@ -208,6 +211,14 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->xpath = argv[++i];
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.push_back(argv[++i]);
+    } else if (arg == "--font-face" && i + 5 < argc) {
+      FontFaceBinding binding;
+      if (!ParseFontFaceBinding(argv + i + 1, &binding)) {
+        std::cerr << "Invalid --font-face binding\n";
+        return 1;
+      }
+      options->fontFaces.push_back(std::move(binding));
+      i += 5;
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
@@ -344,6 +355,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
     return {};
   }
+  if (!LoadFontFaces(&fontConfig, options.fontFaces, "pagx render")) return {};
   document->applyLayout(&fontConfig);
 
   // Animated frame requested: evaluate the timelines at the requested playback time and render

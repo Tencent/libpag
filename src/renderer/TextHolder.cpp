@@ -95,6 +95,7 @@ void TextHolder::apply(Text* node, const std::string& channel, const KeyValue& v
       return;
     }
     glyph.text = *v;
+    glyph.inlinePositions.clear();
   } else if (channel == "fontFamily") {
     const auto* v = std::get_if<std::string>(&value);
     if (v == nullptr || *v == glyph.fontFamily) {

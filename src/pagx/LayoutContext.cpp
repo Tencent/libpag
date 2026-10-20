@@ -73,10 +73,26 @@ LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& fontFamily,
-                                                            const std::string& fontStyle) {
+                                                            const std::string& fontStyle,
+                                                            int32_t codepoint) {
   if (fontConfig == nullptr) {
     if (!fontFamily.empty()) {
       return ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
+    }
+    return nullptr;
+  }
+
+  auto faces = fontConfig->data->fontFaces.find(fontFamily);
+  if (faces != fontConfig->data->fontFaces.end()) {
+    for (auto& face : faces->second) {
+      bool covered = codepoint < 0 || face.unicodeRanges.empty();
+      for (const auto& range : face.unicodeRanges) {
+        covered |= codepoint >= 0 && static_cast<uint32_t>(codepoint) >= range.first &&
+                   static_cast<uint32_t>(codepoint) <= range.second;
+      }
+      if (!covered) continue;
+      auto typeface = face.holder.getTypeface();
+      if (typeface && (codepoint < 0 || typeface->getGlyphID(codepoint) != 0)) return typeface;
     }
     return nullptr;
   }

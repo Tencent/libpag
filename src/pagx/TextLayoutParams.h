@@ -25,6 +25,7 @@
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/TextAlign.h"
 #include "pagx/types/TextBaseline.h"
+#include "pagx/types/TextOrientation.h"
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
@@ -40,6 +41,8 @@ struct TextGlyphParams {
   std::string fontStyle;
   float fontSize = 12.0f;
   float letterSpacing = 0.0f;
+
+  TextOrientation textOrientation = TextOrientation::Mixed;
   std::vector<float> inlinePositions = {};
   bool fauxBold = false;
   bool fauxItalic = false;

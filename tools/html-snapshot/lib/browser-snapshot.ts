@@ -807,6 +807,8 @@ function readBorderSide(computed, side) {
 // bar should sit 1.5px from the inner padding edge, but emitting the raw
 // border-box-relative offset (2.5px) drifts it by the 1px border).
 function paddingBoxOrigin(rect, computed) {
+  // Asymmetric borders become paint overlays; the emitted host has no CSS border.
+  if (!isUniformBorder(computed)) return rect;
   const bt = borderWidthOf(computed, 'top');
   const bl = borderWidthOf(computed, 'left');
   if (bt === 0 && bl === 0) return rect;
@@ -1253,20 +1255,44 @@ function snapshotFontFamily(value, computed) {
   if (!aliases.length) return value;
   const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
   const italic = /italic|oblique/.test(computed.getPropertyValue('font-style'));
-  return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
+  const faces = [];
+  for (const part of (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || [])) {
     const family = part.trim().replace(/^["']|["']$/g, '');
     const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
-    matches.sort((a, b) => {
-      const score = (face) => {
-        const range = (face.weight || '400').split(/\s+/).map(Number);
-        const lo = range[0] || 400, hi = range[1] || lo;
-        return (italic !== /italic|oblique/.test(face.style) ? 10000 : 0) +
-          Math.max(lo - weight, weight - hi, 0);
-      };
-      return score(a) - score(b);
-    });
-    return matches.length ? `'${matches[0].to.replace(/'/g, "\\'")}'` : part.trim();
-  }).join(', ');
+    const weightScore = (face) => {
+      const range = (face.weight || '400').split(/\s+/).map(Number);
+      const lo = range[0] || 400, hi = range[1] || lo;
+      if (weight >= lo && weight <= hi) return 0;
+      // CSS Fonts weight matching: 400..500 first searches upward through 500,
+      // then lighter faces, then heavier faces. Other weights search toward their edge first.
+      if (weight >= 400 && weight <= 500) {
+        if (lo > weight && lo <= 500) return lo - weight;
+        if (hi < weight) return 1000 + weight - hi;
+        return 2000 + lo - weight;
+      }
+      return weight < 400 ? (hi < weight ? weight - hi : 1000 + lo - weight)
+                          : (lo > weight ? lo - weight : 1000 + weight - hi);
+    };
+    const score = face => (italic !== /italic|oblique/.test(face.style) ? 10000 : 0) + weightScore(face);
+    matches.sort((a, b) => score(a) - score(b));
+    if (matches.length) {
+      const best = score(matches[0]);
+      // Later @font-face rules take precedence for overlapping unicode ranges.
+      faces.push(...matches.filter(face => score(face) === best).reverse());
+    } else {
+      faces.push({ systemFamily: family, style: (weight >= 600 ? 'Bold' : '') +
+        (italic ? (weight >= 600 ? ' Italic' : 'Italic') : '') || 'Regular' });
+    }
+  }
+  const bindings = window.__pagxFontBindings || (window.__pagxFontBindings = []);
+  const key = JSON.stringify(faces);
+  let binding = bindings.find(b => JSON.stringify(b.faces) === key);
+  if (!binding) {
+    binding = { family: 'pagx-snapshot-font-' + bindings.length, faces };
+    bindings.push(binding);
+  }
+  return "'" + binding.family + "'";
+
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -2887,17 +2913,19 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
       box: false, text: true,
     });
     let transformed = col.computed ? col.text : applyTextTransform(col.text, colComputed);
-    const positions = colComputed.getPropertyValue('text-align') === 'justify'
-      ? measureTextInlinePositions(textNode, col, colComputed, transformed, true) : [];
+    const positions = measureTextInlinePositions(textNode, col, colComputed, transformed, true);
     if (col.computed) {
       transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
     } else {
       if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
       if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
     }
-    const positionAttr = positions.length === Array.from(transformed).length && positions.length > 1
+    const positionAttr = positions.length === Array.from(transformed).length && positions.length > 0
       ? ` data-pagx-inline-positions="${positions.join(',')}"` : '';
-    out.push(`<span${positionAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    if (!positionAttr && transformed) {
+      PAINT_CAPTURE.warnings.push('html-snapshot: vertical text positions unavailable; using natural shaping');
+    }
+    out.push(`<span${positionAttr} style="${withNowrap(base)};text-align:start">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -5276,6 +5304,7 @@ const STYLE_SCHEMA = [
   { prop: 'text-decoration-line',  scope: 'text', defaults: ['none'], outProp: 'text-decoration' },
   { prop: 'text-decoration-color', scope: 'text', defaults: ['currentcolor'], skipIfEqualsTextColor: true },
   { prop: 'white-space',           scope: 'text', defaults: ['normal'] },
+  { prop: 'text-orientation',      scope: 'text', defaults: ['mixed'] },
   { prop: 'writing-mode',          scope: 'text', defaults: ['horizontal-tb'], normalize: normalizeWritingMode },
 ];
 const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));

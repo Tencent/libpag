@@ -986,6 +986,7 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);
+  text->textOrientation = GET_ENUM(node, "textOrientation", "mixed", doc, TextOrientation);
   text->baseline = GET_ENUM(node, "baseline", "lineBox", doc, TextBaseline);
 
   // Parse GlyphRun children for precomposition mode

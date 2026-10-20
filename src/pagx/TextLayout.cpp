@@ -128,6 +128,8 @@ class TextLayoutContext {
     uint32_t cluster = 0;
     float xOffset = 0;
     float yOffset = 0;
+    float verticalAdvance = 0;
+    bool sideways = false;
     uint8_t bidiLevel = 0;
   };
 
@@ -141,9 +143,7 @@ class TextLayoutContext {
     float roundingRatio = 1.0f;
   };
 
-  // Vertical glyph group with layout metrics. Usually contains a single glyph, but consecutive
-  // rotated-group characters (Latin letters, digits, etc.) are collected into one group and rendered
-  // as a horizontal run rotated 90 degrees (tate-chu-yoko).
+  // A shaped glyph with vertical layout metrics. Sideways runs are shaped horizontally first.
   struct VerticalGlyphInfo {
     std::vector<GlyphInfo> glyphs = {};
     VerticalOrientation orientation = VerticalOrientation::Upright;
@@ -276,6 +276,7 @@ class TextLayoutContext {
     GlyphInfo gi = {};
     gi.unichar = '\t';
     gi.advance = tabAdvance;
+    gi.verticalAdvance = tabAdvance;
     gi.xPosition = xPosition;
     gi.fontSize = font.getSize();
     gi.ascent = metrics.ascent;
@@ -444,8 +445,13 @@ class TextLayoutContext {
     // Use BiDi resolver to split text into directional runs, then further split by newlines/tabs.
     auto bidiResult = BidiResolver::Resolve(content);
     info.paragraphRTL = bidiResult.isRTL;
-    for (auto& run : bidiResult.runs) {
-      SplitTextSegments(content, run.start, run.length, run.level, segments);
+    if (vertical && glyph.textOrientation == TextOrientation::Upright) {
+      info.paragraphRTL = false;
+      SplitTextSegments(content, 0, content.size(), 0, segments);
+    } else {
+      for (auto& run : bidiResult.runs) {
+        SplitTextSegments(content, run.start, run.length, run.level, segments);
+      }
     }
 
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
@@ -470,7 +476,9 @@ class TextLayoutContext {
       // Shape this text segment with HarfBuzz.
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = seg.bidiLevel & 1;
-      auto shapedGlyphs = TextShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl);
+      auto shapedGlyphs =
+          TextShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl,
+                            glyph.textOrientation, glyph.fontFamily, glyph.fontStyle);
       // Resolve source scalar positions against UTF-8 HarfBuzz cluster boundaries. The minimum
       // handles RTL clusters and ligatures whose source characters have distinct visual boxes.
       std::map<uint32_t, float> clusterPositions;
@@ -510,7 +518,7 @@ class TextLayoutContext {
       // is insufficient because HarfBuzz places neutral characters (spaces, punctuation) at
       // visual positions that don't correspond to a simple reversal of the logical sequence.
       // Visual reordering is done later via the UAX#9 L2 algorithm when building the TextBlob.
-      if (rtl) {
+      if (rtl && !vertical) {
         std::stable_sort(shapedGlyphs.begin(), shapedGlyphs.end(), CompareByCluster);
       }
 
@@ -544,7 +552,7 @@ class TextLayoutContext {
                           : clusterPositions.find(positionCluster->second);
         if (anchor != clusterPositions.end()) {
           gi.inlinePosition = anchor->second + clusterAdvances[anchor->first];
-          clusterAdvances[anchor->first] += vertical ? std::fabs(sg.yAdvance) : sg.xAdvance;
+          clusterAdvances[anchor->first] += vertical && !sg.sideways ? -sg.yAdvance : sg.xAdvance;
         }
         gi.unichar = unichar;
         gi.fontSize = effectiveFontSize;
@@ -556,11 +564,13 @@ class TextLayoutContext {
         gi.cluster = static_cast<uint32_t>(seg.start) + sg.cluster;
         gi.xOffset = sg.xOffset;
         gi.yOffset = sg.yOffset;
+        gi.verticalAdvance = sg.sideways ? sg.xAdvance : -sg.yAdvance;
+        gi.sideways = sg.sideways;
         gi.letterSpacing = effectiveLetterSpacing;
         gi.bidiLevel = seg.bidiLevel;
         info.allGlyphs.push_back(gi);
 
-        currentX += sg.xAdvance + effectiveLetterSpacing;
+        currentX += (vertical ? gi.verticalAdvance : sg.xAdvance) + gi.letterSpacing;
       }
     }
 
@@ -1304,7 +1314,7 @@ class TextLayoutContext {
   std::vector<ColumnInfo> layoutColumns(const std::vector<GlyphInfo>& allGlyphs,
                                         const TextLayoutParams& params) {
     // Phase 1: Build VerticalGlyphInfo list with orientation, metrics, and break marks.
-    // Consecutive rotated-group characters are collected into a single VerticalGlyphInfo.
+    // Orientation and advance come from the same shaping run as glyph IDs and offsets.
     std::vector<VerticalGlyphInfo> vgList = {};
     vgList.reserve(allGlyphs.size());
     for (size_t i = 0; i < allGlyphs.size(); i++) {
@@ -1317,27 +1327,19 @@ class TextLayoutContext {
       }
 
       float letterSpacing = glyph.letterSpacing;
-      auto orientation = VerticalTextUtils::GetOrientation(glyph.unichar);
+      auto orientation =
+          glyph.sideways ? VerticalOrientation::Rotated : VerticalOrientation::Upright;
 
       {
         // Each glyph gets its own VerticalGlyphInfo entry.
         VerticalGlyphInfo vg = {};
         vg.glyphs.push_back(glyph);
         vg.orientation = orientation;
-        if (orientation == VerticalOrientation::Rotated) {
-          // Use horizontal advance from font metrics; HarfBuzz TTB xAdvance may be 0.
-          float hAdvance = glyph.font.getAdvance(glyph.glyphID);
-          vg.height = hAdvance + letterSpacing;
-          vg.width = glyph.fontSize;
-        } else {
-          // For upright characters, use the vertical advance from font metrics.
-          float vertAdvance = glyph.font.getAdvance(glyph.glyphID, true);
-          vg.height = vertAdvance + letterSpacing;
-          vg.width = glyph.fontSize;
-        }
+        vg.height = glyph.verticalAdvance + letterSpacing;
+        vg.width = glyph.fontSize;
 
         if (i > 0 && allGlyphs[i - 1].unichar != '\n') {
-          bool sameCluster = (glyph.cluster != 0 || allGlyphs[i - 1].cluster != 0) &&
+          bool sameCluster = glyph.sourceText == allGlyphs[i - 1].sourceText &&
                              glyph.cluster == allGlyphs[i - 1].cluster;
           vg.canBreakBefore =
               !sameCluster && LineBreaker::CanBreakBetween(allGlyphs[i - 1].unichar, glyph.unichar);
@@ -1682,21 +1684,19 @@ class TextLayoutContext {
           vpg.font = g.font;
           vpg.useRSXform = true;
           float absAscent = fabsf(g.ascent);
-          float tx = columnCenterX - (absAscent - g.descent) / 2;
-          float ty = currentY - vg.leadingSquash;
+          float tx = columnCenterX - (absAscent - g.descent) / 2 + g.yOffset;
+          float ty = currentY - vg.leadingSquash + g.xOffset;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         } else {
-          // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
-          // If the font has vert/vrt2 features, HarfBuzz already substituted the glyph.
+          // HarfBuzz includes vertical origin, glyph substitution, and mark positioning.
           auto& g = vg.glyphs.front();
           VerticalPositionedGlyph vpg = {};
           vpg.glyphID = g.glyphID;
           vpg.font = g.font;
           vpg.useRSXform = false;
-          auto offset = g.font.getVerticalOffset(g.glyphID);
-          float glyphX = columnCenterX + offset.x;
-          float glyphY = currentY - vg.leadingSquash + offset.y;
+          float glyphX = columnCenterX + g.xOffset;
+          float glyphY = currentY - vg.leadingSquash - g.yOffset;
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         }

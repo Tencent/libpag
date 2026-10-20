@@ -449,6 +449,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"white-space", PropAction::Keep, nullptr, nullptr},
     {"text-overflow", PropAction::Keep, nullptr, nullptr},
     {"writing-mode", PropAction::Keep, nullptr, nullptr},
+    {"text-orientation", PropAction::Keep, nullptr, nullptr},
     // `-webkit-text-stroke` (and its two longhands) round-trips into a PAGX text `<Stroke>`
     // (the inverse of HTMLWriter::ResolveTextStrokeCss). The shorthand carries a width token
     // plus a colour token, so it cannot be length-resolved as a unit; keep it verbatim and let

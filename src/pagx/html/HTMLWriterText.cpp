@@ -45,6 +45,7 @@
 #include "pagx/types/TrimType.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/TextUtils.h"
 #include "tgfx/core/UTF.h"
 
 namespace pagx {
@@ -891,6 +892,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // and text-align behave identically to the upright case).
     style += ";font-style:italic";
   }
+  style += ";text-orientation:" + TextOrientationToString(text->textOrientation);
   // Font properties are hoisted to the parent Layer when fontHoisted; skip them on the span.
   if (!fontHoisted) {
     if (!text->fontFamily.empty()) {
@@ -2156,6 +2158,7 @@ static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text) {
   out.addAttrAllowEmpty("data-pagx-text", text->text);
   out.addAttrAllowEmpty("data-pagx-font-family", text->fontFamily);
   out.addAttrAllowEmpty("data-pagx-font-style", text->fontStyle);
+  out.addAttr("data-pagx-text-orientation", TextOrientationToString(text->textOrientation));
   if (!text->inlinePositions.empty()) {
     std::string positions;
     for (float position : text->inlinePositions) {
@@ -2377,22 +2380,20 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       const auto& fontResult = fontIt->second;
       float fontSize = run->fontSize;
       bool runIsBitmapFont = !run->font->glyphs.empty() && run->font->glyphs[0]->image;
+      float currentX = run->x;
       for (size_t i = 0; i < run->glyphs.size(); i++) {
         uint16_t glyphID = run->glyphs[i];
         if (glyphID == 0) {
           continue;
         }
-        // GlyphRun positions are in pixel coordinates (already scaled).
-        // posX/posY = the glyph origin position in screen space.
-        float posX = run->x;
-        float posY = run->y;
-        if (i < run->xOffsets.size()) {
-          posX += run->xOffsets[i];
-        }
-        if (i < run->positions.size()) {
-          posX += run->positions[i].x;
-          posY += run->positions[i].y;
-        }
+        float posX = 0;
+        float posY = 0;
+        ResolveGlyphPosition(run, i, run->x, run->y, currentX, &posX, &posY);
+        auto gi = static_cast<size_t>(glyphID) - 1;
+        float advance = gi < run->font->glyphs.size()
+                            ? run->font->glyphs[gi]->advance * fontSize / run->font->unitsPerEm
+                            : 0;
+        currentX += advance;
 
         bool hasRotation = i < run->rotations.size() && !FloatNearlyZero(run->rotations[i]);
         bool hasGlyphScale = i < run->scales.size() && (!FloatNearlyZero(run->scales[i].x - 1.0f) ||
@@ -2415,64 +2416,16 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
                                 "px;line-height:1;font-family:'" + fontResult.familyName + "'";
         charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
         if (hasTransform) {
-          // When per-glyph transforms are present, compute the CSS matrix that combines
-          // rotation/scale/skew around the PAGX anchor with the residual translation. We cannot
-          // use CSS transform-origin because PAGX's anchor arithmetic shifts only anchorX (not
-          // anchorY) before applying the rotation — the glyph's Y position (posY) participates in
-          // the rotation. CSS transform-origin subtracts origin from the local point before
-          // rotating, which produces different results when anchorY=0 but posY≠0.
-          //
-          // Native: T(-ax, -ay) * S(sx,sy) * Skew * R(θ) * T(ax, ay) * T(posX, posY) * S(fs/upm)
-          // We need: span_origin + CSS matrix * browser_local_point = native screen position
-          // Browser renders glyph at local (px*fs/upm, fontSize + py*fs/upm) within the span.
-          auto gi = static_cast<size_t>(glyphID) - 1;
-          float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
-          float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);
-          float anchorY = 0.0f;
-          if (i < run->anchors.size()) {
-            anchorX += run->anchors[i].x;
-            anchorY += run->anchors[i].y;
-          }
-
-          // Build linear part: S(sx,sy) * Skew * R(θ)
-          float cosR = 1.0f, sinR = 0.0f;
-          if (hasRotation) {
-            float rad = run->rotations[i] * static_cast<float>(M_PI) / 180.0f;
-            cosR = std::cos(rad);
-            sinR = std::sin(rad);
-          }
-          // R matrix: [cosR, -sinR; sinR, cosR]
-          float m00 = cosR, m01 = -sinR, m10 = sinR, m11 = cosR;
-
-          // Skew: [1, -tan(angle); 0, 1] (skewX — horizontal shear matching native shear.c)
-          if (hasSkew) {
-            float tanS = -std::tan(run->skews[i] * static_cast<float>(M_PI) / 180.0f);
-            // Skew * current: row0 += tanS * row1, row1 unchanged
-            float nm00 = m00 + tanS * m10;
-            float nm01 = m01 + tanS * m11;
-            m00 = nm00;
-            m01 = nm01;
-          }
-
-          // Scale: S(sx,sy) * current
-          float gsx = hasGlyphScale ? run->scales[i].x : 1.0f;
-          float gsy = hasGlyphScale ? run->scales[i].y : 1.0f;
-          m00 *= gsx;
-          m01 *= gsx;
-          m10 *= gsy;
-          m11 *= gsy;
-
-          // Translation: T(-ax,-ay) * [linear] * T(ax+posX, ay+cssTop) applied to the span
-          // origin already carried by left/top, i.e. the difference between the full native
-          // translation and the span position.
-          float txFull = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
-          float tyFull = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
-
-          // CSS matrix(a, b, c, d, e, f) maps (x,y) to (a*x+c*y+e, b*x+d*y+f)
-          charStyle += ";transform:matrix(" + CssFloatToString(m00) + "," + CssFloatToString(m10) +
-                       "," + CssFloatToString(m01) + "," + CssFloatToString(m11) + "," +
-                       CssFloatToString(txFull - cssLeft) + "," +
-                       CssFloatToString(tyFull - cssTop) + ")";
+          // Browser glyph coordinates have their baseline at fontSize within the span.
+          // Translate that baseline to zero, apply the common glyph matrix, then express
+          // the result relative to the span origin already carried by left/top.
+          auto matrix = Matrix::Translate(-cssLeft, -cssTop) *
+                        ComposeGlyphMatrix(run, i, advance, posX, posY) *
+                        Matrix::Translate(0, runIsBitmapFont ? 0 : -fontSize);
+          charStyle += ";transform:matrix(" + CssFloatToString(matrix.a) + "," +
+                       CssFloatToString(matrix.b) + "," + CssFloatToString(matrix.c) + "," +
+                       CssFloatToString(matrix.d) + "," + CssFloatToString(matrix.tx) + "," +
+                       CssFloatToString(matrix.ty) + ")";
           charStyle += ";transform-origin:0 0";
         }
 

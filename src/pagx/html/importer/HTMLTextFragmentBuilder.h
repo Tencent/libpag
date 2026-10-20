@@ -24,6 +24,7 @@
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/TextOrientation.h"
 
 namespace pagx {
 
@@ -72,6 +73,7 @@ class HTMLTextFragmentBuilder {
     bool fauxItalic = false;
     float fontSize = HTML_DEFAULT_FONT_SIZE;
     float letterSpacing = 0.0f;
+    TextOrientation textOrientation = TextOrientation::Mixed;
     std::vector<float> inlinePositions = {};
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};

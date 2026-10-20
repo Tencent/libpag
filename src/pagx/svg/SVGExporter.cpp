@@ -2315,22 +2315,23 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
   // / zero-fontSize edge case so the <text font-size> attribute is always populated.
   float fontSize = referenceSize > 0.0f ? referenceSize : 12.0f;
   for (auto* run : text->glyphRuns) {
+    float currentX = run->x;
     for (size_t i = 0; i < run->glyphs.size(); ++i) {
       uint16_t gid = run->glyphs[i];
       if (gid == 0) {
         continue;
       }
-      float gx = run->x;
-      float gy = run->y;
-      if (i < run->xOffsets.size()) {
-        gx += run->xOffsets[i];
-      }
-      if (i < run->positions.size()) {
-        gx += run->positions[i].x;
-        gy += run->positions[i].y;
-      }
-      gx += renderPos.x;
-      gy += renderPos.y;
+      float gx = 0;
+      float gy = 0;
+      ResolveGlyphPosition(run, i, run->x, run->y, currentX, &gx, &gy);
+      auto gi = static_cast<size_t>(gid) - 1;
+      float advance = run->font && run->font->unitsPerEm > 0 && gi < run->font->glyphs.size()
+                          ? run->font->glyphs[gi]->advance * run->fontSize / run->font->unitsPerEm
+                          : 0;
+      currentX += advance;
+      auto glyphMatrix = ComposeGlyphMatrix(run, i, advance, gx, gy);
+      gx = glyphMatrix.tx + renderPos.x;
+      gy = glyphMatrix.ty + renderPos.y;
       if (!puaText.empty()) {
         xList += ' ';
         yList += ' ';
@@ -2380,6 +2381,9 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
 // ── writeText ───────────────────────────────────────────────────────────────
 
 static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor anchor) {
+  if (text->textOrientation != TextOrientation::Mixed) {
+    out.addAttribute("text-orientation", TextOrientationToString(text->textOrientation));
+  }
   // Browser-first bold/italic mapping. A real Bold / Italic face (the PAGX
   // Text carries fontStyle="Bold" / "Italic" / "Bold Italic") is encoded by
   // appending the style to the family name (e.g. "Arial Bold"), and the

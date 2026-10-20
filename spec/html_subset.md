@@ -238,6 +238,7 @@ remain supported.
 | `line-height: N px` / `line-height: N` (unitless multiplier) / `N%` | `TextBox.lineHeight` (unitless and % are resolved against the element's `font-size`) |
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
+| `text-orientation: mixed | upright | sideways` | `Text.textOrientation` (inherited) |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"` (horizontal modes are the default) |
 | `overflow: hidden` (or any non-`visible` axis) on a text container | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
@@ -261,7 +262,9 @@ leaf whose box paints a background/border/shadow, a leaf anchored against its fa
 `data-pagx-inline-positions` on a single-style text leaf supplies comma-separated physical
 inline positions in pixels, one per Unicode scalar of the emitted text. It becomes
 `Text.inlinePositions`, preserving browser justification/word spacing after shaping whole
-clusters. It is intended for a single pre-laid-out line/column; it suppresses rewrapping and
+clusters. Vertical snapshots supply these anchors for every reliably mapped column, including
+start-aligned columns; their measured height is retained and alignment is normalized to start.
+It is intended for a single pre-laid-out line/column; it suppresses rewrapping and
 additional justification. Invalid counts, non-finite values, newlines/tabs, and mixed-style
 hosts produce a diagnostic and use normal layout.
 

@@ -941,6 +941,26 @@ PAGX_TEST(PAGXUtilsTest, ComputeGlyphPaths_DefaultPositioning) {
   EXPECT_FLOAT_EQ(result[1].transform.tx, expectedSecondX);
 }
 
+PAGX_TEST(PAGXUtilsTest, GlyphTransformsKeepLayoutPositionAndAnchor) {
+  pagx::GlyphRun run;
+  run.rotations = {90, 90};
+  run.scales = {{2, 3}, {2, 3}};
+  run.skews = {45, 45};
+  run.anchors = {{2, 5}, {2, 5}};
+  auto a = pagx::ComposeGlyphMatrix(&run, 0, 10, 20, 140);
+  auto b = pagx::ComposeGlyphMatrix(&run, 1, 10, 20, 180);
+  EXPECT_NEAR(b.tx - a.tx, 0, 0.0001f);
+  EXPECT_NEAR(b.ty - a.ty, 40, 0.0001f);
+  // The anchor (7,5) stays fixed at position + anchor for every linear transform.
+  EXPECT_NEAR(a.a * 7 + a.c * 5 + a.tx, 27, 0.0001f);
+  EXPECT_NEAR(a.b * 7 + a.d * 5 + a.ty, 145, 0.0001f);
+  // Scale, then shear, then clockwise rotation: (1,0) maps to (0,2).
+  EXPECT_NEAR(a.a, 0, 0.0001f);
+  EXPECT_NEAR(a.b, 2, 0.0001f);
+  EXPECT_NEAR(a.c, -3, 0.0001f);
+  EXPECT_NEAR(a.d, -3, 0.0001f);
+}
+
 PAGX_TEST(PAGXUtilsTest, ComputeGlyphPaths_WithRotation) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto text = doc->makeNode<pagx::Text>();

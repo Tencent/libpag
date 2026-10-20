@@ -20,12 +20,13 @@
 
 #include <string>
 #include <vector>
-#include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
+#include "pagx/types/TextOrientation.h"
 
 namespace pagx {
 
@@ -72,6 +73,8 @@ class Text : public Element, public LayoutNode {
    * is 0.
    */
   float letterSpacing = 0.0f;
+
+  TextOrientation textOrientation = TextOrientation::Mixed;
 
   /**
    * Optional physical inline positions (x in horizontal text, y in vertical text), in pixels

@@ -41,6 +41,14 @@ class PathData;
 bool ParseTextInlinePositions(const std::string& text, const std::string& value,
                               std::vector<float>* positions);
 
+// Resolve a glyph's pen in layout coordinates. currentX includes all preceding advances.
+void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float baseY, float currentX,
+                          float* posX, float* posY);
+
+// Pixel-space glyph transform: T(position) T(anchor) R K S T(-anchor).
+// The default anchor is half the scaled advance. Font-unit scaling is the caller's responsibility.
+Matrix ComposeGlyphMatrix(const GlyphRun* run, size_t i, float advance, float posX, float posY);
+
 struct GlyphPath {
   Matrix transform;
   const PathData* pathData = nullptr;

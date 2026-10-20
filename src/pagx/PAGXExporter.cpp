@@ -803,6 +803,9 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       xml.addAttribute("fontSize", text->fontSize, Default<Text>().fontSize);
       xml.addAttribute("letterSpacing", text->letterSpacing, Default<Text>().letterSpacing);
+      if (text->textOrientation != Default<Text>().textOrientation) {
+        xml.addAttribute("textOrientation", TextOrientationToString(text->textOrientation));
+      }
       if (!text->inlinePositions.empty()) {
         xml.addAttribute("inlinePositions", FloatListToString(text->inlinePositions));
       }

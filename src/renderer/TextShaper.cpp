@@ -25,6 +25,7 @@
 #include <mutex>
 #include <unordered_map>
 #include "UTF8Utils.h"
+#include "VerticalTextUtils.h"
 #include "hb.h"
 #include "pagx/LayoutContext.h"
 
@@ -132,6 +133,25 @@ static FontCache GetFontCache() {
   return {cacheLRU, cacheMap, cacheMutex};
 }
 
+// CSS needs a stable em-box origin when a font has no vertical metrics. HarfBuzz's
+// default fallback centers each glyph's ink independently, moving punctuation toward the
+// middle of its cell. Keep the normal shaping offsets but synthesize a common baseline.
+static hb_bool_t SynthesizedVerticalOrigin(hb_font_t* font, void*, hb_codepoint_t glyph,
+                                           hb_position_t* x, hb_position_t* y, void*) {
+  auto* parent = hb_font_get_parent(font);
+  hb_font_extents_t extents = {};
+  hb_font_get_h_extents(parent, &extents);
+  *x = hb_font_get_glyph_h_advance(parent, glyph) / 2;
+  *y = extents.ascender;
+  return true;
+}
+
+static hb_position_t SynthesizedVerticalAdvance(hb_font_t* font, void*, hb_codepoint_t, void*) {
+  int xScale = 0, yScale = 0;
+  hb_font_get_scale(font, &xScale, &yScale);
+  return -yScale;
+}
+
 static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typeface>& typeface) {
   if (typeface == nullptr) {
     return nullptr;
@@ -151,13 +171,24 @@ static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typef
   // font size — a standard optimization used by Chrome and other engines.
   auto upem = static_cast<int>(typeface->unitsPerEm());
   hb_font_set_scale(hbFont.get(), upem, upem);
+  if (!typeface->copyTableData(HB_TAG('v', 'h', 'e', 'a')) ||
+      !typeface->copyTableData(HB_TAG('v', 'm', 't', 'x'))) {
+    auto child = std::shared_ptr<hb_font_t>(hb_font_create_sub_font(hbFont.get()), hb_font_destroy);
+    auto* funcs = hb_font_funcs_create();
+    hb_font_funcs_set_glyph_v_origin_func(funcs, SynthesizedVerticalOrigin, nullptr, nullptr);
+    hb_font_funcs_set_glyph_v_advance_func(funcs, SynthesizedVerticalAdvance, nullptr, nullptr);
+    hb_font_set_funcs(child.get(), funcs, nullptr, nullptr);
+    hb_font_funcs_destroy(funcs);
+    hbFont = std::move(child);
+  }
   return cache.insert(typeface->uniqueID(), hbFont);
 }
 
 // Shapes a single run. The run must be homogeneous in font and script.
 static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOffset,
                                          size_t byteLength, const tgfx::Font& font,
-                                         hb_script_t script, bool vertical, bool rtl) {
+                                         hb_script_t script, bool vertical, bool rtl,
+                                         bool isolated = false) {
   auto typeface = font.getTypeface();
   auto hbFont = CreateHBFont(typeface);
   if (hbFont == nullptr) {
@@ -170,8 +201,13 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
   }
 
   // Add the run substring, but provide full text as context for correct shaping at boundaries.
-  hb_buffer_add_utf8(buffer.get(), text.data(), static_cast<int>(text.size()),
-                     static_cast<unsigned int>(byteOffset), static_cast<int>(byteLength));
+  if (isolated) {
+    hb_buffer_add_utf8(buffer.get(), text.data() + byteOffset, static_cast<int>(byteLength), 0,
+                       static_cast<int>(byteLength));
+  } else {
+    hb_buffer_add_utf8(buffer.get(), text.data(), static_cast<int>(text.size()),
+                       static_cast<unsigned int>(byteOffset), static_cast<int>(byteLength));
+  }
 
   hb_feature_t features[2] = {};
   unsigned int featureCount = 0;
@@ -181,7 +217,7 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
     hb_buffer_set_script(buffer.get(), script);
     hb_buffer_set_language(buffer.get(), hb_language_get_default());
     features[featureCount++] = {HB_TAG('v', 'e', 'r', 't'), 1, 0, static_cast<unsigned>(-1)};
-    features[featureCount++] = {HB_TAG('v', 'r', 't', '2'), 1, 0, static_cast<unsigned>(-1)};
+    features[featureCount++] = {HB_TAG('v', 'r', 't', '2'), 0, 0, static_cast<unsigned>(-1)};
   } else if (rtl) {
     hb_buffer_set_direction(buffer.get(), HB_DIRECTION_RTL);
     hb_buffer_set_script(buffer.get(), script);
@@ -210,7 +246,7 @@ static std::vector<ShapedGlyph> ShapeRun(const std::string& text, size_t byteOff
   for (unsigned int i = 0; i < glyphCount; ++i) {
     ShapedGlyph glyph = {};
     glyph.glyphID = static_cast<tgfx::GlyphID>(infos[i].codepoint);
-    glyph.cluster = infos[i].cluster;
+    glyph.cluster = infos[i].cluster + (isolated ? static_cast<uint32_t>(byteOffset) : 0);
     glyph.xAdvance = static_cast<float>(positions[i].x_advance) * scale;
     glyph.yAdvance = static_cast<float>(positions[i].y_advance) * scale;
     glyph.xOffset = static_cast<float>(positions[i].x_offset) * scale;
@@ -227,6 +263,8 @@ struct ShapingRun {
   size_t byteEnd = 0;
   tgfx::Font font = {};
   hb_script_t script = HB_SCRIPT_COMMON;
+  bool vertical = false;
+  bool isolated = false;
 };
 
 // Resolves the effective script for a Unicode code point. COMMON and INHERITED scripts inherit the
@@ -247,7 +285,9 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 // Performs combined font + script itemization. Each character is assigned the best available font
 // and an effective script. Adjacent characters sharing both font and script are merged into runs.
 static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
-                                           LayoutContext& layoutContext) {
+                                           LayoutContext& layoutContext, bool vertical,
+                                           TextOrientation orientation, const std::string& family,
+                                           const std::string& style) {
   std::vector<ShapingRun> runs;
   size_t pos = 0;
   const tgfx::Font* lastFont = nullptr;
@@ -265,20 +305,23 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
 
     // Find the best font for this codepoint.
     const tgfx::Font* bestFont = nullptr;
-    if (primaryFont.getGlyphID(codepoint) != 0) {
+    auto selectedTypeface =
+        family.empty() ? primaryTypeface : layoutContext.findTypeface(family, style, codepoint);
+    if (selectedTypeface && selectedTypeface->getGlyphID(codepoint) == 0)
+      selectedTypeface = nullptr;
+    if (!selectedTypeface)
+      selectedTypeface = layoutContext.fallbackTypeface(codepoint, primaryTypeface.get());
+    if (selectedTypeface == primaryTypeface && selectedTypeface) {
       bestFont = &primaryFont;
-    } else {
-      auto fallbackTypeface = layoutContext.fallbackTypeface(codepoint, primaryTypeface.get());
-      if (fallbackTypeface != nullptr) {
-        auto it = fallbackFontCache.find(fallbackTypeface.get());
-        if (it == fallbackFontCache.end()) {
-          tgfx::Font f(fallbackTypeface, primaryFont.getSize());
-          f.setFauxBold(primaryFont.isFauxBold());
-          f.setFauxItalic(primaryFont.isFauxItalic());
-          it = fallbackFontCache.emplace(fallbackTypeface.get(), std::move(f)).first;
-        }
-        bestFont = &it->second;
+    } else if (selectedTypeface) {
+      auto it = fallbackFontCache.find(selectedTypeface.get());
+      if (it == fallbackFontCache.end()) {
+        tgfx::Font f(selectedTypeface, primaryFont.getSize());
+        f.setFauxBold(primaryFont.isFauxBold());
+        f.setFauxItalic(primaryFont.isFauxItalic());
+        it = fallbackFontCache.emplace(selectedTypeface.get(), std::move(f)).first;
       }
+      bestFont = &it->second;
     }
 
     if (bestFont == nullptr) {
@@ -289,7 +332,23 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
 
     bool sameFont = lastFont != nullptr && bestFont->getTypeface() == lastFont->getTypeface();
     bool sameScript = (script == lastScript);
-    if (sameFont && sameScript) {
+    bool upright = vertical &&
+                   (orientation == TextOrientation::Upright ||
+                    (orientation == TextOrientation::Mixed &&
+                     VerticalTextUtils::GetOrientation(codepoint) == VerticalOrientation::Upright));
+    auto category = hb_unicode_general_category(hb_unicode_funcs_get_default(), codepoint);
+    bool extendsCluster = category == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK ||
+                          category == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK ||
+                          category == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK ||
+                          codepoint == 0x200D;
+    if (extendsCluster && !runs.empty()) {
+      upright = runs.back().vertical;
+    }
+    bool sameOrientation = !runs.empty() && runs.back().vertical == upright;
+    // Upright horizontal cursive scripts use isolated forms. Keep a base and its marks
+    // together, but do not expose neighboring letters as HarfBuzz joining context.
+    bool isolated = upright && hb_script_get_horizontal_direction(script) == HB_DIRECTION_RTL;
+    if (sameFont && sameScript && sameOrientation && (!isolated || extendsCluster)) {
       runs.back().byteEnd = pos + charLen;
     } else {
       ShapingRun run = {};
@@ -297,6 +356,8 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
       run.byteEnd = pos + charLen;
       run.font = *bestFont;
       run.script = script;
+      run.vertical = upright;
+      run.isolated = isolated;
       runs.push_back(run);
       lastFont = bestFont;
     }
@@ -309,13 +370,16 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
 }
 
 std::vector<ShapedGlyph> TextShaper::Shape(const std::string& text, const tgfx::Font& primaryFont,
-                                           LayoutContext& layoutContext, bool vertical, bool rtl) {
+                                           LayoutContext& layoutContext, bool vertical, bool rtl,
+                                           TextOrientation orientation, const std::string& family,
+                                           const std::string& style) {
   if (text.empty()) {
     return {};
   }
 
   // Phase 1: Combined font + script itemization.
-  auto shapingRuns = ItemizeRuns(text, primaryFont, layoutContext);
+  auto shapingRuns =
+      ItemizeRuns(text, primaryFont, layoutContext, vertical, orientation, family, style);
   if (shapingRuns.empty()) {
     return {};
   }
@@ -324,9 +388,13 @@ std::vector<ShapedGlyph> TextShaper::Shape(const std::string& text, const tgfx::
   std::vector<ShapedGlyph> result;
   result.reserve(text.size() / 2 + 1);
 
+  if (rtl && (!vertical || orientation != TextOrientation::Upright)) {
+    std::reverse(shapingRuns.begin(), shapingRuns.end());
+  }
   for (auto& run : shapingRuns) {
     auto shaped = ShapeRun(text, run.byteStart, run.byteEnd - run.byteStart, run.font, run.script,
-                           vertical, rtl);
+                           run.vertical, rtl, run.isolated);
+    for (auto& glyph : shaped) glyph.sideways = vertical && !run.vertical;
     result.insert(result.end(), shaped.begin(), shaped.end());
   }
 

@@ -19,8 +19,10 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include "pagx/PAGFont.h"
 
@@ -33,6 +35,19 @@ namespace pagx {
  */
 class FontConfig {
  public:
+  // An ordered face candidate belonging to a document-local family. Empty path selects a
+  // system family. Empty unicodeRanges means all codepoints; otherwise ranges are inclusive.
+  struct FontFace {
+    std::string path;
+    int faceIndex = 0;
+    PAGFont systemFont;
+    std::vector<std::pair<uint32_t, uint32_t>> unicodeRanges;
+  };
+
+  // Appends without replacing earlier subsets. These candidates are scoped to family and
+  // never enter the global fallback list. Returns false if the source cannot be loaded.
+  bool addFontFace(const std::string& family, const FontFace& face);
+
   FontConfig();
   ~FontConfig();
   FontConfig(const FontConfig& other);

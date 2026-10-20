@@ -22,8 +22,8 @@
 namespace pagx {
 
 // Upright ranges from Unicode VerticalOrientation-16.0.0.txt (UAX #50).
-// Characters with orientation U or Tu (fallback Upright) are listed.
-// Characters with orientation R or Tr (fallback Rotated) use the default.
+// U and Tu ranges are listed here; Tr is classified separately below.
+// CSS typesets U, Tu and Tr upright, enabling vertical font features.
 // clang-format off
 static const int32_t UprightRanges[][2] = {
     {0x000A7, 0x000A7},  // § Section Sign
@@ -127,8 +127,9 @@ static constexpr size_t UprightRangeCount = sizeof(UprightRanges) / sizeof(Uprig
 
 VerticalOrientation VerticalTextUtils::GetOrientation(int32_t c) {
   // Binary search over sorted upright ranges from UAX #50 VerticalOrientation-16.0.0.txt.
-  // Characters with orientation U (Upright) or Tu (fallback Upright) return Upright.
-  // Characters with orientation R (Rotated) or Tr (fallback Rotated) return Rotated.
+  // CSS Writing Modes 4 §5.1.2 includes Tr in upright typesetting; do not rotate
+  // an unchanged glyph again when its font lacks a vertical alternate.
+  if (IsTransformedRotated(c)) return VerticalOrientation::Upright;
   size_t lo = 0;
   size_t hi = UprightRangeCount;
   while (lo < hi) {
@@ -142,6 +143,20 @@ VerticalOrientation VerticalTextUtils::GetOrientation(int32_t c) {
     }
   }
   return VerticalOrientation::Rotated;
+}
+
+bool VerticalTextUtils::IsTransformedRotated(int32_t c) {
+  // Unicode 16.0 Vertical_Orientation=Tr, from unicode.org/Public/16.0.0/ucd/VerticalOrientation.txt.
+  static const int32_t ranges[][2] = {
+      {0x2329, 0x232A}, {0x3008, 0x3011}, {0x3014, 0x301F}, {0x3030, 0x3030}, {0x30A0, 0x30A0},
+      {0x30FC, 0x30FC}, {0xFE59, 0xFE5E}, {0xFF08, 0xFF09}, {0xFF1A, 0xFF1B}, {0xFF3B, 0xFF3B},
+      {0xFF3D, 0xFF3D}, {0xFF3F, 0xFF3F}, {0xFF5B, 0xFF60}, {0xFFE3, 0xFFE3},
+  };
+  for (const auto& range : ranges) {
+    if (c < range[0]) return false;
+    if (c <= range[1]) return true;
+  }
+  return false;
 }
 
 bool VerticalTextUtils::NeedsPunctuationOffset(int32_t c) {

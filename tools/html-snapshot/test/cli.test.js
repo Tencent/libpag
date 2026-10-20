@@ -73,6 +73,7 @@ describe('parseArgs — file inputs', () => {
     const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/out.subset.html', '--download-fonts'));
     expect(opts.downloadFonts).toBe(true);
     expect(opts.fontDir).toBe(path.resolve('/tmp/out.fonts'));
+    expect(opts.fontManifest).toBe(path.resolve('/tmp/out.subset.html.fonts.json'));
   });
 
   test('--font-dir overrides the default destination', () => {
@@ -85,6 +86,12 @@ describe('parseArgs — file inputs', () => {
       '/tmp/page.html', '--download-fonts', '--font-manifest', 'manifest.txt',
     ));
     expect(opts.fontManifest).toBe(path.resolve('manifest.txt'));
+  });
+
+  test('font bindings are retained when the snapshot is written to stdout', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '-o', '-', '--download-fonts',
+      '--font-dir', '/tmp/fonts'));
+    expect(opts.fontManifest).toBe(path.resolve('/tmp/fonts/fonts.json'));
   });
 
   test('--download-images defaults --image-dir to a sibling .images dir', () => {
