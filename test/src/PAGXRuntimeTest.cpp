@@ -29,8 +29,11 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
+#include "pagx/tgfx.h"
+#include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -147,6 +150,80 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceMakeOffscreen) {
   EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(0, 48), nullptr);
   EXPECT_EQ(pagx::PAGSurface::MakeOffscreen(64, -1), nullptr);
 }
+
+/**
+ * Test case: wrapping a surface while its device is locked preserves ownership and supports Record.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSurfaceWrapsMatchingDeviceWhileLocked) {
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  std::weak_ptr<tgfx::Device> weakDevice = device;
+  std::weak_ptr<tgfx::Surface> weakSurface;
+  std::shared_ptr<pagx::PAGSurface> wrapped;
+  {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    auto surface = tgfx::Surface::Make(scope.context(), 64, 48);
+    ASSERT_TRUE(surface != nullptr);
+    weakSurface = surface;
+    auto drawable = pagx::Drawable::MakeFrom(device, surface);
+    ASSERT_TRUE(drawable != nullptr);
+    EXPECT_EQ(drawable->getDevice(), device);
+    EXPECT_EQ(drawable->getSurface(scope.context()), surface);
+    wrapped = pagx::MakeFrom(device, surface);
+    ASSERT_TRUE(wrapped != nullptr);
+    EXPECT_EQ(wrapped->width(), 64);
+    EXPECT_EQ(wrapped->height(), 48);
+    auto scene = pagx::PAGScene::Make(pagx::PAGXDocument::Make(64, 48));
+    ASSERT_TRUE(scene != nullptr);
+    auto recording = pagx::Record(scope.context(), scene, wrapped);
+    ASSERT_TRUE(recording != nullptr);
+    scope.context()->submit(std::move(recording));
+  }
+  device.reset();
+  EXPECT_FALSE(weakDevice.expired());
+  EXPECT_FALSE(weakSurface.expired());
+  wrapped.reset();
+  EXPECT_TRUE(weakSurface.expired());
+}
+
+/**
+ * Test case: both public and internal wrapping factories reject null arguments.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSurfaceWrapRejectsNullInputs) {
+  EXPECT_EQ(pagx::MakeFrom(nullptr, nullptr), nullptr);
+  EXPECT_EQ(pagx::Drawable::MakeFrom(nullptr, nullptr), nullptr);
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  EXPECT_EQ(pagx::MakeFrom(device, nullptr), nullptr);
+  EXPECT_EQ(pagx::Drawable::MakeFrom(device, nullptr), nullptr);
+  DeviceLockScope scope(device);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto surface = tgfx::Surface::Make(scope.context(), 64, 48);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(pagx::MakeFrom(nullptr, surface), nullptr);
+  EXPECT_EQ(pagx::Drawable::MakeFrom(nullptr, surface), nullptr);
+}
+
+#ifdef TGFX_USE_OPENGL
+/**
+ * Test case: a surface created on one GL device is rejected when paired with another device.
+ */
+PAGX_TEST(PAGXRuntimeTest, PAGSurfaceWrapRejectsMismatchedDevice) {
+  auto ownerDevice = Devices::MakeDefault();
+  auto otherDevice = Devices::MakeDefault();
+  ASSERT_TRUE(ownerDevice != nullptr);
+  ASSERT_TRUE(otherDevice != nullptr);
+  ASSERT_NE(ownerDevice.get(), otherDevice.get());
+  DeviceLockScope scope(ownerDevice);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto surface = tgfx::Surface::Make(scope.context(), 64, 48);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(pagx::MakeFrom(otherDevice, surface), nullptr);
+  EXPECT_EQ(pagx::Drawable::MakeFrom(otherDevice, surface), nullptr);
+  EXPECT_TRUE(pagx::MakeFrom(ownerDevice, surface) != nullptr);
+}
+#endif
 
 /**
  * Test case: advancing a top-level alpha animation produces distinct rendered frames over time.
