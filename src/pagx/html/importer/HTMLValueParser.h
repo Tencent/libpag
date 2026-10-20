@@ -48,14 +48,13 @@ class HTMLValueParser {
  public:
   /**
    * Container for a single resolved `box-shadow` / `drop-shadow` entry. `inset` distinguishes
-   * inner shadows. CSS `spread` is intentionally not modelled — PAGX has no spread axis on its
-   * shadow styles, so the parser emits a diagnostic when a non-zero spread is present and drops
-   * the value rather than carrying a field downstream consumers cannot honour.
+   * inner shadows. Spread is lowered to box geometry by HTMLLayerBuilder.
    */
   struct ShadowSpec {
     float offsetX = 0;
     float offsetY = 0;
     float blur = 0;
+    float spread = 0;
     Color color = {};
     bool inset = false;
   };

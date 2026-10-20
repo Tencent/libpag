@@ -16,6 +16,24 @@ First letters originating in generated content/shadow trees without a DOM Range 
 diagnosed. Length-changing text transforms use measured source fragments and natural
 cluster spacing when the browser cannot expose individual output-character positions.
 
+Form text is captured from Chromium's UA layout: live values, placeholder styles,
+password masks and textarea line breaks remain editable text. Password DOM values
+are never copied into snapshot metadata. Native surfaces (date/select decorations,
+checkboxes, radios, range/color, progress/meter, etc.) use isolated transparent PNGs;
+ancestor backgrounds and effects are reapplied by the normal paint pipeline. Fieldset
+captures only its decoration, retaining editable legend/content and the browser's
+legend cutout. Radios, checkboxes and selects using `appearance:none` keep their
+authored CSS boxes.
+Generated `::before`/`::after` text joins the measured flow, including resolved
+counters and `attr()` content when protocol capture is available.
+
+The browser bundle accepts native surfaces through `installControlPaints(paints)`
+(`ControlPaint[]` in `lib/control-capture.ts`) and control text through the optional
+`controls` field of `installTextLayout(data)` (`TextLayoutData`). Without
+these providers it retains control positions and emits diagnostics for missing
+native paint/approximate text. Capture and install providers immediately before
+`takeSnapshot()`, after viewport, fonts and live control state have settled.
+
 Use `--embed-fonts` for portable output with the page's web fonts. Font capture includes
 inline `data:` sources, resolves CSS family aliases to the saved font's internal family,
 and copies WOFF2 decoder memory before another decode can reuse it.

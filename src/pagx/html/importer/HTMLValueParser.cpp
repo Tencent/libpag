@@ -404,9 +404,7 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
       s.offsetX = lengths[0];
       s.offsetY = lengths[1];
       if (lengths.size() >= 3) s.blur = lengths[2];
-      if (lengths.size() >= 4 && lengths[3] != 0) {
-        _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
-      }
+      if (lengths.size() >= 4) s.spread = lengths[3];
     } else {
       _diagnostics.warn("html: malformed box-shadow '" + item + "'");
       continue;

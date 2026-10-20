@@ -93,6 +93,17 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
   out.close();
 }
 
+void BuildShadowBoxPath(PathData& out, float width, float height, const float radii[4],
+                        bool ellipse) {
+  if (ellipse) {
+    const float radius = width * 0.5f;
+    BuildPerCornerRoundedRectPathData(out, width, width, radius, radius, radius, radius);
+    out.transform(Matrix::Scale(1, height / width));
+  } else {
+    BuildPerCornerRoundedRectPathData(out, width, height, radii[0], radii[1], radii[2], radii[3]);
+  }
+}
+
 // Hands the parent-facing layout slot (positional anchors, percent sizing, and flex
 // participation) over from `inner` to `outer`. Used by the wrapper helpers that hoist a Layer
 // "out from under" inner so the wrapper occupies the same space `inner` previously held.
@@ -151,12 +162,14 @@ BlendMode HTMLLayerBuilder::resolveBackgroundBlendMode(const std::string& value)
 }
 
 HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
-                                   HTMLInlineSvgEmitter& svgEmitter)
-    : _diagnostics(sink), _valueParser(valueParser), _filterDecoder(sink, svgEmitter, valueParser) {
+                                   HTMLInlineSvgEmitter& svgEmitter, HTMLIdAllocator& idAllocator)
+    : _diagnostics(sink), _valueParser(valueParser), _idAllocator(idAllocator),
+      _filterDecoder(sink, svgEmitter, valueParser) {
 }
 
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+  _outerBoxShadows.clear();
   _filterDecoder.bindDocument(document);
 }
 
@@ -192,6 +205,26 @@ Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& 
   }
   outer->children.push_back(inner);
   return inner;
+}
+
+void HTMLLayerBuilder::appendCSSChild(Layer* host, Layer* child, const HTMLBoxAttributes& box) {
+  if (!child->includeInLayout) {
+    const float border = box.borderSet ? box.borderWidthPx : 0.0f;
+    const auto& padding = host->padding;
+    if (padding.left != border || padding.right != border || padding.top != border ||
+        padding.bottom != border) {
+      auto frame = _document->makeNode<Layer>();
+      frame->includeInLayout = false;
+      frame->left = border - padding.left;
+      frame->right = border - padding.right;
+      frame->top = border - padding.top;
+      frame->bottom = border - padding.bottom;
+      frame->children.push_back(child);
+      host->children.push_back(frame);
+      return;
+    }
+  }
+  host->children.push_back(child);
 }
 
 Fill* HTMLLayerBuilder::buildSolidFill(const Color& color) {
@@ -646,6 +679,111 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
   // `box-shadow` — the `filter: drop-shadow()` consumer keeps its blur as-is, since the CSS
   // Filter spec defines that function's blur-radius as σ already.
   auto shadows = _valueParser.parseShadowList(box.boxShadow);
+  bool hasSpread = false;
+  for (const auto& shadow : shadows) hasSpread |= shadow.spread != 0;
+  if (hasSpread && std::isfinite(box.widthPx) && std::isfinite(box.heightPx)) {
+    // A spread applies to the box silhouette, independently of its background
+    // alpha and descendants. Blur that silhouette, then clip it to the outside
+    // of the border box (or the inside of the padding box for inset shadows).
+    // Paint back to front: the first CSS shadow is the topmost one.
+    for (auto it = shadows.rbegin(); it != shadows.rend(); ++it) {
+      const auto& s = *it;
+      const float border = s.inset && box.borderSet ? box.borderWidthPx : 0;
+      const float w = std::max(0.0f, box.widthPx - 2 * border);
+      const float h = std::max(0.0f, box.heightPx - 2 * border);
+      if (w <= 0 || h <= 0) continue;
+      float radii[] = {std::max(0.0f, box.borderRadiusTLPx - border),
+                       std::max(0.0f, box.borderRadiusTRPx - border),
+                       std::max(0.0f, box.borderRadiusBRPx - border),
+                       std::max(0.0f, box.borderRadiusBLPx - border)};
+      const float spread = s.inset ? -s.spread : s.spread;
+      const float sw = std::max(0.0f, w + 2 * spread);
+      const float sh = std::max(0.0f, h + 2 * spread);
+      if (!s.inset && (sw <= 0 || sh <= 0)) continue;
+      float expanded[4];
+      for (size_t i = 0; i < 4; i++) {
+        float adjustment = spread;
+        if (!s.inset && spread > 0 && radii[i] < spread) {
+          const float ratio = radii[i] / spread;
+          const float coverage = std::min(1.0f, 2 * radii[i] / std::max(w, h));
+          adjustment *= 1 - std::pow(1 - ratio, 3) * (1 - std::pow(coverage, 3));
+        }
+        expanded[i] = std::max(0.0f, radii[i] + adjustment);
+      }
+      // CSS scales overlapping corners by one common factor.
+      float scale = 1;
+      const float sums[] = {expanded[0] + expanded[1], expanded[3] + expanded[2],
+                            expanded[0] + expanded[3], expanded[1] + expanded[2]};
+      for (size_t i = 0; i < 4; i++) {
+        if (sums[i] > 0) scale = std::min(scale, (i < 2 ? sw : sh) / sums[i]);
+      }
+      for (auto& radius : expanded) radius *= scale;
+      const float extent =
+          std::abs(s.offsetX) + std::abs(s.offsetY) + std::abs(spread) + 2 * s.blur + 1;
+      auto* sourceData = _document->makeNode<PathData>();
+      if (sw > 0 && sh > 0) {
+        BuildShadowBoxPath(*sourceData, sw, sh, expanded, box.borderRadiusEllipse);
+        sourceData->transform(
+            Matrix::Translate(border - spread + s.offsetX, border - spread + s.offsetY));
+      }
+      auto* clipData = _document->makeNode<PathData>();
+      BuildShadowBoxPath(*clipData, w, h, radii, box.borderRadiusEllipse);
+      clipData->transform(Matrix::Translate(border, border));
+      // An even-odd contour represents the complement without relying on the
+      // opacity of the actual element. Its finite outer edge is beyond the
+      // blur kernel, so it cannot affect the visible shadow.
+      auto* complement = s.inset ? sourceData : clipData;
+      complement->moveTo(-extent, -extent);
+      complement->lineTo(box.widthPx + extent, -extent);
+      complement->lineTo(box.widthPx + extent, box.heightPx + extent);
+      complement->lineTo(-extent, box.heightPx + extent);
+      complement->close();
+
+      auto* source = _document->makeNode<Layer>();
+      auto* mask = _document->makeNode<Layer>();
+      mask->id = _idAllocator.generateUnique("shadowClip");
+      auto* clipped = _document->makeNode<Layer>();
+      auto* group = _document->makeNode<Layer>();
+      for (auto* part : {source, mask, clipped, group}) {
+        part->includeInLayout = false;
+        part->width = box.widthPx;
+        part->height = box.heightPx;
+        part->left = 0;
+        part->top = 0;
+      }
+      auto* sourcePath = _document->makeNode<Path>();
+      sourcePath->data = sourceData;
+      auto* sourceFill = buildSolidFill(s.color);
+      sourceFill->fillRule = FillRule::EvenOdd;
+      source->contents = {sourcePath, sourceFill};
+      if (s.blur > 0) {
+        auto* blur = _document->makeNode<BlurFilter>();
+        blur->blurX = blur->blurY = s.blur * 0.5f;
+        source->filters.push_back(blur);
+      }
+      auto* clipPath = _document->makeNode<Path>();
+      clipPath->data = clipData;
+      auto* clipFill = buildSolidFill({1, 1, 1, 1, ColorSpace::SRGB});
+      clipFill->fillRule = FillRule::EvenOdd;
+      mask->contents = {clipPath, clipFill};
+      clipped->children.push_back(source);
+      clipped->mask = mask;
+      clipped->maskType = MaskType::Alpha;
+      group->children = {mask, clipped};
+      if (s.inset) {
+        layer->children.push_back(group);
+      } else {
+        _outerBoxShadows[layer].push_back(group);
+      }
+    }
+    emitted = true;
+    return;
+  }
+  if (hasSpread) {
+    _diagnostics.warn(
+        "html: box-shadow spread requires resolved px width/height; "
+        "using an unspread shadow");
+  }
   for (auto& s : shadows) {
     const float sigma = s.blur * 0.5f;
     if (s.inset) {
@@ -861,7 +999,10 @@ void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
 }
 
 Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
-  if (inner == nullptr || !inner->clipToBounds || inner->styles.empty()) {
+  if (inner == nullptr) return inner;
+  auto pending = _outerBoxShadows.find(inner);
+  const bool hasGeometry = pending != _outerBoxShadows.end();
+  if (!hasGeometry && (!inner->clipToBounds || inner->styles.empty())) {
     return inner;
   }
 
@@ -878,7 +1019,7 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
       kept.push_back(s);
     }
   }
-  if (hoisted.empty()) {
+  if (hoisted.empty() && !hasGeometry) {
     return inner;
   }
 
@@ -920,6 +1061,10 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   inner->matrix3D = Matrix3D{};
   inner->preserve3D = false;
 
+  if (hasGeometry) {
+    outer->children = std::move(pending->second);
+    _outerBoxShadows.erase(pending);
+  }
   outer->children.push_back(inner);
   return outer;
 }

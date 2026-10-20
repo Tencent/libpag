@@ -479,8 +479,15 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
       _valueParser.resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
   bool hasRealLineHeight =
       (!std::isnan(leafLineHeightPx) && leafLineHeightPx > 0) || fragmentHasExplicitLineHeight;
+  const bool constrainedInlineSize =
+      isVertical ? (!std::isnan(box.heightPx) || !std::isnan(box.heightPct) ||
+                    (!std::isnan(box.topPx) && !std::isnan(box.bottomPx)))
+                 : (!std::isnan(box.widthPx) || !std::isnan(box.widthPct) ||
+                    (!std::isnan(box.leftPx) && !std::isnan(box.rightPx)));
+  const bool needsWrapping =
+      !hasNoWrap && (constrainedInlineSize || (box.flexGrowSet && box.flexGrow > 0));
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() || box.clipOverflow ||
-                      isVertical || hasRealLineHeight;
+                      isVertical || hasRealLineHeight || needsWrapping;
 
   // CSS shrink-to-fit for inline text. The html-snapshot pipeline bakes the *browser's*
   // measured px width/height onto every text `<span>` (it flattens each run into an

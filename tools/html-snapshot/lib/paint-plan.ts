@@ -6,6 +6,7 @@
 const PAINT_SOURCE_ATTR = 'data-pagx-paint-source';
 const PAINT_ORDER_ATTR = 'data-pagx-paint-order';
 const PAINT_DECORATION_ATTR = 'data-pagx-paint-decoration';
+const PAINT_SURFACE_ATTR = 'data-pagx-paint-surface';
 const PAINT_CAPTURE = {
   active: false, nodes: [], byElement: new WeakMap(), warnings: [], animations: new Map(),
 };
@@ -177,6 +178,11 @@ function markPaintDecoration(html) {
   return html.replace(/^<([\w:-]+)/, `<$1 ${PAINT_DECORATION_ATTR}="true"`);
 }
 
+function markPaintSurface(html) {
+  if (!PAINT_CAPTURE.active || !html) return html;
+  return html.replace(/^<([\w:-]+)/, `<$1 ${PAINT_SURFACE_ATTR}="true"`);
+}
+
 function paintParticipant(box) {
   return !!box.source && (box.source.style.context || box.source.style.positioned);
 }
@@ -213,6 +219,9 @@ function buildPaintBoxes(el, parent, sequence) {
   el.removeAttribute(PAINT_SOURCE_ATTR);
   box.decoration = el.hasAttribute(PAINT_DECORATION_ATTR);
   el.removeAttribute(PAINT_DECORATION_ATTR);
+  box.surface = el.hasAttribute(PAINT_SURFACE_ATTR);
+  el.removeAttribute(PAINT_SURFACE_ATTR);
+  if (box.surface) box.decoration = true;
   if (source && source.style.paintContainment) el.style.overflow = 'hidden';
   // Renderers own generated image/text/SVG subtrees. Reuse them without interpreting their
   // synthetic absolute positioning as authored CSS positioning.
@@ -248,7 +257,8 @@ function planPaintContext(root) {
   context.negative.sort(compare);
   context.zero.sort(compare);
   context.positive.sort(compare);
-  return context.negative.flatMap(entry => entry.items).concat(flow,
+  return root.children.filter(box => box.surface).map(box => ({ box, kind: 'atom' }))
+    .concat(context.negative.flatMap(entry => entry.items), flow,
     context.zero.flatMap(entry => entry.items), context.positive.flatMap(entry => entry.items));
 }
 
@@ -256,7 +266,11 @@ function planPaintFlow(root, context, ownDecoration) {
   const flow = { blocks: [], floats: [], inline: [] };
   const own = [];
   if (ownDecoration && paintHasDecoration(root.el)) own.push({ box: root, kind: 'decoration' });
-  for (const child of root.children) collectPaintFlow(child, flow, context);
+  for (const child of root.children) {
+    if (child.surface) {
+      if (ownDecoration) own.push({ box: child, kind: 'atom' });
+    } else collectPaintFlow(child, flow, context);
+  }
   return own.concat(flow.blocks, flow.floats, flow.inline);
 }
 
@@ -294,7 +308,11 @@ function collectPaintFlow(box, flow, context) {
   if (paintHasDecoration(box.el)) {
     (paintInline(box) ? flow.inline : flow.blocks).push({ box, kind: 'decoration' });
   }
-  for (const child of box.children) collectPaintFlow(child, flow, context);
+  for (const child of box.children) {
+    if (child.surface) {
+      (paintInline(box) ? flow.inline : flow.blocks).push({ box: child, kind: 'atom' });
+    } else collectPaintFlow(child, flow, context);
+  }
 }
 
 function neutralPaintStyle(el) {
@@ -556,7 +574,7 @@ function endPaintCapture() {
 const PAINT_PLAN_HELPERS_SRC = [
   paintProperty, paintStyleRecord, beginPaintCapture, collectPaintSources, paintWarning,
   paintSource, paintNeedsSeparateChildren, capturePaintGeometry, markPaintSource,
-  markPaintDecoration, paintParticipant, paintPseudoContainer, paintInline,
+  markPaintDecoration, markPaintSurface, paintParticipant, paintPseudoContainer, paintInline,
   paintHasDecoration, buildPaintBoxes, assignPaintOrder, planPaintContext, planPaintFlow, collectPaintFlow,
   neutralPaintStyle, positionPaintClone, clonePaintBox, paintItemSource, paintItemClips, paintPath,
   clearPaintEffects, paintBorder, insetPaintClip, makePaintClip, emitPaintItems, compilePaintMarkup,
@@ -567,6 +585,7 @@ const PAINT_PLAN_CONSTANTS_SRC = `
 const PAINT_SOURCE_ATTR = '${PAINT_SOURCE_ATTR}';
 const PAINT_ORDER_ATTR = '${PAINT_ORDER_ATTR}';
 const PAINT_DECORATION_ATTR = '${PAINT_DECORATION_ATTR}';
+const PAINT_SURFACE_ATTR = '${PAINT_SURFACE_ATTR}';
 const PAINT_CAPTURE = {
   active: false, nodes: [], byElement: new WeakMap(), warnings: [], animations: new Map(),
 };

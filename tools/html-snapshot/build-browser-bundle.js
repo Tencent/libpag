@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { installTextLayout } = require('./dist/lib/text-layout');
+const { installControlPaints } = require('./dist/lib/control-capture');
 
 const {
   inlineExternalImages,
@@ -49,6 +50,7 @@ const {
 // this list.
 const BROWSER_EXPORTS = [
   { name: 'installTextLayout',     fn: installTextLayout },
+  { name: 'installControlPaints',   fn: installControlPaints },
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },

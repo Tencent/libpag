@@ -121,6 +121,7 @@ function makeHostWithAfter({ animated }) {
 
 function runOn(host) {
   global.document = {
+    head: new FakeElement('head'),
     querySelectorAll: () => [host],
     createElement: (tag) => new FakeElement(tag),
   };
@@ -334,7 +335,7 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     expect(div.textContent).toBe('本机');
   });
 
-  test('an in-flow text pseudo keeps the text-leaf path', async () => {
+  test('an in-flow text pseudo gets a measurable stand-in', async () => {
     const host = new FakeElement('div');
     host.__cs = {
       '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
@@ -342,11 +343,12 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     };
     await runOn(host);
 
-    expect(host.children).toHaveLength(0);
-    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+    expect(host.children).toHaveLength(1);
+    expect(host.children[0].textContent).toBe('→');
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(true);
   });
 
-  test('a host mixing a box pseudo with in-flow text is left to the text-leaf path', async () => {
+  test('a host mixing a box pseudo with in-flow text preserves both', async () => {
     const host = new FakeElement('div');
     host.__cs = {
       '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
@@ -359,10 +361,9 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     };
     await runOn(host);
 
-    // Appending a stand-in suppresses `renderPseudoTextLeaf` for the whole host, so materialising
-    // the box pseudo would silently drop the in-flow glyphs — the host keeps the text path.
-    expect(host.children).toHaveLength(0);
-    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+    expect(host.children).toHaveLength(2);
+    expect(host.children[0].textContent).toBe('→');
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(true);
   });
 
   test('a host with an already inlined icon-font glyph is not materialised again', async () => {

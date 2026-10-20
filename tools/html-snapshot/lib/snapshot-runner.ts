@@ -46,7 +46,8 @@ import {
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
 import { applyCanvasViewport } from './canvas-viewport';
 import { responseBytes } from './browser-engine';
-import { captureTextLayout, installTextLayout } from './text-layout';
+import { capturePseudoContents, captureTextLayout, installTextLayout } from './text-layout';
+import { captureControlPaints, installControlPaints } from './control-capture';
 import type {
   BrowserResponse,
   CookieParam,
@@ -620,7 +621,13 @@ export async function runSnapshot(
     // the entire pass (e.g. a missing helper triggering `ReferenceError`
     // inside `page.evaluate`) does not get buried among importer warnings.
     try {
-      await page.evaluate(materializeDecorativePseudoElements);
+      let contents;
+      try {
+        contents = await capturePseudoContents(page, engine);
+      } catch (err) {
+        if (log) log(`generated text capture unavailable; using CSS strings: ${errMessage(err)}`);
+      }
+      await page.evaluate(materializeDecorativePseudoElements, contents);
     } catch (err) {
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
@@ -764,6 +771,12 @@ export async function runSnapshot(
       await page.evaluate((value: unknown) => {
         (window as unknown as Record<string, unknown>).__pagxFontAliases = value;
       }, aliases);
+    }
+
+    try {
+      await page.evaluate(installControlPaints, await captureControlPaints(page, engine));
+    } catch (err) {
+      if (log) log(`native control paint capture unavailable: ${errMessage(err)}`);
     }
 
     // Read text boundaries after viewport settlement. Geometry is still measured

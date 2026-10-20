@@ -1129,23 +1129,64 @@ function imgAlt(el) {
 // label). For checkboxes / radios / file pickers / colour swatches / date
 // pickers there is no meaningful text to surface; their `value` attribute is
 // metadata (`"on"`, hidden file path, ISO date) that would only confuse
-// downstream rendering, so we return empty and let `classify` drop the
-// element.
+// downstream rendering. Their visual surface is captured separately.
 function syntheticText(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'textarea') {
-    return (el.value || el.getAttribute('placeholder') || '').trim();
+    return el.value || el.getAttribute('placeholder') || '';
   }
   if (tag === 'input') {
     const type = (el.getAttribute('type') || 'text').toLowerCase();
     if (NON_TEXT_INPUT_TYPES.has(type)) return '';
-    return (el.value || el.getAttribute('placeholder') || '').trim();
+    if (type === 'password' && el.value) return '•'.repeat(Array.from(el.value).length);
+    return el.value || el.getAttribute('placeholder') || '';
   }
   if (tag === 'select') {
     const opt = el.options && el.options[el.selectedIndex];
     return opt ? (opt.text || opt.label || opt.value || '').trim() : '';
   }
   return '';
+}
+
+function needsNativeControlPaint(el, computed) {
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'fieldset' || tag === 'progress' || tag === 'meter') return true;
+  const appearance = computed.getPropertyValue('appearance');
+  if (tag === 'select') return appearance !== 'none';
+  if (tag !== 'input') return false;
+  const type = el.type;
+  if (type === 'radio' || type === 'checkbox') return appearance !== 'none';
+  return ['range', 'color', 'date', 'datetime-local', 'month', 'time', 'week',
+    'file', 'image', 'number', 'search'].includes(type);
+}
+
+function renderControlPaint(el, parentRect, rect, left, top, computed, opts) {
+  const paint = window.__pagxControlPaints && window.__pagxControlPaints.get(el);
+  if (!paint) {
+    PAINT_CAPTURE.warnings.push(`html-snapshot: native paint unavailable for <${el.tagName.toLowerCase()}>; preserved its layout box`);
+    if (syntheticText(el)) return renderTextInput(el, parentRect, rect, left, top, computed, opts);
+    return renderContainer(el, parentRect, rect, left, top, computed, opts);
+  }
+  // The captured surface is the element's own decoration. It may extend outside
+  // the border box (e.g. a focus outline); an image background would clip it and
+  // would antialias already-rounded pixels against the border radius twice.
+  const overrides = {
+    'background-color': 'transparent',
+    'background-image': 'none',
+  };
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    overrides[`border-${side}-width`] = '0px';
+    overrides[`border-${side}-style`] = 'none';
+  }
+  const surfaceStyle = textFragmentStyle(computed, overrides);
+  const style = buildStyle(left, top, rect.width, rect.height, surfaceStyle, { box: true, ...opts });
+  const image = markPaintSurface(`<img src="${escapeHtml(paint.src)}" alt="" style="position: absolute; ` +
+    `left: ${px(paint.x)}; top: ${px(paint.y)}; width: ${px(paint.width)}; height: ${px(paint.height)}"/>`);
+  // The original fieldset still lays out its rendered legend. Only its own
+  // decoration is captured; all descendants retain editable/vector content.
+  const children = el.tagName.toLowerCase() === 'fieldset'
+    ? renderChildrenInto(el, rect, computed) : '';
+  return `<div style="${style}">${image}${children}</div>`;
 }
 
 // Apply CSS `text-transform` to a text fragment. The PAGX importer downstream
@@ -1181,6 +1222,8 @@ function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
   if (DROP_TAGS.has(tag)) return null;
   if (!isVisible(computed, el)) return null;
+  if (tag === 'input' && el.type === 'hidden') return null;
+  if (needsNativeControlPaint(el, computed)) return 'control';
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
   if (tag === 'canvas') {
@@ -1199,8 +1242,9 @@ function classify(el, computed) {
     // value-less input that paints only its border-bottom underline). Keep
     // the box when the author painted any box visuals so the underline /
     // background / shadow survives the snapshot.
-    if (hasBoxVisualsForInline(computed)) return 'box';
-    return null;
+    // An empty control still occupies a layout slot (notably disabled radio
+    // buttons in a flex label). Never collapse the following label into it.
+    return 'box';
   }
   return 'box';
 }
@@ -3435,19 +3479,35 @@ function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
 // box; emitting them as one rect would smear text over absolute siblings
 // (e.g. the search icon at `left: 16px` inside the same wrapper).
 //
-// Native form controls vertically centre their value/placeholder inside the
-// padding box — that's a UA behaviour, not something we can read off
-// computed style. A bare abs-positioned inner span at `top: pad.top`
-// therefore drops short single-line text against the top of the wrapper
-// (search bars in 40px-tall pills, "Email" labels in 48px login fields).
-// Emit the wrapper as a flex container with `align-items: center` and the
-// input's padding so the inner span rides centred regardless of
-// `opts.flexItem` — the box still anchors via `position: absolute` (or
-// `relative` when it's itself a flex item), so absolute overlay siblings
-// keep their positioning context. `white-space: nowrap` is mandatory so
-// PAGX's text engine doesn't re-wrap a single-line value to two lines when
-// its intrinsic width exceeds the wrapper by sub-pixel.
+// UA layout supplies the painted text, font and line bounds, including
+// placeholders, masking and scrolling. Preserve its line breaks as individual
+// spans and clip them to the control's content area. Browser-only callers
+// without a provider get a diagnosed CSS fallback: single-line values are
+// centered, whereas textarea content starts at its top padding.
 function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
+  const layout = window.__pagxControlTexts && window.__pagxControlTexts.get(el);
+  if (layout) {
+    const pad = readPadding(computed);
+    const bl = borderWidthOf(computed, 'left'), bt = borderWidthOf(computed, 'top');
+    const width = Math.max(0, rect.width - bl - borderWidthOf(computed, 'right') - pad.left - pad.right);
+    const height = Math.max(0, rect.height - bt - borderWidthOf(computed, 'bottom') - pad.top - pad.bottom);
+    const spans = layout.fragments.map(fragment => {
+      const cs = textFragmentStyle(computed, {
+        ...fragment.style, 'white-space': 'pre', 'text-transform': 'none',
+      });
+      let y = fragment.y - bt - pad.top;
+      let h = fragment.height;
+      const lineHeight = readNum(cs, 'line-height');
+      if (lineHeight > 0) { y -= (lineHeight - h) / 2; h = lineHeight; }
+      const style = buildStyle(fragment.x - bl - pad.left, y, fragment.width, h, cs, {
+        text: true, box: false,
+      });
+      return `<span style="${style}">${escapeHtml(fragment.text.replace(/ /g, BOUNDARY_SPACE))}</span>`;
+    }).join('');
+    const clip = `position: absolute; left: ${px(pad.left)}; top: ${px(pad.top)}; ` +
+      `width: ${px(width)}; height: ${px(height)}; overflow: hidden`;
+    return renderBoxedReplaced(rect, left, top, computed, opts, `<div style="${clip}">${spans}</div>`);
+  }
   const text = syntheticText(el);
   const pad = readPadding(computed);
   const placeholderColor = (!el.value && el.getAttribute('placeholder'))
@@ -3458,8 +3518,13 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     box: false, text: true, positioned: false,
     textColorOverride: placeholderColor || undefined,
   });
-  const finalTextStyle = withNowrap(textStyle);
-  const innerLayout = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const multiline = el.tagName.toLowerCase() === 'textarea';
+  PAINT_CAPTURE.warnings.push('html-snapshot: control text layout unavailable; using CSS text fallback');
+  const finalTextStyle = multiline
+    ? joinStyles(textStyle, 'white-space: pre-wrap; width: 100%; height: 100%; overflow: hidden')
+    : withNowrap(textStyle);
+  const innerLayout = (multiline ? 'display: block' : 'display: flex; align-items: center') +
+    '; overflow: hidden' + (padShort === '0px' ? '' : `; padding: ${padShort}`);
   const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
@@ -4716,7 +4781,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // through to the absolute path below — the inference pass remains a
   // backstop.
   capturePaintGeometry(el, parentRect);
-  const flexChildren = classifyFlexContainer(el, computed);
+  const flexChildren = needsNativeControlPaint(el, computed) ? null : classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
   }
@@ -5349,7 +5414,7 @@ const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));
 const STYLE_SCHEMA_BOX = STYLE_SCHEMA.filter((e) => e.scope === 'box');
 const STYLE_SCHEMA_TEXT = STYLE_SCHEMA.filter((e) => e.scope === 'text');
 
-const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, text: renderTextInput };
+const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, text: renderTextInput, control: renderControlPaint };
 `;
 
 // ===== Payload assembly =====
@@ -5414,6 +5479,8 @@ const HELPER_FNS = [
   restoreEmptyImagePlaceholders,
   imgAlt,
   syntheticText,
+  needsNativeControlPaint,
+  renderControlPaint,
   applyTextTransform,
   classify,
   appendStyleProp,
@@ -6021,9 +6088,9 @@ async function inlineCanvases() {
 // added to the host to suppress the `renderPseudoTextLeaf` fallback (which
 // would otherwise still try to emit the now-empty pseudo as inline text).
 //
-// Out-of-flow text pseudos carry their text on the stand-in too. In-flow decorative
-// pseudos are replaced in their layout slot, with the original disabled to avoid taking
-// space twice. In-flow text stays on renderPseudoTextLeaf; sticky pseudos remain unsupported.
+// Text and decorative pseudos share the same layout stand-in, so generated text
+// also survives hosts with ordinary text/children. Disable the original in-flow
+// pseudo before measuring, to avoid taking its layout slot twice.
 //
 // The properties copied onto the synthetic div cover the ones the snapshot
 // walker (`STYLE_SCHEMA_BOX` + the `position/inset/transform/box-shadow`
@@ -6031,7 +6098,15 @@ async function inlineCanvases() {
 // actually consults; copying every CSS property would balloon the inline
 // style attribute without adding visible information. Border longhands are
 // emitted per side so asymmetric borders survive.
-async function materializeDecorativePseudoElements() {
+async function materializeDecorativePseudoElements(resolvedContents) {
+  const contents = new WeakMap();
+  for (const entry of resolvedContents || []) {
+    let node = document;
+    for (const index of entry.path) node = node && node.childNodes[index];
+    if (!node) continue;
+    if (!contents.has(node)) contents.set(node, {});
+    contents.get(node)[entry.pseudo] = entry.text;
+  }
   // Helper functions duplicated locally so this function stays self-contained
   // when shipped through `page.evaluate`. The Node-side helpers are not in
   // scope inside the browser context — Puppeteer/Playwright serialise the
@@ -6123,26 +6198,9 @@ async function materializeDecorativePseudoElements() {
     return text;
   }
 
-  // Decide whether a pseudo with the given resolved style should be
-  // materialised. A pseudo with no visible box (no width / height) is
-  // skipped — there's nothing to render anyway. Out-of-flow pseudos
-  // (absolute/fixed) become detached synthetic siblings exactly as before.
-  // In-flow pseudos (static/relative) are materialised as layout-equivalent
-  // stand-ins: the synthetic div joins the same flow (flex item, inline
-  // block, …) with the pseudo's copied layout styles and the original pseudo
-  // is switched off via an injected `content: none` rule, so the host's
-  // measured layout is unchanged while the decorative box survives the
-  // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
-  // at the current scroll position and lose the sticky semantics.
-  //
-  // A *text*-bearing pseudo normally stays on `renderPseudoTextLeaf`, which re-emits the glyphs
-  // inside the host's own flow — the right approximation while the glyphs really do ride that
-  // flow. An out-of-flow pseudo carries a box of its own instead (`position` / `inset` /
-  // `width` / `height` / `background` / `transform`), and the text-only path drops every one of
-  // those: baidu-pan's "current device" badge is `position:absolute;bottom:-3px;width:90px;
-  // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
-  // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
-  // Such a pseudo materialises like any other box, with its text carried on the stand-in.
+  // Text contributes intrinsic size even when CSS width/height are auto.
+  // In-flow stand-ins replace the original pseudo's slot; out-of-flow ones
+  // preserve its positioning and stacking identity. Sticky is not flattened.
   function shouldMaterialise(cs, pseudoText) {
     const position = (cs.getPropertyValue('position') || '').trim();
     if (position !== 'absolute' && position !== 'fixed' &&
@@ -6150,12 +6208,9 @@ async function materializeDecorativePseudoElements() {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
-      return { ok: false, reason: 'text-content' };
-    }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    if (widthPx <= 0 && heightPx <= 0 && pseudoText === '') {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };
@@ -6270,7 +6325,9 @@ async function materializeDecorativePseudoElements() {
     for (const pseudo of PSEUDO_TYPES) {
       const cs = getComputedStyle(el, pseudo);
       const contentRaw = (cs.getPropertyValue('content') || '').trim();
-      const pseudoText = unquoteContent(contentRaw);
+      const resolved = contents.get(el);
+      const pseudoText = resolved && Object.prototype.hasOwnProperty.call(resolved, pseudo)
+        ? resolved[pseudo] : unquoteContent(contentRaw);
       if (pseudoText === null) {
         // content: none / normal — pseudo not generated.
         pseudoData.push(null);

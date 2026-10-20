@@ -3897,6 +3897,29 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
   EXPECT_FALSE(text->fauxBold);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, SystemRegularTextUsesResolvedRegularFace) {
+  for (const auto* family : {"Helvetica", "Arial", "PingFang SC", "DejaVu Sans"}) {
+    auto expected = pagx::SystemFonts::ResolveTypeface(family, "Regular");
+    if (!expected || !pagx::SystemFonts::FontNamesMatch(expected->fontStyle(), "Regular")) continue;
+    auto doc = ParseRaw(std::string("<html><body style=\"width:300px;height:40px\">") +
+                        "<span style=\"font-family:'" + family +
+                        "';font-size:14px;font-weight:400\">Example</span></body></html>");
+    ASSERT_NE(doc, nullptr);
+    auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+    ASSERT_NE(text, nullptr);
+    doc->applyLayout();
+    ASSERT_NE(text->glyphData, nullptr);
+    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+    for (const auto& run : text->glyphData->layoutRuns) {
+      auto actual = run.font.getTypeface();
+      ASSERT_NE(actual, nullptr);
+      EXPECT_TRUE(pagx::SystemFonts::FontNamesMatch(actual->fontStyle(), expected->fontStyle()))
+          << family << ": " << actual->fontStyle();
+      EXPECT_FALSE(run.font.isFauxBold()) << family;
+    }
+  }
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   // Registered families are resolved by LayoutContext through an exact (family, style) key, so the
   // importer must report their names verbatim — including an authored style label the platform has
@@ -6631,19 +6654,119 @@ PAG_TEST(PAGXHTMLImporterTest, RawLineHeightUnknownUnitWarns) {
   EXPECT_TRUE(warned);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, BoxShadowSpreadIsIgnoredWithWarning) {
-  auto doc = ParseFromString(R"HTML(
+PAG_TEST(PAGXHTMLImporterTest, BoxShadowSpreadUsesBoxGeometryAndKnockout) {
+  auto doc = ParseRaw(R"HTML(
     <html><body style="width:80px;height:80px">
-      <div style="width:80px;height:80px;background-color:#FFF;
-                  box-shadow:0 1px 2px 3px #000"></div>
+      <div style="width:80px;height:80px;border-radius:4px;
+                  box-shadow:0 1px 2px 3px #000">
+        <div style="position:absolute;left:90px;top:0;width:5px;height:5px;background:red"></div>
+      </div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find("box-shadow spread") != std::string::npos) warned = true;
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "box-shadow spread"));
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_EQ(outer->children.size(), 2u);
+  auto* shadow = outer->children.front();
+  ASSERT_EQ(shadow->children.size(), 2u);
+  auto* mask = shadow->children.front();
+  auto* clipped = shadow->children.back();
+  EXPECT_FALSE(mask->id.empty());
+  EXPECT_EQ(clipped->mask, mask);
+  EXPECT_EQ(FindElementOfType<pagx::Fill>(mask)->fillRule, pagx::FillRule::EvenOdd);
+  auto* source = clipped->children.front();
+  auto* geometry = FindElementOfType<pagx::Path>(source);
+  ASSERT_NE(geometry, nullptr);
+  auto bounds = geometry->data->getBounds();
+  EXPECT_FLOAT_EQ(bounds.x, -3);
+  EXPECT_FLOAT_EQ(bounds.y, -2);
+  EXPECT_FLOAT_EQ(bounds.width, 86);
+  EXPECT_FLOAT_EQ(bounds.height, 86);
+  ASSERT_EQ(source->filters.size(), 1u);
+  auto* blur = As<pagx::BlurFilter>(source->filters.front());
+  ASSERT_NE(blur, nullptr);
+  EXPECT_FLOAT_EQ(blur->blurX, 1);
+  // The descendant remains on the content layer, never in the shadow source.
+  EXPECT_TRUE(source->children.empty());
+  EXPECT_FALSE(outer->children.back()->children.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SpreadShadowOrderInsetAndCollapsedNegativeSpread) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="width:100px;height:60px;border:4px solid black;overflow:hidden;
+                  box-shadow:0 0 0 3px red, 0 0 0 8px blue, inset 0 0 0 6px green,
+                             0 0 0 -60px black"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_EQ(outer->children.size(), 3u);
+  for (size_t i = 0; i < 2; i++) {
+    auto* source = outer->children[i]->children.back()->children.front();
+    auto* fill = FindElementOfType<pagx::Fill>(source);
+    ASSERT_NE(fill, nullptr);
+    auto* color = As<pagx::SolidColor>(fill->color);
+    ASSERT_NE(color, nullptr);
+    EXPECT_TRUE(ColorNear(color->color, HexColor(i == 0 ? 0x0000FF : 0xFF0000)));
   }
-  EXPECT_TRUE(warned);
+  auto* content = outer->children.back();
+  EXPECT_TRUE(content->clipToBounds);
+  ASSERT_EQ(content->children.size(), 1u);
+  auto* inset = content->children.front();
+  auto* mask = inset->children.front();
+  auto* clip = FindElementOfType<pagx::Path>(mask);
+  ASSERT_NE(clip, nullptr);
+  auto bounds = clip->data->getBounds();
+  EXPECT_FLOAT_EQ(bounds.x, 4);
+  EXPECT_FLOAT_EQ(bounds.y, 4);
+  EXPECT_FLOAT_EQ(bounds.width, 92);
+  EXPECT_FLOAT_EQ(bounds.height, 52);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AbsoluteChildrenUsePaddingBoxWithPercentAndEndAnchors) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:300px;height:200px">
+      <div style="display:flex;width:200px;height:100px;padding:12px 20px;border:2px solid black">
+        <div id="flow" style="width:10px;height:10px;background:red"></div>
+        <div id="absolute" style="position:absolute;right:5px;bottom:7px;width:50%;height:20px;background:blue"></div>
+        <div id="stretch" style="position:absolute;left:3px;right:4px;top:2px;height:5px;background:green"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* outer = doc->layers.front()->children.front();
+  auto* host = outer->children.front();
+  ASSERT_EQ(host->children.size(), 3u);
+  auto* flow = host->children[0];
+  EXPECT_FLOAT_EQ(flow->layoutBounds().x, 22);
+  EXPECT_FLOAT_EQ(flow->layoutBounds().y, 14);
+  auto* frame = host->children[1];
+  auto* absolute = frame->children.front();
+  EXPECT_FLOAT_EQ(frame->layoutBounds().x, 2);
+  EXPECT_FLOAT_EQ(frame->layoutBounds().y, 2);
+  EXPECT_FLOAT_EQ(frame->layoutBounds().width, 196);
+  EXPECT_FLOAT_EQ(absolute->layoutBounds().width, 98);
+  EXPECT_FLOAT_EQ(frame->layoutBounds().x + absolute->layoutBounds().x, 95);
+  EXPECT_FLOAT_EQ(frame->layoutBounds().y + absolute->layoutBounds().y, 71);
+  auto* stretchFrame = host->children[2];
+  auto* stretch = stretchFrame->children.front();
+  EXPECT_FLOAT_EQ(stretch->layoutBounds().width, 189);
+  EXPECT_FLOAT_EQ(stretchFrame->layoutBounds().x + stretch->layoutBounds().x, 5);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BoundedPreWrapTextCreatesWrappingTextBox) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <span style="position:absolute;width:60px;height:100px;white-space:pre-wrap;font-size:16px">alpha beta gamma delta</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  auto* textBox = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(textBox, nullptr);
+  EXPECT_TRUE(textBox->wordWrap);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BoxShadowMalformedSkippedWithWarning) {

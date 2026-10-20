@@ -127,7 +127,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
   _animationBuilder =
       std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
+  _layerBuilder =
+      std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter, *_idAllocator);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
@@ -621,7 +622,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, 1);
       if (childLayer) {
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -782,17 +783,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        // CSS border-box: position:absolute descendants are positioned relative to the
-        // parent's padding box, which sits inside the border. Shift their explicit
-        // left/right/top/bottom offsets by the border width so they don't overlap the
-        // border stroke.
-        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
-          if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
-          if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
-          if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
-          if (!std::isnan(childLayer->bottom)) childLayer->bottom += box.borderWidthPx;
-        }
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);
