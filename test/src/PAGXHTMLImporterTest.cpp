@@ -890,6 +890,32 @@ PAG_TEST(PAGXHTMLImporterTest, BorderInsetsPercentageChildIntoContentBox) {
   auto* maskRect = FindElementOfType<pagx::Rectangle>(hostMask);
   ASSERT_NE(maskRect, nullptr);
   EXPECT_FLOAT_EQ(maskRect->roundness, 6.0f);
+  // Laid out, the mask covers exactly the box the 100% image fills: with no authored padding the
+  // padding box and the content box coincide, one border width in from the border box.
+  doc->applyLayout();
+  EXPECT_EQ(hostMask->layoutBounds(), pagx::Rect::MakeXYWH(4, 4, 92, 72));
+  EXPECT_EQ(image->layoutBounds(), hostMask->layoutBounds());
+}
+
+// Authored padding moves the content box but not the clip: `overflow` clips to the padding box,
+// one border width in from the border box however much padding the box carries. A mask that also
+// took the padding shifted the clip onto the content and cut off whatever sat beside it.
+PAG_TEST(PAGXHTMLImporterTest, BorderedRoundedClipIgnoresAuthoredPadding) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:120px;height:40px;padding:0 12px;border:1px solid #000000;
+                  border-radius:8px;overflow:hidden">
+        <img src="pic.png" style="width:100%;height:100%"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  ASSERT_FALSE(wrapper->children.empty());
+  auto* host = wrapper->children.front();
+  ASSERT_NE(host->mask, nullptr);
+  doc->applyLayout();
+  EXPECT_EQ(host->mask->layoutBounds(), pagx::Rect::MakeXYWH(1, 1, 118, 38));
 }
 
 // Only children that resolve against the content box need the inset host. An absolutely positioned

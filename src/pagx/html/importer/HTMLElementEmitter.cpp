@@ -1286,14 +1286,12 @@ void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, Layer* contentHos
   auto* maskLayer = _document->makeNode<Layer>();
   maskLayer->includeInLayout = false;
   if (inset > 0.0f) {
-    // Land the mask on the padding box: the masked layer's own top-left plus the border width.
-    // The renderer anchors a mask layer at the masked layer's top-left corner (the same origin
-    // every `includeInLayout="false"` child uses), so the inset must *not* back out the masked
-    // layer's padding — doing that shifted the clip left/up by the authored padding on every
-    // padded rounded box (the form `<select>`, padding 0 12px, had its trailing chevron clipped
-    // to a sliver).
-    maskLayer->left = inset;
-    maskLayer->top = inset;
+    // Land the mask on the padding box, one border width in from the masked layer's top-left.
+    // Constraint layout places every child of `masked` from its padding origin, an
+    // `includeInLayout="false"` one included, and that padding already carries the border width
+    // plus any authored padding, so back it out.
+    maskLayer->left = inset - masked->padding.left;
+    maskLayer->top = inset - masked->padding.top;
     maskLayer->width = maskBox.widthPx;
     maskLayer->height = maskBox.heightPx;
   } else {
