@@ -1124,6 +1124,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
     }
     out.openTag("div");
+    {
+      auto animIdIt = _ctx->animatedElementIds.find(tb);
+      if (animIdIt != _ctx->animatedElementIds.end()) {
+        out.addAttr("id", animIdIt->second);
+      }
+    }
     out.addAttr("style", style);
     out.closeTagStart();
     bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
@@ -1313,6 +1319,12 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     style += ";overflow:hidden";
   }
   out.openTag("div");
+  {
+    auto animIdIt = _ctx->animatedElementIds.find(tb);
+    if (animIdIt != _ctx->animatedElementIds.end()) {
+      out.addAttr("id", animIdIt->second);
+    }
+  }
   out.addAttr("style", style);
   out.closeTagStart();
   bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;

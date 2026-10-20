@@ -964,7 +964,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
   }
   out.openTag("span");
   auto animIdIt = _ctx->animatedElementIds.end();
-  if (fill) {
+  if (tb) {
+    animIdIt = _ctx->animatedElementIds.find(tb);
+  }
+  if (animIdIt == _ctx->animatedElementIds.end() && fill) {
     animIdIt = _ctx->animatedElementIds.find(fill);
   }
   if (animIdIt == _ctx->animatedElementIds.end() && text) {

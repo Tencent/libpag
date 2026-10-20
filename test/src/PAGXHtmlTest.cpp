@@ -3610,4 +3610,114 @@ CLI_TEST(PAGXHtmlTest, AnimationSampleFileExport) {
   }
 }
 
+CLI_TEST(PAGXHtmlTest, AnimationSVGMultiGeometryPainterUniqueIds) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="multiGeoLayer" width="200" height="200">
+      <Rectangle position="40,40" size="40,40"/>
+      <Ellipse position="120,120" size="40,40"/>
+      <Stroke id="sharedStroke" color="#00FF00" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="sharedStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="2" interpolation="linear"/>
+            <Key time="60" value="8"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  // No duplicate id="sharedStroke" in DOM; the second shape receives id="sharedStroke__1".
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedStroke\""), 1u);
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedStroke__1\""), 1u);
+
+  auto firstTag = FindTagContaining(html, "id=\"sharedStroke\"");
+  auto secondTag = FindTagContaining(html, "id=\"sharedStroke__1\"");
+  ASSERT_FALSE(firstTag.empty());
+  ASSERT_FALSE(secondTag.empty());
+  EXPECT_NE(firstTag.find("animation:pagx_sharedStroke_0 1s linear infinite"), std::string::npos);
+  EXPECT_NE(secondTag.find("animation:pagx_sharedStroke_0 1s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationPrecompTimelineEvaluationOffset) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="rootLayer" composition="@comp1" width="200" height="200"/>
+    <Resources>
+      <Composition id="comp1" width="200" height="200">
+        <Layer id="innerLayer" width="100" height="100">
+          <Rectangle width="100" height="100"/>
+          <Fill color="#FF0000"/>
+          <Timelines>
+            <Animation ref="@innerAnim" evaluationOffset="18"/>
+          </Timelines>
+        </Layer>
+      </Composition>
+    </Resources>
+    <Animations>
+      <Animation id="innerAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="innerLayer">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto innerTag = FindTagContaining(html, "id=\"innerLayer\"");
+  ASSERT_FALSE(innerTag.empty());
+  // evaluationOffset="18" at 60fps -> 0.3s delay
+  EXPECT_NE(innerTag.find("animation:pagx_innerLayer_0 1s linear 0.3s infinite"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationTextBoxContainerProps) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="txtLayer" width="200" height="200">
+      <TextBox id="tb1" left="20" top="30" width="120" height="40">
+        <Text text="Hello" fontFamily="Arial" fontSize="16"/>
+        <Fill color="#112233"/>
+      </TextBox>
+    </Layer>
+    <Animations>
+      <Animation id="tbAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="tb1">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+          <Channel name="position.x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="70"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tbTag = FindTagContaining(html, "id=\"tb1\"");
+  ASSERT_FALSE(tbTag.empty());
+  EXPECT_NE(tbTag.find("animation:pagx_tb1_0 1s linear infinite"), std::string::npos);
+  EXPECT_NE(html.find("0% { opacity: 0.2; transform: translate(0px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { opacity: 1; transform: translate(50px, 0px); }"), std::string::npos);
+}
+
 }  // namespace pag

@@ -160,6 +160,9 @@ void CollectTimelineOffsets(const std::vector<Layer*>& layers,
         }
       }
     }
+    if (layer->composition != nullptr) {
+      CollectTimelineOffsets(layer->composition->layers, animOffsets);
+    }
     CollectTimelineOffsets(layer->children, animOffsets);
   }
 }
@@ -446,14 +449,14 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
 }
 
 // Injects `animation` declaration (and optional extra style properties such as
-// `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`.
-void WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
-                               const std::string& animDecl, bool needsZeroTransformOrigin) {
+// `transform-origin:0 0`) into a single opening tag with `id="domId"` in `bodyHtml`.
+bool WeaveStyleIntoSingleElementById(std::string& bodyHtml, const std::string& domId,
+                                     const std::string& animDecl, bool needsZeroTransformOrigin) {
   size_t tagStart = 0;
   size_t tagEnd = 0;
   std::string tagName;
   if (!FindElementOpeningTagById(bodyHtml, domId, tagStart, tagEnd, tagName)) {
-    return;
+    return false;
   }
   std::string tagStr = bodyHtml.substr(tagStart, tagEnd - tagStart);
   size_t stylePos = tagStr.find(" style=\"");
@@ -474,7 +477,7 @@ void WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
       styleVal += "animation:" + animDecl;
       tagStr.replace(valStart, valEnd - valStart, styleVal);
       bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
-      return;
+      return true;
     }
   }
   // No existing style="..." attribute on the tag (e.g. SVG <path/>). Insert one before `/>` or `>`.
@@ -489,6 +492,23 @@ void WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
   }
   tagStr.insert(insertPos, newStyle);
   bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
+  return true;
+}
+
+// Weaves `animation` declaration into `id="domId"` and any multi-geometry sibling replicas
+// (`id="domId__1"`, `id="domId__2"`, ...) emitted by `renderSVG` when a single animated Fill/Stroke
+// paints multiple geometries.
+void WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
+                               const std::string& animDecl, bool needsZeroTransformOrigin) {
+  if (!WeaveStyleIntoSingleElementById(bodyHtml, domId, animDecl, needsZeroTransformOrigin)) {
+    return;
+  }
+  for (size_t replicaIdx = 1;; ++replicaIdx) {
+    std::string replicaId = domId + "__" + std::to_string(replicaIdx);
+    if (!WeaveStyleIntoSingleElementById(bodyHtml, replicaId, animDecl, needsZeroTransformOrigin)) {
+      break;
+    }
+  }
 }
 
 // ============================================================================
@@ -847,9 +867,10 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     float baseSX = 1.0f;
     float baseSY = 1.0f;
     Point anchor = {0.0f, 0.0f};
+    bool isTextBoxHost =
+        (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::TextBox);
     if (bundle.primaryHost != nullptr &&
-        (bundle.primaryHost->nodeType() == NodeType::Group ||
-         bundle.primaryHost->nodeType() == NodeType::TextBox)) {
+        (bundle.primaryHost->nodeType() == NodeType::Group || isTextBoxHost)) {
       auto* grp = static_cast<const Group*>(bundle.primaryHost);
       auto rp = grp->renderPosition();
       basePosX = rp.x;
@@ -861,6 +882,13 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     }
     float px = EvalFloatChannel(chSet.posXCh, t, basePosX);
     float py = EvalFloatChannel(chSet.posYCh, t, basePosY);
+    // Unlike Group (`position:relative` at 0,0 with renderPosition baked into its CSS transform),
+    // TextBox containers already emit `position:absolute;left:basePosX;top:basePosY`, so any CSS
+    // translate() on a TextBox must be relative to (basePosX, basePosY).
+    if (isTextBoxHost) {
+      px -= basePosX;
+      py -= basePosY;
+    }
     float rot = EvalFloatChannel(chSet.rotCh, t, baseRot);
     float sx = EvalFloatChannel(chSet.scaleXCh, t, baseSX);
     float sy = EvalFloatChannel(chSet.scaleYCh, t, baseSY);
