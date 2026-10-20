@@ -34,7 +34,7 @@ Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z);
 bool IsFiniteMatrix(const Matrix& matrix);
 
 // Returns true if the matrix carries a perspective row other than [0, 0, 0, 1]. Such a transform
-// can project a flat point with a w other than 1, which no 2D affine can express.
+// projects points at different z values with different w, which no 2D affine can express.
 bool HasPerspective(const Matrix3D& matrix);
 
 // Returns true if constraint or container layout generated a position for the layer. A generated

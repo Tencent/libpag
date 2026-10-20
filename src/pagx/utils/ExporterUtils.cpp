@@ -100,8 +100,8 @@ Matrix BuildLayerMatrix(const Layer* layer) {
   auto layoutPosition = layer->layoutPosition();
   float layoutX = std::isnan(layoutPosition.x) ? 0 : layoutPosition.x;
   float layoutY = std::isnan(layoutPosition.y) ? 0 : layoutPosition.y;
-  // A non-finite matrix is ignored by the renderer (see BuildLayerLocalMatrix3D), so it must not
-  // reach the exporters either.
+  // A non-finite matrix is ignored by the renderer (see BuildLayerLocalMatrix3D), so it is treated
+  // as if it were not set here as well; the same flags also skip an identity matrix.
   bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
   bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
   Matrix m = hasMatrix ? layer->matrix : Matrix::Identity();

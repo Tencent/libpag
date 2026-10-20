@@ -53,9 +53,10 @@ struct PPTFeatureFlags {
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
-  // The Layer's perspective makes w depend on x / y, so no 2D affine can represent the projection
-  // (a rectangle renders as a trapezoid). The projected matrix stays axis aligned, so the shear
-  // probe above cannot see it.
+  // The Layer carries a perspective row, so the projection divides by a w that depends on z and no
+  // 2D affine can represent it. The whole layer bakes, which also keeps descendants at another z at
+  // the size the renderer gives them. The projected matrix stays axis aligned, so the shear probe
+  // above cannot see it.
   bool hasPerspectiveTransform = false;
   bool hasBackdropStyle = false;  // A backdrop-sampling layer style (BackgroundBlurStyle or
                                   // GlassStyle). Both are shader-based effects that sample the
@@ -68,8 +69,8 @@ struct PPTFeatureFlags {
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
-   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms) always
-   * trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
+   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms, perspective)
+   * always trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
    * modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
