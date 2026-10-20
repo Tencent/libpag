@@ -187,6 +187,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
+| `isolation: isolate \| auto` | `isolate` sets `Layer.passThroughBackground = false`; `auto` keeps the default background pass-through |
 | `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
@@ -202,6 +203,14 @@ rebuilt as an inset child layer, which is how CSS paints gradient borders (a pla
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
 `outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
 `path`), and compound / non-`matrix3d` 3D `transform` chains.
+
+The importer paints sibling layers in document order; it does not resolve CSS `z-index`.
+`tools/html-snapshot` resolves the source page's stacking contexts and paint phases before
+emitting this subset. It retains compositing groups with `isolation: isolate`, and marks
+planned containers `data-pagx-paint-order="fixed"`. Flex inference must leave these containers'
+absolute children in their emitted order: geometric separation alone does not prove that
+descendants, shadows or overflowing content can be reordered safely. Explicit flex layouts
+remain supported.
 
 ### 4.5 Text
 

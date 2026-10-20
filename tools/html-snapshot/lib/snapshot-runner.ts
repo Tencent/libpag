@@ -328,6 +328,8 @@ export interface RunSnapshotResult {
   html: string;
   width: number;
   height: number;
+  /** Painting features that require a model beyond the supported static 2D subset. */
+  warnings?: string[];
   fonts: SavedFont[];
   images: SavedImage[];
 }
@@ -728,8 +730,11 @@ export async function runSnapshot(
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
     const snapshot = await page.evaluate(snapshotExpr) as {
-      html: string; width: number; height: number;
+      html: string; width: number; height: number; warnings?: string[];
     };
+    for (const warning of snapshot.warnings || []) {
+      if (log) log(warning);
+    }
 
     // Write the web fonts the browser fetched to disk. The font bytes were
     // captured off the `response` event during load + settle, so they are

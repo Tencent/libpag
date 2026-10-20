@@ -319,6 +319,7 @@ struct HTMLBoxAttributes {
   bool opacitySet = false;
 
   std::string mixBlendMode = {};
+  bool isolate = false;
 
   bool clipOverflow = false;
 

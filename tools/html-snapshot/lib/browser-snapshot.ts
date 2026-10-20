@@ -39,6 +39,7 @@
 // @ts-nocheck
 
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
+import { PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC } from './paint-plan';
 // Imported under a distinct name because the value is only embedded as a
 // literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
 // `MAX_CAPTURE_HEIGHT_PX` that `snapshotMain` references is the const defined
@@ -1885,7 +1886,7 @@ function readBoxTransform(computed) {
   return { transform: t, transformOrigin: o };
 }
 
-// Run `fn` with the element's inline transform temporarily cleared, then
+// Run `fn` with the element's transform temporarily set to identity, then
 // restore the original declarations. Used by the text path to obtain
 // pre-transform `getBoundingClientRect()` / `Range.getClientRects()`
 // measurements so the geometry handed to PAGX matches the unrotated layout
@@ -1894,7 +1895,9 @@ function withStrippedTransform(el, fn) {
   if (!el || !el.style) return fn();
   const savedT = el.style.transform;
   const savedO = el.style.transformOrigin;
-  el.style.transform = 'none';
+  // An identity transform keeps the original containing block for absolute/fixed children.
+  // `none` would make those children jump to a different ancestor during measurement.
+  el.style.transform = 'matrix(1, 0, 0, 1, 0, 0)';
   if (savedO) el.style.transformOrigin = '';
   try {
     return fn();
@@ -3021,6 +3024,9 @@ function isFlexCrossAxisFaithful(el, computed, children) {
 // a subset-friendly flex configuration AND its border/wrapping/child shape
 // don't require absolute positioning. `null` means "render as absolute".
 function classifyFlexContainer(el, computed) {
+  // Keep layout and painting separate when positioned/context descendants must participate
+  // outside an item. The paint compiler can retain ordinary flex subtrees intact.
+  if (paintNeedsSeparateChildren(el)) return null;
   const display = computed.display;
   if (display !== 'flex' && display !== 'inline-flex') return null;
   const wrap = computed.getPropertyValue('flex-wrap').trim();
@@ -3551,6 +3557,7 @@ function isIntrinsicWidthInlineRunChild(el) {
 // the inter-run advance with whatever font it actually has loaded, so the
 // runs always touch correctly regardless of font fallback.
 function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
+  if (paintNeedsSeparateChildren(el)) return false;
   const hasChildren = precomputedHasChildren !== undefined
     ? precomputedHasChildren
     : elementHasChildren(el);
@@ -4291,7 +4298,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
     intrinsicWidth,
   });
-  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  const overlays = borderOverlayHTML(computed, rect.width, rect.height).map(markPaintDecoration).join('');
   const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
@@ -4344,6 +4351,7 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
         stackable: isStackable,
         zIndex: isStackable ? resolveZIndex(paintStyle.zIndex) : 0,
         domIndex: domIndex++,
+        order: flexOrGridParent ? (Number(childComputed.order) || 0) : 0,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
         html: render(n, parentRect, undefined, childComputed),
@@ -4355,12 +4363,16 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
           stackable: false,
           zIndex: 0,
           domIndex: domIndex++,
+          order: 0,
           html: spans.join(''),
         });
       }
     }
   }
-  items.sort(paintOrder);
+  // CSS painting is planned across ancestor boundaries after all boxes have been measured.
+  // Retain order-modified tree order here; sorting subtrees would hide positioned descendants.
+  if (PAINT_CAPTURE.active) items.sort((a, b) => a.order - b.order || a.domIndex - b.domIndex);
+  else items.sort(paintOrder);
   return items.map((it) => it.html).join('');
 }
 
@@ -4434,7 +4446,7 @@ function applyLayerName(el, html, opts, precomputed) {
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
   const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  return applyLayerName(el, markPaintSource(el, html, opts), opts, precomputed);
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -4458,7 +4470,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // `<div class="rotate-45">` lays down as an axis-aligned square instead
   // of the diamond Chromium painted.
   //
-  // Strategy: temporarily clear the inline `transform` slot (which
+  // Strategy: temporarily set the inline `transform` to identity (which
   // out-specifies any class-level rule) so all downstream measurements —
   // this element's `getBoundingClientRect()`, every descendant's rect,
   // every text-line `Range.getClientRects()` — see the unrotated layout.
@@ -4492,6 +4504,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // asymmetric borders, stray text, display:contents middlemen) fall
   // through to the absolute path below — the inference pass remains a
   // backstop.
+  capturePaintGeometry(el, parentRect);
   const flexChildren = classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
@@ -4864,6 +4877,7 @@ function snapshotMainImpl(opts) {
   // browser bundle) pass nothing and we fall back to the fresh measurement.
   const measured = measureCanvas();
   const body = document.body;
+  beginPaintCapture(body);
   const canvasWidth = (typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0)
     ? opts.canvasWidth : measured.width;
   const canvasHeight = (typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0)
@@ -4883,10 +4897,7 @@ function snapshotMainImpl(opts) {
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
   const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
-  const parts = [];
-  for (const c of body.children) {
-    parts.push(render(c, rootOrigin));
-  }
+  const content = compilePaintMarkup(renderChildrenInto(body, rootOrigin, getComputedStyle(body)));
 
   const title = (document.title || '').trim();
   const bodyComputed = getComputedStyle(body);
@@ -4976,8 +4987,8 @@ function snapshotMainImpl(opts) {
     <title>${title.replace(/</g, '&lt;').replace(/&/g, '&amp;')}</title>
     <style>${styleBlock}</style>
   </head>
-  <body style="${bodyStyle.join('; ')}">
-${clipDefsSvg}${parts.join('')}
+  <body data-pagx-paint-order="fixed" style="${bodyStyle.join('; ')}">
+${clipDefsSvg}${content}
   </body>
 </html>
 `,
@@ -4992,8 +5003,11 @@ ${clipDefsSvg}${parts.join('')}
 function snapshotMain(opts) {
   normalizeEmptyImagePlaceholders();
   try {
-    return snapshotMainImpl(opts);
+    const result = snapshotMainImpl(opts);
+    result.warnings = PAINT_CAPTURE.warnings.slice();
+    return result;
   } finally {
+    endPaintCapture();
     restoreEmptyImagePlaceholders();
   }
 }
@@ -5008,6 +5022,7 @@ function snapshotMain(opts) {
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
+${PAINT_PLAN_CONSTANTS_SRC}
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
 const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
@@ -5266,7 +5281,7 @@ const HELPER_FNS = [
   snapshotMain,
 ];
 
-const HELPERS_SRC = HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
+const HELPERS_SRC = PAINT_PLAN_HELPERS_SRC + '\n\n' + HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
 // Single-shot browser-side payload. `page.evaluate` accepts a string and
 // will return whatever the expression evaluates to, so the IIFE simply

@@ -962,6 +962,12 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     }
   }
   box.mixBlendMode = LookupLowerTrimmed(props, "mix-blend-mode");
+  const auto isolation = LookupLowerTrimmed(props, "isolation");
+  if (isolation == "isolate") {
+    box.isolate = true;
+  } else if (!isolation.empty() && isolation != "auto") {
+    _diagnostics.warn("html: unsupported isolation '" + isolation + "'");
+  }
 
   // CSS `overflow` takes one or two values (`<x> <y>`) and clips the box whenever either axis is
   // not `visible` (the other axis computes to `auto` and still clips), so every clipping axis

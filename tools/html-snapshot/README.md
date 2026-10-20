@@ -53,6 +53,19 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - relative `<img src>` paths are preserved so the importer can still resolve
   them.
 
+Painting is planned across DOM ancestors, using the original computed positioning and
+stacking-context properties before transforms are temporarily removed for measurement.
+Negative, in-flow, floating, inline, zero-level and positive-level paints follow CSS painting
+order; `z-index: auto` remains distinct from an explicit `0`. Flex/grid items use
+order-modified tree order. Real stacking contexts remain compositing groups, while
+positioned descendants of non-context containers can participate in their enclosing context.
+Overflow clips follow the source containing-block chain, including absolute descendants
+that bypass an intermediate overflow container.
+
+The emitted `data-pagx-paint-order="fixed"` attribute prevents the importer's flex inference
+from rearranging planned fragments. Ordinary flex subtrees stay as flex where their children
+can be emitted together. `isolation: isolate` preserves context boundaries for blending.
+
 The output still has to pass through `pagx import --format html` to be turned
 into PAGX. The importer's normaliser handles any final cleanup (unit
 conversion, dropping properties we missed, etc.).
@@ -521,6 +534,8 @@ npm run test:coverage # run with a coverage report (written to coverage/)
 Browser regressions in `test/browser/` run separately with `npm run test:browser`
 after `npm run build`. They launch Puppeteer's Chromium to check CSS cascade,
 pseudo-element paint order, layout, and animation behavior against the source page.
+Set `PAGX_PAINT_TEST_BIN` to an absolute path to a built `pagx` binary to additionally
+import and render each paint-order fixture and compare its solid interior pixels.
 
 The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
 only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
@@ -532,6 +547,12 @@ Babel-compiled at runtime.
 
 ## Limitations
 
+- CSS `preserve-3d` and top-layer elements need painting models beyond the supported 2D
+  subset. The snapshot returns `paint:preserve-3d` / `paint:top-layer` warnings for these
+  cases; the CLI logs them. Their existing supported representation is retained.
+- Captured animations that change the stacking topology (`z-index`, `position`, `display`,
+  `isolation`, `contain`) return `paint:animated-stacking`. The emitted paint order is static;
+  captured opacity/transform channels retain their compositing groups.
 - Animation capture is **off by default** — the snapshot emits a single static
   frame. Pass `--capture-animations` (`snapshot.js` / `html2pagx` /
   `pagx import`), set `captureAnimations: true` on the `runSnapshot` /

@@ -174,6 +174,7 @@
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
+| `isolation: isolate \| auto` | `isolate` 设置 `Layer.passThroughBackground = false`；`auto` 保留默认的背景穿透 |
 | `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
@@ -188,6 +189,12 @@
 禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
 `matrix3d` 的 3D `transform`。
+
+导入器按文档顺序绘制同级图层，不解析 CSS `z-index`。`tools/html-snapshot` 会先计算源页面的
+层叠上下文和绘制阶段，再生成子集；通过 `isolation: isolate` 保留合成分组，并用
+`data-pagx-paint-order="fixed"` 标记已规划的容器。flex 推断必须保留这些容器的绝对定位
+子元素及其顺序：仅凭布局矩形互不相交，无法证明后代、阴影和溢出内容可以安全重排。
+显式 flex 布局仍受支持。
 
 ### 4.5 文本
 

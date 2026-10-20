@@ -742,6 +742,7 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
     }
   }
   if (box.opacitySet) layer->alpha = box.opacity;
+  if (box.isolate) layer->passThroughBackground = false;
   if (!box.mixBlendMode.empty()) {
     // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,
     // `plus-lighter`), which SVGBlendModeFromString maps directly. BlendModeFromString expects
@@ -895,6 +896,7 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   // Move "through-effects" that semantically wrap the element + its shadow in CSS.
   outer->alpha = inner->alpha;
   outer->blendMode = inner->blendMode;
+  outer->passThroughBackground = inner->passThroughBackground;
   outer->matrix = inner->matrix;
   outer->matrix3D = inner->matrix3D;
   outer->preserve3D = inner->preserve3D;
@@ -913,6 +915,7 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   inner->percentHeight = 100.0f;
   inner->alpha = 1.0f;
   inner->blendMode = BlendMode::Normal;
+  inner->passThroughBackground = true;
   inner->matrix = Matrix{};
   inner->matrix3D = Matrix3D{};
   inner->preserve3D = false;

@@ -432,6 +432,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
     {"opacity", PropAction::Transform, &TransformOpacity, nullptr},
     {"mix-blend-mode", PropAction::Keep, nullptr, nullptr},
+    {"isolation", PropAction::Keep, nullptr, nullptr},
     {"overflow", PropAction::Keep, nullptr, nullptr},
     {"object-fit", PropAction::Transform, &TransformObjectFit, nullptr},
     // Text

@@ -968,6 +968,41 @@ PAG_TEST(PAGXHTMLImporterTest, MixBlendModeMapsToBlendMode) {
   EXPECT_EQ(div->blendMode, pagx::BlendMode::Multiply);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, IsolationControlsBackgroundPassThrough) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:50px;height:50px;isolation:isolate">
+        <div style="width:20px;height:20px;mix-blend-mode:multiply"></div>
+      </div>
+      <div style="width:50px;height:50px;isolation:auto"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  const auto& children = doc->layers.front()->children;
+  ASSERT_EQ(children.size(), 2u);
+  EXPECT_FALSE(children[0]->passThroughBackground);
+  EXPECT_TRUE(children[1]->passThroughBackground);
+  ASSERT_EQ(children[0]->children.size(), 1u);
+  EXPECT_EQ(children[0]->children.front()->blendMode, pagx::BlendMode::Multiply);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, IsolationWrapsBothShadowAndClippedContent) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:50px;height:50px;isolation:isolate;overflow:hidden;
+                  box-shadow:0px 2px 4px black;background:white">
+        <div style="width:20px;height:20px;mix-blend-mode:multiply"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  EXPECT_FALSE(outer->passThroughBackground);
+  ASSERT_EQ(outer->children.size(), 1u);
+  EXPECT_TRUE(outer->children.front()->passThroughBackground);
+  EXPECT_TRUE(outer->children.front()->clipToBounds);
+}
+
 // CSS `mix-blend-mode` uses hyphenated keywords for the multi-word modes; the importer must accept
 // them (they differ from PAGX's internal camelCase names, which single-word modes happen to share).
 PAG_TEST(PAGXHTMLImporterTest, MixBlendModeHyphenatedKeywords) {
@@ -9790,6 +9825,31 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsChildrenWhenDomOrderMa
   EXPECT_EQ(orderedIds[0], "a");
   EXPECT_EQ(orderedIds[1], "b");
   EXPECT_EQ(orderedIds[2], "c");
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferencePreservesExplicitPaintOrder) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body data-pagx-paint-order="fixed" style="width:300px;height:50px">
+               <div data-id="right" style="position:absolute;left:200px;top:0px;width:100px;height:50px"></div>
+               <div data-id="left" style="position:absolute;left:0px;top:0px;width:100px;height:50px"></div>
+               <div data-id="middle" style="position:absolute;left:100px;top:0px;width:100px;height:50px"></div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  EXPECT_FALSE(StyleContains(body, "display: flex"));
+  std::vector<std::string> ids;
+  for (auto child = body->firstChild; child; child = child->nextSibling) {
+    if (child->type != pagx::DOMNodeType::Element) continue;
+    ids.push_back(AttrValue(child, "data-id"));
+    EXPECT_TRUE(StyleContains(child, "position: absolute"));
+  }
+  EXPECT_EQ(ids, (std::vector<std::string>{"right", "left", "middle"}));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderStretchParent) {
