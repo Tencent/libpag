@@ -139,56 +139,36 @@ inline double Determinant3(const double source[3][3]) {
          source[0][2] * (source[1][0] * source[2][1] - source[1][1] * source[2][0]);
 }
 
-// Returns true if the matrix is finite and invertible. With an invertible linear part the
-// determinant factors as det(L) * (m33 - r * L^-1 * t) for the block form [[L, t], [r, m33]], so the
-// linear part is measured by its column-normalized determinant (the Hadamard ratio) and the scalar by
-// the Schur complement, which the translation reaches only through the perspective row. A pure
-// translation therefore never makes an otherwise well-conditioned matrix look singular, and neither
-// does its scale. A singular linear part falls back to the column-normalized determinant of the whole
-// matrix, which is the only case where the 2D block alone cannot decide.
+// Returns true if the matrix is finite and invertible. Without a perspective row the determinant
+// factors as det(L) * m33 for the upper 3x3 block L, so only L and m33 decide and the translation
+// cannot make a well-conditioned matrix look singular. A perspective row couples the translation
+// into the determinant, so that case keeps the column-normalized determinant of the whole matrix,
+// which is also the only way to describe a matrix whose 3x3 block is singular but is still
+// invertible. Columns are normalized by their Euclidean norm, so the threshold depends neither on
+// the overall scale nor on the translation.
 inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   if (!IsFiniteMatrix3D(matrix)) {
     return false;
   }
-  double linear[3][3] = {};
-  for (int column = 0; column < 3; ++column) {
-    for (int row = 0; row < 3; ++row) {
-      linear[row][column] = matrix.getRowColumn(row, column);
-    }
-  }
-  double scaled[3][3] = {};
-  bool linearInvertible = true;
-  for (int column = 0; column < 3 && linearInvertible; ++column) {
-    double norm = 0;
-    for (int row = 0; row < 3; ++row) {
-      norm += linear[row][column] * linear[row][column];
-    }
-    norm = std::sqrt(norm);
-    linearInvertible = std::isfinite(norm) && norm != 0;
-    for (int row = 0; row < 3 && linearInvertible; ++row) {
-      scaled[row][column] = linear[row][column] / norm;
-    }
-  }
-  if (linearInvertible && std::abs(Determinant3(scaled)) > 1.0e-9) {
-    // Solve L * u = t with Cramer's rule and compare the Schur complement m33 - r * u with the terms
-    // it is made of, so the threshold is relative to the perspective strength.
-    double translate[3] = {matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 3),
-                           matrix.getRowColumn(2, 3)};
-    double linearDeterminant = Determinant3(linear);
-    double projection = 0;
+  bool hasPerspective = matrix.getRowColumn(3, 0) != 0 || matrix.getRowColumn(3, 1) != 0 ||
+                        matrix.getRowColumn(3, 2) != 0;
+  if (!hasPerspective) {
+    double linear[3][3] = {};
     for (int column = 0; column < 3; ++column) {
-      double replaced[3][3] = {};
+      double norm = 0;
       for (int row = 0; row < 3; ++row) {
-        for (int i = 0; i < 3; ++i) {
-          replaced[row][i] = i == column ? translate[row] : linear[row][i];
-        }
+        linear[row][column] = matrix.getRowColumn(row, column);
+        norm += linear[row][column] * linear[row][column];
       }
-      projection += matrix.getRowColumn(3, column) * (Determinant3(replaced) / linearDeterminant);
+      norm = std::sqrt(norm);
+      if (!std::isfinite(norm) || norm == 0) {
+        return false;
+      }
+      for (int row = 0; row < 3; ++row) {
+        linear[row][column] /= norm;
+      }
     }
-    double scalarValue = matrix.getRowColumn(3, 3);
-    double scalar = scalarValue - projection;
-    double scale = std::max(1.0, std::max(std::abs(scalarValue), std::abs(projection)));
-    return std::isfinite(scalar) && std::abs(scalar) > 1.0e-9 * scale;
+    return std::abs(Determinant3(linear)) > 1.0e-9 && std::abs(matrix.getRowColumn(3, 3)) > 1.0e-9;
   }
   double values[4][4] = {};
   for (int column = 0; column < 4; ++column) {
