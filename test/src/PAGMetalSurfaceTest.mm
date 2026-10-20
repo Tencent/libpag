@@ -25,6 +25,7 @@
 #include "platform/cocoa/private/metal/MetalLayerDrawable.h"
 #include "platform/cocoa/private/metal/MetalLayerHelper.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
 
 #if TARGET_OS_IPHONE
 #import "platform/ios/PAGSurface+Metal.h"
@@ -189,6 +190,62 @@ PAG_TEST(PAGMetalSurfaceTest, OffscreenReadbackAfterFlush) {
         EXPECT_TRUE(PixelMatches(pixels.data() + offset, color));
       }
     }
+  }
+}
+
+/**
+ * Verifies that textures and render targets resolve to the owning Metal device and that captured
+ * device identities remain compatible with the same device.
+ */
+PAG_TEST(PAGMetalSurfaceTest, ExternalTextureDeviceResolution) {
+  @autoreleasepool {
+    auto device = pag::Devices::MakeDefault();
+    ASSERT_TRUE(device != nullptr);
+    auto metalDevice = std::static_pointer_cast<tgfx::MetalDevice>(device);
+    auto descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                       width:SURFACE_SIZE
+                                                                      height:SURFACE_SIZE
+                                                                   mipmapped:NO];
+    id<MTLTexture> texture =
+        [[metalDevice->metalDevice() newTextureWithDescriptor:descriptor] autorelease];
+    ASSERT_TRUE(texture != nil);
+    tgfx::MetalTextureInfo info = {};
+    info.texture = (__bridge const void*)texture;
+    info.format = static_cast<unsigned>(texture.pixelFormat);
+    tgfx::BackendTexture backendTexture(info, SURFACE_SIZE, SURFACE_SIZE);
+    tgfx::BackendRenderTarget renderTarget(info, SURFACE_SIZE, SURFACE_SIZE);
+    EXPECT_EQ(pag::Devices::MakeForTexture(backendTexture), device);
+    EXPECT_EQ(pag::Devices::MakeForTexture(renderTarget), device);
+    auto identity = pag::Devices::CaptureFromTexture(backendTexture);
+    ASSERT_TRUE(identity != nullptr);
+    pag::DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    EXPECT_TRUE(pag::Devices::CanSampleFrom(scope.context(), identity.get()));
+  }
+}
+
+/**
+ * Verifies that device resolution and identity capture reject invalid descriptions, null Metal
+ * texture handles, and resources tagged with a different backend.
+ */
+PAG_TEST(PAGMetalSurfaceTest, ExternalTextureDeviceResolutionRejectsInvalidResources) {
+  tgfx::MetalTextureInfo metalInfo = {};
+  tgfx::GLTextureInfo glInfo = {};
+  glInfo.id = 1;
+  const tgfx::BackendTexture textures[] = {
+      tgfx::BackendTexture(), tgfx::BackendTexture(metalInfo, SURFACE_SIZE, SURFACE_SIZE),
+      tgfx::BackendTexture(glInfo, SURFACE_SIZE, SURFACE_SIZE)};
+  for (const auto& texture : textures) {
+    EXPECT_TRUE(pag::Devices::MakeForTexture(texture) == nullptr);
+    EXPECT_TRUE(pag::Devices::CaptureFromTexture(texture) == nullptr);
+  }
+  tgfx::GLFrameBufferInfo glFramebufferInfo = {};
+  glFramebufferInfo.id = 1;
+  const tgfx::BackendRenderTarget targets[] = {
+      tgfx::BackendRenderTarget(), tgfx::BackendRenderTarget(metalInfo, SURFACE_SIZE, SURFACE_SIZE),
+      tgfx::BackendRenderTarget(glFramebufferInfo, SURFACE_SIZE, SURFACE_SIZE)};
+  for (const auto& target : targets) {
+    EXPECT_TRUE(pag::Devices::MakeForTexture(target) == nullptr);
   }
 }
 

@@ -28,6 +28,14 @@ namespace pag {
 
 namespace {
 
+static id<MTLDevice> GetMTLDevice(const tgfx::MetalTextureInfo& info) {
+  if (info.texture == nullptr) {
+    return nil;
+  }
+  id<MTLTexture> texture = (__bridge id<MTLTexture>)info.texture;
+  return texture.device;
+}
+
 /**
  * ExternalDeviceRef subclass for the Metal backend. Retains the underlying id<MTLDevice> so
  * comparing identity later is safe even after the caller drops its own strong reference.
@@ -99,11 +107,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture
   // — MetalDevice::MakeFrom() will wrap the same id<MTLDevice> and return a Device that talks to
   // the same MTLCommandQueue family.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!texture.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!texture.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }
@@ -117,11 +124,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
   // Same reasoning as the BackendTexture overload — Metal render targets are just MTLTextures
   // under the hood, so ask the texture for its device.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!renderTarget.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!renderTarget.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }
@@ -134,11 +140,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(
   // MetalExternalDeviceRef keeps the identity valid for the render-time comparison even after the
   // caller drops its own reference to the texture.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!texture.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!texture.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }
