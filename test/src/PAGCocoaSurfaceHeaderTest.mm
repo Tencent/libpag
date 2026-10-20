@@ -41,9 +41,8 @@ PAG_TEST(PAGCocoaSurfaceTest, PrimaryHeaderExposesBackendFactories) {
     EXPECT_TRUE([PAGSurface FromView:nil] == nil);
 #endif
 #if TARGET_OS_IPHONE
-#if defined(TGFX_USE_METAL)
-    EXPECT_TRUE([PAGSurface FromCVPixelBuffer:nil mtlDevice:nil] == nil);
-#else
+    EXPECT_TRUE([PAGSurface FromCVPixelBuffer:nil] == nil);
+#if !defined(TGFX_USE_METAL)
     EXPECT_TRUE([PAGSurface FromCVPixelBuffer:nil context:nil] == nil);
 #endif
 #endif

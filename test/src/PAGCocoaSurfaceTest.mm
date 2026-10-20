@@ -54,7 +54,7 @@ PAG_TEST(PAGCocoaSurfaceTest, BackendFactoriesAreLinked) {
   EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:)]);
   EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:)]);
 #if defined(TGFX_USE_METAL)
-  EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
+  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
   EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
   EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
   EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:context:)]);

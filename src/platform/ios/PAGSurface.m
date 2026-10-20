@@ -139,15 +139,5 @@
   return pagSurface;
 }
 
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:device];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
 @end
 #endif

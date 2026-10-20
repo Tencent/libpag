@@ -30,9 +30,11 @@
 PAG_API @interface PAGSurface : NSObject
 
 /**
- * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
- * by PAGSurface. On the simulator this returns nil when the GL build's EAGL backend has no
- * hardware buffers; Metal builds are not affected.
+ * Creates a new PAGSurface from the specified CVPixelBuffer. The GPU device or context is
+ * resolved internally. Metal builds use the system default MTLDevice and share its GPU caches;
+ * the pixel buffer must be Metal-compatible (set kCVPixelBufferMetalCompatibilityKey to YES when
+ * creating it). Metal builds support this method on arm64 simulators. On the simulator this
+ * returns nil when the GL build's EAGL backend has no hardware buffers.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
