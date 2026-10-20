@@ -189,7 +189,7 @@ bool HTMLTextFragmentBuilder::collectEmbeddedGlyphs(Text* text,
     }
     for (auto* sourceRun : sourceText->glyphRuns) {
       auto* run = _document->makeNode<GlyphRun>();
-      run->font = fonts.at(sourceRun->font);
+      run->font = fonts[sourceRun->font];
       run->fontSize = sourceRun->fontSize;
       run->glyphs = sourceRun->glyphs;
       for (const auto& pos : sourceRun->positions) {
