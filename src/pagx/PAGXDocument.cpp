@@ -364,6 +364,17 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   nodeMap[id] = node;
 }
 
+void PAGXDocument::rollbackNodes(size_t mark) {
+  if (mark >= nodes.size()) {
+    return;
+  }
+  std::unordered_set<Node*> toRemove = {};
+  for (size_t i = mark; i < nodes.size(); i++) {
+    toRemove.insert(nodes[i].get());
+  }
+  removeNodes(toRemove);
+}
+
 void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
   for (auto it = nodeMap.begin(); it != nodeMap.end();) {
     if (toRemove.count(it->second) > 0) {

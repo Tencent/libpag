@@ -356,6 +356,12 @@ class PAGXDocument : public Node {
   std::unordered_set<const Node*> nodeSet = {};
 
   void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+  // Marks the current end of the node list so a friend that builds a subtree and then fails can
+  // discard exactly the nodes it created, instead of leaving them attached to the document.
+  size_t markNodes() const {
+    return nodes.size();
+  }
+  void rollbackNodes(size_t mark);
   void setNodeId(Node* node, const std::string& id);
   void resetLayoutState();
 

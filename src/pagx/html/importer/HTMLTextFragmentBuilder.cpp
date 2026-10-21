@@ -229,16 +229,15 @@ Layer* HTMLTextFragmentBuilder::convertEmbeddedTextHost(const std::shared_ptr<DO
                                                         const HTMLInheritedStyle& inherited) {
   if (_registeredFontFamilies.empty()) return nullptr;
   auto style = _styleCascade.resolveInheritedStyle(element, inherited);
-  size_t firstNode = _document->nodes.size();
+  size_t mark = _document->markNodes();
   auto* text = _document->makeNode<Text>();
   _glyphModifiers.clear();
   TextFragment fragment = makeFragment(style);
   if (!collectEmbeddedGlyphs(text, element, style, Matrix{}, fragment) || text->glyphRuns.empty()) {
-    std::unordered_set<Node*> remove;
-    for (size_t i = firstNode; i < _document->nodes.size(); ++i) {
-      remove.insert(_document->nodes[i].get());
-    }
-    _document->removeNodes(remove);
+    _document->rollbackNodes(mark);
+    // The modifiers just dropped were recorded while the subtree was being built; leaving them
+    // behind would keep pointers to removed nodes until the next call clears the list.
+    _glyphModifiers.clear();
     return nullptr;
   }
   Rect bounds = text->glyphRuns.front()->bounds;
