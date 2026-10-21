@@ -47,6 +47,8 @@
     "brotli": "brotli ./lib/libpag.wasm",
     "server:mt": "node server.js wasm-mt",
     "server:st": "node server.js wasm",
+    "server:webgpu:mt": "node server.js wasm-mt webgpu",
+    "server:webgpu:st": "node server.js wasm webgpu",
     "server:cypress": "http-server -p 8080"
   },
   "repository": {
