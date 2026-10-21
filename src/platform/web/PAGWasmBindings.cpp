@@ -37,6 +37,16 @@ using namespace emscripten;
 
 namespace pag {
 
+// Reports whether this wasm build uses the WebGPU backend. The JS side branches on it to skip
+// WebGL context creation and to bootstrap the GPUDevice before any rendering call.
+static bool IsWebGPUBackend() {
+#if defined(TGFX_USE_WEBGPU)
+  return true;
+#else
+  return false;
+#endif
+}
+
 std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   if (!emscriptenData.as<bool>()) {
     return nullptr;
@@ -672,6 +682,7 @@ bool PAGBindInit() {
            }));
 
   function("_SDKVersion", &PAG::SDKVersion);
+  function("_IsWebGPUBackend", &IsWebGPUBackend);
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");

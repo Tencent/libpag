@@ -1,6 +1,15 @@
-import { PAGModule } from '../pag-module';
+import { getPAGModule, PAGModule } from '../pag-module';
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { isInstanceOf } from '../utils/type-utils';
+
+/**
+ * Returns true when the loaded wasm module is built with the WebGPU backend. Internal helper
+ * for branching backend-specific behavior in the TS layer.
+ */
+export const isWebGPUBackend = (): boolean => {
+  const module = getPAGModule();
+  return !!module && typeof module._IsWebGPUBackend === 'function' && module._IsWebGPUBackend();
+};
 
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {

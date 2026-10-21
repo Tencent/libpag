@@ -1,5 +1,5 @@
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
-import { BackendContext } from './backend-context';
+import { BackendContext, isWebGPUBackend } from './backend-context';
 
 const renderCanvasList: RenderCanvas[] = [];
 
@@ -18,6 +18,11 @@ export class RenderCanvas {
 
   public constructor(canvas: HTMLCanvasElement | OffscreenCanvas, contextAttributes?: WebGLContextAttributes) {
     this._canvas = canvas;
+    if (isWebGPUBackend()) {
+      // On the WebGPU backend the canvas is configured by the C++ WebGPUWindow. A canvas can
+      // only hold one context type, so creating a WebGL context here would conflict.
+      return;
+    }
     const gl = canvas.getContext('webgl2', {
       ...WEBGL_CONTEXT_ATTRIBUTES,
       ...contextAttributes,
