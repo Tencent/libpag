@@ -356,6 +356,10 @@ class Layer : public Node, public LayoutNode {
    * container layout on each axis where it is set, else the authored x / y. This is not the rendered
    * translation, which also composes the authored x / y, matrix, matrix3D and the transform
    * components on top of the generated layout position (see BuildLayerMatrix).
+   *
+   * Unlike layoutPosition(), which keeps NAN on an axis that layout did not place, this always
+   * returns a number and falls back to the authored x / y on such an axis. Use layoutPosition() when
+   * the difference between "layout placed it at 0" and "layout left it alone" matters.
    */
   Point renderPosition() const;
 
