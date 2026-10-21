@@ -59,6 +59,8 @@ class HTMLTextFragmentBuilder {
   struct TextFragment {
     std::string text = {};
     std::string fontFamily = {};
+    std::string fontFamilyList = {};
+    std::string fontVariantEmoji = "normal";
     std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
     // When true, fontStyleName carries the exact PAGX fontStyle string (possibly empty) from a
     // data-pagx-* round-trip host and must be assigned verbatim; the ordinary HTML path instead
@@ -75,6 +77,7 @@ class HTMLTextFragmentBuilder {
     float letterSpacing = 0.0f;
     TextOrientation textOrientation = TextOrientation::Mixed;
     std::vector<float> inlinePositions = {};
+    float measuredBaseline = NAN;
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};
     // CSS `-webkit-text-stroke` resolved into a stroke width (px) and colour. `strokeWidth` is

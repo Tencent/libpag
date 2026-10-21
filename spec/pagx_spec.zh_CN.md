@@ -1440,6 +1440,8 @@ Text 是一种几何元素，向几何列表贡献字形（而非路径）。与
 | `text` | string | "" | 文本内容 |
 | `position` | Point | 0,0 | 文本起点位置（y 为基线），设置约束属性时由约束系统自动计算。推荐使用约束属性（`left`/`top`）进行定位 |
 | `fontFamily` | string | "" | 字体族（空字符串表示系统默认字体） |
+| `fontFamilyList` | string | "" | 可选的有序 CSS 字体族列表，支持引号包围的名称和未加引号的通用字体族；非空时优先于 `fontFamily` 参与匹配。 |
+| `fontVariantEmoji` | string | normal | Emoji 显示偏好：`normal`、`text`、`emoji` 或 `unicode`。显式 VS15/VS16 选择符优先。 |
 | `fontStyle` | string | "" | 字体变体（Regular, Bold, Italic, Bold Italic 等）。空字符串表示该字体的默认变体 |
 | `fontSize` | float | 12 | 字号 |
 | `letterSpacing` | float | 0 | 字间距 |
@@ -1489,7 +1491,7 @@ Line 3]]>
 | `alphabetic` | `position.y` 是字母基线。文本直接在基线位置渲染 |
 
 **运行时排版渲染流程**：
-1. 根据 `fontFamily` 和 `fontStyle` 查找系统字体，不可用时按运行时配置的回退列表选择替代字体
+1. 按 Unicode 扩展字符簇，依次匹配当前 Text 的 `fontFamilyList`（未设置时使用 `fontFamily`）、`fontStyle`，再匹配配置及系统回退字体。匹配会检查 Emoji 显示偏好和完整序列的 shaping 支持；普通空格沿用常规字体匹配。各 Text 的列表互不影响。`normal` 使用 Unicode 默认显示风格；`text`、`emoji`、`unicode` 为 Unicode Emoji 变体基字符应用隐式选择符，显式选择符优先。
 2. 使用 `text` 属性（或 CDATA 子节点）进行塑形，换行符触发换行（默认行高取自字体指标：ascent + descent + leading，可通过 TextBox 自定义）
 3. 应用 `fontSize`、`letterSpacing` 等排版参数
 4. 构造字形列表累积到渲染上下文

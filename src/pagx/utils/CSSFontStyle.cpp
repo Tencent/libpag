@@ -23,7 +23,8 @@
 
 namespace pagx {
 
-std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std::string& requested) {
+std::string MatchCSSFontStyle(const std::vector<std::string>& styles,
+                              const std::string& requested) {
   auto target = ParseFontStyleName(requested);
   int bestScore = 100000;
   std::string best;
@@ -50,11 +51,12 @@ std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std:
   return best;
 }
 
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value) {
+std::vector<std::string> ParseCSSFontFamilyList(const std::string& value, bool resolveGenerics) {
   std::vector<std::string> families;
   std::string current;
   char quote = 0;
   bool escaped = false;
+  bool quoted = false;
   for (size_t i = 0; i <= value.size(); ++i) {
     char c = i == value.size() ? ',' : value[i];
     if (escaped) {
@@ -64,14 +66,20 @@ std::vector<std::string> ParseCSSFontFamilyList(const std::string& value) {
       escaped = true;
     } else if (quote != 0) {
       if (c == quote) quote = 0;
-      else current += c;
+      else
+        current += c;
     } else if (c == '"' || c == '\'') {
       quote = c;
+      quoted = true;
     } else if (c == ',') {
       auto start = current.find_first_not_of(" \t\r\n");
       auto end = current.find_last_not_of(" \t\r\n");
-      if (start != std::string::npos) families.push_back(current.substr(start, end - start + 1));
+      if (start != std::string::npos) {
+        auto name = current.substr(start, end - start + 1);
+        families.push_back(resolveGenerics && !quoted ? ResolveCSSGenericFontFamily(name) : name);
+      }
       current.clear();
+      quoted = false;
     } else {
       current += c;
     }
@@ -83,6 +91,8 @@ std::string ResolveCSSGenericFontFamily(const std::string& name) {
   std::string lower = name;
   for (auto& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 #if defined(__APPLE__)
+  if (lower == "system-ui" || lower == "-apple-system" || lower == "blinkmacsystemfont")
+    return "system-ui";
   if (lower == "serif" || lower == "ui-serif") return "Times";
   if (lower == "monospace" || lower == "ui-monospace") return "Menlo";
   const char* sans = "Helvetica";
@@ -96,9 +106,11 @@ std::string ResolveCSSGenericFontFamily(const std::string& name) {
   const char* sans = "DejaVu Sans";
 #endif
   if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
-      lower == "-apple-system" || lower == "blinkmacsystemfont") return sans;
+      lower == "-apple-system" || lower == "blinkmacsystemfont")
+    return sans;
   if (lower == "cursive" || lower == "fantasy" || lower == "ui-rounded" || lower == "emoji" ||
-      lower == "math" || lower == "fangsong") return {};
+      lower == "math" || lower == "fangsong")
+    return {};
   return name;
 }
 

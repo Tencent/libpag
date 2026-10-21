@@ -972,6 +972,13 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   }
   text->position = GetPointAttribute(node, "position", Default<Text>().position, doc);
   text->fontFamily = GetAttribute(node, "fontFamily");
+  text->fontFamilyList = GetAttribute(node, "fontFamilyList");
+  text->fontVariantEmoji = GetAttribute(node, "fontVariantEmoji", "normal");
+  if (text->fontVariantEmoji != "normal" && text->fontVariantEmoji != "text" &&
+      text->fontVariantEmoji != "emoji" && text->fontVariantEmoji != "unicode") {
+    ReportError(doc, node, "Invalid fontVariantEmoji: expected normal, text, emoji, or unicode.");
+    text->fontVariantEmoji = "normal";
+  }
   text->fontStyle = GetAttribute(node, "fontStyle");
   text->fontSize = GetFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
   text->letterSpacing =

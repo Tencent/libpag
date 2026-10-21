@@ -594,6 +594,13 @@ function px(n) {
   return `${roundPx(n)}px`;
 }
 
+// Position rounding accumulates through ancestors. A 0.04px baseline error can cross a
+// device-pixel boundary and move a bitmap glyph by a full pixel. Keep layout positions at
+// the importer's millipixel precision; dimensions and paint serialization retain their policy.
+function roundPosition(n) {
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : 0;
+}
+
 // Format a numeric `flex-grow` for the subset HTML's `flex: <N>` shorthand.
 // Integers stay integer-shaped (`flex: 1`) so the imported PAGX renders the
 // canonical form; non-integers keep up to three decimals to round-trip the
@@ -1608,8 +1615,8 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.positioned !== false) {
     parts.push(`position: absolute`);
-    parts.push(`left: ${px(left)}`);
-    parts.push(`top: ${px(top)}`);
+    parts.push(`left: ${roundPosition(left)}px`);
+    parts.push(`top: ${roundPosition(top)}px`);
     parts.push(`width: ${px(width)}`);
     parts.push(`height: ${px(height)}`);
   }
@@ -2550,6 +2557,58 @@ function measureTextInlinePositions(textNode, line, computed, text, vertical) {
   return positions;
 }
 
+// Measure the baseline in the actual inline formatting context. A zero-sized inline-block's
+// bottom is its alphabetic baseline. Restore the original Text node (including its identity),
+// and accept the measurement only if inserting the marker left this fragment's geometry intact.
+// First-letter fragments have their own pseudo formatting context and stay on the normal path.
+function measureTextBaseline(textNode, line) {
+  if (line.initial || line.start === undefined || line.end === undefined || !textNode.parentNode)
+    return null;
+  const source = textNode.nodeValue;
+  let formattingParent = textNode.parentElement;
+  while (formattingParent && getComputedStyle(formattingParent).display === 'contents')
+    formattingParent = formattingParent.parentElement;
+  let anonymousItem = null;
+  if (formattingParent && /^(inline-)?(flex|grid)$/.test(getComputedStyle(formattingParent).display)) {
+    // Direct text is an anonymous flex/grid item. A sibling marker would be a separate item,
+    // so temporarily materialize that anonymous box and measure inside its inline context.
+    anonymousItem = document.createElement('span');
+    anonymousItem.style.cssText = 'all:unset!important;display:block!important;direction:inherit!important;';
+    textNode.before(anonymousItem);
+    anonymousItem.append(textNode);
+  }
+  const tail = document.createTextNode(source.slice(line.end));
+  const marker = document.createElement('span');
+  marker.style.cssText = 'all:initial!important;display:inline-block!important;' +
+    'width:0!important;height:0!important;min-width:0!important;min-height:0!important;' +
+    'padding:0!important;margin:0!important;border:0!important;vertical-align:baseline!important;' +
+    'font-size:0!important;line-height:0!important;position:static!important;float:none!important;';
+  try {
+    textNode.nodeValue = source.slice(0, line.end);
+    textNode.after(marker, tail);
+    const range = document.createRange();
+    range.setStart(textNode, line.start);
+    range.setEnd(textNode, line.end);
+    const after = range.getBoundingClientRect();
+    if (['left', 'top', 'width', 'height'].some(k => Math.abs(after[k] - line.rect[k]) > 0.05))
+      return null;
+    const baseline = marker.getBoundingClientRect().bottom;
+    // At a soft wrap a zero-width marker may stay on the preceding line or move to the next.
+    // Never accept that other line's baseline, even when the text itself did not move.
+    return getComputedStyle(marker).display === 'inline-block' &&
+      Number.isFinite(baseline) && baseline >= after.top && baseline <= after.bottom
+      ? baseline : null;
+  } finally {
+    marker.remove();
+    tail.remove();
+    textNode.nodeValue = source;
+    if (anonymousItem) {
+      anonymousItem.before(textNode);
+      anonymousItem.remove();
+    }
+  }
+}
+
 // Join connected glyph-run rectangles with the same block-axis edges. A tall
 // initial and adjacent lines with tight leading may overlap substantially but
 // must remain distinct. Source order need not be monotonic on either axis.
@@ -2864,7 +2923,12 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     // the emitted text still has exactly the measured number of characters.
     const positionAttr = positions.length === Array.from(transformed).length && positions.length > 1
       ? ` data-pagx-inline-positions="${positions.join(',')}"` : '';
-    out.push(`<span${intrinsicWidth}${positionAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    const baseline = measureTextBaseline(textNode, line);
+    // buildStyle rounds the host's top. Compensate here so that the absolute baseline retains
+    // browser subpixel precision instead of inheriting that geometry serialization rounding.
+    const baselineAttr = baseline === null ? '' :
+      ` data-pagx-baseline="${baseline - parentRect.top - roundPosition(tt)}"`;
+    out.push(`<span${intrinsicWidth}${positionAttr}${baselineAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -5295,6 +5359,7 @@ const STYLE_SCHEMA = [
   { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
+  { prop: 'font-variant-emoji',     scope: 'text', defaults: ['normal'] },
   { prop: 'font-size',             scope: 'text' },
   { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
   { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
@@ -5343,6 +5408,7 @@ const HELPER_FNS = [
   normalizeWritingMode,
   roundPx,
   px,
+  roundPosition,
   formatFlexGrow,
   canForwardFlexGrow,
   escapeHtml,
@@ -5413,6 +5479,7 @@ const HELPER_FNS = [
   measuredTextFragments,
   snapshotTextFragments,
   measureTextInlinePositions,
+  measureTextBaseline,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
   isInlineLevelSibling,

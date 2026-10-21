@@ -798,6 +798,10 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.addAttribute("position", PointToString(text->position));
       }
       xml.addAttribute("fontFamily", text->fontFamily);
+      xml.addAttribute("fontFamilyList", text->fontFamilyList);
+      if (text->fontVariantEmoji != "normal") {
+        xml.addAttribute("fontVariantEmoji", text->fontVariantEmoji);
+      }
       if (!text->fontStyle.empty()) {
         xml.addAttribute("fontStyle", text->fontStyle);
       }

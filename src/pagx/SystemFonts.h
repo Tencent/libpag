@@ -89,7 +89,8 @@ class SystemFonts {
    * rejected. Returns nullptr when the requested family cannot be resolved.
    */
   static std::shared_ptr<tgfx::Typeface> ResolveTypeface(const std::string& family,
-                                                         const std::string& style);
+                                                         const std::string& style,
+                                                         float size = 12.0f);
 
   /**
    * Normalises a font family or style name for comparison: lower-cased, leading/trailing

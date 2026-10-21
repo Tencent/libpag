@@ -56,6 +56,12 @@ class Text : public Element, public LayoutNode {
    */
   std::string fontFamily = {};
 
+  /** Optional ordered CSS font-family list. When present, overrides fontFamily for matching. */
+  std::string fontFamilyList = {};
+
+  /** Emoji presentation preference: "normal", "text", "emoji", or "unicode". */
+  std::string fontVariantEmoji = "normal";
+
   /**
    * The font style/variant name (e.g., "Regular", "Bold", "Italic", "Bold Italic"). This
    * corresponds to the specific font file variant. The default value is an empty string, which

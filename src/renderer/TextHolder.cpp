@@ -98,10 +98,11 @@ void TextHolder::apply(Text* node, const std::string& channel, const KeyValue& v
     glyph.inlinePositions.clear();
   } else if (channel == "fontFamily") {
     const auto* v = std::get_if<std::string>(&value);
-    if (v == nullptr || *v == glyph.fontFamily) {
+    if (v == nullptr || (*v == glyph.fontFamily && glyph.fontFamilyList.empty())) {
       return;
     }
     glyph.fontFamily = *v;
+    glyph.fontFamilyList.clear();
   } else if (channel == "fontStyle") {
     const auto* v = std::get_if<std::string>(&value);
     if (v == nullptr || *v == glyph.fontStyle) {

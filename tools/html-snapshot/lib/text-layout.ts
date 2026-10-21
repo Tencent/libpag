@@ -8,6 +8,7 @@ import type { ControlText } from './control-capture';
 
 export const TEXT_LAYOUT_PROPERTIES = [
   'font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch',
+  'font-variant-emoji',
   'font-variation-settings', 'font-feature-settings', 'font-kerning',
   'color', '-webkit-text-fill-color', '-webkit-text-stroke-width',
   '-webkit-text-stroke-color', 'line-height', 'letter-spacing', 'word-spacing',

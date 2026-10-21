@@ -28,6 +28,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
@@ -405,7 +406,19 @@ class TextLayoutContext {
 
   void shapeText(Text* text, const TextGlyphParams& glyph, ShapedInfo& info, bool vertical = false,
                  float textScale = 1.0f) {
-    auto primaryTypeface = findTypeface(glyph.fontFamily, glyph.fontStyle);
+    auto primaryTypeface = layoutContext_->findTypeface(glyph.fontFamily, glyph.fontStyle, -1,
+                                                        glyph.fontSize * textScale);
+    if (!glyph.fontFamilyList.empty()) {
+      for (auto family : ParseCSSFontFamilyList(glyph.fontFamilyList, true)) {
+        if (family.empty()) continue;
+        auto candidate =
+            layoutContext_->findTypeface(family, glyph.fontStyle, 0x20, glyph.fontSize * textScale);
+        if (candidate) {
+          primaryTypeface = candidate;
+          break;
+        }
+      }
+    }
 
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
     // special characters (newline, tab) that do not go through per-character glyph fallback.
@@ -476,9 +489,9 @@ class TextLayoutContext {
       // Shape this text segment with HarfBuzz.
       auto substring = content.substr(seg.start, seg.length);
       bool rtl = seg.bidiLevel & 1;
-      auto shapedGlyphs =
-          TextShaper::Shape(substring, primaryFont, *layoutContext_, vertical, rtl,
-                            glyph.textOrientation, glyph.fontFamily, glyph.fontStyle);
+      auto shapedGlyphs = TextShaper::Shape(
+          substring, primaryFont, *layoutContext_, vertical, rtl, glyph.textOrientation,
+          glyph.fontFamily, glyph.fontStyle, glyph.fontFamilyList, glyph.fontVariantEmoji);
       // Resolve source scalar positions against UTF-8 HarfBuzz cluster boundaries. The minimum
       // handles RTL clusters and ligatures whose source characters have distinct visual boxes.
       std::map<uint32_t, float> clusterPositions;

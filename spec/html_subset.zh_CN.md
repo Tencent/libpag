@@ -202,7 +202,8 @@
 |-----|------|
 | `color: <color>` | 文本旁的 `<Fill color="…"/>`（继承） |
 | `text-decoration-color: <color>` | 下划线/删除线叠加矩形的颜色（继承,见 §6） |
-| `font-family: name` | `Text.fontFamily` |
+| `font-family: name, ...` | `Text.fontFamily` 和有序的 `Text.fontFamilyList`；回退顺序仅作用于当前文本，不修改文档全局字体回退 |
+| `font-variant-emoji: normal | text | emoji | unicode` | `Text.fontVariantEmoji`；显式 VS15/VS16 选择符覆盖此偏好 |
 | `font-size: N px` | `Text.fontSize` |
 | `font-weight: bold` / `600+` | 粗体（`bold` 或数值 ≥ 600）映射为粗体样式；当解析到的字体没有原生粗体时，导入器施加合成 `fauxBold`，使字重仍能呈现 |
 | `font-style: italic | oblique` | `Text.fontStyle = "Italic"`（与粗体组合为 `"Bold Italic"`） |
@@ -228,6 +229,11 @@
 锚定（`right` / `bottom`）的叶子，或带 flex 伸展的子项。
 
 ### 4.6 自定义数据
+
+`data-pagx-baseline` 表示相对于输出文本宿主顶部的字母基线偏移，单位为 CSS 像素，必须为有限数值。
+快照工具从浏览器布局测量水平、单样式文本行的基线。对不含换行或制表符的 `nowrap`/`pre` 叶子，
+导入器保留宿主尺寸并输出 `baseline="alphabetic"` 的独立 `Text`，将小数基线保存到 `position.y`，
+避免用回退字体度量再次计算基线。不支持或无效的输入使用常规文本布局。此协议属性不会复制为自定义数据。
 
 `data-*` 前缀的属性按 PAGX `data-*` 约定（见 `spec/pagx_spec.zh_CN.md` §2.3）原样保留
 到对应 PAGX 节点。HTML 的 `id` 属性在去重后透传为 Layer 的 `id`。

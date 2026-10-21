@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -42,8 +43,15 @@ class LayoutContext {
   // Finds a typeface for the given family/style. Searches user-registered fonts first,
   // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
-                                               const std::string& fontStyle,
-                                               int32_t codepoint = -1);
+                                               const std::string& fontStyle, int32_t codepoint = -1,
+                                               float size = 12.0f);
+
+  using TypefacePredicate = std::function<bool(const std::shared_ptr<tgfx::Typeface>&)>;
+  std::shared_ptr<tgfx::Typeface> findClusterTypeface(const std::string& family,
+                                                      const std::string& style, float size,
+                                                      const std::vector<int32_t>& codepoints,
+                                                      const TypefacePredicate& accepts);
+  std::shared_ptr<tgfx::Typeface> fallbackTypeface(const TypefacePredicate& accepts, float size);
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
   // fonts first, then system fallback fonts. Typefaces are created on demand.

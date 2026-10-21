@@ -591,6 +591,17 @@
     <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="text" type="xs:string"/>
     <xs:attribute name="fontFamily" type="xs:string" default=""/>
+    <xs:attribute name="fontFamilyList" type="xs:string" default=""/>
+    <xs:attribute name="fontVariantEmoji" default="normal">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="normal"/>
+          <xs:enumeration value="text"/>
+          <xs:enumeration value="emoji"/>
+          <xs:enumeration value="unicode"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
     <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>

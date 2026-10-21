@@ -228,7 +228,8 @@ remain supported.
 |-----|------|
 | `color: <color>` | `<Fill color="…"/>` next to the text (inherited) |
 | `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
-| `font-family: name` | `Text.fontFamily` |
+| `font-family: name, ...` | `Text.fontFamily` plus the ordered `Text.fontFamilyList`; fallback order is local to the text, not global to the document |
+| `font-variant-emoji: normal | text | emoji | unicode` | `Text.fontVariantEmoji`; explicit VS15/VS16 selectors override this preference |
 | `font-size: N px` | `Text.fontSize` |
 | `font-weight: bold` / `600+` | bold weights (`bold` or numeric ≥ 600) map to the bold style; when the resolved typeface has no native bold face the importer applies synthetic `fauxBold` so the weight still shows |
 | `font-style: italic | oblique` | `Text.fontStyle = "Italic"` (combined with bold into `"Bold Italic"`) |
@@ -258,6 +259,13 @@ leaf whose box paints a background/border/shadow, a leaf anchored against its fa
 (`right` / `bottom`), or a flex-grow child.
 
 ### 4.6 Custom Data
+
+`data-pagx-baseline` is a finite alphabetic baseline offset in CSS pixels from the emitted
+text host's top. The snapshot measures it from browser layout for horizontal single-style
+lines. On a `nowrap`/`pre` leaf without line breaks or tabs, the importer preserves the host
+size and emits bare `Text` with `baseline="alphabetic"` and fractional `position.y`, avoiding
+a second baseline calculation from fallback font metrics. Unsupported or invalid input uses
+ordinary text layout. This protocol attribute is consumed, not copied as custom data.
 
 `data-pagx-inline-positions` on a single-style text leaf supplies comma-separated physical
 inline positions in pixels, one per Unicode scalar of the emitted text. It becomes

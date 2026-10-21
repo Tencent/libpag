@@ -438,6 +438,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // Text
     {"color", PropAction::Keep, nullptr, nullptr},
     {"font-family", PropAction::Keep, nullptr, nullptr},
+    {"font-variant-emoji", PropAction::Keep, nullptr, nullptr},
     {"font-size", PropAction::Transform, &ResolveLength, nullptr},
     {"font-weight", PropAction::Keep, nullptr, nullptr},
     {"font-style", PropAction::Keep, nullptr, nullptr},

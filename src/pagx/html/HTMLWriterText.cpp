@@ -2157,6 +2157,8 @@ static void AppendUTF8(std::string& out, uint32_t cp) {
 static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text) {
   out.addAttrAllowEmpty("data-pagx-text", text->text);
   out.addAttrAllowEmpty("data-pagx-font-family", text->fontFamily);
+  out.addAttrAllowEmpty("data-pagx-font-family-list", text->fontFamilyList);
+  out.addAttr("data-pagx-font-variant-emoji", text->fontVariantEmoji);
   out.addAttrAllowEmpty("data-pagx-font-style", text->fontStyle);
   out.addAttr("data-pagx-text-orientation", TextOrientationToString(text->textOrientation));
   if (!text->inlinePositions.empty()) {

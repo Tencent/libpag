@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace tgfx {
@@ -41,8 +42,9 @@ class TypefaceHolder {
   TypefaceHolder(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
                  std::string family, std::string style);
   TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::string family, std::string style);
+  TypefaceHolder(std::string systemFamily, std::string systemStyle);
 
-  std::shared_ptr<tgfx::Typeface> getTypeface();
+  std::shared_ptr<tgfx::Typeface> getTypeface(float size = 12.0f);
   const std::string& getFontFamily() const;
   const std::string& getFontStyle() const;
 
@@ -53,6 +55,8 @@ class TypefaceHolder {
   std::string fontFamily = {};
   std::string fontStyle = {};
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+  bool nativeSystemFont = false;
+  std::unordered_map<float, std::shared_ptr<tgfx::Typeface>> sizedTypefaces = {};
 };
 
 }  // namespace pagx

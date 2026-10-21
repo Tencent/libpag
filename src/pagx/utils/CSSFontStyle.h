@@ -23,7 +23,8 @@
 
 namespace pagx {
 
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value);
+std::vector<std::string> ParseCSSFontFamilyList(const std::string& value,
+                                                bool resolveGenerics = false);
 std::string ResolveCSSGenericFontFamily(const std::string& name);
 std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std::string& requested);
 

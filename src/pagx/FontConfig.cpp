@@ -48,7 +48,21 @@ TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::st
     : fontFamily(std::move(family)), fontStyle(std::move(style)), typeface(std::move(typeface)) {
 }
 
-std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
+TypefaceHolder::TypefaceHolder(std::string systemFamily, std::string systemStyle)
+    : fontFamily(std::move(systemFamily)), fontStyle(std::move(systemStyle)),
+      nativeSystemFont(true) {
+}
+
+std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface(float size) {
+  if (nativeSystemFont) {
+    auto found = sizedTypefaces.find(size);
+    if (found == sizedTypefaces.end()) {
+      found =
+          sizedTypefaces.emplace(size, SystemFonts::ResolveTypeface(fontFamily, fontStyle, size))
+              .first;
+    }
+    return found->second;
+  }
   if (typeface == nullptr) {
     if (!path.empty()) {
       typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
@@ -90,8 +104,14 @@ bool FontConfig::addFontFace(const std::string& family, const FontFace& face) {
                                                                    face.systemFont.fontStyle)
                                     : tgfx::Typeface::MakeFromPath(face.path, face.faceIndex);
   if (!typeface || family.empty()) return false;
-  data->fontFaces[family].push_back(
-      {TypefaceHolder(std::move(typeface), family, "Regular"), face.unicodeRanges});
+  if (face.path.empty()) {
+    data->fontFaces[family].push_back(
+        {TypefaceHolder(face.systemFont.fontFamily, face.systemFont.fontStyle),
+         face.unicodeRanges});
+  } else {
+    data->fontFaces[family].push_back(
+        {TypefaceHolder(std::move(typeface), family, "Regular"), face.unicodeRanges});
+  }
   return true;
 }
 
