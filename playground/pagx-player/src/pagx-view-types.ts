@@ -47,12 +47,64 @@ export interface PlayerView {
     currentTimeMicros(): number;
     setCurrentTimeMicros(micros: number): void;
     durationMicros(): number;
+    hasTimeline(): boolean;
     frameRate(): number;
     setLoop(loop: boolean): void;
     isLoop(): boolean;
 
+    // Selection (phase 1, read-only canvas<->editor queries)
+    hitTest(surfaceX: number, surfaceY: number): HitTestResult | null;
+    getNodeSourceMap(): NodeSourceEntry[];
+    getNodeBounds(index: number): NodeBounds[] | null;
+    validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[];
+
+    // Incremental edit (phase 2, source-editor attribute edits). Sets a channel on nodes[index]
+    // from its raw PAGX attribute string and refreshes the scene in place. Returns false when the
+    // edit cannot go incremental (invalid index, unknown channel, or unparseable value), signalling
+    // the caller to fall back to a full reparse.
+    setNodeChannel(index: number, channel: string, value: string): boolean;
+
     // Lifetime
     destroy(): void;
+}
+
+/** One node's source span and incrementable channels, exported by getNodeSourceMap. */
+export interface NodeSourceEntry {
+    index: number;
+    startLine: number;   // 1-based source line of the start tag; -1 = unavailable
+    endLine: number;     // 1-based source line of the end tag; -1 = unavailable
+    nodeType: number;    // NodeType enum int (see NodeType.h)
+    channels: string[];  // incrementable channel names (phase-2 reuse)
+}
+
+/** Surface-space bounds of one runtime layer instance, returned by getNodeBounds. A source node
+ *  referenced by multiple composition layers yields one array entry per instance. */
+export interface NodeBounds {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+/** Hit-test result returned by hitTest. The span points at the *reference* node — when the click
+ *  lands inside a <Layer composition="@X"> instance, startLine/endLine refer to that <Layer>
+ *  reference rather than the internal definition node. bounds is the on-screen rect of the clicked
+ *  instance itself, so the overlay outlines exactly what the user clicked. bounds is null when the
+ *  resolved layer has no measurable on-screen rect (e.g. empty bounds). */
+export interface HitTestResult {
+    index: number;
+    startLine: number;
+    endLine: number;
+    bounds: NodeBounds | null;
+}
+
+/** A schema-level PAGX diagnostic exported by the WASM importer. XML well-formedness diagnostics
+ *  are produced separately in SourceEditor with DOMParser; these cover valid XML that violates the
+ *  PAGX schema, such as unknown elements, invalid attribute values, and unresolved references. */
+export interface PagxSchemaDiagnostic {
+    message: string;
+    line: number;
+    column: number;
 }
 
 /** Static shape of the wasm module returned by the host-supplied `moduleFactory`. The player
