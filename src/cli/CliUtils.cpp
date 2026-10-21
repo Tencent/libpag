@@ -231,18 +231,11 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   // Collected before embedding, while the difference between a runtime-shaped text and a
   // pre-shaped one is still visible.
   auto substituted = CollectSubstitutedTexts(document);
-  std::unordered_map<Text*, std::vector<GlyphRun*>> embeddedRuns;
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::Text) continue;
-    auto* text = static_cast<Text*>(node.get());
-    if (!text->glyphRuns.empty()) embeddedRuns[text] = text->glyphRuns;
-  }
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
     return false;
   }
-  for (auto& entry : embeddedRuns) entry.first->glyphRuns = std::move(entry.second);
   // A text that shaped to nothing means no font available here covered its characters. Writing the
   // document anyway would silently produce a file whose text is blank on every host lacking the
   // authored font, so fail loudly and name the texts instead.

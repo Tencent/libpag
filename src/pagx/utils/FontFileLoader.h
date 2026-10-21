@@ -55,6 +55,10 @@ std::shared_ptr<tgfx::Typeface> MakeTypefaceFromBytes(const void* bytes, size_t 
  */
 int CountFontFaces(const void* bytes, size_t length);
 
+/** Loads shared font bytes without copying their buffer into each face's typeface. */
+std::shared_ptr<tgfx::Typeface> MakeTypefaceFromSharedBytes(
+    std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex);
+
 /**
  * Loads every face of a font file in face-index order: a single entry for a plain font, one per
  * face for a collection. A WOFF2 file is decoded once and shared by all of its faces. Returns an

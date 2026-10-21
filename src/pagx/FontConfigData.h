@@ -26,7 +26,16 @@
 
 namespace pagx {
 
+class PAGXDocument;
+
 struct FontConfig::Data {
+  Data() = default;
+  Data(const Data& other)
+      : registeredTypefaces(other.registeredTypefaces), fallbackTypefaces(other.fallbackTypefaces),
+        fileFonts(other.fileFonts != nullptr ? std::make_shared<Data>(*other.fileFonts) : nullptr),
+        fileOwner(other.fileOwner) {
+  }
+
   struct FontKey {
     std::string family = {};
     std::string style = {};
@@ -44,6 +53,9 @@ struct FontConfig::Data {
 
   std::unordered_map<FontKey, TypefaceHolder, FontKeyHash> registeredTypefaces = {};
   std::vector<TypefaceHolder> fallbackTypefaces = {};
+  // Document file registrations are an overlay so replacing a source also removes its old faces.
+  std::shared_ptr<Data> fileFonts = nullptr;
+  const PAGXDocument* fileOwner = nullptr;
 };
 
 }  // namespace pagx

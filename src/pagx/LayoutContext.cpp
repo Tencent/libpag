@@ -86,26 +86,30 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     FontConfig::Data::FontKey key = {};
     key.family = fontFamily;
     key.style = fontStyle.empty() ? "Regular" : fontStyle;
-    auto it = fontConfig->data->registeredTypefaces.find(key);
-    if (it != fontConfig->data->registeredTypefaces.end()) {
-      return it->second.getTypeface();
+    for (auto* data : {fontConfig->data->fileFonts.get(), fontConfig->data.get()}) {
+      if (data == nullptr) continue;
+      auto it = data->registeredTypefaces.find(key);
+      if (it != data->registeredTypefaces.end()) return it->second.getTypeface();
     }
 
     // Stage 2: Family-name match in registered typefaces (prefer Regular style)
     std::shared_ptr<tgfx::Typeface> bestTypeface = nullptr;
     int bestPriority = 4;
     std::string bestStyle = {};
-    for (auto& pair : fontConfig->data->registeredTypefaces) {
-      if (pair.first.family != fontFamily) {
-        continue;
-      }
-      int priority = StylePriority(pair.first.style);
-      bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
-                       (priority == bestPriority && pair.first.style < bestStyle);
-      if (preferred) {
-        bestTypeface = pair.second.getTypeface();
-        bestPriority = priority;
-        bestStyle = pair.first.style;
+    for (auto* data : {fontConfig->data->fileFonts.get(), fontConfig->data.get()}) {
+      if (data == nullptr) continue;
+      for (auto& pair : data->registeredTypefaces) {
+        if (pair.first.family != fontFamily) {
+          continue;
+        }
+        int priority = StylePriority(pair.first.style);
+        bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
+                         (priority == bestPriority && pair.first.style < bestStyle);
+        if (preferred) {
+          bestTypeface = pair.second.getTypeface();
+          bestPriority = priority;
+          bestStyle = pair.first.style;
+        }
       }
     }
     if (bestTypeface != nullptr) {
@@ -115,17 +119,22 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 
   // Stage 3: Family-name match in user fallback typefaces
   if (!fontFamily.empty()) {
-    for (auto& holder : fontConfig->data->fallbackTypefaces) {
-      if (holder.getFontFamily() == fontFamily) {
-        return holder.getTypeface();
+    for (auto* data : {fontConfig->data.get(), fontConfig->data->fileFonts.get()}) {
+      if (data == nullptr) continue;
+      for (auto& holder : data->fallbackTypefaces) {
+        if (holder.getFontFamily() == fontFamily) {
+          return holder.getTypeface();
+        }
       }
     }
   }
 
 #ifdef PAG_BUILD_FOR_WEB
   // Stage 4: On web, prefer the first registered fallback typeface over browser fonts.
-  if (!fontConfig->data->fallbackTypefaces.empty()) {
-    return fontConfig->data->fallbackTypefaces.front().getTypeface();
+  for (auto* data : {fontConfig->data.get(), fontConfig->data->fileFonts.get()}) {
+    if (data != nullptr && !data->fallbackTypefaces.empty()) {
+      return data->fallbackTypefaces.front().getTypeface();
+    }
   }
 #endif
 
@@ -155,13 +164,16 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
     int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
   if (fontConfig != nullptr) {
     // Search user-registered fallback fonts first.
-    for (auto& holder : fontConfig->data->fallbackTypefaces) {
-      auto typeface = holder.getTypeface();
-      if (typeface == nullptr || typeface.get() == primaryTypeface) {
-        continue;
-      }
-      if (typeface->getGlyphID(codepoint) != 0) {
-        return typeface;
+    for (auto* data : {fontConfig->data.get(), fontConfig->data->fileFonts.get()}) {
+      if (data == nullptr) continue;
+      for (auto& holder : data->fallbackTypefaces) {
+        auto typeface = holder.getTypeface();
+        if (typeface == nullptr || typeface.get() == primaryTypeface) {
+          continue;
+        }
+        if (typeface->getGlyphID(codepoint) != 0) {
+          return typeface;
+        }
       }
     }
   }

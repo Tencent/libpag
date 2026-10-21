@@ -197,6 +197,7 @@ class FontConfig {
   struct Data;
   std::unique_ptr<Data> data;
   friend class LayoutContext;
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

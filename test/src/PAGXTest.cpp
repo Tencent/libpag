@@ -1030,9 +1030,9 @@ PAGX_TEST(PAGXTest, FontFileDataLoadedAfterSceneRelayouts) {
 }
 
 /**
-   * Test case: the batch loader attaches font bytes exactly as loadFileData does, so a host that
-   * collects getExternalFilePaths and loads every path in one pass does not silently lose fonts.
-   */
+ * Test case: the batch loader attaches font bytes exactly as loadFileData does, so a host that
+ * collects getExternalFilePaths and loads every path in one pass does not silently lose fonts.
+ */
 PAGX_TEST(PAGXTest, FontFileDataLoadedByBatchMap) {
   auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
   ASSERT_NE(doc, nullptr);
@@ -1053,41 +1053,49 @@ PAGX_TEST(PAGXTest, FontFileDataLoadedByBatchMap) {
   EXPECT_TRUE(doc->getExternalFilePaths().empty());
 }
 
-/**
-   * Test case: registration is keyed on the file a Font node currently names as well as on the bytes
-   * it carries, so pointing an already laid-out Font at another file registers the new file instead
-   * of keeping the first one's registration.
-   */
-PAGX_TEST(PAGXTest, FontFileChangedAfterLayoutRegistersNewFile) {
-  auto notoPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  auto xml = std::string(R"(<pagx width="200" height="60">
-    <Layer>
-      <Text text="A" fontFamily="Noto Sans SC" fontSize="24"/>
-      <Fill color="#000000"/>
-    </Layer>
-    <Resources>
-      <Font id="webFont" file=")") +
-             notoPath + R"("/>
-    </Resources>
-  </pagx>)";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
+PAGX_TEST(PAGXTest, ReplacingFontFileRemovesOldRegistrations) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
   ASSERT_NE(doc, nullptr);
-  auto* text = FirstText(doc.get());
-  ASSERT_NE(text, nullptr);
   auto* font = doc->findNode<pagx::Font>("webFont");
   ASSERT_NE(font, nullptr);
-  doc->applyLayout();
-  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "Noto Sans SC");
-
   font->file = ProjectPath::Absolute(PUA_WOFF2_FONT);
-  text->fontFamily = "pagx-font-f0";
-  text->text = "\uE000";
   doc->applyLayout();
-  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+  EXPECT_TRUE(doc->fontConfig().containsFamily("pagx-font-f0"));
+  font->file = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  doc->applyLayout();
+  EXPECT_FALSE(doc->fontConfig().containsFamily("pagx-font-f0"));
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "pagx-font-f0"), 0u);
+  EXPECT_TRUE(doc->fontConfig().containsFamily("Noto Sans SC"));
+  auto config = doc->fontConfig();
+  font->file.clear();
+  doc->applyLayout(&config);
+  EXPECT_FALSE(doc->fontConfig().containsFamily("Noto Sans SC"));
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "Noto Sans SC"), 0u);
+}
+
+PAGX_TEST(PAGXTest, ReplacingFontDataKeepsCallerRegistrations) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
+  ASSERT_NE(doc, nullptr);
+  auto* font = doc->findNode<pagx::Font>("webFont");
+  ASSERT_NE(font, nullptr);
+  auto pua = tgfx::Data::MakeFromFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  auto cjk =
+      tgfx::Data::MakeFromFile(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(pua, nullptr);
+  ASSERT_NE(cjk, nullptr);
+  doc->fontConfig().registerFont(ProjectPath::Absolute(PUA_WOFF2_FONT), 0, "Caller Font",
+                                 "Regular");
+  font->fileData = pagx::Data::MakeWithCopy(pua->data(), pua->size());
+  doc->applyLayout();
+  font->fileData = pagx::Data::MakeWithCopy(cjk->data(), cjk->size());
+  doc->applyLayout();
+  EXPECT_FALSE(doc->fontConfig().containsFamily("pagx-font-f0"));
+  EXPECT_TRUE(doc->fontConfig().containsFamily("Noto Sans SC"));
+  EXPECT_TRUE(doc->fontConfig().containsFamily("Caller Font"));
 }
 
 /**
-   * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
+ * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
  * fontFamily rather than an id reference, so pruning them as unreferenced would drop the font.
  */
 PAGX_TEST(PAGXTest, OptimizerKeepsFontFileSources) {
@@ -6005,6 +6013,13 @@ PAGX_TEST(PAGXTest, DocumentEmbedWithLayout) {
 
   EXPECT_TRUE(doc->embed());
   EXPECT_FALSE(text->glyphRuns.empty());
+  auto runs = text->glyphRuns;
+  auto nodeCount = doc->nodes.size();
+  text->fauxItalic = true;
+  EXPECT_TRUE(doc->embed());
+  EXPECT_EQ(text->glyphRuns, runs);
+  EXPECT_EQ(doc->nodes.size(), nodeCount);
+  EXPECT_TRUE(text->fauxItalic);
 }
 
 /**

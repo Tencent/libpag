@@ -89,6 +89,14 @@ class PAGXDocument : public Node {
   std::vector<DataBind*> dataBinds = {};
 
   /**
+   * Discards owned nodes after the caller has detached all references to them. Intended for
+   * rolling back explicitly tracked allocations when constructing a subtree fails. Nodes owned
+   * by another document are ignored.
+   * @param nodesToRemove The detached nodes to discard.
+   */
+  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+
+  /**
    * Creates a node of the specified type and adds it to the document management.
    * If an ID is provided, the node will be indexed for lookup.
    * If the ID already exists, an error will be logged and the new node will replace the old one in
@@ -249,7 +257,8 @@ class PAGXDocument : public Node {
   /**
    * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
    * The document must have had applyLayout() called first so that Text nodes contain valid
-   * layout run data.
+   * layout run data. Text nodes that already carry GlyphRuns are left unchanged. Call clearEmbed()
+   * before layout to explicitly reshape and replace existing embedded runs.
    * @return true if embedding succeeded, false if layout has not been applied.
    */
   bool embed();
@@ -341,13 +350,13 @@ class PAGXDocument : public Node {
   void unregisterLiveScene(PAGScene* scene);
 
   FontConfig _fontConfig;
-  // What a Font node was last registered from: the file path it named and the bytes it carried
-  // (nullptr when read from disk). Cleared whenever applyLayout replaces the config. Comparing both
-  // keeps re-layouts from appending the same file to the fallback chain again, while bytes that
-  // loadFileData supplies later or a file the host repoints are still picked up.
   struct RegisteredFontFile {
     std::string file = {};
-    const Data* fileData = nullptr;
+    std::shared_ptr<Data> fileData = nullptr;
+
+    bool operator==(const RegisteredFontFile& other) const {
+      return file == other.file && fileData == other.fileData;
+    }
   };
   std::unordered_map<const Font*, RegisteredFontFile> registeredFontFiles = {};
   bool layoutApplied = false;
@@ -355,13 +364,6 @@ class PAGXDocument : public Node {
   // O(1) containment check for ownsNode(), maintained alongside nodes.
   std::unordered_set<const Node*> nodeSet = {};
 
-  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
-  // Marks the current end of the node list so a friend that builds a subtree and then fails can
-  // discard exactly the nodes it created, instead of leaving them attached to the document.
-  size_t markNodes() const {
-    return nodes.size();
-  }
-  void rollbackNodes(size_t mark);
   void setNodeId(Node* node, const std::string& id);
   void resetLayoutState();
 
@@ -370,7 +372,6 @@ class PAGXDocument : public Node {
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
   friend class FontEmbedder;
-  friend class HTMLTextFragmentBuilder;
 
   // Lazily built index of Image node filePath -> pagx Layer list, used by
   // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits

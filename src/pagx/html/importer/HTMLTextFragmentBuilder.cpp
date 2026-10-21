@@ -137,40 +137,66 @@ bool HTMLTextFragmentBuilder::collectEmbeddedGlyphs(Text* text,
       if (codepoint < 0xE000 || codepoint > 0xF8FF) return false;
     }
     auto fragment = makeFragment(inherited);
-    auto embedded = PAGXDocument::Make(0, 0);
-    auto* layer = embedded->makeNode<Layer>();
-    auto* sourceText = embedded->makeNode<Text>();
-    sourceText->text = child->name;
-    sourceText->fontFamily = fragment.fontFamily;
-    sourceText->fontStyle = ResolveHTMLFontStyleName(fragment.fontStyleName);
-    sourceText->fontSize = fragment.fontSize;
-    sourceText->letterSpacing = fragment.letterSpacing;
-    layer->contents.push_back(sourceText);
-    embedded->layers.push_back(layer);
-    embedded->applyLayout(&_document->fontConfig());
-    if (!embedded->embed() || sourceText->glyphRuns.empty()) return false;
+    EmbeddedTextKey key = {fragment.fontFamily, ResolveHTMLFontStyleName(fragment.fontStyleName),
+                           fragment.fontSize, fragment.letterSpacing, child->name};
+    auto cached = _embeddedTexts.find(key);
+    if (cached == _embeddedTexts.end()) {
+      auto embedded = PAGXDocument::Make(0, 0);
+      auto* layer = embedded->makeNode<Layer>();
+      auto* sourceText = embedded->makeNode<Text>();
+      sourceText->text = child->name;
+      sourceText->fontFamily = fragment.fontFamily;
+      sourceText->fontStyle = std::get<1>(key);
+      sourceText->fontSize = fragment.fontSize;
+      sourceText->letterSpacing = fragment.letterSpacing;
+      layer->contents.push_back(sourceText);
+      embedded->layers.push_back(layer);
+      embedded->applyLayout(&_document->fontConfig());
+      if (!embedded->embed() || sourceText->glyphRuns.empty()) return false;
+      cached = _embeddedTexts.emplace(key, EmbeddedText{embedded, sourceText}).first;
+    }
+    auto* sourceText = cached->second.text;
+    if (sourceText->glyphRuns.front() == nullptr) return false;
     auto sourceBounds = sourceText->glyphRuns.front()->bounds;
     std::unordered_map<Font*, Font*> fonts;
     for (auto* sourceRun : sourceText->glyphRuns) {
+      if (sourceRun == nullptr || sourceRun->font == nullptr) return false;
       auto* sourceFont = sourceRun->font;
+      if (sourceFont->unitsPerEm <= 0) return false;
+      for (auto glyphID : sourceRun->glyphs) {
+        if (glyphID == 0 || glyphID > sourceFont->glyphs.size() ||
+            sourceFont->glyphs[glyphID - 1] == nullptr)
+          return false;
+      }
       if (fonts.count(sourceFont) != 0) continue;
-      auto* font = _document->makeNode<Font>(_idAllocator.generateUnique("font"));
+      auto existing = _embeddedFonts.find(sourceFont);
+      if (existing != _embeddedFonts.end()) {
+        fonts[sourceFont] = existing->second;
+        continue;
+      }
+      auto pending = _pendingEmbeddedFonts.find(sourceFont);
+      if (pending != _pendingEmbeddedFonts.end()) {
+        fonts[sourceFont] = pending->second;
+        continue;
+      }
+      auto* font = makeEmbeddedNode<Font>(_idAllocator.generateUnique("font"));
       font->unitsPerEm = sourceFont->unitsPerEm;
       for (auto* sourceGlyph : sourceFont->glyphs) {
-        auto* glyph = _document->makeNode<Glyph>();
+        auto* glyph = makeEmbeddedNode<Glyph>();
         glyph->advance = sourceGlyph->advance;
         glyph->offset = sourceGlyph->offset;
         if (sourceGlyph->path != nullptr) {
-          glyph->path = _document->makeNode<PathData>();
+          glyph->path = makeEmbeddedNode<PathData>();
           *glyph->path = *sourceGlyph->path;
         }
         if (sourceGlyph->image != nullptr) {
-          glyph->image = _document->makeNode<Image>();
+          glyph->image = makeEmbeddedNode<Image>();
           glyph->image->data = sourceGlyph->image->data;
         }
         font->glyphs.push_back(glyph);
       }
       fonts[sourceFont] = font;
+      _pendingEmbeddedFonts[sourceFont] = font;
     }
     if (text->glyphRuns.empty()) firstStyle = fragment;
     size_t firstGlyph = 0;
@@ -180,11 +206,11 @@ bool HTMLTextFragmentBuilder::collectEmbeddedGlyphs(Text* text,
     if (fragment.color != firstStyle.color ||
         !StrokesMatch(fragment.strokeWidth, fragment.strokeColor, firstStyle.strokeWidth,
                       firstStyle.strokeColor)) {
-      auto* modifier = _document->makeNode<TextModifier>();
+      auto* modifier = makeEmbeddedNode<TextModifier>();
       modifier->fillColor = fragment.color;
       modifier->strokeColor = fragment.strokeColor;
       modifier->strokeWidth = std::isnan(fragment.strokeWidth) ? 0.0f : fragment.strokeWidth;
-      auto* selector = _document->makeNode<RangeSelector>();
+      auto* selector = makeEmbeddedNode<RangeSelector>();
       selector->unit = SelectorUnit::Index;
       selector->start = static_cast<float>(firstGlyph);
       selector->end = static_cast<float>(lastGlyph);
@@ -192,8 +218,10 @@ bool HTMLTextFragmentBuilder::collectEmbeddedGlyphs(Text* text,
       _glyphModifiers.push_back(modifier);
     }
     for (auto* sourceRun : sourceText->glyphRuns) {
-      auto* run = _document->makeNode<GlyphRun>();
-      run->font = fonts[sourceRun->font];
+      auto* run = makeEmbeddedNode<GlyphRun>();
+      auto font = fonts.find(sourceRun->font);
+      if (font == fonts.end()) return false;
+      run->font = font->second;
       run->fontSize = sourceRun->fontSize;
       run->glyphs = sourceRun->glyphs;
       for (const auto& pos : sourceRun->positions) {
@@ -229,14 +257,15 @@ Layer* HTMLTextFragmentBuilder::convertEmbeddedTextHost(const std::shared_ptr<DO
                                                         const HTMLInheritedStyle& inherited) {
   if (_registeredFontFamilies.empty()) return nullptr;
   auto style = _styleCascade.resolveInheritedStyle(element, inherited);
-  size_t mark = _document->markNodes();
-  auto* text = _document->makeNode<Text>();
+  _embeddedNodes.clear();
+  _pendingEmbeddedFonts.clear();
+  auto* text = makeEmbeddedNode<Text>();
   _glyphModifiers.clear();
   TextFragment fragment = makeFragment(style);
   if (!collectEmbeddedGlyphs(text, element, style, Matrix{}, fragment) || text->glyphRuns.empty()) {
-    _document->rollbackNodes(mark);
-    // The modifiers just dropped were recorded while the subtree was being built; leaving them
-    // behind would keep pointers to removed nodes until the next call clears the list.
+    _document->removeNodes(_embeddedNodes);
+    _embeddedNodes.clear();
+    _pendingEmbeddedFonts.clear();
     _glyphModifiers.clear();
     return nullptr;
   }
@@ -271,6 +300,10 @@ Layer* HTMLTextFragmentBuilder::convertEmbeddedTextHost(const std::shared_ptr<DO
   auto* stroke = buildTextStroke(fragment);
   if (stroke != nullptr) host->contents.push_back(stroke);
   _idAllocator.assign(wrapper, element);
+  _embeddedFonts.insert(_pendingEmbeddedFonts.begin(), _pendingEmbeddedFonts.end());
+  _pendingEmbeddedFonts.clear();
+  _embeddedNodes.clear();
+  _glyphModifiers.clear();
   return wrapper;
 }
 

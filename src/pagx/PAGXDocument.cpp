@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/FontConfigData.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
@@ -223,8 +224,19 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     errors.push_back("Cyclic external composition reference detected during layout.");
     return;
   }
-  if (config != nullptr) {
+  if (config != nullptr && config != &_fontConfig) {
     _fontConfig = *config;
+    auto& data = *_fontConfig.data;
+    if (data.fileFonts != nullptr && data.fileOwner != this) {
+      for (const auto& entry : data.fileFonts->registeredTypefaces) {
+        data.registeredTypefaces.insert_or_assign(entry.first, entry.second);
+      }
+      data.fallbackTypefaces.insert(data.fallbackTypefaces.end(),
+                                    data.fileFonts->fallbackTypefaces.begin(),
+                                    data.fileFonts->fallbackTypefaces.end());
+    }
+    data.fileFonts = nullptr;
+    data.fileOwner = nullptr;
     registeredFontFiles.clear();
   }
   registerFontFiles();
@@ -306,29 +318,30 @@ void PAGXDocument::applyLayout(const FontConfig* config,
 
 // The document's own font files go on top of the caller's config: they are what the document was
 // authored against, so a same-named registration from the caller must not shadow them. A Font is
-// registered once per config; it is registered again only when it gains bytes it was not
-// registered from, which is how a host on a platform without file access (the web) delivers it.
+// registered once per source set. Replacing or removing a path or its data rebuilds only the
+// file overlay, keeping caller registrations intact and releasing faces from obsolete sources.
 void PAGXDocument::registerFontFiles() {
+  std::unordered_map<const Font*, RegisteredFontFile> sources = {};
   for (auto& node : nodes) {
-    if (node->nodeType() != NodeType::Font) {
-      continue;
-    }
+    if (node->nodeType() != NodeType::Font) continue;
     auto* font = static_cast<Font*>(node.get());
-    if (font->file.empty()) {
-      continue;
-    }
-    auto registered = registeredFontFiles.find(font);
-    if (registered != registeredFontFiles.end() && registered->second.file == font->file &&
-        registered->second.fileData == font->fileData.get()) {
-      continue;
-    }
-    if (font->fileData != nullptr) {
-      RegisterFontDataFaces(&_fontConfig, font->fileData->bytes(), font->fileData->size(), true);
-    } else if (IsLocalFilePath(font->file)) {
-      RegisterFontFileFaces(&_fontConfig, font->file, true);
-    }
-    registeredFontFiles[font] = {font->file, font->fileData.get()};
+    if (!font->file.empty()) sources[font] = {font->file, font->fileData};
   }
+  if (sources == registeredFontFiles && _fontConfig.data->fileFonts != nullptr) return;
+  FontConfig files;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Font) continue;
+    auto* font = static_cast<Font*>(node.get());
+    if (font->file.empty()) continue;
+    if (font->fileData != nullptr) {
+      RegisterFontDataFaces(&files, font->fileData->bytes(), font->fileData->size(), true);
+    } else if (IsLocalFilePath(font->file)) {
+      RegisterFontFileFaces(&files, font->file, true);
+    }
+  }
+  _fontConfig.data->fileFonts = std::move(files.data);
+  _fontConfig.data->fileOwner = this;
+  registeredFontFiles = std::move(sources);
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
@@ -364,17 +377,6 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
   nodeMap[id] = node;
 }
 
-void PAGXDocument::rollbackNodes(size_t mark) {
-  if (mark >= nodes.size()) {
-    return;
-  }
-  std::unordered_set<Node*> toRemove = {};
-  for (size_t i = mark; i < nodes.size(); i++) {
-    toRemove.insert(nodes[i].get());
-  }
-  removeNodes(toRemove);
-}
-
 void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
   for (auto it = nodeMap.begin(); it != nodeMap.end();) {
     if (toRemove.count(it->second) > 0) {
@@ -389,9 +391,6 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
       nodes[writeIdx++] = std::move(nodes[readIdx]);
     } else {
       nodeSet.erase(nodes[readIdx].get());
-      if (nodes[readIdx]->nodeType() == NodeType::Font) {
-        registeredFontFiles.erase(static_cast<const Font*>(nodes[readIdx].get()));
-      }
     }
   }
   nodes.resize(writeIdx);

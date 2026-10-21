@@ -19,11 +19,14 @@
 #pragma once
 
 #include <cmath>
+#include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
@@ -33,6 +36,7 @@ namespace pagx {
 struct DOMNode;
 class Data;
 class Fill;
+class Font;
 class HTMLDiagnosticSink;
 class HTMLIdAllocator;
 class HTMLLayerBuilder;
@@ -233,6 +237,22 @@ class HTMLTextFragmentBuilder {
   HTMLStyleCascade& _styleCascade;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
+  struct EmbeddedText {
+    std::shared_ptr<PAGXDocument> document;
+    Text* text = nullptr;
+  };
+  using EmbeddedTextKey = std::tuple<std::string, std::string, float, float, std::string>;
+  std::map<EmbeddedTextKey, EmbeddedText> _embeddedTexts = {};
+  std::unordered_map<Font*, Font*> _embeddedFonts = {};
+  std::unordered_map<Font*, Font*> _pendingEmbeddedFonts = {};
+  std::unordered_set<Node*> _embeddedNodes = {};
+
+  template <typename T>
+  T* makeEmbeddedNode(const std::string& id = "") {
+    auto* node = _document->makeNode<T>(id);
+    _embeddedNodes.insert(node);
+    return node;
+  }
   std::unordered_set<std::string> _registeredFontFamilies = {};
   std::vector<TextModifier*> _glyphModifiers = {};
 };

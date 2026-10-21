@@ -54,8 +54,14 @@ afterEach(() => {
 
 describe('readLineClamp', () => {
   test('reads the authored count', () => {
-    expect(readLineClamp(computedStub({ '-webkit-line-clamp': '2' }))).toBe(2);
-    expect(readLineClamp(computedStub({ '-webkit-line-clamp': ' 3 ' }))).toBe(3);
+    expect(readLineClamp(computedStub({ display: '-webkit-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': '2' }))).toBe(2);
+    expect(readLineClamp(computedStub({ display: '-webkit-inline-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': ' 3 ' }))).toBe(3);
+  });
+
+  test('ignores inactive legacy clamp and reads the standard property', () => {
+    expect(readLineClamp(computedStub({ display: 'block', '-webkit-line-clamp': '2' }))).toBe(0);
+    expect(readLineClamp(computedStub({ display: '-webkit-box', '-webkit-box-orient': 'horizontal', '-webkit-line-clamp': '2' }))).toBe(0);
+    expect(readLineClamp(computedStub({ display: 'block', 'line-clamp': '3' }))).toBe(3);
   });
 
   test('treats none / empty / garbage as disabled', () => {

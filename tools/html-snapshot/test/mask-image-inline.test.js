@@ -44,6 +44,7 @@ afterEach(() => {
   global.fetch = savedGlobals.fetch;
   global.FileReader = savedGlobals.FileReader;
   warnSpy.mockRestore();
+  jest.useRealTimers();
 });
 
 // Minimal FileReader: hands back whatever `__dataUri` the stubbed blob carries,
@@ -86,6 +87,30 @@ describe('inlineMaskImages', () => {
     await runOn([el]);
 
     expect(el.style.maskImage).toBe(`url('${DATA_URI}'), linear-gradient(#000, #000)`);
+  });
+
+  test('resolves all remote layers even after a local layer', async () => {
+    const second = REMOTE + '?second';
+    const el = new FakeElement(`url('data:image/png;base64,AAAA'), url(${REMOTE}), url(${second})`);
+    const fetcher = jest.fn(async () => ({ ok: true, blob: async () => ({ __dataUri: DATA_URI }) }));
+    await runOn([el], fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(el.style.maskImage).toBe(`url('data:image/png;base64,AAAA'), url('${DATA_URI}'), url('${DATA_URI}')`);
+  });
+
+  test.each(['fetch', 'body'])('bounds a hanging %s and aborts the request', async (stage) => {
+    jest.useFakeTimers();
+    let signal;
+    const el = new FakeElement(`url(${REMOTE})`);
+    const pending = runOn([el], async (_, options) => {
+      signal = options.signal;
+      if (stage === 'fetch') return new Promise(() => {});
+      return { ok: true, blob: () => new Promise(() => {}) };
+    });
+    await jest.advanceTimersByTimeAsync(10000);
+    await pending;
+    expect(signal.aborted).toBe(true);
+    expect(warnSpy.mock.calls[0][0]).toContain('timed out');
   });
 
   test('leaves gradients, data: and file: masks untouched', async () => {

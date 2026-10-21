@@ -54,7 +54,7 @@ std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
     if (!path.empty()) {
       typeface = MakeTypefaceFromFile(path, ttcIndex);
     } else if (bytes != nullptr && !bytes->empty()) {
-      typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
+      typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
     }
   }
   return typeface;
@@ -149,7 +149,7 @@ void FontConfig::registerFont(std::shared_ptr<const std::vector<uint8_t>> bytes,
     return;
   }
   if (fontFamily.empty()) {
-    auto typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
+    auto typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -218,7 +218,7 @@ void FontConfig::addFallbackFont(std::shared_ptr<const std::vector<uint8_t>> byt
     return;
   }
   if (fontFamily.empty()) {
-    auto typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
+    auto typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -270,6 +270,11 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   for (auto& holder : data->fallbackTypefaces) {
     names.push_back(holder.getFontFamily());
   }
+  if (data->fileFonts != nullptr) {
+    for (const auto& holder : data->fileFonts->fallbackTypefaces) {
+      names.push_back(holder.getFontFamily());
+    }
+  }
   return names;
 }
 
@@ -277,14 +282,17 @@ bool FontConfig::containsFamily(const std::string& fontFamily) const {
   if (fontFamily.empty()) {
     return false;
   }
-  for (const auto& pair : data->registeredTypefaces) {
-    if (pair.first.family == fontFamily) {
-      return true;
+  for (auto* source : {data->fileFonts.get(), data.get()}) {
+    if (source == nullptr) continue;
+    for (const auto& pair : source->registeredTypefaces) {
+      if (pair.first.family == fontFamily) {
+        return true;
+      }
     }
-  }
-  for (const auto& holder : data->fallbackTypefaces) {
-    if (holder.getFontFamily() == fontFamily) {
-      return true;
+    for (const auto& holder : source->fallbackTypefaces) {
+      if (holder.getFontFamily() == fontFamily) {
+        return true;
+      }
     }
   }
   return false;

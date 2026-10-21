@@ -93,6 +93,22 @@ std::shared_ptr<tgfx::Typeface> MakeTypefaceFromBytes(const void* bytes, size_t 
   return sfnt != nullptr ? tgfx::Typeface::MakeFromData(std::move(sfnt), ttcIndex) : nullptr;
 }
 
+static void ReleaseSharedFontBytes(const void*, void* context) {
+  delete static_cast<std::shared_ptr<const std::vector<uint8_t>>*>(context);
+}
+
+std::shared_ptr<tgfx::Typeface> MakeTypefaceFromSharedBytes(
+    std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex) {
+  if (bytes == nullptr || bytes->empty()) return nullptr;
+  if (HasWOFF2Signature(bytes->data(), bytes->size())) {
+    auto sfnt = DecodeWOFF2(bytes->data(), bytes->size());
+    return sfnt != nullptr ? tgfx::Typeface::MakeFromData(std::move(sfnt), ttcIndex) : nullptr;
+  }
+  auto* owner = new std::shared_ptr<const std::vector<uint8_t>>(bytes);
+  auto data = tgfx::Data::MakeAdopted(bytes->data(), bytes->size(), ReleaseSharedFontBytes, owner);
+  return tgfx::Typeface::MakeFromData(std::move(data), ttcIndex);
+}
+
 int CountFontFaces(const void* bytes, size_t length) {
   auto data = static_cast<const uint8_t*>(bytes);
   if (data == nullptr || length < 4) {
@@ -154,8 +170,9 @@ std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromBytes(const void* 
                          : std::vector<std::shared_ptr<tgfx::Typeface>>{};
 }
 
-int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
-                          bool addToFallbackChain, const std::string& familyOverride) {
+static int RegisterFontDataFacesInternal(FontConfig* fontConfig, const void* bytes, size_t length,
+                                         bool addToFallbackChain, const std::string& familyOverride,
+                                         std::string* internalFamily) {
   // The font is copied (or decoded) once and the same buffer backs every face's registration and
   // fallback entry: taking the bytes overloads per face would hold one full copy per face per list.
   std::shared_ptr<const std::vector<uint8_t>> buffer = nullptr;
@@ -182,6 +199,7 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
     if (typeface == nullptr) {
       break;
     }
+    if (index == 0 && internalFamily != nullptr) *internalFamily = typeface->fontFamily();
     auto family = familyOverride.empty() ? typeface->fontFamily() : familyOverride;
     auto style = typeface->fontStyle();
     fontConfig->registerFont(buffer, index, family, style);
@@ -193,22 +211,18 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
   return faceCount;
 }
 
+int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
+                          bool addToFallbackChain, const std::string& familyOverride) {
+  return RegisterFontDataFacesInternal(fontConfig, bytes, length, addToFallbackChain,
+                                       familyOverride, nullptr);
+}
+
 int RegisterFontFileFaces(FontConfig* fontConfig, const std::string& path, bool addToFallbackChain,
                           const std::string& familyOverride, std::string* internalFamily) {
-  auto faces = MakeTypefacesFromFile(path);
-  for (size_t index = 0; index < faces.size(); index++) {
-    auto ttcIndex = static_cast<int>(index);
-    if (index == 0 && internalFamily != nullptr) {
-      *internalFamily = faces[index]->fontFamily();
-    }
-    auto family = familyOverride.empty() ? faces[index]->fontFamily() : familyOverride;
-    auto style = faces[index]->fontStyle();
-    fontConfig->registerFont(path, ttcIndex, family, style);
-    if (addToFallbackChain) {
-      fontConfig->addFallbackFont(path, ttcIndex, family, style);
-    }
-  }
-  return static_cast<int>(faces.size());
+  auto bytes = tgfx::Data::MakeFromFile(path);
+  if (bytes == nullptr) return 0;
+  return RegisterFontDataFacesInternal(fontConfig, bytes->data(), bytes->size(), addToFallbackChain,
+                                       familyOverride, internalFamily);
 }
 
 }  // namespace pagx

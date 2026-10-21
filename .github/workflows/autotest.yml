@@ -59,6 +59,12 @@ jobs:
           npm test --prefix tools/ppt-eval
         shell: bash
 
+      - name: Test HTML Snapshot
+        run: |
+          npm ci --prefix tools/html-snapshot
+          npm test --prefix tools/html-snapshot -- --runInBand
+        shell: bash
+
       - name: Check Code Format
         run: |
           chmod +x codeformat.sh

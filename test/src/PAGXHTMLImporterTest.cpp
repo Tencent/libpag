@@ -7119,6 +7119,29 @@ static void ExpectWebFontImported(const std::shared_ptr<pagx::PAGXDocument>& doc
   }
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RepeatedIconTextSharesEmbeddedFonts) {
+  auto html = "<html><head><style>@font-face{font-family:Icon;src:url('" + PuaWoff2FontPath() +
+              "')}</style></head><body style='width:100px;height:40px'>";
+  for (int i = 0; i < 3; i++) {
+    html += "<div data-pagx-text='icon' style='position:absolute;left:" + std::to_string(i * 20) +
+            "px;top:0px;font-family:Icon;font-size:20px'><span>&#xE000;</span></div>";
+  }
+  html += "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html);
+  ASSERT_NE(doc, nullptr);
+  pagx::Font* shared = nullptr;
+  int texts = 0;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    ASSERT_EQ(text->glyphRuns.size(), 1u);
+    if (shared == nullptr) shared = text->glyphRuns.front()->font;
+    EXPECT_EQ(text->glyphRuns.front()->font, shared);
+    texts++;
+  }
+  EXPECT_EQ(texts, 3);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextMetadataEmbedsGlyphsDuringImport) {
   auto path = PuaWoff2FontPath();
   for (bool normalize : {false, true}) {

@@ -43,6 +43,14 @@ describe('nativeControlKind', () => {
     expect(nativeControlKind(fakeEl('meter'))).toBe('meter');
   });
 
+  test('does not synthesize hidden or custom-painted controls', () => {
+    const el = fakeEl('input', { type: 'checkbox' });
+    expect(nativeControlKind(el, { ...computed(), display: 'none' })).toBeNull();
+    expect(nativeControlKind(el, { ...computed(), visibility: 'hidden' })).toBeNull();
+    expect(nativeControlKind(el, computed({ appearance: 'none' }))).toBeNull();
+    expect(nativeControlKind(el, computed({ '-webkit-appearance': 'none' }))).toBeNull();
+  });
+
   test('leaves text inputs and non-controls to the normal pipeline', () => {
     expect(nativeControlKind(fakeEl('input', { type: 'text' }))).toBeNull();
     expect(nativeControlKind(fakeEl('input', { type: 'password' }))).toBeNull();
