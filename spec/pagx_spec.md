@@ -938,7 +938,7 @@ Layer child elements are automatically categorized into five collections by type
 | Child Element Type | Category | Description |
 |-------------------|----------|-------------|
 | VectorElement | contents | Geometry elements, modifiers, painters (participate in accumulation processing) |
-| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle, GlassStyle |
+| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, BackgroundFilterStyle, NoiseStyle, GlassStyle |
 | LayerFilter | filters | BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter, NoiseFilter |
 | `<Timelines>` | timelines | Container of `<Animation ref="@id" playing="..."/>` and `<StateMachine ref="@id"/>` entries that drive animations or state machines on the referenced Composition |
 | Layer | children | Nested child layers |
@@ -1049,6 +1049,17 @@ Applies blur effect to layer background **below** the layer. Computes effect bas
 1. Get layer background below layer bounds
 2. Apply Gaussian blur `(blurX, blurY)` to layer background
 3. Clip blurred result using opaque layer content as mask
+
+#### 5.3.2.1 BackgroundFilterStyle
+
+Applies child `LayerFilter` nodes in order to a single backdrop capture, then paints the layer’s
+own content. Optional `clipPath` contains SVG path data in owner-layer coordinates and defines
+the sampling and paint area even for transparent empty layers. When absent, the layer contour
+is used. Common style attributes `blendMode` and `excludeChildEffects` apply. Children may be
+`BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `ColorMatrixFilter`, `BlendFilter` or
+`NoiseFilter`, with their usual attributes.
+
+Older readers may ignore this new node. Existing `BackgroundBlurStyle` semantics are unchanged.
 
 #### 5.3.3 InnerShadowStyle
 
@@ -2830,7 +2841,7 @@ This appendix describes node categorization and nesting rules.
 | **State Machine** | `StateMachine`, `Input`, `StateRegion`, `State`, `Transition`, `Condition` | State-driven behavior: input-conditioned transitions between states, each bound to an Animation or empty. Defined in `<Animations>`, driven via `<StateMachine ref="@id"/>` in Layer `<Timelines>`. |
 | **ViewModel** | `ViewModel`, `Property`, `DataBind`, `DataConverter` | ViewModel schema and data binding definitions. |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
-| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle`, `GlassStyle` | Visual effects applied to Layer content. |
+| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `BackgroundFilterStyle`, `NoiseStyle`, `GlassStyle` | Visual effects applied to Layer content. |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter`, `NoiseFilter` | Post-processing effects applied to composited Layer. |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | Transform or combine geometry and text. |

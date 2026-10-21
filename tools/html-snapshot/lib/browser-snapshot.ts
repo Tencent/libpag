@@ -814,8 +814,7 @@ function readBorderSide(computed, side) {
 // bar should sit 1.5px from the inner padding edge, but emitting the raw
 // border-box-relative offset (2.5px) drifts it by the 1px border).
 function paddingBoxOrigin(rect, computed) {
-  // Asymmetric borders become paint overlays; the emitted host has no CSS border.
-  if (!isUniformBorder(computed)) return rect;
+
   const bt = borderWidthOf(computed, 'top');
   const bl = borderWidthOf(computed, 'left');
   if (bt === 0 && bl === 0) return rect;
@@ -836,7 +835,7 @@ function paddingBoxOrigin(rect, computed) {
 // computed-style serialisation never sneaks past the equality check.
 function isUniformBorder(computed) {
   const top = readBorderSide(computed, 'top');
-  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted') return false;
+  if (top.style === 'none' || top.style === 'hidden') return false;
   if (top.width <= 0) return false;
   for (const side of SIDES) {
     if (side === 'top') continue;
@@ -1302,15 +1301,33 @@ function snapshotFontFamily(value, computed) {
 
 }
 
-// Forward a uniform `border` shorthand, preserving the actual line style
-// (solid/dashed/dotted) so the importer can reproduce dash patterns. Asymmetric
-// borders are emitted as overlay rectangles by borderOverlayHTML(); see that
-// comment for the trade-off.
+// Preserve border semantics on the host; the importer owns side joins and line styles.
 function appendBorder(parts, computed) {
-  if (!isUniformBorder(computed)) return;
-  const top = readBorderSide(computed, 'top');
-  if (top.width <= 0) return;
-  parts.push(`border: ${px(top.width)} ${top.style} ${top.color.trim()}`);
+  if (isUniformBorder(computed)) {
+    const top = readBorderSide(computed, 'top');
+    parts.push(`border: ${px(top.width)} ${top.style} ${top.color.trim()}`);
+  } else {
+    for (const side of SIDES) {
+      const b = readBorderSide(computed, side);
+      if (b.width > 0 && b.style !== 'none' && b.style !== 'hidden')
+        parts.push(`border-${side}: ${px(b.width)} ${b.style} ${b.color.trim()}`);
+    }
+  }
+  const image = computed.getPropertyValue('border-image-source').trim();
+  if (image && image !== 'none') {
+    for (const prop of ['source', 'slice', 'width', 'outset', 'repeat']) {
+      const raw = computed.getPropertyValue('border-image-' + prop).trim();
+      const value = prop === 'source' ? normalizeBackgroundImage(raw) : raw;
+      if (value) parts.push(`border-image-${prop}: ${value}`);
+    }
+  }
+  const outline = computed.getPropertyValue('outline-style').trim();
+  if (outline && outline !== 'none') {
+    for (const prop of ['width', 'style', 'color', 'offset']) {
+      const value = computed.getPropertyValue('outline-' + prop).trim();
+      if (value) parts.push(`outline-${prop}: ${value}`);
+    }
+  }
 }
 
 // Pass `box-shadow` through verbatim if non-none.
@@ -1391,81 +1408,10 @@ function appendTextStroke(parts, computed) {
   if (value) parts.push(`-webkit-text-stroke: ${value}`);
 }
 
-// Translate CSS `text-shadow` (a text glow like `0 0 12px rgba(...)`) into an
-// equivalent `filter: drop-shadow(...)` chain so it survives into PAGX. The
-// importer has no `text-shadow` property, but it lowers `filter: drop-shadow()`
-// onto a DropShadowFilter (HTMLLayerBuilder / HTMLAnimationBuilder). For an
-// element that paints no box, `filter: drop-shadow` glows only the rendered
-// glyphs — visually identical to `text-shadow`. The caller (buildStyle) gates
-// this on `!hasBoxVisualsForInline(computed)` so a solid panel is never haloed,
-// and only invokes it inside the `opts.text` branch (elements that render text
-// directly), which avoids double-glowing when the inherited `text-shadow`
-// re-appears on both a container and its text leaves.
-//
-// Computed `text-shadow` is `<color> <offX> <offY> [<blur>]` per shadow, comma
-// separated (no `inset`, no spread). Each maps to `drop-shadow(offX offY blur
-// color)`; a missing blur defaults to `0px`. The chain is merged into any
-// `filter` already emitted (a second inline `filter:` would clobber the first).
+// Text shadows are parallel paints from glyph coverage, never a serial filter chain.
 function appendTextShadow(parts, computed) {
-  const raw = computed.getPropertyValue('text-shadow').trim();
-  if (!raw || raw === 'none') return;
-  // Top-level comma split that keeps `rgb(...)` / `hsl(...)` colour commas
-  // intact (they nest inside parens).
-  const items = [];
-  let depth = 0;
-  let seg = '';
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch === '(') depth++;
-    else if (ch === ')') depth = Math.max(0, depth - 1);
-    if (ch === ',' && depth === 0) {
-      items.push(seg);
-      seg = '';
-    } else {
-      seg += ch;
-    }
-  }
-  if (seg) items.push(seg);
-  const chain = [];
-  for (const item of items) {
-    const spec = item.trim();
-    if (!spec) continue;
-    // Whitespace tokeniser that keeps function args (`rgb(...)`) intact.
-    const tokens = [];
-    let d = 0;
-    let cur = '';
-    for (let i = 0; i < spec.length; i++) {
-      const c = spec[i];
-      if (c === '(') d++;
-      else if (c === ')') d = Math.max(0, d - 1);
-      if (d === 0 && /\s/.test(c)) {
-        if (cur) {
-          tokens.push(cur);
-          cur = '';
-        }
-      } else {
-        cur += c;
-      }
-    }
-    if (cur) tokens.push(cur);
-    const lengths = [];
-    const colors = [];
-    for (const t of tokens) {
-      if (/^-?[\d.]+(px)?$/.test(t)) lengths.push(t);
-      else colors.push(t);
-    }
-    if (lengths.length < 2) continue; // need at least offX / offY
-    const offX = lengths[0];
-    const offY = lengths[1];
-    const blur = lengths.length >= 3 ? lengths[2] : '0px';
-    const color = colors.length ? colors.join(' ') : 'rgb(0, 0, 0)';
-    chain.push(`drop-shadow(${offX} ${offY} ${blur} ${color})`);
-  }
-  if (!chain.length) return;
-  const glow = chain.join(' ');
-  const idx = parts.findIndex((p) => p.indexOf('filter:') === 0);
-  if (idx >= 0) parts[idx] = `${parts[idx]} ${glow}`;
-  else parts.push(`filter: ${glow}`);
+  const value = computed.getPropertyValue('text-shadow').trim();
+  if (value) parts.push(`text-shadow: ${value}`);
 }
 
 // Preserve the complete per-layer layout for generated and URL images alike. Keeping the
@@ -1647,18 +1593,7 @@ function buildStyle(left, top, width, height, computed, opts) {
       appendStyleProp(parts, computed, entry, ctx);
     }
     appendTextStroke(parts, computed);
-    // Text glow: forward `text-shadow` as a `filter: drop-shadow(...)` chain so
-    // the glow survives import (the importer lowers a drop-shadow filter onto a
-    // DropShadowFilter but has no `text-shadow`). `filter` glows the element's
-    // whole painted content, so only skip when THIS style call also paints a
-    // box (`opts.box` with a background/border/shadow) — a whole-element glow
-    // would then halo the box. A text-only span (`opts.box` false, the common
-    // case: a text leaf inside a separately-painted wrapper) always glows just
-    // its glyphs, matching CSS text-shadow, even when the inherited `computed`
-    // carries the wrapper's background.
-    if (!(opts.box && hasBoxVisualsForInline(computed))) {
-      appendTextShadow(parts, computed);
-    }
+    appendTextShadow(parts, computed);
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -1835,41 +1770,11 @@ function dashedBorderSideSvg(side, width, height, b) {
     `stroke-linecap="${cap}" stroke-dasharray="${dash}"/></svg>`;
 }
 
-// Returns an array of HTML strings — one absolutely-positioned <div> per
-// non-zero border side — to overlay onto the host box. Used when the element
-// has an asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list
-// row).
-//
-// When the host has uniform border widths + uniform border-radius + only
-// asymmetric *colours* (the canonical CSS ring-spinner pattern), the overlay
-// rectangles can't honour the radius (they're absolutely positioned and the
-// host has no `overflow: hidden`), so the radius would be silently dropped and
-// the spinner would render as a square frame. `roundedUniformBorderSvg`
-// short-circuits that case with one stroked <path> per side; the overlay
-// rectangle path stays for genuinely asymmetric-width borders (list-row
-// dividers, single-side underlines, etc.) where the radius rarely matters.
+// Legacy renderer hook. Host CSS now carries all border paint.
 function borderOverlayHTML(computed, width, height) {
-  if (isUniformBorder(computed)) return [];
-  const ringSvg = roundedUniformBorderSvg(computed, width, height);
-  if (ringSvg !== null) return ringSvg ? [ringSvg] : [];
-  const out = [];
-  for (const side of SIDES) {
-    const b = readBorderSide(computed, side);
-    if (b.width <= 0) continue;
-    if (b.style === 'none' || b.style === 'hidden') continue;
-    if (colorAlpha(b.color) <= 0) continue;
-    // `dashed` / `dotted` sides are stroked as an inline <svg> line so the dash
-    // pattern survives; a solid background-color <div> would flatten them into a
-    // continuous strip. Other styles (`double`, `groove`, …) fall back to solid.
-    if (b.style === 'dashed' || b.style === 'dotted') {
-      out.push(dashedBorderSideSvg(side, width, height, b));
-      continue;
-    }
-    const r = SIDE_OVERLAY[side](width, height, b.width);
-    out.push(`<div style="position: absolute; left: ${px(r.left)}; top: ${px(r.top)}; ` +
-      `width: ${px(r.w)}; height: ${px(r.h)}; background-color: ${b.color.trim()}"></div>`);
-  }
-  return out;
+  // Borders are semantic paint on the host, including asymmetric widths and styles.
+  // Keeping overlays would paint them twice and lose their rounded corner joins.
+  return [];
 }
 
 // Resolve the alpha channel of a computed colour string. `transparent` and
@@ -2928,7 +2833,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     // browser subpixel precision instead of inheriting that geometry serialization rounding.
     const baselineAttr = baseline === null ? '' :
       ` data-pagx-baseline="${baseline - parentRect.top - roundPosition(tt)}"`;
-    out.push(`<span${intrinsicWidth}${positionAttr}${baselineAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span data-pagx-text-clip="include"${intrinsicWidth}${positionAttr}${baselineAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -2989,7 +2894,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     if (!positionAttr && transformed) {
       PAINT_CAPTURE.warnings.push('html-snapshot: vertical text positions unavailable; using natural shaping');
     }
-    out.push(`<span${positionAttr} style="${withNowrap(base)};text-align:start">${escapeHtml(transformed)}</span>`);
+    out.push(`<span data-pagx-text-clip="include"${positionAttr} style="${withNowrap(base)};text-align:start">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3346,10 +3251,6 @@ function classifyFlexContainer(el, computed) {
   if (wrap && wrap !== 'nowrap') return null;
   const rect = el.getBoundingClientRect();
   if (!nonZero(rect)) return null;
-  // Asymmetric borders are baked into per-side overlay rectangles by
-  // borderOverlayHTML(). Those rectangles use `position: absolute` and would
-  // not anchor correctly inside a non-positioned flex parent, so bail.
-  if (!isUniformBorder(computed) && hasAnyBorder(computed)) return null;
   const children = flexItemChildren(el);
   if (!children) return null;
   if (!isFlexLayoutFaithful(children, computed)) return null;
@@ -3766,6 +3667,8 @@ function hasBoxVisualsForInline(cs) {
   if (borderWidthOf(cs, 'left') > 0) return true;
   const shadow = cs.getPropertyValue('box-shadow').trim();
   if (shadow && shadow !== 'none') return true;
+  const textShadow = cs.getPropertyValue('text-shadow').trim();
+  if (textShadow && textShadow !== 'none') return true;
   const outline = cs.getPropertyValue('outline-style').trim();
   if (outline && outline !== 'none') return true;
   const filter = cs.getPropertyValue('filter').trim();
@@ -4681,7 +4584,12 @@ function applyLayerName(el, html, opts, precomputed) {
 // children, absolute children, body roots, stripped-transform re-entry) picks up name
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
-  const html = renderElementBox(el, parentRect, opts, precomputed);
+  let html = renderElementBox(el, parentRect, opts, precomputed);
+  const position = (precomputed || getComputedStyle(el)).position;
+  const eligibility = position === 'absolute' || position === 'fixed' ? 'exclude' : 'include';
+  if (!opts || !opts._strippedTransform) {
+    html = html.replace(/^(<[^\s>]+)/, `$1 data-pagx-text-clip="${eligibility}"`);
+  }
   return applyLayerName(el, markPaintSource(el, html, opts), opts, precomputed);
 }
 
@@ -5840,22 +5748,24 @@ async function inlineExternalImages(cachedMap) {
   const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
-    const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    const matches = cssUrls(bg);
-    // Each element owns one mutable token list. Concurrent downloads replace their own token;
-    // writing from the original string on each completion would erase previously inlined layers.
-    const state = { el, bg, matches, replacements: matches.map(m => m[0]) };
-    for (let index = 0; index < matches.length; index++) {
-      const token = matches[index][0];
-      let url = token.slice(token.indexOf('(') + 1, -1).trim();
-      if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
-      url = url.replace(/\\(['"\\])/g, '$1');
-      if (!url || /^file:/i.test(url)) continue;
-      if (url.startsWith('data:')) {
-        bgInlinePending.push({ state, index, src: url, current: url });
-      } else if (/^https?:/i.test(url)) {
-        if (cache[url]) bgInlinePending.push({ state, index, src: cache[url], current: url });
-        else bgPending.push({ state, index, url });
+    for (const property of ['background-image', 'border-image-source']) {
+      const bg = getComputedStyle(el).getPropertyValue(property).trim();
+      const matches = cssUrls(bg);
+      // Each element owns one mutable token list. Concurrent downloads replace their own token;
+      // writing from the original string on each completion would erase previously inlined layers.
+      const state = { el, property, bg, matches, replacements: matches.map(m => m[0]) };
+      for (let index = 0; index < matches.length; index++) {
+        const token = matches[index][0];
+        let url = token.slice(token.indexOf('(') + 1, -1).trim();
+        if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+        url = url.replace(/\\(['"\\])/g, '$1');
+        if (!url || /^file:/i.test(url)) continue;
+        if (url.startsWith('data:')) {
+          bgInlinePending.push({ state, index, src: url, current: url });
+        } else if (/^https?:/i.test(url)) {
+          if (cache[url]) bgInlinePending.push({ state, index, src: cache[url], current: url });
+          else bgPending.push({ state, index, url });
+        }
       }
     }
   }
@@ -5869,7 +5779,7 @@ async function inlineExternalImages(cachedMap) {
       result += state.bg.slice(at, match.index) + state.replacements[i];
       at = match.index + match[0].length;
     }
-    state.el.style.backgroundImage = result + state.bg.slice(at);
+    state.el.style.setProperty(state.property, result + state.bg.slice(at));
   }
 
   async function processOneBg(entry) {
@@ -6011,6 +5921,9 @@ async function materializeDecorativePseudoElements(resolvedContents) {
     'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
     'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
     'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset',
+    'border-image-repeat', 'outline-width', 'outline-style', 'outline-color', 'outline-offset',
+    'text-shadow',
     'border-top-left-radius', 'border-top-right-radius',
     'border-bottom-left-radius', 'border-bottom-right-radius',
     'box-shadow', 'opacity', 'mix-blend-mode', 'filter', 'backdrop-filter',

@@ -118,6 +118,9 @@ class HTMLLayerBuilder {
   ColorSource* parseGradientByValue(const std::string& value, float boxWidth = NAN,
                                     float boxHeight = NAN);
 
+  // Paint background-clip:text after the descendant text geometry is available.
+  void applyTextBackground(Layer* layer, const HTMLBoxAttributes& box);
+
   // Inner host / wrappers --------------------------------------------------------------
   /** Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke
    *  chain on the outer Layer (used to decide whether a double-host split is needed). */
@@ -154,6 +157,7 @@ class HTMLLayerBuilder {
                               bool decorationColorDiffers, float bottom, float centerY);
 
  private:
+  bool applyBorderImage(Layer* layer, const HTMLBoxAttributes& box);
   bool applyBackgroundLayers(Layer* layer, const HTMLBoxAttributes& box);
   Layer* makeBackgroundClip(const HTMLBoxAttributes& box, const HTMLBackgroundRect& rect);
   void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
@@ -171,6 +175,7 @@ class HTMLLayerBuilder {
   HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
   std::unordered_map<Layer*, std::vector<Layer*>> _outerBoxShadows;
+  std::unordered_map<Layer*, std::vector<Layer*>> _textBackgrounds;
   std::function<HTMLBackgroundImage(const std::string&)> _backgroundImageResolver;
 };
 

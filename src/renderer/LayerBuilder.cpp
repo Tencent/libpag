@@ -25,6 +25,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -76,6 +77,7 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/BackgroundFilterStyle.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
@@ -2591,6 +2593,20 @@ class LayerBuilderContext {
         bindInnerShadowStyleChannels(style);
         return tgfxStyle;
 #endif
+      }
+      case NodeType::BackgroundFilterStyle: {
+        auto* style = static_cast<const pagx::BackgroundFilterStyle*>(node);
+        std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
+        for (auto* filter : style->filters) {
+          auto converted = convertLayerFilter(filter);
+          if (converted) filters.push_back(std::move(converted));
+        }
+        auto result = std::make_shared<BackdropStyle>(
+            std::move(filters), style->clipPath ? ToTGFX(*style->clipPath) : tgfx::Path{});
+        result->setBlendMode(ToTGFX(style->blendMode));
+        result->setExcludeChildEffects(style->excludeChildEffects);
+        _result.binding.set(style, result);
+        return result;
       }
       case NodeType::BackgroundBlurStyle: {
 #if PAG_DISABLE_BACKGROUND_BLUR_STYLE

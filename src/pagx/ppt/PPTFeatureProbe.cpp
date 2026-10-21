@@ -227,7 +227,8 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
       if (bg->blurX > 0 || bg->blurY > 0) {
         out.hasBackdropStyle = true;
       }
-    } else if (style->nodeType() == NodeType::GlassStyle) {
+    } else if (style->nodeType() == NodeType::GlassStyle ||
+               style->nodeType() == NodeType::BackgroundFilterStyle) {
       // Unlike BackgroundBlurStyle, a GlassStyle always composites the backdrop through the
       // layer's shape (frost / refraction / chromatic dispersion / edge lighting) as soon as
       // it is present, so flag it unconditionally.

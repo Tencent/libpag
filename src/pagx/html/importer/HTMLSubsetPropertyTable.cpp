@@ -194,7 +194,7 @@ std::string TransformBackgroundImage(const std::string& value, const PropertyCon
   return DropProperty("background-image", value, "is not a supported value", diags);
 }
 
-// `background-clip: text` routes a gradient `background-image` onto descendant text fills
+// `background-clip: text` clips owner-space backgrounds using descendant text coverage
 // instead of painting a rectangle. Layered box clips are kept verbatim (comma-separated in
 // CSS layer order): a `padding-box` layer inset by the border width is how CSS paints
 // gradient borders, and the layer builder rebuilds it with its own inset geometry. A list
@@ -212,7 +212,7 @@ std::string TransformBackgroundClip(const std::string& value, const PropertyCont
     std::string clip = ToLower(Trim(layer));
     if (clip.empty() || clip == "border-box") {
       clip = "border-box";
-    } else if (clip == "padding-box" || clip == "content-box") {
+    } else if (clip == "padding-box" || clip == "content-box" || clip == "text") {
       anyPaddingBox = true;
     } else {
       return DropProperty("background-clip", value, "is not a supported value", diags);
@@ -245,34 +245,39 @@ std::string TransformClipPath(const std::string& value, const PropertyContext&,
   return DropProperty("clip-path", value, "only url(#id) and basic shapes are supported", diags);
 }
 
-std::string TransformBorder(const std::string& value, const PropertyContext&,
-                            HTMLTransformContext& diags) {
-  std::string trimmed = Trim(value);
-  if (trimmed.empty()) return std::string();
-  std::string lc = ToLower(trimmed);
-  if (lc == "none" || lc == "0" || lc == "0px") return std::string();
-  // Accept the canonical `Wpx <style> <color>` form with arbitrary token order. `solid`,
-  // `dashed`, and `dotted` are first-class and pass through to the resolver, which routes
-  // them onto the Stroke node's dash pattern. Other style keywords (`double`, `groove`, …)
-  // have no Stroke equivalent and are downgraded to `solid` here. Width/colour tokens pass
-  // through unchanged.
-  auto tokens = SplitTopLevelWhitespace(trimmed);
-  for (auto& t : tokens) {
-    std::string tl = ToLower(t);
-    if (tl == "solid" || tl == "dashed" || tl == "dotted") continue;
-    if (tl == "double" || tl == "groove" || tl == "ridge" || tl == "inset" || tl == "outset" ||
-        tl == "none" || tl == "hidden") {
-      diags.warn("subset:unsupported-property",
-                 "html: 'border' style '" + tl + "' downgraded to 'solid'");
-      continue;
+// Radius axes must be validated independently and retained as a single declaration.
+std::string TransformBorderRadius(const std::string& value, const PropertyContext& ctx,
+                                  HTMLTransformContext& diags) {
+  auto slash = value.find('/');
+  if (slash != std::string::npos && value.find('/', slash + 1) != std::string::npos)
+    return DropProperty(ctx.propertyName, value, "has more than one radius separator", diags);
+  std::string result;
+  for (auto axis : {value.substr(0, slash),
+                    slash == std::string::npos ? std::string() : value.substr(slash + 1)}) {
+    if (axis.empty() && slash == std::string::npos && !result.empty()) break;
+    auto tokens = SplitTopLevelWhitespace(axis);
+    if (tokens.empty() || tokens.size() > 4)
+      return DropProperty(ctx.propertyName, value, "requires one to four radii per axis", diags);
+    std::string resolvedAxis;
+    for (const auto& token : tokens) {
+      float number = 0;
+      std::string unit;
+      if (!ParseLengthComponent(token, number, unit) || !std::isfinite(number) || number < 0)
+        return DropProperty(ctx.propertyName, value, "contains an invalid radius", diags);
+      auto resolved = ResolveLength(token, ctx, diags);
+      if (resolved.empty()) return {};
+      if (!resolvedAxis.empty()) resolvedAxis += " ";
+      resolvedAxis += resolved;
     }
-    float n = 0.0f;
-    std::string unit;
-    if (ParseLengthComponent(t, n, unit)) continue;
-    // Otherwise assume color: pass through. The resolver's parseColor() emits a diagnostic
-    // when a token is not a recognised colour, so we don't re-validate here.
+    if (!result.empty()) result += " / ";
+    result += resolvedAxis;
   }
-  return trimmed;
+  return result;
+}
+
+std::string TransformBorder(const std::string& value, const PropertyContext&,
+                            HTMLTransformContext&) {
+  return Trim(value);
 }
 
 std::string TransformOpacity(const std::string& value, const PropertyContext&,
@@ -426,7 +431,18 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"clip-path", PropAction::Transform, &TransformClipPath, nullptr},
     {"border", PropAction::Transform, &TransformBorder, nullptr},
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
-    {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
+    {"border-radius", PropAction::Transform, &TransformBorderRadius, nullptr},
+    {"outline", PropAction::Keep, nullptr, nullptr},
+    {"outline-width", PropAction::Keep, nullptr, nullptr},
+    {"outline-style", PropAction::Keep, nullptr, nullptr},
+    {"outline-color", PropAction::Keep, nullptr, nullptr},
+    {"outline-offset", PropAction::Transform, &ResolveLength, nullptr},
+    {"border-image-source", PropAction::Keep, nullptr, nullptr},
+    {"border-image-slice", PropAction::Keep, nullptr, nullptr},
+    {"border-image-width", PropAction::Keep, nullptr, nullptr},
+    {"border-image-outset", PropAction::Keep, nullptr, nullptr},
+    {"border-image-repeat", PropAction::Keep, nullptr, nullptr},
+    {"text-shadow", PropAction::Keep, nullptr, nullptr},
     {"box-shadow", PropAction::Keep, nullptr, nullptr},
     {"filter", PropAction::Keep, nullptr, nullptr},
     {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
@@ -492,7 +508,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
-    {"outline", PropAction::Drop, nullptr, "is not in the subset"},
+
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
     {"align-content", PropAction::Drop, nullptr, "is not in the subset"},
@@ -520,10 +536,10 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"grid-area", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
     {"grid-column", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
     {"grid-row", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
-    {"border-top", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
-    {"border-right", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
-    {"border-bottom", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
-    {"border-left", PropAction::Drop, nullptr, "use the shorthand 'border' instead"},
+    {"border-top", PropAction::Transform, &TransformBorder, nullptr},
+    {"border-right", PropAction::Transform, &TransformBorder, nullptr},
+    {"border-bottom", PropAction::Transform, &TransformBorder, nullptr},
+    {"border-left", PropAction::Transform, &TransformBorder, nullptr},
     {"border-top-left-radius", PropAction::Drop, nullptr,
      "use the shorthand 'border-radius' instead"},
     {"border-top-right-radius", PropAction::Drop, nullptr,

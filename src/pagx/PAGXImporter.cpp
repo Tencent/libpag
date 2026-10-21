@@ -31,6 +31,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
@@ -806,6 +807,25 @@ static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc) {
 }
 
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
+  if (node->name == "BackgroundFilterStyle") {
+    auto* style = makeNodeFromXML<BackgroundFilterStyle>(node, doc);
+    if (!style) return nullptr;
+    style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+    style->excludeChildEffects = GetBoolAttribute(node, "excludeChildEffects", false, doc);
+    auto clip = GetAttribute(node, "clipPath");
+    if (!clip.empty()) {
+      style->clipPath = doc->makeNode<PathData>();
+      *style->clipPath = PathDataFromSVGString(clip);
+    }
+    for (auto child = node->firstChild; child; child = child->nextSibling) {
+      if (child->type != DOMNodeType::Element) continue;
+      auto* filter = ParseLayerFilter(child.get(), doc);
+      if (filter) style->filters.push_back(filter);
+      else
+        ReportError(doc, child.get(), "BackgroundFilterStyle requires layer filter children");
+    }
+    return style;
+  }
   if (node->name == "DropShadowStyle") {
     return ParseDropShadowStyle(node, doc);
   }

@@ -51,6 +51,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
@@ -80,6 +81,12 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/xml/XMLDOM.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -132,6 +139,7 @@ DECLARE_PAGX_NODE_TYPE(ImagePattern);
 DECLARE_PAGX_NODE_TYPE(DropShadowStyle);
 DECLARE_PAGX_NODE_TYPE(InnerShadowStyle);
 DECLARE_PAGX_NODE_TYPE(BackgroundBlurStyle);
+DECLARE_PAGX_NODE_TYPE(BackgroundFilterStyle);
 DECLARE_PAGX_NODE_TYPE(BlurFilter);
 DECLARE_PAGX_NODE_TYPE(DropShadowFilter);
 DECLARE_PAGX_NODE_TYPE(InnerShadowFilter);
@@ -177,7 +185,7 @@ void CollectPaintElements(const std::vector<pagx::Element*>& elements, std::vect
 
 template <typename T>
 void CollectPaintElements(pagx::Layer* layer, std::vector<T*>& out) {
-  if (!layer) return;
+  if (!layer || !layer->visible) return;
   CollectPaintElements(layer->contents, out);
   for (auto* child : layer->children) {
     if (child != layer->mask) CollectPaintElements(child, out);
@@ -264,7 +272,7 @@ inline size_t CountBackgroundBlurStyles(pagx::Layer* layer) {
   if (!layer) return 0;
   size_t count = 0;
   for (auto* s : layer->styles) {
-    if (As<pagx::BackgroundBlurStyle>(s)) count++;
+    if (As<pagx::BackgroundBlurStyle>(s) || As<pagx::BackgroundFilterStyle>(s)) count++;
   }
   for (auto* c : layer->children) count += CountBackgroundBlurStyles(c);
   return count;
@@ -1578,21 +1586,21 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
-  bool foundBlur = false;
-  for (auto* s : div->styles) {
-    if (auto* b = As<pagx::BackgroundBlurStyle>(s)) {
-      EXPECT_FLOAT_EQ(b->blurX, 6.0f);
-      foundBlur = true;
-    }
-  }
-  EXPECT_TRUE(foundBlur);
+  ASSERT_EQ(div->styles.size(), 1u);
+  auto* style = As<pagx::BackgroundFilterStyle>(div->styles.front());
+  ASSERT_NE(style, nullptr);
+  ASSERT_EQ(style->filters.size(), 1u);
+  auto* blur = As<pagx::BlurFilter>(style->filters.front());
+  ASSERT_NE(blur, nullptr);
+  EXPECT_FLOAT_EQ(blur->blurX, 6);
+  EXPECT_FLOAT_EQ(blur->blurY, 6);
 }
 
 // A `backdrop-filter: blur` under an ancestor whose opacity is animated below 1 is dropped: PAGX
 // isolates the fading group into an offscreen surface, so the child backdrop-filter would sample
 // that surface (its own tint) instead of the page behind. See
 // HTMLParserContext::suppressBackdropBlurUnderOpacityFade.
-PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedUnderAnimatedOpacityAncestor) {
+PAG_TEST(PAGXHTMLImporterTest, BackdropFilterRetainedUnderAnimatedOpacityAncestor) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1609,12 +1617,12 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedUnderAnimatedOpacityAncestor) 
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 1u);
 }
 
 // The element that itself animates its opacity also isolates into an offscreen surface, so its own
 // backdrop-filter blur is dropped as well.
-PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedWhenElementAnimatesOwnOpacity) {
+PAG_TEST(PAGXHTMLImporterTest, BackdropFilterRetainedWhenElementAnimatesOwnOpacity) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -1629,7 +1637,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedWhenElementAnimatesOwnOpacity)
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 1u);
 }
 
 // Without any opacity animation on the element or an ancestor, the backdrop-filter blur stays: a
@@ -3268,7 +3276,7 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
     if (msg.find("clip-path") != std::string::npos) clipWarn = true;
     if (msg.find("perspective") != std::string::npos) perspectiveWarn = true;
   }
-  EXPECT_TRUE(outlineWarn);
+  EXPECT_FALSE(outlineWarn);
   EXPECT_TRUE(clipWarn);
   EXPECT_TRUE(perspectiveWarn);
 }
@@ -3362,7 +3370,7 @@ PAG_TEST(PAGXHTMLImporterTest, FlexShorthandWithDisallowedFormWarns) {
   EXPECT_TRUE(flexWarn);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AbsoluteOnTextLeafEmitsWarning) {
+PAG_TEST(PAGXHTMLImporterTest, AbsoluteOnTextLeafDoesNotWarnForSupportedMapping) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="position:absolute;top:0;left:0;font-size:14px">Hi</span>
@@ -3373,7 +3381,7 @@ PAG_TEST(PAGXHTMLImporterTest, AbsoluteOnTextLeafEmitsWarning) {
   for (const auto& msg : doc->errors) {
     if (msg.find("absolute on text leaf") != std::string::npos) downgradeWarn = true;
   }
-  EXPECT_TRUE(downgradeWarn);
+  EXPECT_FALSE(downgradeWarn);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, TextLeafWithBlockChildFallsBackToContainer) {
@@ -4815,7 +4823,7 @@ PAG_TEST(PAGXHTMLImporterTest, ConicGradientFrom90DegMapsToZero) {
 // Verifies CSS `background-clip: text` combined with a gradient `background-image` redirects
 // the gradient onto the descendant text fill. The element's own rectangle gradient must be
 // suppressed, and a `<TextBox>`-level `<Fill>` with the same `LinearGradient` must appear.
-PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesGradientToTextFill) {
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextMasksGradientInOwnerSpace) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:240px;height:80px">
       <div style="position:absolute;left:0;top:0;width:240px;height:80px;
@@ -4828,26 +4836,24 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesGradientToTextFill) {
   ASSERT_NE(doc, nullptr);
   auto* outer = doc->layers.front()->children.front();
   ASSERT_NE(outer, nullptr);
-  // No Rectangle should be emitted on the clip-to-text wrapper: the gradient is consumed
-  // by the descendant text fill instead of painting a coloured block behind the glyphs.
-  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 0u);
-  EXPECT_EQ(FindElementOfType<pagx::Fill>(outer), nullptr);
-  // The text leaf carries the gradient as its glyph fill.
-  auto* textLeaf = outer->children.front();
-  ASSERT_NE(textLeaf, nullptr);
+  ASSERT_GE(outer->children.size(), 2u);
+  auto* background = outer->children.front();
+  ASSERT_FALSE(background->children.empty());
+  auto* clipped = background->children.front();
+  ASSERT_NE(clipped->mask, nullptr);
+  EXPECT_FLOAT_EQ(clipped->mask->width, 240);
+  EXPECT_FLOAT_EQ(clipped->mask->height, 80);
+  auto* paint = FindBackgroundElement<pagx::Fill>(clipped);
+  ASSERT_NE(paint, nullptr);
+  auto* gradient = As<pagx::LinearGradient>(paint->color);
+  ASSERT_NE(gradient, nullptr);
+  EXPECT_EQ(gradient->colorStops.size(), 2u);
+  auto* textLeaf = outer->children.back();
   auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
-  pagx::Fill* textFill = nullptr;
-  if (textBox) {
-    textFill = FindElement<pagx::Fill>(textBox->elements);
-  } else {
-    textFill = FindElementOfType<pagx::Fill>(textLeaf);
-  }
-  ASSERT_NE(textFill, nullptr);
-  auto* lg = As<pagx::LinearGradient>(textFill->color);
-  ASSERT_NE(lg, nullptr);
-  ASSERT_EQ(lg->colorStops.size(), 2u);
-  EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
-  EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, HexColor(0x0000FF)));
+  auto* foreground = textBox ? FindElement<pagx::Fill>(textBox->elements)
+                             : FindElementOfType<pagx::Fill>(textLeaf);
+  ASSERT_NE(foreground, nullptr);
+  EXPECT_NE(As<pagx::SolidColor>(foreground->color), nullptr);
 }
 
 // Negative control: without `background-clip: text` the same gradient must still paint a
@@ -4875,7 +4881,7 @@ PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
 // fill while the rectangle behind the text is suppressed. Sites drive their tab / link
 // hover-and-active colour changes this way, pairing an inherited transparent text-fill with a
 // background that swaps between a solid colour and a gradient.
-PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesSolidColorToTextFill) {
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextMasksSolidBehindForeground) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:240px;height:80px">
       <div style="position:absolute;left:0;top:0;width:240px;height:80px;
@@ -4887,25 +4893,24 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesSolidColorToTextFill) {
   ASSERT_NE(doc, nullptr);
   auto* outer = doc->layers.front()->children.front();
   ASSERT_NE(outer, nullptr);
-  // No Rectangle on the clip-to-text wrapper: the colour is consumed by the text fill instead
-  // of painting a block behind the glyphs.
-  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 0u);
-  EXPECT_EQ(FindElementOfType<pagx::Fill>(outer), nullptr);
-  // The text leaf carries the background colour as its glyph fill, outranking the default
-  // text colour that the snapshot omits (CSS inherits a transparent text-fill-color).
-  auto* textLeaf = outer->children.front();
-  ASSERT_NE(textLeaf, nullptr);
+  ASSERT_GE(outer->children.size(), 2u);
+  auto* background = outer->children.front();
+  ASSERT_FALSE(background->children.empty());
+  auto* clipped = background->children.front();
+  ASSERT_NE(clipped->mask, nullptr);
+  EXPECT_FLOAT_EQ(clipped->mask->width, 240);
+  EXPECT_FLOAT_EQ(clipped->mask->height, 80);
+  auto* paint = FindBackgroundElement<pagx::Fill>(clipped);
+  ASSERT_NE(paint, nullptr);
+  auto* color = As<pagx::SolidColor>(paint->color);
+  ASSERT_NE(color, nullptr);
+  EXPECT_TRUE(ColorNear(color->color, HexColor(0x000000, .9f)));
+  auto* textLeaf = outer->children.back();
   auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
-  pagx::Fill* textFill = nullptr;
-  if (textBox) {
-    textFill = FindElement<pagx::Fill>(textBox->elements);
-  } else {
-    textFill = FindElementOfType<pagx::Fill>(textLeaf);
-  }
-  ASSERT_NE(textFill, nullptr);
-  auto* solid = As<pagx::SolidColor>(textFill->color);
-  ASSERT_NE(solid, nullptr);
-  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x000000, 0.9f)));
+  auto* foreground = textBox ? FindElement<pagx::Fill>(textBox->elements)
+                             : FindElementOfType<pagx::Fill>(textLeaf);
+  ASSERT_NE(foreground, nullptr);
+  EXPECT_NE(As<pagx::SolidColor>(foreground->color), nullptr);
 }
 
 // Negative control: without `background-clip: text` a solid `background-color` must still paint
@@ -4944,7 +4949,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextTransparentColorKeepsTextColor)
   ASSERT_NE(doc, nullptr);
   auto* outer = doc->layers.front()->children.front();
   ASSERT_NE(outer, nullptr);
-  auto* textLeaf = outer->children.front();
+  auto* textLeaf = outer->children.back();
   ASSERT_NE(textLeaf, nullptr);
   pagx::Fill* textFill = nullptr;
   auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
@@ -5270,12 +5275,12 @@ PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffec
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* image = doc->layers.front()->children.front();
-  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 1u);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+
+  auto* fill = FindBackgroundElement<pagx::Fill>(image);
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(As<pagx::LinearGradient>(fill->color), nullptr);
-  auto* stroke = FindElementOfType<pagx::Stroke>(image);
+  auto* stroke = FindBackgroundElement<pagx::Stroke>(image);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
   bool foundShadow = false;
@@ -5324,9 +5329,9 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgBackgroundClipTextAvoidsEmptyVisualWrapp
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* svg = doc->layers.front()->children.front();
-  EXPECT_EQ(svg->importDirective.format, "svg");
-  EXPECT_FALSE(svg->importDirective.content.empty());
-  EXPECT_TRUE(svg->children.empty());
+  auto* content = FindSvgImportLayer(svg);
+  ASSERT_NE(content, nullptr);
+  EXPECT_FALSE(content->importDirective.content.empty());
   EXPECT_TRUE(svg->contents.empty());
 }
 
@@ -6221,7 +6226,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawSingleTransformIsAccepted) {
   }
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusDropped) {
+PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusEmitsPath) {
   // Elliptical syntax `<h>/<v>` cannot be expressed with PAGX's uniform roundness; warn and skip.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -6233,14 +6238,11 @@ PAG_TEST(PAGXHTMLImporterTest, RawEllipticalBorderRadiusDropped) {
                                              opts);
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
-  auto* rect = FindElementOfType<pagx::Rectangle>(div);
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->roundness, 0.0f);
-  bool warned = false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find("elliptical border-radius") != std::string::npos) warned = true;
-  }
-  EXPECT_TRUE(warned);
+  auto* path = FindElementOfType<pagx::Path>(div);
+  ASSERT_NE(path, nullptr);
+  EXPECT_FLOAT_EQ(path->data->points().front().x, 50);
+  EXPECT_FLOAT_EQ(path->data->points().front().y, 5);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "elliptical border-radius"));
 }
 
 // Per-corner `border-radius` (e.g. the shorthand `4px 12px` which expands to TL=BR=4 /
@@ -6361,9 +6363,10 @@ PAG_TEST(PAGXHTMLImporterTest, RawBorderDashedProducesDashPattern) {
   for (const auto& msg : doc->errors) {
     EXPECT_EQ(msg.find("dashed"), std::string::npos);
   }
-  auto* stroke = FindElementOfType<pagx::Stroke>(doc->layers.front()->children.front());
+  auto* stroke = FindBackgroundElement<pagx::Stroke>(doc->layers.front()->children.front());
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  EXPECT_EQ(stroke->align, pagx::StrokeAlign::Center);
   ASSERT_EQ(stroke->dashes.size(), 2u);
   EXPECT_FLOAT_EQ(stroke->dashes[0], 4.0f);
   EXPECT_FLOAT_EQ(stroke->dashes[1], 2.0f);
@@ -6380,9 +6383,10 @@ PAG_TEST(PAGXHTMLImporterTest, RawBorderDottedProducesRoundDots) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  auto* stroke = FindElementOfType<pagx::Stroke>(doc->layers.front()->children.front());
+  auto* stroke = FindBackgroundElement<pagx::Stroke>(doc->layers.front()->children.front());
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  EXPECT_EQ(stroke->align, pagx::StrokeAlign::Center);
   ASSERT_EQ(stroke->dashes.size(), 2u);
   EXPECT_FLOAT_EQ(stroke->dashes[0], 0.0f);
   EXPECT_FLOAT_EQ(stroke->dashes[1], 4.0f);
@@ -6584,7 +6588,7 @@ PAG_TEST(PAGXHTMLImporterTest, FilterContrastAndSaturateClampOnlyAtLowerBound) {
   EXPECT_NEAR(lowSaturate->matrix[1], 0.715f, kEps);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterDropShadowUnsupportedWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterSaturationPreserved) {
   // `backdrop-filter` only models blur(); other functions emit a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -6600,7 +6604,12 @@ PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterDropShadowUnsupportedWarns) {
   for (const auto& msg : doc->errors) {
     if (msg.find("backdrop-filter") != std::string::npos) warned = true;
   }
-  EXPECT_TRUE(warned);
+  EXPECT_FALSE(warned);
+  auto* style =
+      As<pagx::BackgroundFilterStyle>(doc->layers.front()->children.front()->styles.front());
+  ASSERT_NE(style, nullptr);
+  ASSERT_EQ(style->filters.size(), 1u);
+  EXPECT_NE(As<pagx::ColorMatrixFilter>(style->filters.front()), nullptr);
 }
 
 //==================================================================================================
@@ -10622,24 +10631,25 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDottedPreserved) {
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "dotted"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDoubleDowngradedToSolid) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderDoublePreserved) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="border: 2px double #000"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "double"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderNoneDropped) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BorderNonePreservedForCascade) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="border: none"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "border:"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "border:"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityNonNumberDropped) {
@@ -12350,14 +12360,14 @@ PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DNonNumericArgWarns) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "matrix3d argument 'a' is not a number"));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawBorderDoubleStyleDowngradedToSolid) {
+PAG_TEST(PAGXHTMLImporterTest, RawBorderDoubleStylePreserved) {
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:80px;height:80px">
       <div style="width:40px;height:40px;border:2px double red"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "border style 'double' not supported"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "border style 'double' not supported"));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawBorderMultipleColorsWarns) {
@@ -12523,7 +12533,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawDisallowedVisualPropertiesWarn) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "outline not supported; ignored"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "outline not supported; ignored"));
   EXPECT_TRUE(HasDiagnosticContaining(doc, "perspective not supported; ignored"));
 }
 
@@ -12816,7 +12826,7 @@ PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradien
   // The shorthand supplies both inherited gradient text fill and box backgroundImage. Repeating
   // the same blend mode traverses the full comparison loop without emitting a mismatch warning.
   auto inherited = cascade.resolveInheritedStyle(custom, pagx::HTMLInheritedStyle{});
-  EXPECT_EQ(inherited.textFillImage, "linear-gradient(90deg, red, blue)");
+  EXPECT_EQ(inherited.textShadow, "");
   EXPECT_FLOAT_EQ(inherited.fontSizePx, pagx::HTML_DEFAULT_FONT_SIZE);
   auto box = cascade.computeBoxAttributes(custom);
   EXPECT_EQ(box.backgroundImage, "linear-gradient(90deg, red, blue)");
@@ -12828,65 +12838,23 @@ PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradien
             "linear-gradient(90deg, red, blue)");
 }
 
-// Verifies that `background-clip: text` supplies the glyph paint in both of its forms: a solid
-// `background-color` becomes `textFillSolid` (outranking `color`, exactly as the gradient form
-// does), a gradient `background-image` wins over the solid colour and clears the solid channel,
-// and a fully transparent colour leaves the glyphs on their own `color`. The fill also
-// propagates to descendants, which is what lets one wrapper paint the glyphs of its inner spans.
-PAG_TEST(PAGXHTMLStyleCascadeTest, BackgroundClipTextSuppliesGlyphFill) {
-  auto root = ParseHtml(R"HTML(
-    <html>
-      <body style="width:100px;height:50px">
-        <solid style="background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456">
-          <inner/>
-        </solid>
-        <grad style="background-image:linear-gradient(90deg, red, blue);
-                     background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456"/>
-        <clear style="background-color:transparent;background-clip:text;color:#123456"/>
-      </body>
-    </html>
-  )HTML");
-  ASSERT_NE(root, nullptr);
-  auto body = root->getFirstChild("body");
-  ASSERT_NE(body, nullptr);
-  auto solid = body->getFirstChild("solid");
-  auto grad = body->getFirstChild("grad");
-  auto clear = body->getFirstChild("clear");
-  ASSERT_NE(solid, nullptr);
-  ASSERT_NE(grad, nullptr);
-  ASSERT_NE(clear, nullptr);
-
-  float canvasWidth = 100.0f;
-  float canvasHeight = 50.0f;
+// A clipped background belongs to the box; it must not replace/inherit as glyph paint.
+PAG_TEST(PAGXHTMLStyleCascadeTest, BackgroundClipTextKeepsForegroundColor) {
+  auto root = ParseHtml(R"HTML(<html><body><div style="color:#123456;
+      background-color:red;background-image:linear-gradient(red,blue);background-clip:text">
+      <span style="color:#654321"/></div></body></html>)HTML");
+  auto parent = root->getFirstChild("body")->getFirstChild("div");
+  float w = 100, h = 50;
   pagx::HTMLDiagnosticSink diagnostics(false);
-  pagx::HTMLValueParser valueParser(diagnostics, canvasWidth, canvasHeight);
-  pagx::HTMLStyleCascade cascade(diagnostics, valueParser);
-
-  // The solid colour is the glyph paint; `color` still resolves normally but no longer decides
-  // how the text is filled.
-  auto solidStyle = cascade.resolveInheritedStyle(solid, pagx::HTMLInheritedStyle{});
-  EXPECT_TRUE(solidStyle.textFillSolidSet);
-  EXPECT_TRUE(ColorNear(solidStyle.textFillSolid, HexColor(0x000000, 0.9f)));
-  EXPECT_TRUE(solidStyle.textFillImage.empty());
-  EXPECT_TRUE(ColorNear(solidStyle.resolvedTextColor, HexColor(0x123456)));
-
-  // The fill propagates: the clip-to-text wrapper paints the glyphs of the spans inside it.
-  auto inner = solid->getFirstChild("inner");
-  ASSERT_NE(inner, nullptr);
-  auto innerStyle = cascade.resolveInheritedStyle(inner, solidStyle);
-  EXPECT_TRUE(innerStyle.textFillSolidSet);
-  EXPECT_TRUE(ColorNear(innerStyle.textFillSolid, HexColor(0x000000, 0.9f)));
-
-  // A gradient layer wins over the solid colour, matching CSS layer order, and clears the solid
-  // channel so the text does not keep two competing paints.
-  auto gradStyle = cascade.resolveInheritedStyle(grad, pagx::HTMLInheritedStyle{});
-  EXPECT_FALSE(gradStyle.textFillSolidSet);
-  EXPECT_EQ(gradStyle.textFillImage, "linear-gradient(90deg, red, blue)");
-
-  // A fully transparent colour carries no paint and leaves the glyphs on `color`.
-  auto clearStyle = cascade.resolveInheritedStyle(clear, pagx::HTMLInheritedStyle{});
-  EXPECT_FALSE(clearStyle.textFillSolidSet);
-  EXPECT_TRUE(clearStyle.textFillImage.empty());
+  pagx::HTMLValueParser parser(diagnostics, w, h);
+  pagx::HTMLStyleCascade cascade(diagnostics, parser);
+  auto inherited = cascade.resolveInheritedStyle(parent, {});
+  EXPECT_TRUE(ColorNear(inherited.resolvedTextColor, HexColor(0x123456)));
+  auto child = cascade.resolveInheritedStyle(parent->getFirstChild("span"), inherited);
+  EXPECT_TRUE(ColorNear(child.resolvedTextColor, HexColor(0x654321)));
+  auto box = cascade.computeBoxAttributes(parent);
+  EXPECT_TRUE(box.backgroundClipText);
+  EXPECT_EQ(box.backgroundImage, "linear-gradient(red,blue)");
 }
 
 PAG_TEST(PAGXHTMLValueParserTest, FilterDefaultsAndRepeatingGradientBoundaries) {
@@ -13535,6 +13503,7 @@ PAG_TEST(PAGXHTMLBackgroundLayoutTest, IntrinsicRatioRoundSpaceAndPaintingArea) 
   EXPECT_EQ(result.x.count, 1);
   EXPECT_FLOAT_EQ(result.x.first, 90);
   box.borderWidthPx = 8;
+  box.borderWidths = {8, 8, 8, 8};
   box.backgroundRepeat = "repeat";
   box.backgroundSize = "20px 20px";
   box.backgroundPosition = "0 0";
@@ -13595,6 +13564,162 @@ PAG_TEST(PAGXHTMLBackgroundLayoutTest, ConicDualStopsUnitsPhaseAndFixup) {
                                        width, height);
   ASSERT_NE(gradient, nullptr);
   EXPECT_TRUE(ColorNear(gradient->colorStops.front()->color, pagx::Color{.5f, 0, .5f, 1}));
+}
+
+namespace {
+tgfx::Bitmap RenderCSSEffects(pagx::PAGXDocument* document, tgfx::Context* context) {
+  document->applyLayout();
+  auto tree = pagx::LayerBuilder::Build(document);
+  if (!tree) return {};
+  auto surface = tgfx::Surface::Make(context, static_cast<int>(document->width),
+                                     static_cast<int>(document->height));
+  if (!surface) return {};
+  tgfx::DisplayList list;
+  list.root()->addChild(tree);
+  list.render(surface.get(), false);
+  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false, nullptr);
+  tgfx::Pixmap pixels(bitmap);
+  if (!surface->readPixels(pixels.info(), pixels.writablePixels())) return {};
+  return bitmap;
+}
+void CollectShadowFilters(pagx::Layer* layer, std::vector<pagx::DropShadowFilter*>& out) {
+  for (auto* filter : layer->filters)
+    if (auto* shadow = As<pagx::DropShadowFilter>(filter)) out.push_back(shadow);
+  for (auto* child : layer->children) CollectShadowFilters(child, out);
+}
+}  // namespace
+
+PAG_TEST(PAGXHTMLImporterTest, TextShadowsUseIndependentOpaqueSourcesAndHalfBlurRadius) {
+  auto doc = ParseFromString(R"HTML(<html><body style="width:160px;height:80px">
+    <span style="width:160px;height:80px;color:transparent;font-size:40px;
+       text-shadow:1px 2px 6px red, 8px 9px 12px blue">Shadow</span>
+    </body></html>)HTML");
+  ASSERT_NE(doc, nullptr);
+  std::vector<pagx::DropShadowFilter*> shadows;
+  CollectShadowFilters(doc->layers.front(), shadows);
+  ASSERT_EQ(shadows.size(), 2u);
+  EXPECT_TRUE(shadows[0]->shadowOnly);
+  EXPECT_TRUE(shadows[1]->shadowOnly);
+  EXPECT_FLOAT_EQ(shadows[0]->offsetX, 8);
+  EXPECT_FLOAT_EQ(shadows[0]->blurX, 6);
+  EXPECT_FLOAT_EQ(shadows[1]->offsetX, 1);
+  EXPECT_FLOAT_EQ(shadows[1]->blurX, 3);
+  auto roundTrip = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(roundTrip, nullptr);
+  EXPECT_TRUE(roundTrip->errors.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, TextShadowNoneOverridesInheritedList) {
+  auto doc = ParseRaw(R"HTML(<html><body style="width:160px;height:80px;text-shadow:2px 3px red">
+    <span style="text-shadow:none">No shadow</span></body></html>)HTML");
+  ASSERT_NE(doc, nullptr);
+  std::vector<pagx::DropShadowFilter*> shadows;
+  CollectShadowFilters(doc->layers.front(), shadows);
+  EXPECT_TRUE(shadows.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, EllipticalRadiusUsesBothAxesAndCommonScale) {
+  auto root = ParseHtml(R"HTML(<html><body><div style="width:200px;height:100px;
+     border-radius:80% 40% 20% 10% / 90% 30% 20% 10%"/></body></html>)HTML");
+  float w = 200, h = 100;
+  pagx::HTMLDiagnosticSink sink(false);
+  pagx::HTMLValueParser parser(sink, w, h);
+  pagx::HTMLStyleCascade cascade(sink, parser);
+  auto box = cascade.computeBoxAttributes(root->getFirstChild("body")->getFirstChild("div"));
+  EXPECT_NEAR(box.borderRadiusTLPx, 160.0f / 1.2f, .001f);
+  EXPECT_NEAR(box.borderRadiusTLYPx, 90.0f / 1.2f, .001f);
+  EXPECT_NEAR(box.borderRadiusBRPx, 40.0f / 1.2f, .001f);
+  EXPECT_NEAR(box.borderRadiusBRYPx, 20.0f / 1.2f, .001f);
+}
+
+PAG_TEST(PAGXHTMLStyleCascadeTest, BorderSideAndOutlineResolveTheirOwnStyleAndCurrentColor) {
+  auto root = ParseHtml(R"HTML(<html><body><div style="width:100px;height:80px;color:red;
+    border:3px dotted blue;border-top:2px solid currentcolor;outline:4px solid currentcolor"/>
+    </body></html>)HTML");
+  float w = 100, h = 80;
+  pagx::HTMLDiagnosticSink sink(false);
+  pagx::HTMLValueParser parser(sink, w, h);
+  pagx::HTMLStyleCascade cascade(sink, parser);
+  auto box = cascade.computeBoxAttributes(root->getFirstChild("body")->getFirstChild("div"));
+  EXPECT_EQ(box.borderStyles[0], pagx::BorderStyle::Solid);
+  EXPECT_EQ(box.borderStyles[1], pagx::BorderStyle::Dotted);
+  EXPECT_TRUE(ColorNear(box.borderColors[0], HexColor(0xFF0000)));
+  EXPECT_TRUE(ColorNear(box.borderColors[1], HexColor(0x0000FF)));
+  EXPECT_TRUE(ColorNear(box.outlineColor, HexColor(0xFF0000)));
+}
+
+PAGX_TEST(PAGXCSSEffectsRenderTest, BackdropChainUsesExternalBackgroundAndLeavesForeground) {
+  auto doc = ParseFromString(R"HTML(<html><body style="width:120px;height:100px;background:#CC331A">
+    <div style="position:absolute;left:10px;top:10px;width:100px;height:80px;
+      border-radius:20px;isolation:isolate;backdrop-filter:brightness(50%) invert(100%)">
+      <div style="position:absolute;left:30px;top:25px;width:20px;height:20px;background:blue"/>
+    </div></body></html>)HTML");
+  ASSERT_NE(doc, nullptr);
+  auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(copy, nullptr);
+  EXPECT_TRUE(copy->errors.empty());
+  auto bitmap = RenderCSSEffects(copy.get(), context);
+  ASSERT_FALSE(bitmap.isEmpty());
+  tgfx::Pixmap pixels(bitmap);
+  auto filtered = pixels.getColor(25, 50);
+  EXPECT_NEAR(filtered.red, .6f, .025f);
+  EXPECT_NEAR(filtered.green, .9f, .025f);
+  EXPECT_NEAR(filtered.blue, .949f, .025f);
+  auto corner = pixels.getColor(10, 10);
+  EXPECT_NEAR(corner.red, .8f, .015f);
+  EXPECT_NEAR(corner.green, .2f, .015f);
+  auto foreground = pixels.getColor(45, 40);
+  EXPECT_LT(foreground.red, .01f);
+  EXPECT_GT(foreground.blue, .99f);
+}
+
+PAGX_TEST(PAGXCSSEffectsRenderTest, TextBackgroundUsesOwnerExtentAndForegroundPaint) {
+  for (bool foreground : {false, true}) {
+    auto doc =
+        ParseRaw(std::string(R"HTML(<html><body style="width:300px;height:100px;background:white">
+      <div style="width:300px;height:100px;background-image:linear-gradient(90deg,red,blue);
+        background-clip:text"><span style="font-family:Arial;font-weight:bold;font-size:70px;color:)HTML") +
+                 (foreground ? "#00FF00" : "transparent") + "\">H</span></div></body></html>");
+    ASSERT_NE(doc, nullptr);
+    auto bitmap = RenderCSSEffects(doc.get(), context);
+    ASSERT_FALSE(bitmap.isEmpty());
+    tgfx::Pixmap pixels(bitmap);
+    int ink = 0;
+    for (int y = 0; y < 100; ++y)
+      for (int x = 0; x < 65; ++x) {
+        auto color = pixels.getColor(x, y);
+        if (foreground) {
+          if (color.green > .98f && color.red < .1f && color.blue < .1f) ++ink;
+        } else if (color.green < .05f) {
+          ++ink;
+          EXPECT_LT(color.blue, .25f);
+          EXPECT_GT(color.red, .75f);
+        }
+      }
+    EXPECT_GT(ink, 300);
+    auto outside = pixels.getColor(150, 50);
+    EXPECT_GT(outside.red, .99f);
+    EXPECT_GT(outside.green, .99f);
+    EXPECT_GT(outside.blue, .99f);
+  }
+}
+
+PAGX_TEST(PAGXCSSEffectsRenderTest, DoubleBorderAndOutlineHaveGapsAndDoNotClipContent) {
+  auto doc = ParseFromString(R"HTML(<html><body style="width:100px;height:100px;background:white">
+    <div style="position:absolute;left:20px;top:20px;width:60px;height:60px;
+      border:9px double black;outline:2px solid red;outline-offset:5px;overflow:hidden"/>
+    </body></html>)HTML");
+  ASSERT_NE(doc, nullptr);
+  auto bitmap = RenderCSSEffects(doc.get(), context);
+  ASSERT_FALSE(bitmap.isEmpty());
+  tgfx::Pixmap pixels(bitmap);
+  EXPECT_LT(pixels.getColor(50, 21).red, .05f);
+  EXPECT_GT(pixels.getColor(50, 24).red, .95f);
+  EXPECT_LT(pixels.getColor(50, 27).red, .05f);
+  auto outline = pixels.getColor(50, 13);
+  EXPECT_GT(outline.red, .95f);
+  EXPECT_LT(outline.green, .05f);
+  EXPECT_GT(pixels.getColor(50, 17).green, .95f);
 }
 
 }  // namespace pag

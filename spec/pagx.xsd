@@ -773,6 +773,21 @@
     <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
+  <xs:complexType name="BackgroundFilterStyleType">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="BlurFilter" type="BlurFilterType"/>
+      <xs:element name="DropShadowFilter" type="DropShadowFilterType"/>
+      <xs:element name="InnerShadowFilter" type="InnerShadowFilterType"/>
+      <xs:element name="BlendFilter" type="BlendFilterType"/>
+      <xs:element name="ColorMatrixFilter" type="ColorMatrixFilterType"/>
+      <xs:element name="NoiseFilter" type="NoiseFilterType"/>
+    </xs:choice>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="clipPath" type="xs:string"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
+  </xs:complexType>
+
   <!-- BackgroundBlurStyle -->
   <xs:complexType name="BackgroundBlurStyleType">
     <xs:attributeGroup ref="CommonAttributes"/>
@@ -950,6 +965,7 @@
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
       <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
       <xs:element name="BackgroundBlurStyle" type="BackgroundBlurStyleType"/>
+      <xs:element name="BackgroundFilterStyle" type="BackgroundFilterStyleType"/>
       <xs:element name="GlassStyle" type="GlassStyleType"/>
       <xs:element name="NoiseStyle" type="NoiseStyleType"/>
       <!-- Layer Filters -->

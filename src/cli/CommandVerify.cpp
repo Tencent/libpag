@@ -1629,7 +1629,8 @@ static bool HasHighCostChildren(const Layer* layer) {
   for (auto* style : layer->styles) {
     auto type = style->nodeType();
     if (type == NodeType::DropShadowStyle || type == NodeType::InnerShadowStyle ||
-        type == NodeType::BackgroundBlurStyle || type == NodeType::GlassStyle) {
+        type == NodeType::BackgroundBlurStyle || type == NodeType::BackgroundFilterStyle ||
+        type == NodeType::GlassStyle) {
       return true;
     }
   }

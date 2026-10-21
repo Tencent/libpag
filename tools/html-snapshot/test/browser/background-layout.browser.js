@@ -165,7 +165,8 @@ describe('CSS background layout agrees with Chromium', { skip: !fs.existsSync(bi
     try {
       await page.setContent('<div id="layers" style="background-image:none,' +
         'url(https://background.test/a.png),linear-gradient(red,blue),' +
-        'url(https://background.test/b.png);width:100px;height:100px"></div>');
+        'url(https://background.test/b.png);border-image-source:url(https://background.test/a.png);' +
+        'width:100px;height:100px"></div>');
       await page.evaluate(inlineExternalImages, {
         'https://background.test/a.png': image,
         'https://background.test/b.png': image,
@@ -175,6 +176,9 @@ describe('CSS background layout agrees with Chromium', { skip: !fs.existsSync(bi
       assert.match(actual, /^none,/);
       assert.match(actual, /linear-gradient/);
       assert.doesNotMatch(actual, /background\.test/);
+      const border = await page.$eval('#layers', el => el.style.borderImageSource);
+      assert.match(border, /data:image\/png/);
+      assert.doesNotMatch(border, /background\.test/);
     } finally {
       page.off('request', respond);
       await page.setRequestInterception(false);

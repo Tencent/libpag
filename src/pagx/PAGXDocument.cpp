@@ -23,6 +23,7 @@
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -518,6 +519,13 @@ bool contentReferencesNode(const Node* parent, const Node* target) {
     return false;
   }
   switch (parent->nodeType()) {
+    case NodeType::BackgroundFilterStyle: {
+      auto* style = static_cast<const BackgroundFilterStyle*>(parent);
+      if (style->clipPath == target) return true;
+      for (auto* filter : style->filters)
+        if (filter == target) return true;
+      return false;
+    }
     case NodeType::Fill: {
       auto* fill = static_cast<const Fill*>(parent);
       return fill->color == target ||
@@ -601,7 +609,7 @@ std::vector<const Layer*> findLayerForContentNode(
       }
     }
     for (auto* style : layer->styles) {
-      if (style == target) {
+      if (style == target || contentReferencesNode(style, target)) {
         result.push_back(layer);
         break;
       }

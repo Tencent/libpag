@@ -91,6 +91,7 @@ struct HTMLInheritedStyle {
   std::string textAlign = {};
   std::string textDecoration = {};
   std::string textDecorationColor = {};
+  std::string textShadow = {};
   std::string whiteSpace = {};
   std::string writingMode = {};
   std::string textOrientation = "mixed";
@@ -101,18 +102,6 @@ struct HTMLInheritedStyle {
   // defaults to the resolved text colour when the shorthand omits it, matching CSS.
   float textStrokeWidthPx = NAN;
   Color textStrokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
-  // Gradient string ("linear-gradient(...)" / "radial-gradient(...)" / "conic-gradient(...)")
-  // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
-  // `background-image`. Empty means descendants paint text with their own solid `color`.
-  std::string textFillImage = {};
-  // Solid colour inherited from the nearest ancestor that combined `background-clip: text`
-  // with a solid `background-color` (the same CSS technique as `textFillImage`, without a
-  // gradient layer). In CSS the background clipped to the glyphs is what paints the text, so
-  // this outranks `color`; `textFillSolidSet` stays false when no such ancestor exists and
-  // descendants keep painting with their own resolved `color`.
-  Color textFillSolid = {0, 0, 0, 1, ColorSpace::SRGB};
-  bool textFillSolidSet = false;
-
   // Pre-resolved numeric forms of the cascade. Kept in lock-step with the string fields by
   // `resolveInheritedStyle` so text-leaf conversion doesn't re-parse the same `font-size` /
   // `letter-spacing` / `color` strings for every fragment.
@@ -177,14 +166,18 @@ struct HTMLTransform {
 };
 
 /**
- * CSS border line styles supported by the HTML subset. Mirrors a subset of
- * `border-style` keywords; other styles (`double`, `groove`, …) are downgraded
- * to `Solid` by the resolver.
+ * CSS border line styles supported by the HTML subset. The resolved width is zero
+ * for `none` and `hidden`.
  */
 enum class BorderStyle {
   Solid,
   Dashed,
   Dotted,
+  Double,
+  Groove,
+  Ridge,
+  Inset,
+  Outset,
 };
 
 /**
@@ -241,9 +234,8 @@ struct HTMLBoxAttributes {
   Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
   bool backgroundColorSet = false;
   std::string backgroundImage = {};
-  // True when computed style had `background-clip: text`. Only meaningful with a gradient
-  // `background-image`; the gradient is then routed onto descendant text fills instead of
-  // painting a rectangle on this element.
+  // True when any background layer is clipped to descendant text coverage.
+  // Backgrounds retain their owner coordinates; foreground text paint stays independent.
   bool backgroundClipText = false;
   // Per-layer `background-clip` box keywords (`border-box` / `padding-box`), comma-separated
   // in CSS layer order (first entry clips the top-most background-image layer, matching
@@ -267,15 +259,19 @@ struct HTMLBoxAttributes {
   // `normal`) means "no blending" and the background paints with its default opaque stacking.
   std::string backgroundBlendMode = {};
 
-  // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
+  // CSS `border-radius` expanded to two radii at each corner (TL, TR, BR, BL), after applying the
   // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
-  // exceed the box's edge length). When the input was uniform — or all four resolved values are
+  // exceed the box's edge length). When the input was uniform — or all eight resolved values are
   // equal after clamping — `borderRadiusUniform` is true and the importer emits a single
   // `Rectangle roundness=...`; otherwise it synthesises a `Path` tracing the per-corner outline.
   float borderRadiusTLPx = 0.0f;
   float borderRadiusTRPx = 0.0f;
   float borderRadiusBRPx = 0.0f;
   float borderRadiusBLPx = 0.0f;
+  float borderRadiusTLYPx = 0.0f;
+  float borderRadiusTRYPx = 0.0f;
+  float borderRadiusBRYPx = 0.0f;
+  float borderRadiusBLYPx = 0.0f;
   bool borderRadiusSet = false;
   bool borderRadiusUniform = true;
   // True when every corner's horizontal radius equals half the box width and every corner's
@@ -289,6 +285,21 @@ struct HTMLBoxAttributes {
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
   BorderStyle borderStyle = BorderStyle::Solid;
   bool borderSet = false;
+  // Physical sides in top/right/bottom/left order. The scalar fields above retain the
+  // uniform fast path; all geometry and layout uses these used widths.
+  Padding borderWidths = {};
+  Color borderColors[4] = {};
+  BorderStyle borderStyles[4] = {};
+  bool borderUniform = true;
+  std::string borderImageSource = {};
+  std::string borderImageSlice = "100%";
+  std::string borderImageWidth = "1";
+  std::string borderImageOutset = "0";
+  std::string borderImageRepeat = "stretch";
+  float outlineWidth = 0;
+  float outlineOffset = 0;
+  Color outlineColor = {};
+  BorderStyle outlineStyle = BorderStyle::Solid;
 
   std::string boxShadow = {};
   std::string filter = {};

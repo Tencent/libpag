@@ -85,17 +85,7 @@ class HTMLTextFragmentBuilder {
     // `<Stroke>` emitted after the Fill so it paints over the fill (CSS default paint-order).
     float strokeWidth = NAN;
     Color strokeColor = {0, 0, 0, 1, ColorSpace::SRGB};
-    // Gradient string copied from `HTMLInheritedStyle::textFillImage`. When non-empty,
-    // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
-    // `background-clip: text` semantics from the nearest clip-to-text ancestor).
-    std::string fillImage = {};
-    // Solid colour copied from `HTMLInheritedStyle::textFillSolid` — the other half of the same
-    // CSS technique, where the clip-to-text ancestor paints the glyphs with a plain
-    // `background-color` instead of a gradient. When `fillSolidSet` is true `buildTextFill`
-    // prefers it over `color`, mirroring CSS where the inherited transparent text-fill-color
-    // leaves the clipped background as the only glyph paint.
-    Color fillSolid = {0, 0, 0, 1, ColorSpace::SRGB};
-    bool fillSolidSet = false;
+    std::string textShadow = {};
     // Resolved CSS line-height in pixels for this run, captured at fragment creation time so
     // an inner-span override (e.g. `<span style="line-height:20px">` inside a fixed-height
     // outer span used as a digit/badge box) survives to the TextBox, where it determines the
@@ -209,6 +199,9 @@ class HTMLTextFragmentBuilder {
   /** Emits underline / line-through decoration lines onto `textHost` derived from the
    *  inherited `text-decoration` and `text-decoration-color`. `<overline>` is unsupported
    *  and produces a diagnostic. */
+  void emitTextShadows(Layer* textHost, const std::vector<TextFragment>& fragments,
+                       const HTMLInheritedStyle& inherited, const HTMLBoxAttributes& box,
+                       bool needsTextBox, bool isVertical, bool hasNoWrap);
   void emitTextDecorations(Layer* textHost, const std::vector<TextFragment>& fragments,
                            const HTMLInheritedStyle& inherited);
 

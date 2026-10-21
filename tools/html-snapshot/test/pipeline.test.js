@@ -253,7 +253,7 @@ describe('runPagxImportToFile', () => {
       '--input', '/in.html',
       '--output', '/out.pagx',
       '--format', 'html',
-      '--no-resolve',
+      '--no-resolve', '--verbose',
     ]);
     // The subset is already rendered, so the importer's own snapshot is disabled.
     expect(fs.readFileSync(envPath, 'utf8')).toBe('0');

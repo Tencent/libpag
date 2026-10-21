@@ -938,7 +938,7 @@ Layer 的子元素按类型自动归类为五个集合：
 | 子元素类型 | 归类 | 说明 |
 |-----------|------|------|
 | VectorElement | contents | 几何元素、修改器、绘制器（参与累积处理） |
-| LayerStyle | styles | DropShadowStyle、InnerShadowStyle、BackgroundBlurStyle、NoiseStyle、GlassStyle |
+| LayerStyle | styles | DropShadowStyle、InnerShadowStyle、BackgroundBlurStyle、BackgroundFilterStyle、NoiseStyle、GlassStyle |
 | LayerFilter | filters | BlurFilter、DropShadowFilter、InnerShadowFilter、BlendFilter、ColorMatrixFilter、NoiseFilter |
 | Timeline | timelines | `<Timelines>` 容器内的 `<Animation ref="@id" playing="..."/>` 和 `<StateMachine ref="@id"/>` 条目，用于驱动引用合成上的动画或状态机 |
 | Layer | children | 嵌套子图层 |
@@ -1049,6 +1049,16 @@ Layer 的子元素按类型自动归类为五个集合：
 1. 获取图层边界下方的图层背景
 2. 对图层背景应用高斯模糊 `(blurX, blurY)`
 3. 使用不透明图层内容作为遮罩裁剪模糊结果
+
+#### 5.3.2.1 背景滤镜链（BackgroundFilterStyle）
+
+按子节点顺序对同一次背景采样应用 `LayerFilter` 链，然后绘制图层自身内容。
+可选的 `clipPath` 为图层本地坐标中的 SVG 路径数据；存在时同时定义背景采样与绘制区域，
+因此透明空图层也可产生背景效果。省略时使用图层轮廓。支持通用样式属性
+`blendMode` 和 `excludeChildEffects`。子节点支持 `BlurFilter`、`DropShadowFilter`、
+`InnerShadowFilter`、`ColorMatrixFilter`、`BlendFilter` 和 `NoiseFilter`，其参数沿用各滤镜定义。
+
+旧版读取器可能忽略此新节点；`BackgroundBlurStyle` 的现有语义保持不变。
 
 #### 5.3.3 内阴影（InnerShadowStyle）
 
@@ -2812,7 +2822,7 @@ ViewModel 是属性的模式定义，包含名称、类型、默认值和可选�
 | **状态机** | `StateMachine`, `Input`, `StateRegion`, `State`, `Transition`, `Condition` | 状态驱动行为：由输入条件触发状态间转换，每个状态可绑定 Animation 或为空。在 `<Animations>` 中定义，通过 `<StateMachine ref="@id"/>` 在 Layer `<Timelines>` 中驱动。 |
 | **ViewModel** | `ViewModel`, `Property`, `DataBind`, `DataConverter` | ViewModel 模式与数据绑定定义。 |
 | **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | 绘制器使用的颜色定义。 |
-| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle`, `GlassStyle` | 应用于图层内容的视觉效果。 |
+| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `BackgroundFilterStyle`, `NoiseStyle`, `GlassStyle` | 应用于图层内容的视觉效果。 |
 | **图层滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter`, `NoiseFilter` | 应用于合成图层的后期处理效果。 |
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | 可绘制的几何（形状和文本）。必须在 Layer/Group 内。 |
 | **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | 变换或组合几何图形和文本。 |

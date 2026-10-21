@@ -24,6 +24,7 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -1557,6 +1558,7 @@ static bool SubtreeHasBackgroundBlur(const Layer* layer, int depth) {
     return false;
   }
   for (auto* ls : layer->styles) {
+    if (ls->nodeType() == NodeType::BackgroundFilterStyle) return true;
     if (ls->nodeType() != NodeType::BackgroundBlurStyle) {
       continue;
     }
@@ -2632,6 +2634,22 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         out.closeTagSelfClosing();
       }
     }
+  }
+
+  for (auto* ls : layer->styles) {
+    if (ls->nodeType() != NodeType::BackgroundFilterStyle) continue;
+    auto* backdrop = static_cast<const BackgroundFilterStyle*>(ls);
+    auto filters = writeFilterDefs(backdrop->filters);
+    if (filters.empty()) continue;
+    std::string style = "position:absolute;inset:0;backdrop-filter:" + filters +
+                        ";-webkit-backdrop-filter:" + filters;
+    if (backdrop->clipPath) {
+      style += ";clip-path:path('" + PathDataToSVGString(*backdrop->clipPath) + "')";
+    } else
+      style += ClipPathFromContents(layer);
+    out.openTag("div");
+    out.addAttr("style", style);
+    out.closeTagSelfClosing();
   }
 
   for (auto* ls : layer->styles) {

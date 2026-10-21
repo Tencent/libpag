@@ -234,6 +234,10 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLBackgroundLayout.cpp
             src/pagx/html/importer/HTMLBackgroundLayout.h
             src/pagx/html/importer/HTMLBoxAttributes.h
+            src/pagx/html/importer/HTMLBoxGeometry.h
+            src/pagx/html/importer/HTMLBoxGeometry.cpp
+            src/pagx/html/importer/HTMLBorderImage.cpp
+            src/pagx/html/importer/HTMLTextPaint.cpp
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h
             src/pagx/html/importer/HTMLDetail.cpp

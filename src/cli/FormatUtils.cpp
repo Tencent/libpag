@@ -395,6 +395,8 @@ const char* NodeTypeName(NodeType type) {
       return "DropShadowStyle";
     case NodeType::InnerShadowStyle:
       return "InnerShadowStyle";
+    case NodeType::BackgroundFilterStyle:
+      return "BackgroundFilterStyle";
     case NodeType::BackgroundBlurStyle:
       return "BackgroundBlurStyle";
     case NodeType::GlassStyle:
