@@ -645,7 +645,7 @@ void HTMLParserContext::loadWebFontFiles() {
           continue;
         }
         registerMappedFontAliases(bytes->data(), bytes->size());
-        _inlineFontFamilies.push_back(rule.family);
+        _webFontFiles.push_back({rule.family, source});
         registered = true;
         break;
       }
@@ -653,20 +653,16 @@ void HTMLParserContext::loadWebFontFiles() {
         continue;
       }
       auto path = _imageResources->resolveSource(source);
-      std::string internalFamily = {};
-      if (!_textFragmentBuilder->registerFontFile(rule.family, path, &internalFamily)) {
+      if (!_textFragmentBuilder->registerFontFile(rule.family, path)) {
         warn("html: @font-face '" + rule.family + "' source '" + path +
              "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
         continue;
-      }
-      if (!internalFamily.empty() && internalFamily != rule.family) {
-        _aliasedFontFamilies.emplace_back(rule.family, internalFamily);
       }
       if (!_options.fontReplacements.empty()) {
         auto bytes = tgfx::Data::MakeFromFile(path);
         if (bytes != nullptr) registerMappedFontAliases(bytes->data(), bytes->size());
       }
-      _webFontFiles.push_back({ToLower(rule.family), path});
+      _webFontFiles.push_back({rule.family, path});
       registered = true;
       break;
     }
@@ -685,52 +681,22 @@ void HTMLParserContext::loadWebFontFiles() {
 }
 
 void HTMLParserContext::emitWebFontResources() {
-  if (!_options.emitFontFileResources || (_webFontFiles.empty() && _inlineFontFamilies.empty())) {
-    return;
-  }
+  if (!_options.emitFontFileResources || _webFontFiles.empty()) return;
   std::unordered_set<std::string> namedFamilies = {};
-  for (const auto& name : _fallbackFamilyNames) {
-    namedFamilies.insert(ToLower(name));
-  }
-  // An inlined source's bytes exist only in this document's font config, so a reloaded output
-  // has no way to resolve the family. Baking the glyphs is the only form that carries it.
-  std::unordered_set<std::string> reportedFamilies = {};
-  for (const auto& family : _inlineFontFamilies) {
-    auto key = ToLower(family);
-    if (namedFamilies.count(key) != 0 && reportedFamilies.insert(key).second) {
-      warn("html: @font-face '" + family +
-           "' is inlined as a data: URI and cannot become a <Font file> resource; text using it "
-           "falls back to other fonts once the output is reloaded unless its glyphs are baked "
-           "(subset:font-face-inline-not-emitted)");
-    }
-  }
-  // The importer registers a file under the CSS family its rule declares, but a <Font file>
-  // reloads under the family stored inside the file, so an aliased family only resolves while the
-  // importer's own registration is alive.
-  for (const auto& alias : _aliasedFontFamilies) {
-    auto key = ToLower(alias.first);
-    if (namedFamilies.count(key) != 0 && reportedFamilies.insert(key).second) {
-      warn("html: @font-face '" + alias.first +
-           "' is an alias of the family stored in the font "
-           "file ('" +
-           alias.second +
-           "'), which is what a <Font file> resource registers; text "
-           "using it falls back to other fonts once the output is reloaded unless its glyphs are "
-           "baked (subset:font-face-family-alias-not-preserved)");
-    }
-  }
-  std::unordered_set<std::string> emittedPaths = {};
+  for (const auto& name : _fallbackFamilyNames) namedFamilies.insert(ToLower(name));
+  std::unordered_map<std::string, std::unordered_set<std::string>> emittedSources = {};
   for (auto& node : _document->nodes) {
-    if (node->nodeType() == NodeType::Font) {
-      emittedPaths.insert(static_cast<Font*>(node.get())->file);
-    }
+    if (node->nodeType() != NodeType::Font) continue;
+    auto* font = static_cast<Font*>(node.get());
+    emittedSources[font->fontFamily].insert(font->file);
   }
   for (const auto& file : _webFontFiles) {
-    if (namedFamilies.count(file.cssFamily) == 0 || !emittedPaths.insert(file.path).second) {
+    if (namedFamilies.count(ToLower(file.cssFamily)) == 0 ||
+        !emittedSources[file.cssFamily].insert(file.path).second)
       continue;
-    }
     auto* font = _document->makeNode<Font>(_idAllocator->generateUnique("font"));
     font->file = file.path;
+    font->fontFamily = file.cssFamily;
   }
 }
 

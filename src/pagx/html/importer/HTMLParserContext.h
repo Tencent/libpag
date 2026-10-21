@@ -349,8 +349,8 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
-  // A font file loaded from an `@font-face` rule: the CSS family the rule declares (lower-cased,
-  // since CSS matches family names case-insensitively) and the resolved path of the file.
+  // Loaded @font-face sources retain the authored registration family and either a resolved path
+  // or the original data URI so emitted resources can reconstruct the same registration.
   struct WebFontFile {
     std::string cssFamily = {};
     std::string path = {};
@@ -360,14 +360,6 @@ class HTMLParserContext {
   // its own rule's family, so a font-family stack that names one of them resolves at render time
   // regardless of the family name stored inside the file.
   std::unordered_set<std::string> _webFontFamilies = {};
-  // CSS families whose @font-face source is an inlined `data:` URI. Their bytes live only in the
-  // document's font config, which no `<Font file>` can reference.
-  std::vector<std::string> _inlineFontFamilies = {};
-  // (CSS family, family stored inside the file) for every file source that serves a different name.
-  // A reloaded `<Font file>` registers under the internal name only, so text asking for the CSS
-  // name no longer matches it.
-  std::vector<std::pair<std::string, std::string>> _aliasedFontFamilies = {};
-
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};

@@ -771,11 +771,8 @@ int RunImport(int argc, char* argv[]) {
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
 
-  // The importer registers every @font-face source under the CSS family its rule declares, and that
-  // registration lives only in the document's own FontConfig. Baking here — while the authored
-  // alias still resolves — is what makes the output independent of the fonts a host happens to
-  // have installed: a Font node reloaded from disk re-registers under the family stored inside the
-  // font file, which a page that aliases a face never matches.
+  // Baking captures glyphs and placement on the import host. External mode instead preserves
+  // font sources and their CSS registration families for runtime shaping after reload.
   if (result.format == "html" && options.fontStorage == FontStorageMode::Embed) {
     if (!EmbedFonts(result.document.get(), options.fontFallbacks, options.fontAliases,
                     "pagx import")) {

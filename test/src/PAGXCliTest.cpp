@@ -45,6 +45,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -1793,6 +1794,52 @@ CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
   ASSERT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(dir + "/page.pagx"));
   EXPECT_TRUE(std::filesystem::exists(dir + "/assets/fonts/font_f0.woff2"));
+}
+
+CLI_TEST(PAGXCliTest, Import_InlineFontSurvivesExternalStorageAndEmbed) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto bytes = ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_FALSE(bytes.empty());
+  auto uri = "data:font/woff2;base64," +
+             pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  auto input = TempDir() + "/InlineFont.html";
+  auto output = TempDir() + "/InlineFont.pagx";
+  auto embedded = TempDir() + "/InlineFontEmbedded.pagx";
+  {
+    std::ofstream file(input);
+    file << "<html><head><style>@font-face{font-family:Alias;src:url('" << uri
+         << "')}</style></head><body style='width:120px;height:40px'>"
+            "<span style='position:absolute;left:0px;top:0px;font-family:Alias;font-size:20px'>"
+            "&#xE000;&#xE001;</span></body></html>";
+  }
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--fonts", "external"}),
+            0);
+  auto doc = pagx::PAGXImporter::FromFile(output);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+  int fonts = 0;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Font) continue;
+    auto* font = static_cast<pagx::Font*>(node.get());
+    EXPECT_EQ(font->file, uri);
+    EXPECT_EQ(font->fontFamily, "Alias");
+    fonts++;
+  }
+  EXPECT_EQ(fonts, 1);
+  StreamCapture errors(std::cerr);
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", output, "-o", embedded}), 0);
+  EXPECT_EQ(errors.str().find("failed to load font"), std::string::npos);
+  EXPECT_EQ(errors.str().find("substitute"), std::string::npos);
+  auto baked = pagx::PAGXImporter::FromFile(embedded);
+  ASSERT_NE(baked, nullptr);
+  int texts = 0;
+  for (auto& node : baked->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    EXPECT_FALSE(static_cast<pagx::Text*>(node.get())->glyphRuns.empty());
+    texts++;
+  }
+  EXPECT_EQ(texts, 1);
 }
 
 // An archive entry that would extract outside the temporary directory aborts the import.

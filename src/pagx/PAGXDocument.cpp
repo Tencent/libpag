@@ -325,7 +325,7 @@ void PAGXDocument::registerFontFiles() {
   for (auto& node : nodes) {
     if (node->nodeType() != NodeType::Font) continue;
     auto* font = static_cast<Font*>(node.get());
-    if (!font->file.empty()) sources[font] = {font->file, font->fileData};
+    if (!font->file.empty()) sources[font] = {font->file, font->fontFamily, font->fileData};
   }
   if (sources == registeredFontFiles && _fontConfig.data->fileFonts != nullptr) return;
   FontConfig files;
@@ -334,9 +334,10 @@ void PAGXDocument::registerFontFiles() {
     auto* font = static_cast<Font*>(node.get());
     if (font->file.empty()) continue;
     if (font->fileData != nullptr) {
-      RegisterFontDataFaces(&files, font->fileData->bytes(), font->fileData->size(), true);
-    } else if (IsLocalFilePath(font->file)) {
-      RegisterFontFileFaces(&files, font->file, true);
+      RegisterFontDataFaces(&files, font->fileData->bytes(), font->fileData->size(), true,
+                            font->fontFamily);
+    } else if (IsLocalFilePath(font->file) || font->file.find("data:") == 0) {
+      RegisterFontFileFaces(&files, font->file, true, font->fontFamily);
     }
   }
   _fontConfig.data->fileFonts = std::move(files.data);

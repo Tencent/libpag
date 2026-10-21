@@ -426,13 +426,10 @@ is `Ma Shan Zheng`); `Text@fontFamily` always keeps the authored name.
   font sources are dropped, so the `.pagx` renders identically on a host that has none of the
   page's fonts. Placement and advances come from the import machine, and the file grows by roughly
   one outline per distinct character.
-- **`external`** — text keeps runtime shaping and each font file is copied next to the output at
-  its original relative path (e.g. `assets/fonts/font_f1.woff2`), referenced by `<Font file="…">`.
-  Smaller and editable, but the output only renders correctly on a host that can load those files
-  — and a `<Font file>` registers under the family name stored inside the file, so a page that
-  aliases a face will not resolve after reload (reported with `-v`). A `data:` source has no file
-  to copy, so text using it falls back to other fonts after reload (reported with `-v`); use
-  `embed` for such pages.
+- **`external`** — text keeps runtime shaping. Local font files are copied next to the output,
+  while inline fonts remain base64 data URIs in `Font@file`. `Font@fontFamily` preserves the CSS
+  registration name, including aliases, so reloading the output reconstructs the same font lookup.
+  Hosts must load referenced local files; data URI fonts need no external download.
 
 Remote (`http(s)://`) font sources are never carried over.
 

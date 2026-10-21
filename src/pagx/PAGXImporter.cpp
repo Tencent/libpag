@@ -2157,6 +2157,7 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
   font->file = GetAttribute(node, "file");
   font->fileOriginal = font->file;
+  font->fontFamily = GetAttribute(node, "fontFamily");
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
@@ -2916,7 +2917,8 @@ static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocume
 //==============================================================================
 
 static void ResolveRelativePath(const std::string& basePath, std::string& path) {
-  if (path.empty() || path[0] == '/' || path.find("://") != std::string::npos) {
+  if (path.empty() || path[0] == '/' || path.find("://") != std::string::npos ||
+      path.find("data:") == 0) {
     return;
   }
   path = basePath + path;

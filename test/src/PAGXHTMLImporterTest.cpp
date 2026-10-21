@@ -7305,60 +7305,73 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesSharingFamilyStayReachable) {
   }
 }
 
-// An inlined source has no file a `<Font file>` could reference, so a document that keeps font
-// references instead of baked glyphs cannot carry its family: each such family that text uses is
-// reported. Baking carries the glyphs themselves and reports nothing.
-PAG_TEST(PAGXHTMLImporterTest, FontFaceInlineSourceReportedWhenKeepingFontFiles) {
+// Document font resources must survive both serialization and replacement of the caller config.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSourcesAndAliasesSurviveReload) {
   std::ifstream file(PuaWoff2FontPath(), std::ios::binary);
   std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   ASSERT_FALSE(bytes.empty());
-  auto html =
-      WebFontPage("data:font/woff2;base64," +
-                  pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()));
-  pagx::HTMLImporter::Options options;
-  auto doc = pagx::HTMLImporter::ParseString(html, options);
-  ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(CollectFonts(doc.get()).empty());
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "'pagx-font-f0' is inlined as a data: URI"));
-  EXPECT_FALSE(HasDiagnosticContaining(doc, "'Unused Face' is inlined"));
-
-  options.emitFontFileResources = false;
-  doc = pagx::HTMLImporter::ParseString(html, options);
-  ASSERT_NE(doc, nullptr);
-  EXPECT_FALSE(HasDiagnosticContaining(doc, "subset:font-face-inline-not-emitted"));
+  auto dataURI = "data:font/woff2;base64," +
+                 pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  for (const auto& source : {PuaWoff2FontPath(), dataURI}) {
+    auto html = "<html><head><style>@font-face{font-family:'Aliased Face';src:url('" + source +
+                "')}@font-face{font-family:Unused;src:url('" + source +
+                "')}</style></head><body style='width:120px;height:40px'>"
+                "<span style='position:absolute;left:0px;top:0px;font-family:Aliased Face;"
+                "font-size:20px;white-space:nowrap'>&#xE000;&#xE001;</span></body></html>";
+    auto doc = pagx::HTMLImporter::ParseString(html);
+    ASSERT_NE(doc, nullptr);
+    auto fonts = CollectFonts(doc.get());
+    ASSERT_EQ(fonts.size(), 1u);
+    EXPECT_EQ(fonts.front()->file, source);
+    EXPECT_EQ(fonts.front()->fontFamily, "Aliased Face");
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    doc->applyLayout();
+    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+    auto glyphs = text->glyphData->layoutRuns.front().glyphs;
+    auto positions = text->glyphData->layoutRuns.front().positions;
+    auto xml = pagx::PAGXExporter::ToXML(*doc);
+    auto reloaded = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(reloaded, nullptr);
+    for (const auto& current : {doc, reloaded}) {
+      pagx::FontConfig config;
+      config.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "Aliased Face", "Regular");
+      current->applyLayout(&config);
+      auto* currentText = FindFirstText(current.get());
+      ASSERT_NE(currentText, nullptr);
+      ASSERT_EQ(currentText->glyphData->layoutRuns.size(), 1u);
+      auto& run = currentText->glyphData->layoutRuns.front();
+      ASSERT_NE(run.font.getTypeface(), nullptr);
+      EXPECT_EQ(run.font.getTypeface()->fontFamily(), "pagx-font-f0");
+      EXPECT_EQ(run.glyphs, glyphs);
+      EXPECT_EQ(run.positions, positions);
+      if (source == dataURI) EXPECT_TRUE(current->getExternalFilePaths().empty());
+    }
+    pagx::HTMLImporter::Options options;
+    options.emitFontFileResources = false;
+    auto embeddedMode = pagx::HTMLImporter::ParseString(html, options);
+    ASSERT_NE(embeddedMode, nullptr);
+    EXPECT_TRUE(CollectFonts(embeddedMode.get()).empty());
+  }
 }
 
-// A rule may serve a file under a CSS family the file itself does not carry. The importer registers
-// the CSS name, but a <Font file> reloads under the family stored inside the file, so an output that
-// keeps font references cannot resolve the alias: each alias text uses is reported. Baking carries
-// the glyphs and reports nothing.
-PAG_TEST(PAGXHTMLImporterTest, FontFaceAliasedFamilyReportedWhenKeepingFontFiles) {
-  auto fontPath = PuaWoff2FontPath();
-  auto html =
-      "<html><head><style>"
-      "@font-face { font-family: 'Aliased Face'; src: url('" +
-      fontPath +
-      "'); }"
-      "@font-face { font-family: 'Unused Alias'; src: url('" +
-      fontPath +
-      "'); }"
-      ".label { font-family: 'Aliased Face'; font-size: 20px; }"
-      "</style></head>"
-      "<body style='width:120px;height:40px'>"
-      "<span class='label' style='position:absolute;left:0px;top:0px;white-space:nowrap'>"
-      "&#xE000;</span>"
-      "</body></html>";
-  pagx::HTMLImporter::Options options;
-  auto doc = pagx::HTMLImporter::ParseString(html, options);
+PAG_TEST(PAGXHTMLImporterTest, OneFontSourceCanPreserveTwoAliases) {
+  auto path = PuaWoff2FontPath();
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><head><style>@font-face{font-family:First;src:url('" + path +
+      "')}@font-face{font-family:Second;src:url('" + path +
+      "')}</style></head><body style='width:120px;height:60px'>"
+      "<span style='position:absolute;left:0px;top:0px;font-family:First'>&#xE000;</span>"
+      "<span style='position:absolute;left:0px;top:30px;font-family:Second'>&#xE001;</span>"
+      "</body></html>");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(
-      doc, "'Aliased Face' is an alias of the family stored in the font file ('pagx-font-f0')"));
-  EXPECT_FALSE(HasDiagnosticContaining(doc, "'Unused Alias' is an alias"));
-
-  options.emitFontFileResources = false;
-  doc = pagx::HTMLImporter::ParseString(html, options);
-  ASSERT_NE(doc, nullptr);
-  EXPECT_FALSE(HasDiagnosticContaining(doc, "subset:font-face-family-alias-not-preserved"));
+  ASSERT_EQ(CollectFonts(doc.get()).size(), 2u);
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  reloaded->applyLayout();
+  EXPECT_TRUE(reloaded->fontConfig().containsFamily("First"));
+  EXPECT_TRUE(reloaded->fontConfig().containsFamily("Second"));
 }
 
 // With the subset transformer off, the importer reads `@font-face` from the original <style>

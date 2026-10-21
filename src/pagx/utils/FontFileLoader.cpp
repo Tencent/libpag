@@ -23,6 +23,7 @@
 #include <cstring>
 #include <fstream>
 #include "pagx/FontConfig.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
@@ -77,6 +78,11 @@ static std::shared_ptr<tgfx::Data> DecodeWOFF2File(const std::string& path) {
 }
 
 std::shared_ptr<tgfx::Typeface> MakeTypefaceFromFile(const std::string& path, int ttcIndex) {
+  if (path.find("data:") == 0) {
+    auto bytes = DecodeBase64DataURI(path);
+    return bytes != nullptr ? MakeTypefaceFromBytes(bytes->bytes(), bytes->size(), ttcIndex)
+                            : nullptr;
+  }
   if (!FileHasWOFF2Signature(path)) {
     return tgfx::Typeface::MakeFromPath(path, ttcIndex);
   }
@@ -140,6 +146,11 @@ static std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromSFNT(
 }
 
 std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromFile(const std::string& path) {
+  if (path.find("data:") == 0) {
+    auto bytes = DecodeBase64DataURI(path);
+    return bytes != nullptr ? MakeTypefacesFromBytes(bytes->bytes(), bytes->size())
+                            : std::vector<std::shared_ptr<tgfx::Typeface>>{};
+  }
   auto header = ReadFileHeader(path);
   if (HasWOFF2Signature(header.data(), header.size())) {
     auto sfnt = DecodeWOFF2File(path);
@@ -219,6 +230,12 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
 
 int RegisterFontFileFaces(FontConfig* fontConfig, const std::string& path, bool addToFallbackChain,
                           const std::string& familyOverride, std::string* internalFamily) {
+  if (path.find("data:") == 0) {
+    auto bytes = DecodeBase64DataURI(path);
+    if (bytes == nullptr) return 0;
+    return RegisterFontDataFacesInternal(fontConfig, bytes->bytes(), bytes->size(),
+                                         addToFallbackChain, familyOverride, internalFamily);
+  }
   auto bytes = tgfx::Data::MakeFromFile(path);
   if (bytes == nullptr) return 0;
   return RegisterFontDataFacesInternal(fontConfig, bytes->data(), bytes->size(), addToFallbackChain,

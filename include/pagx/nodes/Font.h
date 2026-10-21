@@ -83,22 +83,29 @@ class Font : public Node {
   int unitsPerEm = 1000;
 
   /**
-   * Path to an external font file (TrueType, OpenType, TTC or WOFF2). When set, this Font node
+   * Path or base64 data URI of a font file (TrueType, OpenType, TTC or WOFF2). When set, this Font node
    * serves as a font source: layout registers every face of the file under the family and style
-   * names stored inside it, so Text whose fontFamily / fontStyle match is shaped and rendered with
+   * names stored inside it, unless fontFamily overrides the family. Matching Text is shaped with
    * the file without embedded glyphs. Runtime-shaped Text does not reference the node by id.
    * GlyphRun references require embedded glyph data. A relative path is
    * resolved against the PAGX file's directory. Hosts without file system access (e.g. the web)
    * supply the file's bytes via PAGXDocument::loadFileData; getExternalFilePaths reports the path
    * until then. `pagx embed` also shapes with this file and stores extracted glyph data in separate
    * Font nodes (the source node's `glyphs` stays empty). An empty string means no external
-   * reference.
+   * reference. A data URI is self-contained and is not reported by getExternalFilePaths().
    *
    * After PAGXImporter::FromFile() resolves relative paths to absolute paths for runtime use,
    * the original verbatim string from the XML attribute is preserved here so that PAGXExporter
    * can round-trip the authored path (relative or URL) unchanged.
    */
   std::string file = {};
+
+  /**
+   * Optional registration family for every face supplied by file or fileData. Preserves a CSS
+   * @font-face alias across export and reload. Empty uses the family stored inside each face.
+   * Face style names are always read from the font. Ignored for embedded glyph-only fonts.
+   */
+  std::string fontFamily = {};
 
   /**
    * The verbatim `file` attribute value as it appeared in the source XML, before any path

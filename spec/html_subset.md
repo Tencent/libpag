@@ -118,22 +118,16 @@ local disk or inlines the font as a `data:` URI:
   file's directory) or a `data:` URI. `local()` names, `format()` hints and every other
   descriptor are ignored.
 - Both kinds of source are registered under the CSS family the rule declares, so
-  `font-family` need not match the family name stored inside the font file (pages routinely write
-  `MaShanZheng` for a file whose family is `Ma Shan Zheng`). Only the artifact differs: a local
-  file becomes a `<Font file="…">` resource (PAGX spec §3.3.5), while a `data:` URI's bytes go
-  straight into the document's font config and produce no resource node.
+  `font-family` need not match the family name stored inside the font file. A used source becomes
+  a `<Font file="…" fontFamily="…">` resource (PAGX spec §3.3.5): local files keep their paths and
+  inline sources keep their base64 `data:` URIs. The saved CSS family preserves aliases after reload.
 - Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
   source is registered: the last rule's file is the family's primary face, and the others join the
   fallback chain, so a character the primary face lacks still shapes with the subset that has it.
-- Whether the output keeps `<Font file>` is an import option: `pagx import --fonts embed` (the HTML
-  default) bakes the glyphs and drops the references, `--fonts external` keeps them along with the
-  font files copied next to the output. A `data:` source has no file to keep, so with
-  `--fonts external` text using it falls back to other fonts once the output is reloaded
-  (`subset:font-face-inline-not-emitted`).
-- A rule may name a CSS family the file itself does not carry (an alias). The importer registers
-  the CSS name, but a `<Font file>` reloads under the family stored inside the file, so with
-  `--fonts external` text using the alias falls back to other fonts
-  (`subset:font-face-family-alias-not-preserved`).
+- Whether the output keeps font sources is an import option: `pagx import --fonts embed` (the HTML
+  default) bakes glyphs and drops source resources. `--fonts external` keeps runtime shaping, copies
+  local font files next to the output, and preserves inline sources as self-contained data URIs.
+  Replacing the caller's FontConfig during layout still reapplies the document's font resources.
 - Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
   cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
   source is dropped like any other unsupported at-rule.

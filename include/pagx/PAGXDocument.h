@@ -352,10 +352,11 @@ class PAGXDocument : public Node {
   FontConfig _fontConfig;
   struct RegisteredFontFile {
     std::string file = {};
+    std::string fontFamily = {};
     std::shared_ptr<Data> fileData = nullptr;
 
     bool operator==(const RegisteredFontFile& other) const {
-      return file == other.file && fileData == other.fileData;
+      return file == other.file && fontFamily == other.fontFamily && fileData == other.fileData;
     }
   };
   std::unordered_map<const Font*, RegisteredFontFile> registeredFontFiles = {};

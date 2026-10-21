@@ -870,6 +870,16 @@ PAGX_TEST(PAGXTest, FontFileLoaderDecodesWOFF2) {
   EXPECT_TRUE(pagx::MakeTypefacesFromFile(path + ".missing").empty());
 }
 
+PAGX_TEST(PAGXTest, FontFileLoaderRejectsInvalidDataURIs) {
+  pagx::FontConfig config;
+  for (const auto& uri : {"data:font/woff2,raw", "data:font/woff2;base64,AAAA", "data:"}) {
+    EXPECT_EQ(pagx::MakeTypefaceFromFile(uri), nullptr);
+    EXPECT_TRUE(pagx::MakeTypefacesFromFile(uri).empty());
+    EXPECT_EQ(pagx::RegisterFontFileFaces(&config, uri, true, "Invalid"), 0);
+  }
+  EXPECT_FALSE(config.containsFamily("Invalid"));
+}
+
 /**
  * Test case: the face count comes from the SFNT header — the number a collection's `ttcf` header
  * records, or one for any other font — rather than from probing face indices until one fails,
@@ -1071,6 +1081,30 @@ PAGX_TEST(PAGXTest, ReplacingFontFileRemovesOldRegistrations) {
   doc->applyLayout(&config);
   EXPECT_FALSE(doc->fontConfig().containsFamily("Noto Sans SC"));
   EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "Noto Sans SC"), 0u);
+}
+
+PAGX_TEST(PAGXTest, ChangingFontAliasInvalidatesRegistration) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
+  ASSERT_NE(doc, nullptr);
+  auto* font = doc->findNode<pagx::Font>("webFont");
+  ASSERT_NE(font, nullptr);
+  font->file = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  font->fontFamily = "First Alias";
+  doc->applyLayout();
+  EXPECT_TRUE(doc->fontConfig().containsFamily("First Alias"));
+  font->fontFamily = "Second Alias";
+  doc->applyLayout();
+  EXPECT_FALSE(doc->fontConfig().containsFamily("First Alias"));
+  EXPECT_TRUE(doc->fontConfig().containsFamily("Second Alias"));
+  auto bytes = tgfx::Data::MakeFromFile(font->file);
+  ASSERT_NE(bytes, nullptr);
+  font->fileData = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
+  font->file = "unavailable.woff2";
+  doc->applyLayout();
+  pagx::LayoutContext context(&doc->fontConfig());
+  auto face = context.findTypeface("Second Alias", "Regular");
+  ASSERT_NE(face, nullptr);
+  EXPECT_EQ(face->fontFamily(), "pagx-font-f0");
 }
 
 PAGX_TEST(PAGXTest, ReplacingFontDataKeepsCallerRegistrations) {

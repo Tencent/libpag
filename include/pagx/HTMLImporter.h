@@ -136,13 +136,12 @@ class HTMLImporter {
     std::string basePath = {};
 
     /**
-     * Emits one `<Font file>` resource per `@font-face` source that resolves to a file on disk.
-     * The sources are loaded and registered into the document's font config either way, so
-     * turning this off keeps layout intact while leaving the output free of font file references
-     * — the shape a self-contained document needs once its glyphs have been baked.
-     * An inlined `data:` source has no file to reference: its family resolves only through this
-     * document's font config, so text using it falls back to other fonts once the output is
-     * reloaded, and the importer reports such a family as a warning.
+     * Emits a Font resource for each used @font-face source and CSS family. Local files keep
+     * their paths; inline fonts keep their base64 data URIs. The resource's fontFamily preserves
+     * the CSS registration name across export, reload and replacement of the caller FontConfig.
+     * Sources are registered into the document's font config either way. Turning this off keeps
+     * the import-time registrations but emits no source resources, for callers that bake glyphs
+     * before serialization. Replacing that runtime config requires supplying the fonts again.
      * Default true.
      */
     bool emitFontFileResources = true;

@@ -107,19 +107,15 @@
 - 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个可用源：
   本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；`local()` 名称、`format()` 提示
   及其他描述符均被忽略。
-- 两种源都按规则声明的 CSS 族名注册，因此 `font-family` 与文件内部的族名不必一致（页面常把
-  `Ma Shan Zheng` 写成 `MaShanZheng`）。差别只在产物形态：本地文件会生成 `<Font file="…">`
-  资源（见 PAGX 规范 §3.3.5），`data:` 源的字节则直接进入文档的字体配置，不产生资源节点。
+- 两种源都按规则声明的 CSS 族名注册，因此 `font-family` 与文件内部的族名不必一致。
+  使用到的源生成 `<Font file="…" fontFamily="…">` 资源（见 PAGX 规范 §3.3.5）：本地文件保留
+  路径，内联字体保留 base64 `data:` URI；保存的 CSS 族名保证重新加载后仍能匹配别名。
 - 多条规则可以声明同一族名（例如中文字体按 unicode-range 拆成的分片）。每条规则的源都会注册：
   最后一条规则的文件作为该族的主字体，其余文件加入回退链，主字体缺少的字符仍会用包含它的分片
   整形。
-- 产物是否保留 `<Font file>` 由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
-  丢弃文件引用，`--fonts external` 保留引用与随产物复制的字体文件。`data:` 源没有可保留的文件，
-  因此在 `--fonts external` 下，使用它的文本在产物重新加载后会回退到其他字体
-  （`subset:font-face-inline-not-emitted`）。
-- 规则声明的 CSS 族名可以与文件内部族名不同（别名）。导入期按 CSS 族名注册，但 `<Font file>`
-  重新加载时按文件内部族名注册，因此在 `--fonts external` 下，使用该别名的文本会回退到其他
-  字体（`subset:font-face-family-alias-not-preserved`）。
+- 产物是否保留字体源由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
+  丢弃源资源；`--fonts external` 保留运行时排版，将本地字体复制到产物旁，内联字体则以自包含
+  data URI 保留。排版时即使替换调用方 FontConfig，文档自身的字体资源仍会重新注册。
 - 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
   会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
   丢弃。
