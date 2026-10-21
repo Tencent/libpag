@@ -143,6 +143,31 @@ void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
   }
 }
 
+void FontConfig::registerFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                              const std::string& fontFamily, const std::string& fontStyle) {
+  if (bytes == nullptr || bytes->empty()) {
+    return;
+  }
+  if (fontFamily.empty()) {
+    auto typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    Data::FontKey key = {};
+    key.family = typeface->fontFamily();
+    key.style = typeface->fontStyle();
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(typeface), key.family, key.style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    Data::FontKey key = {};
+    key.family = fontFamily;
+    key.style = normalizedStyle;
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(bytes), ttcIndex, fontFamily, normalizedStyle));
+  }
+}
+
 void FontConfig::addFallbackFont(const PAGFont& font, const std::string& path, int ttcIndex) {
   addFallbackFont(path, ttcIndex, font.fontFamily, font.fontStyle);
 }
@@ -184,6 +209,25 @@ void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
         std::make_shared<const std::vector<uint8_t>>(static_cast<const uint8_t*>(bytes),
                                                      static_cast<const uint8_t*>(bytes) + length),
         ttcIndex, fontFamily, normalizedStyle);
+  }
+}
+
+void FontConfig::addFallbackFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                                 const std::string& fontFamily, const std::string& fontStyle) {
+  if (bytes == nullptr || bytes->empty()) {
+    return;
+  }
+  if (fontFamily.empty()) {
+    auto typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    auto family = typeface->fontFamily();
+    auto style = typeface->fontStyle();
+    data->fallbackTypefaces.emplace_back(std::move(typeface), std::move(family), std::move(style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    data->fallbackTypefaces.emplace_back(std::move(bytes), ttcIndex, fontFamily, normalizedStyle);
   }
 }
 

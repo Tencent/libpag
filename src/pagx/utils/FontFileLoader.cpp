@@ -156,17 +156,27 @@ std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromBytes(const void* 
 
 int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
                           bool addToFallbackChain, const std::string& familyOverride) {
-  std::shared_ptr<tgfx::Data> sfnt = nullptr;
+  // The font is copied (or decoded) once and the same buffer backs every face's registration and
+  // fallback entry: taking the bytes overloads per face would hold one full copy per face per list.
+  std::shared_ptr<const std::vector<uint8_t>> buffer = nullptr;
   if (HasWOFF2Signature(bytes, length)) {
-    sfnt = DecodeWOFF2(bytes, length);
+    auto sfnt = DecodeWOFF2(bytes, length);
+    if (sfnt != nullptr && sfnt->size() > 0) {
+      auto* decoded = static_cast<const uint8_t*>(sfnt->data());
+      buffer = std::make_shared<const std::vector<uint8_t>>(decoded, decoded + sfnt->size());
+    }
   } else if (bytes != nullptr && length > 0) {
-    sfnt = tgfx::Data::MakeWithoutCopy(bytes, length);
+    auto* data = static_cast<const uint8_t*>(bytes);
+    buffer = std::make_shared<const std::vector<uint8_t>>(data, data + length);
   }
-  if (sfnt == nullptr) {
+  if (buffer == nullptr || buffer->empty()) {
     return 0;
   }
+  // Faces are enumerated through a no-copy view: the typefaces built here only report their
+  // family and style, and the buffer itself is owned by the registrations that follow.
+  auto sfnt = tgfx::Data::MakeWithoutCopy(buffer->data(), buffer->size());
   int faceCount = 0;
-  auto faceLimit = CountFontFaces(sfnt->data(), sfnt->size());
+  auto faceLimit = CountFontFaces(buffer->data(), buffer->size());
   for (int index = 0; index < faceLimit; index++) {
     auto typeface = tgfx::Typeface::MakeFromData(sfnt, index);
     if (typeface == nullptr) {
@@ -174,9 +184,9 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
     }
     auto family = familyOverride.empty() ? typeface->fontFamily() : familyOverride;
     auto style = typeface->fontStyle();
-    fontConfig->registerFont(sfnt->data(), sfnt->size(), index, family, style);
+    fontConfig->registerFont(buffer, index, family, style);
     if (addToFallbackChain) {
-      fontConfig->addFallbackFont(sfnt->data(), sfnt->size(), index, family, style);
+      fontConfig->addFallbackFont(buffer, index, family, style);
     }
     faceCount++;
   }

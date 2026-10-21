@@ -87,8 +87,9 @@ int RegisterFontFileFaces(FontConfig* fontConfig, const std::string& path, bool 
  * Registers every face of an in-memory font file the same way RegisterFontFileFaces registers a
  * file on disk, each face under the (family, style) its name table carries, or under
  * familyOverride when that is non-empty. WOFF2 data is decoded once and the decoded SFNT is what
- * gets registered, so the registrations never decode it again. Returns the number of faces
- * registered, 0 when the bytes hold no usable font.
+ * gets registered, so the registrations never decode it again, and every face of the font shares
+ * one buffer instead of holding a copy each. Returns the number of faces registered, 0 when the
+ * bytes hold no usable font.
  */
 int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
                           bool addToFallbackChain, const std::string& familyOverride = "");
