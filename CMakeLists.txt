@@ -541,10 +541,10 @@ function(find_include_dirs out)
 endfunction()
 
 # Apple drawable implementations and surface category headers are selected per GPU backend.
-# Surface category implementations share a translation unit with their class so ordinary static
-# linking retains them without -ObjC. Both public categories declare the same ObjC selector
-# (FromLayer:), and framework consumers have no TGFX_USE_* build macros, so only the selected
-# backend's category header is exported.
+# Public surface categories share a translation unit with their class so ordinary static linking
+# retains them without -ObjC. Private factories use direct C++ calls to the selected backend.
+# On iOS both public categories declare FromLayer:, and framework consumers have no TGFX_USE_*
+# build macros, so only the selected backend's category header is exported.
 if (APPLE)
     if (PAG_USE_METAL)
         set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
@@ -1203,5 +1203,18 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
+
+    if (APPLE AND USE_NATIVE_PLATFORM)
+        # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros
+        # and cannot pull backend objects through direct references to private implementation symbols.
+        add_executable(PAGCocoaStaticLinkTest test/cocoa/StaticLinkTest.m)
+        add_dependencies(PAGCocoaStaticLinkTest pag)
+        target_include_directories(PAGCocoaStaticLinkTest PRIVATE ${PAG_INCLUDES} include)
+        target_compile_options(PAGCocoaStaticLinkTest PRIVATE -fobjc-arc)
+        target_link_options(PAGCocoaStaticLinkTest PRIVATE -dead_strip)
+        target_link_libraries(PAGCocoaStaticLinkTest "$<TARGET_FILE:pag>" ${PAG_SHARED_LIBS})
+        set_target_properties(PAGCocoaStaticLinkTest PROPERTIES LINKER_LANGUAGE CXX)
+        add_dependencies(PAGFullTest PAGCocoaStaticLinkTest)
+    endif ()
 
 endif ()

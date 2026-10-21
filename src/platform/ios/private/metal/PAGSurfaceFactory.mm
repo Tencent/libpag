@@ -16,18 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include "platform/cocoa/private/metal/MetalLayerDrawable.h"
+#include "rendering/drawables/HardwareBufferDrawable.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
 
-#import "platform/ios/private/PAGSurfaceImpl.h"
+namespace pag::cocoa {
 
-#import <QuartzCore/QuartzCore.h>
+std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  return PAGSurface::MakeFrom(MetalLayerDrawable::FromLayer(host));
+}
 
-@protocol MTLDevice;
+std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(CVPixelBufferRef pixelBuffer, id device) {
+  std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
+  if (device != nil) {
+    metalDevice = tgfx::MetalDevice::MakeFrom(device);
+  }
+  return PAGSurface::MakeFrom(HardwareBufferDrawable::MakeFrom(pixelBuffer, metalDevice));
+}
 
-@interface PAGSurfaceImpl (Metal)
-
-+ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
-
-@end
+}  // namespace pag::cocoa

@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include "CGLDrawable.h"
 
-#import "platform/mac/private/PAGSurfaceImpl.h"
+namespace pag::cocoa {
 
-#import <AppKit/AppKit.h>
+std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  return PAGSurface::MakeFrom(CGLDrawable::FromView(host));
+}
 
-@interface PAGSurfaceImpl (OpenGL)
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view;
-
-@end
+}  // namespace pag::cocoa

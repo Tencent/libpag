@@ -18,12 +18,23 @@
 
 #pragma once
 
-#import "platform/mac/private/PAGSurfaceImpl.h"
+#import <CoreVideo/CoreVideo.h>
+#import <Foundation/Foundation.h>
+#include "pag/pag.h"
 
-#import <QuartzCore/QuartzCore.h>
+namespace pag::cocoa {
 
-@interface PAGSurfaceImpl (Metal)
+/**
+ * Creates a surface from the selected backend's native host: a layer on iOS and Metal, or an NSView
+ * on macOS OpenGL. The caller keeps the host alive for the lifetime of the surface.
+ */
+__attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host);
 
-+ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
+/**
+ * Creates an iOS pixel-buffer surface using an optional native device or context for the selected
+ * backend. The caller retains ownership of the pixel buffer and native device.
+ */
+__attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(
+    CVPixelBufferRef pixelBuffer, id device);
 
-@end
+}  // namespace pag::cocoa
