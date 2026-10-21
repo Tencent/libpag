@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
+#include <thread>
 #include "rendering/drawables/TextureDrawable.h"
 #include "utils/TestUtils.h"
 
@@ -271,8 +273,9 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 namespace pag {
 
 /**
- * 用例描述: 测试 PAGSurface 异步回读会话，公共 API 覆盖全部后端（阻塞式回读的后端上
- * isReady 创建后即就绪），并与同步 readPixels 的结果逐字节比对
+ * 用例描述: 测试 PAGSurface 异步回读会话，公共 API 覆盖全部后端。GL 回读基于 fence，
+ * 就绪要等 GPU 排空之前堆积的任务，不能假定创建即就绪，必须与同步 readPixels 的结果
+ * 逐字节比对
  */
 PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
@@ -289,7 +292,14 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   ASSERT_TRUE(readback != nullptr);
   EXPECT_EQ(readback->width(), pagFile->width());
   EXPECT_EQ(readback->height(), pagFile->height());
-  ASSERT_TRUE(readback->isReady());
+  auto ready = false;
+  for (int i = 0; i < 5000 && !ready; i++) {
+    ready = readback->isReady();
+    if (!ready) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
+  ASSERT_TRUE(ready);
 
   const auto width = readback->width();
   const auto height = readback->height();

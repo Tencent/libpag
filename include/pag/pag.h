@@ -1185,9 +1185,9 @@ class PAGSurface;
 /**
  * An asynchronous pixel readback session created by PAGSurface::asyncReadPixels(). The pixel data
  * may not be available immediately after creation, because it can involve asynchronous GPU
- * processing: on backends with blocking readback (OpenGL, Metal) isReady() returns true right
- * away, while on WebGPU the data arrives through an asynchronous GPU buffer mapping that must be
- * polled. Poll isReady() until it returns true, then call readPixels() to copy the pixels out.
+ * processing: on WebGPU the data arrives through an asynchronous GPU buffer mapping, and even on
+ * OpenGL readiness is fence-based, meaning it arrives only after the GPU drains previously queued
+ * work. Poll isReady() until it returns true, then call readPixels() to copy the pixels out.
  * The session holds GPU resources until it is destroyed, so do not keep it alive longer than
  * needed.
  */
