@@ -1215,6 +1215,14 @@ if (PAG_BUILD_TESTS)
         target_link_libraries(PAGCocoaStaticLinkTest "$<TARGET_FILE:pag>" ${PAG_SHARED_LIBS})
         set_target_properties(PAGCocoaStaticLinkTest PROPERTIES LINKER_LANGUAGE CXX)
         add_dependencies(PAGFullTest PAGCocoaStaticLinkTest)
+        if (MACOS AND NOT CMAKE_CROSSCOMPILING)
+            add_custom_target(PAGCocoaStaticLinkCheck
+                    COMMAND "$<TARGET_FILE:PAGCocoaStaticLinkTest>"
+                    DEPENDS PAGCocoaStaticLinkTest
+                    COMMENT "Running Cocoa static link regression"
+                    VERBATIM)
+            add_dependencies(PAGFullTest PAGCocoaStaticLinkCheck)
+        endif ()
     endif ()
 
 endif ()
