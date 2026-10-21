@@ -983,6 +983,9 @@ function hasPseudoContent(el) {
 function imgSrc(el) {
   const inlined = el.getAttribute('data-snapshot-src');
   if (inlined) return inlined;
+  if ((el.getAttribute('srcset') || '').trim() || el.parentElement?.tagName === 'PICTURE') {
+    return el.currentSrc || el.getAttribute('src') || '';
+  }
   return el.getAttribute('src') || '';
 }
 
@@ -2018,6 +2021,48 @@ function imageInnerStyle(rect, flexItem, objectFit, forceExplicitSize) {
     return `${base}; object-fit: ${objectFit}`;
   }
   return base;
+}
+
+// The image paints in the content box. Its absolute containing block is the wrapper's
+// padding box, so border offsets are subtracted from size, but not added to left/top.
+function replacedImageStyle(rect, computed, opts, svg) {
+  const pad = readPadding(computed);
+  const bl = borderWidthOf(computed, 'left'), br = borderWidthOf(computed, 'right');
+  const bt = borderWidthOf(computed, 'top'), bb = borderWidthOf(computed, 'bottom');
+  const fit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
+  const pos = computed.objectPosition || computed.getPropertyValue('object-position') || '';
+  let style;
+  if (bl + br + bt + bb + pad.left + pad.right + pad.top + pad.bottom === 0) {
+    style = imageInnerStyle(rect, opts.flexItem, fit, svg);
+  } else {
+    const w = Math.max(0, rect.width - bl - br - pad.left - pad.right);
+    const h = Math.max(0, rect.height - bt - bb - pad.top - pad.bottom);
+    style = `position: absolute; left: ${px(pad.left)}; top: ${px(pad.top)}; ` +
+      `width: ${px(w)}; height: ${px(h)}; object-fit: ${fit || 'fill'}`;
+    const corners = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+    const rx = [], ry = [];
+    const length = (token, base) => (parseFloat(token) || 0) * (token.endsWith('%') ? base / 100 : 1);
+    for (const corner of corners) {
+      const tokens = (computed.getPropertyValue(`border-${corner}-radius`) || '0').split(/\s+/);
+      rx.push(length(tokens[0], rect.width));
+      ry.push(length(tokens[1] || tokens[0], rect.height));
+    }
+    let scale = 1;
+    for (const [size, sum] of [[rect.width, rx[0] + rx[1]], [rect.width, rx[2] + rx[3]],
+      [rect.height, ry[0] + ry[3]], [rect.height, ry[1] + ry[2]]]) {
+      if (sum > 0) scale = Math.min(scale, size / sum);
+    }
+    const dx = [bl + pad.left, br + pad.right, br + pad.right, bl + pad.left];
+    const dy = [bt + pad.top, bt + pad.top, bb + pad.bottom, bb + pad.bottom];
+    for (let i = 0; i < 4; i++) {
+      rx[i] = Math.max(0, rx[i] * scale - dx[i]);
+      ry[i] = Math.max(0, ry[i] * scale - dy[i]);
+      if (!rx[i] || !ry[i]) rx[i] = ry[i] = 0;
+    }
+    if (rx.some(r => r > 0)) style += `; border-radius: ${rx.map(px).join(' ')} / ${ry.map(px).join(' ')}`;
+  }
+  if (pos && pos !== '50% 50%') style += `; object-position: ${pos}`;
+  return style;
 }
 
 // True when an <img> source is an SVG (by extension or `data:` MIME). SVG
@@ -3563,10 +3608,17 @@ function forwardDataAttrs(el) {
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(imgAlt(el));
-  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
+  const svg = isSvgSource(src);
+  const imgStyle = replacedImageStyle(rect, computed, opts, svg);
   const dataAttrs = forwardDataAttrs(el);
-  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
+  const natural = el.naturalWidth > 0 && el.naturalHeight > 0
+    ? ` data-pagx-image-width="${el.naturalWidth}" data-pagx-image-height="${el.naturalHeight}"` : '';
+  const pixels = Number(el.getAttribute('data-snapshot-image-pixel-width'));
+  // A single width candidate preserves density in the browser preview as well as in PAGX.
+  // An x candidate would implicitly add src as 1x and select the wrong image at DPR 1.
+  const density = natural && pixels > 0 && pixels !== el.naturalWidth
+    ? ` srcset="${escapeHtml(src.replace(/\s/g, c => encodeURIComponent(c)))} ${pixels}w" sizes="${el.naturalWidth}px"` : '';
+  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs}${natural}${density} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -3580,9 +3632,9 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
 // touching PAGX's renderer.
 function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
   const src = el.getAttribute('data-snapshot-canvas-src') || '';
-  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
-  const inner = `<img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>`;
+  const imgStyle = replacedImageStyle(rect, computed, opts, false);
+  const inner = `<img src="${escapeHtml(src)}" alt="" data-pagx-image-width="${el.width}" ` +
+    `data-pagx-image-height="${el.height}" style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -5533,6 +5585,7 @@ const HELPER_FNS = [
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,
+  replacedImageStyle,
   isSvgSource,
   freezeSvg,
   renderCapturedParagraph,
@@ -5806,6 +5859,21 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // Resource pixels and CSS natural size are different for density-selected sources. Read
+  // selected resources without srcset once, using the browser's decoded-resource cache.
+  const pixelSizes = new Map();
+  await Promise.all(imgs.map(async img => {
+    if (!(img.getAttribute('srcset') || '').trim() && img.parentElement?.tagName !== 'PICTURE') return;
+    const selected = img.currentSrc;
+    if (!selected || !img.naturalWidth) return;
+    if (!pixelSizes.has(selected)) pixelSizes.set(selected, (async () => {
+      const probe = new Image();
+      probe.src = selected;
+      try { await probe.decode(); return probe.naturalWidth; } catch (_) { return 0; }
+    })());
+    const width = await pixelSizes.get(selected);
+    if (width > 0) img.setAttribute('data-snapshot-image-pixel-width', String(width));
+  }));
   // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
   // data URI the page authored) and only needs normalising.
   const pending = [];
@@ -5821,7 +5889,8 @@ async function inlineExternalImages(cachedMap) {
     // skipped outright.
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
-    if (!rawSrc && !rawSrcset) continue;
+    const pictureSource = img.parentElement?.tagName === 'PICTURE' && img.currentSrc;
+    if (!rawSrc && !rawSrcset && !pictureSource) continue;
     // Skip images an earlier pass already inlined (a `data:` URI or local path
     // stamped on `data-snapshot-src`). This function may run more than once on
     // a JS-driven page — components can mount fresh <img>s after the first pass

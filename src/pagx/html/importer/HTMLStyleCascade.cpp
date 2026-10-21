@@ -706,7 +706,8 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
-  parseBoxVisuals(box, props);
+  parseBoxVisuals(box, props, element->name == "img" &&
+                                 (std::isnan(box.widthPx) || std::isnan(box.heightPx)));
   parseBoxTransform(box, props);
   return box;
 }
@@ -887,7 +888,8 @@ bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* o
   return true;
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                                      bool deferBorderRadius) {
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
@@ -911,7 +913,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   box.backgroundClipText = bgClip.find("text") != std::string::npos;
 
   const std::string& br = LookupProperty(props, "border-radius");
-  if (!br.empty()) {
+  if (!br.empty() && !deferBorderRadius) {
     parseBorderRadius(box, props);
   }
 
@@ -1036,6 +1038,16 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
+  if (!box.objectFit.empty() && box.objectFit != "fill" && box.objectFit != "contain" &&
+      box.objectFit != "cover" && box.objectFit != "none" && box.objectFit != "scale-down") {
+    _diagnostics.warn("html: unsupported object-fit '" + box.objectFit + "'; using fill");
+    box.objectFit.clear();
+  }
+  auto objectPosition = LookupLowerTrimmed(props, "object-position");
+  if (!objectPosition.empty() &&
+      !ParseHTMLCSSPosition(objectPosition, _valueParser, box.objectPosition)) {
+    _diagnostics.warn("html: unsupported object-position '" + objectPosition + "'; using center");
+  }
 
   static const char* VisualsDisallowed[] = {"perspective"};
   for (const auto* prop : VisualsDisallowed) {
@@ -1204,6 +1216,15 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
   }
   out = ExpandFourSideShorthand(nums);
   return true;
+}
+
+void HTMLStyleCascade::resolveUsedBoxSize(HTMLBoxAttributes& box,
+                                        const std::shared_ptr<DOMNode>& element,
+                                        float width, float height) {
+  box.widthPx = width;
+  box.heightPx = height;
+  const auto& props = getResolvedStyle(element);
+  if (!LookupProperty(props, "border-radius").empty()) parseBorderRadius(box, props);
 }
 
 void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props) {

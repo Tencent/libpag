@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cstdlib>
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLCSSPosition.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 
 namespace pagx {
@@ -55,45 +56,9 @@ HTMLBackgroundRect BackgroundBoxRect(const HTMLBoxAttributes& box, const std::st
 namespace {
 
 bool Length(const std::string& value, float base, HTMLValueParser& parser, float& out) {
-  std::string s = Trim(value);
-  // Chromium serializes edge offsets and mixed percentage/length positions as calc(). Support
-  // sums of lengths/percentages; reject other expressions rather than interpreting a prefix.
-  if (s.rfind("calc(", 0) == 0 && s.back() == ')') {
-    s = s.substr(5, s.size() - 6);
-    out = 0;
-    size_t at = 0;
-    while (at < s.size()) {
-      while (at < s.size() && std::isspace(static_cast<unsigned char>(s[at]))) ++at;
-      float sign = 1;
-      if (at < s.size() && (s[at] == '+' || s[at] == '-')) {
-        if (s[at] == '-') sign = -1;
-        ++at;
-      }
-      while (at < s.size() && std::isspace(static_cast<unsigned char>(s[at]))) ++at;
-      size_t start = at;
-      while (at < s.size() && s[at] != '+' && s[at] != '-' &&
-             !std::isspace(static_cast<unsigned char>(s[at])))
-        ++at;
-      float term = 0;
-      if (start == at || !Length(s.substr(start, at - start), base, parser, term)) return false;
-      out += sign * term;
-    }
-    return std::isfinite(out);
-  }
-  float percent = 0;
-  if (ParseCssPercentage(s, percent)) {
-    out = base * percent;
-    return std::isfinite(out);
-  }
-  if (s.empty()) return false;
-  char* end = nullptr;
-  float number = std::strtof(s.c_str(), &end);
-  if (end == s.c_str() || !std::isfinite(number)) return false;
-  auto unit = ToLower(Trim(end));
-  if (!(unit == "px" || unit == "pt" || unit == "pc" || unit == "in" || unit == "cm" ||
-        unit == "mm" || unit == "q" || (unit.empty() && number == 0)))
-    return false;
-  out = parser.parseAbsoluteLengthPx(s);
+  HTMLLengthPercentage length;
+  if (!ParseHTMLLengthPercentage(value, parser, length)) return false;
+  out = length.resolve(base);
   return std::isfinite(out);
 }
 
@@ -134,56 +99,11 @@ bool ResolveAxis(float areaStart, float area, float clipStart, float clipSize, f
 
 bool ResolveBackgroundPosition(const std::string& value, float slackX, float slackY,
                                HTMLValueParser& parser, float& x, float& y) {
-  auto tokens = SplitTopLevelWhitespace(ToLower(Trim(value)));
-  if (tokens.empty()) tokens = {"0%", "0%"};
-  auto isX = [](const std::string& s) { return s == "left" || s == "right"; };
-  auto isY = [](const std::string& s) { return s == "top" || s == "bottom"; };
-  auto axis = [&](const std::string& token, float slack, float& result) {
-    if (token == "center") {
-      result = slack * .5f;
-      return true;
-    }
-    if (token == "left" || token == "top") {
-      result = 0;
-      return true;
-    }
-    if (token == "right" || token == "bottom") {
-      result = slack;
-      return true;
-    }
-    return Length(token, slack, parser, result);
-  };
-  if (tokens.size() <= 2) {
-    if (tokens.size() == 1) {
-      if (isY(tokens[0])) tokens.insert(tokens.begin(), "center");
-      else
-        tokens.push_back("center");
-    }
-    if (isY(tokens[0]) || isX(tokens[1])) std::swap(tokens[0], tokens[1]);
-    return !isY(tokens[0]) && !isX(tokens[1]) && axis(tokens[0], slackX, x) &&
-           axis(tokens[1], slackY, y);
-  }
-  if (tokens.size() > 4) return false;
-  bool setX = false, setY = false;
-  for (size_t i = 0; i < tokens.size(); ++i) {
-    const auto& key = tokens[i];
-    bool horizontal = isX(key);
-    if (!horizontal && !isY(key) && key != "center") return false;
-    if (key == "center") horizontal = !setX;
-    if (horizontal ? setX : setY) return false;
-    float slack = horizontal ? slackX : slackY;
-    float result = 0;
-    if (!axis(key, slack, result)) return false;
-    if (i + 1 < tokens.size() && !isX(tokens[i + 1]) && !isY(tokens[i + 1]) &&
-        tokens[i + 1] != "center") {
-      float offset = 0;
-      if (key == "center" || !Length(tokens[++i], slack, parser, offset)) return false;
-      result += (key == "right" || key == "bottom") ? -offset : offset;
-    }
-    (horizontal ? x : y) = result;
-    (horizontal ? setX : setY) = true;
-  }
-  return setX && setY;
+  HTMLCSSPosition position;
+  if (!ParseHTMLCSSPosition(value.empty() ? "0% 0%" : value, parser, position, true)) return false;
+  x = position.x.resolve(slackX);
+  y = position.y.resolve(slackY);
+  return std::isfinite(x) && std::isfinite(y);
 }
 
 bool ResolveBackgroundLayout(const HTMLBoxAttributes& box, size_t index, float intrinsicWidth,

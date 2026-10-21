@@ -1264,7 +1264,8 @@ void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
     if (attr.name.compare(0, 5, "data-") != 0) continue;
     // Internal html-snapshot/importer handshake; it controls layout semantics and is not user
     // custom data. Keep all other data-* attributes forwarding exactly as before.
-    if (attr.name == "data-pagx-intrinsic-width") continue;
+    if (attr.name == "data-pagx-intrinsic-width" || attr.name == "data-pagx-image-width" ||
+        attr.name == "data-pagx-image-height") continue;
     std::string key = attr.name.substr(5);
     if (IsInternalPagxTextProtocolKey(key)) {
       continue;

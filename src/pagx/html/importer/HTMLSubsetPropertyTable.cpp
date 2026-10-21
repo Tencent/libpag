@@ -300,18 +300,45 @@ std::string TransformObjectFit(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string lc = ToLower(Trim(value));
   if (lc.empty()) return std::string();
-  if (lc == "fill" || lc == "contain" || lc == "cover") return lc;
-  if (lc == "none") {
-    diags.warn("subset:unsupported-property",
-               "html: 'object-fit: none' is not supported; downgraded to 'contain'");
-    return "contain";
-  }
-  if (lc == "scale-down") {
-    diags.warn("subset:unsupported-property",
-               "html: 'object-fit: scale-down' is not supported; downgraded to 'contain'");
-    return "contain";
-  }
+  if (lc == "fill" || lc == "contain" || lc == "cover" || lc == "none" || lc == "scale-down")
+    return lc;
   return DropProperty("object-fit", value, "is not a recognised keyword", diags);
+}
+
+// Normalize dimension tokens, including those inside calc(), without resolving percentages
+// against the canvas. Their reference is the eventual content-box minus the concrete object.
+std::string TransformObjectPosition(const std::string& value, const PropertyContext& ctx,
+                                    HTMLTransformContext& diags) {
+  std::string source = ToLower(Trim(value));
+  std::string result;
+  for (size_t at = 0; at < source.size();) {
+    if (!std::isdigit(static_cast<unsigned char>(source[at])) && source[at] != '.' &&
+        source[at] != '+' && source[at] != '-') {
+      result += source[at++];
+      continue;
+    }
+    char* end = nullptr;
+    std::strtof(source.c_str() + at, &end);
+    if (end == source.c_str() + at ||
+        (at > 0 && std::isalpha(static_cast<unsigned char>(source[at - 1])))) {
+      result += source[at++];
+      continue;
+    }
+    size_t unitStart = static_cast<size_t>(end - source.c_str());
+    size_t unitEnd = unitStart;
+    while (unitEnd < source.size() && std::isalpha(static_cast<unsigned char>(source[unitEnd])))
+      ++unitEnd;
+    if (unitEnd == unitStart) {
+      result += source.substr(at, unitStart - at);
+      at = unitStart;
+      continue;
+    }
+    auto length = ResolveLength(source.substr(at, unitEnd - at), ctx, diags);
+    if (length.empty()) return {};
+    result += length;
+    at = unitEnd;
+  }
+  return result;
 }
 
 std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTransformContext&) {
@@ -451,6 +478,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"isolation", PropAction::Keep, nullptr, nullptr},
     {"overflow", PropAction::Keep, nullptr, nullptr},
     {"object-fit", PropAction::Transform, &TransformObjectFit, nullptr},
+    {"object-position", PropAction::Transform, &TransformObjectPosition, nullptr},
     // Text
     {"color", PropAction::Keep, nullptr, nullptr},
     {"font-family", PropAction::Keep, nullptr, nullptr},

@@ -88,6 +88,10 @@ class HTMLStyleCascade {
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
+  // Re-resolves size-dependent corner geometry after percentage/flex layout.
+  void resolveUsedBoxSize(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                          float width, float height);
+
   /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
    *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
   const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
@@ -102,7 +106,8 @@ class HTMLStyleCascade {
   void parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
-  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props);
+  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                        bool deferBorderRadius = false);
   void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);

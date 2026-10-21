@@ -340,9 +340,26 @@ to isolate its `<Fill>`.
   URI accepted; relative paths are resolved against the input file's directory) and emits
   `<Rectangle width="100%" height="100%"/>` filled with `<ImagePattern image="@id"/>`.
   `border-radius` set directly on the `<img>` rounds that rectangle.
-- `object-fit` on the `<img>` sets `ImagePattern.scaleMode`: `fill`→`Stretch`,
-  `contain`→`LetterBox`, `cover`→`Zoom`. `none` and `scale-down` are downgraded to
-  `contain` with a warning. Omitting `object-fit` defaults to `Stretch` (CSS `fill`).
+- All five `object-fit` values are supported. The default is `fill`. `none` uses natural
+  CSS dimensions; `scale-down` selects the smaller of `none` and `contain`.
+- `object-position` defaults to `50% 50%`. Keywords, percentages, absolute lengths,
+  four-token edge offsets, and affine `calc()` expressions are supported. Percentages resolve
+  against **content-box size minus concrete object size**, including negative space for `cover`.
+  The generic one/two/four-token position grammar is distinct from background's three-token form.
+- Simple centered raster images retain `Stretch` / `LetterBox` / `Zoom` fills. Other images use
+  a positioned content layer, sized after percentage/flex layout, with a content-box clip. Border,
+  padding, rounded content corners, backgrounds and shadows remain independent of image fitting.
+  The resulting geometry captures the import-time layout; editing the outer size or replacing
+  a resource later does not re-run CSS object sizing.
+- Snapshot images carry private `data-pagx-image-width` / `data-pagx-image-height` metadata
+  for the browser's natural CSS dimensions, separately from encoded resource pixels. This preserves
+  density-selected sources and browser fallback viewports for dimensionless SVG without changing
+  a shared resource. The metadata is consumed by the importer and is not exported as custom data.
+  Direct SVG import treats `viewBox` as an aspect ratio, not a natural size; its concrete object
+  rectangle becomes the SVG viewport, with native `preserveAspectRatio` semantics.
+- The object sizing algorithm follows CSS Images. Chromium currently applies the `scale-down`
+  no-enlargement limit to encoded pixels for density-selected raster images; those browser captures
+  can differ from the CSS-correct result. `none` uses density-corrected natural dimensions in both.
 - Inline `<svg>...</svg>` is captured verbatim and stored as the host `Layer`'s
   `<svg>` import directive. The SVG is resolved during `pagx verify` / `pagx resolve`.
 - `<img src="path.svg"/>` is converted into an external import directive
@@ -371,7 +388,8 @@ rounded `Rectangle` directly when **all** of the following hold:
 - the wrapper has exactly one element child, which is an `<img>` (no other elements; only
   whitespace text), and
 - that `<img>` exactly covers the wrapper's content box (matching `width` / `height`,
-  anchored at `(0, 0)`).
+  anchored at `(0, 0)`), has no independent effects, padding, border or animation, and uses
+  centered `fill`, `contain` or `cover`. Other cases retain separate geometry and clipping.
 
 The importer walks through up to three nested layout-only wrapper `<div>`s (wrappers that only
 pass layout through, with no paint of their own) to find the `<img>`, so common
@@ -449,7 +467,7 @@ Behaviour:
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side width/color/style longhands, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `object-position` (including affine `calc()`), `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side width/color/style longhands, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |

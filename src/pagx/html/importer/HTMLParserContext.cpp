@@ -352,6 +352,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  finishImageLayouts();
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {

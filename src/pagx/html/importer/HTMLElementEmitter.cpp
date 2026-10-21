@@ -199,6 +199,10 @@ bool IsLayoutOnlyWrapperBox(const HTMLBoxAttributes& box) {
   if (box.opacitySet && box.opacity < 1.0f) return false;
   if (!box.mixBlendMode.empty()) return false;
   if (box.transform.valid) return false;
+  if (box.paddingSet) return false;
+  if (!box.maskImage.empty() || !box.clipPathRef.empty() || box.isolate) return false;
+  if (box.marginTopPx != 0 || box.marginRightPx != 0 || box.marginBottomPx != 0 ||
+      box.marginLeftPx != 0 || box.flexGrowSet) return false;
   if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
   return true;
 }
@@ -236,9 +240,7 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   if (objectFit.empty() || objectFit == "fill") return ScaleMode::Stretch;
   if (objectFit == "contain") return ScaleMode::LetterBox;
   if (objectFit == "cover") return ScaleMode::Zoom;
-  // The SubsetTransformer normalises any other keyword to one of the above before
-  // emitting the subset HTML; reaching this branch means a hand-written subset
-  // file slipped through. Fall back to the CSS default.
+  // none/scale-down are emitted through concrete object layout, never through this fast path.
   return ScaleMode::Stretch;
 }
 
@@ -637,6 +639,7 @@ std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
+  if (box.borderSet || box.paddingSet) return false;
   if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
   if (HTMLLayerBuilder::usesBackgroundLayout(box)) return false;
 
@@ -655,6 +658,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
     if (img->name != "div") return false;
     HTMLBoxAttributes wrapperBox = _styleCascade->computeBoxAttributes(img);
     if (!IsLayoutOnlyWrapperBox(wrapperBox)) return false;
+    if (!_styleCascade->getStyleProperty(img, "animation").empty()) return false;
     if (!WrapperBoxCoversOuter(wrapperBox, box)) return false;
     img = FindSoleElementChild(img);
   }
@@ -671,6 +675,10 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   // image and folding would stretch it across the wrapper.
   HTMLBoxAttributes imgBox = _styleCascade->computeBoxAttributes(img);
   if (!WrapperBoxCoversOuter(imgBox, box)) return false;
+  if (!_styleCascade->getStyleProperty(img, "animation").empty()) return false;
+  if (!imgBox.objectPosition.isCenter() || imgBox.objectFit == "none" ||
+      imgBox.objectFit == "scale-down" || !IsLayoutOnlyWrapperBox(imgBox) ||
+      imgBox.paddingSet || imgBox.clipOverflow) return false;
 
   auto* imageNode = registerImageResource(resolveImageSource(src));
   if (!imageNode) return false;
@@ -700,81 +708,66 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
 
 Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
                                        const HTMLBoxAttributes& box) {
-  auto* srcAttr = element->findAttribute("src");
-  const std::string src = (srcAttr != nullptr) ? *srcAttr : std::string();
+  const auto* srcAttr = element->findAttribute("src");
+  const std::string src = srcAttr ? *srcAttr : std::string();
   std::string svgContent;
-  if (IsSvgImportSource(src, &svgContent)) {
-    auto* layer = _document->makeNode<Layer>();
-    _layerBuilder->applySizeAndPosition(layer, box);
-    _layerBuilder->applyLayerAttributes(layer, element, box);
-    _layerBuilder->applyBoxTransform(layer, box, element);
-
-    // A Layer with an unresolved import directive cannot also carry vector contents. When the
-    // replaced SVG has box visuals, keep those on an outer layer, resolve the SVG in a filling
-    // child, and paint a border-only overlay child last so the SVG cannot cover the border.
-    Layer* importHost = layer;
-    if (HTMLLayerBuilder::hasBackgroundVisuals(box)) {
-      HTMLBoxAttributes underlayBox = box;
-      underlayBox.borderSet = false;
-      _layerBuilder->applyBackgroundVisuals(layer, underlayBox);
-
-      importHost = _document->makeNode<Layer>();
-      importHost->percentWidth = 100.0f;
-      importHost->percentHeight = 100.0f;
-      layer->children.push_back(importHost);
-
-      if (box.borderSet) {
-        HTMLBoxAttributes borderBox = box;
-        borderBox.backgroundColorSet = false;
-        borderBox.backgroundImage.clear();
-        borderBox.boxShadow.clear();
-        borderBox.backdropFilter.clear();
-        auto* borderOverlay = _document->makeNode<Layer>();
-        borderOverlay->percentWidth = 100.0f;
-        borderOverlay->percentHeight = 100.0f;
-        borderOverlay->includeInLayout = false;
-        _layerBuilder->applyBackgroundVisuals(borderOverlay, borderBox);
-        layer->children.push_back(borderOverlay);
-      }
-    }
-    if (svgContent.empty()) {
-      importHost->importDirective.source = resolveImageSource(src);
-    } else {
-      importHost->importDirective.content = std::move(svgContent);
-    }
-    importHost->importDirective.format = "svg";
-    auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
-    assignElementId(wrapper, element);
-    return wrapper;
-  }
-
-  // A missing / empty `src` is not a reason to drop the element: the `<img>` still occupies a
-  // box in the layout and carries its own visuals (size, border-radius, data-*). Preserve the
-  // layer and back its fill with a placeholder `Image` whose source is left unresolved, so the
-  // image slot survives the import instead of vanishing from the PAGX. A non-empty `src` always
-  // registers an `Image` (even a broken path decodes to an unloadable-but-present resource).
-  Image* imageNode = src.empty() ? nullptr : registerImageResource(resolveImageSource(src));
-  if (imageNode == nullptr) {
+  bool svg = IsSvgImportSource(src, &svgContent);
+  std::string svgSource = svg && svgContent.empty() ? resolveImageSource(src) : std::string();
+  Image* image = svg || src.empty() ? nullptr : registerImageResource(resolveImageSource(src));
+  if (!svg && !image) {
     warn("html: <img> missing src; image preserved with unresolved source");
-    imageNode = _imageResources->createPlaceholder();
+    image = _imageResources->createPlaceholder();
   }
-
+  auto intrinsic = imageIntrinsicSize(element, image, svgSource, svgContent);
   auto* layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
   _layerBuilder->applyLayerAttributes(layer, element, box);
 
-  auto* fill = _document->makeNode<Fill>();
-  auto* pattern = _document->makeNode<ImagePattern>();
-  pattern->image = imageNode;
-  pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
-  fill->color = pattern;
-  // The image is the foreground paint: CSS backgrounds sit behind it, while border and box
-  // effects remain visible around it. The shared geometry also preserves border-radius.
-  _layerBuilder->applyBackgroundVisuals(layer, box, fill);
-  _layerBuilder->applyBoxTransform(layer, box, element);
-  auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
-  assignElementId(wrapper, element);
-  return wrapper;
+  // Retain the compact representation only where the renderer's centered fit is equivalent.
+  bool compact = !svg && box.objectPosition.isCenter() && box.objectFit != "none" &&
+                 box.objectFit != "scale-down" && !box.paddingSet && !box.borderSet &&
+                 box.maskImage.empty() && box.clipPathRef.empty() &&
+                 !(box.flexGrowSet && box.flexGrow > 0) &&
+                 std::isfinite(box.widthPx) && std::isfinite(box.heightPx);
+  if (compact) {
+    auto* fill = _document->makeNode<Fill>();
+    auto* pattern = _document->makeNode<ImagePattern>();
+    pattern->image = image;
+    pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
+    fill->color = pattern;
+    _layerBuilder->applyBackgroundVisuals(layer, box, fill);
+    _layerBuilder->applyBoxTransform(layer, box, element);
+    auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
+    assignElementId(wrapper, element);
+    return wrapper;
+  }
+  if (image && !std::isfinite(intrinsic.width) && !std::isfinite(intrinsic.height) &&
+      !box.objectFit.empty() && box.objectFit != "fill") {
+    warn("html: image natural size unavailable; preserving the image slot with default sizing");
+  }
+
+  // Supply intrinsic preferred sizes for auto axes. Percentages, opposite-edge constraints,
+  // and flex still take precedence in the normal layout pass.
+  float insetX = box.padding.left + box.padding.right + box.borderWidths.left + box.borderWidths.right;
+  float insetY = box.padding.top + box.padding.bottom + box.borderWidths.top + box.borderWidths.bottom;
+  float preferredW = intrinsic.width, preferredH = intrinsic.height;
+  if (intrinsic.ratio > 0) {
+    if (std::isfinite(box.widthPx) && !std::isfinite(box.heightPx))
+      preferredH = std::max(0.f, box.widthPx - insetX) / intrinsic.ratio;
+    else if (std::isfinite(box.heightPx) && !std::isfinite(box.widthPx))
+      preferredW = std::max(0.f, box.heightPx - insetY) * intrinsic.ratio;
+  }
+  if (!std::isfinite(preferredW) || !std::isfinite(preferredH)) {
+    ResolveHTMLObjectSize(intrinsic, "none", 300, 150, preferredW, preferredH);
+  }
+  if (std::isnan(layer->width)) layer->width = preferredW + insetX;
+  if (std::isnan(layer->height)) layer->height = preferredH + insetY;
+  // Image contents always clip to their content box. Decorations and shadows have their own
+  // paint layer, so overflow must not clip the whole element including its outer shadow.
+  layer->clipToBounds = false;
+  _pendingImageLayouts.push_back({layer, element, box, intrinsic, image, svgSource, svgContent});
+  assignElementId(layer, element);
+  return layer;
 }
 
 Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& element,
@@ -1664,6 +1657,8 @@ std::pair<int, int> HTMLParserContext::decodeImageNativeSize(const Image* image)
     }
   }
   if (!codec) return {0, 0};
+  if (tgfx::OrientationSwapsWidthHeight(codec->orientation()))
+    return {codec->height(), codec->width()};
   return {codec->width(), codec->height()};
 }
 

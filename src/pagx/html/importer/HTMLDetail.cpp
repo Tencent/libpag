@@ -685,6 +685,15 @@ float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx,
     recognized = true;
     return num * 4.0f / 3.0f;
   }
+  for (auto absolute : {std::make_pair("pc", 16.0f), std::make_pair("in", 96.0f),
+                        std::make_pair("cm", 96.0f / 2.54f),
+                        std::make_pair("mm", 96.0f / 25.4f),
+                        std::make_pair("q", 96.0f / 101.6f)}) {
+    if (unit == absolute.first) {
+      recognized = true;
+      return num * absolute.second;
+    }
+  }
   if (unit == "vw") {
     if (std::isfinite(canvasW) && canvasW > 0) {
       recognized = true;

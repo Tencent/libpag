@@ -21,6 +21,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "pagx/html/importer/HTMLCSSPosition.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Matrix.h"
@@ -61,7 +62,7 @@ static constexpr const char* HTML_DEFAULT_TEXT_COLOR = "#1E293B";
  * Pixel tolerance used when comparing image and wrapper geometry for the rounded-image
  * fold optimisation in `foldRoundedImageWrapper`.
  */
-static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.5f;
+static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.0001f;
 
 /**
  * Inherited CSS style properties that cascade down the element tree during HTML
@@ -335,6 +336,7 @@ struct HTMLBoxAttributes {
   // `<img>`). Empty means "not set" and should fall back to the CSS default
   // `fill`, which corresponds to PAGX `ScaleMode::Stretch`.
   std::string objectFit = {};
+  HTMLCSSPosition objectPosition = {};
 
   // Inline `transform` mapped to the TextBox / Group transform fields. Currently the
   // importer only honours `valid == true` for text leaves (where the resolved fields

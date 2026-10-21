@@ -38,6 +38,7 @@
 #include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
+#include "pagx/html/importer/HTMLObjectLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -5161,7 +5162,8 @@ PAG_TEST(PAGXHTMLImporterTest, ImgWithSvgSrcBecomesImportDirective) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  auto* leaf = doc->layers.front()->children.front();
+  auto* leaf = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(leaf, nullptr);
   EXPECT_EQ(leaf->importDirective.format, "svg");
   EXPECT_FALSE(leaf->importDirective.source.empty());
   EXPECT_NE(leaf->importDirective.source.find("logo.svg"), std::string::npos);
@@ -5310,17 +5312,20 @@ PAG_TEST(PAGXHTMLImporterTest, ImagePreservesBorderEffectsAndTransform) {
   auto* image = doc->layers.front()->children.front();
   EXPECT_FLOAT_EQ(image->matrix.tx, 7.0f);
   EXPECT_FLOAT_EQ(image->matrix.ty, 9.0f);
-  auto* stroke = FindElementOfType<pagx::Stroke>(image);
+  auto* stroke = FindBackgroundElement<pagx::Stroke>(image);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  auto* fill = FindBackgroundElement<pagx::Fill>(image);
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(CountBackgroundBlurStyles(image), 1u);
   bool foundShadow = false;
-  for (auto* style : image->styles) {
-    if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
-  }
+  auto findShadow = [&](auto&& self, pagx::Layer* layer) -> void {
+    for (auto* style : layer->styles)
+      if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
+    for (auto* child : layer->children) self(self, child);
+  };
+  findShadow(findShadow, image);
   EXPECT_TRUE(foundShadow);
 }
 
@@ -5346,9 +5351,12 @@ PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffec
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
   bool foundShadow = false;
-  for (auto* style : image->styles) {
-    if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
-  }
+  auto findShadow = [&](auto&& self, pagx::Layer* layer) -> void {
+    for (auto* style : layer->styles)
+      if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
+    for (auto* child : layer->children) self(self, child);
+  };
+  findShadow(findShadow, image);
   EXPECT_TRUE(foundShadow);
 }
 
@@ -6740,13 +6748,12 @@ PAG_TEST(PAGXHTMLImporterTest, RawPxLengthEmRemWarnsThroughPadding) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
-  // `in` is a real CSS unit but parsePxLength does not understand it; it falls back with a
-  // warning. (CSS recognised units consumed by parsePxLength are px / em / rem / pt / vw / vh.)
+  // Unrecognised dimension units must diagnose instead of accepting their numeric prefix.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="display:flex;padding:5in;width:50px;height:50px"></div>
+      <div style="display:flex;padding:5unknown;width:50px;height:50px"></div>
     </body></html>
   )HTML",
                                              opts);
@@ -9066,7 +9073,8 @@ PAG_TEST(PAGXHTMLImporterTest, ImgExternalSvgRoutesAsImportDirective) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   ASSERT_FALSE(doc->layers.front()->children.empty());
-  auto* layer = doc->layers.front()->children.front();
+  auto* layer = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(layer, nullptr);
   EXPECT_EQ(layer->importDirective.format, "svg");
 }
 
@@ -9148,7 +9156,8 @@ PAG_TEST(PAGXHTMLImporterTest, ImgSvgDataUriRoutesAsImportDirective) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   ASSERT_FALSE(doc->layers.front()->children.empty());
-  auto* layer = doc->layers.front()->children.front();
+  auto* layer = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(layer, nullptr);
   EXPECT_EQ(layer->importDirective.format, "svg");
   EXPECT_TRUE(layer->importDirective.source.empty());
   EXPECT_NE(layer->importDirective.content.find("<path"), std::string::npos);
@@ -9169,7 +9178,8 @@ PAG_TEST(PAGXHTMLImporterTest, SvgDataUriPrologStrippedFromImportDirective) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   ASSERT_FALSE(doc->layers.front()->children.empty());
-  auto* layer = doc->layers.front()->children.front();
+  auto* layer = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(layer, nullptr);
   ASSERT_EQ(layer->importDirective.format, "svg");
   EXPECT_EQ(layer->importDirective.content.compare(0, 4, "<svg"), 0);
   EXPECT_EQ(layer->importDirective.content.find("<?xml"), std::string::npos);
@@ -10746,26 +10756,26 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, OpacityClampedAbove1) {
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "opacity: 1"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitNoneDowngradedToContain) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitNonePreserved) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <img src="x.png" style="object-fit: none"/></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
-  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: none"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitScaleDownDowngraded) {
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitScaleDownPreserved) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <img src="x.png" style="object-fit: scale-down"/></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: contain"));
-  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "img"), "object-fit: scale-down"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectFitInvalidDropped) {
@@ -13500,6 +13510,187 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsFlexGrowChil
   ASSERT_TRUE(result.ok);
   EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImagePercentageCornersResolveAfterLayout) {
+  auto doc = ParseRaw(R"HTML(<html><body style="width:200px;height:100px">
+    <img src="missing.png" style="width:50%;height:50%;border-radius:50%"/>
+    </body></html>)HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& diagnostic : doc->errors)
+    EXPECT_EQ(diagnostic.find("percentage border-radius"), std::string::npos);
+  auto* image = doc->layers.front()->children.front();
+  ASSERT_FALSE(image->children.empty());
+  auto* paint = image->children.front();
+  ASSERT_FALSE(paint->children.empty());
+  auto* clip = paint->children.back();
+  EXPECT_FLOAT_EQ(clip->width, 100);
+  EXPECT_FLOAT_EQ(clip->height, 50);
+  ASSERT_NE(clip->mask, nullptr);
+  EXPECT_FLOAT_EQ(clip->mask->width, 100);
+  EXPECT_FLOAT_EQ(clip->mask->height, 50);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageFoldRequiresEquivalentGeometryAndEffects) {
+  for (auto* style : {"width:99.8px;height:100px", "width:100px;height:100px;margin-left:2px",
+                      "width:100px;height:100px;clip-path:inset(10px)",
+                      "width:100px;height:100px;object-position:right bottom"}) {
+    SCOPED_TRACE(style);
+    auto doc = ParseRaw(std::string("<html><body style=\"width:100px;height:100px\">"
+        "<div style=\"width:100px;height:100px;border-radius:20px;overflow:hidden\">"
+        "<img src=\"test.png\" style=\"") + style + "\"/></div></body></html>");
+    ASSERT_NE(doc, nullptr);
+    auto* wrapper = doc->layers.front()->children.front();
+    auto* fill = FindElementOfType<pagx::Fill>(wrapper);
+    EXPECT_TRUE(fill == nullptr || As<pagx::ImagePattern>(fill->color) == nullptr);
+    EXPECT_TRUE(HasImagePatternFill(wrapper));
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImageNaturalSizesArePerInstanceAndRoundTrip) {
+  const std::string source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==";
+  std::string html = "<html><body style=\"width:300px;height:100px\">";
+  for (int width : {16, 8, 4}) {
+    html += "<img src=\"" + source + "\" data-id=\"photo\" data-pagx-image-width=\"" +
+        std::to_string(width) + "\" data-pagx-image-height=\"" + std::to_string(width / 2) +
+        "\" style=\"width:100px;height:60px;object-fit:scale-down;object-position:right bottom\"/>";
+  }
+  html += "</body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto check = [&](pagx::PAGXDocument* document) {
+    std::vector<pagx::Layer*> objects;
+    auto visit = [&](auto&& self, pagx::Layer* layer) -> void {
+      for (auto* element : layer->contents) {
+        auto* fill = As<pagx::Fill>(element);
+        if (fill && As<pagx::ImagePattern>(fill->color)) objects.push_back(layer);
+      }
+      EXPECT_EQ(layer->customData.count("pagx-image-width"), 0u);
+      EXPECT_EQ(layer->customData.count("pagx-image-height"), 0u);
+      for (auto* child : layer->children) self(self, child);
+    };
+    for (auto* layer : document->layers) visit(visit, layer);
+    ASSERT_EQ(objects.size(), 3u);
+    pagx::Image* shared = nullptr;
+    for (size_t i = 0; i < objects.size(); ++i) {
+      auto* object = objects[i];
+      float width = 16.f / static_cast<float>(1 << i);
+      EXPECT_FLOAT_EQ(object->width, width);
+      EXPECT_FLOAT_EQ(object->height, width / 2);
+      EXPECT_FLOAT_EQ(object->left, 100 - width);
+      EXPECT_FLOAT_EQ(object->top, 60 - width / 2);
+      EXPECT_FALSE(object->includeInLayout);
+      auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(object)->color);
+      EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+      if (shared) EXPECT_EQ(pattern->image, shared);
+      shared = pattern->image;
+    }
+  };
+  check(doc.get());
+  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(restored, nullptr);
+  EXPECT_TRUE(restored->errors.empty());
+  restored->applyLayout();
+  check(restored.get());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SvgViewBoxSuppliesRatioWithoutNaturalDimensions) {
+  auto path = SaveFile("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 20\">"
+                       "<rect width=\"60\" height=\"20\"/></svg>", "object-layout-ratio.svg");
+  auto doc = ParseRaw("<html><body style=\"width:240px;height:200px\"><img src=\"" + path +
+      "\" style=\"width:210px;height:180px;object-fit:none;object-position:right bottom\"/>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* object = FindSvgImportLayer(doc->layers.front());
+  ASSERT_NE(object, nullptr);
+  EXPECT_FLOAT_EQ(object->width, 210);
+  EXPECT_FLOAT_EQ(object->height, 70);
+  EXPECT_FLOAT_EQ(object->left, 0);
+  EXPECT_FLOAT_EQ(object->top, 110);
+}
+
+PAG_TEST(PAGXHTMLObjectLayoutTest, PositionGrammarAndAffineLengths) {
+  float width = 200, height = 100;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  pagx::HTMLValueParser parser(diagnostics, width, height);
+  struct Case { const char* source; float x, y; };
+  const Case cases[] = {
+      {"left top", 0, 0}, {"bottom right", -40, 60}, {"top", -20, 0},
+      {"center left", 0, 30}, {"20% 80%", -8, 48}, {"-20% 130%", 8, 78},
+      {"right 7px bottom 9px", -47, 51}, {"bottom 9px right 7px", -47, 51},
+      {"calc(100% - 7px) calc(50% + 2px)", -47, 32},
+      {"calc((25% + 3px) * 2) calc(80px / 2)", -14, 40},
+      {"10px bottom", 10, 60}, {"right 10px", -40, 10},
+  };
+  for (auto& c : cases) {
+    SCOPED_TRACE(c.source);
+    pagx::HTMLCSSPosition position;
+    ASSERT_TRUE(pagx::ParseHTMLCSSPosition(c.source, parser, position));
+    EXPECT_FLOAT_EQ(position.x.resolve(-40), c.x);
+    EXPECT_FLOAT_EQ(position.y.resolve(60), c.y);
+  }
+  for (auto* invalid : {"left right", "top bottom", "left 10px top", "top 10px", "10px left",
+                       "10px junk", "calc(10px+2px) top", "calc(1px / 0) 0",
+                       "calc(2px * 3px) 0", "min(10px,20px) center", "0x20px 0"}) {
+    SCOPED_TRACE(invalid);
+    pagx::HTMLCSSPosition position;
+    EXPECT_FALSE(pagx::ParseHTMLCSSPosition(invalid, parser, position));
+    EXPECT_TRUE(position.isCenter());
+  }
+  for (auto* background : {"left 10px top", "center right 7px", "bottom 9px center"}) {
+    pagx::HTMLCSSPosition position;
+    EXPECT_TRUE(pagx::ParseHTMLCSSPosition(background, parser, position, true));
+    EXPECT_FALSE(pagx::ParseHTMLCSSPosition(background, parser, position));
+  }
+}
+
+PAG_TEST(PAGXHTMLObjectLayoutTest, ConcreteObjectSizeAndPosition) {
+  const pagx::Rect content = {11, 17, 248, 160};
+  const pagx::HTMLImageIntrinsicSize large = {600, 360, 600.f / 360};
+  struct Case { const char* fit; float width, height; };
+  const Case cases[] = {{"fill", 248, 160}, {"contain", 248, 148.8f},
+                        {"cover", 266.66667f, 160}, {"none", 600, 360},
+                        {"scale-down", 248, 148.8f}};
+  for (auto& c : cases) {
+    SCOPED_TRACE(c.fit);
+    pagx::Rect object;
+    ASSERT_TRUE(pagx::ResolveHTMLObjectRect(large, c.fit, {}, content, object));
+    EXPECT_NEAR(object.width, c.width, .0001f);
+    EXPECT_NEAR(object.height, c.height, .0001f);
+    EXPECT_NEAR(object.x, 11 + (248 - c.width) / 2, .0001f);
+    EXPECT_NEAR(object.y, 17 + (160 - c.height) / 2, .0001f);
+  }
+  pagx::Rect object;
+  ASSERT_TRUE(pagx::ResolveHTMLObjectRect({40, 20, 2}, "scale-down", {}, content, object));
+  EXPECT_FLOAT_EQ(object.width, 40);
+  EXPECT_FLOAT_EQ(object.height, 20);
+  ASSERT_TRUE(pagx::ResolveHTMLObjectRect({NAN, NAN, 2}, "none", {}, content, object));
+  EXPECT_FLOAT_EQ(object.width, 248);
+  EXPECT_FLOAT_EQ(object.height, 124);
+  ASSERT_TRUE(pagx::ResolveHTMLObjectRect({60, NAN, 2}, "none", {}, content, object));
+  EXPECT_FLOAT_EQ(object.width, 60);
+  EXPECT_FLOAT_EQ(object.height, 30);
+  ASSERT_TRUE(pagx::ResolveHTMLObjectRect({}, "none", {}, content, object));
+  EXPECT_FLOAT_EQ(object.width, 248);
+  EXPECT_FLOAT_EQ(object.height, 160);
+  EXPECT_FALSE(pagx::ResolveHTMLObjectRect(large, "cover", {}, {0, 0, NAN, 100}, object));
+  ASSERT_TRUE(pagx::ResolveHTMLObjectRect(large, "none", {}, {0, 0, 0, 100}, object));
+  EXPECT_FLOAT_EQ(object.width, 0);
+  EXPECT_FLOAT_EQ(object.height, 0);
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectPositionKeepsCalcAndNormalizesUnits) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(R"HTML(<html><body style="width:200px;height:100px">
+    <img style="object-position:right 1in bottom 12pt"/>
+    <img style="object-position:calc(50% + 1in) calc(100% - 2px)"/>
+    </body></html>)HTML", &root);
+  ASSERT_TRUE(result.ok);
+  auto first = FirstBodyChild(root, "img");
+  ASSERT_NE(first, nullptr);
+  EXPECT_TRUE(StyleContains(first, "object-position: right 96px bottom 16px"));
+  EXPECT_TRUE(StyleContains(first->getNextSibling("img"),
+      "object-position: calc(50% + 96px) calc(100% - 2px)"));
 }
 
 PAG_TEST(PAGXHTMLBackgroundLayoutTest, GeneratedImageSizingAndPositions) {

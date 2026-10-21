@@ -36,6 +36,7 @@
 #include "pagx/html/importer/HTMLImageResources.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLLayerBuilder.h"
+#include "pagx/html/importer/HTMLObjectLayout.h"
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -96,6 +97,14 @@ class HTMLParserContext {
 
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
+
+  HTMLImageIntrinsicSize imageIntrinsicSize(const std::shared_ptr<DOMNode>& element, Image* image,
+                                            const std::string& svgSource,
+                                            const std::string& svgContent);
+  void emitImageContent(Layer* layer, const HTMLBoxAttributes& box,
+                         const HTMLImageIntrinsicSize& intrinsic, Image* image,
+                         const std::string& svgSource, const std::string& svgContent);
+  void finishImageLayouts();
 
   // Recovers a CSS `url(...)` background into an `ImagePattern` Fill appended to `layer`
   // (the inverse of `HTMLWriter`'s ImagePattern emission). `background-size` selects the
@@ -294,6 +303,18 @@ class HTMLParserContext {
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).
   std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+
+  struct PendingImageLayout {
+    Layer* layer = nullptr;
+    std::shared_ptr<DOMNode> element;
+    HTMLBoxAttributes box;
+    HTMLImageIntrinsicSize intrinsic;
+    Image* image = nullptr;
+    std::string svgSource;
+    std::string svgContent;
+  };
+  std::vector<PendingImageLayout> _pendingImageLayouts;
+  std::unordered_map<std::string, HTMLImageIntrinsicSize> _imageIntrinsicSizes;
 
   // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
   // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the

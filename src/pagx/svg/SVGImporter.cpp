@@ -157,8 +157,19 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     sourceW = _viewBoxWidth;
     sourceH = _viewBoxHeight;
   } else {
-    sourceW = parseLength(getAttribute(root, "width"), 0);
-    sourceH = parseLength(getAttribute(root, "height"), 0);
+    auto width = getAttribute(root, "width");
+    auto height = getAttribute(root, "height");
+    sourceW = parseLength(width, 0);
+    sourceH = parseLength(height, 0);
+    // An externally sized image supplies the viewport even when the SVG has no intrinsic
+    // dimensions/viewBox. Without a viewBox, percentages use this viewport and user units
+    // remain unscaled. Preserve an explicitly zero-sized source as non-rendering.
+    if (std::isfinite(_options.targetWidth) &&
+        (sourceW > 0 || width.empty() || width == "auto" || width.find('%') != std::string::npos))
+      sourceW = _options.targetWidth;
+    if (std::isfinite(_options.targetHeight) &&
+        (sourceH > 0 || height.empty() || height == "auto" || height.find('%') != std::string::npos))
+      sourceH = _options.targetHeight;
     _viewBoxWidth = sourceW;
     _viewBoxHeight = sourceH;
   }
