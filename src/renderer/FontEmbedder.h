@@ -29,7 +29,7 @@ namespace pagx {
  *
  * Font merging strategy:
  * - All vector glyphs (with path) are merged into a single Font node
- * - Bitmap glyphs (with image) are grouped by typeface into separate Font nodes
+ * - Bitmap glyphs are grouped by font instance, rasterization size and foreground color.
  */
 class FontEmbedder {
  public:
@@ -56,6 +56,13 @@ class FontEmbedder {
    * layout run data.
    */
   bool embed(PAGXDocument* document);
+
+  const std::string& error() const {
+    return lastError;
+  }
+
+ private:
+  std::string lastError = {};
 };
 
 }  // namespace pagx

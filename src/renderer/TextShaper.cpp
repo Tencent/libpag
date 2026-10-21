@@ -351,7 +351,7 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
 
 enum class Presentation { Any, Text, Emoji };
 
-static Presentation ClusterPresentation(const TextCluster& cluster) {
+static Presentation ClusterPresentation(const TextCluster& cluster, bool useUnicodeDefault = true) {
   bool emoji = false;
   bool emojiDefault = false;
   for (size_t i = 0; i < cluster.codepoints.size(); ++i) {
@@ -363,6 +363,7 @@ static Presentation ClusterPresentation(const TextCluster& cluster) {
     emoji |= IsEmojiCharacter(cp);
     emojiDefault |= IsEmojiPresentation(cp);
   }
+  if (!useUnicodeDefault) return Presentation::Any;
   if (!emoji) return Presentation::Any;
   return emojiDefault || cluster.codepoints.back() == 0x20E3 ? Presentation::Emoji
                                                              : Presentation::Text;
@@ -435,6 +436,7 @@ static bool SupportsCluster(const std::shared_ptr<tgfx::Typeface>& typeface,
   unsigned count = 0;
   auto* glyphs = hb_buffer_get_glyph_infos(buffer.get(), &count);
   auto* positions = hb_buffer_get_glyph_positions(buffer.get(), nullptr);
+  auto sequencePresentation = ClusterPresentation(cluster);
   bool regionalPair = cluster.codepoints.size() == 2 &&
                       IsRegionalIndicator(cluster.codepoints.front()) &&
                       IsRegionalIndicator(cluster.codepoints.back());
@@ -444,12 +446,12 @@ static bool SupportsCluster(const std::shared_ptr<tgfx::Typeface>& typeface,
     if (offset < text.size()) DecodeUTF8(text.data() + offset, text.size() - offset, &cp);
     bool ignorable = IsDefaultIgnorable(cp);
     if (!glyphs[i].codepoint && !ignorable) return false;
-    if (strict && presentation == Presentation::Emoji &&
+    if (strict && sequencePresentation == Presentation::Emoji &&
         (cp == 0x200D || (cp >= 0xE0020 && cp <= 0xE007F)))
       return false;
     // A separately advancing modifier/second regional indicator is an uncombined component.
     // Zero-advance marks and multiple glyphs sharing the base cluster remain valid.
-    if (strict && presentation == Presentation::Emoji && offset > cluster.start &&
+    if (strict && sequencePresentation == Presentation::Emoji && offset > cluster.start &&
         (IsEmojiModifier(cp) || cp == 0x20E3 || (regionalPair && IsRegionalIndicator(cp))) &&
         (positions[i].x_advance != 0 || positions[i].y_advance != 0))
       return false;
@@ -478,7 +480,11 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
     if (found != resolvedClusters.end()) {
       selected = found->second;
     } else {
-      auto presentation = ClusterPresentation(cluster);
+      // Unicode defaults guide system fallback, but must not reject a covering CSS family.
+      // In particular, digits, # and * in a display color font are still ordinary text.
+      // Explicit selectors (including those inserted for font-variant-emoji) do request a
+      // presentation and retain priority over the family's default glyphs.
+      auto presentation = ClusterPresentation(cluster, false);
       for (bool strict : {true, false}) {
         auto accepts = [&](const auto& typeface) {
           return SupportsCluster(typeface, text, cluster, script, presentation, strict);
@@ -492,7 +498,13 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
           }
           if (selected) break;
         }
-        if (!selected) selected = layoutContext.fallbackTypeface(accepts, primaryFont.getSize());
+        if (!selected) {
+          auto fallbackAccepts = [&](const auto& typeface) {
+            return SupportsCluster(typeface, text, cluster, script, ClusterPresentation(cluster),
+                                   strict);
+          };
+          selected = layoutContext.fallbackTypeface(fallbackAccepts, primaryFont.getSize());
+        }
         if (selected) break;
       }
       if (!selected) selected = primaryTypeface;
