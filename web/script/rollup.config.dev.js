@@ -10,8 +10,8 @@ const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includ
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const arch = process.env.ARCH;
 const backend = process.env.BACKEND;
-const demoName = backend === 'webgpu' ? 'index-webgpu' : (arch === 'wasm-mt' ? 'index' : 'index-st');
-const demoOutDir = backend === 'webgpu' ? `${arch}-webgpu` : arch;
+const demoName = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'index-webgpu-mt' : 'index-webgpu') : (arch === 'wasm-mt' ? 'index' : 'index-st');
+const demoOutDir = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : arch;
 
 require("./update.pag.import");
 

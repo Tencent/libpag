@@ -14,7 +14,7 @@ const arch = process.env.ARCH;
 const backend = process.env.BACKEND;
 const libPath = backend === 'webgpu' ? (arch === 'wasm-mt' ? "lib-webgpu-mt" : "lib-webgpu") : (arch === 'wasm-mt' ? "lib-mt" : "lib");
 const demoName = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'index-webgpu-mt' : 'index-webgpu') : (arch === 'wasm-mt' ? 'index' : 'index-st');
-const demoOutDir = backend === 'webgpu' ? `${arch}-webgpu` : arch;
+const demoOutDir = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : arch;
 
 require("./update.pag.import");
 

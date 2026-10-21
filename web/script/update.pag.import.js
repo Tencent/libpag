@@ -4,7 +4,7 @@ const path = require('path');
 const arch = process.env.ARCH;
 const backend = process.env.BACKEND;
 const archTarget = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
-const target = (backend === 'webgpu' ? `${archTarget}-webgpu` : archTarget);
+const target = (backend === 'webgpu' ? (archTarget === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : archTarget);
 const filePath = path.resolve(__dirname, '../src/pag.ts');
 console.log("target:",target);
 fs.readFile(filePath, 'utf8', (err, data) => {

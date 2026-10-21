@@ -3,7 +3,7 @@ process.chdir(__dirname);
 const fs = require("fs");
 
 // Mirrors cmake.demo.js but builds the WebGPU variant and preserves the emscripten glue under
-// src/<arch>-webgpu/ so that rollup can select it per backend via update.pag.import.js.
+// src/wasm-webgpu[-mt]/ so that rollup can select it per backend via update.pag.import.js.
 process.argv.push("-s");
 process.argv.push("../../");
 process.argv.push("-o");
@@ -18,7 +18,7 @@ require("../../build_pag");
 const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
 
 const arch = getArgValue("-a");
-const webgpuArch = `${arch}-webgpu`;
+const webgpuArch = arch === "wasm-mt" ? "wasm-webgpu-mt" : "wasm-webgpu";
 const libPath = (arch === "wasm-mt" ? "../lib-webgpu-mt" : "../lib-webgpu");
 
 fs.mkdirSync(`../src/${webgpuArch}`, {recursive: true});
