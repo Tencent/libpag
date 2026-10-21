@@ -341,11 +341,15 @@ class PAGXDocument : public Node {
   void unregisterLiveScene(PAGScene* scene);
 
   FontConfig _fontConfig;
-  // Font nodes whose font file has already been registered into _fontConfig, mapped to the
-  // fileData they were registered from (nullptr when read from disk). Cleared whenever
-  // applyLayout replaces the config. Keeps re-layouts from appending the same file to the fallback
-  // chain again, while bytes that loadFileData supplies later are still picked up.
-  std::unordered_map<const Font*, const Data*> registeredFontFiles = {};
+  // What a Font node was last registered from: the file path it named and the bytes it carried
+  // (nullptr when read from disk). Cleared whenever applyLayout replaces the config. Comparing both
+  // keeps re-layouts from appending the same file to the fallback chain again, while bytes that
+  // loadFileData supplies later or a file the host repoints are still picked up.
+  struct RegisteredFontFile {
+    std::string file = {};
+    const Data* fileData = nullptr;
+  };
+  std::unordered_map<const Font*, RegisteredFontFile> registeredFontFiles = {};
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.

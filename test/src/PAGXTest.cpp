@@ -1054,6 +1054,39 @@ PAGX_TEST(PAGXTest, FontFileDataLoadedByBatchMap) {
 }
 
 /**
+   * Test case: registration is keyed on the file a Font node currently names as well as on the bytes
+   * it carries, so pointing an already laid-out Font at another file registers the new file instead
+   * of keeping the first one's registration.
+   */
+PAGX_TEST(PAGXTest, FontFileChangedAfterLayoutRegistersNewFile) {
+  auto notoPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto xml = std::string(R"(<pagx width="200" height="60">
+    <Layer>
+      <Text text="A" fontFamily="Noto Sans SC" fontSize="24"/>
+      <Fill color="#000000"/>
+    </Layer>
+    <Resources>
+      <Font id="webFont" file=")") +
+             notoPath + R"("/>
+    </Resources>
+  </pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  auto* font = doc->findNode<pagx::Font>("webFont");
+  ASSERT_NE(font, nullptr);
+  doc->applyLayout();
+  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "Noto Sans SC");
+
+  font->file = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  text->fontFamily = "pagx-font-f0";
+  text->text = "\uE000";
+  doc->applyLayout();
+  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+}
+
+/**
    * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
  * fontFamily rather than an id reference, so pruning them as unreferenced would drop the font.
  */

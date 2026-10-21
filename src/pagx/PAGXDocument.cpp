@@ -318,7 +318,8 @@ void PAGXDocument::registerFontFiles() {
       continue;
     }
     auto registered = registeredFontFiles.find(font);
-    if (registered != registeredFontFiles.end() && registered->second == font->fileData.get()) {
+    if (registered != registeredFontFiles.end() && registered->second.file == font->file &&
+        registered->second.fileData == font->fileData.get()) {
       continue;
     }
     if (font->fileData != nullptr) {
@@ -326,7 +327,7 @@ void PAGXDocument::registerFontFiles() {
     } else if (IsLocalFilePath(font->file)) {
       RegisterFontFileFaces(&_fontConfig, font->file, true);
     }
-    registeredFontFiles[font] = font->fileData.get();
+    registeredFontFiles[font] = {font->file, font->fileData.get()};
   }
 }
 
