@@ -15,11 +15,23 @@ const READBACK_TIMEOUT_MS = 30000;
 @destroyVerify
 export class PAGSurface {
   /**
-   * Make a PAGSurface from canvas.
+   * Make a PAGSurface from canvas. Pass a canvas ID string on the WebGL backend. On the WebGPU
+   * backend a canvas object (HTMLCanvasElement or OffscreenCanvas) can also be passed, which is
+   * the only way to target a canvas that has no DOM id, such as an OffscreenCanvas.
    */
-  public static fromCanvas(canvasID: string): PAGSurface {
-    const wasmIns = PAGModule._PAGSurface._FromCanvas(canvasID);
-    if (!wasmIns) throw new Error(`Make PAGSurface from canvas ${canvasID} fail!`);
+  public static fromCanvas(canvas: string | HTMLCanvasElement | OffscreenCanvas): PAGSurface {
+    if (typeof canvas !== 'string') {
+      if (!isWebGPUBackend()) {
+        throw new Error(
+          'PAGSurface.fromCanvas() with a canvas object is only supported on the WebGPU backend. Pass a canvas ID string on the WebGL backend.',
+        );
+      }
+      const wasmIns = PAGModule._PAGSurface._FromCanvasObject!(canvas);
+      if (!wasmIns) throw new Error('Make PAGSurface from canvas object fail!');
+      return new PAGSurface(wasmIns);
+    }
+    const wasmIns = PAGModule._PAGSurface._FromCanvas(canvas);
+    if (!wasmIns) throw new Error(`Make PAGSurface from canvas ${canvas} fail!`);
     return new PAGSurface(wasmIns);
   }
   /**

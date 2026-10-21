@@ -49,6 +49,11 @@ export interface PAG extends EmscriptenModule {
   _PAGPlayer: any;
   _PAGSurface: {
     _FromCanvas: (canvasID: string) => any;
+    /**
+     * WebGPU build only. Wraps a canvas object (HTMLCanvasElement or OffscreenCanvas) instead of
+     * a DOM id selector.
+     */
+    _FromCanvasObject?: (canvas: HTMLCanvasElement | OffscreenCanvas) => any;
     _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
     _FromRenderTarget: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };

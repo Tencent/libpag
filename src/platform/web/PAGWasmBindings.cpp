@@ -394,6 +394,11 @@ bool PAGBindInit() {
       .class_function("_FromCanvas", optional_override([](const std::string& canvasID) {
                         return PAGSurface::MakeFrom(GPUDrawable::FromCanvasID(canvasID));
                       }))
+#if defined(TGFX_USE_WEBGPU)
+      .class_function("_FromCanvasObject", optional_override([](val canvas) {
+                        return PAGSurface::MakeFrom(GPUDrawable::FromCanvas(std::move(canvas)));
+                      }))
+#endif
       .class_function(
           "_FromTexture",
           optional_override([](int textureID, int width, int height, bool flipY, int format) {

@@ -31,18 +31,15 @@ export interface PAGViewOptions {
 
 let autoCanvasID = 0;
 
-// The WebGPU backend locates the canvas through a CSS selector (its C++ WebGPUWindow wraps
+// The WebGPU backend locates a DOM canvas through a CSS selector (its C++ WebGPUWindow wraps
 // WGPUSurfaceDescriptorFromCanvasHTMLSelector), so the canvas element must carry an id.
-const ensureCanvasSelector = (canvasElement: HTMLCanvasElement | OffscreenCanvas): string => {
-  if (isOffscreenCanvas(canvasElement)) {
-    throw new Error('PAGView with an OffscreenCanvas is not supported on the WebGPU backend yet.');
-  }
-  const element = canvasElement as HTMLCanvasElement;
-  if (!element.id) {
+// OffscreenCanvas has no DOM id and takes the canvas-object path instead.
+const ensureCanvasSelector = (canvasElement: HTMLCanvasElement): string => {
+  if (!canvasElement.id) {
     autoCanvasID += 1;
-    element.id = `pag-webgpu-canvas-${autoCanvasID}`;
+    canvasElement.id = `pag-webgpu-canvas-${autoCanvasID}`;
   }
-  return `#${element.id}`;
+  return `#${canvasElement.id}`;
 };
 
 @destroyVerify
@@ -113,6 +110,9 @@ export class PAGView {
     if (isWebGPUBackend()) {
       // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
       // Width and height are read from the canvas by the C++ side.
+      if (isOffscreenCanvas(canvasElement)) {
+        return PAGSurface.fromCanvas(canvasElement);
+      }
       return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement));
     }
     if (!pagGlContext || !pagGlContext.makeCurrent()) throw new Error('Make context current fail!');

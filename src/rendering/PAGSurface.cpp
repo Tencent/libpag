@@ -343,8 +343,12 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
         // and logging it would fire on every frame.
         break;
-      case tgfx::Backend::Vulkan:
       case tgfx::Backend::WebGPU:
+        // WebGPU has no cross-queue synchronization objects (WebGPUSyncInfo is empty); the
+        // queue's submission order already provides the ordering a semaphore would express,
+        // so there is nothing to forward.
+        break;
+      case tgfx::Backend::Vulkan:
       case tgfx::Backend::D3D12:
         LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
         break;
