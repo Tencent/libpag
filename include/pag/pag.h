@@ -1355,6 +1355,8 @@ class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
   friend class FileReporter;
 
   friend class PAGSurfaceExt;
+
+  friend class PAGSurfaceReadback;
 };
 
 class FileReporter;
