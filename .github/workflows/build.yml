@@ -62,8 +62,8 @@ jobs:
 
   mac_metal:
     # Compile-only verification of the Metal backend on macOS. Building PAGFullTest covers all
-    # test modules on top of the library itself. Running the Metal tests (PAGFullTest_Metal)
-    # requires the per-backend test infrastructure, which lands in a follow-up PR.
+    # test modules on top of the library itself. Executing baseline-independent Metal behavior
+    # tests in CI and adding backend-specific screenshot baselines are deferred to a follow-up PR.
     runs-on: macos-14
     steps:
       - name: Check Out Repo

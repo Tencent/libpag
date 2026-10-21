@@ -42,6 +42,9 @@ PAGWindow {
     // Minimum window height while the side edit panel is open, so the panel stays usable.
     property int minWindowHeightWithEditPanel: 650
 
+    // Minimum top offset so the custom title bar stays below the macOS menu bar.
+    readonly property int menuBarInset: 50
+
     property var contentView: mainForm.contentView
     property var connectedContentView: null
 
@@ -173,7 +176,7 @@ PAGWindow {
         let width = geometry.width;
         let height = geometry.height;
         let x = Math.max(0, oldX - ((width - oldWidth) / 2));
-        let y = Math.max(50, oldY - ((height - oldHeight) / 2));
+        let y = Math.max(menuBarInset, oldY - ((height - oldHeight) / 2));
         settings.lastX = x;
         settings.lastY = y;
         viewWindow.x = x;
@@ -482,27 +485,68 @@ PAGWindow {
         settings.isEditPanelOpen = willOpen;
         mainForm.isEditPanelOpen = willOpen;
 
-        let preferredSize = contentView ? contentView.viewModel.preferredSize : Qt.size(0, 0);
-        if (viewWindow.visibility === Window.FullScreen) {
-            // Full screen: the window size is fixed, so only reserve horizontal room for the
-            // panel instead of resizing the window.
+        if (viewWindow.visibility === Window.FullScreen || viewWindow.visibility === Window.Maximized) {
+            // Full screen and maximized: the window size is fixed, so only reserve horizontal
+            // room for the panel by shrinking the canvas instead of resizing the window.
+            // Assigning width/height here would also drop the window out of the maximized
+            // state, which the user cannot restore by an ordinary drag.
             applyFullScreenCanvas(willOpen);
             return;
         }
-        // Recompute the whole window geometry so that both dimensions stay consistent with the
-        // file aspect ratio. Opening or closing the panel goes through the same path, which
-        // avoids the letterboxing that a linear width add/subtract reintroduced on close.
-        let geometry = computeWindowGeometry(preferredSize, willOpen);
+        // Keep the canvas exactly as the user left it: the window width changes by the panel
+        // width and the height is untouched, so toggling never resizes the visible content.
+        // Manual resizes between toggles are respected as-is, including any letterboxing the
+        // user chose; only the desktop bounds and the window minimums may still adjust it.
+        // (Re-deriving a dimension from the file ratio here would resize the canvas after the
+        // user manually dragged the window, which reads as the canvas moving on its own.)
+        let panelWidth = panelReservedWidth(willOpen);
+        let winW = mainForm.centerItem.width + panelWidth + windowPadding;
+        let winH = viewWindow.height;
+        let availW = Screen.desktopAvailableWidth;
+        let availH = Screen.desktopAvailableHeight;
+        if (winW > availW) {
+            winW = availW;
+        }
+        if (winH > availH) {
+            winH = availH;
+        }
+        // The width floor keeps the SplitView's own minimums (canvas floor + panel) so the panel
+        // is never squeezed below minPanelWidth; the height floor keeps the panel usable. Both
+        // reuse the same helpers as the load path (clampWindowGeometry) so the two paths agree on
+        // the minimum window width for a given panel state.
+        let minWinW = canvasFloorWidth() + panelWidth + windowPadding;
+        if (winW < minWinW) {
+            winW = Math.min(minWinW, availW);
+        }
+        let minWinH = willOpen ? Math.max(viewWindow.minimumHeight, minWindowHeightWithEditPanel)
+            : viewWindow.minimumHeight;
+        if (winH < minWinH) {
+            winH = Math.min(minWinH, availH);
+        }
+        let geometry = {"width": Math.round(winW), "height": Math.round(winH)};
+        // The window is top-left anchored, so growing it extends right/down past the desktop
+        // edge when the user parked the window near the right or bottom. Shift it back just
+        // enough to stay fully visible; the size is already bounded to the desktop above, so
+        // maxX/maxY are never negative. The load path recenters the window
+        // (onContentViewFilePathChanged); the panel toggle only clamps.
+        let maxX = Screen.desktopAvailableWidth - geometry.width;
+        if (viewWindow.x > maxX) {
+            viewWindow.x = maxX;
+        }
+        let maxY = Screen.desktopAvailableHeight - geometry.height;
+        if (viewWindow.y > maxY) {
+            // Keep the custom title bar below the macOS menu bar, matching the load path.
+            viewWindow.y = Math.max(maxY, menuBarInset);
+        }
         viewWindow.width = geometry.width;
         viewWindow.height = geometry.height;
     }
 
-    // In full screen the window size is fixed and cannot be resized, so this only reserves
-    // horizontal room for the side panel by shrinking centerItem.width; the content view keeps
+    // In full screen or maximized the window size is fixed, so this only reserves horizontal
+    // room for the side panel by shrinking centerItem.width; the content view keeps
     // aspect-fit rendering within whatever area is left.
     function applyFullScreenCanvas(panelOpen) {
-        let panelWidth = panelOpen ? Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth)
-            + mainForm.splitHandleWidth : 0;
+        let panelWidth = panelReservedWidth(panelOpen);
         mainForm.centerItem.width = viewWindow.width - panelWidth;
     }
 
@@ -517,6 +561,22 @@ PAGWindow {
         mainForm.contentViewLoader.item.y = 0;
     }
 
+    // Horizontal room reserved for the side panel (plus its split handle), or 0 when closed.
+    // Uses the panel's actual width so a user-widened panel is preserved; falls back to
+    // minPanelWidth before the panel has been laid out (rightItemLoader.width still 0). Shared by
+    // the load path, the panel toggle, and the full-screen/maximized canvas shrink.
+    function panelReservedWidth(panelOpen) {
+        return panelOpen ? Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth)
+            + mainForm.splitHandleWidth : 0;
+    }
+
+    // Minimum canvas width, covering both the window minimum and the SplitView's own minimum
+    // player width. Shared by the load path and the panel toggle so both derive the same window
+    // minimum width for a given panel state.
+    function canvasFloorWidth() {
+        return Math.max(viewWindow.minimumWidth - windowPadding, mainForm.minPlayerWidth);
+    }
+
     // Computes the window {width, height} that fits a canvas of the file aspect ratio.
     //
     // The width direction previously had no upper bound: reverse-deriving the width from the
@@ -526,31 +586,39 @@ PAGWindow {
     // blowing up the width, and vice versa, so the canvas always matches the file ratio without
     // letterboxing.
     function computeWindowGeometry(preferredSize, panelOpen) {
-        let availW = Screen.desktopAvailableWidth;
-        let availH = Screen.desktopAvailableHeight;
-        let panelWidth = panelOpen ? Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth)
-            + mainForm.splitHandleWidth : 0;
-
         if (!(preferredSize.width > 0) || !(preferredSize.height > 0)) {
             // preferredSize can be {0,0} before the file is loaded or the window has no screen
             // yet; avoid dividing by zero and just fall back to the minimum plus the panel.
+            let panelWidth = panelReservedWidth(panelOpen);
             let fallbackW = viewWindow.minimumWidth + panelWidth;
             let fallbackH = panelOpen ? Math.max(viewWindow.minimumHeight, minWindowHeightWithEditPanel)
                 : viewWindow.minimumHeight;
             return {
-                "width": Math.round(Math.min(fallbackW, availW)),
-                "height": Math.round(Math.min(fallbackH, availH))
+                "width": Math.round(Math.min(fallbackW, Screen.desktopAvailableWidth)),
+                "height": Math.round(Math.min(fallbackH, Screen.desktopAvailableHeight))
             };
         }
 
         let ratio = preferredSize.width / preferredSize.height;
-
         // Start from the file height (or the panel minimum height) and derive the width.
         let canvasHeight = preferredSize.height;
         if (panelOpen) {
             canvasHeight = Math.max(canvasHeight, minWindowHeightWithEditPanel - chromeHeight);
         }
         let canvasWidth = canvasHeight * ratio;
+        return clampWindowGeometry(canvasWidth, canvasHeight, ratio, panelOpen);
+    }
+
+    // Applies screen bounds and window minimums to a seed canvas already sized at the file
+    // aspect ratio, reverse-deriving the paired dimension whenever a bound binds so the ratio
+    // survives every clamp. Only the load path (computeWindowGeometry) calls this; the panel
+    // toggle keeps the canvas fixed rather than reseeding from the ratio, so it has its own
+    // inline clamp that shares the panelReservedWidth()/canvasFloorWidth() helpers to agree on
+    // the minimum window width for a given panel state.
+    function clampWindowGeometry(canvasWidth, canvasHeight, ratio, panelOpen) {
+        let availW = Screen.desktopAvailableWidth;
+        let availH = Screen.desktopAvailableHeight;
+        let panelWidth = panelReservedWidth(panelOpen);
 
         let winW = canvasWidth + panelWidth + windowPadding;
         let winH = canvasHeight + chromeHeight + contentHeightPadding;
@@ -575,8 +643,15 @@ PAGWindow {
         // height is still bounded by the screen: when the minimum width and the screen height
         // cannot both hold at the file ratio, we accept the screen bound (some letterboxing)
         // rather than let the window run off-screen.
-        if (winW < viewWindow.minimumWidth) {
-            winW = viewWindow.minimumWidth;
+        //
+        // The canvas floor stays identical whether the panel is open (the floor grows by the
+        // panel width) or closed, so toggling never narrows the canvas; it also covers the
+        // SplitView's own minimums (minPlayerWidth + splitHandleWidth + minPanelWidth), so the
+        // panel can never be squeezed below minPanelWidth.
+        let canvasFloor = canvasFloorWidth();
+        let minWinWidth = canvasFloor + panelWidth + windowPadding;
+        if (winW < minWinWidth) {
+            winW = Math.min(minWinWidth, availW);
             canvasWidth = winW - panelWidth - windowPadding;
             canvasHeight = canvasWidth / ratio;
             winH = canvasHeight + chromeHeight + contentHeightPadding;
@@ -584,9 +659,12 @@ PAGWindow {
         }
         // Minimum height clamp: reverse-derive the width for the same reason, and likewise bound
         // the reverse-derived width by the screen so the window never exceeds it (dropping the
-        // ratio only when the minimum height and the screen width cannot both hold).
-        if (winH < viewWindow.minimumHeight) {
-            winH = viewWindow.minimumHeight;
+        // ratio only when the minimum height and the screen width cannot both hold). While the
+        // panel is open, the height floor also keeps the panel usable.
+        let minWinHeight = panelOpen ? Math.max(viewWindow.minimumHeight, minWindowHeightWithEditPanel)
+            : viewWindow.minimumHeight;
+        if (winH < minWinHeight) {
+            winH = minWinHeight;
             canvasHeight = winH - chromeHeight - contentHeightPadding;
             canvasWidth = canvasHeight * ratio;
             winW = canvasWidth + panelWidth + windowPadding;

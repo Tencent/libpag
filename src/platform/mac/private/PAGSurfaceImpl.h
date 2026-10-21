@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #import <AppKit/AppKit.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
@@ -24,9 +26,8 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-// Backend-specific factory categories live in opengl/ and metal/ next to this file. They are
-// compiled per backend through their own TGFX_USE_* guards; only the backend-agnostic surface
-// entry points stay in this class interface.
+// Backend factory declarations live in the opengl/ and metal/ category headers. The selected
+// category implementation shares PAGSurfaceImpl.mm with the class for ordinary static linking.
 @interface PAGSurfaceImpl : NSObject
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;

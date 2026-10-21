@@ -20,6 +20,14 @@
 #import "platform/mac/private/PAGSurface+Internal.h"
 #import "platform/mac/private/PAGSurfaceImpl.h"
 
+#if defined(TGFX_USE_OPENGL)
+#import "PAGSurface+OpenGL.h"
+#import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
+#elif defined(TGFX_USE_METAL)
+#import "PAGSurface+Metal.h"
+#import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
+#endif
+
 @implementation PAGSurface {
 }
 
@@ -71,3 +79,34 @@
 }
 
 @end
+
+// Keep category implementations with the class so static linking loads their methods without -ObjC.
+#if defined(TGFX_USE_OPENGL)
+@implementation PAGSurface (OpenGL)
+
++ (PAGSurface*)FromView:(NSView*)view {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromView:view];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
+@end
+#elif defined(TGFX_USE_METAL)
+@implementation PAGSurface (Metal)
+
++ (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
+@end
+#endif

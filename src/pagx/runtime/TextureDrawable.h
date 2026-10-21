@@ -42,17 +42,12 @@ class TextureDrawable : public Drawable {
     return _texture.height();
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() override {
-    return _device;
-  }
-
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
   TextureDrawable(std::shared_ptr<tgfx::Device> device, const tgfx::BackendTexture& texture,
                   tgfx::ImageOrigin origin);
 
-  std::shared_ptr<tgfx::Device> _device = nullptr;
   tgfx::BackendTexture _texture = {};
   tgfx::ImageOrigin _origin = tgfx::ImageOrigin::TopLeft;
 };

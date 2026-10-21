@@ -35,6 +35,13 @@ bool Devices::SupportsBackend(tgfx::Backend backend) {
   return backend == tgfx::Backend::WebGPU;
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void*) {
+  // WebGPU has no share-group concept keyed by an opaque context handle: all rendering on Web
+  // goes through the single GPUDevice preinitialized on the JS side, so the caller's GL-shaped
+  // handle carries no usable information here. Fall back to the default device.
+  return MakeDefault();
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   // WebGPU has no per-thread context to derive. Note that tgfx restricts device creation to
   // the main runtime thread, and the wasm bindings do not expose PAGDecoder (the only caller
@@ -56,14 +63,14 @@ Devices::AdoptedDevice Devices::AdoptCurrent() {
 }
 
 std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture&) {
-  // WGPUTexture does not expose its owning device. Returning nullptr lets PAGSurfaceFactory
-  // fall back to MakeDefault(), which is correct for the single-device model on Web.
-  return nullptr;
+  // WGPUTexture does not expose its owning device, but Web runs on a single shared GPUDevice,
+  // so the default device is always the one that created the caller's texture.
+  return MakeDefault();
 }
 
 std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendRenderTarget&) {
   // Same reasoning as the BackendTexture overload above.
-  return nullptr;
+  return MakeDefault();
 }
 
 std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(const tgfx::BackendTexture&) {

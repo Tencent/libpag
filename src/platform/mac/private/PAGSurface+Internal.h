@@ -21,11 +21,9 @@
 
 @class PAGSurfaceImpl;
 
-// The class extension is declared here (instead of inside PAGSurface.m) so the backend category
-// implementations in PAGSurface+OpenGL.m / PAGSurface+Metal.m can assign the backing property.
-// Keep this header free of C++ includes: it is imported from pure-Objective-C (.m) translation
-// units. The pag::PAGSurface plumbing stays in .mm files through PAGSurfaceImpl+Internal.h or
-// local extensions (the same pattern PAGPlayerImpl.mm uses).
+// Shares the backing implementation with the Cocoa bridge without exposing it in public headers.
+// Keep this header free of C++ includes because PAGSurface.m is pure Objective-C; C++ accessors
+// are declared separately in PAGSurfaceImpl+Internal.h.
 @interface PAGSurface ()
 
 @property(nonatomic, strong) PAGSurfaceImpl* surface;

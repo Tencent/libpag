@@ -294,19 +294,21 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
   // Dispatch on the pag-side backend tag so the returned tgfx::BackendSemaphore carries the
   // right variant. Non-initialized semaphores return a default-constructed tgfx one, which is
-  // a no-op at the tgfx layer. Vulkan / D3D12 / WebGPU sync ABI extensions are deferred to
-  // the specific backend PRs that introduce user-facing sync APIs.
+  // a no-op at the tgfx layer. Only OpenGL semaphores are exposed by libpag; other backends
+  // return an empty semaphore.
   if (!semaphore.isInitialized()) {
     return {};
   }
-  if (auto glSync = semaphore.glSync()) {
-    tgfx::GLSyncInfo syncInfo = {glSync};
-    return tgfx::BackendSemaphore(syncInfo);
-  }
-  MtlEventInfo mtlInfo = {};
-  if (semaphore.getMtlEventInfo(&mtlInfo)) {
-    tgfx::MetalSyncInfo syncInfo = {mtlInfo.event, mtlInfo.value};
-    return tgfx::BackendSemaphore(syncInfo);
+  switch (semaphore.backend()) {
+    case Backend::OPENGL: {
+      tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
+      return tgfx::BackendSemaphore(syncInfo);
+    }
+    case Backend::METAL:
+    case Backend::VULKAN:
+    case Backend::WEBGPU:
+    case Backend::MOCK:
+      return {};
   }
   return {};
 }

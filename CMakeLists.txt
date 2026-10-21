@@ -4,8 +4,10 @@ cmake_minimum_required(VERSION 3.13)
 # configuring the project and derives both the deployment target and the compiler target triple
 # from it. Apple toolchains reject iOS deployment targets below 15.0 (Xcode 26/27 SDKs), and
 # the tgfx Metal backend has its own >= 13.0 floor that 15.0 satisfies, so Metal builds must
-# pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
-# default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
+# pre-set the minimum before configuration — otherwise the toolchain's own iOS default flows into
+# tgfx and trips those checks. Raising it here is what lets `gen_ios -DPAG_USE_METAL=ON` work
+# without extra flags (as documented in ios/README.md). This only applies to iOS builds; macOS
+# keeps its own default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
 if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
     set(DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum iOS deployment target" FORCE)
 endif ()
@@ -137,12 +139,9 @@ if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-# The Metal backend requires iOS 13+ (see the tgfx deployment-target check) and supports the iOS
-# simulator on arm64 only. Raise the deployment target automatically when Metal is selected so
-# `gen_ios -DPAG_USE_METAL=ON` needs no extra flags (as documented in ios/README.md). Without this
-# the toolchain's iOS default (9.0) flows into tgfx and trips its >= 13.0 check. Must run before
-# tgfx is added via add_subdirectory(). Metal also only exists on Apple platforms — reject it
-# elsewhere up front instead of failing later with a pile of undefined symbols.
+# Metal only exists on Apple platforms — reject it elsewhere up front instead of failing later
+# with a pile of undefined symbols. The matching iOS deployment-target bump lives at the top of
+# this file, because the toolchain reads DEPLOYMENT_TARGET before project() runs.
 if (PAG_USE_METAL AND NOT APPLE)
     message(FATAL_ERROR "PAG_USE_METAL is only supported on Apple platforms.")
 endif ()
@@ -528,12 +527,11 @@ function(find_include_dirs out)
     set(${out} ${include_dirs} PARENT_SCOPE)
 endfunction()
 
-# Apple platform files are organized per GPU backend, mirroring tgfx's src/gpu/opengl and
-# src/gpu/metal layout: backend implementations live under private/opengl/ and private/metal/,
-# and the public PAGSurface factories live in the PAGSurface+OpenGL / PAGSurface+Metal
-# categories. Only the built backend's files are compiled and exported. Both categories declare
-# the same ObjC selector (FromLayer:), and framework consumers have no TGFX_USE_* build macros,
-# so the selection has to happen here at configuration time rather than in the public headers.
+# Apple drawable implementations and surface category headers are selected per GPU backend.
+# Surface category implementations share a translation unit with their class so ordinary static
+# linking retains them without -ObjC. Both public categories declare the same ObjC selector
+# (FromLayer:), and framework consumers have no TGFX_USE_* build macros, so only the selected
+# backend's category header is exported.
 if (APPLE)
     if (PAG_USE_METAL)
         set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
@@ -541,6 +539,13 @@ if (APPLE)
     else ()
         set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+OpenGL.h")
         set(PAG_APPLE_EXCLUDED_BACKEND_REGEX "(/private/metal(/|$)|PAGSurface\\+Metal\\.)")
+    endif ()
+    if (USE_NATIVE_PLATFORM)
+        configure_file(src/platform/cocoa/PAGSurfaceBackend.h.in
+                ${CMAKE_CURRENT_BINARY_DIR}/generated/PAGSurfaceBackend.h @ONLY)
+        list(APPEND PAG_FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/PAGSurfaceBackend.h)
+        list(APPEND PAG_PLATFORM_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/generated/PAGSurfaceBackend.h)
+        list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_BINARY_DIR}/generated)
     endif ()
 endif ()
 
@@ -589,7 +594,7 @@ elseif (IOS)
         # target source as well, otherwise CMake does not copy it into the framework Headers.
         configure_file(src/platform/ios/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h @ONLY)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
-        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|libpag\\.h\\.in$")
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|\\.h\\.in$")
         list(APPEND PLATFORM_FILES ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
@@ -640,7 +645,7 @@ elseif (MACOS)
         # target source as well, otherwise CMake does not copy it into the framework Headers.
         configure_file(src/platform/mac/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h @ONLY)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
-        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|libpag\\.h\\.in$")
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|\\.h\\.in$")
         list(APPEND PLATFORM_FILES ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
@@ -993,8 +998,10 @@ if (PAG_BUILD_FRAMEWORK)
     set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
     if (IOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/ios/libpag.modulemap)
+        set(PAG_PRIVACY_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/ios/PrivacyInfo.xcprivacy)
     elseif (MACOS)
         set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mac/libpag.modulemap)
+        set(PAG_PRIVACY_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/mac/PrivacyInfo.xcprivacy)
     endif ()
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
     if (HasParent)
@@ -1013,6 +1020,8 @@ if (PAG_BUILD_FRAMEWORK)
     foreach (header ${PAG_PLATFORM_HEADERS})
         set_source_files_properties(${header} PROPERTIES MACOSX_PACKAGE_LOCATION "Headers")
     endforeach ()
+    set_source_files_properties(${PAG_PRIVACY_MANIFEST} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(pag PRIVATE ${PAG_PRIVACY_MANIFEST})
     if (NOT CMAKE_GENERATOR MATCHES "Xcode")
         if (MACOS)
             add_custom_command(TARGET pag POST_BUILD
@@ -1020,13 +1029,16 @@ if (PAG_BUILD_FRAMEWORK)
                     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
                     COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
-                    COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Resources"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${PAG_PRIVACY_MANIFEST}" "$<TARGET_FILE_DIR:pag>/Resources/PrivacyInfo.xcprivacy"
+                    COMMENT "Copying modulemap and privacy manifest into framework/Versions/A/"
             )
         else ()
             add_custom_command(TARGET pag POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
-                    COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${PAG_PRIVACY_MANIFEST}" "$<TARGET_FILE_DIR:pag>/PrivacyInfo.xcprivacy"
+                    COMMENT "Copying modulemap and privacy manifest into framework root"
             )
         endif ()
     endif ()
@@ -1132,6 +1144,15 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(MetalSurface|CocoaSurface(Header)?)Test\\.mm$")
+    else ()
+        set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        if (NOT PAG_USE_METAL)
+            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetalSurfaceTest\\.mm$")
+        endif ()
+    endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
     # Build minizip's reader into test binaries only, so archive-producing tests
@@ -1185,7 +1206,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(UpdateBaseline PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
@@ -1193,7 +1213,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
     target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGUnitTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
 
     add_executable(PAGFullTest ${PAG_TEST_FILES})
@@ -1201,7 +1220,6 @@ if (PAG_BUILD_TESTS)
     target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
     target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
 
 endif ()

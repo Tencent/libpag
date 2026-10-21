@@ -16,30 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGSurface+Metal.h"
-#import "platform/ios/private/PAGSurface+Internal.h"
-#import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
+#pragma once
 
-@implementation PAGSurface (Metal)
-
-+ (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:metalLayer];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:device];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
-@end
+#import "@PAG_SURFACE_BACKEND_HEADER@"

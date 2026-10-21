@@ -56,11 +56,12 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
  * Creates a PAGSurface wrapping an existing tgfx::Surface, sharing ownership. Use this when the
  * host already has a tgfx::Surface and wants to render a PAGScene into it via Record() without
  * creating a separate render target.
- * @param device the tgfx::Device the surface was created from. The device is required because a
- *               tgfx::Surface does not carry its owning device back-reference, and rendering
- *               must lock that exact device.
+ * @param device shared ownership of the exact tgfx::Device the surface was created from. The
+ *               surface exposes only a raw device pointer through getContext()->device(), so
+ *               the caller must supply a shared_ptr that keeps that device alive.
  * @param surface the tgfx::Surface to wrap.
- * @return a PAGSurface sharing ownership, or nullptr if device or surface is null.
+ * @return a PAGSurface sharing ownership of device and surface, or nullptr if either is null
+ *         or the surface does not belong to the supplied device.
  */
 std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Device>& device,
                                      const std::shared_ptr<tgfx::Surface>& surface);

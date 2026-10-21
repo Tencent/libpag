@@ -128,6 +128,38 @@ class Devices {
   static bool SupportsBackend(tgfx::Backend backend);
 
   /**
+   * Creates a device that shares GPU resources with a caller-owned native context handle.
+   *   OpenGL: GLDevice::Make(sharedContext) - the handle is a native GL context, so the new
+   *           device joins its share group and both sides can see each other's textures. A null
+   *           handle yields an independent device.
+   *   Other backends: Equivalent to MakeDefault(); they have no share-group notion tied to an
+   *           opaque context handle, so the parameter is unused but kept for signature parity.
+   * Used by pag_surface_make_offscreen_double_buffered(), whose sharedContext parameter predates
+   * the multi-backend split and stays GL-shaped in the public C API.
+   */
+  static std::shared_ptr<tgfx::Device> MakeForSharedContext(void* sharedContext);
+
+  /**
+   * Validates a caller-owned GPU texture and resolves the device libpag must render it with.
+   * Returns an empty AdoptedDevice when the description is invalid or carries the tag of a
+   * backend this build was not compiled with; both cases are logged, so resource factories only
+   * have to map a null device onto a null resource instead of returning an object that can never
+   * be drawn. Otherwise the device is resolved as:
+   *   forAsyncThread == true:  MakeForAsyncThread(texture), falling back to MakeDefault().
+   *   forAsyncThread == false: AdoptCurrent() — which sets externalContext on the backends that
+   *                            have a thread-local current context — falling back to
+   *                            MakeForTexture(texture) on the ones that do not.
+   */
+  static AdoptedDevice ResolveForExternalResource(const tgfx::BackendTexture& texture,
+                                                  bool forAsyncThread);
+
+  /**
+   * Same as ResolveForExternalResource(BackendTexture, bool) for a caller-owned render target.
+   * Render targets are never resolved for an async worker, so there is no forAsyncThread variant.
+   */
+  static AdoptedDevice ResolveForExternalResource(const tgfx::BackendRenderTarget& renderTarget);
+
+  /**
    * Adopts the host thread's "current" GPU context as a rendering device. Only meaningful on the
    * OpenGL backend, where {GLDevice::Current(), externalContext=true} is returned so the caller
    * keeps ownership of the GL context and libpag guards its global state. Other backends return
@@ -144,11 +176,13 @@ class Devices {
    *                texture's creating context is current. The texture parameter is unused on this
    *                backend but kept for signature parity.
    *   Metal:       Reads MTLTexture.device and wraps it via MetalDevice::MakeFrom().
-   *   WebGPU:      Returns nullptr; WGPUTexture carries no device back-reference, and Web runs
-   *                on a single shared GPUDevice, so callers fall back to MakeDefault().
+   *   WebGPU:      Returns MakeDefault(); WGPUTexture carries no device back-reference, but Web
+   *                runs on a single shared GPUDevice, so the default device is always the one
+   *                that created the caller's texture.
    *   Vulkan / D3D12: Not implemented yet — selecting those backends fails at compile
    *                time (see Devices_Backend.cpp). Their texture types do not carry a device
-   *                back-reference either.
+   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
+   *                first of them lands.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -157,7 +191,7 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; WebGPU returns nullptr and lets the caller fall back to MakeDefault(); Vulkan /
+   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; Vulkan /
    * D3D12 are not implemented yet (see Devices_Backend.cpp).
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
@@ -217,40 +251,28 @@ class Devices {
 };
 
 /**
- * Reentrancy-safe RAII lock over the default device.
- *
- * tgfx::Device::lockContext() uses a non-recursive mutex and only documents cross-thread
- * blocking; locking the same device twice from one thread is undefined and, with the device
- * deduplication introduced by tgfx #1581, deadlocks: MakeDefault() returns the same shared
- * Device instance to every caller on a thread, so a caller that already holds the device lock
- * and calls back into libpag code that fetches the default device (e.g. HTMLExporter::ToData
- * rasterizing gradient fills) re-enters the same mutex.
- *
- * DeviceLockScope removes that hazard for libpag-internal usage: scopes created on a thread
- * that already holds the lock (through an outer DeviceLockScope) reuse the live context and
- * only the outermost scope's destruction unlocks the device. Callers that bypass this class
- * and call tgfx::Device::lockContext() directly still own the reentrancy contract themselves.
+ * RAII boundary lock that keeps a GPU device alive and unlocks it on destruction after a successful
+ * lockContext(). The lock is non-recursive: the calling thread must not already hold the same
+ * device's context lock. Construct and destroy the scope on the same thread, and pass context()
+ * to work performed within the scope instead of acquiring the device lock again.
+ * Callers must release the lock before invoking libpag APIs that manage device locks internally.
  */
 class DeviceLockScope {
  public:
   /**
-   * Locks Devices::MakeDefault(), or reuses the already-locked default device when the calling
-   * thread holds one through an outer DeviceLockScope. Use the bool conversion to check for
-   * failure (device creation or context lock failed); the scope is then empty and inert.
+   * Creates and locks a default device. The scope is empty if device creation or context locking
+   * fails; use the bool conversion to check for success.
    */
   DeviceLockScope();
 
   /**
-   * Locks the given device instead of fetching the default one, so callers that cache a device
-   * (e.g. GPUContext reusing one GL context across many rasterization calls) do not create a new
-   * device per scope. Behaves exactly like the default constructor otherwise, including reusing
-   * the context of an outer DeviceLockScope when the calling thread already holds one.
+   * Locks the given device and retains it for the scope's lifetime. The scope is empty if the
+   * device is null or context locking fails. The calling thread must not already hold its lock.
    */
   explicit DeviceLockScope(std::shared_ptr<tgfx::Device> device);
 
   /**
-   * Releases the device lock, unless the calling thread still holds an outer DeviceLockScope
-   * (the lock is released when the outermost scope is destroyed).
+   * Releases the device lock if this scope acquired it successfully.
    */
   ~DeviceLockScope();
 
@@ -272,7 +294,6 @@ class DeviceLockScope {
   }
 
  private:
-  bool _ownsLock = false;
   tgfx::Context* _context = nullptr;
   std::shared_ptr<tgfx::Device> _device = {};
 };

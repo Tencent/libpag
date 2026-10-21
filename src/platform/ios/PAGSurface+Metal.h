@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #import <QuartzCore/QuartzCore.h>
 #import "PAGSurface.h"
-
-@protocol MTLDevice;
 
 PAG_API @interface PAGSurface(Metal)
 
@@ -35,15 +35,5 @@ PAG_API @interface PAGSurface(Metal)
  * updateSize on the PAGSurface.
  */
 + (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer;
-
-/**
- * Creates a new PAGSurface from specified CVPixelBuffer and MTLDevice. The MTLDevice is used as
- * the rendering device — the CVPixelBuffer must have been created with kCVPixelBufferMetal-
- * CompatibilityKey set. Multiple PAGSurfaces with the same MTLDevice share the same GPU caches.
- * The caches are not destroyed when resetting a PAGPlayer's surface to another PAGSurface with
- * the same device. Unlike the GL entry points this works in the simulator (Metal hardware
- * buffers are available there).
- */
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
 
 @end

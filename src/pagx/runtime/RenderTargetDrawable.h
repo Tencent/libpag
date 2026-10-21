@@ -41,17 +41,12 @@ class RenderTargetDrawable : public Drawable {
     return _renderTarget.height();
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() override {
-    return _device;
-  }
-
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                        const tgfx::BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
 
-  std::shared_ptr<tgfx::Device> _device = nullptr;
   tgfx::BackendRenderTarget _renderTarget = {};
   tgfx::ImageOrigin _origin = tgfx::ImageOrigin::TopLeft;
 };

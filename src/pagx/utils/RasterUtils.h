@@ -39,8 +39,8 @@ class ImagePattern;
  * Reuse a single instance across multiple render calls to avoid repeated GL context creation
  * (each Devices::MakeDefault() on the GL backend builds a brand-new GL context, which would make
  * per-pattern bakes in SVG/PPT export repeatedly recompile shaders).
- * lockContext()/unlock() pairs may nest: inner pairs reuse the already-locked context through
- * pag::DeviceLockScope instead of re-entering tgfx's non-recursive device mutex.
+ * The context lock is non-recursive: lockContext()/unlock() pairs must not nest, and callers
+ * must not already hold the device's context lock.
  */
 class GPUContext {
  public:

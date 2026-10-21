@@ -16,21 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-// Backend-specific factory categories (PAGSurface+OpenGL.h / PAGSurface+Metal.h) are selected by
-// the libpag build and exported through the framework's umbrella header; only the
-// backend-agnostic surface entry points stay in this class interface.
+// Backend-specific factories are declared in separate category headers. The generated
+// PAGSurfaceBackend.h imports the selected category after this class declaration, so importing
+// PAGSurface.h alone exposes all factories supported by the framework.
 PAG_API @interface PAGSurface : NSObject
 
 /**
- * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
- * by PAGSurface. On the simulator this returns nil when the GL build's EAGL backend has no
- * hardware buffers; Metal builds are not affected.
+ * Creates a new PAGSurface from the specified CVPixelBuffer. The GPU device or context is
+ * resolved internally. Metal builds use the system default MTLDevice and share its GPU caches;
+ * the pixel buffer must be Metal-compatible (set kCVPixelBufferMetalCompatibilityKey to YES when
+ * creating it). Metal builds support this method on arm64 simulators. On the simulator this
+ * returns nil when the GL build's EAGL backend has no hardware buffers.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
@@ -81,21 +85,22 @@ PAG_API @interface PAGSurface : NSObject
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
- * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
- * the PAGSurface will not be captured.
- * Limitation: on a PAGSurface created from a CAMetalLayer this method is unreliable — the
- * underlying tgfx window presents and releases its CAMetalDrawable as part of every flush, so a
- * later readback receives whichever drawable comes off the layer's rotation queue (often blank or
- * stale). Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if you need reliable
- * readback with Metal. The OpenGL backend is not affected.
+ * Returns a CVPixelBuffer object capturing the contents of the PAGSurface, or nil if readback
+ * fails. Subsequent rendering of the PAGSurface will not be captured.
+ * On a PAGSurface created from a CAMetalLayer, readback is rejected if the layer is
+ * framebuffer-only or the frame's drawing batch has already been flushed. A presented window frame
+ * is not retained for later snapshots. Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if
+ * you need reliable readback with Metal.
  */
 - (CVPixelBufferRef)makeSnapshot;
 
 /**
  * Copies the pixels of the PAGSurface to the specified memory address. The format of the copied
- * pixels is in the BGRA color type with the premultiplied alpha type. Returns false if failed.
- * The same CAMetalLayer limitation as makeSnapshot applies.
+ * pixels is in the BGRA color type with the premultiplied alpha type. Returns NO if copying fails,
+ * including when CAMetalLayer readback is rejected as described by makeSnapshot.
  */
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end
+
+#import "PAGSurfaceBackend.h"

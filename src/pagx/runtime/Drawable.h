@@ -42,7 +42,7 @@ class Drawable {
   /**
    * Creates a Drawable that renders into the given tgfx::Surface on the given tgfx::Device. The
    * device must be the one the surface was created from. Both are kept alive for the lifetime of
-   * the Drawable.
+   * the Drawable. Returns nullptr if either is null or the surface belongs to a different device.
    */
   static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Device> device,
                                             std::shared_ptr<tgfx::Surface> surface);
@@ -59,11 +59,8 @@ class Drawable {
   }
 
   virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {
-    // A surface created from a specific context cannot be used with a different one. Without this
-    // guard, a PAGSurface built via pagx::MakeFrom(tgfx::Surface) would silently hand its surface
-    // to whichever context PAGScene::draw() happens to lock, even if that context belongs to a
-    // different device. Callers that need cross-device rendering should use pagx::Record() with
-    // the matching context instead.
+    // A surface wrapped by pagx::MakeFrom(device, surface) must only be used with its original
+    // context, including when pagx::Record() is called with a caller-supplied context.
     if (surface && context != nullptr && surface->getContext() != context) {
       return nullptr;
     }

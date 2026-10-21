@@ -32,6 +32,7 @@
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
+#include <mutex>
 #import "PAGSurface+Metal.h"
 #include "platform/cocoa/private/metal/MetalLayerHelper.h"
 #endif
@@ -49,6 +50,9 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
+#if defined(TGFX_USE_METAL)
+  std::mutex renderLock;
+#endif
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -102,8 +106,15 @@
   [animator cancel];
   [animator release];
   [animatorListenerProxy release];
-  [pagPlayer release];
-  [pagSurface release];
+  {
+#if defined(TGFX_USE_METAL)
+    std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
+    [pagPlayer release];
+    pagPlayer = nil;
+    [pagSurface release];
+    pagSurface = nil;
+  }
   [pagFile release];
   [filePath release];
   [listeners release];
@@ -112,15 +123,31 @@
   [super dealloc];
 }
 
+- (void)refreshSurfaceSize {
+#if defined(TGFX_USE_METAL)
+  // CVDisplayLink updates synchronously on its own thread, not the main thread. Keep the layer
+  // size write and the surface cache invalidation in the same critical section as rendering.
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
+  if (pagSurface == nil) {
+    return;
+  }
+#if defined(TGFX_USE_METAL)
+  [self updateLayerDrawableSize];
+#endif
+  [pagSurface updateSize];
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // Resizing the view's coordinate system directly does not necessarily go through
+  // setFrameSize:, and AppKit does not document which internal paths call which setter. Both
+  // overrides therefore call the same helper, and the size comparison here keeps an
+  // already-applied change from being applied twice.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-#if defined(TGFX_USE_METAL)
-    [self updateLayerDrawableSize];
-#endif
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
     }
@@ -130,14 +157,11 @@
 - (void)setFrameSize:(NSSize)newSize {
   NSSize oldSize = self.bounds.size;
   [super setFrameSize:newSize];
-  // Every size change funnels through setFrameSize:: setFrame: calls it internally, and
-  // autoresizing / Auto Layout drive it directly, so this is the single place to react — handling
-  // the same change in setFrame: as well would run updateSize twice per resize.
+  // setFrame: calls this internally, and autoresizing / Auto Layout drive it directly, so this is
+  // the main entry for frame-driven resizes. Handling the same change in setFrame: as well would
+  // run updateSize twice per resize.
   if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
-#if defined(TGFX_USE_METAL)
-    [self updateLayerDrawableSize];
-#endif
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldSize.width == 0 || oldSize.height == 0) {
       [animator update];
     }
@@ -153,12 +177,9 @@
 - (void)viewDidChangeBackingProperties {
   [super viewDidChangeBackingProperties];
   // Moving the window between displays with different backing scales does not change bounds, so
-  // setBounds:/setFrame: never fire and contentsScale would stay stuck on the old display's
-  // scale (blurry or clipped content).
-  if (pagSurface != nil) {
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
-  }
+  // neither setBounds: nor setFrameSize: fires and contentsScale would stay stuck on the old
+  // display's scale (blurry or clipped content).
+  [self refreshSurfaceSize];
 }
 #endif
 
@@ -189,17 +210,21 @@
 }
 
 - (void)initPAGSurface {
+  {
 #if defined(TGFX_USE_METAL)
-  CAMetalLayer* layer = (CAMetalLayer*)self.layer;
-  pag::cocoa::SetUpPAGMetalLayer(layer);
-  // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
-  [self updateLayerDrawableSize];
-  pagSurface = [[PAGSurface FromLayer:layer] retain];
+    std::lock_guard<std::mutex> autoLock(renderLock);
+    CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+    pag::cocoa::SetUpPAGMetalLayer(layer);
+    // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
+    // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+    [self updateLayerDrawableSize];
+    pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else
-  pagSurface = [[PAGSurface FromView:self] retain];
+    pagSurface = [[PAGSurface FromView:self] retain];
 #endif
-  [pagPlayer setSurface:pagSurface];
+    [pagPlayer setSurface:pagSurface];
+  }
+  // Synchronous updates re-enter onAnimationFlush:, which acquires renderLock.
   [animator update];
 }
 
@@ -253,6 +278,9 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -379,6 +407,9 @@
 }
 
 - (BOOL)flush {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   return [pagPlayer flush];
 }
 

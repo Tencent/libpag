@@ -17,63 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/gpu/Devices.h"
-#include "tgfx/gpu/Context.h"
 
 namespace pag {
-
-namespace {
-// Per-thread record of the context locked by the outermost DeviceLockScope. Inner scopes created
-// on the same thread reuse the recorded context instead of re-entering tgfx's non-recursive
-// device mutex (see the class comment in Devices.h). Only DeviceLockScope maintains this record;
-// raw tgfx::Device::lockContext() callers are outside its protection.
-thread_local tgfx::Context* tlsLockedContext = nullptr;
-thread_local int tlsLockDepth = 0;
-}  // namespace
 
 DeviceLockScope::DeviceLockScope() : DeviceLockScope(Devices::MakeDefault()) {
 }
 
-DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device) {
-  if (tlsLockDepth > 0) {
-    // The calling thread already holds the default device through an outer scope: reuse its
-    // context. The outer scope keeps the device alive, so the raw pointers stay valid. The passed
-    // device is ignored here: callers that cache Devices::MakeDefault() results resolve to the
-    // same deduplicated instance anyway, and honoring the outer scope is what prevents the
-    // same-thread re-entry that a raw tgfx::Device::lockContext() call would cause.
-    tlsLockDepth++;
-    _context = tlsLockedContext;
-    return;
+DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device)
+    : _device(std::move(device)) {
+  if (_device != nullptr) {
+    _context = _device->lockContext();
   }
-  _device = std::move(device);
-  if (!_device) {
-    return;
-  }
-  auto* context = _device->lockContext();
-  if (!context) {
-    _device = nullptr;
-    return;
-  }
-  _ownsLock = true;
-  _context = context;
-  tlsLockedContext = context;
-  tlsLockDepth = 1;
 }
 
 DeviceLockScope::~DeviceLockScope() {
-  if (tlsLockDepth == 0) {
-    // A failed scope (no context acquired) or a scope destroyed after an unbalanced unlock.
-    return;
-  }
-  tlsLockDepth--;
-  if (tlsLockDepth > 0) {
-    // An inner scope: the outermost owner keeps the device locked.
-    return;
-  }
-  if (_ownsLock && _device) {
+  if (_context != nullptr) {
     _device->unlock();
   }
-  tlsLockedContext = nullptr;
-  _context = nullptr;
 }
 
 }  // namespace pag

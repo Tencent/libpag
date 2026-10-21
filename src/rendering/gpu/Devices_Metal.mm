@@ -28,20 +28,32 @@ namespace pag {
 
 namespace {
 
+static id<MTLDevice> GetMTLDevice(const tgfx::MetalTextureInfo& info) {
+  if (info.texture == nullptr) {
+    return nil;
+  }
+  id<MTLTexture> texture = (__bridge id<MTLTexture>)info.texture;
+  return texture.device;
+}
+
 /**
  * ExternalDeviceRef subclass for the Metal backend. Retains the underlying id<MTLDevice> so
  * comparing identity later is safe even after the caller drops its own strong reference.
  * libpag builds without ARC, so ownership is managed manually: retain in the constructor and
- * release in the destructor, which keeps the object alive for the lifetime of the ref.
+ * release in the destructor, which keeps the object alive for the lifetime of the ref. Copying
+ * is disabled because the manual release would then run once per copy on a single retain.
  */
 class MetalExternalDeviceRef : public ExternalDeviceRef {
  public:
   explicit MetalExternalDeviceRef(id<MTLDevice> mtlDevice) : device([mtlDevice retain]) {
   }
 
-  ~MetalExternalDeviceRef() {
+  ~MetalExternalDeviceRef() override {
     [device release];
   }
+
+  MetalExternalDeviceRef(const MetalExternalDeviceRef&) = delete;
+  MetalExternalDeviceRef& operator=(const MetalExternalDeviceRef&) = delete;
 
   id<MTLDevice> device = nil;
 };
@@ -62,6 +74,13 @@ std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   // be handled explicitly by matching MTLDevices at texture construction time — see
   // MakeForTexture below.
   return tgfx::MetalDevice::Make();
+}
+
+std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void*) {
+  // Metal has no share-group concept keyed by an opaque context handle: resource sharing is
+  // decided by the MTLDevice itself. The caller's GL-shaped handle carries no usable information
+  // here, so fall back to the default device.
+  return MakeDefault();
 }
 
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread(const tgfx::BackendTexture& texture) {
@@ -88,11 +107,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture
   // — MetalDevice::MakeFrom() will wrap the same id<MTLDevice> and return a Device that talks to
   // the same MTLCommandQueue family.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!texture.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!texture.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }
@@ -106,11 +124,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
   // Same reasoning as the BackendTexture overload — Metal render targets are just MTLTextures
   // under the hood, so ask the texture for its device.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!renderTarget.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!renderTarget.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }
@@ -123,11 +140,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(
   // MetalExternalDeviceRef keeps the identity valid for the render-time comparison even after the
   // caller drops its own reference to the texture.
   tgfx::MetalTextureInfo mtlInfo = {};
-  if (!texture.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+  if (!texture.getMetalTextureInfo(&mtlInfo)) {
     return nullptr;
   }
-  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
-  id<MTLDevice> mtlDevice = mtlTexture.device;
+  auto mtlDevice = GetMTLDevice(mtlInfo);
   if (mtlDevice == nil) {
     return nullptr;
   }

@@ -124,9 +124,6 @@ std::shared_ptr<tgfx::Data> RenderTileToPng(PAGXDocument* doc, int cssWidth, int
   }
   doc->applyLayout();
 
-  // Reentrancy-safe lock: when the caller already holds the default device (e.g. a test fixture
-  // or host app that locked it before calling HTMLExporter::ToData), the scope reuses that
-  // context instead of re-entering tgfx's non-recursive device mutex and deadlocking.
   pag::DeviceLockScope deviceLock;
   if (!deviceLock) {
     return nullptr;

@@ -128,46 +128,34 @@
 #endif
 }
 
+- (void)refreshSurfaceSize {
+  if (pagSurface == nil) {
+    return;
+  }
+#if defined(TGFX_USE_METAL)
+  // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
+  // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
+  // The GL backend serializes updateSize against flush through the device lock already and
+  // has no drawableSize, so the lock is Metal-only.
+  std::lock_guard<std::mutex> autoLock(lock);
+#endif
+  [self updateLayerDrawableSize];
+  [pagSurface updateSize];
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // UIView updates its bounds from within setFrame:, so frame, autoresizing and Auto Layout
+  // driven resizes all land here. Overriding setFrame: as well would run the whole update — and
+  // take the lock — twice for a single resize.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
     bool fromZero = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
-    {
-#if defined(TGFX_USE_METAL)
-      // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
-      // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
-      // The GL backend serializes updateSize against flush through the device lock already and
-      // has no drawableSize, so the lock is Metal-only.
-      std::lock_guard<std::mutex> autoLock(lock);
-#endif
-      [self updateLayerDrawableSize];
-      [pagSurface updateSize];
-    }
-    // [animator update] must stay outside the lock: in sync mode it re-enters onAnimationFlush:
-    // on the same thread, which lock_guards the same non-recursive mutex and would deadlock.
-    if (fromZero) {
-      [animator update];
-    }
-  }
-}
-
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    bool fromZero = (oldRect.size.width == 0 || oldRect.size.height == 0);
-    {
-#if defined(TGFX_USE_METAL)
-      // Same locking rationale as setBounds:.
-      std::lock_guard<std::mutex> autoLock(lock);
-#endif
-      [self updateLayerDrawableSize];
-      [pagSurface updateSize];
-    }
-    // Same deadlock rationale as setBounds: keep this call outside the lock.
+    [self refreshSurfaceSize];
+    // [animator update] must stay outside the lock refreshSurfaceSize takes: in sync mode it
+    // re-enters onAnimationFlush: on the same thread, which lock_guards the same non-recursive
+    // mutex and would deadlock.
     if (fromZero) {
       [animator update];
     }
@@ -177,18 +165,30 @@
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
-  if (pagSurface != nil && oldScaleFactor != scaleFactor) {
-#if defined(TGFX_USE_METAL)
-    // Same locking rationale as setBounds:.
-    std::lock_guard<std::mutex> autoLock(lock);
-#endif
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
+  if (oldScaleFactor != scaleFactor) {
+    [self refreshSurfaceSize];
   }
 }
 
 - (void)didMoveToWindow {
   [super didMoveToWindow];
+#if defined(TGFX_USE_METAL)
+  if (self.window != nil) {
+    std::lock_guard<std::mutex> autoLock(lock);
+    if (pagSurface != nil) {
+      auto size = self.bounds.size;
+      auto scale = self.contentScaleFactor;
+      auto drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+      auto layer = (CAMetalLayer*)self.layer;
+      // Window moves can change the scale without calling setContentScaleFactor:, but reattaching
+      // at the same size must not discard the rendering caches.
+      if (!CGSizeEqualToSize(layer.drawableSize, drawableSize)) {
+        [self updateLayerDrawableSize];
+        [pagSurface updateSize];
+      }
+    }
+  }
+#endif
   [self checkVisible];
 }
 
@@ -223,7 +223,9 @@
   CAMetalLayer* layer = (CAMetalLayer*)[self layer];
   pag::cocoa::SetUpPAGMetalLayer(layer);
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible. This has
+  // to happen before FromLayer: below, so refreshSurfaceSize() cannot be reused — it bails out
+  // while pagSurface is still nil.
   [self updateLayerDrawableSize];
   pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else
