@@ -21,7 +21,24 @@
 #include <emscripten/html5.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include "pagx/PAGComposition.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -114,6 +131,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   defaultAnimation = nullptr;
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
+  fallbackClockUs = 0;
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -121,11 +139,400 @@ void PAGXView::parsePAGX(const val& pagxData) {
   document = PAGXImporter::FromXML(data->bytes(), data->size());
 }
 
+static int ParseDiagnosticLine(const std::string& error) {
+  constexpr char LinePrefix[] = "line ";
+  if (error.rfind(LinePrefix, 0) != 0) {
+    return 1;
+  }
+  auto cursor = error.data() + sizeof(LinePrefix) - 1;
+  auto line = std::strtol(cursor, nullptr, 10);
+  return line > 0 ? static_cast<int>(line) : 1;
+}
+
+static std::string ParseDiagnosticMessage(const std::string& error) {
+  auto separator = error.find(": ");
+  return separator == std::string::npos ? error : error.substr(separator + 2);
+}
+
+emscripten::val PAGXView::validatePAGX(const val& pagxData) const {
+  auto diagnostics = val::array();
+  auto data = GetPagxDataFromEmscripten(pagxData);
+  if (!data) {
+    return diagnostics;
+  }
+  auto validationDocument = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (!validationDocument) {
+    // XML well-formedness is diagnosed by the browser-side DOMParser. Reaching here with valid
+    // XML means the document root is not PAGX, which is a schema error at the root element.
+    auto diagnostic = val::object();
+    diagnostic.set("message", "Root element must be 'pagx'.");
+    diagnostic.set("line", 1);
+    diagnostic.set("column", 1);
+    diagnostics.call<void>("push", diagnostic);
+    return diagnostics;
+  }
+  // Collapse repeated messages: a single schema slip (e.g. one legacy element repeated on
+  // hundreds of lines) otherwise floods the editor with identical diagnostics. The first
+  // occurrence keeps its line and absorbs the rest into a trailing count.
+  std::vector<std::pair<size_t, std::string>> keptDiagnostics = {};
+  std::unordered_map<std::string, size_t> firstIndexByMessage = {};
+  std::unordered_map<size_t, size_t> suppressedCount = {};
+  for (const auto& error : validationDocument->errors) {
+    auto message = ParseDiagnosticMessage(error);
+    auto it = firstIndexByMessage.find(message);
+    if (it == firstIndexByMessage.end()) {
+      firstIndexByMessage[message] = keptDiagnostics.size();
+      keptDiagnostics.emplace_back(ParseDiagnosticLine(error), std::move(message));
+    } else {
+      ++suppressedCount[it->second];
+    }
+  }
+  for (size_t i = 0; i < keptDiagnostics.size(); ++i) {
+    auto message = keptDiagnostics[i].second;
+    auto it = suppressedCount.find(i);
+    if (it != suppressedCount.end()) {
+      message += " (and " + std::to_string(it->second) + " more)";
+    }
+    auto diagnostic = val::object();
+    diagnostic.set("message", message);
+    diagnostic.set("line", keptDiagnostics[i].first);
+    diagnostic.set("column", 1);
+    diagnostics.call<void>("push", diagnostic);
+  }
+  return diagnostics;
+}
+
 std::vector<std::string> PAGXView::getExternalFilePaths() const {
   if (!document) {
     return {};
   }
   return document->getExternalFilePaths();
+}
+
+static bool LayerHasOwnText(const Layer* layer) {
+  for (const auto* element : layer->contents) {
+    if (element != nullptr &&
+        (element->nodeType() == NodeType::Text || element->nodeType() == NodeType::TextBox)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Returns the laid-out box of the layer's own text element in the layer's local coordinates (the
+// space the text positions its glyphs in), or an empty rect when the layer has no text of its own
+// or has not been laid out yet.
+static Rect TextBoxOf(const Layer* layer) {
+  for (const auto* element : layer->contents) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::TextBox) {
+      return static_cast<const TextBox*>(element)->layoutBounds();
+    }
+    if (element->nodeType() == NodeType::Text) {
+      return static_cast<const Text*>(element)->layoutBounds();
+    }
+  }
+  return {};
+}
+
+static bool SurfaceToLayerLocal(const PAGLayer& layer, float surfaceX, float surfaceY,
+                                Point* localPoint) {
+  auto matrix = layer.getGlobalMatrix();
+  float determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+  if (determinant == 0.0f) {
+    return false;
+  }
+  float dx = surfaceX - matrix.tx;
+  float dy = surfaceY - matrix.ty;
+  localPoint->x = (matrix.d * dx - matrix.c * dy) / determinant;
+  localPoint->y = (matrix.a * dy - matrix.b * dx) / determinant;
+  return true;
+}
+
+static bool RectContainsPoint(const Rect& rect, const Point& point) {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y &&
+         point.y <= rect.y + rect.height;
+}
+
+// Finds the runtime instance of node inside one composition instance, without descending into
+// nested composition instances (a mask always refers to a layer of the same composition).
+static std::shared_ptr<PAGLayer> FindLayerInComposition(const std::shared_ptr<PAGLayer>& layer,
+                                                        const Layer* node) {
+  for (const auto& child : layer->getChildren()) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->getNode() == node) {
+      return child;
+    }
+    if (child->layerType() == LayerType::Composition) {
+      continue;
+    }
+    auto found = FindLayerInComposition(child, node);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+// True when the authored visibility, scroll clip and mask of the layer and all of its ancestors
+// let the point through. The core already applies the runtime equivalents to its shape hits; this
+// check only gates the text boxes the host adds on top of them.
+static bool AuthoredChainAcceptsPoint(const std::shared_ptr<PAGLayer>& layer, float surfaceX,
+                                      float surfaceY) {
+  for (auto walker = layer; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (node == nullptr) {
+      continue;
+    }
+    if (!node->visible) {
+      return false;
+    }
+    // Layout converts clipToBounds into scrollRect (Layer::updateScrollRect), so a single check
+    // covers both authored forms.
+    if (node->hasScrollRect) {
+      Point localPoint = {};
+      if (!SurfaceToLayerLocal(*walker, surfaceX, surfaceY, &localPoint) ||
+          !RectContainsPoint(node->scrollRect, localPoint)) {
+        return false;
+      }
+    }
+    if (node->mask != nullptr) {
+      // The masked layer's node lives in the composition that holds its parent, which is where
+      // the mask layer is searched for.
+      auto composition = walker->getParent();
+      while (composition != nullptr && composition->layerType() != LayerType::Composition) {
+        composition = composition->getParent();
+      }
+      auto maskLayer =
+          composition != nullptr ? FindLayerInComposition(composition, node->mask) : nullptr;
+      if (maskLayer != nullptr && !maskLayer->hitTestPoint(surfaceX, surfaceY, true)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+static bool TextBoxContainsPoint(const PAGLayer& layer, float surfaceX, float surfaceY) {
+  const auto* node = layer.getNode();
+  if (node == nullptr) {
+    return false;
+  }
+  auto box = TextBoxOf(node);
+  if (box.isEmpty()) {
+    return false;
+  }
+  Point localPoint = {};
+  return SurfaceToLayerLocal(layer, surfaceX, surfaceY, &localPoint) &&
+         RectContainsPoint(box, localPoint);
+}
+
+// Walks the runtime tree in reverse paint order (later children first, a layer's children before
+// the layer itself) and returns the first layer that is either the core's top-most shape hit or a
+// text layer whose laid-out box contains the point. Selecting text by its box is an editor policy:
+// the core reports exact glyph outlines, which reject the gaps between glyphs and make a text
+// block feel unclickable, so the host widens text to its box here without changing what the core
+// reports to other callers.
+static std::shared_ptr<PAGLayer> FindTopMostSelectable(const std::shared_ptr<PAGLayer>& layer,
+                                                       const PAGLayer* shapeHit, float surfaceX,
+                                                       float surfaceY) {
+  const auto& children = layer->getChildren();
+  for (auto item = children.rbegin(); item != children.rend(); ++item) {
+    if (*item == nullptr) {
+      continue;
+    }
+    auto found = FindTopMostSelectable(*item, shapeHit, surfaceX, surfaceY);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  if (layer.get() == shapeHit) {
+    return layer;
+  }
+  if (TextBoxContainsPoint(*layer, surfaceX, surfaceY) &&
+      AuthoredChainAcceptsPoint(layer, surfaceX, surfaceY)) {
+    return layer;
+  }
+  return nullptr;
+}
+
+// Resolves a surface point to the runtime layer a host should select: the top-most layer under the
+// point (a text layer counts over its whole laid-out box), walked up to the first Composition whose
+// source node belongs to the given document, so a click inside a <Layer composition="@X"> instance
+// selects the reference layer instead of the internal definition. Compositions built from an
+// embedded external document are skipped (their nodes are numbered against a different document),
+// and a hit that lands entirely inside one selects nothing rather than reporting a node the host
+// cannot map. The core runtime keeps no source-node -> runtime-layer map, so this resolution
+// belongs to the host, which owns the source document. Returns nullptr when nothing should be
+// selected.
+static std::shared_ptr<PAGLayer> ResolveSelectionTarget(const std::shared_ptr<PAGScene>& scene,
+                                                        PAGXDocument* document, float surfaceX,
+                                                        float surfaceY) {
+  if (scene == nullptr || document == nullptr) {
+    return nullptr;
+  }
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return nullptr;
+  }
+  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
+  const PAGLayer* shapeHit = layers.empty() ? nullptr : layers.front().get();
+  auto target = FindTopMostSelectable(root, shapeHit, surfaceX, surfaceY);
+  if (target == nullptr) {
+    return nullptr;
+  }
+  for (auto walker = target; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (walker->layerType() == LayerType::Composition && node != nullptr &&
+        document->ownsNode(node)) {
+      target = walker;
+      break;
+    }
+  }
+  const auto* node = target->getNode();
+  if (node == nullptr || !document->ownsNode(node)) {
+    return nullptr;
+  }
+  return target;
+}
+
+emscripten::val PAGXView::hitTest(float surfaceX, float surfaceY) {
+  auto target = ResolveSelectionTarget(scene, document.get(), surfaceX, surfaceY);
+  if (target == nullptr) {
+    return emscripten::val::null();
+  }
+  // The host owns the source document, so the source-side fields come from the node the runtime
+  // layer points at; the runtime itself only supplies the handle and its on-screen rect.
+  const auto* node = target->getNode();
+  auto bounds = scene->getTightGlobalBounds(target);
+  auto obj = emscripten::val::object();
+  obj.set("index", node->index);
+  obj.set("startLine", node->sourceLine);
+  obj.set("endLine", node->endLine);
+  if (bounds.isEmpty()) {
+    obj.set("bounds", emscripten::val::null());
+  } else {
+    auto boundsObj = emscripten::val::object();
+    boundsObj.set("x", bounds.x);
+    boundsObj.set("y", bounds.y);
+    boundsObj.set("w", bounds.width);
+    boundsObj.set("h", bounds.height);
+    obj.set("bounds", boundsObj);
+  }
+  return obj;
+}
+
+emscripten::val PAGXView::getNodeSourceMap() const {
+  auto array = emscripten::val::array();
+  if (document == nullptr) {
+    return array;
+  }
+  for (const auto& source : document->getNodeSourceMap()) {
+    auto entry = emscripten::val::object();
+    entry.set("index", source.index);
+    entry.set("startLine", source.startLine);
+    entry.set("endLine", source.endLine);
+    entry.set("nodeType", static_cast<int>(source.nodeType));
+    auto channels = emscripten::val::array();
+    for (const auto& c : source.channels) {
+      channels.call<void>("push", c);
+    }
+    entry.set("channels", channels);
+    array.call<void>("push", entry);
+  }
+  return array;
+}
+
+// Collects every runtime layer instance built from the given source node by walking the runtime
+// tree in pre-order. The core runtime intentionally does not maintain a source-node -> instance
+// map, so the host (which holds the source document) owns the node-to-runtime correspondence.
+// A pre-order walk matches the tree's construction order, so instances come back in the same
+// order the runtime tree declares them.
+static void CollectLayersForNode(const std::shared_ptr<PAGLayer>& layer, const Layer* node,
+                                 std::vector<std::shared_ptr<PAGLayer>>& out) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->getNode() == node) {
+    out.push_back(layer);
+  }
+  for (const auto& child : layer->getChildren()) {
+    CollectLayersForNode(child, node, out);
+  }
+}
+
+emscripten::val PAGXView::getNodeBounds(int index) const {
+  if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
+    return emscripten::val::null();
+  }
+  Node* n = document->nodes[index].get();
+  // hitTest granularity is Layer-level, so bounds are only meaningful for Layer nodes.
+  if (n->nodeType() != NodeType::Layer) {
+    return emscripten::val::null();
+  }
+  if (scene == nullptr) {
+    return emscripten::val::null();
+  }
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return emscripten::val::null();
+  }
+  auto* layerNode = static_cast<Layer*>(n);
+  std::vector<std::shared_ptr<PAGLayer>> instances = {};
+  CollectLayersForNode(root, layerNode, instances);
+  // Selection-outline slack for FreeType's anti-aliasing overshoot: per-glyph tight bounds stop
+  // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
+  // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
+  // with a 0.5 root-space floor scaled by the current zoom. This is presentation-only slack,
+  // kept here so the bounds query itself stays tight. Only glyphs overshoot, so layers without
+  // their own text (shapes, images, containers) keep their exact bounds.
+  bool applyTextSlack = LayerHasOwnText(layerNode);
+  float zoom = contentScale * userZoom;
+  auto array = emscripten::val::array();
+  size_t visibleCount = 0;
+  for (auto& layer : instances) {
+    auto rect = scene->getTightGlobalBounds(layer);
+    if (rect.isEmpty()) {
+      continue;
+    }
+    if (applyTextSlack) {
+      rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
+    }
+    auto obj = emscripten::val::object();
+    obj.set("x", rect.x);
+    obj.set("y", rect.y);
+    obj.set("w", rect.width);
+    obj.set("h", rect.height);
+    array.call<void>("push", obj);
+    ++visibleCount;
+  }
+  if (visibleCount == 0) {
+    return emscripten::val::null();
+  }
+  return array;
+}
+
+bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::string& value) {
+  if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
+    return false;
+  }
+  Node* node = document->nodes[index].get();
+  if (node == nullptr || !ChannelExists(node->nodeType(), channel)) {
+    return false;
+  }
+  if (!SetNodeChannelFromString(node, channel, value)) {
+    return false;
+  }
+  // RequiresLayout tells whether the edit only shows up after a layout pass; a render-only refresh
+  // (layoutChanged=false) is the cheap path for edits that cannot move geometry (alpha/color/...).
+  bool layoutChanged = RequiresLayout(node->nodeType(), channel);
+  document->notifyChange({node}, layoutChanged);
+  presentImmediately = true;
+  return true;
 }
 
 bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
@@ -155,6 +562,7 @@ void PAGXView::buildLayers() {
   }
   playing = true;
   lastAnimationTimeMs = -1.0;
+  fallbackClockUs = 0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
   applySceneDisplayOptions();
@@ -173,51 +581,62 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   }
   if (playing) {
     if (defaultAnimation != nullptr) {
-      int64_t duration = defaultAnimation->duration();
-      // Track the boundary on the linear playbackPosition rather than currentTime. currentTime is
-      // the folded in-cycle phase, which for PingPong is a triangle wave that turns around at the
-      // half point; that turn made a single pass stop after only the forward half. playbackPosition
-      // rises across one full loop period (duration for Once/Loop, 2 * duration for PingPong) and
-      // only wraps back down when a complete pass finishes, so it marks the true end for every mode.
-      int64_t before = defaultAnimation->playbackPosition();
-      // Let the engine advance and wrap according to the file's loop mode; this keeps the in-cycle
-      // motion intact, including PingPong mirroring. The view only overrides what happens at a cycle
-      // boundary based on loopEnabled, so the file's loop flag never dictates repeat vs stop.
-      bool changed = defaultAnimation->advanceAndApply(deltaUs);
-      int64_t after = defaultAnimation->playbackPosition();
-      if (!changed) {
-        // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
-        // when looping keep playing for the next cycle, otherwise park on the first frame so a
-        // finished single pass resets to the start instead of freezing on the last frame.
-        if (duration > 0) {
-          defaultAnimation->setCurrentTime(0);
-          defaultAnimation->apply();
-        }
-        if (!loopEnabled) {
-          playing = false;
-        }
-      } else if (!loopEnabled && duration > 0 && after < before) {
-        // A Loop/PingPong file crossed its period boundary while the user wants a single pass. The
-        // linear position climbs monotonically to the period and then wraps back down, so the first
-        // backward step marks one completed pass: rewind to the first frame and stop there. For
-        // PingPong the period is 2 * duration, so this fires only after the full forward-and-back
-        // trip, not at the half-way turning point. Here duration > 0 is only a validity guard; the
-        // actual boundary is the playbackPosition period, which already accounts for PingPong's
-        // doubled span, so this condition does not need the period value itself.
-        defaultAnimation->setCurrentTime(0);
-        defaultAnimation->apply();
-        playing = false;
-      }
+      advanceAnimationUnit(defaultAnimation, deltaUs);
     } else if (defaultTimeline != nullptr) {
-      // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
-      defaultTimeline->advanceAndApply(deltaUs);
+      // Non-animation timelines (state machines) have no queryable duration to gate; drive
+      // as-is and accumulate the fallback clock so the playback bar stays functional.
+      advanceFallbackTimeline(deltaUs);
     }
     // Drive the scene inside the playing gate so pausing freezes the whole picture: this advances
     // the auto-playing nested compositions, which would otherwise keep animating (and keep
     // hasContentChanged() true) even while the top-level animation is paused.
     if (scene != nullptr) {
       scene->advanceAndApply(deltaUs);
+      // Track the fallback clock for documents whose only animations are nested (no top-level
+      // timeline at all), so frame stepping has a position reference.
+      if (defaultTimeline == nullptr) {
+        fallbackClockUs += deltaUs;
+      }
     }
+  }
+}
+
+// Drives one animation by delta with the player-level loop policy: the engine keeps the in-cycle
+// motion (including PingPong mirroring) and this method decides what happens at a cycle boundary
+// based on loopEnabled. The boundary is tracked on the linear playbackPosition rather than
+// currentTime. currentTime is the folded in-cycle phase, which for PingPong is a triangle wave
+// that turns around at the half point; that turn made a single pass stop after only the forward
+// half. playbackPosition rises across one full loop period (duration for Once/Loop, 2 * duration
+// for PingPong) and only wraps back down when a complete pass finishes, so it marks the true end
+// for every mode.
+void PAGXView::advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animation,
+                                    int64_t deltaUs) {
+  int64_t duration = animation->duration();
+  int64_t before = animation->playbackPosition();
+  bool changed = animation->advanceAndApply(deltaUs);
+  int64_t after = animation->playbackPosition();
+  if (!changed) {
+    // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
+    // when looping keep playing for the next cycle, otherwise park on the first frame so a
+    // finished single pass resets to the start instead of freezing on the last frame.
+    if (duration > 0) {
+      animation->setCurrentTime(0);
+      animation->apply();
+    }
+    if (!loopEnabled) {
+      playing = false;
+    }
+  } else if (!loopEnabled && duration > 0 && after < before) {
+    // A Loop/PingPong file crossed its period boundary while the user wants a single pass. The
+    // linear position climbs monotonically to the period and then wraps back down, so the first
+    // backward step marks one completed pass: rewind to the first frame and stop there. For
+    // PingPong the period is 2 * duration, so this fires only after the full forward-and-back
+    // trip, not at the half-way turning point. Here duration > 0 is only a validity guard; the
+    // actual boundary is the playbackPosition period, which already accounts for PingPong's
+    // doubled span, so this condition does not need the period value itself.
+    animation->setCurrentTime(0);
+    animation->apply();
+    playing = false;
   }
 }
 
@@ -497,6 +916,11 @@ void PAGXView::updateAdaptiveTileRefinement() {
   }
 }
 
+void PAGXView::advanceFallbackTimeline(int64_t deltaUs) {
+  defaultTimeline->advanceAndApply(deltaUs);
+  fallbackClockUs += deltaUs;
+}
+
 void PAGXView::play() {
   playing = true;
 }
@@ -517,6 +941,10 @@ int64_t PAGXView::currentTimeMicros() const {
     // the progress bar run backward on the return half.
     return defaultAnimation->playbackPosition();
   }
+  if (defaultTimeline != nullptr) {
+    // Duration-less timeline (e.g. a state machine): the fallback clock is the only position.
+    return fallbackClockUs;
+  }
   return 0;
 }
 
@@ -533,7 +961,36 @@ float PAGXView::frameRate() const {
   if (defaultAnimation != nullptr) {
     return defaultAnimation->frameRate();
   }
+  if (hasTimeline()) {
+    // Duration-less timelines (state machines, nested-only animations) have no single frame
+    // rate. Return the PAGX default so frame stepping still has a sane step unit.
+    return 60.0f;
+  }
   return 0.0f;
+}
+
+// Returns true when any composition in the runtime subtree has spawned timelines, i.e. there is
+// animated content even without a top-level default timeline (all animations are
+// composition-scoped and driven purely through <Timelines> references).
+static bool HasAnySpawnedTimeline(const std::shared_ptr<PAGLayer>& layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  if (layer->layerType() == LayerType::Composition &&
+      static_cast<PAGComposition*>(layer.get())->hasTimelines()) {
+    return true;
+  }
+  for (const auto& child : layer->getChildren()) {
+    if (HasAnySpawnedTimeline(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGXView::hasTimeline() const {
+  return defaultTimeline != nullptr ||
+         (scene != nullptr && HasAnySpawnedTimeline(scene->rootComposition()));
 }
 
 // Known limitation: seek only repositions the default (top-level) animation. Nested
@@ -551,6 +1008,25 @@ void PAGXView::setCurrentTimeMicros(int64_t micros) {
     defaultAnimation->apply();
     lastAnimationTimeMs = -1.0;
     presentImmediately = true;
+  } else if (defaultTimeline != nullptr) {
+    // Fallback mode (duration-less timeline): the caller always sends current + signed delta
+    // because the slider is disabled in this mode and only relative frame steps come through.
+    int64_t delta = micros - fallbackClockUs;
+    if (delta != 0) {
+      advanceFallbackTimeline(delta);
+      lastAnimationTimeMs = -1.0;
+      presentImmediately = true;
+    }
+  } else if (scene != nullptr) {
+    // Nested-only animations: no top-level timeline to drive, so frame stepping advances the
+    // scene directly (same relative-delta convention as the fallback branch above).
+    int64_t delta = micros - fallbackClockUs;
+    if (delta != 0) {
+      scene->advanceAndApply(delta);
+      fallbackClockUs += delta;
+      lastAnimationTimeMs = -1.0;
+      presentImmediately = true;
+    }
   }
 }
 

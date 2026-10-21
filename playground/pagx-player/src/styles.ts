@@ -300,6 +300,22 @@ const CSS = `
     transform: scale(1.2);
 }
 
+/* Fallback mode (a default timeline without a queryable duration, e.g. a state machine):
+   the slider and loop toggle are disabled and dimmed, while play/pause and frame stepping
+   stay fully styled and usable. */
+.pagx-player-playback-bar.is-untimed .progress-slider {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.pagx-player-playback-bar.is-untimed .time-display {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.pagx-player-playback-bar.is-untimed .progress-slider::-webkit-slider-thumb {
+    cursor: default;
+}
+
 .pagx-player-playback-bar .progress-slider::-moz-range-thumb {
     width: 12px;
     height: 12px;
@@ -308,6 +324,28 @@ const CSS = `
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Selection overlay: an axis-aligned rect drawn over the canvas to mirror the hovered/selected
+   layer. pointer-events:none (also set inline) so it never steals hover/click from the canvas.
+   z-index sits above the canvas (1) but below the toolbar (175) and status pill (200). */
+.pagx-select-overlay {
+    position: absolute;
+    z-index: 50;
+    display: none;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Colors follow Chrome DevTools' inspect overlay: the fill is its content-box blue; the sticky
+   selection adds a solid accent border to distinguish it from the transient hover. */
+.pagx-select-overlay.is-hover {
+    background: rgba(111, 168, 220, 0.66);
+}
+
+.pagx-select-overlay.is-selected {
+    background: rgba(111, 168, 220, 0.66);
+    border: 1px solid rgba(26, 115, 232, 1);
 }
 
 /* Transient status pill anchored above the canvas area. position: absolute relative to the
