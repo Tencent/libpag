@@ -351,7 +351,7 @@ inline double WrapDegrees(double degrees) {
 // two solutions, (x, y, z) and (x + 180, 180 - y, z + 180); this returns the canonical one with the
 // smaller |x| + |z|, each angle within (-180, 180], so a pure Y rotation beyond 90 degrees reads
 // back as that Y angle instead of an equivalent set with X and Z at 180. At gimbal lock
-// (|cos y| <= 1e-3, wide enough to absorb float round-off) the whole remaining rotation is
+// (|cos y| <= 1e-6, just wide enough to absorb float round-off) the whole remaining rotation is
 // assigned to X and Z is 0. When both solutions weigh the same (for example x = z = 90) the asin
 // solution with Y in [-90, 90] is kept. Since a matrix keeps no winding, the result may differ from
 // the angles a rotation was authored with. Returns false for a zero-length or non-finite
@@ -374,7 +374,7 @@ inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double o
   double cosY = std::cos(y);
   double x = 0;
   double z = 0;
-  if (std::abs(cosY) > 1.0e-3) {
+  if (std::abs(cosY) > 1.0e-6) {
     x = std::atan2(rotation[2][1], rotation[2][2]);
     z = std::atan2(rotation[1][0], rotation[0][0]);
   } else {

@@ -492,6 +492,20 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->skewX = GetFloatAttribute(node, "skewX", Default<Layer>().skewX, doc);
   layer->skewY = GetFloatAttribute(node, "skewY", Default<Layer>().skewY, doc);
   layer->perspective = GetFloatAttribute(node, "perspective", Default<Layer>().perspective, doc);
+  // A skew of exactly +/-90 degrees has no finite tangent and a negative viewing distance is not a
+  // projection, so both are rejected here instead of silently rendering a fallback transform.
+  if (std::abs(layer->skewX) >= 90.0f) {
+    ReportError(doc, node, "'skewX' must be within (-90, 90) degrees.");
+    layer->skewX = Default<Layer>().skewX;
+  }
+  if (std::abs(layer->skewY) >= 90.0f) {
+    ReportError(doc, node, "'skewY' must be within (-90, 90) degrees.");
+    layer->skewY = Default<Layer>().skewY;
+  }
+  if (layer->perspective < 0.0f) {
+    ReportError(doc, node, "'perspective' must be zero or a positive distance.");
+    layer->perspective = Default<Layer>().perspective;
+  }
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);

@@ -33,7 +33,9 @@ static void SkipWhitespace(const char*& ptr, const char* end) {
   }
 }
 
-static float ReadNumber(const char*& ptr, const char* end) {
+// allowPixelUnit is true only for length arguments: CSS adds the px suffix to lengths such as
+// translate() or the pivot of rotate(), never to angles or scale factors.
+static float ReadNumber(const char*& ptr, const char* end, bool allowPixelUnit = false) {
   SkipWhitespace(ptr, end);
   const char* start = ptr;
   if (ptr < end && (*ptr == '-' || *ptr == '+')) {
@@ -56,7 +58,7 @@ static float ReadNumber(const char*& ptr, const char* end) {
   }
   // CSS lengths inside <style> rules or inline styles carry a px suffix; SVG presentation
   // attributes are unitless. Dropping the suffix keeps both forms parseable and matches browsers.
-  if (ptr + 1 < end && ptr[0] == 'p' && ptr[1] == 'x') {
+  if (allowPixelUnit && ptr + 1 < end && ptr[0] == 'p' && ptr[1] == 'x') {
     ptr += 2;
   }
   return strtof(start, nullptr);
@@ -92,11 +94,11 @@ Matrix MatrixFromSVGTransform(const std::string& value) {
     Matrix matrix = Matrix::Identity();
 
     if (funcLen == 9 && memcmp(funcStart, "translate", 9) == 0) {
-      float tx = ReadNumber(ptr, end);
+      float tx = ReadNumber(ptr, end, true);
       SkipWhitespace(ptr, end);
       float ty = 0;
       if (ptr < end && *ptr != ')') {
-        ty = ReadNumber(ptr, end);
+        ty = ReadNumber(ptr, end, true);
       }
       matrix = Matrix::Translate(tx, ty);
     } else if (funcLen == 5 && memcmp(funcStart, "scale", 5) == 0) {
@@ -111,8 +113,8 @@ Matrix MatrixFromSVGTransform(const std::string& value) {
       float angle = ReadNumber(ptr, end);
       SkipWhitespace(ptr, end);
       if (ptr < end && *ptr != ')') {
-        float cx = ReadNumber(ptr, end);
-        float cy = ReadNumber(ptr, end);
+        float cx = ReadNumber(ptr, end, true);
+        float cy = ReadNumber(ptr, end, true);
         matrix = Matrix::Translate(cx, cy) * Matrix::Rotate(angle) * Matrix::Translate(-cx, -cy);
       } else {
         matrix = Matrix::Rotate(angle);
@@ -128,8 +130,8 @@ Matrix MatrixFromSVGTransform(const std::string& value) {
       matrix.b = ReadNumber(ptr, end);
       matrix.c = ReadNumber(ptr, end);
       matrix.d = ReadNumber(ptr, end);
-      matrix.tx = ReadNumber(ptr, end);
-      matrix.ty = ReadNumber(ptr, end);
+      matrix.tx = ReadNumber(ptr, end, true);
+      matrix.ty = ReadNumber(ptr, end, true);
     }
 
     SkipWhitespace(ptr, end);

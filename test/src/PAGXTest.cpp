@@ -8013,6 +8013,28 @@ PAGX_TEST(PAGXTest, SameDocCompositionSelfReferenceCycle) {
  */
 // The Layer matrix attributes go through the same finite / invertible rule as the channel and
 // keyframe entry points, and a rejected value leaves the field at its default.
+PAGX_TEST(PAGXTest, LayerTransformComponentsRejectOutOfRangeValues) {
+  const std::string xml =
+      "<pagx width=\"50\" height=\"50\">"
+      "<Layer id=\"skew\" skewX=\"90\"/>"
+      "<Layer id=\"negPersp\" perspective=\"-1\"/>"
+      "<Layer id=\"ok\" skewX=\"45\" perspective=\"500\"/>"
+      "</pagx>";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->errors.size(), 2u);
+  auto* skew = static_cast<pagx::Layer*>(doc->findNode("skew"));
+  auto* negPersp = static_cast<pagx::Layer*>(doc->findNode("negPersp"));
+  auto* ok = static_cast<pagx::Layer*>(doc->findNode("ok"));
+  ASSERT_NE(skew, nullptr);
+  ASSERT_NE(negPersp, nullptr);
+  ASSERT_NE(ok, nullptr);
+  EXPECT_FLOAT_EQ(skew->skewX, 0);
+  EXPECT_FLOAT_EQ(negPersp->perspective, 0);
+  EXPECT_FLOAT_EQ(ok->skewX, 45);
+  EXPECT_FLOAT_EQ(ok->perspective, 500);
+}
+
 PAGX_TEST(PAGXTest, LayerMatrixAttributesRejectNonFiniteAndSingular) {
   std::string xml =
       "<pagx width=\"50\" height=\"50\">\n"
