@@ -117,6 +117,9 @@
   丢弃文件引用，`--fonts external` 保留引用与随产物复制的字体文件。`data:` 源没有可保留的文件，
   因此在 `--fonts external` 下，使用它的文本在产物重新加载后会回退到其他字体
   （`subset:font-face-inline-not-emitted`）。
+- 规则声明的 CSS 族名可以与文件内部族名不同（别名）。导入期按 CSS 族名注册，但 `<Font file>`
+  重新加载时按文件内部族名注册，因此在 `--fonts external` 下，使用该别名的文本会回退到其他
+  字体（`subset:font-face-family-alias-not-preserved`）。
 - 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
   会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
   丢弃。

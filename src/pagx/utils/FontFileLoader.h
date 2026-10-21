@@ -78,10 +78,12 @@ std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromBytes(const void* 
  * its own key. When addToFallbackChain is true each face is also appended to the fallback chain,
  * which keeps unicode-range subset files sharing one (family, style) key reachable even though
  * the primary registration of that key holds only one of them. Returns the number of faces
- * registered, 0 when the file cannot be read.
+ * registered, 0 when the file cannot be read. @param internalFamily when not null, receives the
+ * family name stored inside the file's first face, regardless of familyOverride.
  */
 int RegisterFontFileFaces(FontConfig* fontConfig, const std::string& path, bool addToFallbackChain,
-                          const std::string& familyOverride = "");
+                          const std::string& familyOverride = "",
+                          std::string* internalFamily = nullptr);
 
 /**
  * Registers every face of an in-memory font file the same way RegisterFontFileFaces registers a

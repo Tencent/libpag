@@ -194,10 +194,13 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
 }
 
 int RegisterFontFileFaces(FontConfig* fontConfig, const std::string& path, bool addToFallbackChain,
-                          const std::string& familyOverride) {
+                          const std::string& familyOverride, std::string* internalFamily) {
   auto faces = MakeTypefacesFromFile(path);
   for (size_t index = 0; index < faces.size(); index++) {
     auto ttcIndex = static_cast<int>(index);
+    if (index == 0 && internalFamily != nullptr) {
+      *internalFamily = faces[index]->fontFamily();
+    }
     auto family = familyOverride.empty() ? faces[index]->fontFamily() : familyOverride;
     auto style = faces[index]->fontStyle();
     fontConfig->registerFont(path, ttcIndex, family, style);

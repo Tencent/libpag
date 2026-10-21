@@ -84,8 +84,9 @@ void HTMLTextFragmentBuilder::bindDocument(PAGXDocument* document) {
 // Every face also joins the fallback chain: a family split across several @font-face rules
 // (unicode-range subsets) registers each file under the same (family, style) key, which holds only
 // the last one, and the chain is what keeps the earlier subsets reachable.
-bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path) {
-  if (RegisterFontFileFaces(&_document->fontConfig(), path, true, family) == 0) {
+bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path,
+                                               std::string* internalFamily) {
+  if (RegisterFontFileFaces(&_document->fontConfig(), path, true, family, internalFamily) == 0) {
     return false;
   }
   _registeredFontFamilies.insert(ToLower(family));

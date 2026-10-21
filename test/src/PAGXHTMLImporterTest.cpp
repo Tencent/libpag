@@ -7305,6 +7305,39 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceInlineSourceReportedWhenKeepingFontFiles)
   EXPECT_FALSE(HasDiagnosticContaining(doc, "subset:font-face-inline-not-emitted"));
 }
 
+// A rule may serve a file under a CSS family the file itself does not carry. The importer registers
+// the CSS name, but a <Font file> reloads under the family stored inside the file, so an output that
+// keeps font references cannot resolve the alias: each alias text uses is reported. Baking carries
+// the glyphs and reports nothing.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceAliasedFamilyReportedWhenKeepingFontFiles) {
+  auto fontPath = PuaWoff2FontPath();
+  auto html =
+      "<html><head><style>"
+      "@font-face { font-family: 'Aliased Face'; src: url('" +
+      fontPath +
+      "'); }"
+      "@font-face { font-family: 'Unused Alias'; src: url('" +
+      fontPath +
+      "'); }"
+      ".label { font-family: 'Aliased Face'; font-size: 20px; }"
+      "</style></head>"
+      "<body style='width:120px;height:40px'>"
+      "<span class='label' style='position:absolute;left:0px;top:0px;white-space:nowrap'>"
+      "&#xE000;</span>"
+      "</body></html>";
+  pagx::HTMLImporter::Options options;
+  auto doc = pagx::HTMLImporter::ParseString(html, options);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(
+      doc, "'Aliased Face' is an alias of the family stored in the font file ('pagx-font-f0')"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "'Unused Alias' is an alias"));
+
+  options.emitFontFileResources = false;
+  doc = pagx::HTMLImporter::ParseString(html, options);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "subset:font-face-family-alias-not-preserved"));
+}
+
 // With the subset transformer off, the importer reads `@font-face` from the original <style>
 // instead of the block the transformer re-emits; both routes must yield the same resource.
 PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileWithoutNormalization) {

@@ -363,6 +363,10 @@ class HTMLParserContext {
   // CSS families whose @font-face source is an inlined `data:` URI. Their bytes live only in the
   // document's font config, which no `<Font file>` can reference.
   std::vector<std::string> _inlineFontFamilies = {};
+  // (CSS family, family stored inside the file) for every file source that serves a different name.
+  // A reloaded `<Font file>` registers under the internal name only, so text asking for the CSS
+  // name no longer matches it.
+  std::vector<std::pair<std::string, std::string>> _aliasedFontFamilies = {};
 
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.

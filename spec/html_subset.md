@@ -130,6 +130,10 @@ local disk or inlines the font as a `data:` URI:
   font files copied next to the output. A `data:` source has no file to keep, so with
   `--fonts external` text using it falls back to other fonts once the output is reloaded
   (`subset:font-face-inline-not-emitted`).
+- A rule may name a CSS family the file itself does not carry (an alias). The importer registers
+  the CSS name, but a `<Font file>` reloads under the family stored inside the file, so with
+  `--fonts external` text using the alias falls back to other fonts
+  (`subset:font-face-family-alias-not-preserved`).
 - Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
   cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
   source is dropped like any other unsupported at-rule.

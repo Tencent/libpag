@@ -653,10 +653,14 @@ void HTMLParserContext::loadWebFontFiles() {
         continue;
       }
       auto path = _imageResources->resolveSource(source);
-      if (!_textFragmentBuilder->registerFontFile(rule.family, path)) {
+      std::string internalFamily = {};
+      if (!_textFragmentBuilder->registerFontFile(rule.family, path, &internalFamily)) {
         warn("html: @font-face '" + rule.family + "' source '" + path +
              "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
         continue;
+      }
+      if (!internalFamily.empty() && internalFamily != rule.family) {
+        _aliasedFontFamilies.emplace_back(rule.family, internalFamily);
       }
       if (!_options.fontReplacements.empty()) {
         auto bytes = tgfx::Data::MakeFromFile(path);
@@ -698,6 +702,21 @@ void HTMLParserContext::emitWebFontResources() {
            "' is inlined as a data: URI and cannot become a <Font file> resource; text using it "
            "falls back to other fonts once the output is reloaded unless its glyphs are baked "
            "(subset:font-face-inline-not-emitted)");
+    }
+  }
+  // The importer registers a file under the CSS family its rule declares, but a <Font file>
+  // reloads under the family stored inside the file, so an aliased family only resolves while the
+  // importer's own registration is alive.
+  for (const auto& alias : _aliasedFontFamilies) {
+    auto key = ToLower(alias.first);
+    if (namedFamilies.count(key) != 0 && reportedFamilies.insert(key).second) {
+      warn("html: @font-face '" + alias.first +
+           "' is an alias of the family stored in the font "
+           "file ('" +
+           alias.second +
+           "'), which is what a <Font file> resource registers; text "
+           "using it falls back to other fonts once the output is reloaded unless its glyphs are "
+           "baked (subset:font-face-family-alias-not-preserved)");
     }
   }
   std::unordered_set<std::string> emittedPaths = {};
