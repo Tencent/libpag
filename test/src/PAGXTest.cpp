@@ -5609,6 +5609,7 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
 // any glyph was embedded as a bitmap, and the outline of the first vector glyph collected.
 struct EmbeddedItalicProbe {
   bool textFauxItalic = false;
+  bool renderFauxItalic = false;
   bool hasBitmapGlyph = false;
   std::vector<pagx::Point> vectorGlyphPoints = {};
 };
@@ -5644,6 +5645,7 @@ static EmbeddedItalicProbe EmbedSingleTextDocument(const std::string& content, b
   }
   probe.textFauxItalic = text->fauxItalic;
   for (auto* run : text->glyphRuns) {
+    probe.renderFauxItalic |= run->fauxItalic.value_or(text->fauxItalic);
     for (auto* glyph : run->font->glyphs) {
       if (glyph->image != nullptr) {
         probe.hasBitmapGlyph = true;
@@ -5661,11 +5663,12 @@ static EmbeddedItalicProbe EmbedSingleTextDocument(const std::string& content, b
  * GlyphRunRenderer shears every run of a Text whose flag is set. A bitmap glyph (NotoColorEmoji
  * keeps no slant in its PNG) can only be slanted by that shear, so such a document keeps the flag
  * and must leave the shared outlines unskewed; a document whose runs all carry outlines bakes the
- * slant instead and drops the flag.
+ * slant instead and disables the run-level flag. The semantic Text style survives both cases.
  */
 PAGX_TEST(PAGXTest, FontEmbedderAppliesSynthesizedItalicExactlyOnce) {
   auto mixed = EmbedSingleTextDocument("A\U0001F600", true);
   EXPECT_TRUE(mixed.textFauxItalic);
+  EXPECT_TRUE(mixed.renderFauxItalic);
   EXPECT_TRUE(mixed.hasBitmapGlyph);
   ASSERT_FALSE(mixed.vectorGlyphPoints.empty());
 
@@ -5676,7 +5679,8 @@ PAGX_TEST(PAGXTest, FontEmbedderAppliesSynthesizedItalicExactlyOnce) {
 
   // No run depends on the render-time shear here, so the outline carries the slant itself.
   auto vectorOnly = EmbedSingleTextDocument("A", true);
-  EXPECT_FALSE(vectorOnly.textFauxItalic);
+  EXPECT_TRUE(vectorOnly.textFauxItalic);
+  EXPECT_FALSE(vectorOnly.renderFauxItalic);
   ASSERT_FALSE(vectorOnly.vectorGlyphPoints.empty());
   EXPECT_NE(vectorOnly.vectorGlyphPoints, upright.vectorGlyphPoints);
 }

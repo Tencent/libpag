@@ -559,6 +559,10 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
 void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx, int depth) {
   if (ShouldSkipWalkerNode(node, depth, ctx, "flex inference")) return;
   if (IsOpaqueSubtreeRoot(node)) return;
+  // Captured text positions and source ranges form one atomic layout record. Flex inference
+  // must not strip their offsets, reorder fragments, or change the paragraph's box dimensions.
+  if (node->findAttribute("data-pagx-paragraph") || node->findAttribute("data-pagx-run-text"))
+    return;
   // Recurse children first: a parent that folds into `align-items: stretch` erases its
   // children's cross-axis size, so each child must finish its own inference while its
   // explicit width/height is still intact.
@@ -566,6 +570,9 @@ void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& c
   while (child) {
     WalkInferFlex(child, ctx, depth + 1);
     child = child->nextSibling;
+  }
+  for (auto c = node->firstChild; c; c = c->nextSibling) {
+    if (c->findAttribute("data-pagx-paragraph")) return;
   }
   TryInferFlexOnContainer(node, ctx);
 }

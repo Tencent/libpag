@@ -1520,6 +1520,7 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 |------|------|--------|------|
 | `font` | idref | (必填) | 引用 Font 资源 `@id` |
 | `fontSize` | float | 12 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
+| `fauxBold`、`fauxItalic` | bool | 继承 Text | 这些字形渲染时仍需施加的合成样式。字体嵌入写入明确值，避免重复施加已烘焙的样式，同时保留 Text 的原始样式供编辑使用。 |
 | `glyphs` | string | (必填) | GlyphID 序列，逗号分隔（0 表示缺失字形） |
 | `x` | float | 0 | 总体 X 偏移 |
 | `y` | float | 0 | 总体 Y 偏移 |
@@ -1979,6 +1980,21 @@ TextBox 是**仅参与预排版**的节点：它在渲染前的排版阶段被�
 | `overflow` | Overflow | visible | 文本超出盒子高度（横排）或宽度（竖排）时的溢出行为。当该维度为 NaN 时无效果 |
 
 TextBox 继承 Group 的所有属性（`position`、`anchor`、`rotation`、`scale`、`skew`、`skewAxis`、`alpha`、`padding`）和约束属性（见 §4.3）。TextBox 的 `width`/`height` 默认为 NaN（无边界，自动尺寸）；NaN 表示该维度上无边界，可能导致 `wordWrap` 或 `overflow` 无效果。`padding` 属性内缩文本排版区域和非 Text 子元素的约束参考系。`position` 属性指定文本区域左上角在父坐标系中的坐标。推荐使用约束属性（`left`/`top`）进行定位——设置约束属性时，`position` 由约束系统自动计算。
+
+可选的捕获布局由 `layoutKey` 属性和位于矢量元素之后的 `TextLayoutFragment` 子项组成。
+每项包含 `textIndex`（Text 遍历顺序，从零开始）、`start` 和 `length`（Unicode 标量计数）、
+`position`（相对内容框的字母基线原点）、`bounds`（同一坐标系中的行片段矩形），以及
+`inlinePositions`（每个标量相对该原点的行内锚点）。同一 Text 的片段按源文本顺序排列，
+不得重叠或切开字素簇，必须覆盖所有非空白文字；间隙只能包含换行处舍弃的 ASCII 空白或显式换行。
+文字仍通过统一整形流程生成连字和组合字符，不会拆成逐字 Text。
+
+`v1-` 校验键由 `TextLayout::CaptureKey` 对完整文本、整形参数、文本区域尺寸和对齐方式、
+子元素变换及片段记录计算，并在 XML 往返中保持稳定。当前只支持横排捕获布局。
+校验通过时直接使用记录的基线和锚点，不再次换行、两端对齐或压缩标点，且不依赖字体嵌入。
+文字、字体、字号、字距或文本框尺寸等变化使整段捕获布局及其 GlyphRun 同时失效，转入普通排版。
+运行时文字覆盖同样必须重新整形，不能继续显示原来的嵌入字形。颜色和文本框外层变换不影响校验。
+主动移除 `layoutKey`、片段记录及嵌入 GlyphRun 可切换为自动重排；不支持该扩展的读取器可使用
+嵌入 GlyphRun，或对完整逻辑文本进行普通排版。
 
 **TextAlign（文本对齐）**：
 

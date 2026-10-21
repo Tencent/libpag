@@ -1267,6 +1267,7 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   if (!textBox) {
     return nullptr;
   }
+  textBox->layoutKey = GetAttribute(node, "layoutKey");
   // Group properties
   textBox->anchor = GetPointAttribute(node, "anchor", Default<TextBox>().anchor, doc);
   textBox->position = GetPointAttribute(node, "position", Default<TextBox>().position, doc);
@@ -1296,6 +1297,22 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
+      if (child->name == "TextLayoutFragment") {
+        TextLayoutFragment fragment;
+        fragment.textIndex =
+            static_cast<uint32_t>(GetIntAttribute(child.get(), "textIndex", -1, doc));
+        fragment.start = static_cast<uint32_t>(GetIntAttribute(child.get(), "start", -1, doc));
+        fragment.length = static_cast<uint32_t>(GetIntAttribute(child.get(), "length", 0, doc));
+        fragment.position = GetPointAttribute(child.get(), "position", {}, doc);
+        fragment.bounds = GetRectAttribute(child.get(), "bounds", {}, doc);
+        if (!ParseTextInlinePositions(fragment.length, GetAttribute(child.get(), "inlinePositions"),
+                                      &fragment.inlinePositions)) {
+          ReportError(doc, child.get(), "Invalid TextLayoutFragment inlinePositions.");
+        }
+        textBox->layoutFragments.push_back(std::move(fragment));
+        child = child->nextSibling;
+        continue;
+      }
       auto element = ParseElement(child.get(), doc);
       if (element) {
         textBox->elements.push_back(element);
@@ -2302,6 +2319,12 @@ static GlyphRun* ParseGlyphRun(const DOMNode* node, PAGXDocument* doc) {
     }
   }
   run->fontSize = GetFloatAttribute(node, "fontSize", Default<GlyphRun>().fontSize, doc);
+  if (node->findAttribute("fauxBold")) {
+    run->fauxBold = GetBoolAttribute(node, "fauxBold", false, doc);
+  }
+  if (node->findAttribute("fauxItalic")) {
+    run->fauxItalic = GetBoolAttribute(node, "fauxItalic", false, doc);
+  }
   run->x = GetFloatAttribute(node, "x", Default<GlyphRun>().x, doc);
   run->y = GetFloatAttribute(node, "y", Default<GlyphRun>().y, doc);
 

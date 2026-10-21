@@ -16,6 +16,13 @@ First letters originating in generated content/shadow trees without a DOM Range 
 diagnosed. Length-changing text transforms use measured source fragments and natural
 cluster spacing when the browser cannot expose individual output-character positions.
 
+Ordinary multiline paragraphs also carry their logical text and run ranges. The importer merges
+them into one `TextBox` (one `Text` for a uniform style), preserving measured baselines and inline
+anchors in serializable `TextLayoutFragment` records. Soft wraps do not become newline characters.
+Editing text, typography or text-box dimensions invalidates the whole captured layout and its
+embedded glyphs; normal typesetting then takes over. Unsupported paragraph layouts and invalid
+descriptors retain the visual spans. This works with and without font embedding.
+
 Form text is captured from Chromium's UA layout: live values, placeholder styles,
 password masks and textarea line breaks remain editable text. Password DOM values
 are never copied into snapshot metadata. Native surfaces (date/select decorations,

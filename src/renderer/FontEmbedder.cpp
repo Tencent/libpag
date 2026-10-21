@@ -71,9 +71,17 @@ static void PathToPathData(const tgfx::Path& path, PathData* pathData) {
 struct GlyphKey {
   const tgfx::Typeface* typeface = nullptr;
   tgfx::GlyphID glyphID = 0;
+  bool fauxBold = false;
+  bool fauxItalic = false;
+
+  GlyphKey(const tgfx::Font& font, tgfx::GlyphID glyphID)
+      : typeface(font.getTypeface().get()), glyphID(glyphID), fauxBold(font.isFauxBold()),
+        fauxItalic(font.isFauxItalic()) {
+  }
 
   bool operator==(const GlyphKey& other) const {
-    return typeface == other.typeface && glyphID == other.glyphID;
+    return typeface == other.typeface && glyphID == other.glyphID && fauxBold == other.fauxBold &&
+           fauxItalic == other.fauxItalic;
   }
 };
 
@@ -81,6 +89,8 @@ struct GlyphKeyHash {
   size_t operator()(const GlyphKey& key) const {
     size_t h = std::hash<const void*>()(key.typeface);
     h ^= std::hash<uint16_t>()(key.glyphID) << 1;
+    h ^= static_cast<size_t>(key.fauxBold) << 17;
+    h ^= static_cast<size_t>(key.fauxItalic) << 18;
     return h;
   }
 };
@@ -101,7 +111,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
                                tgfx::GlyphID glyphID,
                                std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
                                VectorFontBuilder& builder) {
-  GlyphKey key = {font.getTypeface().get(), glyphID};
+  GlyphKey key = {font, glyphID};
   float fontSize = font.getSize();
 
   // Track the maximum font size for each vector glyph, and only collect the path at the largest
@@ -156,7 +166,7 @@ static void CollectBitmapGlyph(
   auto* typeface = font.getTypeface().get();
   auto& builder = builders[typeface];
 
-  GlyphKey key = {typeface, glyphID};
+  GlyphKey key = {font, glyphID};
   if (builder.glyphMapping.count(key)) {
     return;
   }
@@ -296,7 +306,7 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
 }
 
 static GlyphRun* CreateGlyphRunFromLayoutRun(
-    PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Typeface* typeface,
+    PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Font& collectFont,
     const std::vector<size_t>& indices, Font* embeddedFont, float fontSize,
     const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping) {
   auto glyphRun = document->makeNode<GlyphRun>();
@@ -304,7 +314,7 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
   glyphRun->fontSize = fontSize;
   glyphRun->glyphs.reserve(indices.size());
   for (auto idx : indices) {
-    GlyphKey key = {typeface, tlRun.glyphs[idx]};
+    GlyphKey key = {collectFont, tlRun.glyphs[idx]};
     auto it = glyphMapping.find(key);
     glyphRun->glyphs.push_back(it != glyphMapping.end() ? it->second : 0);
   }
@@ -368,7 +378,7 @@ static void CollectSpacingGlyph(
     return;
   }
   auto* typeface = font.getTypeface().get();
-  GlyphKey key = {typeface, glyphID};
+  GlyphKey key = {font, glyphID};
   float runFontSize = font.getSize();
   if (runFontSize < MinFontSize) {
     return;
@@ -470,7 +480,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
         continue;
       }
       for (auto glyphID : tlRun.glyphs) {
-        auto& type = glyphTypes[GlyphKey{typeface, glyphID}];
+        auto& type = glyphTypes[GlyphKey{tlRun.font, glyphID}];
         if (type == GlyphType::Unknown) {
           type = ClassifyGlyph(tlRun.font, glyphID);
         }
@@ -481,11 +491,12 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // A synthesized italic must reach the glyphs exactly once, and its two carriers are mutually
   // exclusive: `Font::getPath()` bakes ITALIC_SKEW into an embedded vector outline, while a bitmap
   // glyph keeps an upright PNG — tgfx rasterizes it without the skew and only slants the placement
-  // matrix — and leans on GlyphRunRenderer applying the Text-level flag. That shear covers *every*
-  // run of the Text, so an outline the bake already covered would be slanted a second time. Layout
+  // matrix — and needs a render-time flag on its GlyphRun. An outline that already contains the
+  // slant must not receive that shear a second time. Layout
   // clears the run-level flag when the resolved typeface is a real italic face, so only a
-  // synthesized run is examined here. The choice is document-wide because an outline is embedded
-  // once and shared by every Text that uses the glyph.
+  // synthesized run is examined here. Keep the collection strategy document-wide so mixed
+  // vector/bitmap text can share upright outlines. The per-run overrides below preserve the
+  // original Text style while recording whether a rendering shear is still required.
   bool needsRenderShear = false;
   for (auto* text : textOrder) {
     if (!text->fauxItalic) {
@@ -495,9 +506,8 @@ bool FontEmbedder::embed(PAGXDocument* document) {
       if (!tlRun.font.isFauxItalic()) {
         continue;
       }
-      auto* typeface = tlRun.font.getTypeface().get();
       for (auto glyphID : tlRun.glyphs) {
-        auto typeIt = glyphTypes.find(GlyphKey{typeface, glyphID});
+        auto typeIt = glyphTypes.find(GlyphKey{tlRun.font, glyphID});
         if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
           needsRenderShear = true;
           break;
@@ -533,7 +543,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
         collectFont.setFauxItalic(false);
       }
       for (auto glyphID : tlRun.glyphs) {
-        switch (glyphTypes[GlyphKey{typeface, glyphID}]) {
+        switch (glyphTypes[GlyphKey{tlRun.font, glyphID}]) {
           case GlyphType::Vector:
             CollectVectorGlyph(document, collectFont, glyphID, maxFontSizes, vectorBuilder);
             break;
@@ -547,11 +557,6 @@ bool FontEmbedder::embed(PAGXDocument* document) {
             break;
         }
       }
-    }
-    // Keep the flag for a document whose runs still rely on the render-time shear; drop it when
-    // the outlines above were baked instead.
-    if (!needsRenderShear) {
-      text->fauxItalic = false;
     }
   }
 
@@ -589,12 +594,14 @@ bool FontEmbedder::embed(PAGXDocument* document) {
           continue;
         }
         float fontSize = tlRun.font.getSize();
+        tgfx::Font collectFont = tlRun.font;
+        if (needsRenderShear) collectFont.setFauxItalic(false);
 
         // Split glyphs by font type (vector vs bitmap).
         std::vector<size_t> vectorIndices;
         std::vector<size_t> bitmapIndices;
         for (size_t i = 0; i < tlRun.glyphs.size(); i++) {
-          GlyphKey key = {typeface, tlRun.glyphs[i]};
+          GlyphKey key = {collectFont, tlRun.glyphs[i]};
           if (vectorBuilder.glyphMapping.count(key) > 0) {
             vectorIndices.push_back(i);
           } else {
@@ -608,16 +615,20 @@ bool FontEmbedder::embed(PAGXDocument* document) {
 
         if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
           auto glyphRun =
-              CreateGlyphRunFromLayoutRun(document, tlRun, typeface, vectorIndices,
+              CreateGlyphRunFromLayoutRun(document, tlRun, collectFont, vectorIndices,
                                           vectorBuilder.font, fontSize, vectorBuilder.glyphMapping);
+          glyphRun->fauxBold = false;  // Already baked into the vector outline.
+          glyphRun->fauxItalic = needsRenderShear && tlRun.font.isFauxItalic();
           text->glyphRuns.push_back(glyphRun);
         }
         if (!bitmapIndices.empty()) {
           auto builderIt = bitmapBuilders.find(typeface);
           if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, typeface, bitmapIndices,
+            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, collectFont, bitmapIndices,
                                                         builderIt->second.font, fontSize,
                                                         builderIt->second.glyphMapping);
+            glyphRun->fauxBold = false;  // getImage() rasterizes the requested weight.
+            glyphRun->fauxItalic = tlRun.font.isFauxItalic();
             text->glyphRuns.push_back(glyphRun);
           }
         }

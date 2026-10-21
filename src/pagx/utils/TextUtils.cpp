@@ -38,6 +38,13 @@ bool ParseTextInlinePositions(const std::string& text, const std::string& value,
   if (count <= 0 || text.find_first_of("\r\n\t") != std::string::npos) {
     return false;
   }
+  return ParseTextInlinePositions(static_cast<size_t>(count), value, positions);
+}
+
+bool ParseTextInlinePositions(size_t count, const std::string& value,
+                              std::vector<float>* positions) {
+  positions->clear();
+  if (count == 0) return false;
   const char* p = value.c_str();
   std::vector<float> parsed;
   while (*p) {
@@ -45,7 +52,7 @@ bool ParseTextInlinePositions(const std::string& text, const std::string& value,
     if (!*p) break;
     char* end = nullptr;
     float number = std::strtof(p, &end);
-    if (end == p || !std::isfinite(number) || parsed.size() >= static_cast<size_t>(count)) {
+    if (end == p || !std::isfinite(number) || parsed.size() >= count) {
       return false;
     }
     parsed.push_back(number);
@@ -58,7 +65,7 @@ bool ParseTextInlinePositions(const std::string& text, const std::string& value,
       if (!*p || *p == ',') return false;
     }
   }
-  if (parsed.size() != static_cast<size_t>(count)) return false;
+  if (parsed.size() != count) return false;
   *positions = std::move(parsed);
   return true;
 }
@@ -556,6 +563,7 @@ TextLayoutParams MakeTextBoxParams(const TextBox* box) {
   params.lineHeight = box->lineHeight;
   params.wordWrap = box->wordWrap;
   params.overflow = box->overflow;
+  params.capturedBox = box;
   return params;
 }
 

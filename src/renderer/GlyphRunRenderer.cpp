@@ -198,8 +198,8 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
     }
     float fontSizeForTypeface = run->fontSize / static_cast<float>(unitsPerEm);
     tgfx::Font font(typeface, fontSizeForTypeface);
-    font.setFauxBold(text->fauxBold);
-    font.setFauxItalic(text->fauxItalic);
+    font.setFauxBold(run->fauxBold.value_or(text->fauxBold));
+    font.setFauxItalic(run->fauxItalic.value_or(text->fauxItalic));
     size_t count = run->glyphs.size();
 
     for (size_t i = 0; i < count; i++) {

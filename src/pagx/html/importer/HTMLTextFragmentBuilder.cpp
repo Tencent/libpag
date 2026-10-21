@@ -20,8 +20,10 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <utility>
 #include "pagx/PAGXDocument.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -39,6 +41,7 @@
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/UTF.h"
 
 namespace pagx {
 
@@ -403,6 +406,153 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
     }
     child = child->getNextSibling();
   }
+}
+
+Layer* HTMLTextFragmentBuilder::convertCapturedParagraph(const std::shared_ptr<DOMNode>& element,
+                                                         const HTMLBoxAttributes& box,
+                                                         const HTMLInheritedStyle& inherited) {
+  auto reject = [&]() -> Layer* {
+    _diagnostics.warn("html: invalid or unsupported captured paragraph; visual fragments retained");
+    return nullptr;
+  };
+  if (*element->findAttribute("data-pagx-paragraph") != "1" || !std::isfinite(box.widthPx) ||
+      !std::isfinite(box.heightPx) || box.widthPx <= 0 || box.heightPx <= 0 || box.displayFlex ||
+      !box.padding.isZero() || !box.borderWidths.isZero() ||
+      (!inherited.writingMode.empty() && inherited.writingMode != "horizontal-tb"))
+    return reject();
+  auto plainFragmentBox = [&](const HTMLBoxAttributes& b) {
+    return b.absolute && b.padding.isZero() && b.borderWidths.isZero() && b.marginLeftPx == 0 &&
+           b.marginRightPx == 0 && b.marginTopPx == 0 && b.marginBottomPx == 0 &&
+           !b.transform.valid && b.opacity == 1 && !HTMLLayerBuilder::hasBackgroundVisuals(b) &&
+           !b.clipOverflow && (b.filter.empty() || b.filter == "none") &&
+           (b.backdropFilter.empty() || b.backdropFilter == "none") &&
+           (b.clipPathRef.empty() || b.clipPathRef == "none") &&
+           (b.maskImage.empty() || b.maskImage == "none") &&
+           (b.mixBlendMode.empty() || b.mixBlendMode == "normal");
+  };
+  std::vector<TextFragment> fragments;
+  std::vector<TextLayoutFragment> layouts;
+  for (auto run = element->getFirstChild(); run; run = run->getNextSibling()) {
+    if (run->type == DOMNodeType::Text && Trim(run->name).empty()) continue;
+    const auto* source = run->findAttribute("data-pagx-run-text");
+    if (run->type != DOMNodeType::Element || !source || source->empty()) return reject();
+    auto runBox = _styleCascade.computeBoxAttributes(run);
+    if (!plainFragmentBox(runBox) || runBox.leftPx != 0 || runBox.topPx != 0) return reject();
+    auto runStyle = _styleCascade.resolveInheritedStyle(run, inherited);
+    std::vector<size_t> offsets;
+    if (tgfx::UTF::CountUTF8(source->data(), source->size()) < 0) return reject();
+    const char* ptr = source->data();
+    while (ptr < source->data() + source->size()) {
+      offsets.push_back(static_cast<size_t>(ptr - source->data()));
+      tgfx::UTF::NextUTF8(&ptr, source->data() + source->size());
+    }
+    offsets.push_back(source->size());
+    TextFragment style;
+    bool first = true;
+    size_t priorEnd = 0;
+    size_t base = 0;
+    for (auto line = run->getFirstChild(); line; line = line->getNextSibling()) {
+      if (line->type == DOMNodeType::Text && Trim(line->name).empty()) continue;
+      if (line->type != DOMNodeType::Element || line->name != "span") return reject();
+      auto lineStyle = _styleCascade.resolveInheritedStyle(line, runStyle);
+      if (!lineStyle.writingMode.empty() && lineStyle.writingMode != "horizontal-tb")
+        return reject();
+      std::vector<TextFragment> pieces;
+      collectFragments(line, lineStyle, pieces);
+      if (pieces.size() != 1 || pieces[0].text.empty()) return reject();
+      auto f = pieces[0];
+      if ((!f.textDecoration.empty() && f.textDecoration != "none") ||
+          (!f.textShadow.empty() && f.textShadow != "none"))
+        return reject();
+      if (first) {
+        style = f;
+        style.text = *source;
+        if (!fragments.empty() && fragmentsShareStyle(fragments.back(), style)) {
+          base = static_cast<size_t>(
+              tgfx::UTF::CountUTF8(fragments.back().text.data(), fragments.back().text.size()));
+          fragments.back().text += *source;
+        } else {
+          fragments.push_back(style);
+        }
+        first = false;
+      } else if (!fragmentsShareStyle(style, f))
+        return reject();
+      auto* startValue = line->findAttribute("data-pagx-start");
+      auto* baselineValue = line->findAttribute("data-pagx-baseline");
+      auto* positions = line->findAttribute("data-pagx-inline-positions");
+      if (!startValue || !baselineValue || !positions || startValue->empty() ||
+          startValue->find_first_not_of("0123456789") != std::string::npos)
+        return reject();
+      char* end = nullptr;
+      errno = 0;
+      auto start = std::strtoull(startValue->c_str(), &end, 10);
+      if (errno || start > std::numeric_limits<uint32_t>::max() ||
+          base + start > std::numeric_limits<uint32_t>::max())
+        return reject();
+      int count = tgfx::UTF::CountUTF8(f.text.data(), f.text.size());
+      if (count <= 0 || start + static_cast<size_t>(count) >= offsets.size() || start < priorEnd ||
+          source->find_first_not_of(" \r\n\t\f", offsets[priorEnd]) < offsets[start] ||
+          source->substr(offsets[start], offsets[start + count] - offsets[start]) != f.text)
+        return reject();
+      priorEnd = start + count;
+      errno = 0;
+      float baseline = std::strtof(baselineValue->c_str(), &end);
+      if (errno || end != baselineValue->c_str() + baselineValue->size() ||
+          baselineValue->empty() || !std::isfinite(baseline))
+        return reject();
+      auto lineBox = _styleCascade.computeBoxAttributes(line);
+      if (!plainFragmentBox(lineBox)) return reject();
+      TextLayoutFragment layout;
+      layout.textIndex = static_cast<uint32_t>(fragments.size() - 1);
+      layout.start = static_cast<uint32_t>(base + start);
+      layout.length = static_cast<uint32_t>(count);
+      layout.position = {lineBox.leftPx, lineBox.topPx + baseline};
+      layout.bounds = {lineBox.leftPx, lineBox.topPx, lineBox.widthPx, lineBox.heightPx};
+      if (!ParseTextInlinePositions(f.text, *positions, &layout.inlinePositions)) return reject();
+      for (auto value :
+           {layout.position.x, layout.position.y, layout.bounds.width, layout.bounds.height})
+        if (!std::isfinite(value)) return reject();
+      layouts.push_back(std::move(layout));
+    }
+    if (source->find_first_not_of(" \r\n\t\f", offsets[priorEnd]) != std::string::npos)
+      return reject();
+    if (first) {
+      auto whitespace = makeFragment(runStyle);
+      whitespace.text = *source;
+      if (!fragments.empty() && fragmentsShareStyle(fragments.back(), whitespace)) {
+        fragments.back().text += *source;
+      } else {
+        fragments.push_back(std::move(whitespace));
+      }
+    }
+  }
+  if (fragments.empty() || layouts.empty()) return reject();
+  // Validate the entire descriptor before allocating document nodes. A malformed range must
+  // fall back without leaving a partially imported paragraph behind.
+  std::vector<TextElement> sourceElements;
+  for (const auto& f : fragments) {
+    TextElement source;
+    source.glyph.text = f.text;
+    sourceElements.push_back(std::move(source));
+  }
+  if (!TextLayout::ValidateFragments(sourceElements, layouts)) return reject();
+  Layer* host = nullptr;
+  auto* wrapper = buildTextHostLayers(element, box, HTMLLayerBuilder::hasBackgroundVisuals(box),
+                                      false, false, host);
+  populateTextHostContents(host, fragments, inherited, box, true, false, false);
+  auto* textBox = static_cast<TextBox*>(host->contents.back());
+  textBox->width = box.widthPx;
+  textBox->height = box.heightPx;
+  textBox->percentWidth = NAN;
+  textBox->layoutFragments = std::move(layouts);
+  std::vector<Text*> texts;
+  TextLayout::CollectTextElements(textBox->elements, texts);
+  auto elements = TextLayout::MakeElements(texts);
+  auto params = MakeTextBoxParams(textBox);
+  textBox->layoutKey = TextLayout::CaptureKey(elements, params);
+  _layerBuilder.applyTextBackground(wrapper, box);
+  _idAllocator.assign(wrapper, element);
+  return wrapper;
 }
 
 Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& element,

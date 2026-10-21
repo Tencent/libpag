@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <map>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
@@ -29,11 +30,13 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/StringParser.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
 #include "renderer/PunctuationSquash.h"
 #include "renderer/TextShaper.h"
+#include "renderer/TextUnicode.h"
 #include "renderer/VerticalTextUtils.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
@@ -1887,6 +1890,150 @@ static Rect MergeEmbeddedBounds(const std::vector<TextElement>& textElements) {
   return totalBounds;
 }
 
+std::string TextLayout::CaptureKey(const std::vector<TextElement>& elements,
+                                   const TextLayoutParams& params) {
+  uint64_t hash = 14695981039346656037ULL;
+  auto add = [&](const std::string& value) {
+    // Length-prefix strings so that adjacent fields cannot alias.
+    auto input = std::to_string(value.size()) + ":" + value;
+    for (unsigned char c : input) hash = (hash ^ c) * 1099511628211ULL;
+  };
+  auto number = [&](float value) {
+    // Use the XML representation so the key survives a save/load cycle. Keep automatic
+    // dimensions distinct from an explicit zero (FloatToString maps non-finite values to zero).
+    add(std::isnan(value) ? "auto" : FloatToString(value));
+  };
+  add("horizontal-fragments-v1");
+  number(params.boxWidth);
+  number(params.boxHeight);
+  number(params.lineHeight);
+  number(params.textScale);
+  number(static_cast<float>(params.baseline));
+  number(static_cast<float>(params.textAlign));
+  number(static_cast<float>(params.paragraphAlign));
+  number(static_cast<float>(params.writingMode));
+  number(static_cast<float>(params.overflow));
+  number(params.wordWrap ? 1 : 0);
+  add(std::to_string(elements.size()));
+  for (const auto& element : elements) {
+    const auto& g = element.glyph;
+    add(g.text);
+    add(g.fontFamily);
+    add(g.fontFamilyList);
+    add(g.fontStyle);
+    add(g.fontVariantEmoji);
+    number(g.fontSize);
+    number(g.letterSpacing);
+    number(g.fauxBold ? 1 : 0);
+    number(g.fauxItalic ? 1 : 0);
+    number(static_cast<float>(g.textOrientation));
+    for (float position : g.inlinePositions) number(position);
+    add("end-text");
+  }
+  if (params.capturedBox) {
+    std::vector<Text*> texts;
+    std::vector<tgfx::Matrix> matrices;
+    CollectTextElements(params.capturedBox->elements, texts, matrices);
+    for (auto& m : matrices) {
+      number(m.getScaleX());
+      number(m.getSkewX());
+      number(m.getTranslateX());
+      number(m.getSkewY());
+      number(m.getScaleY());
+      number(m.getTranslateY());
+    }
+    for (const auto& f : params.capturedBox->layoutFragments) {
+      add(std::to_string(f.textIndex));
+      add(std::to_string(f.start));
+      add(std::to_string(f.length));
+      number(f.position.x);
+      number(f.position.y);
+      number(f.bounds.x);
+      number(f.bounds.y);
+      number(f.bounds.width);
+      number(f.bounds.height);
+      add(std::to_string(f.inlinePositions.size()));
+      for (float p : f.inlinePositions) number(p);
+    }
+  }
+  char buffer[24];
+  snprintf(buffer, sizeof(buffer), "v1-%016llx", static_cast<unsigned long long>(hash));
+  return buffer;
+}
+
+static std::vector<size_t> ScalarOffsets(const std::string& text) {
+  std::vector<size_t> offsets;
+  if (tgfx::UTF::CountUTF8(text.data(), text.size()) < 0) return offsets;
+  const char* ptr = text.data();
+  const char* end = ptr + text.size();
+  while (ptr < end) {
+    offsets.push_back(static_cast<size_t>(ptr - text.data()));
+    tgfx::UTF::NextUTF8(&ptr, end);
+  }
+  offsets.push_back(text.size());
+  return offsets;
+}
+
+bool TextLayout::ValidateCapture(const std::vector<TextElement>& elements,
+                                 const TextLayoutParams& params) {
+  auto* box = params.capturedBox;
+  if (!box || box->layoutFragments.empty() || box->layoutKey.empty() ||
+      params.writingMode != WritingMode::Horizontal ||
+      box->layoutKey != CaptureKey(elements, params))
+    return false;
+  return ValidateFragments(elements, box->layoutFragments);
+}
+
+bool TextLayout::ValidateFragments(const std::vector<TextElement>& elements,
+                                   const std::vector<TextLayoutFragment>& fragments) {
+  if (fragments.empty()) return false;
+  std::vector<std::vector<size_t>> offsets;
+  std::vector<std::vector<size_t>> clusterBoundaries;
+  std::vector<size_t> ends(elements.size(), 0);
+  for (const auto& element : elements) {
+    offsets.push_back(ScalarOffsets(element.glyph.text));
+    if (offsets.back().empty()) return false;
+    std::vector<size_t> boundaries;
+    for (const auto& cluster : SegmentTextClusters(element.glyph.text)) {
+      boundaries.push_back(cluster.start);
+    }
+    boundaries.push_back(element.glyph.text.size());
+    clusterBoundaries.push_back(std::move(boundaries));
+  }
+  auto whitespace = [](const std::string& text, size_t begin, size_t end) {
+    return text.find_first_not_of(" \r\n\t\f", begin) >= end;
+  };
+  for (const auto& f : fragments) {
+    if (f.textIndex >= elements.size() || f.length == 0) return false;
+    const auto& o = offsets[f.textIndex];
+    size_t end = static_cast<size_t>(f.start) + f.length;
+    if (end >= o.size() || f.start < ends[f.textIndex] || f.inlinePositions.size() != f.length)
+      return false;
+    const auto& text = elements[f.textIndex].glyph.text;
+    const auto& boundaries = clusterBoundaries[f.textIndex];
+    if (!std::binary_search(boundaries.begin(), boundaries.end(), o[f.start]) ||
+        !std::binary_search(boundaries.begin(), boundaries.end(), o[end]))
+      return false;
+    if (!whitespace(text, o[ends[f.textIndex]], o[f.start]) ||
+        text.find_first_of("\r\n\t", o[f.start]) < o[end])
+      return false;
+    for (float value :
+         {f.position.x, f.position.y, f.bounds.x, f.bounds.y, f.bounds.width, f.bounds.height}) {
+      if (!std::isfinite(value)) return false;
+    }
+    if (f.bounds.width < 0 || f.bounds.height <= 0 ||
+        !std::all_of(f.inlinePositions.begin(), f.inlinePositions.end(),
+                     [](float v) { return std::isfinite(v); }))
+      return false;
+    ends[f.textIndex] = end;
+  }
+  for (size_t i = 0; i < elements.size(); i++) {
+    if (!whitespace(elements[i].glyph.text, offsets[i][ends[i]], elements[i].glyph.text.size()))
+      return false;
+  }
+  return true;
+}
+
 TextLayoutResult TextLayout::Layout(const std::vector<TextElement>& textElements,
                                     const TextLayoutParams& params, LayoutContext* context,
                                     bool useEmbeddedGlyphRuns) {
@@ -1895,10 +2042,52 @@ TextLayoutResult TextLayout::Layout(const std::vector<TextElement>& textElements
   }
   TextLayoutContext layoutContext(context);
   TextLayoutResult result = {};
-  if (useEmbeddedGlyphRuns && AllHaveEmbeddedGlyphRuns(textElements)) {
+  bool hasCapture = params.capturedBox && !params.capturedBox->layoutKey.empty();
+  bool validCapture = hasCapture && ValidateCapture(textElements, params);
+  bool hasEmbeddedRuns =
+      validCapture ? std::all_of(params.capturedBox->layoutFragments.begin(),
+                                 params.capturedBox->layoutFragments.end(),
+                                 [&](const auto& f) {
+                                   return !textElements[f.textIndex].node->glyphRuns.empty();
+                                 })
+                   : AllHaveEmbeddedGlyphRuns(textElements);
+  if (useEmbeddedGlyphRuns && (!hasCapture || validCapture) && hasEmbeddedRuns) {
     // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
     result.bounds = MergeEmbeddedBounds(textElements);
+  } else if (validCapture) {
+    bool first = true;
+    std::vector<std::vector<size_t>> offsets;
+    for (const auto& element : textElements) offsets.push_back(ScalarOffsets(element.glyph.text));
+    for (const auto& fragment : params.capturedBox->layoutFragments) {
+      auto element = textElements[fragment.textIndex];
+      const auto& runOffsets = offsets[fragment.textIndex];
+      auto byteStart = runOffsets[fragment.start];
+      auto byteEnd = runOffsets[static_cast<size_t>(fragment.start) + fragment.length];
+      element.glyph.text = element.glyph.text.substr(byteStart, byteEnd - byteStart);
+      element.glyph.inlinePositions = fragment.inlinePositions;
+      TextLayoutParams lineParams;
+      lineParams.baseline = TextBaseline::Alphabetic;
+      lineParams.wordWrap = false;
+      auto line = layoutContext.processTextWithLayout({element}, lineParams);
+      auto runs = line.extractLayoutRuns(element.node);
+      for (auto& run : runs) {
+        for (auto& p : run.positions) {
+          p.x += fragment.position.x;
+          p.y += fragment.position.y;
+        }
+        result.layoutGlyphRuns[element.node].push_back(std::move(run));
+      }
+      auto found = result.perTextBounds.find(element.node);
+      result.perTextBounds[element.node] = found == result.perTextBounds.end()
+                                               ? fragment.bounds
+                                               : RectUnion(found->second, fragment.bounds);
+      result.bounds = first ? fragment.bounds : RectUnion(result.bounds, fragment.bounds);
+      first = false;
+      result.textLines[element.node].push_back(
+          {fragment.position.y, fragment.position.x, fragment.bounds.width,
+           static_cast<uint32_t>(byteStart), static_cast<uint32_t>(byteEnd)});
+    }
   } else {
     result = layoutContext.processTextWithLayout(textElements, params);
   }
