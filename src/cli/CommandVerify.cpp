@@ -208,8 +208,7 @@ using LayerMatrixMap = std::unordered_map<const Layer*, Matrix>;
 static void CollectLayerMatrices(const std::vector<Layer*>& layers, const Matrix& parentMatrix,
                                  LayerMatrixMap& matrices) {
   for (const auto* layer : layers) {
-    if (layer->hasScrollRect || layer->preserve3D || layer->z != 0 ||
-        !layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
+    if (layer->hasScrollRect || layer->preserve3D || HasLayer3DTransform(layer)) {
       continue;
     }
     auto matrix = parentMatrix * BuildLayerMatrix(layer);
@@ -232,9 +231,9 @@ static bool MaskSharesOwnerSpace(const Layer* layer, const LayerMatrixMap& matri
 // Checks the authored local transform separately from the position produced by layout.
 static bool HasIdentityLayerTransform(const Layer* layer) {
   auto position = layer->layoutPosition();
-  return layer->x == 0 && layer->y == 0 && layer->z == 0 && layer->matrix.isIdentity() &&
-         layer->matrix3D.isIdentity() && !HasLayerTransformComponents(layer) &&
-         (std::isnan(position.x) || position.x == 0) && (std::isnan(position.y) || position.y == 0);
+  return layer->x == 0 && layer->y == 0 && layer->matrix.isIdentity() &&
+         !HasLayer3DTransform(layer) && (std::isnan(position.x) || position.x == 0) &&
+         (std::isnan(position.y) || position.y == 0);
 }
 
 static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, float canvasHeight,

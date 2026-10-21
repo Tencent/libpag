@@ -39,6 +39,8 @@ bool HasPerspective(const Matrix3D& matrix);
 
 // Returns true if the Layer carries any 3D transform: a Z translation, a matrix3D, or a transform
 // component. Exporters and optimizers that only handle the 2D plane use this as a single guard.
+// Callers that must also ignore a non-finite matrix keep their own finite checks; this predicate
+// only answers whether the plane stays at z = 0.
 bool HasLayer3DTransform(const Layer* layer);
 
 // Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from

@@ -105,7 +105,7 @@ bool ComputeScreenBounds(const Layer* target,
                             !FloatNearlyZero(m.b) || !FloatNearlyZero(m.c))) {
       return false;
     }
-    if (!cur->matrix3D.isIdentity() || HasLayerTransformComponents(cur)) {
+    if (HasLayer3DTransform(cur)) {
       return false;
     }
     auto parentMatrix = BuildLayerMatrix(cur);

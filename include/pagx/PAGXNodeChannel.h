@@ -36,7 +36,7 @@ namespace pagx {
  * Value encoding (KeyValue alternatives): scalars map directly (float/bool/int/string/Color), as do
  * whole transform matrices (a Layer's "matrix" as Matrix and "matrix3D" as Matrix3D);
  * enums are passed as their string name (e.g. blendMode = "multiply"); the Layer transform
- * components use "rotation.x", "scale.y", "skew.z"-style names that do not match their XML
+ * components use "rotation.x", "scale.y", "skew.y"-style names that do not match their XML
  * attributes (rotationX, scaleY, skewY), so callers cannot derive a channel from an attribute name;
  * Point/Size fields are
  * addressed component-wise via suffixed channels ("position.x", "size.width"). Multi-component

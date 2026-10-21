@@ -1506,7 +1506,7 @@ static ContourMaskBox ContourMaskBorderRadius(const Layer* layer) {
   // writeClipContent folds the mask layer's local transform and generated layout slot into the
   // clip geometry, so only an identity 2D mask transform leaves the shape bounds comparable to
   // this box. A 2D border-radius cannot represent a full 3D transform.
-  if (!mask->matrix3D.isIdentity() || HasLayerTransformComponents(mask)) {
+  if (HasLayer3DTransform(mask)) {
     return {};
   }
   Matrix maskMatrix = BuildLayerMatrix(mask);
