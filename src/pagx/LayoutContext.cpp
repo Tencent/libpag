@@ -78,6 +78,38 @@ static std::shared_ptr<tgfx::Typeface> ResolveCachedLayoutTypeface(
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
+std::shared_ptr<tgfx::Typeface> LayoutContext::matchTypeface(const std::string& family,
+                                                             const CSSFontStyle& request,
+                                                             std::string* resolvedStyle,
+                                                             float size) {
+  if (fontConfig) {
+    // Snapshot aliases contain an already CSS-selected, ordered unicode-range composite.
+    if (fontConfig->data->fontFaces.count(family))
+      return findTypeface(family, FontStyleRequestName(request), -1, size);
+    std::vector<CSSFontFace> faces;
+    std::vector<std::shared_ptr<tgfx::Typeface>> typefaces;
+    auto append = [&](TypefaceHolder& holder) {
+      if (holder.getFontFamily() != family) return;
+      auto face = holder.getTypeface(size);
+      if (!face) return;
+      faces.push_back({holder.getFontStyle(), SystemFonts::TypefaceStyle(face.get())});
+      typefaces.push_back(std::move(face));
+    };
+    for (auto& entry : fontConfig->data->registeredTypefaces) append(entry.second);
+    if (faces.empty()) {
+      for (auto& holder : fontConfig->data->fallbackTypefaces) append(holder);
+    }
+    auto best = MatchCSSFontFace(faces, request);
+    if (best >= 0) {
+      if (resolvedStyle) *resolvedStyle = faces[best].name;
+      return typefaces[best];
+    }
+  }
+  auto face = SystemFonts::MatchTypeface(family, request, size);
+  if (face && resolvedStyle) *resolvedStyle = face->fontStyle();
+  return face;
+}
+
 std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& fontFamily,
                                                             const std::string& fontStyle,
                                                             int32_t codepoint, float size) {

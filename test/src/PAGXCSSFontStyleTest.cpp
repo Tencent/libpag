@@ -16,10 +16,75 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <fstream>
 #include "base/PAGTest.h"
+#include "nlohmann/json.hpp"
+#include "pagx/SystemFonts.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "tgfx/core/Typeface.h"
+#include "utils/ProjectPath.h"
 
 namespace pag {
+
+CLI_TEST(PAGXCSSFontStyleTest, SharedPropertyMatchingCases) {
+  std::ifstream input(ProjectPath::Absolute("test/fixtures/font-matching-cases.json"));
+  ASSERT_TRUE(input.good());
+  auto cases = nlohmann::json::parse(input);
+  for (const auto& row : cases) {
+    SCOPED_TRACE(row["name"].get<std::string>());
+    auto props = [](const nlohmann::json& values, size_t offset) {
+      return pagx::ParseCSSFontStyle(values[offset].dump(), values[offset + 2].get<std::string>(),
+                                     values[offset + 1].dump() + "%");
+    };
+    auto request = props(row["request"], 0);
+    std::vector<pagx::CSSFontFace> faces;
+    for (const auto& face : row["faces"])
+      faces.push_back({face[0].get<std::string>(), props(face, 1)});
+    for (size_t i = 0; i < faces.size(); ++i) {
+      auto index = pagx::MatchCSSFontFace(faces, request);
+      ASSERT_GE(index, 0);
+      EXPECT_EQ(faces[index].name, row["expected"].get<std::string>());
+      std::rotate(faces.begin(), faces.begin() + 1, faces.end());
+    }
+    std::reverse(faces.begin(), faces.end());
+    EXPECT_EQ(faces[pagx::MatchCSSFontFace(faces, request)].name,
+              row["expected"].get<std::string>());
+  }
+}
+
+CLI_TEST(PAGXCSSFontStyleTest, NumericRequestsAndWidthNames) {
+  for (auto width : {50.0, 62.5, 75.0, 87.5, 100.0, 112.5, 125.0, 150.0, 200.0}) {
+    auto request = pagx::ParseCSSFontStyle("550.5", "oblique", std::to_string(width) + "%");
+    auto restored = pagx::FontStyleFromName(pagx::FontStyleRequestName(request));
+    EXPECT_DOUBLE_EQ(restored.width, width);
+    EXPECT_DOUBLE_EQ(restored.weight, 550.5);
+    EXPECT_EQ(restored.slant, pagx::CSSFontSlant::Oblique);
+  }
+  EXPECT_DOUBLE_EQ(pagx::FontStyleFromName("Semi Condensed Bold").width, 87.5);
+  EXPECT_DOUBLE_EQ(pagx::FontStyleFromName("Extra-Expanded Light").width, 150);
+  EXPECT_DOUBLE_EQ(pagx::FontStyleFromName("UltraLight").width, 100);
+  EXPECT_EQ(pagx::MatchCSSFontFace({}, {}), -1);
+}
+
+CLI_TEST(PAGXCSSFontStyleTest, NativeMetadataAndExactNameAreDistinct) {
+#ifdef __APPLE__
+  auto normal = pagx::SystemFonts::MatchTypeface("Helvetica Neue", {800, 100});
+  auto condensed = pagx::SystemFonts::MatchTypeface("Helvetica Neue", {800, 75});
+  auto exact = pagx::SystemFonts::ResolveTypeface("Helvetica Neue", "Condensed Black");
+  ASSERT_NE(normal, nullptr);
+  ASSERT_NE(condensed, nullptr);
+  ASSERT_NE(exact, nullptr);
+  EXPECT_EQ(normal->fontStyle(), "Bold");
+  EXPECT_EQ(condensed->fontStyle(), "Condensed Black");
+  EXPECT_EQ(exact->fontStyle(), "Condensed Black");
+  auto thin = pagx::SystemFonts::MatchTypeface("Helvetica Neue", {100, 100});
+  ASSERT_NE(thin, nullptr);
+  EXPECT_EQ(thin->fontStyle(), "UltraLight");
+  EXPECT_DOUBLE_EQ(pagx::SystemFonts::TypefaceStyle(normal.get()).width, 100);
+  EXPECT_DOUBLE_EQ(pagx::SystemFonts::TypefaceStyle(condensed.get()).width, 75);
+#endif
+}
 
 CLI_TEST(PAGXCSSFontStyleTest, MatchAvailableWeightAndSlant) {
   EXPECT_EQ(pagx::MatchCSSFontStyle({"Regular", "Medium", "Semibold"}, "Bold"), "Semibold");

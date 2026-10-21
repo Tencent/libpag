@@ -1,0 +1,20 @@
+[
+  {"name":"normal width before heavier condensed", "request":[800,100,"normal"], "faces":[["Bold",700,100,"normal"],["Condensed Black",900,75,"normal"]], "expected":"Bold"},
+  {"name":"heavier normal width remains preferred", "request":[800,100,"normal"], "faces":[["Bold",700,100,"normal"],["Black",900,100,"normal"],["Condensed Black",900,75,"normal"]], "expected":"Black"},
+  {"name":"explicit condensed request", "request":[800,75,"normal"], "faces":[["Bold",700,100,"normal"],["Condensed Black",900,75,"normal"]], "expected":"Condensed Black"},
+  {"name":"family only contains condensed faces", "request":[800,100,"normal"], "faces":[["Condensed Bold",700,75,"normal"],["Condensed Black",900,75,"normal"]], "expected":"Condensed Black"},
+  {"name":"width precedes slant", "request":[700,100,"italic"], "faces":[["Upright",400,100,"normal"],["Condensed Italic",700,75,"italic"]], "expected":"Upright"},
+  {"name":"slant precedes weight", "request":[700,100,"italic"], "faces":[["Bold",700,100,"normal"],["Italic",400,100,"italic"]], "expected":"Italic"},
+  {"name":"normal prefers oblique before italic", "request":[400,100,"normal"], "faces":[["Italic",400,100,"italic"],["Oblique",400,100,"oblique"]], "expected":"Oblique"},
+  {"name":"italic prefers oblique before upright", "request":[400,100,"italic"], "faces":[["Regular",400,100,"normal"],["Oblique",400,100,"oblique"]], "expected":"Oblique"},
+  {"name":"oblique prefers italic before upright", "request":[400,100,"oblique"], "faces":[["Regular",400,100,"normal"],["Italic",400,100,"italic"]], "expected":"Italic"},
+  {"name":"light searches downward first", "request":[350,100,"normal"], "faces":[["Light",300,100,"normal"],["Regular",400,100,"normal"]], "expected":"Light"},
+  {"name":"400 searches toward 500 first", "request":[400,100,"normal"], "faces":[["Light",300,100,"normal"],["Medium",500,100,"normal"]], "expected":"Medium"},
+  {"name":"450 searches toward 500 first", "request":[450,100,"normal"], "faces":[["Regular",400,100,"normal"],["Medium",500,100,"normal"]], "expected":"Medium"},
+  {"name":"500 searches downward before 600", "request":[500,100,"normal"], "faces":[["Regular",400,100,"normal"],["Semibold",600,100,"normal"]], "expected":"Regular"},
+  {"name":"fractional weight is not rounded", "request":[550.5,100,"normal"], "faces":[["A",550,100,"normal"],["B",551,100,"normal"],["C",600,100,"normal"]], "expected":"B"},
+  {"name":"subnormal width searches downward first", "request":[400,90,"normal"], "faces":[["Normal",400,100,"normal"],["Semi Condensed",400,87.5,"normal"]], "expected":"Semi Condensed"},
+  {"name":"expanded width searches upward first", "request":[400,110,"normal"], "faces":[["Normal",400,100,"normal"],["Expanded",400,125,"normal"]], "expected":"Expanded"},
+  {"name":"real weight overrides misleading names", "request":[100,100,"normal"], "faces":[["Thin",200,100,"normal"],["UltraLight",100,100,"normal"]], "expected":"UltraLight"},
+  {"name":"real width overrides misleading names", "request":[800,100,"normal"], "faces":[["ExtraBold",800,75,"normal"],["Unknown Vendor Face",700,100,"normal"]], "expected":"Unknown Vendor Face"}
+]

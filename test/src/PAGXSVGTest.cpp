@@ -675,6 +675,32 @@ static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
   }
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_CSSFontWidthAndWeight) {
+#ifdef __APPLE__
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="600" height="100"><g font-family="Helvetica Neue" font-weight="800"
+      font-stretch="75%"><text y="50">Narrow<tspan font-stretch="normal">Wide</tspan>
+      <tspan>Again</tspan></text></g></svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  ASSERT_EQ(texts.size(), 3u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->fontStyle, "Condensed Black");
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[1])->fontStyle, "Bold");
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[2])->fontStyle, "Condensed Black");
+#endif
+  auto missing = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="300" height="100"><g font-family="Missing CSS Fixture" font-stretch="87.5%">
+      <text y="50" font-weight="550.5" font-style="oblique">Unrounded</text></g></svg>)SVG");
+  ASSERT_NE(missing, nullptr);
+  std::vector<pagx::Element*> unresolved;
+  for (auto layer : missing->layers) CollectElementsByType(layer, pagx::NodeType::Text, unresolved);
+  ASSERT_EQ(unresolved.size(), 1u);
+  auto text = static_cast<pagx::Text*>(unresolved[0]);
+  EXPECT_EQ(text->fontStyle, "87.5% 550.5 Oblique");
+  EXPECT_TRUE(text->fauxItalic);
+}
+
 static pagx::Layer* FindFirstMaskedLayer(pagx::Layer* layer) {
   if (layer == nullptr) {
     return nullptr;

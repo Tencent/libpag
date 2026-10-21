@@ -25,6 +25,7 @@
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace tgfx {
 class Typeface;
@@ -45,6 +46,11 @@ class LayoutContext {
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle, int32_t codepoint = -1,
                                                float size = 12.0f);
+  // CSS selection returns a document registration key when one exists, preserving aliases.
+  std::shared_ptr<tgfx::Typeface> matchTypeface(const std::string& family,
+                                                const CSSFontStyle& request,
+                                                std::string* resolvedStyle = nullptr,
+                                                float size = 12.0f);
 
   using TypefacePredicate = std::function<bool(const std::shared_ptr<tgfx::Typeface>&)>;
   std::shared_ptr<tgfx::Typeface> findClusterTypeface(const std::string& family,

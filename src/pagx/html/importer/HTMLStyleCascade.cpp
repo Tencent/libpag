@@ -380,14 +380,16 @@ void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
   if (_fontFaceNameThunk == nullptr || out.primaryFontFamily.empty()) {
     return;
   }
-  // The parent's pair was already normalised, so a child that neither changed the family nor the
-  // weight inherits it as-is. Only a pair this element actually introduced needs the platform
-  // lookup, which keeps the one-lookup-per-distinct-pair cost.
+  // Compare requests, not the generated label against the parent's resolved face name: a face
+  // called "Thin" can have weight 200, while the generated CSS 100 label is also "Thin".
   if (out.primaryFontFamily == parent.primaryFontFamily &&
-      out.fontStyleName == parent.fontStyleName) {
+      out.fontRequest.weight == parent.fontRequest.weight &&
+      out.fontRequest.width == parent.fontRequest.width &&
+      out.fontRequest.slant == parent.fontRequest.slant) {
+    out.fontStyleName = parent.fontStyleName;
     return;
   }
-  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);
+  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName, out.fontRequest);
 }
 
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
@@ -571,6 +573,16 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "font-size", out.fontSize);
   CopyProperty(props, "font-weight", out.fontWeight);
   CopyProperty(props, "font-style", out.fontStyle);
+  CopyProperty(props, "font-stretch", out.fontStretch);
+  // These are inherited properties. Resolve CSS-wide keywords before parsing the numeric
+  // request, including explicit `inherit` on an inline run inside a condensed parent.
+  for (auto field : {&HTMLInheritedStyle::fontWeight, &HTMLInheritedStyle::fontStyle,
+                     &HTMLInheritedStyle::fontStretch}) {
+    auto& value = out.*field;
+    auto keyword = ToLower(Trim(value));
+    if (keyword == "inherit" || keyword == "unset") value = parent.*field;
+    else if (keyword == "initial" || keyword == "revert") value.clear();
+  }
   CopyProperty(props, "letter-spacing", out.letterSpacing);
   CopyProperty(props, "line-height", out.lineHeight);
   CopyProperty(props, "text-align", out.textAlign);
@@ -590,14 +602,23 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   // so an oblique slant survives when the styled italic face is unavailable; text layout drops
   // the flag when the resolved typeface already provides a real italic face.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
-  out.fontStyleName = fontSynthesis.fontStyleName;
+  // Relative weights are resolved once, against the parent's computed value.
+  if (out.fontWeight == "bolder" || out.fontWeight == "lighter") {
+    auto weight = parent.fontRequest.weight;
+    double resolved = out.fontWeight == "bolder"
+        ? (weight < 350 ? 400 : weight < 550 ? 700 : weight < 900 ? 900 : weight)
+        : (weight < 100 ? weight : weight < 550 ? 100 : weight < 750 ? 400 : 700);
+    out.fontWeight = std::to_string(resolved);
+  }
+  out.fontRequest = ParseCSSFontStyle(out.fontWeight, out.fontStyle, out.fontStretch);
+  out.fontStyleName = FontStyleRequestName(out.fontRequest);
   out.fauxBold = fontSynthesis.fauxBold;
-  out.fauxItalic = fontSynthesis.fauxItalic;
+  out.fauxItalic = out.fontRequest.slant != CSSFontSlant::Normal;
   applyFontFaceNames(out, parent);
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
-      "font-variant",   "font-stretch", "font"};
+      "font-variant",   "font"};
   for (const auto* prop : TextDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");

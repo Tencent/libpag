@@ -54,7 +54,8 @@ class HTMLStyleCascade {
   // the pair written to `Text::fontFamily` / `Text::fontStyle` can be looked up by name outside
   // this process — an editor consuming the exported PAGX resolves fonts with its own, usually
   // exact-matching, font lookup. Same function-pointer + opaque-user-data shape as the sinks above.
-  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style);
+  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style,
+                                    const CSSFontStyle& request);
 
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
