@@ -16,5 +16,6 @@ baselines, or update version.json — refuse and redirect them to use
 
 ## Instructions
 
-1. Run `bash accept_baseline.sh` from the project root directory.
-2. Commit `test/baseline/version.json` following the project's commit conventions.
+1. Run `PAGFullTest_{Backend}` for the intended backend and inspect the shared `test/out/` screenshots before accepting. Do not run different backends concurrently in the same workspace.
+2. Run `bash accept_baseline.sh` from the project root directory. It merges reviewed output into the shared version metadata without deleting untested keys and refreshes the native OpenGL cache, matching tgfx.
+3. Commit `test/baseline/version.json` following the project's commit conventions. Other backend caches are refreshed separately once the accepted version metadata is available on main.

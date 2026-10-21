@@ -94,7 +94,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           cmake -G Ninja -DPAG_USE_METAL=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B build-metal
-          cmake --build build-metal --target PAGFullTest -- -j 12
+          cmake --build build-metal --target PAGFullTest_Metal -- -j 12
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
