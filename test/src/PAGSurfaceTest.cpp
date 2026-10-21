@@ -267,3 +267,40 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 }  // namespace pag
 
 #endif  // TGFX_USE_OPENGL
+
+namespace pag {
+
+/**
+ * 用例描述: 测试 PAGSurface 异步回读会话，公共 API 覆盖全部后端（阻塞式回读的后端上
+ * isReady 创建后即就绪），并与同步 readPixels 的结果逐字节比对
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = pagSurface->asyncReadPixels();
+  ASSERT_TRUE(readback != nullptr);
+  EXPECT_EQ(readback->width(), pagFile->width());
+  EXPECT_EQ(readback->height(), pagFile->height());
+  ASSERT_TRUE(readback->isReady());
+
+  const auto width = readback->width();
+  const auto height = readback->height();
+  std::vector<uint8_t> asyncPixels(static_cast<size_t>(width * height * 4));
+  ASSERT_TRUE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                   asyncPixels.data(), static_cast<size_t>(width * 4)));
+
+  std::vector<uint8_t> syncPixels(static_cast<size_t>(width * height * 4));
+  ASSERT_TRUE(pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                     syncPixels.data(), static_cast<size_t>(width * 4)));
+  EXPECT_EQ(asyncPixels, syncPixels);
+}
+
+}  // namespace pag

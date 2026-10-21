@@ -11,6 +11,52 @@ export const isWebGPUBackend = (): boolean => {
   return !!module && typeof module._IsWebGPUBackend === 'function' && module._IsWebGPUBackend();
 };
 
+/**
+ * Minimal structure of a GPUTexture required when wrapping a host texture on the WebGPU backend.
+ * lib.dom of TypeScript ~5.0 does not ship WebGPU declarations, so a structural type is used;
+ * a real GPUTexture satisfies it.
+ */
+export interface WebGPUTextureLike {
+  readonly format: string;
+}
+
+interface WebGPUObjectManager {
+  create: (object: object) => number;
+  release: (id: number) => void;
+}
+
+const getWebGPURuntime = (): { mgrTexture?: WebGPUObjectManager; TextureFormat?: string[] } | undefined => {
+  return PAGModule.WebGPU;
+};
+
+/**
+ * WebGPU backend only. Registers a host GPUTexture in Emscripten's WebGPU runtime and returns the
+ * wasm-side texture handle together with the numeric WGPUTextureFormat resolved from
+ * GPUTexture.format. Returns null when the WebGPU runtime is unavailable or the format is
+ * unknown. Pair every successful registration with unregisterWebGPUTexture() once the wrapping
+ * PAGSurface/PAGImage is destroyed.
+ */
+export const registerWebGPUTexture = (
+  texture: WebGPUTextureLike,
+): { handle: number; format: number } | null => {
+  const webGPU = getWebGPURuntime();
+  const format = webGPU?.TextureFormat?.indexOf(texture.format) ?? -1;
+  if (!webGPU?.mgrTexture || format <= 0) {
+    return null;
+  }
+  return { handle: webGPU.mgrTexture.create(texture), format };
+};
+
+/**
+ * WebGPU backend only. Releases a texture handle previously returned by registerWebGPUTexture().
+ */
+export const unregisterWebGPUTexture = (handle: number): void => {
+  const webGPU = getWebGPURuntime();
+  if (handle > 0 && webGPU?.mgrTexture) {
+    webGPU.mgrTexture.release(handle);
+  }
+};
+
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {
     if (gl instanceof BackendContext) {

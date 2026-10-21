@@ -2,6 +2,12 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
+import {
+  isWebGPUBackend,
+  registerWebGPUTexture,
+  unregisterWebGPUTexture,
+  WebGPUTextureLike,
+} from './core/backend-context';
 
 @destroyVerify
 export class PAGImage {
@@ -52,19 +58,41 @@ export class PAGImage {
   }
   /**
    * Creates a PAGImage object from the specified backend texture, return null if the texture is
-   * invalid.
+   * invalid. On the WebGL backend, pass the numeric texture handle registered via
+   * BackendContext.registerTexture(). On the WebGPU backend, pass the host GPUTexture directly;
+   * it must be created from the same GPUDevice that drives PAG rendering (the device passed to
+   * PAGInit) and with the TEXTURE_BINDING usage flag.
    */
-  public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
-    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY);
-    if (!wasmIns) throw new Error('Make PAGImage from texture fail!');
-    return new PAGImage(wasmIns);
+  public static fromTexture(texture: number | WebGPUTextureLike, width: number, height: number, flipY: boolean) {
+    let textureID = 0;
+    let format = 0;
+    if (typeof texture === 'number') {
+      if (isWebGPUBackend()) {
+        throw new Error('PAGImage.fromTexture() requires a GPUTexture on the WebGPU backend.');
+      }
+      textureID = texture;
+    } else {
+      const registered = registerWebGPUTexture(texture);
+      if (!registered) throw new Error('PAGImage.fromTexture() failed to register the GPUTexture!');
+      textureID = registered.handle;
+      format = registered.format;
+    }
+    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format);
+    if (!wasmIns) {
+      if (format > 0) unregisterWebGPUTexture(textureID);
+      throw new Error('Make PAGImage from texture fail!');
+    }
+    return new PAGImage(wasmIns, format > 0 ? textureID : 0);
   }
 
   public wasmIns;
   public isDestroyed = false;
 
-  public constructor(wasmIns: any) {
+  private webGPUTextureHandle = 0;
+
+  public constructor(wasmIns: any, webGPUTextureHandle = 0) {
     this.wasmIns = wasmIns;
+    this.webGPUTextureHandle = webGPUTextureHandle;
   }
   /**
    * Returns the width in pixels.
@@ -111,6 +139,10 @@ export class PAGImage {
    */
   public destroy(): void {
     this.wasmIns.delete();
+    if (this.webGPUTextureHandle > 0) {
+      unregisterWebGPUTexture(this.webGPUTextureHandle);
+      this.webGPUTextureHandle = 0;
+    }
     this.isDestroyed = true;
   }
 }

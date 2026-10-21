@@ -360,21 +360,61 @@ bool PAGBindInit() {
                 }))
       .function("_copyOriginal", &PAGFile::copyOriginal);
 
+  // Registered before _PAGSurface because _PAGSurface._readPixelsAsync returns this type; embind
+  // requires the class to be bound before it appears in another class's method signature.
+  class_<PAGSurfaceReadback>("_PAGSurfaceReadback")
+      .smart_ptr<std::shared_ptr<PAGSurfaceReadback>>("_PAGSurfaceReadback")
+      .function("_isReady", &PAGSurfaceReadback::isReady)
+      .function("_width", &PAGSurfaceReadback::width)
+      .function("_height", &PAGSurfaceReadback::height)
+      .function("_readPixels", optional_override([](PAGSurfaceReadback& session, int colorType,
+                                                    int alphaType, size_t dstRowBytes) -> val {
+                  auto dataSize = dstRowBytes * static_cast<size_t>(session.height());
+                  if (dataSize == 0) {
+                    return val::null();
+                  }
+                  std::unique_ptr<uint8_t[]> uint8Array(new (std::nothrow) uint8_t[dataSize]);
+                  if (uint8Array && session.readPixels(static_cast<ColorType>(colorType),
+                                                       static_cast<AlphaType>(alphaType),
+                                                       uint8Array.get(), dstRowBytes)) {
+                    auto memory = val::module_property("HEAPU8")["buffer"];
+                    auto memoryView =
+                        val::global("Uint8Array")
+                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
+                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
+                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
+                    newUint8Array.call<void>("set", memoryView);
+                    return newUint8Array;
+                  }
+                  return val::null();
+                }));
+
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")
       .class_function("_FromCanvas", optional_override([](const std::string& canvasID) {
                         return PAGSurface::MakeFrom(GPUDrawable::FromCanvasID(canvasID));
                       }))
-      .class_function("_FromTexture",
-                      optional_override([](int textureID, int width, int height, bool flipY) {
-                        GLTextureInfo glInfo = {};
-                        glInfo.target = GL_TEXTURE_2D;
-                        glInfo.id = static_cast<unsigned>(textureID);
-                        glInfo.format = GL_RGBA8;
-                        BackendTexture glTexture(glInfo, width, height);
-                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-                        return PAGSurface::MakeFrom(glTexture, origin);
-                      }))
+      .class_function(
+          "_FromTexture",
+          optional_override([](int textureID, int width, int height, bool flipY, int format) {
+#if defined(TGFX_USE_WEBGPU)
+            // The textureID is the numeric handle of the host GPUTexture registered in
+            // Emscripten's WebGPU runtime (Module.WebGPU.mgrTexture); format is the
+            // WGPUTextureFormat value resolved from GPUTexture.format on the JS side.
+            WgpuTextureInfo wgpuInfo = {};
+            wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
+            wgpuInfo.format = static_cast<unsigned>(format);
+            BackendTexture backendTexture(wgpuInfo, width, height);
+#else
+            GLTextureInfo glInfo = {};
+            glInfo.target = GL_TEXTURE_2D;
+            glInfo.id = static_cast<unsigned>(textureID);
+            glInfo.format = GL_RGBA8;
+            BackendTexture backendTexture(glInfo, width, height);
+#endif
+            auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+            return PAGSurface::MakeFrom(backendTexture, origin);
+          }))
       .class_function("_FromRenderTarget",
                       optional_override([](int frameBufferID, int width, int height, bool flipY) {
                         GLFrameBufferInfo glFrameBufferInfo = {};
@@ -409,7 +449,8 @@ bool PAGBindInit() {
                     return newUint8Array;
                   }
                   return val::null();
-                }));
+                }))
+      .function("_readPixelsAsync", &PAGSurface::asyncReadPixels);
 
   class_<PAGImage>("_PAGImage")
       .smart_ptr<std::shared_ptr<PAGImage>>("_PAGImage")
@@ -438,16 +479,26 @@ bool PAGBindInit() {
                                         rowBytes, static_cast<ColorType>(colorType),
                                         static_cast<AlphaType>(alphaType));
           }))
-      .class_function("_FromTexture",
-                      optional_override([](int textureID, int width, int height, bool flipY) {
-                        GLTextureInfo glInfo = {};
-                        glInfo.target = GL_TEXTURE_2D;
-                        glInfo.id = static_cast<unsigned>(textureID);
-                        glInfo.format = GL_RGBA8;
-                        BackendTexture glTexture(glInfo, width, height);
-                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-                        return PAGImage::FromTexture(glTexture, origin);
-                      }))
+      .class_function(
+          "_FromTexture",
+          optional_override([](int textureID, int width, int height, bool flipY, int format) {
+#if defined(TGFX_USE_WEBGPU)
+            // Same handle convention as _PAGSurface._FromTexture: textureID is the
+            // host GPUTexture registered in Module.WebGPU.mgrTexture.
+            WgpuTextureInfo wgpuInfo = {};
+            wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
+            wgpuInfo.format = static_cast<unsigned>(format);
+            BackendTexture backendTexture(wgpuInfo, width, height);
+#else
+            GLTextureInfo glInfo = {};
+            glInfo.target = GL_TEXTURE_2D;
+            glInfo.id = static_cast<unsigned>(textureID);
+            glInfo.format = GL_RGBA8;
+            BackendTexture backendTexture(glInfo, width, height);
+#endif
+            auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+            return PAGImage::FromTexture(backendTexture, origin);
+          }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height)
       .function("_scaleMode", optional_override([](PAGImage& pagImage) {
