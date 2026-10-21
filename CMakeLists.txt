@@ -922,7 +922,10 @@ if (WEB)
             # (Module.WebGPU.mgrDevice/mgrTexture) for color-space configuration and video
             # uploads. 'GL' stays exported because shared web platform code may still touch GL
             # symbols.
-            list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1
+            # Tint (Dawn's shader compiler) runs deep recursion in DependencyAnalysis when
+            # parsing SPIR-V, which overflows emscripten's default 64KB stack and traps as a
+            # segfault. 1MB mirrors tgfx's own web builds (tgfx/web/demo/CMakeLists.txt).
+            list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1 -sSTACK_SIZE=1MB
                     -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'])
             # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
             # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
