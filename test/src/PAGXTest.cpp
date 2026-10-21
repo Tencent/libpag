@@ -21,6 +21,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
@@ -1029,7 +1030,31 @@ PAGX_TEST(PAGXTest, FontFileDataLoadedAfterSceneRelayouts) {
 }
 
 /**
- * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
+   * Test case: the batch loader attaches font bytes exactly as loadFileData does, so a host that
+   * collects getExternalFilePaths and loads every path in one pass does not silently lose fonts.
+   */
+PAGX_TEST(PAGXTest, FontFileDataLoadedByBatchMap) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* text = FirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_NE(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+
+  auto bytes = tgfx::Data::MakeFromFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_NE(bytes, nullptr);
+  std::unordered_map<std::string, std::shared_ptr<pagx::Data>> fileDataMap = {};
+  fileDataMap["assets/fonts/font_f0.woff2"] =
+      pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
+  doc->loadFileDataMap(fileDataMap);
+  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "pagx-font-f0"), 1u);
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+}
+
+/**
+   * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
  * fontFamily rather than an id reference, so pruning them as unreferenced would drop the font.
  */
 PAGX_TEST(PAGXTest, OptimizerKeepsFontFileSources) {

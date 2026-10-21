@@ -823,15 +823,18 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
-// Embeds file data into every Image node whose filePath matches a key in fileDataMap, descending
-// into resolved external composition documents so nested images are embedded in the same pass.
-// Mirrors the recursion of AppendExternalImagePaths (read side) and LoadImageInChain (single-image
-// side); without the descent, getExternalImagePaths() collects child-document paths that
-// loadFileDataMap() would silently fail to match.
+// Embeds file data into every Image node whose filePath matches a key in fileDataMap and attaches
+// font data to every Font node whose file does, descending into resolved external composition
+// documents so nested nodes are matched in the same pass. Mirrors the recursion of
+// AppendExternalFilePaths (read side) and LoadFileDataInChain (single-file side); without the
+// descent, getExternalFilePaths() collects child-document paths that loadFileDataMap() would
+// silently fail to match.
 static void LoadFileDataMapInChain(
     PAGXDocument* document,
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap,
-    std::unordered_set<const PAGXDocument*>& visited) {
+    std::unordered_set<const PAGXDocument*>& visited,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes,
+    std::unordered_set<PAGXDocument*>& layoutDirtyDocs) {
   if (document == nullptr || !visited.insert(document).second) {
     return;
   }
@@ -847,10 +850,27 @@ static void LoadFileDataMapInChain(
       }
       image->data = it->second;
       image->filePath = {};
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->file.empty()) {
+        continue;
+      }
+      auto it = fileDataMap.find(font->file);
+      if (it == fileDataMap.end() || it->second == nullptr) {
+        continue;
+      }
+      font->fileData = it->second;
+      // A font changes how every Text shapes, so an already laid-out document is refreshed as a
+      // whole, exactly as the single-file overload does.
+      if (document->isLayoutApplied()) {
+        docDirtyNodes[document].push_back(document);
+        layoutDirtyDocs.insert(document);
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited);
+        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited, docDirtyNodes,
+                               layoutDirtyDocs);
       }
     }
   }
@@ -859,7 +879,13 @@ static void LoadFileDataMapInChain(
 void PAGXDocument::loadFileDataMap(
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  LoadFileDataMapInChain(this, fileDataMap, visited);
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
+  std::unordered_set<PAGXDocument*> layoutDirtyDocs = {};
+  LoadFileDataMapInChain(this, fileDataMap, visited, docDirtyNodes, layoutDirtyDocs);
+  for (auto& entry : docDirtyNodes) {
+    entry.first->notifyChange(entry.second,
+                              layoutDirtyDocs.find(entry.first) != layoutDirtyDocs.end());
+  }
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into
