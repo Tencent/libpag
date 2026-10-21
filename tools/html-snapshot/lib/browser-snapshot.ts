@@ -39,6 +39,7 @@
 // @ts-nocheck
 
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
+import { MEASURE_BODY_CANVAS_SRC, measureBodyCanvas as measureBodyCanvasNode } from './canvas-measure';
 import { PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC } from './paint-plan';
 // Imported under a distinct name because the value is only embedded as a
 // literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
@@ -56,6 +57,7 @@ import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 // PAYLOAD_CONSTANTS_SRC via interpolation so the shipped helpers resolve it in-page, while the
 // Node-side helpers (and their unit tests) resolve it here.
 const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+const measureBodyCanvas = measureBodyCanvasNode;
 
 // Internal bridge to the HTML importer for a measured width that must remain available while
 // the subset transformer recovers flex geometry, but must not become an authored PAGX width.
@@ -198,13 +200,9 @@ function normalizeClipPath(value) {
   return /^(url|polygon|path|circle|ellipse|inset)\(/i.test(trimmed) ? trimmed : '';
 }
 
-// Format a number for SVG geometry: round to sub-pixel precision and drop a
-// trailing `.0` so `10` stays `10` (not `10px` — SVG coordinates are unitless
-// user units) and `12.5` stays `12.5`.
+// Unitless SVG coordinates use the same precision as CSS boxes and their clips.
 function pagxClipNum(n) {
-  if (!isFinite(n)) return '0';
-  const r = Math.round(n * 1000) / 1000;
-  return String(r);
+  return String(geometryNumber(n));
 }
 
 // Split `str` on top-level occurrences of `sep` (a single char), ignoring any
@@ -577,28 +575,14 @@ function normalizeWritingMode(value) {
 
 // ===== Pure number / string utilities =====
 
-// Preserve sub-pixel precision (one decimal). Authors regularly use
-// half-pixel values like Tailwind's `inset-[1.5px]`; combined with an
-// integer parent border the child's measured offset becomes 2.5px, which
-// a plain `Math.round` would snap to 3px and introduce a visible 0.5px
-// shift on every such element. One decimal place is enough to round-trip
-// the common 0.5/1.5/2.5 cases while still snapping cleanly when the
-// browser reports a noisy measurement like 19.99998.
-function roundPx(n) {
-  if (!isFinite(n)) return 0;
-  return Math.round(n * 10) / 10;
+// Geometry is already resolved by the browser. Preserve its numbers through CSS serialization;
+// rounding each box independently changes shared edges and accumulates through nested containers.
+function geometryNumber(n) {
+  return Number.isFinite(n) ? n : 0;
 }
 
 function px(n) {
-  if (!isFinite(n)) return '0px';
-  return `${roundPx(n)}px`;
-}
-
-// Position rounding accumulates through ancestors. A 0.04px baseline error can cross a
-// device-pixel boundary and move a bitmap glyph by a full pixel. Keep layout positions at
-// the importer's millipixel precision; dimensions and paint serialization retain their policy.
-function roundPosition(n) {
-  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : 0;
+  return `${geometryNumber(n)}px`;
 }
 
 // Format a numeric `flex-grow` for the subset HTML's `flex: <N>` shorthand.
@@ -656,10 +640,10 @@ function withNowrap(style) {
 
 // Collapse 4 px sides into the shortest CSS shorthand.
 function paddingShorthand(t, r, b, l) {
-  const a = Math.max(0, roundPx(t));
-  const rr = Math.max(0, roundPx(r));
-  const bb = Math.max(0, roundPx(b));
-  const ll = Math.max(0, roundPx(l));
+  const a = Math.max(0, geometryNumber(t));
+  const rr = Math.max(0, geometryNumber(r));
+  const bb = Math.max(0, geometryNumber(b));
+  const ll = Math.max(0, geometryNumber(l));
   if (a === rr && rr === bb && bb === ll) return `${a}px`;
   if (a === bb && ll === rr) return `${a}px ${rr}px`;
   if (ll === rr) return `${a}px ${rr}px ${bb}px`;
@@ -1598,8 +1582,8 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.positioned !== false) {
     parts.push(`position: absolute`);
-    parts.push(`left: ${roundPosition(left)}px`);
-    parts.push(`top: ${roundPosition(top)}px`);
+    parts.push(`left: ${geometryNumber(left)}px`);
+    parts.push(`top: ${geometryNumber(top)}px`);
     parts.push(`width: ${px(width)}`);
     parts.push(`height: ${px(height)}`);
   }
@@ -1742,7 +1726,7 @@ function roundedUniformBorderSvg(computed, width, height) {
     return [center[0] + rMid * Math.cos(a), center[1] + rMid * Math.sin(a)];
   }
   function fmt(p) {
-    return `${roundPx(p[0])} ${roundPx(p[1])}`;
+    return `${geometryNumber(p[0])} ${geometryNumber(p[1])}`;
   }
   // Eight corner-cut points (two per corner) plus eight tangent points where
   // each arc meets the straight edge segment. SVG y-axis points down, so 270°
@@ -1759,7 +1743,7 @@ function roundedUniformBorderSvg(computed, width, height) {
   const bl135 = pt(centers.bl, 135);
   const bl180 = pt(centers.bl, 180);
   const tl180 = pt(centers.tl, 180);
-  const arc = `${roundPx(rMid)} ${roundPx(rMid)} 0 0 1`;
+  const arc = `${geometryNumber(rMid)} ${geometryNumber(rMid)} 0 0 1`;
   const segments = [
     { color: top.color,    d: `M ${fmt(tl225)} A ${arc} ${fmt(tl270)} L ${fmt(tr270)} A ${arc} ${fmt(tr315)}` },
     { color: right.color,  d: `M ${fmt(tr315)} A ${arc} ${fmt(tr0)}   L ${fmt(br0)}  A ${arc} ${fmt(br45)}`  },
@@ -1774,7 +1758,7 @@ function roundedUniformBorderSvg(computed, width, height) {
   if (!paths) return '';
   return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
     `left: 0px; top: 0px; width: ${px(W)}; height: ${px(H)}; pointer-events: none" ` +
-    `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${roundPx(W)} ${roundPx(H)}">${paths}</svg>`;
+    `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${geometryNumber(W)} ${geometryNumber(H)}">${paths}</svg>`;
 }
 
 // Emit one inline <svg> for a single dashed / dotted border side so the
@@ -1789,20 +1773,20 @@ function dashedBorderSideSvg(side, width, height, b) {
   const half = t / 2;
   let d;
   if (side === 'top') {
-    d = `M 0 ${roundPx(half)} L ${roundPx(width)} ${roundPx(half)}`;
+    d = `M 0 ${geometryNumber(half)} L ${geometryNumber(width)} ${geometryNumber(half)}`;
   } else if (side === 'bottom') {
-    d = `M 0 ${roundPx(height - half)} L ${roundPx(width)} ${roundPx(height - half)}`;
+    d = `M 0 ${geometryNumber(height - half)} L ${geometryNumber(width)} ${geometryNumber(height - half)}`;
   } else if (side === 'left') {
-    d = `M ${roundPx(half)} 0 L ${roundPx(half)} ${roundPx(height)}`;
+    d = `M ${geometryNumber(half)} 0 L ${geometryNumber(half)} ${geometryNumber(height)}`;
   } else {
-    d = `M ${roundPx(width - half)} 0 L ${roundPx(width - half)} ${roundPx(height)}`;
+    d = `M ${geometryNumber(width - half)} 0 L ${geometryNumber(width - half)} ${geometryNumber(height)}`;
   }
   const dotted = b.style === 'dotted';
   const cap = dotted ? 'round' : 'butt';
-  const dash = dotted ? `0 ${roundPx(2 * t)}` : `${roundPx(2 * t)} ${roundPx(t)}`;
+  const dash = dotted ? `0 ${geometryNumber(2 * t)}` : `${geometryNumber(2 * t)} ${geometryNumber(t)}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
     `left: 0px; top: 0px; width: ${px(width)}; height: ${px(height)}; pointer-events: none" ` +
-    `width="${px(width)}" height="${px(height)}" viewBox="0 0 ${roundPx(width)} ${roundPx(height)}">` +
+    `width="${px(width)}" height="${px(height)}" viewBox="0 0 ${geometryNumber(width)} ${geometryNumber(height)}">` +
     `<path d="${d}" fill="none" stroke="${b.color.trim()}" stroke-width="${px(t)}" ` +
     `stroke-linecap="${cap}" stroke-dasharray="${dash}"/></svg>`;
 }
@@ -2011,7 +1995,7 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
     if (colorAlpha(color) <= 0) continue;
     const pts = triangles[side]
       .map(([x, y]) => mapPoint(x, y))
-      .map(([x, y]) => `${roundPx(x)},${roundPx(y)}`)
+      .map(([x, y]) => `${geometryNumber(x)},${geometryNumber(y)}`)
       .join(' ');
     polys.push(`<polygon points="${pts}" fill="${color}"/>`);
   }
@@ -2019,7 +2003,7 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
     box: true, ...opts,
   });
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${px(paintW)}" `
-    + `height="${px(paintH)}" viewBox="0 0 ${roundPx(paintW)} ${roundPx(paintH)}">`
+    + `height="${px(paintH)}" viewBox="0 0 ${geometryNumber(paintW)} ${geometryNumber(paintH)}">`
     + polys.join('') + `</svg>`;
   return `<div style="${wrapperStyle}">${svg}</div>`;
 }
@@ -2475,7 +2459,7 @@ function renderCapturedParagraph(el, rect, left, top, computed, opts) {
       const style = buildStyle(x, y, line.rect.width, lineHeight, cs, { box: false, text: true });
       spans.push(`<span data-pagx-text-clip="include" data-pagx-start="${indices[0].i}"` +
         ` data-pagx-inline-positions="${positions.join(',')}"` +
-        ` data-pagx-baseline="${baseline - rect.top - roundPosition(y)}"` +
+        ` data-pagx-baseline="${baseline - rect.top - geometryNumber(y)}"` +
         ` style="${withNowrap(style)};white-space:pre">${escapeHtml(line.text)}</span>`);
       baselines.push(baseline);
     }
@@ -3060,10 +3044,9 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     const positionAttr = positions.length === Array.from(transformed).length && positions.length > 1
       ? ` data-pagx-inline-positions="${positions.join(',')}"` : '';
     const baseline = measureTextBaseline(textNode, line);
-    // buildStyle rounds the host's top. Compensate here so that the absolute baseline retains
-    // browser subpixel precision instead of inheriting that geometry serialization rounding.
+    // Store the measured baseline relative to the serialized host position.
     const baselineAttr = baseline === null ? '' :
-      ` data-pagx-baseline="${baseline - parentRect.top - roundPosition(tt)}"`;
+      ` data-pagx-baseline="${baseline - parentRect.top - geometryNumber(tt)}"`;
     out.push(`<span data-pagx-text-clip="include"${intrinsicWidth}${positionAttr}${baselineAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -3142,7 +3125,7 @@ function flexMainGapPx(computed, direction) {
   const main = direction === 'column' ? rowRaw : colRaw;
   const v = parseFloat(main);
   if (!isFinite(v) || v <= 0) return '';
-  return `${roundPx(v)}px`;
+  return `${geometryNumber(v)}px`;
 }
 
 // Reads the live flex configuration of `el` and serialises it to a
@@ -3591,8 +3574,8 @@ function renderInlineIconSvg(el, parentRect, rect, left, top, computed, opts) {
   // viewBox-only SVG so the size is decided here against the live
   // measurement; strip any author-emitted dimensions before re-injecting
   // ours so the values stay coherent.
-  const w = roundPx(iconW);
-  const h = roundPx(iconH);
+  const w = geometryNumber(iconW);
+  const h = geometryNumber(iconH);
   const sized = raw.replace(/^<svg([^>]*)>/i, (_, attrs) => {
     const stripped = attrs
       .replace(/\s+width="[^"]*"/i, '')
@@ -5071,6 +5054,12 @@ function canvasRootRect(canvasWidth, canvasHeight) {
 // is what makes the two renders comparable.
 function prepareBodyForSnapshot() {
   const body = document.body;
+  if (!body.__pagxAuthoredPosition) {
+    body.__pagxAuthoredPosition = {
+      value: body.style.getPropertyValue('position'),
+      priority: body.style.getPropertyPriority('position'),
+    };
+  }
   // Reset the geometric clip-path def registry so a re-run (this function is the
   // registered `takeSnapshot` and may be evaluated more than once per page) does
   // not accumulate defs from a previous pass. `appendGeometricClipPath` fills it
@@ -5158,62 +5147,9 @@ function prepareBodyForSnapshot() {
 // extends past the viewport.
 function measureCanvas() {
   prepareBodyForSnapshot();
-  const body = document.body;
-  const bodyRect = body.getBoundingClientRect();
-  // `prepareBodyForSnapshot` forces an inline `position: relative` on the live
-  // <body> so that `right`/`bottom`-anchored absolute children resolve against
-  // the body (not the initial containing block) during the emission walk. But
-  // that role change also makes every body-anchored `position: absolute` child
-  // part of the body's scrollable overflow, so `scrollWidth`/`scrollHeight`
-  // would grow to include any such child that overflows the body's own box —
-  // e.g. a bottom-pinned nav bar whose inner content is wider than the bar,
-  // which inflates the canvas past the body (weibo: 390x780 -> 422x796).
-  //
-  // The canvas must match the eval baseline's screenshot clip, and baseline.js
-  // measures `body.scrollWidth/scrollHeight` WITHOUT injecting any position (it
-  // only zeroes margin/padding), i.e. against the body's *authored* position.
-  // Mirror that here: drop the injected inline `relative` for the scroll read so
-  // the body falls back to its authored containing-block role (`static` unless
-  // the page's own CSS set it otherwise). In-flow content that overflows the
-  // declared size (fixed-size mocks, fluid feeds) still grows the canvas, while
-  // an absolute child whose containing block is the initial containing block —
-  // not the body — no longer does. The injected `relative` is restored right
-  // afterward so the tree walk keeps its body-anchored geometry.
-  const savedPosition = body.style.position;
-  body.style.position = '';
-  void body.offsetHeight;
-  let width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
-  let height = Math.max(body.scrollHeight, Math.round(bodyRect.height));
-  // Fixed-canvas mocks routinely position EVERY child out of flow
-  // (`.stage { position: absolute; width: 672px; height: 480px }` with nothing
-  // else in the body). An out-of-flow child contributes no content size to its
-  // parent, and the scroll read above deliberately drops the injected
-  // `relative` so the body is back to its authored `static` role — which takes
-  // those children out of its scrollable overflow too. Both `scrollHeight` and
-  // `getBoundingClientRect().height` then read 0 even though the page paints
-  // normally in a browser. A zero canvas emits an empty <body> and the importer
-  // rejects the subset outright, so fall back to the union of the visible boxes
-  // — for the mock above that recovers exactly 672x480.
-  //
-  // `documentElement` is NOT a usable fallback here for the reason above: it is
-  // stretched to the viewport, so it would report the 1400x900 default rather
-  // than the design's own canvas. Each axis falls back independently: a body
-  // can collapse on the block axis alone (the common case, since the inline
-  // axis is filled by the containing block).
-  if (width <= 0 || height <= 0) {
-    const content = visibleContentExtent();
-    if (width <= 0 && content.right > 0) width = Math.ceil(content.right);
-    if (height <= 0 && content.bottom > 0) height = Math.ceil(content.bottom);
-  }
-  // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
-  // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
-  // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
-  // and matches the same clamp baseline.js applies, so the two stay aligned.
-  height = Math.min(MAX_CAPTURE_HEIGHT_PX, height);
-  body.style.position = savedPosition;
-  void body.offsetHeight;
+  const canvas = measureBodyCanvas(MAX_CAPTURE_HEIGHT_PX, visibleContentExtent);
   resetRootScroll();
-  return { width, height };
+  return canvas;
 }
 
 // Far edges of every painted box in the body, measured from the canvas origin.
@@ -5556,9 +5492,8 @@ const HELPER_FNS = [
   pagxClipPathInnerMarkup,
   appendGeometricClipPath,
   normalizeWritingMode,
-  roundPx,
+  geometryNumber,
   px,
-  roundPosition,
   formatFlexGrow,
   canForwardFlexGrow,
   escapeHtml,
@@ -5692,7 +5627,8 @@ const HELPER_FNS = [
   snapshotMain,
 ];
 
-const HELPERS_SRC = PAINT_PLAN_HELPERS_SRC + '\n\n' + HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
+const HELPERS_SRC = PAINT_PLAN_HELPERS_SRC + '\n\n' + MEASURE_BODY_CANVAS_SRC + '\n\n' +
+  HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
 // Single-shot browser-side payload. `page.evaluate` accepts a string and
 // will return whatever the expression evaluates to, so the IIFE simply

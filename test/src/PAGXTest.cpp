@@ -331,6 +331,56 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
   }
 }
 
+PAGX_TEST(PAGXTest, FractionalCanvasAndMatrixRenderRoundTrip) {
+  pagx::FontConfig fontConfig;
+  for (const auto& path : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(path, 0);
+  }
+  // These inputs contain canvas dimensions and transforms that lose bits with %g's default
+  // six significant digits. The serialized document must render just like the in-memory import.
+  for (const auto* name : {"complex3", "complex5"}) {
+    SCOPED_TRACE(name);
+    auto doc = pagx::SVGImporter::Parse(
+        ProjectPath::Absolute(std::string("resources/svg/") + name + ".svg"));
+    ASSERT_NE(doc, nullptr);
+    pagx::PAGXOptimizer::Optimize(doc.get());
+    doc->applyLayout(&fontConfig);
+    pagx::FontEmbedder().embed(doc.get());
+    doc->applyLayout(&fontConfig);
+    auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+    ASSERT_NE(copy, nullptr);
+    copy->applyLayout(&fontConfig);
+    EXPECT_EQ(copy->width, doc->width);
+    EXPECT_EQ(copy->height, doc->height);
+    float scale = std::max(1.0f, 400 / std::max(doc->width, doc->height));
+    int width = static_cast<int>(std::ceil(doc->width * scale));
+    int height = static_cast<int>(std::ceil(doc->height * scale));
+    auto renderPixels = [&](pagx::PAGXDocument* source) -> std::vector<uint8_t> {
+      auto layer = pagx::LayerBuilder::Build(source);
+      auto surface = Surface::Make(context, width, height);
+      EXPECT_NE(layer, nullptr);
+      EXPECT_NE(surface, nullptr);
+      if (!layer || !surface) return {};
+      DisplayList display;
+      auto container = tgfx::Layer::Make();
+      container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
+      container->addChild(layer);
+      display.root()->addChild(container);
+      display.render(surface.get(), false);
+      tgfx::Bitmap bitmap(width, height, false, false);
+      tgfx::Pixmap pixmap(bitmap);
+      bool read = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+      EXPECT_TRUE(read);
+      if (!read) return {};
+      auto* pixels = static_cast<const uint8_t*>(pixmap.pixels());
+      return {pixels, pixels + pixmap.byteSize()};
+    };
+    auto before = renderPixels(doc.get());
+    ASSERT_FALSE(before.empty());
+    EXPECT_TRUE(renderPixels(copy.get()) == before);
+  }
+}
+
 /**
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
@@ -2162,6 +2212,133 @@ PAGX_TEST(PAGXTest, LayoutSnapToPixelGrid) {
   EXPECT_EQ(child3->layoutWidth, std::round(child3->layoutWidth));
 
   EXPECT_EQ(child1->layoutWidth + child2->layoutWidth + child3->layoutWidth, 100.0f);
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundingInheritedAndScoped) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx width="200" height="100">
+    <Layer layoutRounding="none" width="100.25" height="70.75">
+      <Layer id="fractional" left="0.125" top="0.25" width="85.8125" height="31.34375"
+             clipToBounds="true">
+        <Group width="100%" height="100%">
+          <Rectangle id="shape" width="100%" height="100%"/>
+        </Group>
+      </Layer>
+      <Layer layoutRounding="pixel" width="85.8125" height="31.34375">
+        <Rectangle id="snapped" width="100%" height="100%" left="0.25"/>
+      </Layer>
+      <Layer id="sibling" width="25%" height="50%" left="0.375" top="0.625"/>
+      <Layer id="stretched" left="0.125" right="0.375" top="0.25" bottom="0.5"/>
+      <Layer id="manualClip" width="50.25" height="30.5" clipToBounds="true"
+             scrollRect="0,0,20.125,10.25"/>
+    </Layer>
+    <Layer width="31.34375" height="31.34375">
+      <Rectangle id="default" width="100%" height="100%"/>
+    </Layer>
+  </pagx>)");
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* frame = static_cast<pagx::Layer*>(doc->findNode("fractional"));
+  auto* shape = static_cast<pagx::Rectangle*>(doc->findNode("shape"));
+  auto* snapped = static_cast<pagx::Rectangle*>(doc->findNode("snapped"));
+  auto* sibling = static_cast<pagx::Layer*>(doc->findNode("sibling"));
+  auto* stretched = static_cast<pagx::Layer*>(doc->findNode("stretched"));
+  auto* manualClip = static_cast<pagx::Layer*>(doc->findNode("manualClip"));
+  EXPECT_FLOAT_EQ(frame->layoutX, 0.125f);
+  EXPECT_FLOAT_EQ(frame->layoutY, 0.25f);
+  EXPECT_FLOAT_EQ(shape->layoutWidth, 85.8125f);
+  EXPECT_FLOAT_EQ(shape->layoutHeight, 31.34375f);
+  EXPECT_FLOAT_EQ(frame->scrollRect.height, 31.34375f);
+  EXPECT_FLOAT_EQ(snapped->layoutX, 0);
+  EXPECT_FLOAT_EQ(snapped->layoutWidth, 86);
+  EXPECT_FLOAT_EQ(snapped->layoutHeight, 32);
+  EXPECT_FLOAT_EQ(sibling->layoutX, 0.375f);
+  EXPECT_FLOAT_EQ(sibling->layoutWidth, 25.0625f);
+  EXPECT_FLOAT_EQ(sibling->layoutHeight, 35.375f);
+  EXPECT_FLOAT_EQ(stretched->layoutWidth, 99.75f);
+  EXPECT_FLOAT_EQ(stretched->layoutHeight, 70);
+  EXPECT_FLOAT_EQ(manualClip->scrollRect.height, 10.25f);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Rectangle*>(doc->findNode("default"))->layoutWidth, 32);
+
+  frame->width = 91.125f;
+  frame->height = 30.625f;
+  manualClip->height = 40.125f;
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(shape->layoutWidth, frame->width);
+  EXPECT_FLOAT_EQ(shape->layoutHeight, frame->height);
+  EXPECT_FLOAT_EQ(frame->scrollRect.height, frame->height);
+  EXPECT_FLOAT_EQ(manualClip->scrollRect.height, 10.25f);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("layoutRounding=\"none\""), std::string::npos);
+  auto copy = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(copy, nullptr);
+  copy->applyLayout();
+  auto* copiedShape = static_cast<pagx::Rectangle*>(copy->findNode("shape"));
+  EXPECT_EQ(copiedShape->layoutBounds(), shape->layoutBounds());
+  EXPECT_FLOAT_EQ(static_cast<pagx::Layer*>(copy->findNode("fractional"))->scrollRect.height,
+                  frame->height);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Layer*>(copy->findNode("manualClip"))->scrollRect.height,
+                  10.25f);
+  EXPECT_TRUE(pagx::RequiresLayout(frame->nodeType(), "layoutRounding"));
+  EXPECT_TRUE(pagx::SetNodeChannel(frame, "layoutRounding", pagx::KeyValue(std::string("pixel"))));
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(shape->layoutWidth, 92);
+  EXPECT_FLOAT_EQ(shape->layoutHeight, 31);
+  EXPECT_FLOAT_EQ(frame->layoutX, 0.125f);
+  EXPECT_TRUE(
+      pagx::SetNodeChannel(frame, "layoutRounding", pagx::KeyValue(std::string("inherit"))));
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(shape->layoutWidth, frame->width);
+  EXPECT_FLOAT_EQ(shape->layoutHeight, frame->height);
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundingFractionalFlexBothAxes) {
+  for (bool horizontal : {false, true}) {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto* parent = doc->makeNode<pagx::Layer>();
+    doc->layers.push_back(parent);
+    parent->layoutRounding = pagx::LayoutRounding::None;
+    parent->layout = horizontal ? pagx::LayoutMode::Horizontal : pagx::LayoutMode::Vertical;
+    parent->width = 100.25f;
+    parent->height = 100.25f;
+    parent->padding = {0.125f, 0.125f, 0.125f, 0.125f};
+    parent->gap = 0.25f;
+    parent->alignment = pagx::Alignment::Center;
+    for (int i = 0; i < 3; i++) {
+      auto* child = doc->makeNode<pagx::Layer>();
+      parent->children.push_back(child);
+      child->flex = 1;
+      if (horizontal) child->percentHeight = 33.25f;
+      else
+        child->percentWidth = 33.25f;
+    }
+    doc->applyLayout();
+    float sum = 0;
+    float next = 0.125f;
+    for (auto* child : parent->children) {
+      auto bounds = child->layoutBounds();
+      float main = horizontal ? bounds.width : bounds.height;
+      EXPECT_NEAR(horizontal ? bounds.x : bounds.y, next, 0.00001f);
+      EXPECT_FLOAT_EQ(horizontal ? bounds.height : bounds.width, 33.25f);
+      EXPECT_FLOAT_EQ(horizontal ? bounds.y : bounds.x, 33.5f);
+      EXPECT_NEAR(main, 99.5f / 3, 0.00001f);
+      next += main + parent->gap;
+      sum += main;
+    }
+    EXPECT_FLOAT_EQ(sum, 99.5f);
+  }
+}
+
+PAGX_TEST(PAGXTest, LayoutRoundingSurvivesOptimization) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx width="100" height="100">
+    <Layer layoutRounding="none">
+      <Layer layoutRounding="pixel"><Rectangle size="10.5,20.5"/></Layer>
+    </Layer>
+  </pagx>)");
+  ASSERT_NE(doc, nullptr);
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("layoutRounding=\"none\""), std::string::npos);
+  EXPECT_NE(xml.find("layoutRounding=\"pixel\""), std::string::npos);
 }
 
 // =====================================================================================

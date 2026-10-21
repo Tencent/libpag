@@ -224,7 +224,7 @@ describe('browser text fragments', () => {
     }
     const snapshot = await page.evaluate(takeSnapshot);
     assert.match(snapshot.html, /data-pagx-baseline=/);
-    assert.match(snapshot.html, /top: 15\.953px/);
+    assert.match(snapshot.html, /top: 15\.953125px/);
   });
 
   it('retains the origin of children when asymmetric borders become overlays', async () => {

@@ -38,6 +38,7 @@
 #include "pagx/types/FilterMode.h"
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/LayoutMode.h"
+#include "pagx/types/LayoutRounding.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/MipmapMode.h"
 #include "pagx/types/NoiseMode.h"
@@ -187,6 +188,10 @@ std::string LayoutModeToString(LayoutMode mode);
 LayoutMode LayoutModeFromString(const std::string& str);
 bool IsValidLayoutModeString(const std::string& str);
 
+std::string LayoutRoundingToString(LayoutRounding rounding);
+LayoutRounding LayoutRoundingFromString(const std::string& str);
+bool IsValidLayoutRoundingString(const std::string& str);
+
 //==============================================================================
 // Alignment
 //==============================================================================
@@ -279,9 +284,8 @@ std::string CoordToString(float value);
 
 /**
  * Formats a float for CSS/HTML output using at most three decimal places, with trailing
- * zeros and a bare trailing dot stripped. Unlike FloatToString (which uses %g and prints
- * up to 6 significant digits, producing inconsistent precision such as 0.0823529 next to
- * -1.90915 next to -11.31), this gives uniform fractional precision suitable for
+ * zeros and a bare trailing dot stripped. Unlike FloatToString (which preserves all float bits),
+ * this gives uniform fractional precision suitable for
  * transform matrix coefficients, rotation degrees, scale factors, alpha values, gradient
  * stop percentages, SVG path data, and other CSS numerics. Px coordinates should still
  * use CoordToString (two decimal places). PAGX serialization and SVG export keep

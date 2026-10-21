@@ -134,6 +134,9 @@
 
 ### 4.2 尺寸
 
+body Layer 使用 `layoutRounding="none"` 并由后代继承。约束和 Flex 布局保留 CSS 像素的小数位置
+及尺寸，包括容器缩放后按百分比计算的背景和边框。PAGX 序列化保留相应浮点值。
+
 | CSS | PAGX |
 |-----|------|
 | `width: N px` / `height: N px` | `width="N"` / `height="N"` |

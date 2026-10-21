@@ -836,6 +836,7 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
   inner->padding = outer->padding;
   inner->alignment = outer->alignment;
   inner->arrangement = outer->arrangement;
+  inner->layoutRounding = outer->layoutRounding;
   outer->layout = LayoutMode::None;
   outer->gap = 0.0f;
   outer->padding = {};

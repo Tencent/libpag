@@ -608,6 +608,7 @@ PAGX 文档采用层级结构组织内容：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `layout` | LayoutMode | none | 子图层容器布局模式 |
+| `layoutRounding` | LayoutRounding | inherit | 本容器内容及子图层布局的取整策略，由后代容器继承 |
 | `gap` | float | 0 | 相邻子 Layer 之间的间距 |
 | `flex` | float | 0 | 主轴弹性权重。子元素无显式主轴尺寸时：`flex=0`（默认）使用内容测量尺寸；`flex>0` 按权重按比例分配剩余空间。设置了显式 `width`/`height` 时忽略此属性 |
 | `padding` | float 或 "t,r,b,l" | 0 | 内缩布局内容区域和所有内容（VectorElements 和子 Layers）的约束参考系。支持单值（四边均匀）、两值（垂直,水平）、四值（上,右,下,左），与 CSS shorthand 一致 |
@@ -622,6 +623,18 @@ PAGX 文档采用层级结构组织内容：
 | `none` | 无容器布局，子图层使用约束属性（`left`/`top`）定位（默认值） |
 | `horizontal` | 主轴水平方向，交叉轴垂直方向 |
 | `vertical` | 主轴垂直方向，交叉轴水平方向 |
+
+**LayoutRounding**：
+
+| 值 | 说明 |
+|------|------|
+| `inherit` | 继承外层容器策略；文档及 Composition 根节点默认使用 `pixel` |
+| `pixel` | 布局计算的位置四舍五入，约束及百分比分配的尺寸向上取整，Flex 空间按整数像素分配 |
+| `none` | 约束布局和 Flex 布局保留小数位置及分配尺寸 |
+
+该策略作用于容器内的 VectorElement（含嵌套 Group）和子 Layer。Layer 自身的位置及分配尺寸
+由父容器的策略决定，其 `layoutRounding` 控制该 Layer 内部的布局。两种模式都保留显式尺寸及
+内容测量尺寸的原值。HTML 导入将 body Layer 设为 `none`，以保留 CSS 像素几何。
 
 **Alignment（交叉轴对齐）**：
 
@@ -866,11 +879,12 @@ left=L, right=R:  position.x = L, width = W - L - R
 
 ### 4.4 与动画的关系
 
-所有布局相关属性（`width`、`height`、`layout`、`gap`、`padding`、`alignment`、`arrangement`，以及约束属性 `left`、`right`、`top`、`bottom`、`centerX`、`centerY`）在运行时不存在。布局引擎在首次渲染前一次性计算，将结果写入各元素的绝对坐标（`position`、`size`），随后布局属性即被丢弃。
+所有布局相关属性（`width`、`height`、`layout`、`layoutRounding`、`gap`、`padding`、`alignment`、`arrangement`，以及约束属性 `left`、`right`、`top`、`bottom`、`centerX`、`centerY`）在运行时不存在。布局引擎在首次渲染前一次性计算，将结果写入各元素的绝对坐标（`position`、`size`），随后布局属性即被丢弃。
 
 因此，动画无法修改布局属性，而是基于布局计算后的结果叠加视觉变化。例如 `transform`、`alpha` 等渲染属性可以设置关键帧动画，它们作用于布局结果之上，不会触发重新布局。
 
-布局引擎在计算完成后，将所有 Layer 的位置（`x`、`y`）四舍五入到最近的整数像素，内容测量的尺寸向上取整到整数像素，避免亚像素渲染带来的模糊和约束边界处的内容裁剪。
+布局计算的位置及分配尺寸遵循容器的 `layoutRounding` 策略（§4.2）。默认 `pixel` 模式保留原有
+整数对齐行为；`none` 模式保留小数几何，避免嵌套容器逐层取整产生累积偏移。
 
 ---
 

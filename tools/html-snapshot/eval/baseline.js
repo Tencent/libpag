@@ -14,6 +14,7 @@ const { openAndSettlePage } = require('../dist/lib/page-loader');
 const { makeFail, parseNumber, MAX_CAPTURE_HEIGHT_PX } = require('../dist/lib/common');
 const { launchBrowser, resolveEngine } = require('../dist/lib/browser-engine');
 const { applyCanvasViewport } = require('../dist/lib/canvas-viewport');
+const { MEASURE_BODY_CANVAS_SRC } = require('../dist/lib/canvas-measure');
 
 const fail = makeFail('baseline');
 
@@ -71,7 +72,7 @@ async function captureBodyRect(page, maxHeightPx) {
   // Force layout flush and read the body rect that snapshot.js will use as the
   // canvas. Anything outside this rect is not addressable in the subset output,
   // so cropping the baseline screenshot to the same rect keeps the diff fair.
-  return page.evaluate((maxHeight) => {
+  function prepareAndMeasure(maxHeight) {
     const body = document.body;
     body.style.margin = '0';
     body.style.padding = '0';
@@ -104,19 +105,13 @@ async function captureBodyRect(page, maxHeightPx) {
       try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
     }
     void body.offsetHeight;
-    const rect = body.getBoundingClientRect();
-    const width = Math.max(body.scrollWidth, Math.round(rect.width));
-    // Clamp to the same renderable maximum snapshot.js applies to the subset
-    // canvas. Infinite-scroll feeds inflate the body past what a single GL
-    // render surface can hold; without this the baseline PNG (ground truth)
-    // would be taller than the subset and the diff would compare mismatched
-    // canvases. Clamping both to MAX_CAPTURE_HEIGHT_PX keeps them aligned.
-    const height = Math.min(
-      maxHeight,
-      Math.max(body.scrollHeight, Math.round(rect.height)),
-    );
-    return { width, height };
-  }, maxHeightPx);
+    return measureBodyCanvas(maxHeight);
+  }
+  return page.evaluate(`(() => {
+    ${MEASURE_BODY_CANVAS_SRC}
+    return (${prepareAndMeasure.toString()})(${maxHeightPx});
+  })()`);
+
 }
 
 async function main() {

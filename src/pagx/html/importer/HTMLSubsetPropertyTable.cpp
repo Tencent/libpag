@@ -47,10 +47,6 @@ bool ParseLengthComponent(const std::string& trimmed, float& outNumber, std::str
   return true;
 }
 
-std::string FormatNumber(float v) {
-  return FormatRoundedNumber(v);
-}
-
 std::string DropProperty(const std::string& propertyName, const std::string& value,
                          const std::string& reason, HTMLTransformContext& diagnostics) {
   diagnostics.warn("subset:unsupported-property",

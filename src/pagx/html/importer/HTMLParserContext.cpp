@@ -353,6 +353,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     return nullptr;
   }
   if (bodyLayer) {
+    bodyLayer->layoutRounding = LayoutRounding::None;
     _document->layers.push_back(bodyLayer);
   }
   finishImageLayouts();

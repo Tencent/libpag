@@ -104,6 +104,7 @@ Layer* TextMask(PAGXDocument* doc, Layer* source, bool root = false) {
   mask->padding = source->padding;
   mask->alignment = source->alignment;
   mask->arrangement = source->arrangement;
+  mask->layoutRounding = source->layoutRounding;
   mask->includeInLayout = source->includeInLayout;
   auto eligibility = source->customData.find("pagx-text-clip");
   if (!source->visible) return mask;
