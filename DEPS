@@ -17,7 +17,7 @@
       },
       {
         "url": "${PAG_GROUP}/libavc.git",
-        "commit": "c2bf4c84a6d39788929e59514417e819185af98e",
+        "commit": "11425ab670b84afd2c204a5fbfcf92473cc76f5d",
         "dir": "third_party/libavc"
       },
       {
