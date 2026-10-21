@@ -45,6 +45,10 @@ Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z) {
   return result;
 }
 
+bool HasLayer3DTransform(const Layer* layer) {
+  return layer->z != 0.0f || !layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer);
+}
+
 bool HasLayerTransformComponents(const Layer* layer) {
   return layer->rotationX != 0.0f || layer->rotationY != 0.0f || layer->rotationZ != 0.0f ||
          layer->scaleX != 1.0f || layer->scaleY != 1.0f || layer->scaleZ != 1.0f ||

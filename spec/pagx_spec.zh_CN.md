@@ -966,7 +966,7 @@ Layer 的子元素按类型自动归类为五个集合：
 | `skewY` | float | 0 | 垂直剪切角，单位为度，同 CSS `skewY()`，范围 (-90, 90) |
 | `perspective` | float | 0 | 透视距离 `d`；0 表示无透视，负数无效 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix3D | - | 3D 变换（16 个值，列优先） |
+| `matrix3D` | Matrix3D | 单位矩阵 | 3D 变换（16 个值，列优先）；必须有限且可逆 |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | true | 组透明度 |

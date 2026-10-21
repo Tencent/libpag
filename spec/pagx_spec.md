@@ -966,7 +966,7 @@ Layer child elements are automatically categorized into five collections by type
 | `skewY` | float | 0 | Vertical skew angle in degrees like CSS `skewY()`, within (-90, 90) |
 | `perspective` | float | 0 | Perspective viewing distance `d`; 0 means none, negative values are invalid |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix3D | - | 3D transform (16 values, column-major) |
+| `matrix3D` | Matrix3D | identity matrix | 3D transform (16 values, column-major); must be finite and invertible |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Group opacity |

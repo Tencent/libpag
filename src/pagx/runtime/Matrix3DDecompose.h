@@ -69,7 +69,7 @@ enum class Matrix3DComponent : uint8_t {
 };
 
 // Number of valid Matrix3DComponent values.
-static constexpr size_t Matrix3DComponentCount = static_cast<size_t>(Matrix3DComponent::Count);
+static constexpr size_t MATRIX3D_COMPONENT_COUNT = static_cast<size_t>(Matrix3DComponent::Count);
 
 // A transform described by independent components, composed as P * T * R * K * S like
 // DecomposedMatrix3D. Rotation holds Euler angles in degrees composed as Rz * Ry * Rx, so authored
@@ -654,7 +654,7 @@ inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DCom
   }
   static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x",    "scale.y",
                                 "scale.z",    "skew.x",     "skew.y",     "perspective"};
-  for (size_t i = 0; i < Matrix3DComponentCount; ++i) {
+  for (size_t i = 0; i < MATRIX3D_COMPONENT_COUNT; ++i) {
     if (channel == names[i]) {
       *component = static_cast<Matrix3DComponent>(i);
       return true;

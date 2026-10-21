@@ -35,7 +35,7 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
   if (layer->blendMode != BlendMode::Normal) {
     return true;
   }
-  if (!layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
+  if (HasLayer3DTransform(layer)) {
     return true;
   }
   if (layer->preserve3D) {
@@ -87,9 +87,6 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
     return true;
   }
   if (!layer->includeInLayout) {
-    return true;
-  }
-  if (layer->z != 0.0f) {
     return true;
   }
   return false;

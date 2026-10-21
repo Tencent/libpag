@@ -51,14 +51,6 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-// Sentinel large value used to seed min/max accumulators when computing axis-aligned bounds.
-// Any realistic layer coordinate is many orders of magnitude smaller, so the first observation
-// always overwrites the seed. Mirrors the same sentinel used in HTMLWriter::ComputeGeosBoundingBox.
-static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
-
-// Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
-// fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
-
 static Point LayerPositionForCSS(const Layer* layer) {
   // Mirror the finite checks LayerTransformCSS applies, so a non-finite matrix is treated as absent
   // on both sides and the authored position still reaches left / top.
@@ -71,6 +63,14 @@ static Point LayerPositionForCSS(const Layer* layer) {
   return {std::isnan(layoutPosition.x) ? 0 : layoutPosition.x,
           std::isnan(layoutPosition.y) ? 0 : layoutPosition.y};
 }
+
+// Sentinel large value used to seed min/max accumulators when computing axis-aligned bounds.
+// Any realistic layer coordinate is many orders of magnitude smaller, so the first observation
+// always overwrites the seed. Mirrors the same sentinel used in HTMLWriter::ComputeGeosBoundingBox.
+static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
+
+// Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
+// fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
 
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";

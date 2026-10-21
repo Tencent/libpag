@@ -516,7 +516,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   if (!m->matrix.isIdentity()) {
     return false;
   }
-  if (m->z != 0.0f || !m->matrix3D.isIdentity() || HasLayerTransformComponents(m)) {
+  if (HasLayer3DTransform(m)) {
     return false;
   }
   if (m->alpha != 1.0f) {
@@ -582,7 +582,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   if (layer->x != 0.0f || layer->y != 0.0f || !layer->matrix.isIdentity()) {
     return false;
   }
-  if (layer->z != 0.0f || !layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
+  if (HasLayer3DTransform(layer)) {
     return false;
   }
   if (LayoutNodeHasConstraints(layer)) {

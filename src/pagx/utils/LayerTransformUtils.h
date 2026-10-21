@@ -37,6 +37,10 @@ bool IsFiniteMatrix(const Matrix& matrix);
 // has a non-zero x, y or z coefficient. A scaled homogeneous row (m33 != 1) is still affine.
 bool HasPerspective(const Matrix3D& matrix);
 
+// Returns true if the Layer carries any 3D transform: a Z translation, a matrix3D, or a transform
+// component. Exporters and optimizers that only handle the 2D plane use this as a single guard.
+bool HasLayer3DTransform(const Layer* layer);
+
 // Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from
 // its default value.
 bool HasLayerTransformComponents(const Layer* layer);

@@ -71,7 +71,7 @@ bool CanHandle(const Layer* layer) {
   if (layer->hasScrollRect) {
     return false;
   }
-  if (!layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
+  if (HasLayer3DTransform(layer)) {
     return false;
   }
   // Only pure translation is supported; rotation/scale/skew would require transforming the filter
