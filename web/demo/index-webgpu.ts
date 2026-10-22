@@ -263,7 +263,10 @@ if (typeof window !== 'undefined') {
     });
     // makeSnapshot
     document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
-      pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
+      pagView
+          .makeSnapshot()
+          .then((bitmap) => console.log('makeSnapshot:', bitmap))
+          .catch((error) => console.error('makeSnapshot fail:', error));
     });
 
     // cacheScale
