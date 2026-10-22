@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const arch = process.env.ARCH;
-const demoName = (arch === 'wasm-mt'? 'index': 'index-st');
+const backend = process.env.BACKEND;
+const demoName = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'index-webgpu-mt' : 'index-webgpu') : (arch === 'wasm-mt' ? 'index' : 'index-st');
+const demoOutDir = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : arch;
 
 require("./update.pag.import");
 
@@ -36,7 +38,7 @@ const plugins = [
 export default [
   {
     input: `demo/${demoName}.ts`,
-    output: { banner, file: `demo/${arch}/libpag.js`, format: 'esm', sourcemap: true },
+    output: { banner, file: `demo/${demoOutDir}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   }
 ];

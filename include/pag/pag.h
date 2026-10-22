@@ -30,6 +30,7 @@ namespace tgfx {
 struct Rect;
 class Context;
 class Surface;
+class SurfaceReadback;
 class ImageInfo;
 class Device;
 }  // namespace tgfx
@@ -1179,12 +1180,61 @@ class Composition;
 
 class PAGPlayer;
 
+class PAGSurface;
+
+/**
+ * An asynchronous pixel readback session created by PAGSurface::asyncReadPixels(). The pixel data
+ * may not be available immediately after creation, because it can involve asynchronous GPU
+ * processing: on WebGPU the data arrives through an asynchronous GPU buffer mapping, and even on
+ * OpenGL readiness is fence-based, meaning it arrives only after the GPU drains previously queued
+ * work. Poll isReady() until it returns true, then call readPixels() to copy the pixels out.
+ * The session holds GPU resources until it is destroyed, so do not keep it alive longer than
+ * needed.
+ */
+class PAG_API PAGSurfaceReadback {
+ public:
+  ~PAGSurfaceReadback();
+
+  /**
+   * Returns the width in pixels of the readback data.
+   */
+  int width() const;
+
+  /**
+   * Returns the height in pixels of the readback data.
+   */
+  int height() const;
+
+  /**
+   * Returns true if the pixel data is ready to be read by readPixels(). This method never blocks.
+   */
+  bool isReady();
+
+  /**
+   * Copies the readback pixels to dstPixels with the specified color type, alpha type and row
+   * bytes. Returns false without copying if the pixel data is not ready yet. dstPixels must have
+   * room for at least height() * dstRowBytes bytes. Returns true if the pixels are copied.
+   */
+  bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
+
+ private:
+  PAGSurfaceReadback(std::shared_ptr<PAGSurface> pagSurface,
+                     std::shared_ptr<tgfx::SurfaceReadback> readback, bool flipY);
+
+  std::shared_ptr<PAGSurface> pagSurface = nullptr;
+  std::shared_ptr<tgfx::SurfaceReadback> readback = nullptr;
+  bool flipY = false;
+
+  friend class PAGSurface;
+};
+
 /**
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
- * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ * including readPixels(), asyncReadPixels(), clearAll(), freeCache(), updateSize(), and
+ * getHardwareBuffer().
  */
-class PAG_API PAGSurface {
+class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
  public:
   /**
    *  Creates a new PAGSurface from specified Drawable, Returns nullptr if drawable is nullptr.
@@ -1263,6 +1313,16 @@ class PAG_API PAGSurface {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
+  /**
+   * Starts an asynchronous readback of the entire surface content and returns a session object.
+   * Unlike readPixels(), this method never blocks the calling thread waiting for the GPU: poll
+   * PAGSurfaceReadback::isReady() until it returns true, then copy the pixels out with
+   * PAGSurfaceReadback::readPixels(). On the WebGPU backend, where synchronous GPU readback is
+   * unsupported, this is the only way to read pixels. The returned session keeps this PAGSurface
+   * alive. Returns nullptr if the readback could not be started.
+   */
+  std::shared_ptr<PAGSurfaceReadback> asyncReadPixels();
+
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);
 
@@ -1296,6 +1356,8 @@ class PAG_API PAGSurface {
   friend class FileReporter;
 
   friend class PAGSurfaceExt;
+
+  friend class PAGSurfaceReadback;
 };
 
 class FileReporter;

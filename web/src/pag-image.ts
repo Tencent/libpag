@@ -2,6 +2,7 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
+import { resolveTextureHandle, unregisterWebGPUTexture, WebGPUTextureLike } from './core/backend-context';
 
 @destroyVerify
 export class PAGImage {
@@ -52,19 +53,29 @@ export class PAGImage {
   }
   /**
    * Creates a PAGImage object from the specified backend texture, return null if the texture is
-   * invalid.
+   * invalid. On the WebGL backend, pass the numeric texture handle registered via
+   * BackendContext.registerTexture(). On the WebGPU backend, pass the host GPUTexture directly;
+   * it must be created from the same GPUDevice that drives PAG rendering (the device passed to
+   * PAGInit) and with the TEXTURE_BINDING usage flag.
    */
-  public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
-    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY);
-    if (!wasmIns) throw new Error('Make PAGImage from texture fail!');
-    return new PAGImage(wasmIns);
+  public static fromTexture(texture: number | WebGPUTextureLike, width: number, height: number, flipY: boolean) {
+    const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGImage.fromTexture()', texture);
+    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format);
+    if (!wasmIns) {
+      if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
+      throw new Error('Make PAGImage from texture fail!');
+    }
+    return new PAGImage(wasmIns, webGPUHandle);
   }
 
   public wasmIns;
   public isDestroyed = false;
 
-  public constructor(wasmIns: any) {
+  private webGPUTextureHandle = 0;
+
+  public constructor(wasmIns: any, webGPUTextureHandle = 0) {
     this.wasmIns = wasmIns;
+    this.webGPUTextureHandle = webGPUTextureHandle;
   }
   /**
    * Returns the width in pixels.
@@ -111,6 +122,10 @@ export class PAGImage {
    */
   public destroy(): void {
     this.wasmIns.delete();
+    if (this.webGPUTextureHandle > 0) {
+      unregisterWebGPUTexture(this.webGPUTextureHandle);
+      this.webGPUTextureHandle = 0;
+    }
     this.isDestroyed = true;
   }
 }

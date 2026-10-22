@@ -17,8 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDrawable.h"
+#include <emscripten/html5.h>
 #include "base/utils/Log.h"
 #include "tgfx/core/Surface.h"
+
+#if defined(TGFX_USE_WEBGPU)
+#include "tgfx/gpu/webgpu/WebGPUWindow.h"
+#else
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#endif
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
@@ -33,7 +40,28 @@ GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
   GPUDrawable::updateSize();
 }
 
+#if defined(TGFX_USE_WEBGPU)
+std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvas(emscripten::val canvas) {
+  if (canvas.isUndefined() || canvas.isNull()) {
+    LOGE("GPUDrawable.FromCanvas() The canvas is invalid.");
+    return nullptr;
+  }
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(std::move(canvas)));
+}
+
+GPUDrawable::GPUDrawable(emscripten::val canvas) : canvas(std::move(canvas)) {
+  GPUDrawable::updateSize();
+}
+#endif
+
 void GPUDrawable::updateSize() {
+#if defined(TGFX_USE_WEBGPU)
+  if (!canvas.isUndefined() && !canvas.isNull()) {
+    _width = canvas["width"].as<int>();
+    _height = canvas["height"].as<int>();
+    return;
+  }
+#endif
   if (!canvasID.empty()) {
     emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
   }
@@ -44,7 +72,18 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
+#if defined(TGFX_USE_WEBGPU)
+    if (!canvas.isUndefined() && !canvas.isNull()) {
+      window = tgfx::WebGPUWindow::MakeFrom(canvas);
+    } else {
+      window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+    }
+#else
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
+  }
+  if (window == nullptr) {
+    return nullptr;
   }
   return window->getDevice();
 }
