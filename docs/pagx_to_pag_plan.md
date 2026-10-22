@@ -25,7 +25,7 @@
 - 格式识别与文件头（规范 §1.1/§3.6）：`PAGImporter::DetectFormat`、v4 头写出与校验。
 - **验收**：varint/位打包/颜色/矩阵/路径/字符串表的单测（字节级断言，直接采用规范 §10 的示例字节）。
 
-### T2 导出前处理：布局扁平化（依赖：无，与 T1 并行）
+### T2 导出前处理：布局扁平化（依赖：无，与 T1 并行）✅ 已完成（2026-10-22，c344ba560）
 - 新增 `src/pagx/pag/exporter/LayoutFlattener.cpp`：§4.2 逐类写回（Layer/形状/Path/Text/Group/TextBox），
   `clipToBounds → scrollRect`，布局输入删除；几何变换回调接口（§12.2 预留，一期空操作）。
 - 布局专用通道的动画/DataBind 删除 + 告警（一期动效内容整体跳过，告警清单先建好给二期用）。
