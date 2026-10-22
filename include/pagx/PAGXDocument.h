@@ -40,43 +40,7 @@ class ViewModel;
 class Image;
 class ImagePattern;
 
-/**
- * One entry of the document's source-node map: the runtime index and source span of a node, its
- * type, and the reflectable channel names available on it. Used by editor selection (line<->index
- * mapping) and by hosts deciding which attribute edits can go incremental.
- *
- * startLine / endLine may be -1 independently of index: a node returned in getNodeSourceMap()
- * always has index >= 0, but its source span can still be unknown when the node was created
- * programmatically or by an importer that did not carry line information.
- */
-struct NodeSourceEntry {
-  /**
-   * Index of the node in PAGXDocument::nodes. See Node::index for the caching caveats on this
-   * value.
-   */
-  int index = -1;
 
-  /**
-   * 1-based start line of the node in the PAGX XML, or -1 when the source span is unavailable.
-   */
-  int startLine = -1;
-
-  /**
-   * 1-based end line of the node in the PAGX XML, or -1 when the source span is unavailable.
-   */
-  int endLine = -1;
-
-  /**
-   * The node type.
-   */
-  NodeType nodeType = NodeType::Document;
-
-  /**
-   * Reflectable channel names of the node, from ListChannels(nodeType). Empty for node types that
-   * expose no channels.
-   */
-  std::vector<std::string> channels = {};
-};
 
 /**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
@@ -179,14 +143,18 @@ class PAGXDocument : public Node {
    * findNode(), data-bind "@id" targets, and deferred mask resolution see the adopted nodes. An
    * id already registered in this document is reported as a duplicate error and the HOST mapping
    * is kept (the adopted node stays unindexed), so foreign content cannot hijack the host's
-   * "@id" references; importers that merge several auto-numbered documents should call
-   * renameCollidingIds() first. Callers must not push into `nodes` directly — a bypassed node
-   * keeps its old index (colliding with existing nodes) and is invisible to ownsNode(), breaking
-   * getNodeSourceMap() index-based lookups and any host that resolves a runtime layer back to a
-   * source node.
-   * @param other the vector to drain; emptied on return.
+   * "@id" references. Renaming happens inside this call, so a caller cannot forget the sequence
+   * and merge duplicate ids into the document. Callers must not push into `nodes` directly — a
+   * bypassed node keeps its old index (colliding with existing nodes) and is invisible to
+   * ownsNode(), breaking getNodeSourceMap() index-based lookups and any host that resolves a
+   * runtime layer back to a source node.
+   *
+   * `other` is drained and invalidated: its node list, ownership set and id index are cleared, so
+   * it can no longer answer ownsNode()/findNode() for nodes it has handed over. Passing *this is
+   * a no-op.
+   * @param other the document to drain; emptied and invalidated on return.
    */
-  void adoptNodes(std::vector<std::unique_ptr<Node>>& other);
+  void adoptNodes(PAGXDocument& other);
 
   /**
    * Renames ids in the given document that collide with ids already used by this document (or
@@ -226,6 +194,11 @@ class PAGXDocument : public Node {
    * inline content (those wrappers are not ours to remove). Call before flattening an import
    * through resolve so the layer renders the flattened contents instead of the composition
    * reference.
+   *
+   * Must not be called while a live PAGScene built from this document is still alive: releasing
+   * the sub-document frees the nodes its layers point at, so any runtime PAGLayer still holding
+   * them (PAGLayer::node, PAGComposition::document) is left dangling. Callers that detach against
+   * a live document must rebuild the scene afterwards.
    * @param layer the layer whose inline import should be detached.
    */
   bool detachInlineImport(Layer* layer);
@@ -246,16 +219,7 @@ class PAGXDocument : public Node {
    */
   std::vector<std::string> getExternalImagePaths() const;
 
-  /**
-   * Returns one entry per node in PAGXDocument::nodes, in document order, carrying the node's
-   * runtime index, source span (1-based lines), type, and reflectable channel names. Use it to map
-   * source lines to node indexes for editor selection, and to decide which attribute edits can go
-   * incremental (a channel edit that fails can fall back to a full reparse). Entries reference the
-   * current node indexing; a structural document change renumbers nodes, so rebuild the map after
-   * such edits.
-   */
-  std::vector<NodeSourceEntry> getNodeSourceMap() const;
-
+  
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.

@@ -79,18 +79,6 @@ class PAGComposition : public PAGLayer {
    */
   bool isTimelinePlaying(const std::string& id) const;
 
-  /**
-   * Returns true when this composition has any spawned timeline (i.e. a referencing layer drives
-   * at least one Animation or StateMachine through <Timelines>). Only meaningful for non-root
-   * compositions: the root composition has no owner layer, so spawnTimelines() returns early and
-   * this is always false on it. To tell an animated document apart from a purely static one, walk
-   * the runtime tree and query each child composition (the playground's PAGXView does this with
-   * its own recursive helper).
-   */
-  bool hasTimelines() const {
-    return !timelines.empty();
-  }
-
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
   // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,

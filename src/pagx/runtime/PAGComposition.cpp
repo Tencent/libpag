@@ -174,8 +174,13 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       // pending). Re-push the ViewModel's current values now, scoped to this composition's
       // binding so sibling instances of the same source node are untouched; during initial
       // construction the bind pass has not run yet, so this is a harmless no-op then.
-      if (scene != nullptr) {
-        scene->reapplyDataBindsForTarget(sm, binding.get());
+      // Re-apply through this composition's own data-bind runtime instead of walking the whole
+      // composition tree: every composition owns an independent binding, so a scope-based tree
+      // walk can only ever match this subtree. Doing the full walk per spawned timeline turned a
+      // rebuild/reset into O(N^2), and it is pure no-op work during initial construction (the bind
+      // pass has not run yet, so dataBindRuntime is still null).
+      if (dataBindRuntime != nullptr) {
+        dataBindRuntime->reapplyForTarget(sm);
       }
       timelines.push_back(std::move(smTimeline));
     }

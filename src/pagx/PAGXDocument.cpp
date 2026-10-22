@@ -316,9 +316,18 @@ Node* PAGXDocument::findNode(const std::string& id) const {
   return it != nodeMap.end() ? it->second : nullptr;
 }
 
-void PAGXDocument::adoptNodes(std::vector<std::unique_ptr<Node>>& other) {
-  nodes.reserve(nodes.size() + other.size());
-  for (auto& node : other) {
+void PAGXDocument::adoptNodes(PAGXDocument& other) {
+  if (&other == this) {
+    // Self-adoption would append nodes to the very vector being iterated.
+    return;
+  }
+  // Rename before taking the nodes over: importer auto-generated ids (image1, path1, ...) collide
+  // as a matter of course when several inline SVGs merge into one document, and a caller that
+  // forgot this step would merge duplicate ids (illegal PAGX on export) with only an error to show
+  // for it. Doing it here makes the correct sequence the only one available.
+  renameCollidingIds(&other);
+  nodes.reserve(nodes.size() + other.nodes.size());
+  for (auto& node : other.nodes) {
     node->index = static_cast<int>(nodes.size());
     nodeSet.insert(node.get());
     // Adopted content is part of this document after the transfer, so its ids join the id index
@@ -333,7 +342,11 @@ void PAGXDocument::adoptNodes(std::vector<std::unique_ptr<Node>>& other) {
     }
     nodes.push_back(std::move(node));
   }
-  other.clear();
+  // The nodes now belong to this document. Clearing the source's ownership set and id index
+  // alongside its list keeps it from answering ownsNode()/findNode() for memory it no longer owns.
+  other.nodes.clear();
+  other.nodeSet.clear();
+  other.nodeMap.clear();
 }
 
 void PAGXDocument::renameCollidingIds(PAGXDocument* other) {
@@ -568,21 +581,33 @@ void PAGXDocument::attachInlineImportDocuments() {
 }
 
 bool PAGXDocument::detachInlineImport(Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  // Clear any failure record up front, independently of whether a wrapper is really detached: a
+  // failed attach records the layer while composition is still null (nothing was mounted), so
+  // gating this erase behind the mount checks below would make it unreachable. That would break
+  // the retry promise in the header - a host fixing importDirective.content and re-parsing would
+  // still be skipped, leaving hasUnresolvedImports() permanently true.
+  inlineImportMountFailures.erase(layer);
   // compositionFilePath is the precise discriminator between the two mount kinds: a file-loaded
   // external composition retains it as its origin (LoadExternalComposition), while an inline
   // import mount never sets it. A layer carrying BOTH a file composition and leftover inline
   // content must not have its file wrapper detached here.
-  if (layer == nullptr || layer->composition == nullptr || layer->externalDoc == nullptr ||
+  if (layer->composition == nullptr || layer->externalDoc == nullptr ||
       !layer->compositionFilePath.empty() || layer->importDirective.content.empty()) {
     return false;
   }
   auto* wrapper = layer->composition;
+  // Drop the wrapper's references into the sub-document before releasing the sub-document itself:
+  // the wrapper's layers/animations point at nodes owned by externalDoc, and clearing them first
+  // keeps the wrapper (and anything still reading it) from reaching into freed memory. The nodes
+  // stay owned by externalDoc until the reset below releases it.
+  wrapper->layers.clear();
+  wrapper->animations.clear();
   layer->composition = nullptr;
   layer->externalDoc = nullptr;
   removeNodes({wrapper});
-  // The layer is back to its unmounted state; a later attach attempt (e.g. a re-parse after the
-  // content is fixed) must not be suppressed by a stale failure record.
-  inlineImportMountFailures.erase(layer);
   return true;
 }
 
@@ -600,20 +625,7 @@ std::vector<std::string> PAGXDocument::getExternalImagePaths() const {
   return paths;
 }
 
-std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
-  std::vector<NodeSourceEntry> result = {};
-  result.reserve(nodes.size());
-  for (const auto& node : nodes) {
-    NodeSourceEntry entry = {};
-    entry.index = node->index;
-    entry.startLine = node->sourceLine;
-    entry.endLine = node->endLine;
-    entry.nodeType = node->nodeType();
-    entry.channels = ListChannels(node->nodeType());
-    result.push_back(std::move(entry));
-  }
-  return result;
-}
+
 
 bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Data> data) {
   if (filePath.empty() || data == nullptr) {

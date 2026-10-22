@@ -1439,10 +1439,11 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
 
 /**
  * Test case: adoptNodes() fully integrates adopted ids into the document's id index — findNode()
- * resolves them like any authored node — and a colliding id is reported as a document error
- * instead of silently coexisting with the host's ids.
+ * resolves them like any authored node — and an id that collides with the host's is renamed on the
+ * way in (adoptNodes() performs the rename itself), so the host's "@id" references keep resolving
+ * to the host node instead of being hijacked by the adopted one.
  */
-PAGX_TEST(PAGXTest, AdoptNodesRegistersIdsAndReportsDuplicates) {
+PAGX_TEST(PAGXTest, AdoptNodesRegistersIdsAndRenamesCollisions) {
   auto host = pagx::PAGXDocument::Make(100, 100);
   host->layers.push_back(host->makeNode<pagx::Layer>("hostLayer"));
 
@@ -1450,24 +1451,20 @@ PAGX_TEST(PAGXTest, AdoptNodesRegistersIdsAndReportsDuplicates) {
   auto foreignLayer = foreign->makeNode<pagx::Layer>("inner");
   foreign->layers.push_back(foreignLayer);
 
-  host->adoptNodes(foreign->nodes);
+  host->adoptNodes(*foreign);
   EXPECT_NE(host->findNode<pagx::Layer>("inner"), nullptr);
   EXPECT_TRUE(host->ownsNode(foreignLayer));
 
   auto second = pagx::PAGXDocument::Make(50, 50);
   auto* foreignDuplicate = second->makeNode<pagx::Layer>("hostLayer");
   second->layers.push_back(foreignDuplicate);
-  host->adoptNodes(second->nodes);
-  bool hasDuplicateError = false;
-  for (const auto& error : host->errors) {
-    if (error.find("Duplicate node id 'hostLayer'") != std::string::npos) {
-      hasDuplicateError = true;
-    }
-  }
-  EXPECT_TRUE(hasDuplicateError);
-  // The host mapping wins on collision: the host's "@id" references keep resolving to the host
-  // node instead of being hijacked by the adopted one.
+  host->adoptNodes(*second);
+  // The colliding id was renamed while being adopted, so the document never carries two nodes
+  // under the same id (which would be illegal on export) and no duplicate error is reported: the
+  // host's "@id" references still resolve to the host node and the adopted one gets a fresh id.
+  EXPECT_EQ(foreignDuplicate->id, "hostLayer_2");
   EXPECT_EQ(host->findNode<pagx::Layer>("hostLayer"), host->layers[0]);
+  EXPECT_NE(host->findNode<pagx::Layer>("hostLayer_2"), nullptr);
 }
 
 /**
@@ -1493,7 +1490,7 @@ PAGX_TEST(PAGXTest, RenameCollidingIdsAvoidsHostAndSelfCollisions) {
   EXPECT_EQ(repeated->id, "image1_3");
   EXPECT_EQ(unique->id, "unique");
 
-  host->adoptNodes(foreign->nodes);
+  host->adoptNodes(*foreign);
   EXPECT_TRUE(host->errors.empty());
   EXPECT_NE(host->findNode<pagx::Layer>("image1_2"), nullptr);
   EXPECT_NE(host->findNode<pagx::Layer>("image1_3"), nullptr);

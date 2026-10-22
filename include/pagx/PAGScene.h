@@ -176,10 +176,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the layers under the given surface point. The first layer in the array is the top-most
    * under the point, the last is the bottom-most, and every ancestor of a hit layer follows it. A
-   * layer is hit when the point falls on the actual shape of its own content (glyph outlines for
-   * text, the filled or stroked area for geometry), so the gap between two glyphs, the inside of a
-   * stroke-only shape, and a fully transparent fill are not hits. Hidden layers, and points outside
-   * a layer's scrollRect clip or mask, are skipped together with their subtrees. Returns an empty
+   * layer is hit when the point falls on its own content. Hidden layers, and points outside a
+   * layer's scrollRect clip or mask, are skipped together with their subtrees. Returns an empty
    * array if nothing is hit. Hit testing does not require a prior draw(). Accepts surface
    * coordinates (with zoom and content offset applied) instead of the composition's local
    * coordinates. The layers are runtime objects: resolving one to a PAGX source node, or applying
@@ -188,8 +186,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * runtime-layer map.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
+   * @param shapeHitTest how a layer's own content is tested. false (the default) tests the
+   * bounding box and preserves the pre-existing behaviour. true tests the actual shape (glyph
+   * outlines for text, the filled or stroked area for geometry), so the gap between two glyphs,
+   * the inside of a stroke-only shape and a fully transparent fill are not hits. Callers that need
+   * precise picking pass true; everyone else keeps the old semantics.
    */
-  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
+  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY,
+                                                             bool shapeHitTest = false);
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
@@ -200,16 +204,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
-  /**
-   * Returns the tight bounds of the given layer in surface coordinates: per-glyph extents for text
-   * (instead of the font-wide envelope of getGlobalBounds), clipped to the layer's own scrollRect
-   * window, so selection outlines hug the visible content. The layer's full on-screen transform
-   * (including animation and the display zoom/offset) is applied. Returns an empty rectangle if
-   * the layer is null or does not belong to this scene.
-   * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
-   */
-  Rect getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
-
+  
  private:
   PAGScene();
 
@@ -276,16 +271,19 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // read is runtime state; the source model is never consulted.
   static bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
                                       float rootY, float surfaceX, float surfaceY,
+                                      bool shapeHitTest,
                                       std::vector<std::shared_ptr<PAGLayer>>* out);
 
   // True when the point passes the visibility, scrollRect clip and mask of every tgfx layer from
-  // layer up to (but excluding) stop. rootX/rootY are in the runtime tree's root space.
+  // layer up to (but excluding) stop. rootX/rootY are in the runtime tree's root space. The mask is
+  // tested with the same shapeHitTest the caller asked for, so both tests agree.
   static bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
-                                      float rootY);
+                                      float rootY, bool shapeHitTest);
 
-  // True when the point falls on the shape of the layer's own content. Layers whose runtime layer
-  // carries no contents never report a hit of their own.
-  static bool OwnContentContainsPoint(PAGLayer* layer, float surfaceX, float surfaceY);
+  // True when the point falls on the layer's own content, tested per shapeHitTest. Layers whose
+  // runtime layer carries no contents never report a hit of their own.
+  static bool OwnContentContainsPoint(PAGLayer* layer, float rootX, float rootY, float surfaceX,
+                                      float surfaceY, bool shapeHitTest);
 
   // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
   // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface

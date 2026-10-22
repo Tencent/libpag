@@ -905,6 +905,40 @@ bool IsValidCustomDataKey(const std::string& key) {
   return true;
 }
 
+bool ParseDimension(const std::string& raw, float* outAbsolute, float* outPercent) {
+  *outAbsolute = NAN;
+  *outPercent = NAN;
+  if (raw.empty()) {
+    return false;
+  }
+  const char* cstr = raw.c_str();
+  // Reject leading whitespace, sign, and hex prefix; strtof would otherwise accept them.
+  char first = cstr[0];
+  if (first == ' ' || first == '\t' || first == '+' || first == '-') {
+    return false;
+  }
+  if (first == '0' && (cstr[1] == 'x' || cstr[1] == 'X')) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  float value = strtof(cstr, &endPtr);
+  if (endPtr == cstr || !std::isfinite(value) || value < 0) {
+    return false;
+  }
+  if (*endPtr == '%') {
+    if (endPtr[1] != '\0') {
+      return false;
+    }
+    *outPercent = value;
+    return true;
+  }
+  if (*endPtr != '\0') {
+    return false;
+  }
+  *outAbsolute = value;
+  return true;
+}
+
 #undef DEFINE_ENUM_CONVERSION
 
 }  // namespace pagx

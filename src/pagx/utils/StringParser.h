@@ -237,6 +237,20 @@ std::string ColorToHexString(const Color& color, bool withAlpha = false);
  */
 Color ParseColor(const std::string& str, bool* outValid = nullptr);
 
+/**
+ * Parses a PAGX dimension attribute string ("100" or "50%") following the XSD DimensionType
+ * pattern "[0-9]*\.?[0-9]+%?": a bare number sets *outAbsolute, a "%"-suffixed one sets
+ * *outPercent, and exactly one of the two is written (the other stays NaN). Rejects empty input,
+ * leading whitespace, a leading sign, a hex prefix, non-finite and negative values, and any
+ * trailing characters (including whitespace around "%").
+ *
+ * Shared by the importer and the incremental channel writer: keeping one grammar is what makes
+ * "an incremental edit never accepts input a full reparse would reject" hold, so both sides must
+ * call this instead of carrying their own copy. Returns false on malformed input with both
+ * outputs NaN. The caller owns the diagnostic (importer) or the fallback (incremental edit).
+ */
+bool ParseDimension(const std::string& raw, float* outAbsolute, float* outPercent);
+
 //==============================================================================
 // Matrix
 //==============================================================================

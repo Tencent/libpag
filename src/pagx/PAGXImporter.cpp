@@ -426,36 +426,13 @@ static void ReadDimension(const DOMNode* node, const std::string& name, float* o
   if (str == nullptr || str->empty()) {
     return;
   }
-  const char* cstr = str->c_str();
-  // Reject leading whitespace, sign, and hex prefix; strtof would otherwise accept them.
-  char first = cstr[0];
-  if (first == ' ' || first == '\t' || first == '+' || first == '-') {
+  // Shares the grammar with the incremental channel writer (PAGXNodeChannel): both go through
+  // StringParser::ParseDimension, so a value accepted here is accepted there and vice versa.
+  // Carrying a second copy would let the XSD rules drift apart and silently break the promise
+  // that an incremental edit matches a full reparse. The importer only adds the diagnostic.
+  if (!ParseDimension(*str, outAbsolute, outPercent)) {
     ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    return;
   }
-  if (first == '0' && (cstr[1] == 'x' || cstr[1] == 'X')) {
-    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    return;
-  }
-  char* endPtr = nullptr;
-  float value = strtof(cstr, &endPtr);
-  if (endPtr == cstr || !std::isfinite(value) || value < 0) {
-    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    return;
-  }
-  if (*endPtr == '%') {
-    if (endPtr[1] != '\0') {
-      ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-      return;
-    }
-    *outPercent = value;
-    return;
-  }
-  if (*endPtr != '\0') {
-    ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
-    return;
-  }
-  *outAbsolute = value;
 }
 
 static Padding GetPaddingAttribute(const DOMNode* node, PAGXDocument* doc) {

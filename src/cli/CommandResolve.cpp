@@ -282,12 +282,11 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     }
   }
 
-  // Auto-numbered importer ids (image1, path1, ...) collide across separately resolved SVGs and
-  // with the host document's ids; rename them here so adoptNodes() registers the ids without
-  // reporting duplicates.
-  doc->renameCollidingIds(svgDoc.get());
-  // Transfer ownership of all nodes from imported document to target document.
-  doc->adoptNodes(svgDoc->nodes);
+  // Transfer ownership of all nodes from the imported document to the target document.
+  // adoptNodes() renames the auto-numbered importer ids (image1, path1, ...) first: they collide
+  // across separately resolved SVGs and with the host document's own ids, and adopting them
+  // unrenamed would report duplicates or hijack the host's "@id" references.
+  doc->adoptNodes(*svgDoc);
   svgDoc->layers.clear();
 
   // Clear import fields and set resolved marker.
@@ -341,12 +340,23 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
   ResolveLayers(doc->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
 
   // Also resolve in Composition layers.
+  // Snapshot the compositions before resolving: ResolveLayers() can detach an inline import, and
+  // PAGXDocument::detachInlineImport() then calls removeNodes(), which resizes and renumbers
+  // doc->nodes. Iterating nodes directly would invalidate the range-for's cached end and hand back
+  // dangling unique_ptrs (a virtual call on a destroyed node), so walk a stable snapshot and skip
+  // entries that an earlier detach already removed.
+  std::vector<Composition*> compositions = {};
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
-                    stats.errorCount);
+      compositions.push_back(static_cast<Composition*>(node.get()));
     }
+  }
+  for (auto* comp : compositions) {
+    if (!doc->ownsNode(comp)) {
+      continue;
+    }
+    ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
+                  stats.errorCount);
   }
 
   return stats;

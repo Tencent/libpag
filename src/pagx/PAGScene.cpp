@@ -691,7 +691,7 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
 }
 
 bool PAGScene::RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
-                                       float rootY) {
+                                       float rootY, bool shapeHitTest) {
   // Mirrors the per-child gating of tgfx::Layer::getLayersUnderPoint. A PAGComposition's runtime
   // layer hangs under the referencing layer's slot, which carries that layer's visibility, clip and
   // mask, so every tgfx layer between the child and its PAGLayer parent is checked.
@@ -708,14 +708,15 @@ bool PAGScene::RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* st
       }
     }
     auto mask = current->mask();
-    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY)) {
+    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY, shapeHitTest)) {
       return false;
     }
   }
   return true;
 }
 
-bool PAGScene::OwnContentContainsPoint(PAGLayer* layer, float surfaceX, float surfaceY) {
+bool PAGScene::OwnContentContainsPoint(PAGLayer* layer, float rootX, float rootY, float surfaceX,
+                                       float surfaceY, bool shapeHitTest) {
   // Only a tgfx::VectorLayer carries contents (see LayerBuilder), so a plain container layer has no
   // content of its own and cannot be hit by itself.
   auto* runtimeLayer = layer->runtimeLayer.get();
@@ -723,13 +724,20 @@ bool PAGScene::OwnContentContainsPoint(PAGLayer* layer, float surfaceX, float su
       static_cast<tgfx::VectorLayer*>(runtimeLayer)->contents().empty()) {
     return false;
   }
-  // Reached only when no child was hit, so the children this also walks cannot turn a miss into a
-  // hit: the result reflects this layer's own content shape.
-  return layer->hitTestPoint(surfaceX, surfaceY, true);
+  // Fast reject before hitTestPoint(): that call recurses into every child layer once this layer's
+  // own content misses, and the caller gets here only after no child was hit, so without this check
+  // hovering empty space would walk the same subtree twice. A point outside this layer's own content
+  // bounds cannot hit its content, so it never needs that walk.
+  auto localPoint = runtimeLayer->globalToLocal(tgfx::Point::Make(rootX, rootY));
+  if (!runtimeLayer->getBounds(runtimeLayer).contains(localPoint.x, localPoint.y)) {
+    return false;
+  }
+  return layer->hitTestPoint(surfaceX, surfaceY, shapeHitTest);
 }
 
 bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
                                        float rootY, float surfaceX, float surfaceY,
+                                       bool shapeHitTest,
                                        std::vector<std::shared_ptr<PAGLayer>>* out) {
   // Subtrees are gated only by visibility, clip and mask, never pruned by an ancestor's shape test:
   // tgfx's shape test recurses into every descendant, so testing each ancestor before descending
@@ -741,14 +749,16 @@ bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, f
   for (auto item = children.rbegin(); item != children.rend(); ++item) {
     const auto& child = *item;
     if (child == nullptr || child->runtimeLayer == nullptr ||
-        !RuntimePathAcceptsPoint(child->runtimeLayer.get(), parentRuntime, rootX, rootY)) {
+        !RuntimePathAcceptsPoint(child->runtimeLayer.get(), parentRuntime, rootX, rootY,
+                                 shapeHitTest)) {
       continue;
     }
-    if (CollectLayersUnderPoint(child, rootX, rootY, surfaceX, surfaceY, out)) {
+    if (CollectLayersUnderPoint(child, rootX, rootY, surfaceX, surfaceY, shapeHitTest, out)) {
       childHit = true;
     }
   }
-  if (!childHit && !OwnContentContainsPoint(layer.get(), surfaceX, surfaceY)) {
+  if (!childHit && !OwnContentContainsPoint(layer.get(), rootX, rootY, surfaceX, surfaceY,
+                                            shapeHitTest)) {
     return false;
   }
   // Descendants are pushed before their parent so the deepest top-most hit ends up at the front,
@@ -758,7 +768,8 @@ bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, f
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
-                                                                     float surfaceY) {
+                                                                     float surfaceY,
+                                                                     bool shapeHitTest) {
   float rootX = 0;
   float rootY = 0;
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
@@ -768,7 +779,8 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
     return {};
   }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  CollectLayersUnderPoint(_rootComposition, rootX, rootY, surfaceX, surfaceY, &result);
+  CollectLayersUnderPoint(_rootComposition, rootX, rootY, surfaceX, surfaceY, shapeHitTest,
+                          &result);
   return result;
 }
 
@@ -788,28 +800,7 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   return FromTGFX(surfaceBounds);
 }
 
-Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
-  // getGlobalBounds' conservative envelope semantics are part of its published contract (existing
-  // callers such as the wechat view's LRU eviction scoring and getImageBounds binding rely on it),
-  // while editor-selection rects want tight bounds that hug the visible content. The two variants
-  // must stay separate so improving selection outlines never changes what existing hosts observe.
-  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
-    return {};
-  }
-  auto scene = pagLayer->rootScene.lock();
-  if (scene.get() != this) {
-    return {};
-  }
-  auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
-  // visible content (per-glyph extents for text) instead of the conservative content envelope
-  // that Layer::getBounds returns by default.
-  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
-  Matrix rootToSurface = {};
-  rootToSurfaceMatrix(&rootToSurface);
-  auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
-  return FromTGFX(surfaceBounds);
-}
+
 
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
