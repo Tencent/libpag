@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Compile-time sentinel for the pag::Devices glue layer. Each supported backend has its own
-// implementation translation unit (Devices_GL.cpp, Devices_Metal.mm, and — in future PRs —
-// Devices_Vulkan.cpp / Devices_D3D12.cpp / Devices_WebGPU.cpp). This file exists solely to make
+// implementation translation unit (Devices_GL.cpp, Devices_Metal.mm, Devices_WebGPU.cpp, and —
+// in future PRs — Devices_Vulkan.cpp / Devices_D3D12.cpp). This file exists solely to make
 // "backend selected via PAG_USE_* but libpag glue not implemented yet" a compile-time error,
 // instead of a late link-time undefined-symbol failure.
 //
@@ -37,9 +37,9 @@
     "(TGFX_USE_OPENGL / TGFX_USE_METAL / TGFX_USE_VULKAN / TGFX_USE_D3D12 / TGFX_USE_WEBGPU)."
 #endif
 
-#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
+#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL) || defined(TGFX_USE_WEBGPU)
 
-// OK — implementation lives in Devices_GL.cpp / Devices_Metal.mm.
+// OK — implementation lives in Devices_GL.cpp / Devices_Metal.mm / Devices_WebGPU.cpp.
 
 #elif defined(TGFX_USE_VULKAN)
 
@@ -48,10 +48,6 @@
 #elif defined(TGFX_USE_D3D12)
 
 #error "libpag D3D12 backend is not yet implemented. Add src/rendering/gpu/Devices_D3D12.cpp."
-
-#elif defined(TGFX_USE_WEBGPU)
-
-#error "libpag WebGPU backend is not yet implemented. Add src/rendering/gpu/Devices_WebGPU.cpp."
 
 #else
 

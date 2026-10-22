@@ -59,6 +59,7 @@ enum class Backend {
   OPENGL,
   METAL,
   VULKAN,
+  WEBGPU,
 };
 
 /**
@@ -136,6 +137,32 @@ struct VkImageInfo {
   void* image = nullptr;
 };
 
+/**
+ * Types for interacting with WebGPU textures created externally to PAG. WGPUTexture and
+ * WGPUTextureView are held as opaque void* handles. The texture must be created from the same
+ * GPUDevice that drives PAG rendering (the device passed to PAGInit as
+ * preinitializedWebGPUDevice) — WGPUTexture carries no device back-reference, so a mismatched
+ * device cannot be detected at runtime and leads to undefined behavior.
+ */
+struct WgpuTextureInfo {
+  /**
+   * Pointer to a WGPUTexture. On Web this is the numeric handle registered in Emscripten's
+   * WebGPU runtime (Module.WebGPU.mgrTexture).
+   */
+  void* texture = nullptr;
+
+  /**
+   * Pointer to a WGPUTextureView. If nullptr, a default view of the texture is used.
+   */
+  void* textureView = nullptr;
+
+  /**
+   * The pixel format of this texture, as a WGPUTextureFormat value (e.g. the value of
+   * WGPUTextureFormat_BGRA8Unorm). Must be explicitly set; 0 means unspecified and is rejected.
+   */
+  uint32_t format = 0;
+};
+
 class PAG_API BackendTexture {
  public:
   /**
@@ -158,6 +185,11 @@ class PAG_API BackendTexture {
    * Creates a Vulkan backend texture.
    */
   BackendTexture(const VkImageInfo& vkInfo, int width, int height);
+
+  /**
+   * Creates a WebGPU backend texture.
+   */
+  BackendTexture(const WgpuTextureInfo& wgpuInfo, int width, int height);
 
   BackendTexture(const BackendTexture& that);
 
@@ -209,6 +241,13 @@ class PAG_API BackendTexture {
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WgpuTextureInfo struct into the
+   * passed in pointer and returns true. Otherwise, returns false if the backend API is not
+   * WebGPU.
+   */
+  bool getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -218,6 +257,7 @@ class PAG_API BackendTexture {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    WgpuTextureInfo wgpuInfo;
   };
 };
 
@@ -243,6 +283,13 @@ class PAG_API BackendRenderTarget {
    * Creates a Vulkan backend render target.
    */
   BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height);
+
+  /**
+   * Creates a WebGPU backend render target. WebGPU has no framebuffer object; a texture (view)
+   * is the render target, so this takes the same description as a WebGPU backend texture. The
+   * texture must be created with the RENDER_ATTACHMENT usage flag.
+   */
+  BackendRenderTarget(const WgpuTextureInfo& wgpuInfo, int width, int height);
 
   BackendRenderTarget(const BackendRenderTarget& that);
 
@@ -294,6 +341,13 @@ class PAG_API BackendRenderTarget {
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WgpuTextureInfo struct into the
+   * passed in pointer and returns true. Otherwise, returns false if the backend API is not
+   * WebGPU.
+   */
+  bool getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -302,6 +356,7 @@ class PAG_API BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    WgpuTextureInfo wgpuInfo;
   };
 };
 
@@ -326,8 +381,16 @@ class PAG_API BackendSemaphore {
     return _backend;
   }
 
+  /**
+   * Initializes this semaphore from a GL sync object. Only valid on the OpenGL backend; the sync
+   * object is usually obtained from PAGSurface::draw() with a non-null signalSemaphore.
+   */
   void initGL(void* sync);
 
+  /**
+   * Returns the wrapped GL sync object, or nullptr if this semaphore was not initialized on the
+   * OpenGL backend.
+   */
   void* glSync() const;
 
  private:

@@ -21,6 +21,12 @@
 #include "GPUDrawable.h"
 #include <emscripten/html5.h>
 
+#if defined(TGFX_USE_WEBGPU)
+#include "tgfx/gpu/webgpu/WebGPUWindow.h"
+#else
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#endif
+
 namespace pagx {
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
@@ -30,17 +36,18 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvas
   return std::shared_ptr<GPUDrawable>(new GPUDrawable(canvasID));
 }
 
-GPUDrawable::GPUDrawable(std::string canvasID) : _canvasID(std::move(canvasID)) {
+GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
   GPUDrawable::updateSize();
 }
 
 void GPUDrawable::updateSize() {
-  if (_canvasID.empty()) {
+  if (canvasID.empty()) {
     return;
   }
-  emscripten_get_canvas_element_size(_canvasID.c_str(), &_width, &_height);
-  // The cached surface is sized for the previous width/height; drop it so the next getSurface()
-  // call reallocates against the new canvas size.
+  emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
+  // Reserved for a future canvas-resize entry point: once updateSize() is reachable after the
+  // surface is created, the cached surface must be dropped so the next getSurface() call
+  // reallocates against the new canvas size.
   freeSurface();
 }
 
@@ -48,20 +55,24 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
-  if (_window == nullptr) {
-    _window = tgfx::WebGLWindow::MakeFrom(_canvasID);
+  if (window == nullptr) {
+#if defined(TGFX_USE_WEBGPU)
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
   }
-  return _window != nullptr ? _window->getDevice() : nullptr;
+  return window != nullptr ? window->getDevice() : nullptr;
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::getSurface(tgfx::Context* context) {
   if (surface != nullptr) {
     return surface;
   }
-  if (_window == nullptr || context == nullptr) {
+  if (window == nullptr || context == nullptr) {
     return nullptr;
   }
-  surface = tgfx::Surface::MakeFrom(context, _window);
+  surface = tgfx::Surface::MakeFrom(context, window);
   return surface;
 }
 
