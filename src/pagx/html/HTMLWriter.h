@@ -396,6 +396,20 @@ class HTMLWriter {
     const Padding* parentPadding = nullptr;
   };
 
+  struct PendingSVGDraw {
+    std::vector<GeoInfo> geos = {};
+    const Fill* fill = nullptr;
+    const Stroke* stroke = nullptr;
+    float alpha = 1.0f;
+    const TrimPath* trim = nullptr;
+  };
+  std::vector<PendingSVGDraw> _pendingSVGDraws = {};
+  bool _coalesceSVGDraws = false;
+  void flushPendingSVGDraws(HTMLBuilder& out);
+  void emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                      const Stroke* stroke, float alpha, const TrimPath* trim, float x0, float y0,
+                      float sw, float sh);
+
   struct ElementDispatchState {
     std::vector<GeoInfo> geos = {};
     const Fill* curFill = nullptr;
@@ -633,6 +647,8 @@ class HTMLWriter {
   static bool ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                      bool useModifiedPathData, float& outX, float& outY,
                                      float& outW, float& outH);
+  static void ExpandStrokePaddedExtent(const std::vector<Element*>& elems, const Matrix& parentMat,
+                                       float& maxRight, float& maxBottom);
 };
 
 }  // namespace pagx
