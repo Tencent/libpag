@@ -63,20 +63,22 @@ static val CopyToNewUint8Array(const uint8_t* data, size_t dataSize) {
 // Emscripten's WebGPU runtime (Module.WebGPU.mgrTexture) and format is the WGPUTextureFormat value
 // resolved from GPUTexture.format on the JS side; on WebGL it is the GL texture id and format is
 // ignored.
-static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int format) {
 #if defined(TGFX_USE_WEBGPU)
+static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int format) {
   WgpuTextureInfo wgpuInfo = {};
   wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
   wgpuInfo.format = static_cast<unsigned>(format);
   return BackendTexture(wgpuInfo, width, height);
+}
 #else
+static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int) {
   GLTextureInfo glInfo = {};
   glInfo.target = GL_TEXTURE_2D;
   glInfo.id = static_cast<unsigned>(textureID);
   glInfo.format = GL_RGBA8;
   return BackendTexture(glInfo, width, height);
-#endif
 }
+#endif
 
 std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   if (!emscriptenData.as<bool>()) {
