@@ -29,8 +29,6 @@ let isMobile = false;
 if (typeof window !== 'undefined') {
   window.onload = async () => {
     PAG = await PAGInit({ locateFile: (file: string) => '../lib-webgpu-mt/' + file });
-    // Expose the namespace for console-based verification (e.g. libpag._IsWebGPUBackend()).
-    (window as any).libpag = PAG;
     // Mobile
     isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
     if (isMobile) {
