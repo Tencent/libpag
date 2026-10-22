@@ -21,17 +21,14 @@
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
-#include "ToTGFX.h"
 #include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Composition.h"
-#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
-#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Data.h"
@@ -110,32 +107,6 @@ struct BitmapFontBuilder {
   std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> glyphMapping = {};
 };
 
-struct BitmapKey {
-  const tgfx::Typeface* typeface;
-  float size;
-  tgfx::Color foreground;
-
-  BitmapKey(const tgfx::Font& font, const tgfx::Color& color)
-      : typeface(font.getTypeface().get()), size(std::ceil(font.getSize())), foreground(color) {
-  }
-
-  bool operator==(const BitmapKey& other) const {
-    return typeface == other.typeface && size == other.size && foreground == other.foreground;
-  }
-};
-
-struct BitmapKeyHash {
-  size_t operator()(const BitmapKey& key) const {
-    size_t h = std::hash<const void*>()(key.typeface);
-    for (auto value : {key.size, key.foreground.red, key.foreground.green, key.foreground.blue}) {
-      h ^= std::hash<float>()(value) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    }
-    return h;
-  }
-};
-
-using BitmapBuilders = std::unordered_map<BitmapKey, BitmapFontBuilder, BitmapKeyHash>;
-
 static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
                                tgfx::GlyphID glyphID,
                                std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
@@ -188,65 +159,66 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
 }
 
-static bool CollectBitmapGlyph(PAGXDocument* document, const tgfx::Font& sourceFont,
-                               tgfx::GlyphID glyphID, const tgfx::Color& foreground,
-                               BitmapBuilders& builders, std::vector<BitmapKey>& order) {
-  BitmapKey bitmapKey(sourceFont, foreground);
-  auto font = sourceFont.makeWithSize(bitmapKey.size);
+static void CollectBitmapGlyph(
+    PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
+    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& builders,
+    std::vector<const tgfx::Typeface*>* typefaceOrder) {
   auto* typeface = font.getTypeface().get();
-  auto& builder = builders[bitmapKey];
+  auto& builder = builders[typeface];
 
   GlyphKey key = {font, glyphID};
   if (builder.glyphMapping.count(key)) {
-    return true;
+    return;
   }
 
   tgfx::Matrix imageMatrix = {};
-  auto imageCodec = font.getImage(glyphID, nullptr, &imageMatrix, {foreground, 0});
+  auto imageCodec = font.getImage(glyphID, nullptr, &imageMatrix);
   if (!imageCodec) {
-    return false;
+    return;
   }
 
   if (builder.backingSize == 0) {
     float scaleX = std::abs(imageMatrix.getScaleX());
     if (scaleX < MinFontSize) {
-      return false;
+      return;
     }
     builder.backingSize = static_cast<int>(std::round(font.getSize() / scaleX));
     builder.typeface = typeface;
     builder.font = document->makeNode<Font>();
     builder.font->unitsPerEm = builder.backingSize;
-    order.push_back(bitmapKey);
+    if (typefaceOrder != nullptr) {
+      typefaceOrder->push_back(typeface);
+    }
   }
 
   int width = imageCodec->width();
   int height = imageCodec->height();
   if (width <= 0 || height <= 0) {
-    return false;
+    return;
   }
 
   tgfx::Bitmap bitmap(width, height, false, false);
   if (bitmap.isEmpty()) {
-    return false;
+    return;
   }
   auto* pixels = bitmap.lockPixels();
   if (pixels == nullptr) {
-    return false;
+    return;
   }
   bool success = imageCodec->readPixels(bitmap.info(), pixels);
   bitmap.unlockPixels();
   if (!success) {
-    return false;
+    return;
   }
 
   auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
   if (pngData == nullptr) {
-    return false;
+    return;
   }
 
   float fontSize = font.getSize();
   if (fontSize <= 0) {
-    return false;
+    return;
   }
 
   auto glyph = document->makeNode<Glyph>();
@@ -264,7 +236,6 @@ static bool CollectBitmapGlyph(PAGXDocument* document, const tgfx::Font& sourceF
 
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
-  return true;
 }
 
 enum class GlyphType {
@@ -272,21 +243,18 @@ enum class GlyphType {
   Vector,
   Bitmap,
   Spacing,
-  Unsupported,
 };
 
 static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
-  switch (font.getGlyphRepresentation(glyphID).content) {
-    case tgfx::GlyphContent::Outline:
-      return GlyphType::Vector;
-    case tgfx::GlyphContent::Color:
-    case tgfx::GlyphContent::Bitmap:
-      return GlyphType::Bitmap;
-    case tgfx::GlyphContent::Empty:
-      return GlyphType::Spacing;
-    default:
-      return GlyphType::Unsupported;
+  tgfx::Path glyphPath = {};
+  if (font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty()) {
+    return GlyphType::Vector;
   }
+  tgfx::Matrix imageMatrix = {};
+  if (font.getImage(glyphID, nullptr, &imageMatrix) != nullptr) {
+    return GlyphType::Bitmap;
+  }
+  return GlyphType::Spacing;
 }
 
 static void CollectTextFromElements(const std::vector<Element*>& elements,
@@ -401,17 +369,21 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
   return glyphRun;
 }
 
-static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
-                                tgfx::GlyphID glyphID, BitmapBuilders& bitmapBuilders,
-                                VectorFontBuilder& vectorBuilder, const tgfx::Color& foreground) {
+static void CollectSpacingGlyph(
+    PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
+    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& bitmapBuilders,
+    VectorFontBuilder& vectorBuilder) {
   float advance = font.getAdvance(glyphID);
-
+  if (advance <= 0) {
+    return;
+  }
+  auto* typeface = font.getTypeface().get();
   GlyphKey key = {font, glyphID};
   float runFontSize = font.getSize();
   if (runFontSize < MinFontSize) {
     return;
   }
-  auto bitmapIt = bitmapBuilders.find(BitmapKey(font, foreground));
+  auto bitmapIt = bitmapBuilders.find(typeface);
   if (bitmapIt != bitmapBuilders.end() && bitmapIt->second.font != nullptr) {
     auto& builder = bitmapIt->second;
     if (builder.glyphMapping.count(key)) {
@@ -422,11 +394,7 @@ static void CollectSpacingGlyph(PAGXDocument* document, const tgfx::Font& font,
     glyph->advance = advance / runFontSize * backingSize;
     builder.font->glyphs.push_back(glyph);
     builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
-  } else {
-    if (!vectorBuilder.font) {
-      vectorBuilder.font = document->makeNode<Font>();
-      vectorBuilder.font->unitsPerEm = VectorFontUnitsPerEm;
-    }
+  } else if (vectorBuilder.font != nullptr) {
     if (vectorBuilder.glyphMapping.count(key) > 0) {
       return;
     }
@@ -485,194 +453,193 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   document->resetLayoutState();
 }
 
-// Each painter captures all preceding geometry, including nested groups. A foreground-dependent
-// color glyph can be baked only when all its painters agree on a solid foreground. Reject other
-// cases explicitly; one image cannot represent two different currentColor values or a gradient.
-struct Foreground {
-  tgfx::Color color = tgfx::Color::Black();
-  bool seen = false;
-  bool supported = true;
-};
-using Foregrounds = std::unordered_map<Text*, Foreground>;
-
-static std::vector<Text*> CollectForegrounds(const std::vector<Element*>& elements,
-                                             Foregrounds& foregrounds) {
-  std::vector<Text*> geometry;
-  for (auto* element : elements) {
-    if (!element) continue;
-    auto type = element->nodeType();
-    if (type == NodeType::Text) {
-      geometry.push_back(static_cast<Text*>(element));
-    } else if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto children = CollectForegrounds(static_cast<Group*>(element)->elements, foregrounds);
-      geometry.insert(geometry.end(), children.begin(), children.end());
-    } else if (type == NodeType::Fill || type == NodeType::Stroke) {
-      bool supported = type == NodeType::Fill;
-      auto color = tgfx::Color::Black();
-      if (supported) {
-        auto* source = static_cast<Fill*>(element)->color;
-        supported = !source || source->nodeType() == NodeType::SolidColor;
-        if (source && supported) color = ToTGFX(static_cast<SolidColor*>(source)->color);
-        color.alpha = 1;  // The painter retains its own alpha after embedding.
-      }
-      for (auto* text : geometry) {
-        auto& foreground = foregrounds[text];
-        foreground.supported &= supported && (!foreground.seen || foreground.color == color);
-        foreground.color = color;
-        foreground.seen = true;
-      }
-    }
-  }
-  return geometry;
-}
-
 bool FontEmbedder::embed(PAGXDocument* document) {
-  lastError.clear();
-  if (!document || !document->isLayoutApplied()) {
-    lastError = "applyLayout() must succeed before embedding";
+  if (document == nullptr) {
+    return false;
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE("FontEmbedder::embed() called before applyLayout(). Call document->applyLayout() first.");
+    DEBUG_ASSERT(false);
     return false;
   }
   auto textOrder = CollectAllText(document);
-  Foregrounds foregrounds;
-  for (const auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      CollectForegrounds(static_cast<Layer*>(node.get())->contents, foregrounds);
+
+  std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes = {};
+  std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
+  VectorFontBuilder vectorBuilder = {};
+  std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
+  std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
+
+  // Classify every glyph up front: the classification decides how the outlines below are baked, and
+  // the collection loop then reads it instead of re-probing the font (ClassifyGlyph() asks for both
+  // the outline and the image of a glyph, and a document repeats the same glyphs across its texts).
+  for (auto* text : textOrder) {
+    for (auto& tlRun : text->glyphData->layoutRuns) {
+      auto* typeface = tlRun.font.getTypeface().get();
+      if (typeface == nullptr) {
+        continue;
+      }
+      for (auto glyphID : tlRun.glyphs) {
+        auto& type = glyphTypes[GlyphKey{tlRun.font, glyphID}];
+        if (type == GlyphType::Unknown) {
+          type = ClassifyGlyph(tlRun.font, glyphID);
+        }
+      }
     }
   }
-  std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes;
-  std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes;
-  VectorFontBuilder vectorBuilder;
-  BitmapBuilders bitmapBuilders;
-  std::vector<BitmapKey> bitmapOrder;
-  bool needsRenderShear = false;
 
-  // Validate representation before allocating anything. Unsupported data is never a space.
+  // A synthesized italic must reach the glyphs exactly once, and its two carriers are mutually
+  // exclusive: `Font::getPath()` bakes ITALIC_SKEW into an embedded vector outline, while a bitmap
+  // glyph keeps an upright PNG — tgfx rasterizes it without the skew and only slants the placement
+  // matrix — and needs a render-time flag on its GlyphRun. An outline that already contains the
+  // slant must not receive that shear a second time. Layout
+  // clears the run-level flag when the resolved typeface is a real italic face, so only a
+  // synthesized run is examined here. Keep the collection strategy document-wide so mixed
+  // vector/bitmap text can share upright outlines. The per-run overrides below preserve the
+  // original Text style while recording whether a rendering shear is still required.
+  bool needsRenderShear = false;
   for (auto* text : textOrder) {
-    for (const auto& run : text->glyphData->layoutRuns) {
-      if (!run.font.getTypeface() || run.font.getSize() < MinFontSize) continue;
-      for (auto glyphID : run.glyphs) {
-        auto key = GlyphKey(run.font, glyphID);
-        auto [it, inserted] = glyphTypes.emplace(key, GlyphType::Unknown);
-        if (inserted) it->second = ClassifyGlyph(run.font, glyphID);
-        if (it->second == GlyphType::Unsupported) {
-          lastError = "unsupported glyph " + std::to_string(glyphID) + " in " +
-                      run.font.getTypeface()->fontFamily();
-          return false;
+    if (!text->fauxItalic) {
+      continue;
+    }
+    for (auto& tlRun : text->glyphData->layoutRuns) {
+      if (!tlRun.font.isFauxItalic()) {
+        continue;
+      }
+      for (auto glyphID : tlRun.glyphs) {
+        auto typeIt = glyphTypes.find(GlyphKey{tlRun.font, glyphID});
+        if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
+          needsRenderShear = true;
+          break;
         }
-        if (it->second == GlyphType::Bitmap) {
-          needsRenderShear |= run.font.isFauxItalic();
-          if (run.font.getGlyphRepresentation(glyphID).usesForeground &&
-              !foregrounds[text].supported) {
-            lastError = "currentColor glyph requires a single solid foreground: " +
-                        run.font.getTypeface()->fontFamily();
-            return false;
+      }
+      if (needsRenderShear) {
+        break;
+      }
+    }
+    if (needsRenderShear) {
+      break;
+    }
+  }
+
+  // First pass: collect vector/bitmap/spacing glyph data.
+  // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
+  for (auto* text : textOrder) {
+    auto& layoutRuns = text->glyphData->layoutRuns;
+    if (layoutRuns.empty()) {
+      continue;
+    }
+    for (auto& tlRun : layoutRuns) {
+      auto* typeface = tlRun.font.getTypeface().get();
+      if (typeface == nullptr) {
+        continue;
+      }
+      // When the renderer will apply the slant to the whole Text anyway, the glyph geometry is
+      // collected from an unskewed font so that the outline carries no slant of its own. Advances
+      // and bitmap glyph data are identical either way: the skew only transforms outlines and
+      // placement matrices, never advances.
+      tgfx::Font collectFont = tlRun.font;
+      if (needsRenderShear) {
+        collectFont.setFauxItalic(false);
+      }
+      for (auto glyphID : tlRun.glyphs) {
+        switch (glyphTypes[GlyphKey{tlRun.font, glyphID}]) {
+          case GlyphType::Vector:
+            CollectVectorGlyph(document, collectFont, glyphID, maxFontSizes, vectorBuilder);
+            break;
+          case GlyphType::Bitmap:
+            CollectBitmapGlyph(document, collectFont, glyphID, bitmapBuilders, &bitmapTypefaces);
+            break;
+          case GlyphType::Spacing:
+            CollectSpacingGlyph(document, collectFont, glyphID, bitmapBuilders, vectorBuilder);
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  // Assign sequential IDs to all embedded fonts. Skip any index already taken by a user node to
+  // avoid silently displacing it from the nodeMap.
+  int fontIndex = 1;
+  if (vectorBuilder.font != nullptr) {
+    document->setNodeId(vectorBuilder.font, NextEmbedFontId(document, fontIndex));
+  }
+  for (auto* typeface : bitmapTypefaces) {
+    if (typeface == nullptr) {
+      continue;
+    }
+    auto builderIt = bitmapBuilders.find(typeface);
+    if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
+      document->setNodeId(builderIt->second.font, NextEmbedFontId(document, fontIndex));
+    }
+  }
+
+  // Second pass: create pagx::GlyphRuns for each Text.
+  // Uses TextLayoutGlyphRun (direct mapping). Text nodes without layoutRuns produce no GlyphRuns.
+  for (auto* text : textOrder) {
+    text->glyphRuns.clear();
+    auto textBounds = text->textBounds;
+    auto& layoutRuns = text->glyphData->layoutRuns;
+
+    if (!layoutRuns.empty()) {
+      // New path: create GlyphRuns directly from TextLayoutGlyphRun.
+      for (auto& tlRun : layoutRuns) {
+        if (tlRun.glyphs.empty()) {
+          continue;
+        }
+        auto* typeface = tlRun.font.getTypeface().get();
+        if (typeface == nullptr) {
+          continue;
+        }
+        float fontSize = tlRun.font.getSize();
+        tgfx::Font collectFont = tlRun.font;
+        if (needsRenderShear) collectFont.setFauxItalic(false);
+
+        // Split glyphs by font type (vector vs bitmap).
+        std::vector<size_t> vectorIndices;
+        std::vector<size_t> bitmapIndices;
+        for (size_t i = 0; i < tlRun.glyphs.size(); i++) {
+          GlyphKey key = {collectFont, tlRun.glyphs[i]};
+          if (vectorBuilder.glyphMapping.count(key) > 0) {
+            vectorIndices.push_back(i);
+          } else {
+            auto builderIt = bitmapBuilders.find(typeface);
+            if (builderIt != bitmapBuilders.end() &&
+                builderIt->second.glyphMapping.count(key) > 0) {
+              bitmapIndices.push_back(i);
+            }
+          }
+        }
+
+        if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
+          auto glyphRun =
+              CreateGlyphRunFromLayoutRun(document, tlRun, collectFont, vectorIndices,
+                                          vectorBuilder.font, fontSize, vectorBuilder.glyphMapping);
+          glyphRun->fauxBold = false;  // Already baked into the vector outline.
+          glyphRun->fauxItalic = needsRenderShear && tlRun.font.isFauxItalic();
+          text->glyphRuns.push_back(glyphRun);
+        }
+        if (!bitmapIndices.empty()) {
+          auto builderIt = bitmapBuilders.find(typeface);
+          if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
+            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, collectFont, bitmapIndices,
+                                                        builderIt->second.font, fontSize,
+                                                        builderIt->second.glyphMapping);
+            glyphRun->fauxBold = false;  // getImage() rasterizes the requested weight.
+            glyphRun->fauxItalic = tlRun.font.isFauxItalic();
+            text->glyphRuns.push_back(glyphRun);
           }
         }
       }
     }
+
+    if (!text->glyphRuns.empty() && (textBounds.width > 0 || textBounds.height > 0)) {
+      text->glyphRuns.front()->bounds = textBounds;
+    }
   }
 
-  // Stage all resources. On failure remove only nodes created by this attempt, retaining the
-  // original GlyphRuns and document IDs. Nothing is published until all images decode/encode.
-  const auto originalNodeCount = document->nodes.size();
-  auto fail = [&](const tgfx::Font& font, tgfx::GlyphID glyphID) {
-    if (lastError.empty()) {
-      lastError =
-          "failed to embed glyph " + std::to_string(glyphID) + " in " +
-          (font.getTypeface() ? font.getTypeface()->fontFamily() : std::string("embedded font"));
-    }
-    std::unordered_set<Node*> staged;
-    for (size_t i = originalNodeCount; i < document->nodes.size(); ++i) {
-      staged.insert(document->nodes[i].get());
-    }
-    document->removeNodes(staged);
-    return false;
-  };
-  for (auto* text : textOrder) {
-    for (const auto& run : text->glyphData->layoutRuns) {
-      if (!run.font.getTypeface() || run.font.getSize() < MinFontSize) continue;
-      auto font = run.font;
-      if (needsRenderShear) font.setFauxItalic(false);
-      for (auto glyphID : run.glyphs) {
-        auto type = glyphTypes.at(GlyphKey(run.font, glyphID));
-        if (type == GlyphType::Vector) {
-          CollectVectorGlyph(document, font, glyphID, maxFontSizes, vectorBuilder);
-          if (!vectorBuilder.glyphMapping.count(GlyphKey(font, glyphID)))
-            return fail(font, glyphID);
-        } else if (type == GlyphType::Bitmap) {
-          if (!CollectBitmapGlyph(document, font, glyphID, foregrounds[text].color, bitmapBuilders,
-                                  bitmapOrder))
-            return fail(font, glyphID);
-        }
-      }
-    }
-  }
-  // Preserve empty glyph IDs even if they precede the first visible glyph or have zero advance.
-  for (auto* text : textOrder) {
-    for (const auto& run : text->glyphData->layoutRuns) {
-      if (!run.font.getTypeface() || run.font.getSize() < MinFontSize) continue;
-      auto font = run.font;
-      if (needsRenderShear) font.setFauxItalic(false);
-      for (auto glyphID : run.glyphs) {
-        if (glyphTypes.at(GlyphKey(run.font, glyphID)) == GlyphType::Spacing) {
-          CollectSpacingGlyph(document, font, glyphID, bitmapBuilders, vectorBuilder,
-                              foregrounds[text].color);
-        }
-      }
-    }
-  }
-  if (vectorBuilder.font && vectorBuilder.font->glyphs.size() > 65535) {
-    lastError = "too many outline glyphs for one embedded font";
-    return fail(tgfx::Font(), 0);
-  }
-  for (const auto& entry : bitmapBuilders) {
-    if (entry.second.font && entry.second.font->glyphs.size() > 65535) {
-      lastError = "too many bitmap glyphs for one embedded font";
-      return fail(tgfx::Font(), 0);
-    }
-  }
-  int fontIndex = 1;
-  if (vectorBuilder.font)
-    document->setNodeId(vectorBuilder.font, NextEmbedFontId(document, fontIndex));
-  for (const auto& key : bitmapOrder) {
-    document->setNodeId(bitmapBuilders.at(key).font, NextEmbedFontId(document, fontIndex));
-  }
-
-  for (auto* text : textOrder) {
-    std::vector<GlyphRun*> runs;
-    for (const auto& run : text->glyphData->layoutRuns) {
-      if (!run.font.getTypeface() || run.font.getSize() < MinFontSize) continue;
-      auto font = run.font;
-      if (needsRenderShear) font.setFauxItalic(false);
-      auto bitmapIt = bitmapBuilders.find(BitmapKey(font, foregrounds[text].color));
-      auto* bitmap = bitmapIt == bitmapBuilders.end() ? nullptr : &bitmapIt->second;
-      // Emit consecutive segments in source order. Grouping all paths before all images changes
-      // the paint order of overlapping glyphs (marks, negative spacing, and transformed text).
-      size_t start = 0;
-      while (start < run.glyphs.size()) {
-        auto isBitmap = [&](size_t i) {
-          return bitmap && bitmap->glyphMapping.count(GlyphKey(font, run.glyphs[i]));
-        };
-        bool image = isBitmap(start);
-        size_t end = start + 1;
-        while (end < run.glyphs.size() && isBitmap(end) == image) ++end;
-        std::vector<size_t> indices;
-        for (size_t i = start; i < end; ++i) indices.push_back(i);
-        auto* embeddedFont = image ? bitmap->font : vectorBuilder.font;
-        auto& mapping = image ? bitmap->glyphMapping : vectorBuilder.glyphMapping;
-        auto* glyphRun = CreateGlyphRunFromLayoutRun(document, run, font, indices, embeddedFont,
-                                                     run.font.getSize(), mapping);
-        glyphRun->fauxBold = false;
-        glyphRun->fauxItalic = needsRenderShear && run.font.isFauxItalic();
-        runs.push_back(glyphRun);
-        start = end;
-      }
-    }
-    text->glyphRuns = std::move(runs);
-    if (!text->glyphRuns.empty() && (text->textBounds.width > 0 || text->textBounds.height > 0)) {
-      text->glyphRuns.front()->bounds = text->textBounds;
-    }
-  }
   return true;
 }
 

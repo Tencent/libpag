@@ -153,7 +153,6 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
     tgfx::ImageTypefaceBuilder builder;
     for (const auto& glyph : fontNode->glyphs) {
       if (glyph->image == nullptr) {
-        builder.addGlyph(nullptr, ToTGFX(glyph->offset), glyph->advance);
         continue;
       }
       std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
@@ -168,9 +167,9 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
       } else if (!imageNode->filePath.empty()) {
         codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
       }
-      // Dropping a failed glyph would renumber every following glyph in the font.
-      if (!codec) return nullptr;
-      builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
+      if (codec) {
+        builder.addGlyph(codec, ToTGFX(glyph->offset), glyph->advance);
+      }
     }
     typeface = builder.detach();
   }

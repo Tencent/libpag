@@ -174,7 +174,7 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   document->applyLayout(&fontConfig);
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
-    std::cerr << command << ": font embedding failed: " << embedder.error() << "\n";
+    std::cerr << command << ": font embedding failed\n";
     return false;
   }
   return true;
