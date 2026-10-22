@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Comma-separated keyframe selectors</title>
+    <style>
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0; }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 120px; background-color: #1A1A2E;">
+    <div id="led"
+         style="position: absolute; left: 76px; top: 36px;
+                width: 48px; height: 48px; border-radius: 24px;
+                background-color: #F43F5E;
+                animation: blink 1s steps(1) infinite;"></div>
+  </body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Loading Button</title>
+    <style>
+      /* Button state crossfade: the "Submit" label fades out (opacity)
+         as three loading dots fade in and bounce (translateY), then the
+         button settles back — a single looped state machine per element. */
+      @keyframes labelGate {
+        0%   { opacity: 1; }
+        38%  { opacity: 1; }
+        50%  { opacity: 0; }
+        88%  { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes btnFill {
+        0%   { background-color: #6366F1; }
+        50%  { background-color: #4F46E5; }
+        100% { background-color: #6366F1; }
+      }
+      @keyframes dotA {
+        0%,45% { opacity: 0; transform: translateY(0px); }
+        55% { opacity: 1; transform: translateY(0px); }
+        62% { transform: translateY(-9px); }
+        70% { transform: translateY(0px); }
+        90% { opacity: 1; transform: translateY(0px); }
+        100% { opacity: 0; transform: translateY(0px); }
+      }
+      @keyframes dotB {
+        0%,45% { opacity: 0; transform: translateY(0px); }
+        55% { opacity: 1; transform: translateY(0px); }
+        68% { transform: translateY(-9px); }
+        76% { transform: translateY(0px); }
+        90% { opacity: 1; transform: translateY(0px); }
+        100% { opacity: 0; transform: translateY(0px); }
+      }
+      @keyframes dotC {
+        0%,45% { opacity: 0; transform: translateY(0px); }
+        55% { opacity: 1; transform: translateY(0px); }
+        74% { transform: translateY(-9px); }
+        82% { transform: translateY(0px); }
+        90% { opacity: 1; transform: translateY(0px); }
+        100% { opacity: 0; transform: translateY(0px); }
+      }
+      .ld { width: 10px; height: 10px; border-radius: 9999px; background-color: #FFFFFF; }
+      .overlay { position: absolute; top: 0px; left: 0px; width: 220px; height: 58px;
+                 display: flex; flex-direction: row; align-items: center; justify-content: center; }
+    </style>
+  </head>
+  <body style="width: 440px; height: 260px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center;
+               background-color: #EEF2FF; font-family: Arial;">
+    <div style="width: 220px; height: 58px; border-radius: 9999px;
+                position: relative;
+                background-color: #6366F1;
+                box-shadow: 0 12px 26px #6366F14D;
+                animation: btnFill 2.8s ease-in-out infinite;">
+      <div class="overlay" style="animation: labelGate 2.8s ease-in-out infinite;">
+        <span style="font-size: 16px; font-weight: bold; color: #FFFFFF; letter-spacing: 1px;">SUBMIT</span>
+      </div>
+      <div class="overlay" style="gap: 10px;">
+        <div class="ld" style="animation: dotA 2.8s ease-in-out infinite;"></div>
+        <div class="ld" style="animation: dotB 2.8s ease-in-out infinite;"></div>
+        <div class="ld" style="animation: dotC 2.8s ease-in-out infinite;"></div>
+      </div>
+    </div>
+  </body>
+</html>
