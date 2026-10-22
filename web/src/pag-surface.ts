@@ -50,7 +50,7 @@ export class PAGSurface {
     const wasmIns = PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format);
     if (!wasmIns) {
       if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
-      throw new Error(`Make PAGSurface from texture fail!`);
+      throw new Error(`Make PAGSurface from texture ${textureID} fail!`);
     }
     return new PAGSurface(wasmIns, webGPUHandle);
   }
