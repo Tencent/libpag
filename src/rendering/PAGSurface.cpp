@@ -26,8 +26,65 @@
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/SurfaceReadback.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace pag {
+
+PAGSurfaceReadback::PAGSurfaceReadback(std::shared_ptr<PAGSurface> pagSurface,
+                                       std::shared_ptr<tgfx::SurfaceReadback> readback, bool flipY)
+    : pagSurface(std::move(pagSurface)), readback(std::move(readback)), flipY(flipY) {
+}
+
+PAGSurfaceReadback::~PAGSurfaceReadback() = default;
+
+int PAGSurfaceReadback::width() const {
+  return readback->info().width();
+}
+
+int PAGSurfaceReadback::height() const {
+  return readback->info().height();
+}
+
+bool PAGSurfaceReadback::isReady() {
+  LockGuard autoLock(pagSurface->rootLocker);
+  auto context = pagSurface->lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  auto ready = readback->isReady(context);
+  pagSurface->unlockContext();
+  return ready;
+}
+
+bool PAGSurfaceReadback::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
+                                    size_t dstRowBytes) {
+  if (dstPixels == nullptr || dstRowBytes == 0) {
+    return false;
+  }
+  LockGuard autoLock(pagSurface->rootLocker);
+  auto context = pagSurface->lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  if (!readback->isReady(context)) {
+    pagSurface->unlockContext();
+    return false;
+  }
+  auto srcPixels = readback->lockPixels(context, flipY);
+  if (srcPixels == nullptr) {
+    pagSurface->unlockContext();
+    return false;
+  }
+  tgfx::Pixmap srcPixmap(readback->info(), srcPixels);
+  auto dstInfo = tgfx::ImageInfo::Make(srcPixmap.width(), srcPixmap.height(), ToTGFX(colorType),
+                                       ToTGFX(alphaType), dstRowBytes);
+  auto result = srcPixmap.readPixels(dstInfo, dstPixels);
+  readback->unlockPixels(context);
+  pagSurface->unlockContext();
+  return result;
+}
 
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
     : drawable(std::move(drawable)), externalContext(externalContext) {
@@ -203,6 +260,37 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   return result;
 }
 
+std::shared_ptr<PAGSurfaceReadback> PAGSurface::asyncReadPixels() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto surface = drawable->getSurface(context, true);
+  if (surface == nullptr) {
+    unlockContext();
+    return nullptr;
+  }
+  auto readback = surface->asyncReadPixels(tgfx::Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    unlockContext();
+    return nullptr;
+  }
+  context->flushAndSubmit();
+  auto buffer = readback->getGPUBuffer(context);
+  if (buffer == nullptr) {
+    unlockContext();
+    return nullptr;
+  }
+  // WebGPU does not start the buffer mapping on its own; without this call isReady() would stay
+  // false forever. On backends with blocking readback this is a no-op.
+  buffer->requestMapAsync();
+  auto flipY = surface->origin() == tgfx::ImageOrigin::BottomLeft;
+  unlockContext();
+  return std::shared_ptr<PAGSurfaceReadback>(
+      new PAGSurfaceReadback(shared_from_this(), std::move(readback), flipY));
+}
+
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
   auto context = lockContext();
@@ -249,14 +337,20 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       }
       case tgfx::Backend::Metal:
+        // BackendSemaphore currently only wraps GL sync objects, so a Metal semaphore cannot be
+        // forwarded through the public API yet. The caller's semaphore stays uninitialized.
         break;
       case tgfx::Backend::Unknown:
         // The flush produced nothing to synchronize on, so the context left the semaphore
         // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
         // and logging it would fire on every frame.
         break;
-      case tgfx::Backend::Vulkan:
       case tgfx::Backend::WebGPU:
+        // WebGPU has no cross-queue synchronization objects (WebGPUSyncInfo is empty); the
+        // queue's submission order already provides the ordering a semaphore would express,
+        // so there is nothing to forward.
+        break;
+      case tgfx::Backend::Vulkan:
       case tgfx::Backend::D3D12:
         LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
         break;

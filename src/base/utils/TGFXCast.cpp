@@ -190,6 +190,17 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
     }
+    case Backend::WEBGPU: {
+      WgpuTextureInfo wgpuInfo = {};
+      if (!texture.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
+        return {};
+      }
+      tgfx::WebGPUTextureInfo sampler = {};
+      sampler.texture = wgpuInfo.texture;
+      sampler.textureView = wgpuInfo.textureView;
+      sampler.format = wgpuInfo.format;
+      return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
+    }
     case Backend::VULKAN:
     case Backend::MOCK:
     default:
@@ -222,6 +233,19 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       sampler.texture = const_cast<void*>(mtlInfo.texture);
       return {sampler, texture.width(), texture.height()};
     }
+    case tgfx::Backend::WebGPU: {
+      tgfx::WebGPUTextureInfo wgpuInfo = {};
+      if (!texture.getWebGPUTextureInfo(&wgpuInfo)) {
+        return {};
+      }
+      WgpuTextureInfo sampler = {};
+      // Same const-to-mutable handle conversion as the Metal branch above: the pointers are
+      // opaque to libpag and never written through.
+      sampler.texture = const_cast<void*>(wgpuInfo.texture);
+      sampler.textureView = const_cast<void*>(wgpuInfo.textureView);
+      sampler.format = wgpuInfo.format;
+      return {sampler, texture.width(), texture.height()};
+    }
     default:
       return {};
   }
@@ -249,6 +273,17 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
+    case Backend::WEBGPU: {
+      WgpuTextureInfo wgpuInfo = {};
+      if (!renderTarget.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
+        return {};
+      }
+      tgfx::WebGPUTextureInfo sampler = {};
+      sampler.texture = wgpuInfo.texture;
+      sampler.textureView = wgpuInfo.textureView;
+      sampler.format = wgpuInfo.format;
+      return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
+    }
     case Backend::VULKAN:
     case Backend::MOCK:
     default:
@@ -271,6 +306,7 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
     }
     case Backend::METAL:
     case Backend::VULKAN:
+    case Backend::WEBGPU:
     case Backend::MOCK:
       return {};
   }

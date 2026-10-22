@@ -19,12 +19,23 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/Window.h"
+#if defined(TGFX_USE_WEBGPU)
+#include <emscripten/val.h>
+#endif
 
 namespace pag {
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromCanvasID(const std::string& canvasID);
+
+#if defined(TGFX_USE_WEBGPU)
+  /**
+   * Creates a GPUDrawable from a canvas object (HTMLCanvasElement or OffscreenCanvas) held by
+   * the calling thread. Used for canvases that have no DOM id to build a selector from.
+   */
+  static std::shared_ptr<GPUDrawable> FromCanvas(emscripten::val canvas);
+#endif
 
   int width() const override {
     return _width;
@@ -48,10 +59,16 @@ class GPUDrawable : public Drawable {
 
  private:
   explicit GPUDrawable(std::string canvasID);
+#if defined(TGFX_USE_WEBGPU)
+  explicit GPUDrawable(emscripten::val canvas);
+#endif
 
   std::string canvasID;
+#if defined(TGFX_USE_WEBGPU)
+  emscripten::val canvas = emscripten::val::undefined();
+#endif
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::Window> window = nullptr;
 };
 }  // namespace pag
