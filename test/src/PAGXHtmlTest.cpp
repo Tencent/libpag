@@ -3720,4 +3720,36 @@ CLI_TEST(PAGXHtmlTest, AnimationTextBoxContainerProps) {
   EXPECT_NE(html.find("100% { opacity: 1; transform: translate(50px, 0px); }"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
+  const char* xml = R"(<pagx width="200" height="160">
+    <Layer matrix="2.66667,0,0,2.66667,0,0">
+      <Group>
+        <Path data="M2 8.5C7.66601 3.43217 16.334 3.43217 22 8.5"/>
+        <Path data="M5.5 12.5C9.22606 9.31296 14.7739 9.31296 18.5 12.5"/>
+        <Path data="M9 16.5C10.7726 15.1705 13.2274 15.1705 15 16.5"/>
+        <Stroke color="#60A5FA" width="2" cap="round"/>
+      </Group>
+      <Group>
+        <Ellipse position="12,20" size="3.2,3.2"/>
+        <Fill color="#60A5FA"/>
+      </Group>
+    </Layer>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  // Un-authored non-flex Layer width must expand from path control bounds (22) to stroke-padded
+  // bounds (24).
+  EXPECT_NE(html.find("width:24px;height:21.6px"), std::string::npos);
+
+  // Both Groups render via SVG and should coalesce into a single <svg> element with an
+  // integer-snapped viewBox so round-trip flex inference does not split them into stacked flex
+  // children.
+  size_t firstSvg = html.find("<svg");
+  ASSERT_NE(firstSvg, std::string::npos);
+  EXPECT_EQ(html.find("<svg", firstSvg + 4), std::string::npos);
+  EXPECT_NE(html.find("viewBox=\"0 1 24 21\""), std::string::npos);
+}
+
 }  // namespace pag

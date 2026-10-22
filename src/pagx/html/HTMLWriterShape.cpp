@@ -1923,9 +1923,22 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   bool conicStroke =
       stroke && stroke->color && stroke->color->nodeType() == NodeType::ConicGradient;
   if (conicStroke) {
+    flushPendingSVGDraws(out);
     renderSVGConicStroke(out, geos, fill, stroke, alpha, painterBlend, trim);
     return;
   }
+  if (_coalesceSVGDraws && painterBlend == BlendMode::Normal) {
+    float pad = 0.0f;
+    if (stroke) {
+      pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+    }
+    float x0 = 0, y0 = 0, sw = 0, sh = 0;
+    if (ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
+      _pendingSVGDraws.push_back({geos, fill, stroke, alpha, trim});
+    }
+    return;
+  }
+  flushPendingSVGDraws(out);
   float pad = 0.0f;
   if (stroke) {
     pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
@@ -1962,6 +1975,80 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   out.addAttr("style", svgStyle);
   out.closeTagStart();
 
+  emitSVGContent(out, geos, fill, stroke, 1.0f, trim, x0, y0, sw, sh);
+
+  out.closeTag();  // </svg>
+}
+
+void HTMLWriter::flushPendingSVGDraws(HTMLBuilder& out) {
+  if (_pendingSVGDraws.empty()) {
+    return;
+  }
+  auto draws = std::move(_pendingSVGDraws);
+  _pendingSVGDraws.clear();
+  if (draws.size() == 1) {
+    bool savedCoalesce = _coalesceSVGDraws;
+    _coalesceSVGDraws = false;
+    renderSVG(out, draws[0].geos, draws[0].fill, draws[0].stroke, draws[0].alpha,
+              BlendMode::Normal, draws[0].trim);
+    _coalesceSVGDraws = savedCoalesce;
+    return;
+  }
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+  bool hasAny = false;
+  for (const auto& draw : draws) {
+    float pad = 0.0f;
+    if (draw.stroke) {
+      pad = (draw.stroke->align != StrokeAlign::Center) ? draw.stroke->width * 2.0f
+                                                        : draw.stroke->width;
+    }
+    float x0 = 0, y0 = 0, sw = 0, sh = 0;
+    if (ComputeGeosBoundingBox(draw.geos, pad, true, x0, y0, sw, sh)) {
+      minX = std::min(minX, x0);
+      minY = std::min(minY, y0);
+      maxX = std::max(maxX, x0 + sw);
+      maxY = std::max(maxY, y0 + sh);
+      hasAny = true;
+    }
+  }
+  if (!hasAny || maxX <= minX || maxY <= minY) {
+    return;
+  }
+  float x0 = std::floor(minX);
+  float y0 = std::floor(minY);
+  float sw = std::ceil(maxX) - x0;
+  float sh = std::ceil(maxY) - y0;
+  std::string svgStyle =
+      "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+  out.openTag("svg");
+  out.addAttr("width", CssFloatToString(sw));
+  out.addAttr("height", CssFloatToString(sh));
+  out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                             CssFloatToString(sw) + " " + CssFloatToString(sh));
+  out.addAttr("style", svgStyle);
+  out.closeTagStart();
+  for (const auto& draw : draws) {
+    float dx0 = x0, dy0 = y0, dsw = sw, dsh = sh;
+    ComputeGeosBoundingBox(draw.geos, 0.0f, true, dx0, dy0, dsw, dsh);
+    emitSVGContent(out, draw.geos, draw.fill, draw.stroke, draw.alpha, draw.trim, dx0, dy0, dsw,
+                   dsh);
+  }
+  out.closeTag();  // </svg>
+}
+
+void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                                const Fill* fill, const Stroke* stroke, float alpha,
+                                const TrimPath* trim, float x0, float y0, float sw, float sh) {
+  bool needOpacityGroup = (alpha < 1.0f);
+  if (needOpacityGroup) {
+    out.openTag("g");
+    out.addAttr("opacity", CssFloatToString(alpha));
+    out.closeTagStart();
+  }
   bool needStrokeClip = stroke && stroke->align != StrokeAlign::Center;
   std::string strokeClipId;
   if (needStrokeClip) {
@@ -2188,7 +2275,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (needStrokeClip) {
     out.closeTag();  // </g> stroke clip group
   }
-  out.closeTag();  // </svg>
+  if (needOpacityGroup) {
+    out.closeTag();  // </g> opacity group
+  }
 }
 
 void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
@@ -2204,6 +2293,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     painterBlend = stroke->blendMode;
   }
   if (hasMerge) {
+    flushPendingSVGDraws(out);
     std::string mergedPath;
     std::string fillRule = "nonzero";
     bool needClipPath = (mergeMode == MergePathMode::Intersect);
@@ -2369,6 +2459,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // 5. Fallback → renderSVG (complex geometries, stroke modes, trims)
   if (fill && fill->color && fill->color->nodeType() == NodeType::DiamondGradient &&
       geos.size() == 1 && !stroke) {
+    flushPendingSVGDraws(out);
     renderDiamondCanvas(out, geos[0], fill, alpha, painterBlend);
     return;
   }
@@ -2380,6 +2471,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // variants fall through to the CSS branch below, which keeps the HTML DOM-inspectable and
     // avoids writing PNGs for simple tiled fills.
     if (p->image && !ImagePatternCSSable(p)) {
+      flushPendingSVGDraws(out);
       renderImagePatternCanvas(out, geos[0], fill, alpha, painterBlend);
       return;
     }
@@ -2390,10 +2482,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // foreignObject content is not painted inside <defs>). Fall back to tgfx rasterization when
     // a resource output (static image directory or in-memory resource writer) is available, so
     // the gradient is always visible.
+    flushPendingSVGDraws(out);
     renderConicCanvas(out, geos, fill, alpha, painterBlend);
     return;
   }
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
+    flushPendingSVGDraws(out);
     renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
   } else {
     renderSVG(out, geos, fill, stroke, alpha, painterBlend, trim, mergeMode);

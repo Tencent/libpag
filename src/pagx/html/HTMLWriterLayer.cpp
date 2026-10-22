@@ -362,6 +362,7 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (hasText) {
     for (auto& g : geos) {
       if (g.type == NodeType::Text) {
+        flushPendingSVGDraws(out);
         writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
       } else {
         std::vector<GeoInfo> single = {g};
@@ -380,6 +381,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   if (guard.overflowed()) {
     return;
   }
+  auto savedPendingSVGDraws = std::move(_pendingSVGDraws);
+  bool savedCoalesceSVGDraws = _coalesceSVGDraws;
+  _pendingSVGDraws.clear();
+  _coalesceSVGDraws = true;
   ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
   float roundCornerRadius = 0.0f;
@@ -415,11 +420,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           bool deferToStroke = fillWillBePairedWithStroke[elemIndex];
           if (state.curTextModifier && !state.geos.empty()) {
             if (!deferToStroke) {
+              flushPendingSVGDraws(out);
               writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
                                 curTextBox, a);
             }
           } else if (state.curTextPath && !state.geos.empty()) {
             if (!deferToStroke) {
+              flushPendingSVGDraws(out);
               writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox,
                             a);
             }
@@ -453,9 +460,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // Merge with the deferred Fill so per-character spans carry both fill and
             // stroke in a single CSS declaration, avoiding Chromium's sub-pixel offset
             // between two stacked <div>s.
+            flushPendingSVGDraws(out);
             writeTextModifier(out, state.geos, state.curTextModifier, state.curFill,
                               state.curStroke, curTextBox, a);
           } else if (state.curTextPath && !state.geos.empty()) {
+            flushPendingSVGDraws(out);
             writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
                           curTextBox, a);
           } else if (state.curFill != nullptr) {
@@ -495,8 +504,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
         if (!curTextBox->elements.empty()) {
+          flushPendingSVGDraws(out);
           renderTextBoxWithSpans(out, curTextBox);
         } else if (useRichText && !richTextSpans.empty()) {
+          flushPendingSVGDraws(out);
           renderTextBoxAsRichText(out, curTextBox, richTextSpans);
         }
         break;
@@ -591,6 +602,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // "Production" labels) symptom: button background renders, label text disappears.
         if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
             _ctx->animatedElementIds.count(group) > 0) {
+          flushPendingSVGDraws(out);
           writeGroup(out, group, alpha, distribute);
         } else {
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
@@ -599,6 +611,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
       }
       case NodeType::Repeater: {
+        flushPendingSVGDraws(out);
         auto rep = static_cast<const Repeater*>(element);
         // tgfx's Repeater::apply multiplies `copyAlpha` onto the painters that already exist
         // when the repeater runs, i.e. only Fill/Stroke nodes emitted *before* the Repeater.
@@ -653,6 +666,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
     }
   }
+  flushPendingSVGDraws(out);
+  _pendingSVGDraws = std::move(savedPendingSVGDraws);
+  _coalesceSVGDraws = savedCoalesceSVGDraws;
 }
 
 struct ElementDispatchStateGuard {
@@ -755,10 +771,12 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       if (fill->placement == targetPlacement && !hasUpcomingRepeater && !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
         if (state.curTextPath && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox, a);
           state.geos.clear();
           groupGeos.clear();
         } else if (state.curTextModifier && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
                             curTextBox, a);
           state.geos.clear();
@@ -775,11 +793,13 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
           !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
         if (state.curTextPath && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
                         curTextBox, a);
           state.geos.clear();
           groupGeos.clear();
         } else if (state.curTextModifier && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, state.curStroke,
                             curTextBox, a);
           state.geos.clear();
@@ -894,6 +914,7 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
         }
       }
     } else if (gt == NodeType::Group) {
+      flushPendingSVGDraws(out);
       writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
     } else if (gt == NodeType::RoundCorner) {
       // Mirror the top-level RoundCorner handler (case above): apply the radius to
@@ -1987,6 +2008,45 @@ std::string HTMLWriter::emitInnerShadowFilterDef(const InnerShadowStyle* is) {
 // HTMLWriter – layer
 //==============================================================================
 
+void HTMLWriter::ExpandStrokePaddedExtent(const std::vector<Element*>& elems,
+                                          const Matrix& parentMat, float& maxRight,
+                                          float& maxBottom) {
+  std::vector<GeoInfo> scopeGeos;
+  float maxPad = 0.0f;
+  for (auto* elem : elems) {
+    if (!elem) {
+      continue;
+    }
+    auto t = elem->nodeType();
+    if (t == NodeType::Rectangle || t == NodeType::Ellipse || t == NodeType::Path ||
+        t == NodeType::Polystar) {
+      PathData pd = PathDataFromSVGString("");
+      GeoToPathData(elem, t, pd);
+      if (!pd.isEmpty()) {
+        std::string svgPath = parentMat.isIdentity() ? PathDataToSVGString(pd)
+                                                     : TransformPathDataToSVG(pd, parentMat);
+        scopeGeos.push_back({t, elem, svgPath, nullptr});
+      }
+    } else if (t == NodeType::Stroke) {
+      auto* st = static_cast<const Stroke*>(elem);
+      float pad = (st->align != StrokeAlign::Center) ? st->width * 2.0f : st->width;
+      maxPad = std::max(maxPad, pad);
+    } else if (t == NodeType::Group) {
+      auto* grp = static_cast<const Group*>(elem);
+      Matrix gm = BuildGroupMatrix(grp);
+      Matrix combined = parentMat.isIdentity() ? gm : (parentMat * gm);
+      ExpandStrokePaddedExtent(grp->elements, combined, maxRight, maxBottom);
+    }
+  }
+  if (!scopeGeos.empty()) {
+    float gx = 0, gy = 0, gw = 0, gh = 0;
+    if (HTMLWriter::ComputeGeosBoundingBox(scopeGeos, maxPad, true, gx, gy, gw, gh)) {
+      maxRight = std::max(maxRight, gx + gw);
+      maxBottom = std::max(maxBottom, gy + gh);
+    }
+  }
+}
+
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
                             bool distributeAlpha, bool isFlexItem, LayoutMode parentLayout) {
   RecursionGuard guard(_ctx);
@@ -2243,11 +2303,31 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (!repeater && (isFlexContainer || !layer->contents.empty() ||
                       layer->composition != nullptr || !layer->children.empty())) {
       auto bounds = layer->layoutBounds();
-      if (bounds.width > 0) {
-        style += ";width:" + CssFloatToString(bounds.width) + "px";
+      float outW = bounds.width;
+      float outH = bounds.height;
+      // When a non-flex Layer has no authored width/height, `layoutBounds()` comes from
+      // content geometry without stroke expansion (e.g. Path::onMeasure). Meanwhile child
+      // `<svg>` elements emitted by `renderSVG` expand their box by `stroke->width`, which can
+      // make the child SVG wider/taller than the parent div and mislead downstream Flex
+      // inference on round-trip import. Expand un-authored axes to cover the stroke-padded
+      // extent of contents.
+      if (layer->layout == LayoutMode::None && !layer->contents.empty() &&
+          (std::isnan(layer->width) || std::isnan(layer->height))) {
+        float maxRight = outW;
+        float maxBottom = outH;
+        ExpandStrokePaddedExtent(layer->contents, Matrix::Identity(), maxRight, maxBottom);
+        if (std::isnan(layer->width)) {
+          outW = maxRight;
+        }
+        if (std::isnan(layer->height)) {
+          outH = maxBottom;
+        }
       }
-      if (bounds.height > 0) {
-        style += ";height:" + CssFloatToString(bounds.height) + "px";
+      if (outW > 0) {
+        style += ";width:" + CssFloatToString(outW) + "px";
+      }
+      if (outH > 0) {
+        style += ";height:" + CssFloatToString(outH) + "px";
       }
     }
   }
