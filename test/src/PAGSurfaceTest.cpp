@@ -338,12 +338,9 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
   const auto width = readback->width();
   const auto height = readback->height();
 
-  // 未就绪时 readPixels 返回 false 且不拷贝（GL 上创建后可能已就绪，只在未就绪时断言）
-  if (!readback->isReady()) {
-    std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4), 0xFF);
-    EXPECT_FALSE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(),
-                                      static_cast<size_t>(width * 4)));
-  }
+  // 「未就绪时 readPixels 返回 false」无法在 GL 上确定性构造：isReady() 的探测与
+  // readPixels 内部的就绪重查之间存在 fence 置位竞态，GPU 排空进度不受 CPU 控制。
+  // 该路径由 §9 浏览器车道覆盖（WebGPU 的 mapAsync 天然有未就绪窗口）。
   ASSERT_TRUE(WaitReadbackReady(readback));
 
   std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
