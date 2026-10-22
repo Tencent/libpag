@@ -1989,8 +1989,8 @@ void HTMLWriter::flushPendingSVGDraws(HTMLBuilder& out) {
   if (draws.size() == 1) {
     bool savedCoalesce = _coalesceSVGDraws;
     _coalesceSVGDraws = false;
-    renderSVG(out, draws[0].geos, draws[0].fill, draws[0].stroke, draws[0].alpha,
-              BlendMode::Normal, draws[0].trim);
+    renderSVG(out, draws[0].geos, draws[0].fill, draws[0].stroke, draws[0].alpha, BlendMode::Normal,
+              draws[0].trim);
     _coalesceSVGDraws = savedCoalesce;
     return;
   }
