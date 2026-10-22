@@ -25,6 +25,10 @@
     "transformIgnorePatterns": [
       "/node_modules/(?!(pixelmatch)/)"
     ],
+    "transform": {
+      "[/\\\\]node_modules[/\\\\]pixelmatch[/\\\\].*\\.js$": "babel-jest"
+    },
+    "coverageProvider": "v8",
     "collectCoverageFrom": [
       "dist/lib/**/*.js",
       "bench/report-utils.js",
