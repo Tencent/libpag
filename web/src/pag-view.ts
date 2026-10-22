@@ -75,6 +75,7 @@ export class PAGView {
     try {
       if (pagView.pagViewOptions.useCanvas2D) {
         PAGModule.globalCanvas.retain();
+        pagView.globalCanvasRetained = true;
         if (!isWebGPUBackend()) {
           pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
         }
@@ -173,6 +174,7 @@ export class PAGView {
   protected eventManager: EventManager<PAGViewEventMap, PAGView> = new EventManager();
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
+  private globalCanvasRetained = false;
   private rawWidth = 0;
   private rawHeight = 0;
   private debugData: DebugData = {
@@ -483,7 +485,12 @@ export class PAGView {
     this.player.destroy();
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
-      PAGModule.globalCanvas.release();
+      // Release only when retain() actually succeeded, otherwise a failed init() would drive the
+      // shared GlobalCanvas retain count negative and poison all subsequent init attempts.
+      if (this.globalCanvasRetained) {
+        PAGModule.globalCanvas.release();
+        this.globalCanvasRetained = false;
+      }
     } else {
       this.renderCanvas?.release();
     }
