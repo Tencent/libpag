@@ -364,7 +364,8 @@ export class PAGView {
         if (!this.canvasContext) {
           // getContext('2d') returns null when the canvas already holds another context type;
           // compositing is impossible then, so skip this frame instead of crashing.
-          this.canvasContext = this.canvasElement?.getContext('2d') ?? null;
+          this.canvasContext = this.canvasElement?.getContext('2d') as
+              CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
         }
         if (!this.canvasContext) return;
         const compositeOperation = this.canvasContext.globalCompositeOperation;
