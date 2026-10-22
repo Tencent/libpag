@@ -1137,4 +1137,17 @@ const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
   return it->second;
 }
 
-}  // namespace pagx
+std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
+  std::vector<NodeSourceEntry> result = {};
+  result.reserve(nodes.size());
+  for (const auto& node : nodes) {
+    NodeSourceEntry entry = {};
+    entry.index = node->index;
+    entry.startLine = node->sourceLine;
+    entry.endLine = node->endLine;
+    entry.nodeType = node->nodeType();
+    entry.channels = ListChannels(node->nodeType());
+    result.push_back(std::move(entry));
+  }
+  return result;
+}}  // namespace pagx

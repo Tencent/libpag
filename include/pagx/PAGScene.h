@@ -196,6 +196,16 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
                                                              bool shapeHitTest = false);
 
   /**
+   * Returns the tight bounds of the given layer in surface coordinates: per-glyph extents for text
+   * (instead of the font-wide envelope of getGlobalBounds), clipped to the layer's own scrollRect
+   * window, so selection outlines hug the visible content. The layer's full on-screen transform
+   * (including animation and the display zoom/offset) is applied. Returns an empty rectangle if
+   * the layer is null or does not belong to this scene.
+   * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
+   */
+  Rect getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
+
+  /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
    * on-screen transform (including animation and the display zoom/offset) applied. Returns an
    * empty rectangle if the layer is null or does not belong to this scene. For the layer's

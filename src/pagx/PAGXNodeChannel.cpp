@@ -1230,4 +1230,64 @@ std::vector<std::string> ListChannels(NodeType type) {
   return names;
 }
 
-}  // namespace pagx
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
+  if (node == nullptr) {
+    return false;
+  }
+  const auto* field = FindChannel(node->nodeType(), channel);
+  if (field == nullptr) {
+    LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  KeyValue value = {};
+  if (field->dimension) {
+    // Width/height accept the XML dimension syntax ("100" or "50%"). A percent value addresses
+    // the percent member, so route through the sibling percent channel; both dimension
+    // accessors clear their counterpart member, keeping the result identical to a full reparse
+    // (ReadDimension writes exactly one of the two members and NaNs the other).
+    float absolute = NAN;
+    float percent = NAN;
+    if (!ParseDimension(raw, &absolute, &percent)) {
+      LOGE("SetNodeChannelFromString: cannot parse dimension value '%s' for channel '%s'.",
+           raw.c_str(), channel.c_str());
+      return false;
+    }
+    if (!std::isnan(percent)) {
+      const char* percentChannel = DimensionPercentChannel(channel);
+      if (percentChannel == nullptr) {
+        LOGE("SetNodeChannelFromString: no percent channel for dimension channel '%s'.",
+             channel.c_str());
+        return false;
+      }
+      field = FindChannel(node->nodeType(), percentChannel);
+      if (field == nullptr) {
+        LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", percentChannel,
+             static_cast<int>(node->nodeType()));
+        return false;
+      }
+      value = percent;
+    } else {
+      value = absolute;
+    }
+  } else if (!ParseChannelValue(field->valueType, raw, &value)) {
+    if (field->valueType == ChannelValueType::ImageRef ||
+        field->valueType == ChannelValueType::Matrix ||
+        field->valueType == ChannelValueType::PAGImage) {
+      LOGE(
+          "SetNodeChannelFromString: channel '%s' has type %d which does not support string "
+          "parsing.",
+          channel.c_str(), static_cast<int>(field->valueType));
+    } else {
+      LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s'.", raw.c_str(),
+           channel.c_str());
+    }
+    return false;
+  }
+  if (!field->access(node, nullptr, &value)) {
+    LOGE("SetNodeChannelFromString: failed to set channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
+}}  // namespace pagx

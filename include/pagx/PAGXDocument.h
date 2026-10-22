@@ -48,7 +48,43 @@ class ImagePattern;
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
  * PAGXImporter to load documents and PAGXExporter to save documents.
  */
-class PAGXDocument : public Node {
+/**
+ * One entry of the document's source-node map: the runtime index and source span of a node, its
+ * type, and the reflectable channel names available on it. Used by editor selection (line<->index
+ * mapping) and by hosts deciding which attribute edits can go incremental.
+ *
+ * startLine / endLine may be -1 independently of index: a node returned in getNodeSourceMap()
+ * always has index >= 0, but its source span can still be unknown when the node was created
+ * programmatically or by an importer that did not carry line information.
+ */
+struct NodeSourceEntry {
+  /**
+   * Index of the node in PAGXDocument::nodes. See Node::index for the caching caveats on this
+   * value.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int endLine = -1;
+
+  /**
+   * The node type.
+   */
+  NodeType nodeType = NodeType::Document;
+
+  /**
+   * Reflectable channel names of the node, from ListChannels(nodeType). Empty for node types that
+   * expose no channels.
+   */
+  std::vector<std::string> channels = {};
+};class PAGXDocument : public Node {
  public:
   /**
    * Creates an empty document with the specified size.
@@ -155,6 +191,15 @@ class PAGXDocument : public Node {
    * @param other the document to drain; emptied and invalidated on return.
    */
   void adoptNodes(PAGXDocument& other);
+/**
+   * Returns one entry per node in PAGXDocument::nodes, in document order, carrying the node's
+   * runtime index, source span (1-based lines), type, and reflectable channel names. Use it to map
+   * source lines to node indexes for editor selection, and to decide which attribute edits can go
+   * incremental (a channel edit that fails can fall back to a full reparse). Entries reference the
+   * current node indexing; a structural document change renumbers nodes, so rebuild the map after
+   * such edits.
+   */
+  std::vector<NodeSourceEntry> getNodeSourceMap() const;
 
   /**
    * Renames ids in the given document that collide with ids already used by this document (or

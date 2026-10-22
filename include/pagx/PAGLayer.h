@@ -107,7 +107,14 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
    * @param mix blend weight, defaults to 1.0 (full overwrite).
    */
   virtual void apply(float mix = 1.0f);
-
+/**
+   * Returns the parent PAGLayer in the runtime tree, or nullptr for the root composition.
+   * General tree navigation, symmetric to getChildren(): hosts walking the runtime layer tree
+   * (e.g. from getLayersUnderPoint) climb with this instead of managing their own parent map.
+   */
+  std::shared_ptr<PAGLayer> getParent() const {
+    return parent.lock();
+  }
   /**
    * Returns the source Layer node associated with this runtime layer, or nullptr for the root
    * composition. This is the runtime's only exposure of the source model and the hook hosts use to

@@ -972,4 +972,25 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
   return recording;
 }
 
-}  // namespace pagx
+Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
+  // getGlobalBounds' conservative envelope semantics are part of its published contract (existing
+  // callers such as the wechat view's LRU eviction scoring and getImageBounds binding rely on it),
+  // while editor-selection rects want tight bounds that hug the visible content. The two variants
+  // must stay separate so improving selection outlines never changes what existing hosts observe.
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
+    return {};
+  }
+  auto scene = pagLayer->rootScene.lock();
+  if (scene.get() != this) {
+    return {};
+  }
+  auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
+  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
+  // visible content (per-glyph extents for text) instead of the conservative content envelope
+  // that Layer::getBounds returns by default.
+  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
+  Matrix rootToSurface = {};
+  rootToSurfaceMatrix(&rootToSurface);
+  auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
+  return FromTGFX(surfaceBounds);
+}}  // namespace pagx
