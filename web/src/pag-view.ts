@@ -123,7 +123,7 @@ export class PAGView {
       if (isOffscreenCanvas(canvasElement)) {
         return PAGSurface.fromCanvas(canvasElement);
       }
-      return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement));
+      return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement as HTMLCanvasElement));
     }
     if (!pagGlContext || !pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
     const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);

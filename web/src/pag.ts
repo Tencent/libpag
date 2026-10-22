@@ -1,7 +1,7 @@
 import './utils/polyfills';
 import { PAGBind } from './binding';
 import * as types from './types';
-import createPAG from './wasm-mt-webgpu/libpag';
+import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
 
 export interface ModuleOption {
