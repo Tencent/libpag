@@ -28,7 +28,7 @@ let isMobile = false;
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
-    if (!navigator.gpu) {
+    if (!('gpu' in navigator)) {
       document.getElementById('waiting')!.innerText = 'WebGPU is not supported in this browser.';
       return;
     }
