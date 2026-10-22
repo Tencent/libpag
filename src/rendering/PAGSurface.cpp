@@ -40,11 +40,11 @@ PAGSurfaceReadback::PAGSurfaceReadback(std::shared_ptr<PAGSurface> pagSurface,
 PAGSurfaceReadback::~PAGSurfaceReadback() = default;
 
 int PAGSurfaceReadback::width() const {
-  return readback ? readback->info().width() : 0;
+  return readback->info().width();
 }
 
 int PAGSurfaceReadback::height() const {
-  return readback ? readback->info().height() : 0;
+  return readback->info().height();
 }
 
 bool PAGSurfaceReadback::isReady() {
