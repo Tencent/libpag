@@ -83,6 +83,12 @@ class HTMLParserContext {
   Layer* convertElement(const std::shared_ptr<DOMNode>& element,
                         const HTMLInheritedStyle& inherited, int depth);
 
+  // Whether any element child resolves its size or position against `element`'s content box — a
+  // flow child (no `position: absolute`), or one sized by percentage. CSS insets that box by the
+  // border width, so such a child needs the inner host that models the inset rather than being
+  // laid out on the border box, where it would cover the border stroke.
+  bool hasContentBoxDependentChild(const std::shared_ptr<DOMNode>& element);
+
   // Container conversion (for <div>-like elements). Emits the standard "outer
   // background + inner padded container" double-layer when both background and
   // padding/layout are present.
@@ -191,10 +197,15 @@ class HTMLParserContext {
   // narrow single-full-cover-image case; this generalises rounded clipping to any content (text,
   // multiple children, bordered rings, ...). The mask is an Ellipse for `border-radius: 50%`, a
   // uniform rounded Rectangle, or a per-corner Path — filled opaque white and read as a contour
-  // mask. No-op unless the box both rounds its corners and clips overflow; when a CSS
+  // mask. A bordered box shapes the mask to its padding box (radius shrunk by the border width),
+  // matching the CSS clip region, so descendants cannot cover the inner half of the border ring.
+  // The mask is attached to `contentHost` — the inner host of the double-layer pattern, or `layer`
+  // itself when there is none — because a contour mask clips the masked Layer's own contents too,
+  // and masking the outer Layer would erase the border stroke it carries.
+  // No-op unless the box both rounds its corners and clips overflow; when a CSS
   // mask-image / clip-path already claimed the layer's single mask slot the rectangular clip is
   // kept and a diagnostic is emitted. Must run after `applyMaskOrClip` so that check is accurate.
-  void applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box);
+  void applyRoundedOverflowClip(Layer* layer, Layer* contentHost, const HTMLBoxAttributes& box);
 
   // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
   // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
@@ -338,6 +349,17 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
+  // Loaded @font-face sources retain the authored registration family and either a resolved path
+  // or the original data URI so emitted resources can reconstruct the same registration.
+  struct WebFontFile {
+    std::string cssFamily = {};
+    std::string path = {};
+  };
+  std::vector<WebFontFile> _webFontFiles = {};
+  // CSS family names declared by the loaded @font-face rules. Layout registers every source under
+  // its own rule's family, so a font-family stack that names one of them resolves at render time
+  // regardless of the family name stored inside the file.
+  std::unordered_set<std::string> _webFontFamilies = {};
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
@@ -362,8 +384,8 @@ class HTMLParserContext {
   static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
 
   // Reports whether `family` will resolve at render time without triggering system font
-  // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
-  // installed system font (the family the platform resolves matches the request). A name the
+  // substitution: it is carried by a loaded `@font-face` file, it is registered/embedded in the
+  // document's FontConfig, or it is a genuinely installed system font (the family the platform resolves matches the request). A name the
   // renderer would silently swap for a mismatched default (e.g. the hidden "SF Mono" system font,
   // which `MakeFromName` replaces with a proportional face) counts as unavailable. Results are
   // memoised in `_fontAvailabilityCache`.
@@ -375,8 +397,9 @@ class HTMLParserContext {
   // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
   // exported PAGX carries names a host process can look up with an exact-matching font lookup
   // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
-  // Families registered or embedded in the document's FontConfig keep their names verbatim,
-  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
+  // Families carried by a loaded `@font-face` file or registered/embedded in the document's
+  // FontConfig keep their names verbatim, because `LayoutContext` resolves those through an exact
+  // key; a family the platform substitutes
   // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
   void resolveFontFaceNames(std::string& family, std::string& style);
 
@@ -387,6 +410,20 @@ class HTMLParserContext {
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
   // discovered during the walk is available for per-glyph fallback at layout time.
   void flushFontFallbacksToDocument();
+
+  // Registers the first loadable source of every `@font-face` rule — a font file on local disk
+  // (also recorded in `_webFontFiles` so `emitWebFontResources` can reference it) or the bytes of
+  // an inlined `data:` URI — under the CSS family the rule declares, and records that family in
+  // `_webFontFamilies`. Runs before the body walk so font-family stacks see those families as
+  // available.
+  void loadWebFontFiles();
+  void registerMappedFontAliases(const void* bytes, size_t length);
+
+  // Emits one `<Font file>` resource per loaded web font file whose CSS family is named by some
+  // font-family stack in the document. Unused faces are left out so they are neither written nor
+  // copied next to the output. A used family whose source is an inlined `data:` URI has nothing
+  // to reference, so it is reported instead.
+  void emitWebFontResources();
 };
 
 }  // namespace pagx

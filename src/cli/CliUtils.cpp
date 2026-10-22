@@ -17,12 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
+#include <cctype>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
+#include <unordered_set>
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 
 namespace pagx::cli {
@@ -40,35 +47,42 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
   return document;
 }
 
+bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command) {
+  auto equals = value.find('=');
+  if (equals == std::string::npos || equals == 0 || equals + 1 >= value.size()) {
+    std::cerr << command << ": malformed --font-alias '" << value
+              << "' (expected <family>=<path>)\n";
+    return false;
+  }
+  alias->family = value.substr(0, equals);
+  alias->path = value.substr(equals + 1);
+  return true;
+}
+
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
-                    const std::vector<std::string>& fallbacks, const std::string& command) {
+                    const std::vector<std::string>& fallbacks,
+                    const std::vector<FontAlias>& aliases, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
-    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
-    if (typeface == nullptr) {
+    if (RegisterFontFileFaces(fontConfig, fontFile, false) == 0) {
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
       return false;
     }
-    fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());
   }
   for (const auto& fallbackStr : fallbacks) {
-    bool isFilePath = fallbackStr.find('/') != std::string::npos;
+    bool isFilePath =
+        fallbackStr.find('/') != std::string::npos || fallbackStr.find('\\') != std::string::npos;
     if (!isFilePath) {
-      auto dot = fallbackStr.rfind('.');
-      if (dot != std::string::npos) {
-        auto ext = fallbackStr.substr(dot);
-        isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
-                     ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
-      }
+      auto ext = GetFileExtension(fallbackStr);
+      isFilePath = ext == "ttf" || ext == "otf" || ext == "ttc" || ext == "woff" || ext == "woff2";
     }
     if (isFilePath) {
       // Register as both a main font (precise family match) and a fallback font, matching the
       // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
-      auto typeface = tgfx::Typeface::MakeFromPath(fallbackStr);
-      if (typeface == nullptr) {
+      // A file that cannot be read is fatal: the caller asked for this exact source, and silently
+      // dropping it would shape the text with a substituted face instead.
+      if (RegisterFontFileFaces(fontConfig, fallbackStr, true) == 0) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->registerFont(fallbackStr, 0, typeface->fontFamily(), typeface->fontStyle());
-        fontConfig->addFallbackFont(fallbackStr, 0);
+        return false;
       }
     } else {
       auto commaPos = fallbackStr.find(',');
@@ -76,56 +90,177 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
       if (!fontConfig->registerSystemFont(family, style)) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->addFallbackSystemFont(family, style);
+        return false;
       }
+      fontConfig->addFallbackSystemFont(family, style);
+    }
+  }
+  // Font aliases come last so an explicit (family, file) pair always wins over a plain file
+  // registration whose name table happened to produce the same key. The style half always comes
+  // from each face, so the faces of an aliased collection stay distinguishable.
+  for (const auto& alias : aliases) {
+    if (RegisterFontFileFaces(fontConfig, alias.path, true, alias.family) == 0) {
+      std::cerr << command << ": font alias '" << alias.family << "=" << alias.path
+                << "' not found\n";
+      return false;
     }
   }
   return true;
 }
 
-bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command) {
-  // Start from the document's own fallback chain: the HTML importer records the CSS font-family
-  // stacks there, and applyLayout below replaces the whole config with the one passed in.
-  FontConfig fontConfig = document->fontConfig();
-  if (!LoadFontConfig(&fontConfig, {}, fallbacks, command)) {
-    return false;
-  }
-  // A source file is the only record of the family/style it provides, so a missing one cannot be
-  // proven unused while any Text still asks for a font: shaping would silently fall back to a
-  // substituted font with different outlines. Only a document that needs no font at all can skip
-  // such a source.
-  bool requiresFonts = !document->getRequiredFonts().empty();
+std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document) {
+  std::vector<std::string> files = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() != NodeType::Font) {
       continue;
     }
-    auto* font = static_cast<Font*>(node.get());
-    if (!font->file.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(font->file);
-      if (typeface == nullptr) {
-        if (requiresFonts) {
-          std::cerr << command << ": failed to load font '" << font->file << "'\n";
-          return false;
-        }
-        std::cerr << command << ": failed to load font '" << font->file
-                  << "', skipped because the document needs no font\n";
-        continue;
-      }
-      fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
-      // Also reach this file through the fallback chain: a (family, style) key holds one primary
-      // registration, so unicode-range subset files sharing that key would otherwise overwrite
-      // each other and drop every glyph that lives in an earlier subset.
-      fontConfig.addFallbackFont(font->file, 0);
+    auto* font = static_cast<const Font*>(node.get());
+    if (!font->file.empty() && MakeTypefacesFromFile(font->file).empty()) {
+      files.push_back(font->file);
     }
   }
-  FontEmbedder::ClearEmbeddedGlyphRuns(document);
+  return files;
+}
+
+static std::string DescribeText(const Text* text) {
+  std::string preview = text->text;
+  if (preview.size() > 32) {
+    size_t end = 32;
+    while (end > 0 && (static_cast<unsigned char>(preview[end]) & 0xC0) == 0x80) {
+      --end;
+    }
+    preview.resize(end);
+    preview += "...";
+  }
+  std::string label = text->fontFamily.empty() ? "(default family)" : text->fontFamily;
+  if (!text->fontStyle.empty()) label += "/" + text->fontStyle;
+  if (!text->id.empty()) label += " id=" + text->id;
+  return label + ": " + preview;
+}
+
+static std::vector<std::string> CollectUnembeddedTexts(PAGXDocument* document) {
+  std::vector<std::string> result;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) continue;
+    auto* text = static_cast<const Text*>(node.get());
+    if (!text->glyphRuns.empty()) continue;
+    for (auto ch : text->text) {
+      if (std::isspace(static_cast<unsigned char>(ch)) == 0) {
+        result.push_back(DescribeText(text));
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// A text whose requested family resolves to nothing was shaped entirely with the substitute face
+// the platform picked, and those outlines are now baked into the document. Such a text still has
+// glyph runs, so the empty-run check cannot see it; without this check the failure
+// ships silently and only shows up when the render is compared with the source page.
+//
+// "Resolves to nothing" means layout could not find a face for the family at all. A family that
+// the platform knows under another spelling is not reported: fontconfig-style aliasing
+// (Arial -> Liberation Sans) still gives layout a face, and rejecting that would make a document
+// authored on one platform unembeddable on another. A name the platform has never heard of is the
+// case that silently produces substitute outlines.
+static std::vector<std::string> CollectSubstitutedTexts(PAGXDocument* document) {
+  std::vector<std::string> substituted = {};
+  // applyLayout registers the document's own font files into the document's config, not into the
+  // copy the caller passed in, so the resolved set is the document's.
+  LayoutContext context(&document->fontConfig());
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) {
+      continue;
+    }
+    auto* text = static_cast<const Text*>(node.get());
+    // Only texts this pass will shape can be substituted: a text that already carries glyph runs
+    // was shaped by an earlier pass, from a font file or from outlines baked back then.
+    if (text->fontFamily.empty() || !text->glyphRuns.empty()) {
+      continue;
+    }
+    if (context.findTypeface(text->fontFamily, text->fontStyle) != nullptr) {
+      continue;
+    }
+    if (!SystemFonts::FindFont(text->fontFamily, text->fontStyle).path.empty()) {
+      continue;
+    }
+    substituted.push_back(DescribeText(text));
+  }
+  return substituted;
+}
+
+bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
+                const std::vector<FontAlias>& aliases, const std::string& command) {
+  // Start from the document's own fallback chain: the HTML importer records the CSS font-family
+  // stacks there, and applyLayout below replaces the whole config with the one passed in.
+  FontConfig fontConfig = document->fontConfig();
+  if (!LoadFontConfig(&fontConfig, {}, fallbacks, aliases, command)) {
+    return false;
+  }
+  if (!fallbacks.empty() || !aliases.empty()) {
+    FontEmbedder::ClearEmbeddedGlyphRuns(document);
+  }
+  // A source file is the only record of the family/style it provides, so a missing one cannot be
+  // proven unused while any Text still asks for a font: shaping would silently fall back to a
+  // substituted font with different outlines. Only a document that needs no font at all can skip
+  // such a source. Pre-shaped runs have an explicit font dependency, or embedded glyphs that
+  // need no source file at all.
+  bool runtimeNeedsFonts = false;
+  std::unordered_set<std::string> referencedFiles;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) continue;
+    auto* text = static_cast<Text*>(node.get());
+    runtimeNeedsFonts |= text->glyphRuns.empty() && !text->text.empty();
+    for (auto* run : text->glyphRuns) {
+      if (run->font != nullptr && run->font->glyphs.empty()) {
+        referencedFiles.insert(run->font->file);
+      }
+    }
+  }
+  for (auto& file : FindUnloadableFontFiles(document)) {
+    if (runtimeNeedsFonts || referencedFiles.count(file) != 0) {
+      std::cerr << command << ": failed to load font '" << file << "'\n";
+      return false;
+    }
+    std::cerr << command << ": failed to load font '" << file
+              << "', skipped because the document needs no font\n";
+  }
+  // applyLayout registers the document's own font files on top of this config.
   document->applyLayout(&fontConfig);
+  // Collected before embedding, while the difference between a runtime-shaped text and a
+  // pre-shaped one is still visible.
+  auto substituted = CollectSubstitutedTexts(document);
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
     return false;
+  }
+  // A text that shaped to nothing means no font available here covered its characters. Writing the
+  // document anyway would silently produce a file whose text is blank on every host lacking the
+  // authored font, so fail loudly and name the texts instead.
+  auto unembedded = CollectUnembeddedTexts(document);
+  if (!unembedded.empty()) {
+    std::cerr << command << ": " << unembedded.size()
+              << " text(s) produced no glyph run, no available font covers them:\n";
+    for (const auto& description : unembedded) {
+      std::cerr << command << ":   " << description << "\n";
+    }
+    return false;
+  }
+  // Not fatal: a host may legitimately lack a family the page names, and refusing the conversion
+  // would block every page that uses a system font the container does not ship. The outlines are
+  // still from a face the author did not choose, so the caller has to be able to see it.
+  if (!substituted.empty()) {
+    std::cerr << command << ": warning: " << substituted.size()
+              << " text(s) ask for a font family that resolves to no available face; the baked "
+                 "glyphs come from a substitute:\n";
+    for (const auto& description : substituted) {
+      std::cerr << command << ": warning:   " << description << "\n";
+    }
+    std::cerr << command
+              << ": warning: install the font or pass it with "
+                 "--font-alias <family>=<file>\n";
   }
   return true;
 }

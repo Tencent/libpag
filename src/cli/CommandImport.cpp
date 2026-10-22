@@ -33,6 +33,7 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
+#include "cli/ZipArchive.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -400,10 +401,13 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
 // HTML import behaviour is fixed in code (no longer exposed via CLI/ImportFormatOptions): the
 // importer always normalizes the subset, prefers the <body> intrinsic size, recovers flex from
 // absolute layout, and downgrades unsupported constructs to warnings rather than hard errors.
-static HTMLImporter::Options ToHTMLOptions(float targetWidth = NAN, float targetHeight = NAN) {
+static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOptions,
+                                           float targetWidth = NAN, float targetHeight = NAN) {
   HTMLImporter::Options options = {};
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
+  options.emitFontFileResources = formatOptions.emitFontFileResources;
+  options.fontReplacements = formatOptions.fontReplacements;
   return options;
 }
 
@@ -437,7 +441,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
+    auto htmlOptions = ToHTMLOptions(formatOptions, targetWidth, targetHeight);
     if (snapshotEnabled) {
       // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
       // subset HTML) straight to the importer. No temp file touches the disk; the HTML
@@ -461,6 +465,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.error = "failed to parse '" + filePath + "'";
     return result;
   }
+  result.format = effectiveFormat;
   InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
@@ -475,7 +480,8 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
+    result.document =
+        HTMLImporter::ParseString(content, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
   } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
@@ -484,6 +490,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.error = "failed to parse inline content";
     return result;
   }
+  result.format = effectiveFormat;
   InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
@@ -492,6 +499,28 @@ ImportResult ImportString(const std::string& content, const std::string& format,
 //--------------------------------------------------------------------------------------------------
 // CLI entry point
 //--------------------------------------------------------------------------------------------------
+
+// How web fonts are carried into the exported PAGX. Imported HTML text is normally left as plain
+// text plus font attributes, which only renders correctly on a host that can resolve the same
+// fonts. Embed bakes the glyphs the page was laid out with as pre-shaped runs, so the output is
+// one self-contained file; External keeps the `<Font file>` references to the fonts written next
+// to the output instead.
+enum class FontStorageMode {
+  External,
+  Embed,
+};
+
+static bool ParseFontStorageMode(const std::string& value, FontStorageMode* mode) {
+  if (value == "external") {
+    *mode = FontStorageMode::External;
+    return true;
+  }
+  if (value == "embed") {
+    *mode = FontStorageMode::Embed;
+    return true;
+  }
+  return false;
+}
 
 struct ImportOptions {
   std::string inputFile = {};
@@ -512,6 +541,18 @@ struct ImportOptions {
   // Directory used to resolve relative image `source` paths to real files. Defaults to the input
   // file's directory. Only meaningful for local (non-URL) inputs.
   std::string imageBaseDir = {};
+  // How the page's web fonts are carried into the output. HTML defaults to Embed: a page's fonts
+  // are usually a snapshot artifact, and an unembedded document silently renders with whatever
+  // substitute face the host resolves the authored family name to.
+  FontStorageMode fontStorage = FontStorageMode::Embed;
+  // Font files to shape with before baking, registered under an explicit CSS family. The snapshot
+  // saves network fonts to disk rather than carrying them into the subset, so a caller that
+  // downloaded them names them here; otherwise their family resolves to nothing.
+  std::vector<FontAlias> fontAliases = {};
+  // Fallback font files or system font names to shape with before baking. A network font the
+  // snapshot downloaded without its @font-face rule has no family to register under, so it can
+  // only cover the page's characters through the fallback chain.
+  std::vector<std::string> fontFallbacks = {};
 };
 
 static void PrintUsage() {
@@ -521,7 +562,8 @@ static void PrintUsage() {
       << "Import a file from another format and convert it to PAGX.\n"
       << "\n"
       << "Options:\n"
-      << "  --input <file|url>             Input file or URL to import (required)\n"
+      << "  --input <file|url>             Input file or URL to import (required). A .zip HTML\n"
+      << "                                 export is extracted and its index.html imported\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
@@ -529,11 +571,22 @@ static void PrintUsage() {
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
       << "                                 @keyframes, Web Animations, GSAP, anime.js) into the\n"
       << "                                 output so they replay in PAGX. Default: a static frame\n"
+      << "  --font-replacement <families> <weight> <style> <target-family> <target-face>\n"
+      << "                                 HTML only: apply an exact font match before layout.\n"
+      << "                                 Repeat for additional source requests.\n"
       << "  --images <mode>                How image resources are stored: 'external' (default;\n"
       << "                                 write image files next to the output PAGX and keep the\n"
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
       << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
       << "                                 (default: the input file's directory)\n"
+      << "  --fonts <mode>                 HTML only: how web fonts are carried into the output.\n"
+      << "                                 'embed' (default) bakes the page's glyphs so the\n"
+      << "                                 document needs no font on the host; 'external' keeps\n"
+      << "                                 <Font file> references and leaves text runtime-shaped\n"
+      << "  --font-alias <family>=<file>   Register a font file under an explicit family name\n"
+      << "                                 while baking (repeatable; HTML only)\n"
+      << "  --fallback <path|name>         Add a fallback font file or system font name while\n"
+      << "                                 baking (repeatable; HTML only)\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -547,6 +600,7 @@ static void PrintUsage() {
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
       << "  pagx import --input page.html --no-resolve        # keep import directives\n"
       << "  pagx import --input page.html --capture-animations # replay page animations in PAGX\n"
+      << "  pagx import --input export.zip                    # zipped HTML export to export.pagx\n"
       << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
@@ -573,6 +627,38 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       }
     } else if (arg == "--image-base-dir" && i + 1 < argc) {
       options->imageBaseDir = argv[++i];
+    } else if (arg == "--font-replacement" && i + 5 < argc) {
+      HTMLImporter::FontReplacement replacement = {};
+      replacement.families = argv[++i];
+      char* end = nullptr;
+      replacement.weight = std::strtof(argv[++i], &end);
+      replacement.style = argv[++i];
+      replacement.targetFamily = argv[++i];
+      replacement.targetStyle = argv[++i];
+      if (*end != '\0' || !std::isfinite(replacement.weight) || replacement.weight < 1 ||
+          replacement.weight > 1000 || replacement.families.empty() ||
+          replacement.targetFamily.empty() || replacement.targetStyle.empty() ||
+          (replacement.style != "normal" && replacement.style != "italic" &&
+           replacement.style != "oblique")) {
+        std::cerr << "pagx import: error: invalid --font-replacement values\n";
+        return 1;
+      }
+      options->formatOptions.fontReplacements.push_back(std::move(replacement));
+    } else if (arg == "--font-alias" && i + 1 < argc) {
+      FontAlias alias = {};
+      if (!ParseFontAlias(argv[++i], &alias, "pagx import")) {
+        return 1;
+      }
+      options->fontAliases.push_back(alias);
+    } else if (arg == "--fallback" && i + 1 < argc) {
+      options->fontFallbacks.push_back(argv[++i]);
+    } else if (arg == "--fonts" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseFontStorageMode(mode, &options->fontStorage)) {
+        std::cerr << "pagx import: error: invalid --fonts value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
@@ -605,6 +691,14 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
 
   ParseFormatOptions(argc, argv, &options->formatOptions);
+  if (options->fontStorage == FontStorageMode::External &&
+      (!options->fontAliases.empty() || !options->fontFallbacks.empty())) {
+    std::cerr << "pagx import: error: --font-alias and --fallback require --fonts embed\n";
+    return 1;
+  }
+  // Baking replaces the font sources with the glyphs they produced, so the references are dropped
+  // in the same pass that arranges for the fonts to be resolvable.
+  options->formatOptions.emitFontFileResources = options->fontStorage != FontStorageMode::Embed;
   return 0;
 }
 
@@ -615,7 +709,29 @@ int RunImport(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto result = ImportFile(options.inputFile, options.format, options.formatOptions);
+  // A zipped HTML export (the page plus its images and fonts) is extracted to a temporary
+  // directory and imported from its entry page; the extracted resources are copied next to the
+  // output below, and the directory is removed when `archive` goes out of scope.
+  std::string importPath = options.inputFile;
+  std::string importFormat = options.format;
+  ExtractedArchive archive = {};
+  if (!IsHttpUrl(options.inputFile) && GetFileExtension(options.inputFile) == "zip") {
+    std::string error = {};
+    if (!archive.extract(options.inputFile, &error)) {
+      std::cerr << "pagx import: error: " << error << "\n";
+      return 1;
+    }
+    importPath = archive.findEntryHTML(&error);
+    if (importPath.empty()) {
+      std::cerr << "pagx import: error: " << error << " in '" << options.inputFile << "'\n";
+      return 1;
+    }
+    if (importFormat.empty()) {
+      importFormat = "html";
+    }
+  }
+
+  auto result = ImportFile(importPath, importFormat, options.formatOptions);
   if (!result.error.empty()) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;
@@ -655,21 +771,33 @@ int RunImport(int argc, char* argv[]) {
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
 
-  // Normalise image resources to the requested storage mode. Relative image paths recorded by the
-  // importer are anchored at the input document's directory, so that is the default base; copied
-  // files land next to the output PAGX. URL inputs have no local base, so image relocation is
-  // skipped for them.
+  // Baking captures glyphs and placement on the import host. External mode instead preserves
+  // font sources and their CSS registration families for runtime shaping after reload.
+  if (result.format == "html" && options.fontStorage == FontStorageMode::Embed) {
+    if (!EmbedFonts(result.document.get(), options.fontFallbacks, options.fontAliases,
+                    "pagx import")) {
+      return 1;
+    }
+  }
+
+  // Normalise image resources to the requested storage mode and copy the font files next to the
+  // output. Relative paths recorded by the importer are anchored at the input document's
+  // directory, so that is the default base; copied files land next to the output PAGX. URL inputs
+  // have no local base, so relocation is skipped for them.
   {
     ImageStorageOptions imageOptions = {};
     imageOptions.mode = options.imageStorage;
-    std::string inputDir =
-        IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
+    std::string inputDir = IsHttpUrl(importPath) ? std::string() : GetDirectory(importPath);
     imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : inputDir;
     // The importer anchors relative `<img>` paths at the input file's directory, so that is the
     // prefix to strip back off when recovering the authored `source`.
     imageOptions.documentDir = inputDir;
+    if (!archive.directory().empty()) {
+      imageOptions.archiveDir = archive.directory() + "/";
+    }
     imageOptions.outputDir = GetDirectory(options.outputFile);
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
+    ApplyFontStorage(result.document.get(), imageOptions, "pagx import");
   }
 
   auto xml = PAGXExporter::ToXML(*result.document);

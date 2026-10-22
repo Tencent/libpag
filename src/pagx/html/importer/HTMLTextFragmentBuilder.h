@@ -19,16 +19,24 @@
 #pragma once
 
 #include <cmath>
+#include <map>
 #include <memory>
 #include <string>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
 struct DOMNode;
+class Data;
 class Fill;
+class Font;
 class HTMLDiagnosticSink;
 class HTMLIdAllocator;
 class HTMLLayerBuilder;
@@ -38,6 +46,7 @@ class Layer;
 class PAGXDocument;
 class Stroke;
 class Text;
+class TextModifier;
 
 /**
  * Converts HTML text-leaf elements (`<p>`, `<h1..6>`, `<span>`, `<a>`) into PAGX `Layer`
@@ -114,6 +123,16 @@ class HTMLTextFragmentBuilder {
   /** Wires the document handle. Must be called once after the document has been constructed. */
   void bindDocument(PAGXDocument* document);
 
+  /** Registers a local @font-face source used by rendered text hosts. Returns false when the file
+   *  holds no usable face. @param internalFamily when not null, receives the family name stored
+   *  inside the file. */
+  bool registerFontFile(const std::string& family, const std::string& path,
+                        std::string* internalFamily = nullptr);
+
+  /** Registers the bytes of a @font-face source that the document inlines as a `data:` URI, under
+   *  the CSS family the rule declares. Returns false when the bytes hold no usable face. */
+  bool registerFontData(const std::string& family, const Data& fontData);
+
   /** Converts a text-leaf element (`<p>`, `<h1..6>`, `<span>`, `<a>`) into a Layer subtree. */
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                          const HTMLInheritedStyle& inherited);
@@ -138,6 +157,12 @@ class HTMLTextFragmentBuilder {
   Stroke* buildTextStroke(const TextFragment& fragment);
 
  private:
+  bool collectEmbeddedGlyphs(Text* text, const std::shared_ptr<DOMNode>& element,
+                             const HTMLInheritedStyle& inherited, const Matrix& matrix,
+                             TextFragment& firstStyle, int depth = 0);
+  Layer* convertEmbeddedTextHost(const std::shared_ptr<DOMNode>& element,
+                                 const HTMLInheritedStyle& inherited);
+
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
 
   /** Overlays the data-pagx-* round-trip metadata (original text / font family / font style /
@@ -166,7 +191,7 @@ class HTMLTextFragmentBuilder {
 
   /** Fast fingerprint check used by `appendFragment` to skip the full `makeFragment`
    *  materialisation when the new run shares style with the previous fragment. */
-  static bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
+  bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
 
   /** Appends `text` to the fragment list, merging into the previous fragment when their style
    *  fingerprints match. */
@@ -212,6 +237,24 @@ class HTMLTextFragmentBuilder {
   HTMLStyleCascade& _styleCascade;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
+  struct EmbeddedText {
+    std::shared_ptr<PAGXDocument> document;
+    Text* text = nullptr;
+  };
+  using EmbeddedTextKey = std::tuple<std::string, std::string, float, float, std::string>;
+  std::map<EmbeddedTextKey, EmbeddedText> _embeddedTexts = {};
+  std::unordered_map<Font*, Font*> _embeddedFonts = {};
+  std::unordered_map<Font*, Font*> _pendingEmbeddedFonts = {};
+  std::unordered_set<Node*> _embeddedNodes = {};
+
+  template <typename T>
+  T* makeEmbeddedNode(const std::string& id = "") {
+    auto* node = _document->makeNode<T>(id);
+    _embeddedNodes.insert(node);
+    return node;
+  }
+  std::unordered_set<std::string> _registeredFontFamilies = {};
+  std::vector<TextModifier*> _glyphModifiers = {};
 };
 
 }  // namespace pagx

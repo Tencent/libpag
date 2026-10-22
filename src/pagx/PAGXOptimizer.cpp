@@ -1674,6 +1674,11 @@ void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::strin
       }
     } else if (type == NodeType::Font) {
       auto* font = static_cast<const Font*>(nodePtr.get());
+      // A Font with a file is a font source that layout registers by the names inside the file,
+      // so Text reaches it through fontFamily rather than an id reference.
+      if (!font->file.empty() && !font->id.empty()) {
+        refs.insert(font->id);
+      }
       for (auto* glyph : font->glyphs) {
         if (glyph == nullptr) {
           continue;

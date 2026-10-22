@@ -511,12 +511,16 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
   <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
+
+<!-- 外部字体文件，供 fontFamily 与文件内字体名一致的 Text 使用 -->
+<Font id="brandFont" file="fonts/Brand-Regular.woff2"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `unitsPerEm` | int | 1000 | 字体设计空间单位。渲染时按 `fontSize / unitsPerEm` 缩放 |
-| `file` | string | — | 外部字体文件路径。设置后，Font 节点引用外部 TTF/OTF 文件。相对路径基于 PAGX 文件所在目录解析。`pagx embed` 会扫描带 `file` 的 Font 节点，加载字体并注册用于文本排版。嵌入后，`file` 仍被保留以便溯源，嵌入的字形数据则存放在独立的 Font 节点中。 |
+| `file` | string | — | 字体文件路径（TTF、OTF、TTC 或 WOFF2）或 base64 `data:` URI。相对路径基于 PAGX 文件所在目录解析；data URI 原样保留，无需外部加载。排版时注册每个 face，族名由 `fontFamily` 指定（为空则读取文件内部族名），样式名始终来自字体文件。Text 按族名和样式匹配，不通过 id 引用。无法加载的源被跳过，相应 Text 回退到其他字体。Web 等宿主可通过 `loadFileData` 提供外部文件字节；data URI 不进入 `getExternalFilePaths()`。`pagx embed` 使用这些源排版，将字形写入独立 Font 节点。 |
+| `fontFamily` | string | — | 可选的字体注册族名，覆盖 `file` / 运行时 `fileData` 中各 face 的内部族名；用于持久化 CSS 字体别名。空值使用文件内部族名。纯内嵌字形 Font 忽略此属性。 |
 
 **一致性约束**：同一 Font 内的所有 Glyph 必须使用相同类型（全部 `path` 或全部 `image`），不允许混用。
 

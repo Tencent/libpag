@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/FontConfigData.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
@@ -37,6 +38,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -76,6 +78,11 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
         continue;
       }
       paths->push_back(image->filePath);
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->fileData == nullptr && IsExternalFilePath(font->file)) {
+        paths->push_back(font->file);
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
@@ -165,6 +172,18 @@ static bool LoadFileDataInChain(
         docDirtyNodes[document].push_back(image);
         found = true;
       }
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->file == filePath) {
+        font->fileData = data;
+        // A font changes how every Text shapes, so an already laid-out document is refreshed as a
+        // whole. Before the first layout there is nothing to refresh: that layout registers it.
+        if (document->isLayoutApplied()) {
+          docDirtyNodes[document].push_back(document);
+          layoutDirtyDocs.insert(document);
+        }
+        found = true;
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       layers.push_back(static_cast<Layer*>(node.get()));
     }
@@ -205,9 +224,22 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     errors.push_back("Cyclic external composition reference detected during layout.");
     return;
   }
-  if (config != nullptr) {
+  if (config != nullptr && config != &_fontConfig) {
     _fontConfig = *config;
+    auto& data = *_fontConfig.data;
+    if (data.fileFonts != nullptr && data.fileOwner != this) {
+      for (const auto& entry : data.fileFonts->registeredTypefaces) {
+        data.registeredTypefaces.insert_or_assign(entry.first, entry.second);
+      }
+      data.fallbackTypefaces.insert(data.fallbackTypefaces.end(),
+                                    data.fileFonts->fallbackTypefaces.begin(),
+                                    data.fileFonts->fallbackTypefaces.end());
+    }
+    data.fileFonts = nullptr;
+    data.fileOwner = nullptr;
+    registeredFontFiles.clear();
   }
+  registerFontFiles();
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
@@ -282,6 +314,35 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     }
   }
   visited.erase(this);
+}
+
+// The document's own font files go on top of the caller's config: they are what the document was
+// authored against, so a same-named registration from the caller must not shadow them. A Font is
+// registered once per source set. Replacing or removing a path or its data rebuilds only the
+// file overlay, keeping caller registrations intact and releasing faces from obsolete sources.
+void PAGXDocument::registerFontFiles() {
+  std::unordered_map<const Font*, RegisteredFontFile> sources = {};
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Font) continue;
+    auto* font = static_cast<Font*>(node.get());
+    if (!font->file.empty()) sources[font] = {font->file, font->fontFamily, font->fileData};
+  }
+  if (sources == registeredFontFiles && _fontConfig.data->fileFonts != nullptr) return;
+  FontConfig files;
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Font) continue;
+    auto* font = static_cast<Font*>(node.get());
+    if (font->file.empty()) continue;
+    if (font->fileData != nullptr) {
+      RegisterFontDataFaces(&files, font->fileData->bytes(), font->fileData->size(), true,
+                            font->fontFamily);
+    } else if (IsLocalFilePath(font->file) || font->file.find("data:") == 0) {
+      RegisterFontFileFaces(&files, font->file, true, font->fontFamily);
+    }
+  }
+  _fontConfig.data->fileFonts = std::move(files.data);
+  _fontConfig.data->fileOwner = this;
+  registeredFontFiles = std::move(sources);
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
@@ -774,15 +835,18 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
-// Embeds file data into every Image node whose filePath matches a key in fileDataMap, descending
-// into resolved external composition documents so nested images are embedded in the same pass.
-// Mirrors the recursion of AppendExternalImagePaths (read side) and LoadImageInChain (single-image
-// side); without the descent, getExternalImagePaths() collects child-document paths that
-// loadFileDataMap() would silently fail to match.
+// Embeds file data into every Image node whose filePath matches a key in fileDataMap and attaches
+// font data to every Font node whose file does, descending into resolved external composition
+// documents so nested nodes are matched in the same pass. Mirrors the recursion of
+// AppendExternalFilePaths (read side) and LoadFileDataInChain (single-file side); without the
+// descent, getExternalFilePaths() collects child-document paths that loadFileDataMap() would
+// silently fail to match.
 static void LoadFileDataMapInChain(
     PAGXDocument* document,
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap,
-    std::unordered_set<const PAGXDocument*>& visited) {
+    std::unordered_set<const PAGXDocument*>& visited,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyNodes,
+    std::unordered_set<PAGXDocument*>& layoutDirtyDocs) {
   if (document == nullptr || !visited.insert(document).second) {
     return;
   }
@@ -798,10 +862,27 @@ static void LoadFileDataMapInChain(
       }
       image->data = it->second;
       image->filePath = {};
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->file.empty()) {
+        continue;
+      }
+      auto it = fileDataMap.find(font->file);
+      if (it == fileDataMap.end() || it->second == nullptr) {
+        continue;
+      }
+      font->fileData = it->second;
+      // A font changes how every Text shapes, so an already laid-out document is refreshed as a
+      // whole, exactly as the single-file overload does.
+      if (document->isLayoutApplied()) {
+        docDirtyNodes[document].push_back(document);
+        layoutDirtyDocs.insert(document);
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited);
+        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited, docDirtyNodes,
+                               layoutDirtyDocs);
       }
     }
   }
@@ -810,7 +891,13 @@ static void LoadFileDataMapInChain(
 void PAGXDocument::loadFileDataMap(
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  LoadFileDataMapInChain(this, fileDataMap, visited);
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
+  std::unordered_set<PAGXDocument*> layoutDirtyDocs = {};
+  LoadFileDataMapInChain(this, fileDataMap, visited, docDirtyNodes, layoutDirtyDocs);
+  for (auto& entry : docDirtyNodes) {
+    entry.first->notifyChange(entry.second,
+                              layoutDirtyDocs.find(entry.first) != layoutDirtyDocs.end());
+  }
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into

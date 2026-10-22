@@ -157,7 +157,11 @@ export class PAGXView {
   }
 
   /**
-   * Returns the list of external file paths referenced by the PAGX document.
+   * Returns the list of external file paths referenced by the PAGX document that have no data
+   * loaded yet: Image sources, Font `file` references (TTF/OTF/TTC/WOFF2) and external composition
+   * files. Relative paths are relative to the .pagx file. Fetch each one and pass its bytes to
+   * loadFileData(); there is no file system access in the browser, so a font is only used once its
+   * bytes are supplied this way.
    */
   public getExternalFilePaths(): string[] {
     const vector = this.nativeView._getExternalFilePaths();
@@ -174,7 +178,8 @@ export class PAGXView {
   }
 
   /**
-   * Loads external file data referenced by the PAGX document.
+   * Loads external file data referenced by the PAGX document: image bytes, font file bytes, or a
+   * nested PAGX document.
    * @param path The file path as returned by getExternalFilePaths()
    * @param data The file binary data
    * @returns true if successful

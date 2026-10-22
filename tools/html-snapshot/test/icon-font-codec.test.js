@@ -24,11 +24,16 @@ function stubFont() {
 
 function loadIconFontWithCodec({ parse, decompress } = {}) {
   jest.resetModules();
+  const decode = decompress || (async (b) => Buffer.concat([SFNT_MARKER, b.subarray(4)]));
   jest.doMock('../dist/lib/font-codec', () => ({
     loadFontCodec: () => ({
       opentype: { parse: parse || (() => stubFont()) },
-      wawoff2: { decompress: decompress || (async (b) => Buffer.concat([SFNT_MARKER, b.subarray(4)])) },
+      wawoff2: { decompress: decode },
     }),
+    // parseFontBuffer routes WOFF2 through this helper (the real one copies the
+    // decoder's shared-heap view into a Buffer and serialises decodes); the stub
+    // mirrors that contract on top of the injected `decompress`.
+    decompressWoff2: async (b) => Buffer.from(await decode(b)),
   }));
   return require('../dist/lib/icon-font');
 }
@@ -63,14 +68,9 @@ describe('parseFontBuffer — codec routing', () => {
     expect(decompressCalls).toBe(0);
   });
 
-  test('handles a Uint8Array (non-Buffer) decompressor result', async () => {
-    const { parseFontBuffer } = loadIconFontWithCodec({
-      decompress: async () => new Uint8Array([0x00, 0x01, 0x00, 0x00]),
-    });
-    const woff2 = Buffer.from([0x77, 0x4f, 0x46, 0x32, 9, 9, 9, 9]);
-    const font = await parseFontBuffer(woff2);
-    expect(font.unitsPerEm).toBe(1000);
-  });
+  // The "decompressor resolved a bare Uint8Array" guarantee now lives in
+  // lib/font-codec's `decompressWoff2` (it owns the copy out of wawoff2's
+  // shared WASM heap) and is covered by font-codec.test.js.
 });
 
 describe('resolveIconFontSvgs — full success path', () => {

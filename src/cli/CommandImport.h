@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/HTMLImporter.h"
 
 namespace pagx {
 class PAGXDocument;
@@ -31,11 +32,15 @@ namespace pagx::cli {
 
 struct ImportResult {
   std::shared_ptr<PAGXDocument> document = nullptr;
+  // The format the input was actually parsed as, after inference and normalization ("svg" or
+  // "html"). Callers use it to decide which post-import passes apply.
+  std::string format = {};
   std::string error = {};
   std::vector<std::string> warnings = {};
 };
 
 struct ImportFormatOptions {
+  std::vector<HTMLImporter::FontReplacement> fontReplacements = {};
   bool svgExpandUse = true;
   bool svgFlattenTransforms = false;
   bool svgPreserveUnknown = false;
@@ -45,6 +50,9 @@ struct ImportFormatOptions {
   // snapshot.js) so the importer can replay the motion. Off by default: the
   // snapshot emits a single static frame.
   bool captureAnimations = false;
+  // Emit one `<Font file>` resource per `@font-face` source on disk. Turned off when the import
+  // bakes the glyphs, so the output carries no font file reference it no longer needs.
+  bool emitFontFileResources = true;
 };
 
 /**

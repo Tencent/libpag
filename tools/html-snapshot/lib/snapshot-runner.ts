@@ -14,7 +14,13 @@ import {
   inlineExternalImages,
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
+  dropCollapsedDetailsContent,
+  hoistTableRowBackgrounds,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
+  inlineSvgVectorPatterns,
   expandStickyScrollytelling,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
@@ -27,7 +33,9 @@ import {
 } from './animation-capture';
 import {
   makeFontCaptureListener,
+  resolveFontFamilies,
   saveDownloadedFonts,
+  type FontFaceSource,
   type SavedFont,
 } from './font-download';
 import {
@@ -51,6 +59,13 @@ import type {
   EngineWrapper,
 } from './browser-engine';
 import { ResourceCache, type CachedResource } from './resource-cache';
+
+// Entry expression for the page's `@font-face` map. The collector ships with
+// ICON_FONT_INIT_SCRIPT (registered at navigation time), so this stays a
+// sub-100-byte round trip. Guarded so a caller that never installed the init
+// script degrades to "no sources" instead of throwing.
+const COLLECT_FONT_FACE_MAP_EXPR =
+  '(async () => (window.__pagxIconFont ? await window.__pagxIconFont.collectFontFaceMap() : {}))()';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -346,10 +361,12 @@ async function bestEffortSave<TItem, TCache>(
 ): Promise<TItem[]> {
   try {
     const arr = await saveFn(cache, dir, log || (() => {}));
-    if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
+    // "saved", not "downloaded": a font may be a `data:` URL decoded from the
+    // page rather than a network response.
+    if (log) log(`saved ${arr.length} ${label} file(s) to ${dir}`);
     return arr;
   } catch (err) {
-    if (log) log(`${label} download failed: ${errMessage(err)}`);
+    if (log) log(`${label} save failed: ${errMessage(err)}`);
     return [];
   }
 }
@@ -574,6 +591,30 @@ export async function runSnapshot(
       }
     }
 
+    // Prune the collapsed content of every closed <details> (accordion items,
+    // FAQ lists, native disclosure widgets). Chromium hides that content via
+    // its UA `::details-content` pseudo-element, which the snapshot cannot
+    // observe: the content reports normal visibility and a full-size rect, so
+    // an unclipped <details> leaked every collapsed answer as a box drawn over
+    // the summary rows. Removing the nodes here makes all five downstream
+    // traversals skip them without any per-path guard.
+    //
+    // Runs after the DOM-cloning passes above (image/canvas inlining, sticky
+    // expansion) so clones of a <details> are pruned too — the query is
+    // document-wide — and before every remaining pass (placeholder
+    // normalisation, icon-font, pseudo materialisation, animation capture and
+    // the snapshot walk) so none of them spend work on content the browser
+    // never paints. Best-effort: a failure only reverts to the previous
+    // behaviour, so it must not abort the snapshot.
+    try {
+      const pruned = await page.evaluate(dropCollapsedDetailsContent);
+      if (log && pruned && pruned.details > 0) {
+        log(`collapsed details: pruned ${pruned.nodes} node(s) from ${pruned.details} closed <details>`);
+      }
+    } catch (err) {
+      if (log) log(`collapsed-details pruning skipped: ${errMessage(err)}`);
+    }
+
     // Chromium renders an empty/missing-src <img> with non-empty alt text as
     // fallback glyphs and ignores even explicit CSS width/height in that
     // state. Neutralise the alt text for source-less placeholders that have a
@@ -599,6 +640,26 @@ export async function runSnapshot(
       }
     }
 
+    // Materialise `::first-letter` drop caps and `::marker` list markers. Both run
+    // before the decorative-pseudo pass: the cap is lifted off the paragraph's text
+    // node while it is still that node's first child, and the marker stand-in is
+    // inserted at the item's front before any `::before` stand-in joins it.
+    // Best-effort, same rationale as the pseudo pass below.
+    try {
+      await page.evaluate(materializeFirstLetter);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: ::first-letter materialisation skipped — drop caps and their paragraph line breaks will be missing from the snapshot: ${errMessage(err)}`);
+      }
+    }
+    try {
+      await page.evaluate(materializeListMarkers);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: list-marker materialisation skipped — <ol>/<ul> markers will be missing from the snapshot: ${errMessage(err)}`);
+      }
+    }
+
     // Materialise decorative `::before` / `::after` pseudo-elements (toggle
     // sliders, custom radio dots, divider lines, etc.). Runs after the
     // icon-font pass so text-bearing pseudos that were converted to inline
@@ -614,6 +675,31 @@ export async function runSnapshot(
     } catch (err) {
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
+      }
+    }
+
+    // Inline remote `mask-image: url(https://…)` values into `data:` URIs.
+    // Runs after the pseudo-element pass so the masks that pass copies onto the
+    // synthetic stand-in divs are resolved too. Best-effort: a failure leaves
+    // the mask url remote, which a browser still renders but the importer
+    // cannot fetch (the mask is silently dropped there).
+    try {
+      await page.evaluate(inlineMaskImages);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: mask-image inlining skipped — remote mask urls stay remote and the importer will drop those masks: ${errMessage(err)}`);
+      }
+    }
+
+    // Rasterize inline-SVG `<pattern>` fills whose content is vector geometry into a tile image.
+    // The importer can only tile a bitmap, so an un-rasterized vector pattern is dropped and the
+    // painted shape loses its texture. Best-effort: a failure leaves the pattern vector, which the
+    // importer drops exactly as before.
+    try {
+      await page.evaluate(inlineSvgVectorPatterns);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: inline SVG pattern rasterization skipped — vector patterns stay unresolved: ${errMessage(err)}`);
       }
     }
 
@@ -724,6 +810,21 @@ export async function runSnapshot(
       if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
     }
 
+    // Hoist painted table-row backgrounds ahead of the rows' own boxes so the
+    // flattened paint order keeps them beneath every cell — a `rowspan` cell
+    // that overflows its row otherwise loses its lower half to the following
+    // rows' backgrounds. Runs last, after the viewport settled to the body
+    // canvas, so the row rectangles measured here are the ones the walker
+    // emits. Best-effort: a failure keeps the previous order.
+    try {
+      const hoistStats = await page.evaluate(hoistTableRowBackgrounds);
+      if (log && hoistStats && hoistStats.hoisted > 0) {
+        log(`table row backgrounds: hoisted ${hoistStats.hoisted} row background(s)`);
+      }
+    } catch (err) {
+      if (log) log(`table row background hoist skipped: ${errMessage(err)}`);
+    }
+
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
@@ -731,14 +832,64 @@ export async function runSnapshot(
       html: string; width: number; height: number;
     };
 
-    // Write the web fonts the browser fetched to disk. The font bytes were
-    // captured off the `response` event during load + settle, so they are
-    // already in `fontBytesByUrl` by now (no page interaction needed). This
-    // is best-effort: a decode/write failure degrades to "no fonts on disk"
-    // and the rest of the snapshot still returns.
-    const fonts: SavedFont[] = (downloadFonts && fontDir)
-      ? await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font')
-      : [];
+    // Write the web fonts to disk: the ones the browser fetched (captured off
+    // the `response` event during load + settle, only when `downloadFonts`
+    // asked for them) plus the ones inlined as `data:` URLs (collected from
+    // the page's `@font-face` rules here — a `data:` URI issues no request, so
+    // the response listener can never see one, and without this pass the font
+    // would neither be saved nor registered). Deferring the collection to this
+    // point costs nothing and lets the CSS-family pass below see every font
+    // the page loaded.
+    //
+    // The inline half runs whenever a directory is set: those faces live only
+    // inside the document, so saving them here is the only way a caller that
+    // needs the bytes on disk can get them. The subset does not depend on this
+    // pass — it carries each `data:` URI verbatim (see
+    // `collectCarryOverFontFaces`), so an unsaved face still reaches the
+    // importer. With `fontBytesByUrl` empty the call below naturally only
+    // decodes the data: sources, so nothing here reaches the network on its own.
+    //
+    // `resolveFontFamilies` also returns each file's authored CSS family names:
+    // PAGX resolves text by the name the document carries, which need not match
+    // the name inside the file (`font-family: MaShanZheng` for a file whose
+    // family is "Ma Shan Zheng"; a font whose typographic name exists only in a
+    // non-English record is reported as "?????" by the platform reader). The
+    // caller forwards the pairs to `pagx embed` / `pagx render` as
+    // `--font-alias`. This is best-effort: a failure degrades to "no fonts on
+    // disk" and the rest of the snapshot still returns.
+    let fonts: SavedFont[] = [];
+    if (fontDir) {
+      let cssFacesByKey: Map<string, FontFaceSource[]> | undefined;
+      try {
+        const fontFaceMap = (await page.evaluate(COLLECT_FONT_FACE_MAP_EXPR)) as Record<
+          string,
+          Array<{ family?: string; style?: string; weight?: string; url?: string }>
+        >;
+        const sources: FontFaceSource[] = [];
+        for (const family of Object.keys(fontFaceMap || {})) {
+          for (const entry of fontFaceMap[family] || []) {
+            sources.push({
+              family: entry.family || family,
+              style: entry.style || '',
+              weight: entry.weight || '',
+              url: entry.url || '',
+            });
+          }
+        }
+        cssFacesByKey = await resolveFontFamilies(sources, fontBytesByUrl, log);
+      } catch (err) {
+        if (log) log(`font-family collection skipped: ${errMessage(err)}`);
+      }
+      fonts = await bestEffortSave(
+        (cache, dir, saveLog) => saveDownloadedFonts(cache, dir, saveLog, cssFacesByKey),
+        fontBytesByUrl,
+        fontDir,
+        log,
+        'font',
+      );
+    }
+    // Network fonts keep travelling through the font manifest: their files are named there so
+    // `pagx embed` / `pagx render` can register them under the authored CSS family.
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does

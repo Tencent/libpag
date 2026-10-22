@@ -25,6 +25,7 @@
 #include <unordered_set>
 #include <vector>
 #include "base/PAGTest.h"
+#include "cli/CliUtils.h"
 #include "cli/CommandBounds.h"
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
@@ -39,9 +40,12 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/utils/Base64.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -49,6 +53,7 @@
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
+#include "zip.h"
 
 namespace pag {
 using namespace tgfx;
@@ -1571,6 +1576,347 @@ CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
                      {"import", "--input", svgPath, "--output", outputPath, "--images", "embed"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// Disables the html-snapshot pre-pass while alive, so HTML imports run in-process without Node,
+// and restores the previous setting when destroyed.
+class ScopedSnapshotDisabled {
+ public:
+  ScopedSnapshotDisabled()
+      : hadPrevious(std::getenv("PAGX_HTML_SNAPSHOT") != nullptr),
+        saved(hadPrevious ? std::getenv("PAGX_HTML_SNAPSHOT") : "") {
+    setenv("PAGX_HTML_SNAPSHOT", "0", 1);
+  }
+  ~ScopedSnapshotDisabled() {
+    if (hadPrevious) {
+      setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+    } else {
+      unsetenv("PAGX_HTML_SNAPSHOT");
+    }
+  }
+  ScopedSnapshotDisabled(const ScopedSnapshotDisabled&) = delete;
+  ScopedSnapshotDisabled& operator=(const ScopedSnapshotDisabled&) = delete;
+
+ private:
+  bool hadPrevious = false;
+  std::string saved = {};
+};
+
+struct ZipEntrySpec {
+  std::string name;
+  std::string contents;
+};
+
+static bool WriteZipArchive(const std::string& path, const std::vector<ZipEntrySpec>& entries) {
+  zipFile archive = zipOpen64(path.c_str(), APPEND_STATUS_CREATE);
+  if (archive == nullptr) {
+    return false;
+  }
+  bool ok = true;
+  for (const auto& entry : entries) {
+    ok = zipOpenNewFileInZip(archive, entry.name.c_str(), nullptr, nullptr, 0, nullptr, 0, nullptr,
+                             Z_DEFLATED, Z_DEFAULT_COMPRESSION) == ZIP_OK &&
+         zipWriteInFileInZip(archive, entry.contents.data(),
+                             static_cast<unsigned>(entry.contents.size())) == ZIP_OK &&
+         zipCloseFileInZip(archive) == ZIP_OK;
+    if (!ok) {
+      break;
+    }
+  }
+  return zipClose(archive, nullptr) == ZIP_OK && ok;
+}
+
+static std::string ReadBinaryFile(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// A WOFF2 subset font whose glyphs sit at Private Use Area codepoints from U+E000 under the family
+// "pagx-font-f0", the shape of the fonts a PAGX-to-HTML export ships in `assets/fonts/`.
+static const char* PUA_WOFF2_FONT = "resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2";
+
+static std::string WebFontIndexHTML() {
+  return "<html><head><style>"
+         "@font-face{font-family:\"pagx-font-f0\";src:url(\"assets/fonts/font_f0.woff2\")}"
+         "</style></head><body style=\"width:60px;height:30px\">"
+         "<span style=\"position:absolute;left:0px;top:0px;font-family:pagx-font-f0;"
+         "font-size:20px;white-space:nowrap\">&#xE000;&#xE001;</span></body></html>";
+}
+
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto input = TempDir() + "/font-replacement.html";
+  auto output = TempDir() + "/font-replacement.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style='font-family:Source;font-size:20px;font-weight:600'>A</span>"
+                          "</body></html>";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--fonts", "external",
+                     "--font-replacement", "Source", "600", "normal", "Target", "Bold"}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+  EXPECT_EQ(xml.find("font-request"), std::string::npos);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--font-replacement", "Source",
+                     "NaN", "normal", "Target", "Bold"}),
+            0);
+}
+
+// A zipped HTML export is extracted, imported from its index.html, and with `--fonts external` the
+// font file its @font-face names is copied next to the output, where the PAGX references it by
+// relative path instead of embedding glyphs. The reloaded document registers that file for layout.
+CLI_TEST(PAGXCliTest, Import_ZipExportReferencesFontFile) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportZipFont";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir + "/out");
+  auto zipPath = dir + "/export.zip";
+  auto fontBytes = ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_FALSE(fontBytes.empty());
+  ASSERT_TRUE(WriteZipArchive(
+      zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
+
+  auto outputPath = dir + "/out/export.pagx";
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", zipPath, "--output", outputPath, "--fonts", "external"});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_NE(xml.find(R"(file="assets/fonts/font_f0.woff2")"), std::string::npos);
+  EXPECT_EQ(xml.find("<Glyph "), std::string::npos);
+  EXPECT_EQ(ReadBinaryFile(dir + "/out/assets/fonts/font_f0.woff2"), fontBytes);
+
+  auto document = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(document, nullptr);
+  EXPECT_TRUE(pagx::cli::FindUnloadableFontFiles(document.get()).empty());
+  document->applyLayout();
+  EXPECT_TRUE(document->fontConfig().containsFamily("pagx-font-f0"));
+}
+
+// By default a zipped HTML export is baked: the glyphs the page was laid out with end up in the
+// output, and the font file they came from is neither referenced nor copied, so the .pagx renders
+// the same anywhere on its own.
+CLI_TEST(PAGXCliTest, Import_ZipExportBakesFontGlyphsByDefault) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportZipBake";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir + "/out");
+  auto zipPath = dir + "/export.zip";
+  auto fontBytes = ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_FALSE(fontBytes.empty());
+  ASSERT_TRUE(WriteZipArchive(
+      zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
+
+  auto outputPath = dir + "/out/export.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+  EXPECT_NE(xml.find("fontFamily=\"pagx-font-f0\""), std::string::npos);
+  // The page draws two PUA codepoints, so two distinct outlines are baked into one glyph run.
+  EXPECT_NE(xml.find(R"(glyphs="1,2")"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(dir + "/out/assets/fonts/font_f0.woff2"));
+
+  auto document = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(document, nullptr);
+  EXPECT_TRUE(pagx::cli::FindUnloadableFontFiles(document.get()).empty());
+}
+
+// A page may alias a face: the CSS family it declares need not match the name stored inside the
+// font file. The importer registers the source under the CSS name, so baking keeps the text on the
+// outlines of that file instead of whatever face the host substitutes for an unknown name.
+CLI_TEST(PAGXCliTest, Import_BakesAliasedWebFontUnderCssFamily) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportAliasedFont";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  auto htmlPath = dir + "/aliased.html";
+  {
+    std::ofstream out(htmlPath);
+    out << "<html><head><style>@font-face{font-family:\"AliasedFace\";src:url(\"" << fontPath
+        << "\")}</style></head>"
+        << "<body style=\"width:80px;height:30px\">"
+        << "<span style=\"position:absolute;left:0px;top:0px;font-family:AliasedFace;"
+           "font-size:20px;white-space:nowrap\">A</span></body></html>";
+  }
+  auto outputPath = dir + "/aliased.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_NE(xml.find("fontFamily=\"AliasedFace\""), std::string::npos);
+  EXPECT_NE(xml.find("<Glyph "), std::string::npos);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+}
+
+// A font downloaded without its @font-face rule (a stylesheet the snapshot could not read) has no
+// family to register under. Passed as --fallback it still covers the characters no available
+// family provides, so baking keeps its outlines. Without baking there is nothing to shape with it.
+CLI_TEST(PAGXCliTest, Import_BakesWithFallbackFont) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportFallbackFont";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto htmlPath = dir + "/fallback.html";
+  std::ofstream(htmlPath) << "<html><body style=\"width:60px;height:30px\">"
+                             "<span style=\"position:absolute;left:0px;top:0px;"
+                             "font-family:UnreadableIconFont;font-size:20px;white-space:nowrap\">"
+                             "&#xE000;&#xE001;</span></body></html>";
+  auto outputPath = dir + "/fallback.pagx";
+  auto fontPath = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
+                                           "--fallback", fontPath}),
+            0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_NE(xml.find(R"(glyphs="1,2")"), std::string::npos);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+
+  StreamCapture errCapture(std::cerr);
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
+                                           "--fonts", "external", "--fallback", fontPath}),
+            1);
+  EXPECT_NE(errCapture.str().find("--fallback require --fonts embed"), std::string::npos);
+}
+
+// Without --output, a zip input writes `<archive>.pagx` next to the archive, with its assets.
+CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportZipDefault";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto zipPath = dir + "/page.zip";
+  ASSERT_TRUE(WriteZipArchive(zipPath, {{"site/index.html", WebFontIndexHTML()},
+                                        {"site/assets/fonts/font_f0.woff2",
+                                         ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT))}}));
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--fonts", "external"});
+  ASSERT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(dir + "/page.pagx"));
+  EXPECT_TRUE(std::filesystem::exists(dir + "/assets/fonts/font_f0.woff2"));
+}
+
+CLI_TEST(PAGXCliTest, Import_InlineFontSurvivesExternalStorageAndEmbed) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto bytes = ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_FALSE(bytes.empty());
+  auto uri = "data:font/woff2;base64," +
+             pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  auto input = TempDir() + "/InlineFont.html";
+  auto output = TempDir() + "/InlineFont.pagx";
+  auto embedded = TempDir() + "/InlineFontEmbedded.pagx";
+  {
+    std::ofstream file(input);
+    file << "<html><head><style>@font-face{font-family:Alias;src:url('" << uri
+         << "')}</style></head><body style='width:120px;height:40px'>"
+            "<span style='position:absolute;left:0px;top:0px;font-family:Alias;font-size:20px'>"
+            "&#xE000;&#xE001;</span></body></html>";
+  }
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--fonts", "external"}),
+            0);
+  auto doc = pagx::PAGXImporter::FromFile(output);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+  int fonts = 0;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Font) continue;
+    auto* font = static_cast<pagx::Font*>(node.get());
+    EXPECT_EQ(font->file, uri);
+    EXPECT_EQ(font->fontFamily, "Alias");
+    fonts++;
+  }
+  EXPECT_EQ(fonts, 1);
+  StreamCapture errors(std::cerr);
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", output, "-o", embedded}), 0);
+  EXPECT_EQ(errors.str().find("failed to load font"), std::string::npos);
+  EXPECT_EQ(errors.str().find("substitute"), std::string::npos);
+  auto baked = pagx::PAGXImporter::FromFile(embedded);
+  ASSERT_NE(baked, nullptr);
+  int texts = 0;
+  for (auto& node : baked->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    EXPECT_FALSE(static_cast<pagx::Text*>(node.get())->glyphRuns.empty());
+    texts++;
+  }
+  EXPECT_EQ(texts, 1);
+}
+
+// An archive entry that would extract outside the temporary directory aborts the import.
+CLI_TEST(PAGXCliTest, Import_ZipRejectsEntryOutsideArchive) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportZipSlip";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto zipPath = dir + "/evil.zip";
+  ASSERT_TRUE(WriteZipArchive(
+      zipPath, {{"index.html", WebFontIndexHTML()}, {"../pagx-zip-slip-escaped.txt", "escaped"}}));
+  StreamCapture errCapture(std::cerr);
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", dir + "/evil.pagx"});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("points outside the archive"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(dir + "/evil.pagx"));
+  EXPECT_FALSE(std::filesystem::exists(std::filesystem::temp_directory_path() /
+                                       "pagx-zip-slip-escaped.txt"));
+}
+
+// An archive with no HTML page cannot be imported.
+CLI_TEST(PAGXCliTest, Import_ZipWithoutHtmlFails) {
+  auto dir = TempDir() + "/ImportZipNoHtml";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto zipPath = dir + "/assets.zip";
+  ASSERT_TRUE(WriteZipArchive(zipPath, {{"assets/readme.txt", "no page here"}}));
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath});
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errCapture.str().find("contains no HTML file"), std::string::npos);
+}
+
+// pagx render registers a document's font files; one that cannot be loaded is reported instead of
+// silently rendering its text with another font.
+CLI_TEST(PAGXCliTest, Render_WarnsOnUnloadableFontFile) {
+  auto pagxPath = TempDir() + "/RenderMissingFontFile.pagx";
+  {
+    std::ofstream out(pagxPath);
+    out << R"(<pagx width="60" height="30">
+  <Layer>
+    <Text text="&#xE000;" fontFamily="pagx-font-f0" fontSize="20"/>
+    <Fill color="#000000"/>
+  </Layer>
+  <Resources>
+    <Font id="webFont" file="missing-font.woff2"/>
+  </Resources>
+</pagx>)";
+  }
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunRender,
+                     {"render", "-o", TempDir() + "/RenderMissingFontFile.png", pagxPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(errCapture.str().find("failed to load font"), std::string::npos);
+  EXPECT_NE(errCapture.str().find("missing-font.woff2"), std::string::npos);
+}
+
+// A Font with a file is a font source reached through fontFamily, so verify must not report it as
+// an unreferenced resource.
+CLI_TEST(PAGXCliTest, Verify_FontFileIsNotUnreferenced) {
+  auto pagxPath = TempDir() + "/VerifyFontFile.pagx";
+  {
+    std::ofstream out(pagxPath);
+    out << R"(<pagx width="60" height="30">
+  <Layer>
+    <Text text="A" fontFamily="Brand" fontSize="20"/>
+    <Fill color="#000000"/>
+  </Layer>
+  <Resources>
+    <Font id="brandFont" file="brand.woff2"/>
+  </Resources>
+</pagx>)";
+  }
+  StreamCapture errCapture(std::cerr);
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", pagxPath});
+  EXPECT_EQ(errCapture.str().find("brandFont"), std::string::npos);
 }
 
 // An invalid --images value is rejected during option parsing.
@@ -3615,6 +3961,63 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   EXPECT_EQ(ret, 1);
   EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"), std::string::npos);
   EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_HTMLGlyphsPreserveOriginalTextAcrossRepeatedEmbed) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto fontPath = ProjectPath::Absolute(PUA_WOFF2_FONT);
+  auto html = TempDir() + "/original_text.html";
+  std::ofstream stream(html);
+  stream << "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" << fontPath
+         << "')}</style></head><body style='width:80px;height:40px'>"
+            "<span data-pagx-text='搜索' style='font-family:pagx-font-f0;font-size:20px'>"
+            "&#xE000;&#xE001;</span></body></html>";
+  stream.close();
+  auto input = TempDir() + "/original_text_imported.pagx";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", html, "--output", input}), 0);
+  auto first = TempDir() + "/original_text_embedded1.pagx";
+  auto second = TempDir() + "/original_text_embedded2.pagx";
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", input, "-o", first}), 0);
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", first, "-o", second}), 0);
+  EXPECT_EQ(ReadFile(first), ReadFile(second));
+  auto doc = pagx::PAGXImporter::FromFile(second);
+  ASSERT_NE(doc, nullptr);
+  bool found = false;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    EXPECT_EQ(text->text, "搜索");
+    ASSERT_FALSE(text->glyphRuns.empty());
+    EXPECT_TRUE(text->glyphRuns[0]->font->file.empty());
+    EXPECT_FALSE(text->glyphRuns[0]->font->glyphs.empty());
+    found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+CLI_TEST(PAGXCliTest, Embed_PreservesEmbeddedRunsAlongsideRuntimeText) {
+  auto document = pagx::PAGXImporter::FromXML(
+      "<pagx width='80' height='40'><Resources>"
+      "<Font id='first'><Glyph advance='500' path='M0 0L500 0L250 -500Z'/></Font>"
+      "<Font id='second'><Glyph advance='500' path='M0 0L500 0L500 -500Z'/></Font>"
+      "</Resources><Layer><Text id='fixed' text='原文'>"
+      "<GlyphRun font='@first' fontSize='20' glyphs='1' positions='0,20'/>"
+      "<GlyphRun font='@second' fontSize='20' glyphs='1' positions='20,20'/>"
+      "<GlyphRun font='@first' fontSize='20' glyphs='1' positions='40,20'/>"
+      "</Text><Text id='runtime' text='A' fontFamily='TestFont' fontSize='20'/>"
+      "<Fill color='#000000'/></Layer></pagx>");
+  ASSERT_NE(document, nullptr);
+  document->fontConfig().registerFont(
+      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, "TestFont", "Regular");
+  auto* fixed = document->findNode<pagx::Text>("fixed");
+  auto originalRuns = fixed->glyphRuns;
+  ASSERT_TRUE(pagx::cli::EmbedFonts(document.get(), {}, {}, "test"));
+  EXPECT_EQ(fixed->glyphRuns, originalRuns);
+  EXPECT_EQ(fixed->text, "原文");
+  EXPECT_FALSE(document->findNode<pagx::Text>("runtime")->glyphRuns.empty());
+  auto firstXML = pagx::PAGXExporter::ToXML(*document);
+  ASSERT_TRUE(pagx::cli::EmbedFonts(document.get(), {}, {}, "test"));
+  EXPECT_EQ(pagx::PAGXExporter::ToXML(*document), firstXML);
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {

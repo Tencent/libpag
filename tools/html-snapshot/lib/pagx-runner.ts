@@ -26,6 +26,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
+import { collectSnapshotFontMetadata, prepareSnapshotFontReplacements } from './snapshot-fonts';
+import type { FontReplacement } from './snapshot-fonts';
+import type { FontMapRule, HtmlFontMetadata } from './font-metadata';
 
 // Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
@@ -60,6 +63,7 @@ interface SpawnPagxImportArgs {
   pagxBin: string;
   htmlPath: string;
   outPath: string;
+  fontReplacements?: FontReplacement[];
 }
 
 interface SpawnPagxImportResult {
@@ -71,7 +75,7 @@ interface SpawnPagxImportResult {
 // just because pagx printed a warning — only the exit code and the
 // existence of the output file matter.
 function spawnPagxImport(
-  { pagxBin, htmlPath, outPath }: SpawnPagxImportArgs,
+  { pagxBin, htmlPath, outPath, fontReplacements = [] }: SpawnPagxImportArgs,
 ): Promise<SpawnPagxImportResult> {
   return new Promise<SpawnPagxImportResult>((resolve, reject) => {
     const args = [
@@ -84,6 +88,10 @@ function spawnPagxImport(
       // out here to preserve that contract and avoid work the caller may not want.
       '--no-resolve',
     ];
+    for (const replacement of fontReplacements) {
+      args.push('--font-replacement', replacement.families, String(replacement.weight),
+        replacement.style, replacement.targetFamily, replacement.targetStyle);
+    }
     // Flex inference is always on inside the importer now, so there is no flag
     // to pass. We feed it the already-rendered subset HTML, so disable the
     // importer's own snapshot pre-pass (PAGX_HTML_SNAPSHOT=0) — otherwise it
@@ -145,6 +153,7 @@ export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
   log?: ((msg: string) => void) | null;
+  fontMap?: FontMapRule[];
 }
 
 // Convenience wrapper: drop the snapshot HTML into a per-call temp dir,
@@ -158,14 +167,28 @@ export interface RunPagxImportOptions {
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
 export async function runPagxImport(
-  { pagxBin, html, log }: RunPagxImportOptions = {},
+  options: RunPagxImportOptions = {},
 ): Promise<string> {
+  return (await runPagxImportWithMetadata(options)).pagx;
+}
+
+export interface PagxImportResult {
+  pagx: string;
+  fontMetadata: HtmlFontMetadata;
+}
+
+/** Apply external font selections before native conversion, retaining the original inventory. */
+export async function runPagxImportWithMetadata(
+  { pagxBin, html, log, fontMap }: RunPagxImportOptions = {},
+): Promise<PagxImportResult> {
   if (typeof pagxBin !== 'string' || !pagxBin) {
     throw new PagxImportError('pagxBin is required');
   }
   if (typeof html !== 'string' || !html) {
     throw new PagxImportError('html payload is required');
   }
+  const prepared = fontMap === undefined ? undefined : prepareSnapshotFontReplacements(html, fontMap);
+  const fontMetadata = collectSnapshotFontMetadata(html);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'html-snapshot-pagx-'));
   const htmlPath = path.join(dir, 'input.subset.html');
   const pagxPath = path.join(dir, 'output.pagx');
@@ -175,6 +198,7 @@ export async function runPagxImport(
       pagxBin,
       htmlPath,
       outPath: pagxPath,
+      fontReplacements: prepared?.replacements,
     });
     if (log) {
       const filtered = filterKnownWarnings(stderr);
@@ -186,7 +210,11 @@ export async function runPagxImport(
         { stderr },
       );
     }
-    return fs.readFileSync(pagxPath, 'utf8');
+    if (prepared && log) {
+      const { replaced, unmatched, missingRequests } = prepared.mapping;
+      log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
+    }
+    return { pagx: fs.readFileSync(pagxPath, 'utf8'), fontMetadata };
   } finally {
     try {
       fs.rmSync(dir, { recursive: true, force: true });

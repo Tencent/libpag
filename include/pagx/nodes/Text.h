@@ -33,7 +33,7 @@ namespace pagx {
  * Text is a geometry element that produces a glyph list after text shaping, which accumulates into
  * the rendering context for subsequent modifiers or painters. It supports two rendering modes:
  * - Pre-shaped mode: Uses GlyphRun children with precomputed glyph IDs and positions, rendered
- *   with embedded fonts to ensure cross-platform consistency.
+ *   with embedded fonts. The original text remains independent of the glyph IDs used for rendering.
  * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
  *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */

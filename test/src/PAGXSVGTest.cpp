@@ -731,6 +731,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
 }
 
 /**
+ * Test SVG import: text-anchor carried on the <textPath> element (which SVG inherits into the
+ * referenced run) is mapped onto the Text node's TextAnchor, so the run is anchored on the path
+ * the same way SVG anchors it. Without this the run starts at startOffset instead of centring.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathAnchor) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<defs><path id=\"arc\" d=\"M10 80A140 140 0 0 1 290 80\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\">"
+      "<textPath href=\"#arc\" startOffset=\"50%\" text-anchor=\"middle\">Curved Label</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  ASSERT_EQ(textPaths.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->textAnchor, pagx::TextAnchor::Center);
+}
+
+/**
  * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
  * modifier but still keeps the text content as a plain Text node, so the run is not lost.
  */
@@ -757,6 +785,26 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
 }
 
 /**
+ * Test SVG import: when the viewBox maps onto a different target box, the layer that carries the
+ * content transform must size to the target box, not the unscaled viewBox extent. Otherwise a
+ * parent that sizes to content (an inline SVG's flex wrapper) lays the layer out a scale factor too
+ * wide and clips the rendered result.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxContentLayerSizedToTarget) {
+  std::string svg =
+      "<svg width=\"100\" height=\"50\" viewBox=\"0 0 200 100\">"
+      "<rect x=\"0\" y=\"0\" width=\"200\" height=\"100\" fill=\"#123456\"/>"
+      "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#654321\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* root = doc->layers[0];
+  EXPECT_FLOAT_EQ(root->width, 100.0f);
+  EXPECT_FLOAT_EQ(root->height, 50.0f);
+}
+
+/**
  * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
  * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
  * the mid marker is instanced twice; every marker triangle contributes its own Path node.
@@ -780,6 +828,30 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MarkersExpandToLayers) {
   }
   // One path for the stroked shape plus one per marker instance (start + 2 mids + end = 4).
   EXPECT_GE(paths.size(), 5u);
+}
+
+/**
+ * Test SVG import: `marker-*` are inherited presentation attributes, so a shape inside a `<g>` that
+ * carries the marker reference must use it. Reading the marker only from the shape element dropped
+ * any group-level marker entirely (a dashed callout arrow lost its head).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkersInheritFromGroup) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\">"
+      "<defs><marker id=\"arrow\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\""
+      " orient=\"auto\"><path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#000000\"/></marker></defs>"
+      "<g stroke=\"#111111\" stroke-width=\"4\" fill=\"none\" marker-end=\"url(#arrow)\">"
+      "<path d=\"M10 100 L190 100\"/></g></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  }
+  // One path for the line plus one for the inherited end marker.
+  EXPECT_GE(paths.size(), 2u);
 }
 
 /**

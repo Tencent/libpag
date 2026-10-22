@@ -29,6 +29,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
 
@@ -61,7 +62,7 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
     }
   }
   if (isFilePath) {
-    return tgfx::Typeface::MakeFromPath(specifier);
+    return MakeTypefaceFromFile(specifier);
   }
   auto commaPos = specifier.find(',');
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
@@ -205,23 +206,61 @@ inline std::string EscapeJson(const std::string& input) {
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
 
 /**
- * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
- * given command name as prefix. Returns false on failure.
+ * A font file registered under an explicit family name instead of the name its own `name` table
+ * carries. PAGX resolves `Text::fontFamily` by exact string match, and the name inside a web font
+ * need not match the name the document uses: a page may alias a file (`font-family:
+ * MaShanZheng` serving a file whose family is "Ma Shan Zheng"), and a font whose typographic name
+ * (nameID 16/17) exists only in a non-English record is reported as "?????" by the platform font
+ * reader, which can only produce ASCII. Callers that know the authored pairing — the HTML
+ * snapshot pipeline records it from the page's `@font-face` rules — pass it here so the file is
+ * reachable by the name the document actually uses.
+ */
+struct FontAlias {
+  std::string family;
+  std::string path;
+};
+
+/**
+ * Parses a `--font-alias` value: `<family>=<path>`. The family is taken verbatim (it has to match
+ * the document's `fontFamily` byte for byte); the path is everything after the first '=', so a
+ * path may itself contain one. Every face of the file is registered under its own style, so the
+ * alias has no style half. Prints an error and returns false for a value missing either half.
+ */
+bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command);
+
+/**
+ * Loads font files and fallback typefaces into a FontConfig. Every face of a font file is
+ * registered, so a collection such as PingFang.ttc contributes each of its (family, style) pairs.
+ * A font alias registers its file the same way but under the given family name. Prints errors to
+ * stderr using the given command name as prefix. Returns false when a requested source cannot be
+ * loaded — the caller named that exact source, so dropping it would shape text with a substituted
+ * face.
  */
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
-                    const std::vector<std::string>& fallbacks, const std::string& command);
+                    const std::vector<std::string>& fallbacks,
+                    const std::vector<FontAlias>& aliases, const std::string& command);
+
+/**
+ * Returns the `file` paths of the document's Font nodes that cannot be loaded as fonts (missing,
+ * unreadable, or not a supported font format). Layout skips such files silently, so commands call
+ * this to tell the user why text naming those fonts falls back to other faces.
+ */
+std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document);
 
 /**
  * Converts the document's text into pre-shaped glyph runs so that it renders without the original
- * fonts. Registers the document's own <Font> resources plus the given fallback specifiers for
- * shaping, runs layout, and writes the resulting glyph outlines back into the document.
+ * fonts. Registers the document's own <Font> resources plus the given fallback specifiers and font
+ * aliases for shaping, runs layout, and writes the resulting glyph outlines back into the
+ * document.
  *
  * Prints messages to stderr using the given command name as prefix. Returns false when a font
  * source cannot be loaded and the document still requires a font; a source that cannot be loaded
  * while the document requires no font at all is reported and skipped, and the call continues.
+ * Also returns false when any text with visible characters produced no glyph run, since such a
+ * document would render that text as blank on hosts lacking the authored font.
  */
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command);
+                const std::vector<FontAlias>& aliases, const std::string& command);
 
 /**
  * Writes a string to a file. Prints errors to stderr using the given command name as prefix.

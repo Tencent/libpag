@@ -14,7 +14,9 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "build:browser": "node build-browser-bundle.js",
+    "pretest": "npm run build",
     "test": "jest",
+    "pretest:coverage": "npm run build",
     "test:coverage": "jest --coverage"
   },
   "jest": {
@@ -41,6 +43,7 @@
     ]
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
     "opentype.js": "^2.0.0",
     "puppeteer": "^23.0.0",
     "wawoff2": "^2.0.1"

@@ -104,6 +104,43 @@ CSS rule precedence (effective): `inline style` > `class rules` > `element rules
 
 External `<link rel="stylesheet">` is forbidden. The importer never performs HTTP I/O.
 
+### 3.5 Web fonts (`@font-face`)
+
+`@font-face` rules inside a `<style>` block are honoured whether `src` names a font file on
+local disk or inlines the font as a `data:` URI:
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- Only the `font-family` and `src` descriptors are read. `src` is scanned for `url()` sources in
+  order, and the first usable one is taken: a local path (relative paths resolve against the HTML
+  file's directory) or a `data:` URI. `local()` names, `format()` hints and every other
+  descriptor are ignored.
+- Both kinds of source are registered under the CSS family the rule declares, so
+  `font-family` need not match the family name stored inside the font file. A used source becomes
+  a `<Font file="…" fontFamily="…">` resource (PAGX spec §3.3.5): local files keep their paths and
+  inline sources keep their base64 `data:` URIs. The saved CSS family preserves aliases after reload.
+- Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
+  source is registered: the last rule's file is the family's primary face, and the others join the
+  fallback chain, so a character the primary face lacks still shapes with the subset that has it.
+- Whether the output keeps font sources is an import option: `pagx import --fonts embed` (the HTML
+  default) bakes glyphs and drops source resources. `--fonts external` keeps runtime shaping, copies
+  local font files next to the output, and preserves inline sources as self-contained data URIs.
+  Replacing the caller's FontConfig during layout still reapplies the document's font resources.
+- Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
+  cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
+  source is dropped like any other unsupported at-rule.
+
+HTML exported by PAGX may render pre-shaped glyphs as private-use characters while keeping
+readable text in `data-pagx-text`. The snapshot bridge preserves this attribute and filters the
+other `data-pagx-*` attributes. Import shapes the displayed private-use characters with the
+registered web font and embeds their outlines or images into ordinary `Font` resources. It
+stores the remapped glyph IDs, positions and transforms in `GlyphRun` children, then restores
+`data-pagx-text` to `Text.text`. These runs need no external font at render time, including when
+`--fonts external` is selected for other text. `pagx embed` preserves already embedded runs
+without changing the original text unless font overrides explicitly request reshaping.
+
 ## 4. Allowed CSS Properties
 
 Lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
@@ -114,6 +151,7 @@ against the canvas size) and emit a `subset:unit-coerced` warning. `vw`/`vh` are
 a `subset:unsupported-property` warning when the canvas size is not yet known. `calc()`,
 `var()`, `min()`, `max()`, and `clamp()` are rejected with a `subset:unsupported-property`
 warning.
+
 
 ### 4.1 Layout
 
@@ -183,7 +221,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
 | `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
-| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning). Like `padding`, the border insets the **content box** by W, so a box with content-box-dependent children gains an inner host (see §5) |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
@@ -224,7 +262,8 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
-`unicode-bidi`, `font-variant`, `font-stretch`, `font` shorthand, web fonts (`@font-face`).
+`unicode-bidi`, `font-variant`, `font-stretch`, `font` shorthand. Web fonts are accepted through
+local `@font-face` files only (see §3.5).
 
 **Inline text shrink-to-fit.** A non-wrapping inline text leaf (`<span>` / `<a>` with
 `white-space: nowrap` or `pre`) drops its authored inline-axis size and lets the shaped text
@@ -261,6 +300,29 @@ PAGX "outer background + inner padded container" pattern (see `spec/pagx_spec.md
 ```
 
 Elements with neither background nor padding emit a single Layer with no wrapper.
+
+In the CSS box model `border` insets the content box just like `padding`: a flow child is laid out
+in the content box, percentage sizes resolve against it, and an absolutely positioned child's
+containing block is the padding box. To match that, a box with a border (`borderWidth > 0`) *and* a
+child that depends on the content box — a flow child, or one declaring a percentage width/height —
+inserts that inner host and adds `border-width` to its `padding`:
+
+```xml
+<Layer width="100" height="80">
+  <Rectangle roundness="10" width="100%" height="100%"/>
+  <Stroke color="#E6E9F0" width="4" align="inside"/>
+  <Layer width="100%" height="100%" padding="4">
+    <!-- children: `width/height: 100%` resolves to 92x72 -->
+  </Layer>
+</Layer>
+```
+
+A box whose children are all absolutely positioned with explicit px anchors skips the host instead
+and only offsets those anchors by `border-width` — one Layer less, identical geometry.
+
+The `border-radius` + `overflow: hidden` rounded clip is likewise shaped to the padding box (radius
+shrunk by `border-width`) and attached to that **inner host**: a contour mask also clips the masked
+Layer's own contents, so masking the outer Layer would erase the border stroke.
 
 ## 6. Text Decoration
 
@@ -324,9 +386,16 @@ When folded, the emitted PAGX is the canonical rounded-image pattern:
 </Layer>
 ```
 
-Any background colour / gradient / border / shadow declared on the wrapper is preserved
-underneath the folded image fill (i.e. it shows through the image's transparent pixels,
-matching CSS painting order). SVG image sources (`.svg`) are never folded — they go
+Any background colour / gradient / shadow declared on the wrapper is preserved underneath the
+folded image fill (i.e. it shows through the image's transparent pixels, matching CSS painting
+order).
+
+A wrapper carrying a `border` is never folded: the fold stretches the image across the whole border
+box, which both covers the border stroke and inflates the image by 2×`border-width` relative to the
+browser's content box. Those wrappers take the standard container path — the inner host of §5 pulls
+the image into the content box and the rounded mask attached to that host clips it.
+
+SVG image sources (`.svg`) are never folded — they go
 through their own external-import directive path.
 
 ## 8. Coordinate / Angle Conventions
@@ -385,7 +454,7 @@ Behaviour:
 | Pass | Silently rewrites | Warns and drops |
 |------|-------------------|-----------------|
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
-| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
+| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element, re-emitting a `<style>` that carries only the `@keyframes` (§13) and `@font-face` (§3.5) rules | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face` without a `url()` source and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
 | PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `writing-mode`, `background-image` + `background-size`/`background-repeat`/`background-position` (url backgrounds), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |

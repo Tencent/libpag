@@ -81,6 +81,11 @@ struct InheritedStyle {
   std::string strokeLinecap = {};     // Empty means not set.
   std::string strokeLinejoin = {};    // Empty means not set.
   std::string strokeMiterlimit = {};  // Empty means not set.
+  // Marker references (`url(#id)`). These are inherited presentation attributes in SVG, so a
+  // marker set on an ancestor `<g>` applies to every shape inside it.
+  std::string markerStart = {};  // Empty means not set.
+  std::string markerMid = {};    // Empty means not set.
+  std::string markerEnd = {};    // Empty means not set.
   // Text properties.
   std::string fontFamily = {};     // Empty means not set.
   std::string fontSize = {};       // Empty means not set.

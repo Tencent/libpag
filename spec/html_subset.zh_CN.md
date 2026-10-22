@@ -96,6 +96,30 @@
 
 `<link rel="stylesheet">` 一律禁止。转换器不执行任何网络 I/O。
 
+### 3.5 Web 字体（`@font-face`）
+
+`<style>` 块中的 `@font-face` 规则会被采纳，无论 `src` 指向本地字体文件还是内联的 `data:` URI：
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个可用源：
+  本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；`local()` 名称、`format()` 提示
+  及其他描述符均被忽略。
+- 两种源都按规则声明的 CSS 族名注册，因此 `font-family` 与文件内部的族名不必一致。
+  使用到的源生成 `<Font file="…" fontFamily="…">` 资源（见 PAGX 规范 §3.3.5）：本地文件保留
+  路径，内联字体保留 base64 `data:` URI；保存的 CSS 族名保证重新加载后仍能匹配别名。
+- 多条规则可以声明同一族名（例如中文字体按 unicode-range 拆成的分片）。每条规则的源都会注册：
+  最后一条规则的文件作为该族的主字体，其余文件加入回退链，主字体缺少的字符仍会用包含它的分片
+  整形。
+- 产物是否保留字体源由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
+  丢弃源资源；`--fonts external` 保留运行时排版，将本地字体复制到产物旁，内联字体则以自包含
+  data URI 保留。排版时即使替换调用方 FontConfig，文档自身的字体资源仍会重新注册。
+- 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
+  会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
+  丢弃。
+
 ## 4. 允许的 CSS 属性
 
 长度均为像素；百分比仅在 `width`/`height` 上接受（按 PAGX 语义参考父节点的内 padding
@@ -170,7 +194,7 @@
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
 | `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。静态几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃——但*动画*的几何 `clip-path` 作为轮廓 mask 变形受支持（见 §13.2） |
 | `border-radius: N`（px）、`N%`（按 `min(width, height)` 解析；固定 px 宽高且 `border-radius: 50%` 的元素会变成 `Ellipse`），或 1–4 值缩写（`T`、`T R`、`T R B`、`T R B L`） | `Rectangle.roundness = N`（`50%` 输出 `Ellipse`）。椭圆 `W / H` 双半径形式告警并忽略 |
-| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`） |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`）。与 `padding` 一样，边框会把**内容盒**向内收 W，因此有依赖内容盒的子节点时外层 Layer 会再套一层内层宿主（见 §5） |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
@@ -210,7 +234,8 @@
 | `text-overflow: ellipsis` | 告警（PAGX 暂未实现） |
 
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
-`unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写、web fonts (`@font-face`)。
+`unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写。Web 字体仅支持通过本地文件的
+`@font-face` 引入（见 §3.5）。
 
 **行内文本自适应宽度。** 不换行的行内文本叶子（`<span>` / `<a>`，且 `white-space: nowrap`
 或 `pre`）会丢弃其内联轴上的显式尺寸，改由排版后的文本撑起盒子，对应 CSS 的 shrink-to-fit。
@@ -242,6 +267,28 @@
 ```
 
 无背景也无 padding 的元素只产出单层 Layer。
+
+CSS 盒模型里 `border` 与 `padding` 一样内缩内容盒：流内子节点落在内容盒中，百分比尺寸也相对内容盒
+解析，而绝对定位子元素的包含块是 padding box。为对齐这一语义，当一个元素带 `border`
+（`borderWidth > 0`）**且**存在依赖内容盒的子节点（流内子节点，或声明了百分比宽高的子节点）时，
+会插入这层内层宿主，并把 `border-width` 加到它的 `padding` 上：
+
+```xml
+<Layer width="100" height="80">
+  <Rectangle roundness="10" width="100%" height="100%"/>
+  <Stroke color="#E6E9F0" width="4" align="inside"/>
+  <Layer width="100%" height="100%" padding="4">
+    <!-- 子内容：`width/height: 100%` 解析为 92x72 -->
+  </Layer>
+</Layer>
+```
+
+若子节点全部是带显式 px 锚点的绝对定位元素，则不插入宿主，只把这些锚点按 `border-width` 偏移
+（少一层 Layer，几何等价）。
+
+`border-radius` + `overflow: hidden` 的圆角裁剪 mask 同样按 padding box 构造（半径按
+`border-width` 收缩），并挂在**内层宿主**上：contour mask 会连同被遮罩 Layer 自身的 contents
+一起裁剪，挂在外层会把边框描边一并裁掉。
 
 ## 6. 文本装饰
 
@@ -295,8 +342,12 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 </Layer>
 ```
 
-包装容器上声明的背景色 / 渐变 / 描边 / 阴影会保留在折叠后的图片填充之下（在图片透明像素处透出
-来，与 CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它们仍然走自己的外部导入指令通道。
+包装容器上声明的背景色 / 渐变 / 阴影会保留在折叠后的图片填充之下（在图片透明像素处透出来，与
+CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它们仍然走自己的外部导入指令通道。
+
+带 `border` 的包装容器**不折叠**：折叠会把图片铺满整个边框盒，既盖住边框描边，又让图片比浏览器
+的内容盒大 2×`border-width`。这类容器走标准容器路径 —— 由 §5 的内层宿主把图片收进内容盒、由
+挂在该宿主上的圆角 mask 完成裁剪。
 
 导入器最多会穿过三层仅用于布局的包装 `<div>`（自身无绘制、只透传布局的包装层）去寻找 `<img>`，
 因此常见的 `div > div > img` 头像结构仍能被折叠。
@@ -351,7 +402,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | Pass | 静默改写 | 警告并丢弃 |
 |------|----------|------------|
 | DocumentSkeleton | 合并重复的 `<head>` / `<body>`、小写化标签、去掉注释与处理指令、丢弃 `<head>` 中除 `<title>` / `<meta>` / `<style>` 之外的元素 | `<script>` 等不允许的 `<head>` 内容（`subset:unsupported-tag`）；外部 `<link rel="stylesheet">`（`subset:external-stylesheet`）；`<html>` 与 `<body>` 之间的多余顶层元素（`subset:unsupported-tag`） |
-| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
+| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身，再重新输出一个只包含 `@keyframes`（§13）与 `@font-face`（§3.5）规则的 `<style>` | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、没有 `url()` 源的 `@font-face` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style；把 `-webkit-` 前缀声明合并到标准名（如 `-webkit-background-clip` → `background-clip`） | — |
 | PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |

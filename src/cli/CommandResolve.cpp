@@ -457,6 +457,7 @@ int RunResolve(int argc, char* argv[]) {
     imageOptions.documentDir = baseDir;
     imageOptions.outputDir = GetDirectory(options.outputFile);
     ApplyImageStorage(doc.get(), imageOptions, "pagx resolve");
+    ApplyFontStorage(doc.get(), imageOptions, "pagx resolve");
   }
 
   auto xml = PAGXExporter::ToXML(*doc);

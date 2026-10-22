@@ -20,6 +20,7 @@
 #include <memory>
 #include "FontConfigData.h"
 #include "SystemFonts.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -51,9 +52,9 @@ TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::st
 std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
   if (typeface == nullptr) {
     if (!path.empty()) {
-      typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+      typeface = MakeTypefaceFromFile(path, ttcIndex);
     } else if (bytes != nullptr && !bytes->empty()) {
-      typeface = tgfx::Typeface::MakeFromBytes(bytes->data(), bytes->size(), ttcIndex);
+      typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
     }
   }
   return typeface;
@@ -98,7 +99,7 @@ void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::
   if (fontFamily.empty()) {
     // Reverse-lookup: build typeface now to read its family/style, then hold the typeface directly
     // to avoid a second lazy build.
-    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    auto typeface = MakeTypefaceFromFile(path, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -120,7 +121,7 @@ void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::
 void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    auto typeface = MakeTypefaceFromBytes(bytes, length, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -142,6 +143,31 @@ void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
   }
 }
 
+void FontConfig::registerFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                              const std::string& fontFamily, const std::string& fontStyle) {
+  if (bytes == nullptr || bytes->empty()) {
+    return;
+  }
+  if (fontFamily.empty()) {
+    auto typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    Data::FontKey key = {};
+    key.family = typeface->fontFamily();
+    key.style = typeface->fontStyle();
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(typeface), key.family, key.style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    Data::FontKey key = {};
+    key.family = fontFamily;
+    key.style = normalizedStyle;
+    data->registeredTypefaces.insert_or_assign(
+        key, TypefaceHolder(std::move(bytes), ttcIndex, fontFamily, normalizedStyle));
+  }
+}
+
 void FontConfig::addFallbackFont(const PAGFont& font, const std::string& path, int ttcIndex) {
   addFallbackFont(path, ttcIndex, font.fontFamily, font.fontStyle);
 }
@@ -154,7 +180,7 @@ void FontConfig::addFallbackFont(const PAGFont& font, const void* bytes, size_t 
 void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    auto typeface = MakeTypefaceFromFile(path, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -170,7 +196,7 @@ void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
 void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    auto typeface = MakeTypefaceFromBytes(bytes, length, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -183,6 +209,25 @@ void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
         std::make_shared<const std::vector<uint8_t>>(static_cast<const uint8_t*>(bytes),
                                                      static_cast<const uint8_t*>(bytes) + length),
         ttcIndex, fontFamily, normalizedStyle);
+  }
+}
+
+void FontConfig::addFallbackFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                                 const std::string& fontFamily, const std::string& fontStyle) {
+  if (bytes == nullptr || bytes->empty()) {
+    return;
+  }
+  if (fontFamily.empty()) {
+    auto typeface = MakeTypefaceFromSharedBytes(bytes, ttcIndex);
+    if (typeface == nullptr) {
+      return;
+    }
+    auto family = typeface->fontFamily();
+    auto style = typeface->fontStyle();
+    data->fallbackTypefaces.emplace_back(std::move(typeface), std::move(family), std::move(style));
+  } else {
+    auto normalizedStyle = NormalizeStyle(fontStyle);
+    data->fallbackTypefaces.emplace_back(std::move(bytes), ttcIndex, fontFamily, normalizedStyle);
   }
 }
 
@@ -225,6 +270,11 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   for (auto& holder : data->fallbackTypefaces) {
     names.push_back(holder.getFontFamily());
   }
+  if (data->fileFonts != nullptr) {
+    for (const auto& holder : data->fileFonts->fallbackTypefaces) {
+      names.push_back(holder.getFontFamily());
+    }
+  }
   return names;
 }
 
@@ -232,14 +282,17 @@ bool FontConfig::containsFamily(const std::string& fontFamily) const {
   if (fontFamily.empty()) {
     return false;
   }
-  for (const auto& pair : data->registeredTypefaces) {
-    if (pair.first.family == fontFamily) {
-      return true;
+  for (auto* source : {data->fileFonts.get(), data.get()}) {
+    if (source == nullptr) continue;
+    for (const auto& pair : source->registeredTypefaces) {
+      if (pair.first.family == fontFamily) {
+        return true;
+      }
     }
-  }
-  for (const auto& holder : data->fallbackTypefaces) {
-    if (holder.getFontFamily() == fontFamily) {
-      return true;
+    for (const auto& holder : source->fallbackTypefaces) {
+      if (holder.getFontFamily() == fontFamily) {
+        return true;
+      }
     }
   }
   return false;

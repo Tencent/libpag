@@ -61,6 +61,7 @@ id,category,feature,tier,expected_warnings,notes
 07-position__sticky-downgraded,position,"position: sticky downgraded to absolute",subset,subset:unsupported-property,
 07-position__absolute-center-translate,position,"absolute centering via top/left 50% + translate(-50%,-50%)",subset,,single transform fn
 07-position__z-index,position,"z-index stacking (ignored, needs snapshot)",snapshot,"subset:flex-inference-skipped,subset:unsupported-property",
+15-typography__inline-webfont-alias,typography,"@font-face fonts inlined as data: URIs resolve under their CSS family name",subset,subset:unsupported-at-rule,the subset drops @font-face; the snapshot captures the files and the eval registers them with --font-alias
 15-typography__font-family-fallback,typography,"font-family primary + fallback chain",subset,,
 15-typography__font-size-px,typography,"font-size in px",subset,,
 15-typography__font-weight-bold,typography,"font-weight: bold",subset,,

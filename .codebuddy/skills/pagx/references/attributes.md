@@ -402,11 +402,12 @@ Layer filter that transforms colors using a 4×5 color matrix (20 comma-separate
 
 ### Font
 
-Embedded font resource containing subsetted glyph data (vector outlines or bitmaps).
+Font resource: either embedded subsetted glyph data (vector outlines or bitmaps), or a reference
+to an external font file through `file`.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `file` | string | - | External font file path (TTF/OTF). Font nodes with `file` serve as font source declarations. `pagx embed` auto-discovers them, loads the referenced font files, and registers fonts for text shaping. After embed, `file` is preserved for source traceability. |
+| `file` | string | - | External font file path (TTF/OTF/TTC/WOFF2), relative to the PAGX file. Layout registers every face of the file under the family/style names inside it, so Text whose `fontFamily`/`fontStyle` match renders with the file and needs no embedded glyphs; Text does not reference the Font by id. `pagx embed` also shapes with these files and keeps `file` for source traceability. |
 | `unitsPerEm` | int | 1000 | Font design space units; rendering scale = fontSize / unitsPerEm |
 
 ### Glyph

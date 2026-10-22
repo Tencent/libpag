@@ -394,6 +394,33 @@ void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
   _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);
 }
 
+std::string HTMLStyleCascade::selectPrimaryFontFamily(
+    const std::vector<std::string>& authoredFamilies,
+    const std::vector<std::string>& genericFamilies, const std::string& fallback) {
+  if (_fontAvailabilityThunk == nullptr) {
+    return fallback;
+  }
+  // An authored family always outranks a generic: `system-ui, ..., "PingFang SC", ..., sans-serif`
+  // must not collapse to whatever face the import platform treats as its UI or default sans
+  // ("Helvetica" on macOS, "DejaVu Sans" on Linux) — that name need not exist on the consuming
+  // machine and hides every later CSS fallback. The generic wins only when no authored family is
+  // installed here, which is what the CSS cascade does, since the generic sits at the tail of the
+  // stack. Within a group the first resolvable family wins, so a leading family the renderer would
+  // silently substitute (a hidden system font such as "SF Mono") is skipped in favour of a later
+  // one that does resolve (e.g. "Menlo" for a `monospace` stack).
+  for (const auto& family : authoredFamilies) {
+    if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+      return family;
+    }
+  }
+  for (const auto& family : genericFamilies) {
+    if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+      return family;
+    }
+  }
+  return fallback;
+}
+
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
@@ -423,13 +450,17 @@ void HTMLStyleCascade::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode
   }
   std::vector<std::string> droppedAtRules;
   std::vector<CssKeyframesRule> keyframesRules;
-  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules);
+  std::vector<CssFontFaceRule> fontFaceRules;
+  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules, fontFaceRules);
   for (auto& at : droppedAtRules) {
     _diagnostics.warn("html: at-rule '" + at + "' not supported in <style>; dropped");
   }
   // Keep `@keyframes` so the animation builder can map them onto PAGX animations (see §13).
   for (auto& kf : keyframesRules) {
     _keyframes[kf.name] = std::move(kf);
+  }
+  for (auto& fontFace : fontFaceRules) {
+    _fontFaces.push_back(std::move(fontFace));
   }
   for (auto& rule : rules) {
     if (rule.declarations.empty()) continue;
@@ -520,24 +551,52 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
   return fallback;
 }
 
+bool HTMLStyleCascade::applyFontReplacement(HTMLInheritedStyle& style) {
+  if (_fontReplacements.empty()) return false;
+  auto families = html::ParseFontFamilyTokens(style.fontFamily);
+  for (auto& family : families) family = ToLower(family);
+  auto cssWeight = ToLower(style.fontWeight);
+  float weight = cssWeight.empty() || cssWeight == "normal" ? 400
+                 : cssWeight == "bold"                      ? 700
+                                       : std::strtof(cssWeight.c_str(), nullptr);
+  auto slant = ToLower(style.fontStyle);
+  slant = slant.find("oblique") == 0 ? "oblique" : slant == "italic" ? "italic" : "normal";
+  for (const auto& replacement : _fontReplacements) {
+    if (weight != replacement.weight || slant != replacement.style) continue;
+    auto expected = html::ParseFontFamilyTokens(replacement.families);
+    for (auto& family : expected) family = ToLower(family);
+    if (families != expected) continue;
+    style.primaryFontFamily = replacement.targetFamily;
+    style.fontStyleName = replacement.targetStyle;
+    style.fauxBold = false;
+    style.fauxItalic = false;
+    return true;
+  }
+  return false;
+}
+
 HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                            const HTMLInheritedStyle& parent,
                                                            bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
+
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
-  // Re-parse the CSS font-family stack only when the raw value actually changed at this
-  // element. The cascade (`out = parent`) already carries the parent's parsed stack
-  // through unchanged in the common case where descendants inherit verbatim.
-  if (out.fontFamily != parent.fontFamily ||
+  // A replacement may have changed the parent's resolved family without changing its CSS.
+  // Rebuild from source CSS so an unmatched child cannot inherit the mapped family.
+  if (!_fontReplacements.empty() || out.fontFamily != parent.fontFamily ||
       (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
     out.fontFamilyChain.clear();
     out.primaryFontFamily.clear();
+    // Families the page named, and the faces its generic keywords map to, kept apart so the
+    // primary pick below can prefer the former.
+    std::vector<std::string> authoredFamilies = {};
+    std::vector<std::string> genericFamilies = {};
     auto tokens = html::ParseFontFamilyTokens(out.fontFamily);
     for (auto& token : tokens) {
-      std::string resolved = html::ResolveGenericFontFamily(token);
-      if (resolved.empty()) {
+      auto classified = html::ClassifyFontFamilyToken(token);
+      if (classified.resolved.empty()) {
         // Recognised generic with no concrete mapping on this platform (cursive,
         // fantasy, ...). Drop with a single diagnostic so a stack like
         // `cursive, "Foo"` still falls through to "Foo".
@@ -545,23 +604,16 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
                           "' not mapped on this platform; dropped");
         continue;
       }
-      out.fontFamilyChain.push_back(resolved);
+      out.fontFamilyChain.push_back(classified.resolved);
+      if (classified.isGeneric) {
+        genericFamilies.push_back(classified.resolved);
+      } else {
+        authoredFamilies.push_back(classified.resolved);
+      }
     }
     if (!out.fontFamilyChain.empty()) {
-      // Default to the stack's first concrete family, then prefer the first family the renderer
-      // can actually resolve. A leading family that the renderer would silently substitute (a
-      // hidden system font such as "SF Mono", or any font absent on this machine) is skipped so
-      // the later CSS fallbacks that DO resolve (e.g. "Menlo" for a `monospace` stack) win —
-      // matching the browser cascade instead of collapsing to the default proportional face.
-      out.primaryFontFamily = out.fontFamilyChain.front();
-      if (_fontAvailabilityThunk != nullptr) {
-        for (const auto& family : out.fontFamilyChain) {
-          if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
-            out.primaryFontFamily = family;
-            break;
-          }
-        }
-      }
+      out.primaryFontFamily =
+          selectPrimaryFontFamily(authoredFamilies, genericFamilies, out.fontFamilyChain.front());
     }
     if (recordFontFallbacks && _fontFallbackThunk) {
       _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
@@ -610,7 +662,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;
   out.fauxItalic = fontSynthesis.fauxItalic;
-  applyFontFaceNames(out, parent);
+  if (ToLower(element->name) == "svg" || !applyFontReplacement(out)) {
+    applyFontFaceNames(out, parent);
+  }
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
@@ -889,6 +943,9 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
+  // `border-image-source: linear-gradient(...)` paints the border with a gradient instead of the
+  // `border-color`; the layer builder turns it into a gradient Stroke.
+  CopyProperty(props, "border-image-source", box.borderImageSource);
   // A `url(...)` background round-trips through `ImagePattern`, which needs the CSS fitting
   // hints the exporter emitted alongside it. Capture them only for url backgrounds; gradients
   // ignore size/repeat/position entirely.

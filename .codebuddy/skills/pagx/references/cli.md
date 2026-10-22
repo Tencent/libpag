@@ -113,6 +113,7 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 pagx render --font CustomFont.ttf input.pagx
 pagx render --font a.ttf --fallback "PingFang SC" input.pagx
 pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
+pagx render --font-alias "MaShanZheng=mashanzheng.woff2.ttf" input.pagx
 pagx render --id "btnLayer" input.pagx            # render only the Layer with id="btnLayer"
 pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Layer
 ```
@@ -129,6 +130,7 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--background <color>` | Background color (#RRGGBB or #RRGGBBAA) |
 | `--font <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--font-alias <family>=<path>` | Register a font file under an explicit family name (repeatable) |
 
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
 is rendered, cropped to that Layer's bounds.
@@ -137,6 +139,19 @@ is rendered, cropped to that Layer's bounds.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
 `"PingFang SC"` or `"Arial,Bold"`). Fallback fonts are tried in order when a character is
 not found in the primary font.
+
+`--font-alias "<family>=<path>"` registers a font file under the given family name instead of
+the name inside the file. Use it whenever the document's `fontFamily` does not match the file's
+own name table: a page can alias a file under any name (`font-family: MaShanZheng` serving a
+font whose family is "Ma Shan Zheng"), and a font whose typographic name exists only in a
+non-English record is reported as `?????` by the platform reader. The family must equal the
+document's `fontFamily` byte for byte; every face of the file is registered under its own style
+and added to the fallback chain, so only the family half is needed.
+
+Font files referenced by the document's own `<Font file="…">` nodes are registered automatically
+(on top of `--font` / `--fallback` / `--font-alias`), so such a document renders its text without
+embedded glyphs. A referenced file that cannot be loaded prints a warning and its text falls back
+to other fonts. Every font option accepts TTF, OTF, TTC and WOFF2 files.
 
 Always output to the same directory as the input `.pagx` file. Do not commit rendered
 image files.
@@ -310,13 +325,20 @@ pagx embed --skip-images input.pagx                      # embed fonts only
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--font-alias <family>=<path>` | Register a font file under an explicit family name (repeatable) |
 | `--skip-fonts` | Skip font embedding |
 | `--skip-images` | Skip image embedding |
 | `-h, --help` | Show this help message |
 
 Fonts are resolved in the following order:
 1. Font nodes with `file` attribute are loaded and registered by their internal family name
-2. `--fallback` fonts are tried when a character is not found in the primary font
+   (layout registers them last, so they win over a same-named `--font-alias` registration)
+2. `--font-alias` files are registered under the given family name (see `pagx render`)
+3. `--fallback` fonts are tried when a character is not found in the primary font
+
+A Font `file` that cannot be loaded is fatal while any Text needs a font. Embedding is optional for
+documents that reference their fonts through Font `file`: `pagx render` and the runtime already
+render them; embed only to make the `.pagx` independent of the font files.
 
 Image embedding inlines external file references (Image nodes with `filePath`) as base64 data. See the Font `file` attribute in `attributes.md` for details on external font references.
 
@@ -351,16 +373,20 @@ pagx import --input layout.html                   # HTML to layout.pagx (import 
 pagx import --input page.html --output card.pagx  # HTML to card.pagx
 pagx import --input page.html --no-resolve        # keep inline <svg>/import directives unexpanded
 pagx import --input page.html -v                  # print conversion warnings
+pagx import --input export.zip                    # zipped HTML export (page + assets) to export.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file\|url>` | Input file or URL to import (required) |
+| `--input <file\|url>` | Input file or URL to import (required). A `.zip` HTML export is extracted to a temporary directory and its entry page imported — see [Zip input](#zip-input) |
 | `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from the input file extension) |
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
 | `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+| `--fonts <mode>` | HTML only: how web fonts are carried into the output — `embed` (default) or `external`. See [Font files](#font-files) |
+| `--font-alias <family>=<file>` | HTML only, requires `--fonts embed`: register a font file under an explicit family name while baking (repeatable) |
+| `--fallback <path\|name>` | HTML only, requires `--fonts embed`: add a fallback font file or system font name while baking (repeatable) |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### Image storage
@@ -386,6 +412,41 @@ the files on disk; it defaults to the input file's directory.
 pagx import --input page.html --output card.pagx                 # external (default): sidecar images
 pagx import --input page.html --output card.pagx --images embed  # self-contained: base64 images
 ```
+
+### Font files
+
+Web fonts the page declares through `@font-face` are registered under the CSS family the rule
+names, whether `src` points at a local file or inlines the font as a `data:` URI. Registering by
+the CSS name is what lets a page alias a face (`font-family: MaShanZheng` for a file whose family
+is `Ma Shan Zheng`); `Text@fontFamily` always keeps the authored name.
+
+`--fonts` decides what the output carries:
+
+- **`embed` (default, HTML)** — the page's glyphs are baked as pre-shaped `GlyphRun` data and the
+  font sources are dropped, so the `.pagx` renders identically on a host that has none of the
+  page's fonts. Placement and advances come from the import machine, and the file grows by roughly
+  one outline per distinct character.
+- **`external`** — text keeps runtime shaping. Local font files are copied next to the output,
+  while inline fonts remain base64 data URIs in `Font@file`. `Font@fontFamily` preserves the CSS
+  registration name, including aliases, so reloading the output reconstructs the same font lookup.
+  Hosts must load referenced local files; data URI fonts need no external download.
+
+Remote (`http(s)://`) font sources are never carried over.
+
+A `fontFamily` that resolves to no available face is reported as a warning: the text is baked
+from whatever substitute the platform picked, and the conversion still succeeds. Install the font,
+or pass it to `pagx import` / `pagx embed` / `pagx render` with `--font-alias <family>=<file>`
+(or `--fallback <file>` when the family it serves is unknown).
+
+### Zip input
+
+`--input` accepts a `.zip` holding an HTML export (a page plus its `assets/`). The archive is
+extracted to a temporary directory that is removed afterwards; the entry page is the shallowest
+`index.html`, or the only HTML file when there is no `index.html`. Images and fonts are copied next
+to the output at their relative paths, so the default output `export.pagx` sits next to the zip
+together with its `assets/` folder. Write to a dedicated directory (`-o out/export.pagx`) when
+several exports share a folder, since their asset names may collide. Entries that would extract
+outside the temporary directory (absolute paths or `..`) are rejected.
 
 ### SVG options
 

@@ -37,6 +37,7 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -59,6 +60,8 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -69,6 +72,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/State.h"
@@ -77,7 +81,13 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/FontFileLoader.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
+#include "renderer/FontEmbedder.h"
+#include "tgfx/core/Font.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -831,6 +841,134 @@ PAG_TEST(PAGXHTMLImporterTest, BorderExpandsLayoutPadding) {
   EXPECT_FLOAT_EQ(host->padding.right, 9.0f);
   EXPECT_FLOAT_EQ(host->padding.bottom, 9.0f);
   EXPECT_FLOAT_EQ(host->padding.left, 9.0f);
+}
+
+// CSS insets the content box by the border width for every box, so a child sized `100%` resolves
+// against the content box rather than the border box. Resolving it against the border box (the
+// outer Layer's box) stretched the child across the border stroke and hid the ring — which is how
+// the html-snapshot pipeline's wrapper + inner `<img width:100%>` pair lost the border of every
+// bordered image and drew the image slightly oversized.
+PAG_TEST(PAGXHTMLImporterTest, BorderInsetsPercentageChildIntoContentBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:80px;border:4px solid #000000;border-radius:10px;
+                  overflow:hidden">
+        <img src="pic.png" style="width:100%;height:100%"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  // The outer Layer keeps the border-box geometry and owns the border stroke that must stay visible.
+  EXPECT_FLOAT_EQ(wrapper->width, 100.0f);
+  EXPECT_FLOAT_EQ(wrapper->height, 80.0f);
+  auto* stroke = FindElementOfType<pagx::Stroke>(wrapper);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 4.0f);
+  // The inner host reproduces the CSS content box as padding, so the 100% image resolves inside the
+  // border instead of on top of it.
+  ASSERT_FALSE(wrapper->children.empty());
+  auto* host = wrapper->children.front();
+  EXPECT_FLOAT_EQ(host->padding.left, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.top, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.right, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.bottom, 4.0f);
+  ASSERT_FALSE(host->children.empty());
+  auto* image = host->children.front();
+  EXPECT_FLOAT_EQ(image->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(image->percentHeight, 100.0f);
+  // The rounded clip belongs to the clipped content, so it masks the host. A contour mask also
+  // clips the masked Layer's own contents, and masking the outer Layer would erase the border ring.
+  EXPECT_EQ(wrapper->mask, nullptr);
+  ASSERT_NE(host->mask, nullptr);
+  EXPECT_EQ(host->maskType, pagx::MaskType::Contour);
+  // The mask is the padding box — the CSS clip region — so its geometry is inset by the border
+  // width with the corner radius shrunk by the same amount.
+  auto* hostMask = host->mask;
+  EXPECT_FLOAT_EQ(hostMask->width, 92.0f);
+  EXPECT_FLOAT_EQ(hostMask->height, 72.0f);
+  auto* maskRect = FindElementOfType<pagx::Rectangle>(hostMask);
+  ASSERT_NE(maskRect, nullptr);
+  EXPECT_FLOAT_EQ(maskRect->roundness, 6.0f);
+  // Laid out, the mask covers exactly the box the 100% image fills: with no authored padding the
+  // padding box and the content box coincide, one border width in from the border box.
+  doc->applyLayout();
+  EXPECT_EQ(hostMask->layoutBounds(), pagx::Rect::MakeXYWH(4, 4, 92, 72));
+  EXPECT_EQ(image->layoutBounds(), hostMask->layoutBounds());
+}
+
+// Authored padding moves the content box but not the clip: `overflow` clips to the padding box,
+// one border width in from the border box however much padding the box carries. A mask that also
+// took the padding shifted the clip onto the content and cut off whatever sat beside it.
+PAG_TEST(PAGXHTMLImporterTest, BorderedRoundedClipIgnoresAuthoredPadding) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:120px;height:40px;padding:0 12px;border:1px solid #000000;
+                  border-radius:8px;overflow:hidden">
+        <img src="pic.png" style="width:100%;height:100%"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  ASSERT_FALSE(wrapper->children.empty());
+  auto* host = wrapper->children.front();
+  ASSERT_NE(host->mask, nullptr);
+  doc->applyLayout();
+  EXPECT_EQ(host->mask->layoutBounds(), pagx::Rect::MakeXYWH(1, 1, 118, 38));
+}
+
+// Only children that resolve against the content box need the inset host. An absolutely positioned
+// child with explicit px anchors is already compensated through its anchors, so a bordered box
+// whose children are all absolutely positioned stays a single Layer.
+PAG_TEST(PAGXHTMLImporterTest, BorderKeepsSingleLayerForAbsolutelyPositionedChildren) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:80px;border:4px solid #000000">
+        <div style="position:absolute;left:0;top:0;width:20px;height:20px;background-color:#F00">
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  ASSERT_EQ(wrapper->children.size(), 1u);
+  // `left` / `top` are relative to the padding box, so the anchors carry the border inset.
+  auto* child = wrapper->children.front();
+  EXPECT_FLOAT_EQ(child->left, 4.0f);
+  EXPECT_FLOAT_EQ(child->top, 4.0f);
+}
+
+// A replaced element's content is inset by the border width as well: a bordered `<img>` fills its
+// content box rather than stretching the image across (and past) the border ring, and the inner
+// corner radius shrinks with the inset exactly like CSS's inner border curve.
+PAG_TEST(PAGXHTMLImporterTest, BorderedImageInsetsImageIntoContentBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <img src="pic.png" style="width:60px;height:40px;border:4px solid #000000;
+           border-radius:10px;object-fit:fill"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* imageLayer = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(imageLayer->width, 60.0f);
+  EXPECT_FLOAT_EQ(imageLayer->height, 40.0f);
+  auto* stroke = FindElementOfType<pagx::Stroke>(imageLayer);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 4.0f);
+  // The image moves onto an inset child Layer covering the 52x32 content box.
+  ASSERT_FALSE(imageLayer->children.empty());
+  auto* host = imageLayer->children.front();
+  EXPECT_FLOAT_EQ(host->left, 4.0f);
+  EXPECT_FLOAT_EQ(host->top, 4.0f);
+  EXPECT_FLOAT_EQ(host->width, 52.0f);
+  EXPECT_FLOAT_EQ(host->height, 32.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(host);
+  ASSERT_NE(fill, nullptr);
+  ASSERT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+  auto* rect = FindElementOfType<pagx::Rectangle>(host);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
@@ -2404,6 +2542,31 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPassedAsImportDirective) {
   EXPECT_FALSE(leaf->importDirective.content.empty());
   EXPECT_EQ(leaf->importDirective.format, "svg");
   EXPECT_NE(leaf->importDirective.content.find("circle"), std::string::npos);
+}
+
+// Regression: an inline <svg> whose <text> omits font-family must inherit the document's face. The
+// wrapper's CSS family stack has to be resolved to its first available concrete family and stamped
+// onto the serialized SVG root, otherwise the nested SVG import reads the raw stack as one literal
+// family name and falls back to the default face (rendering lighter / with the wrong metrics).
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgTextInheritsResolvedFontFamily) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px;font-family:'NoSuchFamilyXyz', sans-serif">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <text x="10" y="50" font-size="12">Hi</text>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  // The stack must be collapsed to a single resolved family, not carried verbatim into the SVG —
+  // the SVG importer has no stack resolution and would treat the whole string as one literal name.
+  auto pos = content.find("font-family:");
+  ASSERT_NE(pos, std::string::npos);
+  auto end = content.find(';', pos);
+  auto value = content.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+  EXPECT_EQ(value.find(','), std::string::npos) << value;
 }
 
 // Regression: an inline <svg> carrying its own `opacity` (presentation attribute and/or inline
@@ -5023,7 +5186,10 @@ PAG_TEST(PAGXHTMLImporterTest, ImagePreservesBorderEffectsAndTransform) {
   auto* stroke = FindElementOfType<pagx::Stroke>(image);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  // The image is inset by the border width into the content box, so its fill sits on a child Layer
+  // rather than across the whole border box (see `BorderedImageInsetsImageIntoContentBox`).
+  ASSERT_FALSE(image->children.empty());
+  auto* fill = FindElementOfType<pagx::Fill>(image->children.front());
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(CountBackgroundBlurStyles(image), 1u);
@@ -5047,8 +5213,11 @@ PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffec
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* image = doc->layers.front()->children.front();
-  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 1u);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  // `background-clip: text` suppresses the box gradient, and the bordered image moved its fill
+  // into the content box, so no Fill of either kind stays on the outer Layer.
+  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 0u);
+  ASSERT_FALSE(image->children.empty());
+  auto* fill = FindElementOfType<pagx::Fill>(image->children.front());
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(As<pagx::LinearGradient>(fill->color), nullptr);
@@ -6882,6 +7051,390 @@ PAG_TEST(PAGXHTMLImporterTest, DuplicateBodyIsMergedBySubsetTransformer) {
   EXPECT_FLOAT_EQ(doc->width, 50.0f);
   EXPECT_FLOAT_EQ(doc->height, 50.0f);
   EXPECT_EQ(doc->layers.front()->children.size(), 2u);
+}
+
+//==================================================================================================
+// Web fonts: local @font-face files -> PAGX <Font file> (spec/html_subset.md §3.5)
+//==================================================================================================
+
+// A WOFF2 subset font whose glyphs sit at Private Use Area codepoints from U+E000 under the family
+// "pagx-font-f0", so only the file itself can render the test text.
+static std::string PuaWoff2FontPath() {
+  return ProjectPath::Absolute("resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2");
+}
+
+static std::string WebFontPage(const std::string& fontPath) {
+  return R"HTML(<html><head><style>
+      @font-face { font-family: "pagx-font-f0"; src: local("Missing"), url(")HTML" +
+         fontPath + R"HTML(") format("woff2"); }
+      @font-face { font-family: "Unused Face"; src: url(")HTML" +
+         fontPath + R"HTML("); }
+      @font-face { font-family: "Remote Face"; src: url(https://example.com/remote.woff2); }
+      .label { font-family: 'pagx-font-f0', 'Remote Face', sans-serif; font-size: 20px; }
+    </style></head>
+    <body style="width:120px;height:40px">
+      <span class="label" style="position:absolute;left:0px;top:0px;white-space:nowrap">&#xE000;&#xE001;</span>
+    </body></html>)HTML";
+}
+
+static std::vector<pagx::Font*> CollectFonts(const pagx::PAGXDocument* doc) {
+  std::vector<pagx::Font*> fonts = {};
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      fonts.push_back(static_cast<pagx::Font*>(node.get()));
+    }
+  }
+  return fonts;
+}
+
+static pagx::Text* FindFirstText(const pagx::PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Text) {
+      return static_cast<pagx::Text*>(node.get());
+    }
+  }
+  return nullptr;
+}
+
+static void ExpectWebFontImported(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                  const std::string& fontPath) {
+  ASSERT_NE(doc, nullptr);
+  // Only the face a font-family stack uses becomes a resource; the unused face and the remote one
+  // are left out.
+  auto fonts = CollectFonts(doc.get());
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts.front()->file, fontPath);
+  EXPECT_FALSE(fonts.front()->id.empty());
+  EXPECT_TRUE(fonts.front()->glyphs.empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:font-face-no-local-source"));
+
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "pagx-font-f0");
+  doc->applyLayout();
+  ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+  for (auto& run : text->glyphData->layoutRuns) {
+    ASSERT_NE(run.font.getTypeface(), nullptr);
+    EXPECT_EQ(run.font.getTypeface()->fontFamily(), "pagx-font-f0");
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RepeatedIconTextSharesEmbeddedFonts) {
+  auto html = "<html><head><style>@font-face{font-family:Icon;src:url('" + PuaWoff2FontPath() +
+              "')}</style></head><body style='width:100px;height:40px'>";
+  for (int i = 0; i < 3; i++) {
+    html += "<div data-pagx-text='icon' style='position:absolute;left:" + std::to_string(i * 20) +
+            "px;top:0px;font-family:Icon;font-size:20px'><span>&#xE000;</span></div>";
+  }
+  html += "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html);
+  ASSERT_NE(doc, nullptr);
+  pagx::Font* shared = nullptr;
+  int texts = 0;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    ASSERT_EQ(text->glyphRuns.size(), 1u);
+    if (shared == nullptr) shared = text->glyphRuns.front()->font;
+    EXPECT_EQ(text->glyphRuns.front()->font, shared);
+    texts++;
+  }
+  EXPECT_EQ(texts, 3);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, TextMetadataEmbedsGlyphsDuringImport) {
+  auto path = PuaWoff2FontPath();
+  for (bool normalize : {false, true}) {
+    pagx::HTMLImporter::Options options;
+    options.autoNormalize = normalize;
+    auto html = "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" + path +
+                "')}</style></head><body style='width:100px;height:40px'>"
+                "<div data-pagx-text='搜索' style='position:absolute;left:4px;top:3px;"
+                "font-family:pagx-font-f0;font-size:20px;color:#FF0000'>"
+                "<div style='position:absolute;left:0px;top:0px;width:16px;height:20px'>"
+                "<span>&#xE000;</span></div>"
+                "<div style='position:absolute;left:17px;top:0px;width:16px;height:20px'>"
+                "<span>&#xE001;</span></div></div></body></html>";
+    auto doc = pagx::HTMLImporter::ParseString(html, options);
+    ASSERT_NE(doc, nullptr);
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->text, "搜索");
+    EXPECT_FLOAT_EQ(text->fontSize, 20);
+    ASSERT_EQ(text->glyphRuns.size(), 2u);
+    for (auto* run : text->glyphRuns) {
+      ASSERT_NE(run->font, nullptr);
+      EXPECT_TRUE(run->font->file.empty());
+      ASSERT_FALSE(run->font->glyphs.empty());
+      ASSERT_EQ(run->glyphs.size(), 1u);
+      ASSERT_GT(run->glyphs[0], 0);
+      ASSERT_LE(run->glyphs[0], run->font->glyphs.size());
+      EXPECT_NE(run->font->glyphs[run->glyphs[0] - 1]->path, nullptr);
+    }
+    EXPECT_FLOAT_EQ(text->glyphRuns[0]->positions[0].x, 0);
+    EXPECT_FLOAT_EQ(text->glyphRuns[1]->positions[0].x, 17);
+    auto positions = text->glyphRuns[1]->positions;
+    doc->applyLayout();
+    auto paths = pagx::ComputeGlyphPaths(*text, 0, 0);
+    EXPECT_EQ(paths.size(), 2u);
+    auto xml = pagx::PAGXExporter::ToXML(*doc);
+    auto restored = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(restored, nullptr);
+    EXPECT_EQ(FindFirstText(restored.get())->text, "搜索");
+    restored->applyLayout();
+    text = FindFirstText(restored.get());
+    EXPECT_EQ(text->text, "搜索");
+    ASSERT_EQ(text->glyphRuns.size(), 2u);
+    EXPECT_FALSE(text->glyphRuns[0]->font->glyphs.empty());
+    EXPECT_TRUE(text->glyphRuns[0]->font->file.empty());
+    EXPECT_EQ(text->glyphRuns[1]->positions, positions);
+    EXPECT_EQ(pagx::ComputeGlyphPaths(*text, 0, 0).size(), 2u);
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, TextMetadataPreservesGlyphColorsAndTransforms) {
+  auto html =
+      "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" + PuaWoff2FontPath() +
+      "')}</style></head><body style='width:80px;height:40px'>"
+      "<div data-pagx-text='样式' style='font-family:pagx-font-f0;font-size:20px;color:#FF0000'>"
+      "<span style='position:absolute;left:0px;top:0px'>&#xE000;</span>"
+      "<span style='position:absolute;left:20px;top:0px;color:#0000FF;transform:scale(2,1);"
+      "transform-origin:0px 0px'>&#xE001;</span></div></body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "样式");
+  ASSERT_EQ(text->glyphRuns.size(), 2u);
+  auto* run = text->glyphRuns[1];
+  ASSERT_EQ(run->scales.size(), 1u);
+  EXPECT_FLOAT_EQ(run->scales[0].x, 2);
+  EXPECT_FLOAT_EQ(run->scales[0].y, 1);
+  bool found = false;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::TextModifier) continue;
+    auto* modifier = static_cast<pagx::TextModifier*>(node.get());
+    ASSERT_TRUE(modifier->fillColor.has_value());
+    EXPECT_FLOAT_EQ(modifier->fillColor->blue, 1);
+    auto* selector = static_cast<pagx::RangeSelector*>(modifier->selectors[0]);
+    EXPECT_EQ(selector->unit, pagx::SelectorUnit::Index);
+    EXPECT_FLOAT_EQ(selector->start, 1);
+    EXPECT_FLOAT_EQ(selector->end, 2);
+    found = true;
+  }
+  EXPECT_TRUE(found);
+  auto scales = run->scales;
+  doc->applyLayout();
+  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(restored, nullptr);
+  text = FindFirstText(restored.get());
+  EXPECT_EQ(text->text, "样式");
+  EXPECT_EQ(text->glyphRuns[1]->scales, scales);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, TextMetadataGlyphsNeedNoSourceFontAfterImport) {
+  auto path = PuaWoff2FontPath();
+  auto html = "<html><head><style>@font-face{font-family:pagx-font-f0;src:url('" + path +
+              "')}</style></head><body style='width:60px;height:30px'>"
+              "<span data-pagx-text='原文' style='font-family:pagx-font-f0;font-size:20px'>"
+              "&#xE000;&#xE001;</span></body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "原文");
+  ASSERT_EQ(text->glyphRuns.size(), 1u);
+  EXPECT_TRUE(text->glyphRuns[0]->font->file.empty());
+  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(restored, nullptr);
+  restored->applyLayout();
+  auto* restoredText = FindFirstText(restored.get());
+  ASSERT_NE(restoredText, nullptr);
+  EXPECT_EQ(restoredText->text, "原文");
+  EXPECT_EQ(pagx::ComputeGlyphPaths(*restoredText, 0, 0).size(), 2u);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileBecomesFontResource) {
+  auto fontPath = PuaWoff2FontPath();
+  ExpectWebFontImported(ParseFromString(WebFontPage(fontPath)), fontPath);
+}
+
+// A family split across several @font-face rules (unicode-range subsets, as CJK web fonts ship)
+// registers every file under one (family, style) key, so only the last one is the primary face.
+// The earlier ones stay reachable through the fallback chain, so each character still shapes with
+// the file that covers it instead of a system substitute, whether the source is a file or inlined.
+// Baking (the CLI default) emits no `<Font file>` for layout to register on its own, so the
+// importer's registrations are all the document has.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesSharingFamilyStayReachable) {
+  auto puaPath = PuaWoff2FontPath();
+  std::ifstream file(puaPath, std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto puaDataURI =
+      "data:font/woff2;base64," +
+      pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  auto cjkPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  pagx::HTMLImporter::Options options;
+  options.emitFontFileResources = false;
+  for (const auto& puaSource : {puaPath, puaDataURI}) {
+    auto doc = pagx::HTMLImporter::ParseString(
+        "<html><head><style>@font-face{font-family:Split;src:url('" + puaSource +
+            "')}@font-face{font-family:Split;src:url('" + cjkPath +
+            "')}</style></head><body style='width:120px;height:40px'>"
+            "<span style='position:absolute;left:0px;top:0px;font-family:Split;font-size:20px;"
+            "white-space:nowrap'>&#xE000;中</span></body></html>",
+        options);
+    ASSERT_NE(doc, nullptr);
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    doc->applyLayout();
+    ASSERT_NE(text->glyphData, nullptr);
+    bool shapedWithPua = false;
+    bool shapedWithCjk = false;
+    for (auto& run : text->glyphData->layoutRuns) {
+      ASSERT_NE(run.font.getTypeface(), nullptr);
+      auto family = run.font.getTypeface()->fontFamily();
+      shapedWithPua |= family == "pagx-font-f0";
+      shapedWithCjk |= family == "Noto Sans SC";
+      for (auto glyph : run.glyphs) {
+        EXPECT_NE(glyph, 0);
+      }
+    }
+    EXPECT_TRUE(shapedWithPua);
+    EXPECT_TRUE(shapedWithCjk);
+  }
+}
+
+// Document font resources must survive both serialization and replacement of the caller config.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSourcesAndAliasesSurviveReload) {
+  std::ifstream file(PuaWoff2FontPath(), std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto dataURI = "data:font/woff2;base64," +
+                 pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  for (const auto& source : {PuaWoff2FontPath(), dataURI}) {
+    auto html = "<html><head><style>@font-face{font-family:'Aliased Face';src:url('" + source +
+                "')}@font-face{font-family:Unused;src:url('" + source +
+                "')}</style></head><body style='width:120px;height:40px'>"
+                "<span style='position:absolute;left:0px;top:0px;font-family:Aliased Face;"
+                "font-size:20px;white-space:nowrap'>&#xE000;&#xE001;</span></body></html>";
+    auto doc = pagx::HTMLImporter::ParseString(html);
+    ASSERT_NE(doc, nullptr);
+    auto fonts = CollectFonts(doc.get());
+    ASSERT_EQ(fonts.size(), 1u);
+    EXPECT_EQ(fonts.front()->file, source);
+    EXPECT_EQ(fonts.front()->fontFamily, "Aliased Face");
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    doc->applyLayout();
+    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+    auto glyphs = text->glyphData->layoutRuns.front().glyphs;
+    auto positions = text->glyphData->layoutRuns.front().positions;
+    auto xml = pagx::PAGXExporter::ToXML(*doc);
+    auto reloaded = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(reloaded, nullptr);
+    for (const auto& current : {doc, reloaded}) {
+      pagx::FontConfig config;
+      config.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "Aliased Face", "Regular");
+      current->applyLayout(&config);
+      auto* currentText = FindFirstText(current.get());
+      ASSERT_NE(currentText, nullptr);
+      ASSERT_EQ(currentText->glyphData->layoutRuns.size(), 1u);
+      auto& run = currentText->glyphData->layoutRuns.front();
+      ASSERT_NE(run.font.getTypeface(), nullptr);
+      EXPECT_EQ(run.font.getTypeface()->fontFamily(), "pagx-font-f0");
+      EXPECT_EQ(run.glyphs, glyphs);
+      EXPECT_EQ(run.positions, positions);
+      if (source == dataURI) EXPECT_TRUE(current->getExternalFilePaths().empty());
+    }
+    pagx::HTMLImporter::Options options;
+    options.emitFontFileResources = false;
+    auto embeddedMode = pagx::HTMLImporter::ParseString(html, options);
+    ASSERT_NE(embeddedMode, nullptr);
+    EXPECT_TRUE(CollectFonts(embeddedMode.get()).empty());
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, OneFontSourceCanPreserveTwoAliases) {
+  auto path = PuaWoff2FontPath();
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><head><style>@font-face{font-family:First;src:url('" + path +
+      "')}@font-face{font-family:Second;src:url('" + path +
+      "')}</style></head><body style='width:120px;height:60px'>"
+      "<span style='position:absolute;left:0px;top:0px;font-family:First'>&#xE000;</span>"
+      "<span style='position:absolute;left:0px;top:30px;font-family:Second'>&#xE001;</span>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(CollectFonts(doc.get()).size(), 2u);
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  reloaded->applyLayout();
+  EXPECT_TRUE(reloaded->fontConfig().containsFamily("First"));
+  EXPECT_TRUE(reloaded->fontConfig().containsFamily("Second"));
+}
+
+// With the subset transformer off, the importer reads `@font-face` from the original <style>
+// instead of the block the transformer re-emits; both routes must yield the same resource.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileWithoutNormalization) {
+  auto fontPath = PuaWoff2FontPath();
+  ExpectWebFontImported(ParseRaw(WebFontPage(fontPath)), fontPath);
+}
+
+// A relative `url()` resolves against the importer's base path, the same anchor `<img src>` uses.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRelativeUrlResolvesAgainstBasePath) {
+  auto fontPath = PuaWoff2FontPath();
+  auto fontDir = std::filesystem::path(fontPath).parent_path().string() + "/";
+  pagx::HTMLImporter::Options options;
+  options.basePath = fontDir;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(<html><head><style>
+      @font-face { font-family: pagx-font-f0; src: url(font_f0.woff2); }
+    </style></head>
+    <body style="width:60px;height:30px">
+      <span style="position:absolute;left:0px;top:0px;font-family:pagx-font-f0;font-size:20px">&#xE000;</span>
+    </body></html>)HTML",
+                                             options);
+  ASSERT_NE(doc, nullptr);
+  auto fonts = CollectFonts(doc.get());
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts.front()->file, fontDir + "font_f0.woff2");
+}
+
+// The tokenizer resolves CSS escapes in `@font-face` strings, keeps every url() source in order,
+// skips local() and format(), and drops a rule that has no url() source. Serializing the parsed
+// rules and tokenizing them again must reproduce them exactly.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesTokenizeAndSerialize) {
+  std::vector<std::string> dropped;
+  std::vector<pagx::html::CssKeyframesRule> keyframes;
+  std::vector<pagx::html::CssFontFaceRule> fontFaces;
+  pagx::html::TokenizeStyleSheet(R"CSS(
+      @font-face { font-family: "a\"b\3c c"; src: local("x)"), url(  'f\27 .woff2'  ) format("woff2"), url(g.ttf); font-weight: 700; }
+      @font-face { font-family: Local Only; src: local(Foo); }
+      @font-face { font-family: Brand  Sans; src: url("data:font/woff2;base64,AAAA"); }
+      .a { color: red; }
+    )CSS",
+                                 dropped, keyframes, fontFaces);
+  ASSERT_EQ(fontFaces.size(), 2u);
+  EXPECT_EQ(fontFaces[0].family, "a\"b<c");
+  ASSERT_EQ(fontFaces[0].sources.size(), 2u);
+  EXPECT_EQ(fontFaces[0].sources[0], "f'.woff2");
+  EXPECT_EQ(fontFaces[0].sources[1], "g.ttf");
+  EXPECT_EQ(fontFaces[1].family, "Brand Sans");
+  ASSERT_EQ(fontFaces[1].sources.size(), 1u);
+  EXPECT_EQ(fontFaces[1].sources[0], "data:font/woff2;base64,AAAA");
+  ASSERT_EQ(dropped.size(), 1u);
+  EXPECT_EQ(dropped[0], "@font-face");
+
+  std::vector<std::string> reDropped;
+  std::vector<pagx::html::CssFontFaceRule> reparsed;
+  pagx::html::TokenizeStyleSheet(pagx::html::SerializeFontFaces(fontFaces), reDropped, keyframes,
+                                 reparsed);
+  EXPECT_TRUE(reDropped.empty());
+  ASSERT_EQ(reparsed.size(), fontFaces.size());
+  for (size_t i = 0; i < fontFaces.size(); i++) {
+    EXPECT_EQ(reparsed[i].family, fontFaces[i].family);
+    EXPECT_EQ(reparsed[i].sources, fontFaces[i].sources);
+  }
 }
 
 //==================================================================================================
@@ -13103,6 +13656,95 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsFlexGrowChil
   ASSERT_TRUE(result.ok);
   EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
+}
+
+TEST(PAGXFontMappingTest, AppliesExactTargetFaceBeforeLayoutWithoutSourceAttributes) {
+  pagx::FontConfig config;
+  config.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, "Target",
+                      "Bold");
+  config.registerFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0, "Target",
+                      "SemiBold");
+  pagx::HTMLImporter::Options options;
+  options.fontConfig = &config;
+  options.fontReplacements.push_back({"Source, sans-serif", 600, "normal", "Target", "Bold"});
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><body style='width:200px;height:100px'>"
+      "<div style='font-family:Source,sans-serif;font-size:20px;font-weight:600'>"
+      "<span>A</span><span style='font-weight:700'>B</span></div></body></html>",
+      options);
+  ASSERT_NE(doc, nullptr);
+  pagx::Text* mapped = nullptr;
+  pagx::Text* unmatched = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    if (text->text == "A") mapped = text;
+    if (text->text == "B") unmatched = text;
+    EXPECT_EQ(text->customData.count("html-font-request"), 0u);
+  }
+  ASSERT_NE(mapped, nullptr);
+  ASSERT_NE(unmatched, nullptr);
+  EXPECT_EQ(mapped->fontFamily, "Target");
+  EXPECT_EQ(mapped->fontStyle, "Bold");
+  EXPECT_NE(unmatched->fontFamily, "Target");
+  doc->applyLayout();
+  ASSERT_FALSE(mapped->glyphData->layoutRuns.empty());
+  EXPECT_EQ(mapped->glyphData->layoutRuns[0].font.getTypeface()->fontFamily(), "Noto Sans SC");
+  EXPECT_EQ(mapped->fontStyle, "Bold");
+  ASSERT_TRUE(doc->embed());
+  EXPECT_FALSE(mapped->glyphRuns.empty());
+}
+
+TEST(PAGXFontMappingTest, MatchesExactNumericWeightBeforeFaceRounding) {
+  pagx::HTMLImporter::Options options;
+  options.fontReplacements.push_back({"Source", 650, "normal", "Target", "Book"});
+  auto doc = pagx::HTMLImporter::ParseString(
+      "<html><body style='width:200px;height:100px'>"
+      "<span style='font-family:Source;font-size:20px'>"
+      "<span style='font-weight:650'>A</span><span style='font-weight:700'>B</span>"
+      "</span></body></html>",
+      options);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->text, "A");
+  EXPECT_EQ(text->fontFamily, "Target");
+  EXPECT_EQ(text->fontStyle, "Book");
+}
+
+TEST(PAGXFontMappingTest, CanonicalTargetNamesResolveCapturedFontFilesAndData) {
+  auto path = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  std::ifstream file(path, std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto dataURI = "data:font/otf;base64," +
+                 pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  for (const auto& source : {path, dataURI}) {
+    pagx::HTMLImporter::Options options;
+    options.fontReplacements.push_back({"SourceAlias", 400, "normal", "noto sans sc", "regular"});
+    options.fontReplacements.push_back({"Unrelated", 400, "normal", "Other Font", "Regular"});
+    auto doc = pagx::HTMLImporter::ParseString(
+        "<html><head><style>@font-face{font-family:SourceAlias;src:url('" + source +
+            "')}</style></head><body style='width:200px;height:100px'>"
+            "<span style='font-family:SourceAlias;font-size:20px'>ABC</span></body></html>",
+        options);
+    ASSERT_NE(doc, nullptr);
+    EXPECT_TRUE(doc->fontConfig().containsFamily("noto sans sc"));
+    EXPECT_FALSE(doc->fontConfig().containsFamily("Other Font"));
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->fontFamily, "noto sans sc");
+    EXPECT_EQ(text->fontStyle, "regular");
+    doc->applyLayout();
+    ASSERT_NE(text->glyphData, nullptr);
+    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+    EXPECT_EQ(text->glyphData->layoutRuns[0].font.getTypeface()->fontFamily(), "Noto Sans SC");
+    EXPECT_EQ(text->glyphData->layoutRuns[0].font.getTypeface()->fontStyle(), "Regular");
+    ASSERT_TRUE(doc->embed());
+    EXPECT_FALSE(text->glyphRuns.empty());
+    EXPECT_EQ(text->fontFamily, "noto sans sc");
+    EXPECT_EQ(text->fontStyle, "regular");
+  }
 }
 
 }  // namespace pag

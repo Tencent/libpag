@@ -87,10 +87,14 @@ class HTMLExporter {
    * CSS styles and SVG elements that visually reproduce the PAGX content in modern browsers.
    *
    * Resource directory contract: `resourceDir` is a mandatory absolute directory path where the
-   * exporter writes auxiliary image files. Two kinds of files land there:
+   * exporter writes auxiliary resource files. These include:
    *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively
    *      (DiamondGradient, tiled ImagePattern, PlusDarker backdrops).
    *   2. Copies of external image files referenced by Image resources via `filePath`.
+   *   3. WOFF2 fonts generated from embedded glyphs. Vector Font resources share one font file
+   *      when their combined glyph count fits the BMP private-use range (6400 glyphs). Bitmap
+   *      fonts and vector groups beyond that capacity retain separate files. Glyph numbering in
+   *      the HTML is remapped without changing the source Font or GlyphRun nodes.
    * The exporter creates the directory if it does not exist. The generated HTML references these
    * assets via a relative URL whose prefix is the basename of `resourceDir` followed by `/`
    * (e.g. `resourceDir = "/tmp/abc"` produces `<img src="abc/dgc0.png">`). Callers must write

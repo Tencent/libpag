@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,7 +30,8 @@ namespace pagx {
 /**
  * FontConfig manages registered and fallback fonts for font lookup during text layout and
  * rendering. It decouples font configuration from the layout process, allowing multiple components
- * to share the same font registry.
+ * to share the same font registry. Font files and buffers may hold TrueType, OpenType, font
+ * collection (TTC) or WOFF2 data; WOFF2 is decoded to SFNT when the typeface is loaded.
  */
 class FontConfig {
  public:
@@ -82,6 +84,18 @@ class FontConfig {
                     const std::string& fontFamily = "", const std::string& fontStyle = "");
 
   /**
+   * Registers a face from an in-memory buffer that several registrations share. The buffer is kept
+   * as-is instead of being copied, so registering every face of a collection holds one copy of its
+   * bytes rather than one per registration.
+   * @param bytes The font data, shared with the other faces of the same font file.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The registration family name. Empty to read from the font data.
+   * @param fontStyle The registration style name. Empty to read from the font data.
+   */
+  void registerFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
+                    const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
    * Adds a fallback font from a file path with an explicit (fontFamily, fontStyle). Used when a
    * character is not found in primary fonts.
    * @param font The PAGFont describing the fallback (fontFamily, fontStyle).
@@ -121,6 +135,17 @@ class FontConfig {
    * @param fontStyle The fallback style name. Empty to read from the font data.
    */
   void addFallbackFont(const void* data, size_t length, int ttcIndex,
+                       const std::string& fontFamily = "", const std::string& fontStyle = "");
+
+  /**
+   * Adds a fallback face from an in-memory buffer that several registrations share, keeping the
+   * buffer as-is instead of copying it.
+   * @param bytes The font data, shared with the other faces of the same font file.
+   * @param ttcIndex The face index within a TTC font collection.
+   * @param fontFamily The fallback family name. Empty to read from the font data.
+   * @param fontStyle The fallback style name. Empty to read from the font data.
+   */
+  void addFallbackFont(std::shared_ptr<const std::vector<uint8_t>> bytes, int ttcIndex,
                        const std::string& fontFamily = "", const std::string& fontStyle = "");
 
   /**
@@ -172,6 +197,7 @@ class FontConfig {
   struct Data;
   std::unique_ptr<Data> data;
   friend class LayoutContext;
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

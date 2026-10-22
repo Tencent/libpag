@@ -441,7 +441,13 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     DEBUG_ASSERT(false);
     return false;
   }
-  auto textOrder = CollectAllText(document);
+  auto allText = CollectAllText(document);
+  std::vector<Text*> textOrder = {};
+  for (auto* text : allText) {
+    if (text->glyphRuns.empty()) {
+      textOrder.push_back(text);
+    }
+  }
 
   std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes = {};
   std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};

@@ -24,6 +24,11 @@ import { spawn } from 'child_process';
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
+import type { CapturedFontRef } from './font-download';
+import { FontMappingError, FontMappingErrorCode, validateFontMap } from './font-metadata';
+import type { FontMapRule } from './font-metadata';
+import { collectSnapshotFontMetadata, prepareSnapshotFontReplacements } from './snapshot-fonts';
+import type { FontMappingResult, FontReplacement } from './snapshot-fonts';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -154,9 +159,9 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   if (Array.isArray(opts.headers)) {
     for (const h of opts.headers) args.push('--header', h);
   }
+  if (opts.fontDir) args.push('--font-dir', opts.fontDir);
   if (opts.downloadFonts) {
     args.push('--download-fonts');
-    if (opts.fontDir) args.push('--font-dir', opts.fontDir);
     if (opts.fontManifest) args.push('--font-manifest', opts.fontManifest);
   }
   if (opts.downloadImages) {
@@ -191,9 +196,13 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
 }
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
+  fontReplacements?: FontReplacement[];
   pagxBin?: string;
   subsetHtml?: string;
   pagxFile?: string;
+  // Font files the snapshot downloaded rather than carried inside the subset. Import bakes glyphs
+  // by default, so it needs them registered under the authored CSS families to shape with.
+  fonts?: CapturedFontRef[];
   log?: (line: string) => void;
 }
 
@@ -201,7 +210,8 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
 export async function runPagxImportToFile(
   opts: RunPagxImportToFileOptions = {},
 ): Promise<SpawnCaptureResult> {
-  const { pagxBin, subsetHtml, pagxFile, stderrPath, log, timeoutMs } = opts;
+  const { pagxBin, subsetHtml, pagxFile, fontReplacements = [], fonts = [], stderrPath, log,
+    timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
@@ -210,6 +220,13 @@ export async function runPagxImportToFile(
   // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
     '--no-resolve'];
+  for (const replacement of fontReplacements) {
+    args.push('--font-replacement', replacement.families, String(replacement.weight),
+      replacement.style, replacement.targetFamily, replacement.targetStyle);
+  }
+  // Import bakes the page's glyphs by default, so the fonts it cannot find on its own — the ones
+  // the snapshot downloaded rather than carried inside the subset — have to be named here.
+  appendFontArgs(args, fonts);
   // Flex inference is always on inside the importer now. The subset is already rendered, so
   // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
   const result = await spawnCapture(pagxBin, args, {
@@ -247,20 +264,37 @@ export async function runPagxResolve(opts: RunPagxResolveOptions = {}): Promise<
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
+// Append the font registrations for one captured font file. A file the page declared in a
+// `@font-face` rule is passed as `--font-alias "<family>=<path>"`: the document carries the
+// authored family, and the name inside the file need not match it (a page may alias a file, and a
+// font whose typographic name exists only in a non-English record is reported as "?????" by the
+// platform font reader). A file with no recorded family — a network font whose stylesheet could
+// not be read — stays a plain `--fallback`.
+function appendFontArgs(args: string[], fonts: CapturedFontRef[]): void {
+  for (const font of fonts) {
+    if (font.family) {
+      args.push('--font-alias', `${font.family}=${font.path}`);
+    } else {
+      args.push('--fallback', font.path);
+    }
+  }
+}
+
 export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
   pagxBin?: string;
   pagxFile?: string;
-  fontFiles?: string[];
+  fonts?: CapturedFontRef[];
 }
 
-// Optional Step 3.5 — `pagx embed <pagx> --skip-images --fallback <font>...`. Images are left
-// alone here because their storage mode is owned by the resolve step's --images flag.
+// Optional Step 3.5 — `pagx embed <pagx> --skip-images [--font-alias ...] [--fallback ...]`.
+// Images are left alone here because their storage mode is owned by the resolve step's --images
+// flag.
 export async function runPagxFontEmbed(opts: RunPagxFontEmbedOptions = {}): Promise<SpawnCaptureResult> {
-  const { pagxBin, pagxFile, fontFiles = [], stderrPath, timeoutMs } = opts;
+  const { pagxBin, pagxFile, fonts = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxFontEmbed: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxFontEmbed: pagxFile is required');
   const args = ['embed', pagxFile, '--skip-images'];
-  for (const f of fontFiles) args.push('--fallback', f);
+  appendFontArgs(args, fonts);
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
@@ -269,39 +303,24 @@ export interface RunPagxRenderOptions extends SpawnCaptureOptions {
   pagxFile?: string;
   output?: string;
   scale?: number;
-  fontFallbacks?: string[];
+  fonts?: CapturedFontRef[];
 }
 
-// Step 4 — `pagx render <pagx> --output <png> --scale <s> [--fallback <font>...]`.
+// Step 4 — `pagx render <pagx> --output <png> --scale <s> [--font-alias ...] [--fallback ...]`.
 export async function runPagxRender(opts: RunPagxRenderOptions = {}): Promise<SpawnCaptureResult> {
-  const { pagxBin, pagxFile, output, scale = 1, fontFallbacks = [], stderrPath, timeoutMs } = opts;
+  const { pagxBin, pagxFile, output, scale = 1, fonts = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxRender: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxRender: pagxFile is required');
   if (!output) throw new Error('runPagxRender: output is required');
   const args = ['render', pagxFile, '--output', output, '--scale', String(scale)];
-  for (const f of fontFallbacks) args.push('--fallback', f);
+  appendFontArgs(args, fonts);
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
 
-// Glob a directory for SFNT files (TTF / OTF / TTC).
-export function collectFontFallbacks(opts: { fontDir?: string } = {}): string[] {
-  const fontDir = opts.fontDir;
-  if (!fontDir) return [];
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(fontDir);
-  } catch (_err) {
-    return [];
-  }
-  const out = entries
-    .filter((n) => /\.(ttf|otf|ttc)$/i.test(n))
-    .map((n) => path.join(fontDir, n));
-  out.sort();
-  return out;
-}
-
-// Read a per-case font manifest produced by `snapshot.js --font-manifest`.
-export function readFontManifest(opts: { manifestPath?: string } = {}): string[] {
+// Read a per-case font manifest produced by `snapshot.js --font-manifest`. Each line is
+// `<path>` or `<path>\t<css-family>`; parents that are already gone are dropped so a manifest
+// left over from an earlier run cannot fail a step with a bogus path.
+export function readFontManifest(opts: { manifestPath?: string } = {}): CapturedFontRef[] {
   const manifestPath = opts.manifestPath;
   if (!manifestPath) return [];
   let text: string;
@@ -310,10 +329,17 @@ export function readFontManifest(opts: { manifestPath?: string } = {}): string[]
   } catch (_err) {
     return [];
   }
-  return text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && fs.existsSync(l));
+  const out: CapturedFontRef[] = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const tab = trimmed.indexOf('\t');
+    const path = tab < 0 ? trimmed : trimmed.slice(0, tab);
+    const family = tab < 0 ? '' : trimmed.slice(tab + 1).trim();
+    if (!path || !fs.existsSync(path)) continue;
+    out.push({ path, family });
+  }
+  return out;
 }
 
 function noopLog(_msg: string): void {}
@@ -367,13 +393,18 @@ export interface RunHtmlToPagxOptions {
   selector?: string;
   snapshotImpl?: SnapshotImpl;
   snapshotExtraArgs?: string[];
+  /** Explicit from/to rules, applied during native import before layout and embedding. Unmatched fonts stay unchanged. */
+  fontMap?: FontMapRule[];
 }
 
 export interface RunHtmlToPagxResult {
   subsetHtml: string;
   pagx: string;
   png: string | null;
-  fonts: string[];
+  fonts: CapturedFontRef[];
+  /** Deduplicated original HTML font requests, written even without fontMap or embedding. */
+  fontMetadataPath: string;
+  fontMapping?: FontMappingResult;
 }
 
 // End-to-end orchestrator. Runs snapshot → import → optional resolve →
@@ -423,17 +454,30 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   }
   const pagxFile = path.join(outputDir, `${baseName}.pagx`);
   const pngFile = path.join(outputDir, `${baseName}.png`);
+  const fontMetadataPath = path.join(outputDir, `${baseName}.fonts.json`);
 
   const doResolve = opts.doResolve !== false;
   const doRender = opts.doRender !== false && doResolve;
   const embedFonts = !!opts.embedFonts;
   const downloadFonts = !!opts.downloadFonts || embedFonts;
   const downloadImages = !!opts.downloadImages;
+  if (opts.fontMap !== undefined) {
+    const errors = validateFontMap(opts.fontMap);
+    if (errors.length) throw new FontMappingError(FontMappingErrorCode.InvalidFontMap, errors.join('; '));
+  }
 
+
+  // Font files always land next to the outputs: even without --download-fonts a page may inline
+  // its fonts as `data:` URLs (icon fonts most often) and the importer needs a real file on disk
+  // to reference. Network fonts stay opt-in, so the default costs nothing extra.
   let fontDir = opts.fontDir || '';
-  if (downloadFonts && !fontDir) {
+  if (!fontDir) {
     fontDir = path.join(outputDir, `${baseName}.fonts`);
   }
+  // The manifest is what carries each captured file's authored CSS family down to
+  // `pagx embed/render --font-alias`; it lives next to the outputs so a shared --font-dir still
+  // gets a per-page list.
+  const fontManifest = downloadFonts ? path.join(outputDir, `${baseName}.fonts.txt`) : '';
   let imageDir = opts.imageDir || '';
   if (downloadImages && !imageDir) {
     imageDir = path.join(outputDir, `${baseName}.images`);
@@ -465,15 +509,32 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       selector: opts.selector,
       downloadFonts,
       fontDir,
+      fontManifest,
       downloadImages,
       imageDir,
       extraArgs: opts.snapshotExtraArgs,
     });
     assertStepOk('snapshot', snapshotResult);
 
-    let fonts: string[] = [];
+    const snapshotHtml = fs.readFileSync(subsetHtml, 'utf8');
+    const fontMetadata = collectSnapshotFontMetadata(snapshotHtml);
+    fs.writeFileSync(fontMetadataPath, JSON.stringify(fontMetadata, null, 2) + '\n', 'utf8');
+    log(`[font-metadata] ${fontMetadata.fonts.length} source request(s), ` +
+      `${fontMetadata.missingRequests} without source requests -> ${fontMetadataPath}`);
+
+    let fontMapping: FontMappingResult | undefined;
+    let fontReplacements: FontReplacement[] = [];
+    if (opts.fontMap !== undefined) {
+      const mapped = prepareSnapshotFontReplacements(snapshotHtml, opts.fontMap);
+      fontReplacements = mapped.replacements;
+      fontMapping = mapped.mapping;
+      log(`[font-map] ${fontMapping.replaced} replaced, ${fontMapping.unmatched} unmatched`);
+    }
+    const fontResult = { fontMetadataPath, ...(fontMapping ? { fontMapping } : {}) };
+
+    let fonts: CapturedFontRef[] = [];
     if (downloadFonts) {
-      fonts = collectFontFallbacks({ fontDir });
+      fonts = readFontManifest({ manifestPath: fontManifest });
       if (fonts.length === 0) {
         log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
       }
@@ -484,6 +545,8 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       pagxBin,
       subsetHtml,
       pagxFile,
+      fontReplacements,
+      fonts,
       log: (line: string) => process.stderr.write(line + '\n'),
     });
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
@@ -493,10 +556,9 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
         stderr: importResult.stderr,
       });
     }
-
     if (!doResolve) {
       log(`[done] wrote ${pagxFile} (skipped resolve+render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts };
+      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
     }
 
     log(`[3/${totalSteps}] resolve   ${pagxFile}`);
@@ -518,14 +580,13 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
     // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
     if (embedFonts) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} downloaded font file(s))`);
-      const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
+      log(`[font-embed] ${pagxFile} (${fonts.length} saved font file(s))`);
+      const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fonts });
       assertStepOk('pagx embed', embedResult);
     }
-
     if (!doRender) {
       log(`[done] wrote ${pagxFile} (skipped render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts };
+      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
     }
 
     log(`[4/${totalSteps}] render    ${pagxFile}  ->  ${pngFile} (scale=${opts.scale || 1})`);
@@ -534,12 +595,12 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       pagxFile,
       output: pngFile,
       scale: opts.scale || 1,
-      fontFallbacks: fonts,
+      fonts,
     });
     assertStepOk('pagx render', renderResult);
 
     log(`[done] ${pngFile}`);
-    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts };
+    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts, ...fontResult };
   } finally {
     if (tempDir) {
       try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_e) { /* ignore */ }

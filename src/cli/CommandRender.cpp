@@ -66,6 +66,7 @@ struct RenderOptions {
   std::string xpath = {};
   std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
+  std::vector<FontAlias> aliases = {};
   // When set, the document's animations are evaluated at this playback time (in seconds) and the
   // resulting frame is rendered through the runtime animation path (PAGScene + PAGTimeline) rather
   // than the static layer-tree path. Negative means "no time requested" (static render).
@@ -91,7 +92,9 @@ static void PrintRenderUsage() {
       << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n"
       << "  --font <path>             Register a font file (can be specified multiple times)\n"
       << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
-         "                            specified multiple times)\n";
+         "                            specified multiple times)\n"
+      << "  --font-alias <family>=<path>  Register a font file under an explicit family name\n"
+         "                            instead of the name inside the file (repeatable)\n";
 }
 
 static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
@@ -210,6 +213,12 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->fontFiles.push_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
+    } else if (arg == "--font-alias" && i + 1 < argc) {
+      FontAlias alias = {};
+      if (!ParseFontAlias(argv[++i], &alias, "pagx render")) {
+        return 1;
+      }
+      options->aliases.push_back(std::move(alias));
     } else if (arg == "--help" || arg == "-h") {
       PrintRenderUsage();
       return -1;
@@ -341,8 +350,13 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   }
 
   FontConfig fontConfig = {};
-  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
+  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, options.aliases,
+                      "pagx render")) {
     return {};
+  }
+  for (auto& file : FindUnloadableFontFiles(document.get())) {
+    std::cerr << "pagx render: warning: failed to load font '" << file
+              << "', text using it falls back to other fonts\n";
   }
   document->applyLayout(&fontConfig);
 

@@ -59,6 +59,9 @@ struct ImageStorageOptions {
   /// may point elsewhere, e.g. the original HTML when resolving an intermediate PAGX). When empty
   /// only `baseDir` is used for prefix recovery.
   std::string documentDir = {};
+  /// Root of a temporary extracted archive. Resources outside documentDir but inside this root
+  /// must also be copied before the archive is removed. Empty for non-archive inputs.
+  std::string archiveDir = {};
   /// Directory the exported PAGX will be written to. In External mode, copied image files land here
   /// (preserving their relative sub-path); it is also where base64/data-URI images are materialised
   /// when converting to External. Required for External mode.
@@ -75,10 +78,22 @@ struct ImageStorageOptions {
  *   - Embed: image bytes are read from the resolved local file and inlined so the exporter emits a
  *     base64 data URI. Images already inline (embedded bytes / data URIs) are left untouched.
  *
- * Absolute local paths and remote URLs (http/https) are left untouched. Missing sources are left as
+ * Absolute paths inside archiveDir are also relocated. Other absolute local paths and remote URLs
+ * (http/https) are left untouched. Missing sources are left as
  * references with a warning. Diagnostics are printed to stderr prefixed with `command`.
  */
 void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
                        const std::string& command);
+
+/**
+ * Relocates the font files referenced by the `file` attribute of Font nodes the same way External
+ * image storage relocates image files: each local file is copied under `outputDir` at its authored
+ * relative path and the reference is rewritten to that relative path, so the exported PAGX and its
+ * fonts travel together. Fonts are always stored as external files, so `options.mode` is not
+ * consulted. Absolute paths inside archiveDir are also relocated. Other absolute paths, remote URLs
+ * and data URIs are left untouched; missing files are left as references with a warning.
+ */
+void ApplyFontStorage(PAGXDocument* doc, const ImageStorageOptions& options,
+                      const std::string& command);
 
 }  // namespace pagx::cli
