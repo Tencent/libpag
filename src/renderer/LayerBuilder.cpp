@@ -418,6 +418,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   bool commitComponents(const Matrix3DComponents& next) {
     Matrix3D matrix = {};
     if (!ComposeMatrix3DComponents(next, &matrix)) {
+      LOGE("LayerRuntimeTarget: rejected an uncomposable transform component value.");
       return false;
     }
     components = next;
