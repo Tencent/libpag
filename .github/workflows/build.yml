@@ -282,7 +282,7 @@ jobs:
           npm run build:st
 
       - name: Cypress run:st
-        uses: cypress-io/github-action@v6
+        uses: cypress-io/github-action@v7.4.6
         with:
           working-directory: web
           start: npm run server:cypress
