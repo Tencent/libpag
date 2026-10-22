@@ -28,5 +28,6 @@ lib-webgpu
 lib-webgpu-mt
 src/wasm-webgpu
 src/wasm-webgpu-mt
+src-webgpu-tmp
 demo/wasm-webgpu
 demo/wasm-webgpu-mt
