@@ -38,9 +38,12 @@ export class RenderCanvas {
   public release() {
     this.retainCount -= 1;
     if (this.retainCount === 0) {
-      if (!this._glContext) return;
-      this._glContext.destroy();
-      this._glContext = null;
+      const index = renderCanvasList.indexOf(this);
+      if (index >= 0) renderCanvasList.splice(index, 1);
+      if (this._glContext) {
+        this._glContext.destroy();
+        this._glContext = null;
+      }
       this._canvas = null;
     }
   }

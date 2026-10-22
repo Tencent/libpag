@@ -1231,7 +1231,8 @@ class PAG_API PAGSurfaceReadback {
 /**
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
- * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ * including readPixels(), asyncReadPixels(), clearAll(), freeCache(), updateSize(), and
+ * getHardwareBuffer().
  */
 class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
  public:

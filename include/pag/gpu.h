@@ -381,8 +381,16 @@ class PAG_API BackendSemaphore {
     return _backend;
   }
 
+  /**
+   * Initializes this semaphore from a GL sync object. Only valid on the OpenGL backend; the sync
+   * object is usually obtained from PAGSurface::draw() with a non-null signalSemaphore.
+   */
   void initGL(void* sync);
 
+  /**
+   * Returns the wrapped GL sync object, or nullptr if this semaphore was not initialized on the
+   * OpenGL backend.
+   */
   void* glSync() const;
 
  private:
