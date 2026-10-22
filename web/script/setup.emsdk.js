@@ -22,8 +22,10 @@ process.env.PATH = process.platform === 'win32'
     ? `${emsdkPath};${emscriptenPath};${process.env.PATH}`
     : `${emsdkPath}:${emscriptenPath}:${process.env.PATH}`;
 
-Utils.exec("emsdk install latest", emsdkPath);
-Utils.exec("emsdk activate latest", emsdkPath);
+// Pin the emscripten version instead of using "latest": the WebGPU backend requires
+// emsdk >= 4.0.15 and < 4.0.18 (enforced at configure time in the root CMakeLists.txt).
+Utils.exec("emsdk install 4.0.15", emsdkPath);
+Utils.exec("emsdk activate 4.0.15", emsdkPath);
 
 const emsdkEnv = process.platform === 'win32' ? "emsdk_env.bat" : "source emsdk_env.sh";
 let result = Utils.execSafe(emsdkEnv, emsdkPath);
