@@ -350,6 +350,27 @@ describe('overflow and containing blocks', () => {
     const flow = compile().querySelector('[data-leaf=flow]');
     expect(flow.closest('[style*="overflow: hidden"]')).not.toBeNull();
   });
+
+  test('asymmetric borders inset overflow clips without negative corner radii', () => {
+    start('<div id="clip" style="position:relative;z-index:0;overflow-x:hidden;' +
+      'width:100px;height:80px;border-style:solid;border-width:3px 7px 11px 5px;' +
+      'border-top-left-radius:2px 1px;border-top-right-radius:20px 30px;' +
+      'border-bottom-right-radius:25% 50%;border-bottom-left-radius:10px 20px"></div>');
+    const source = document.querySelector('#clip');
+    const wrapper = source.cloneNode(false);
+    wrapper.innerHTML = '<img src="generated.png"/>';
+    const clip = compile(markPaintSource(source, wrapper.outerHTML))
+      .querySelector('img').closest('[style*="overflow: hidden"]');
+    // The clip is already inside the source's padding-box coordinate system.
+    expect(clip.style.left).toBe('0px');
+    expect(clip.style.top).toBe('0px');
+    expect(clip.style.width).toBe('88px');
+    expect(clip.style.height).toBe('66px');
+    expect(clip.style.borderTopLeftRadius).toBe('0px 0px');
+    expect(clip.style.borderTopRightRadius).toBe('13px 27px');
+    expect(clip.style.borderBottomRightRadius).toBe('18px 29px');
+    expect(clip.style.borderBottomLeftRadius).toBe('5px 9px');
+  });
 });
 
 test('planPaintContext accepts generated text atoms without authored sources', () => {

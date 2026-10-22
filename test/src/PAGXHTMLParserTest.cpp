@@ -262,6 +262,28 @@ PAG_TEST(PAGXHTMLParserTest, ConicGradientClipsStopsOutsideOneTurnWithInterpolat
   EXPECT_NEAR(end->color.blue, 5.f / 6, 1e-5f);
 }
 
+PAG_TEST(PAGXHTMLParserTest, RepeatingConicGradientRejectsInsufficientOrExcessivelyDenseStops) {
+  ParserInput input;
+  EXPECT_EQ(input.values.parseConicGradient("repeating-conic-gradient(from 0deg,red)", true),
+            nullptr);
+  EXPECT_EQ(
+      input.values.parseConicGradient("repeating-conic-gradient(red 0deg,blue .0001deg)", true),
+      nullptr);
+  EXPECT_TRUE(input.warned("repeating gradient exceeds the 4096-stop budget"));
+}
+
+PAG_TEST(PAGXHTMLParserTest, ConicGradientInfersMalformedAngularStopWithoutDroppingItsColor) {
+  ParserInput input;
+  auto* gradient = input.values.parseConicGradient("conic-gradient(red 12px,blue 360deg)");
+  ASSERT_NE(gradient, nullptr);
+  ASSERT_EQ(gradient->colorStops.size(), 2u);
+  EXPECT_FLOAT_EQ(gradient->colorStops.front()->offset, 0);
+  EXPECT_FLOAT_EQ(gradient->colorStops.front()->color.red, 1);
+  EXPECT_FLOAT_EQ(gradient->colorStops.back()->offset, 1);
+  EXPECT_FLOAT_EQ(gradient->colorStops.back()->color.blue, 1);
+  EXPECT_TRUE(input.warned("malformed gradient stop offset '12px'"));
+}
+
 PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalText) {
   for (const auto& spacing : {"", "nan", "1px", "1e100", "1e-100"}) {
     SCOPED_TRACE(spacing);

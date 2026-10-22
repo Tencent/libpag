@@ -187,4 +187,56 @@ describe('captureControlPaints', () => {
     expect(document.documentElement.outerHTML).toBe(original);
     expect(page.screenshot).not.toHaveBeenCalled();
   });
+
+  test('restores styles removed between asynchronous discovery and isolation', async () => {
+    document.body.innerHTML = '<div><input type="checkbox"></div>';
+    const control = document.querySelector('input');
+    setRect(control);
+    const original = document.documentElement.outerHTML;
+    const page = pageFixture();
+    const evaluate = page.evaluate.getMockImplementation();
+    page.evaluate.mockImplementation(async (fn, arg) => {
+      if (Array.isArray(arg)) {
+        // Page scripts can run between protocol calls; isolation must also restore absent styles.
+        control.removeAttribute('style');
+        control.parentElement.removeAttribute('style');
+      }
+      return evaluate(fn, arg);
+    });
+    expect(await captureControlPaints(page, 'puppeteer')).toHaveLength(1);
+    expect(document.documentElement.outerHTML).toBe(original);
+    expect(window.__pagxIsolatedControl).toBeUndefined();
+    expect(window.__pagxCaptureTransforms).toBeUndefined();
+  });
+
+  test('restores isolation when measuring the control throws after styles were changed', async () => {
+    document.body.innerHTML = '<input type="checkbox" style="opacity:.4!important">';
+    const control = document.querySelector('input');
+    const original = document.documentElement.outerHTML;
+    const error = new Error('layout unavailable');
+    control.getBoundingClientRect = jest.fn()
+      .mockReturnValueOnce({ left: 0, top: 0, width: 100, height: 20 })
+      .mockImplementation(() => { throw error; });
+    const page = pageFixture();
+    await expect(captureControlPaints(page, 'puppeteer')).rejects.toBe(error);
+    expect(page.screenshot).not.toHaveBeenCalled();
+    expect(document.documentElement.outerHTML).toBe(original);
+    expect(window.__pagxIsolatedControl).toBeUndefined();
+  });
+
+  test('scroll offsets and negative outline offsets retain an outward-rounded document clip', async () => {
+    document.body.innerHTML = '<input type="date">';
+    const control = document.querySelector('input');
+    computed.set(control, { outlineStyle: 'solid', outlineWidth: '2px', outlineOffset: '-4px' });
+    setRect(control, { left: 10.25, top: 20.25, width: 30.25, height: 10.25 });
+    jest.replaceProperty(window, 'devicePixelRatio', 2);
+    jest.replaceProperty(window, 'scrollX', 100);
+    jest.replaceProperty(window, 'scrollY', 50);
+    const page = pageFixture();
+    const [paint] = await captureControlPaints(page, 'playwright');
+    expect(paint).toMatchObject({ x: -.25, y: -.25, width: 30.5, height: 10.5 });
+    expect(page.screenshot).toHaveBeenCalledWith({
+      type: 'png', omitBackground: true, clip: { x: 110, y: 70, width: 30.5, height: 10.5 },
+    });
+  });
 });

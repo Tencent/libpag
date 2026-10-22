@@ -34,6 +34,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/TextBox.h"
+#include "utils/ProjectPath.h"
 
 namespace pag {
 namespace {
@@ -411,6 +412,27 @@ PAG_TEST(PAGXHTMLElementTest, MissingImageDimensionsPreserveSlotAndReportNatural
   EXPECT_GT(layer->width, 0);
   EXPECT_GT(layer->height, 0);
   EXPECT_TRUE(HasWarning(document, "image natural size unavailable"));
+}
+
+PAG_TEST(PAGXHTMLElementTest, ExifOrientationControlsIntrinsicImageAndBackgroundSize) {
+  // The stored JPEG is 4032x3024 with EXIF orientation 6, so its displayed size is 3024x4032.
+  const auto source = ProjectPath::Absolute("resources/apitest/rotation.jpg");
+  auto document = ParseElements("<img id=\"box\" src=\"" + source + "\"/>");
+  ASSERT_NE(document, nullptr);
+  auto* image = NamedLayer(document);
+  ASSERT_NE(image, nullptr);
+  EXPECT_FLOAT_EQ(image->width, 3024);
+  EXPECT_FLOAT_EQ(image->height, 4032);
+
+  auto background =
+      ParseBackground(source, "background-size:30.24px 40.32px;background-repeat:repeat");
+  ASSERT_NE(background, nullptr);
+  EXPECT_FALSE(HasWarning(background, "intrinsic size unavailable"));
+  auto patterns = Nodes<pagx::ImagePattern>(background, pagx::NodeType::ImagePattern);
+  ASSERT_EQ(patterns.size(), 1u);
+  EXPECT_EQ(patterns[0]->scaleMode, pagx::ScaleMode::None);
+  EXPECT_NEAR(patterns[0]->matrix.a, .01f, 1e-6f);
+  EXPECT_NEAR(patterns[0]->matrix.d, .01f, 1e-6f);
 }
 
 PAG_TEST(PAGXHTMLElementTest, GenericDataUriTypesAreSniffedFromThePayload) {
