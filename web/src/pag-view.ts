@@ -39,7 +39,9 @@ const ensureCanvasSelector = (canvasElement: HTMLCanvasElement): string => {
     autoCanvasID += 1;
     canvasElement.id = `pag-webgpu-canvas-${autoCanvasID}`;
   }
-  return `#${canvasElement.id}`;
+  // The selector reaches the wasm side via WGPUSurfaceDescriptorFromCanvasHTMLSelector, so ids
+  // with special characters (dots, colons) must be escaped to stay a valid CSS selector.
+  return `#${CSS.escape(canvasElement.id)}`;
 };
 
 @destroyVerify
@@ -352,14 +354,19 @@ export class PAGView {
     const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
       if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
-        if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d') as CanvasRenderingContext2D;
-        const compositeOperation = this.canvasContext!.globalCompositeOperation;
-        this.canvasContext!.globalCompositeOperation = 'copy';
+        if (!this.canvasContext) {
+          // getContext('2d') returns null when the canvas already holds another context type;
+          // compositing is impossible then, so skip this frame instead of crashing.
+          this.canvasContext = this.canvasElement?.getContext('2d') ?? null;
+        }
+        if (!this.canvasContext) return;
+        const compositeOperation = this.canvasContext.globalCompositeOperation;
+        this.canvasContext.globalCompositeOperation = 'copy';
         // On WebGL the render target is the default framebuffer (bottom-left origin) of a
         // possibly larger global canvas, so the content sits at the bottom; on WebGPU the
         // surface wraps the whole exactly-sized canvas with top-left origin.
         const srcY = isWebGPUBackend() ? 0 : PAGModule.globalCanvas.canvas.height - this.rawHeight;
-        this.canvasContext?.drawImage(
+        this.canvasContext.drawImage(
           PAGModule.globalCanvas.canvas,
           0,
           srcY,
@@ -370,7 +377,7 @@ export class PAGView {
           this.canvasContext.canvas.width,
           this.canvasContext.canvas.height,
         );
-        this.canvasContext!.globalCompositeOperation = compositeOperation;
+        this.canvasContext.globalCompositeOperation = compositeOperation;
       }
       clock.mark('flush');
       this.setDebugData({ flushTime: clock.measure('', 'flush') });

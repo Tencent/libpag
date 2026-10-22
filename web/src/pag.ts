@@ -34,8 +34,11 @@ const initWebGPUDevice = async (module: types.PAG, webGPUDevice?: object): Promi
     module.preinitializedWebGPUDevice = webGPUDevice;
     return;
   }
+  if (typeof navigator === 'undefined') {
+    throw new Error('WebGPU is not supported in this browser. Please use the WebGL build of libpag.');
+  }
   const nav = navigator as NavigatorWithGPU;
-  if (typeof navigator === 'undefined' || !nav.gpu) {
+  if (!nav.gpu) {
     throw new Error('WebGPU is not supported in this browser. Please use the WebGL build of libpag.');
   }
   const adapter = await nav.gpu.requestAdapter();
@@ -55,7 +58,7 @@ const PAGInit = (moduleOption: ModuleOption = {}): Promise<types.PAG> =>
       throw new Error('PAGInit fail! Please check .wasm file path valid.');
     })
     .then(async (module: types.PAG) => {
-      if (module._IsWebGPUBackend()) {
+      if (typeof module._IsWebGPUBackend === 'function' && module._IsWebGPUBackend()) {
         // The GPUDevice must be preinitialized on the JS side before any rendering call,
         // because tgfx picks it up synchronously via emscripten_webgpu_get_device().
         await initWebGPUDevice(module, moduleOption.webGPUDevice);

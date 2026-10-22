@@ -337,6 +337,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       }
       case tgfx::Backend::Metal:
+        // BackendSemaphore currently only wraps GL sync objects, so a Metal semaphore cannot be
+        // forwarded through the public API yet. The caller's semaphore stays uninitialized.
         break;
       case tgfx::Backend::Unknown:
         // The flush produced nothing to synchronize on, so the context left the semaphore

@@ -20,7 +20,7 @@ export const setMixin = (module: PAG) => {
     return module._SDKVersion();
   };
   module.isWebGPUBackend = function () {
-    return module._IsWebGPUBackend();
+    return typeof module._IsWebGPUBackend === 'function' && module._IsWebGPUBackend();
   };
   module.isIPhone = () => IPHONE;
 };

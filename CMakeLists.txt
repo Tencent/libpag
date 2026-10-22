@@ -150,6 +150,12 @@ if (PAG_USE_METAL AND IOS)
     set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
 endif ()
 
+# WebGPU glue (Devices_WebGPU.cpp) pulls in tgfx's webgpu headers, which require emscripten —
+# reject the flag on other platforms at configure time instead of failing on missing headers.
+if (PAG_USE_WEBGPU AND NOT WEB)
+    message(FATAL_ERROR "PAG_USE_WEBGPU is only supported on the Web platform.")
+endif ()
+
 if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
         AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
     message(FATAL_ERROR
