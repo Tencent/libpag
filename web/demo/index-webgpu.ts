@@ -28,7 +28,16 @@ let isMobile = false;
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
-    PAG = await PAGInit({ locateFile: (file: string) => '../lib-webgpu/' + file });
+    if (!navigator.gpu) {
+      document.getElementById('waiting')!.innerText = 'WebGPU is not supported in this browser.';
+      return;
+    }
+    try {
+      PAG = await PAGInit({ locateFile: (file: string) => '../lib-webgpu/' + file });
+    } catch (error) {
+      document.getElementById('waiting')!.innerText = `libpag init failed: ${error}`;
+      return;
+    }
     // Mobile
     isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
     if (isMobile) {
