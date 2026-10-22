@@ -39,6 +39,11 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
 }
 
 void TextBox::onMeasure(LayoutContext* context) {
+  // Mirrors Group::onMeasure: the authored position is the box origin when no constraints
+  // position it. Without this the position field is dead (preferredX/Y stay 0) and a
+  // constraint-positioned box loses its origin once the constraints are gone.
+  preferredX = position.x;
+  preferredY = position.y;
   // TextBox keeps width/height as the authored text-box dimensions for shaping. this->width /
   // this->height constrain the shaping box and also become the preferred size when set; otherwise
   // the shaped text bounds drive the preferred size. percentWidth/percentHeight are not consulted
