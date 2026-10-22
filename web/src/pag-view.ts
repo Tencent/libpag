@@ -175,6 +175,7 @@ export class PAGView {
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private globalCanvasRetained = false;
+  private canvasContextUnavailableWarned = false;
   private rawWidth = 0;
   private rawHeight = 0;
   private debugData: DebugData = {
@@ -369,7 +370,15 @@ export class PAGView {
           this.canvasContext = this.canvasElement?.getContext('2d') as
               CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
         }
-        if (!this.canvasContext) return;
+        if (!this.canvasContext) {
+          if (!this.canvasContextUnavailableWarned) {
+            this.canvasContextUnavailableWarned = true;
+            console.warn(
+              'PAGView: the target canvas already holds a different context type, so Canvas2D compositing is skipped.',
+            );
+          }
+          return;
+        }
         const compositeOperation = this.canvasContext.globalCompositeOperation;
         this.canvasContext.globalCompositeOperation = 'copy';
         // On WebGL the render target is the default framebuffer (bottom-left origin) of a
