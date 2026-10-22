@@ -3,7 +3,7 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
-import { BackendContext } from './core/backend-context';
+import { BackendContext, isWebGPUBackend } from './core/backend-context';
 import { PAGModule } from './pag-module';
 import { RenderCanvas } from './core/render-canvas';
 import { Clock } from './utils/clock';
@@ -28,6 +28,21 @@ export interface PAGViewOptions {
    */
   firstFrame?: boolean;
 }
+
+let autoCanvasID = 0;
+
+// The WebGPU backend locates a DOM canvas through a CSS selector (its C++ WebGPUWindow wraps
+// WGPUSurfaceDescriptorFromCanvasHTMLSelector), so the canvas element must carry an id.
+// OffscreenCanvas has no DOM id and takes the canvas-object path instead.
+const ensureCanvasSelector = (canvasElement: HTMLCanvasElement): string => {
+  if (!canvasElement.id) {
+    autoCanvasID += 1;
+    canvasElement.id = `pag-webgpu-canvas-${autoCanvasID}`;
+  }
+  // The selector reaches the wasm side via WGPUSurfaceDescriptorFromCanvasHTMLSelector, so ids
+  // with special characters (dots, colons) must be escaped to stay a valid CSS selector.
+  return `#${CSS.escape(canvasElement.id)}`;
+};
 
 @destroyVerify
 export class PAGView {
@@ -57,29 +72,70 @@ export class PAGView {
     const pagView = new PAGView(pagPlayer, canvasElement);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
-    if (pagView.pagViewOptions.useCanvas2D) {
-      PAGModule.globalCanvas.retain();
-      pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
-    } else {
-      pagView.renderCanvas = RenderCanvas.from(canvasElement);
-      pagView.renderCanvas.retain();
-      pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
-    }
-    pagView.resetSize(pagView.pagViewOptions.useScale);
-    pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
-    pagView.player.setSurface(pagView.pagSurface);
-    pagView.player.setComposition(file);
-    pagView.setProgress(0);
-    if (pagView.pagViewOptions.firstFrame) {
-      await pagView.flush();
-      pagView.playFrame = 0;
+    try {
+      if (pagView.pagViewOptions.useCanvas2D) {
+        PAGModule.globalCanvas.retain();
+        pagView.globalCanvasRetained = true;
+        if (!isWebGPUBackend()) {
+          pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
+        }
+      } else {
+        pagView.renderCanvas = RenderCanvas.from(canvasElement);
+        pagView.renderCanvas.retain();
+        if (!isWebGPUBackend()) {
+          pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
+        }
+      }
+      pagView.resetSize(pagView.pagViewOptions.useScale);
+      pagView.frameRate = file.frameRate();
+      pagView.pagSurface = this.makePAGSurface(
+        pagView.pagGlContext,
+        canvasElement,
+        pagView.rawWidth,
+        pagView.rawHeight,
+        pagView.pagViewOptions.useCanvas2D,
+      );
+      pagView.player.setSurface(pagView.pagSurface);
+      pagView.player.setComposition(file);
+      pagView.setProgress(0);
+      if (pagView.pagViewOptions.firstFrame) {
+        await pagView.flush();
+        pagView.playFrame = 0;
+      }
+    } catch (error) {
+      // Roll back everything acquired above so a failed init() leaks neither the wasm player
+      // instance nor the retained canvas/GL registrations.
+      pagView.destroy();
+      throw error;
     }
     return pagView;
   }
 
-  protected static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
-    if (!pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
+  protected static makePAGSurface(
+    pagGlContext: BackendContext | null,
+    canvasElement: HTMLCanvasElement | OffscreenCanvas,
+    width: number,
+    height: number,
+    useCanvas2D = false,
+  ): PAGSurface {
+    if (isWebGPUBackend()) {
+      // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
+      // Width and height are read from the canvas by the C++ side.
+      if (useCanvas2D) {
+        // In canvas2D mode PAG renders into the shared global canvas and flush() composites it
+        // onto the target canvas with drawImage. Size the global canvas exactly, because the
+        // surface wraps the whole canvas and its content is top-left origin.
+        const globalCanvas = PAGModule.globalCanvas.canvas;
+        if (!globalCanvas) throw new Error('Global canvas is not initialized!');
+        PAGModule.globalCanvas.setCanvasSize(width, height);
+        return PAGSurface.fromCanvas(globalCanvas);
+      }
+      if (isOffscreenCanvas(canvasElement)) {
+        return PAGSurface.fromCanvas(canvasElement);
+      }
+      return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement as HTMLCanvasElement));
+    }
+    if (!pagGlContext || !pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
     const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);
     pagGlContext.clearCurrent();
     return pagSurface;
@@ -118,6 +174,8 @@ export class PAGView {
   protected eventManager: EventManager<PAGViewEventMap, PAGView> = new EventManager();
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
+  private globalCanvasRetained = false;
+  private canvasContextUnavailableWarned = false;
   private rawWidth = 0;
   private rawHeight = 0;
   private debugData: DebugData = {
@@ -306,13 +364,31 @@ export class PAGView {
     const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
       if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
-        if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d') as CanvasRenderingContext2D;
-        const compositeOperation = this.canvasContext!.globalCompositeOperation;
-        this.canvasContext!.globalCompositeOperation = 'copy';
-        this.canvasContext?.drawImage(
+        if (!this.canvasContext) {
+          // getContext('2d') returns null when the canvas already holds another context type;
+          // compositing is impossible then, so skip this frame instead of crashing.
+          this.canvasContext = this.canvasElement?.getContext('2d') as
+              CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+        }
+        if (!this.canvasContext) {
+          if (!this.canvasContextUnavailableWarned) {
+            this.canvasContextUnavailableWarned = true;
+            console.warn(
+              'PAGView: the target canvas already holds a different context type, so Canvas2D compositing is skipped.',
+            );
+          }
+          return;
+        }
+        const compositeOperation = this.canvasContext.globalCompositeOperation;
+        this.canvasContext.globalCompositeOperation = 'copy';
+        // On WebGL the render target is the default framebuffer (bottom-left origin) of a
+        // possibly larger global canvas, so the content sits at the bottom; on WebGPU the
+        // surface wraps the whole exactly-sized canvas with top-left origin.
+        const srcY = isWebGPUBackend() ? 0 : PAGModule.globalCanvas.canvas.height - this.rawHeight;
+        this.canvasContext.drawImage(
           PAGModule.globalCanvas.canvas,
           0,
-          PAGModule.globalCanvas.canvas.height - this.rawHeight,
+          srcY,
           this.rawWidth,
           this.rawHeight,
           0,
@@ -320,7 +396,7 @@ export class PAGView {
           this.canvasContext.canvas.width,
           this.canvasContext.canvas.height,
         );
-        this.canvasContext!.globalCompositeOperation = compositeOperation;
+        this.canvasContext.globalCompositeOperation = compositeOperation;
       }
       clock.mark('flush');
       this.setDebugData({ flushTime: clock.measure('', 'flush') });
@@ -378,8 +454,21 @@ export class PAGView {
     }
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
+    if (isWebGPUBackend()) {
+      const webgpuSurface = PAGView.makePAGSurface(
+        null,
+        this.canvasElement,
+        this.rawWidth,
+        this.rawHeight,
+        this.pagViewOptions.useCanvas2D,
+      );
+      this.player.setSurface(webgpuSurface);
+      this.pagSurface?.destroy();
+      this.pagSurface = webgpuSurface;
+      return;
+    }
     if (!this.pagGlContext) return;
-    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.rawWidth, this.rawHeight);
+    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
@@ -405,7 +494,12 @@ export class PAGView {
     this.player.destroy();
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
-      PAGModule.globalCanvas.release();
+      // Release only when retain() actually succeeded, otherwise a failed init() would drive the
+      // shared GlobalCanvas retain count negative and poison all subsequent init attempts.
+      if (this.globalCanvasRetained) {
+        PAGModule.globalCanvas.release();
+        this.globalCanvasRetained = false;
+      }
     } else {
       this.renderCanvas?.release();
     }

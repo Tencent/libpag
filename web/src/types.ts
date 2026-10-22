@@ -44,12 +44,17 @@ export interface PAG extends EmscriptenModule {
       colorType: ColorType,
       alphaType: AlphaType,
     ) => any;
-    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
   };
   _PAGPlayer: any;
   _PAGSurface: {
     _FromCanvas: (canvasID: string) => any;
-    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
+    /**
+     * WebGPU build only. Wraps a canvas object (HTMLCanvasElement or OffscreenCanvas) instead of
+     * a DOM id selector.
+     */
+    _FromCanvasObject?: (canvas: HTMLCanvasElement | OffscreenCanvas) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
     _FromRenderTarget: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
   _PAGComposition: {
@@ -122,6 +127,27 @@ export interface PAG extends EmscriptenModule {
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
+  /**
+   * Returns true when the loaded wasm module is built with the WebGPU backend.
+   */
+  isWebGPUBackend: () => boolean;
+  _IsWebGPUBackend: () => boolean;
+  /**
+   * WebGPU build only. The GPUDevice preinitialized on the JS side during PAGInit, picked up by
+   * tgfx via emscripten_webgpu_get_device().
+   */
+  preinitializedWebGPUDevice?: object;
+  /**
+   * WebGPU build only. Emscripten's WebGPU runtime exported via EXPORTED_RUNTIME_METHODS,
+   * providing the object managers that map wasm handle numbers to JS WebGPU objects.
+   */
+  WebGPU?: {
+    mgrTexture?: {
+      create: (object: object) => number;
+      release: (id: number) => void;
+    };
+    TextureFormat?: string[];
+  };
   currentPlayer: PAGPlayer | null;
   videoReaderManager: VideoReaderManager | null;
   _videoInfoManager: {
