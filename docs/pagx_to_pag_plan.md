@@ -15,7 +15,7 @@
 
 ## 一期任务（依赖顺序）
 
-### T1 基础编解码设施（无依赖）
+### T1 基础编解码设施（无依赖）✅ 已完成（2026-10-22）
 - 新增 `src/pagx/pag/TagCode.h`：v4 全部 TagCode 枚举（规范 §1.3/§9，含 263/264/436/489–492 新增号）。
 - 新增 `src/pagx/pag/StreamContext.h` 复用与 `EncodeStream`/`DecodeStream` 接入：确认流工具对
   独立 PAGX 构建的可编入性（设计文档 §2 编译依赖），必要时把 `src/codec/utils/` 移到共用位置。

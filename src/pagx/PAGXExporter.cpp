@@ -319,6 +319,10 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       // PAGImage channels carry a runtime-only decoded bitmap with no serializable form, so they
       // are intentionally not written; there is no matching import path in ParseChannel.
       break;
+    case ChannelValueType::Path:
+      // Path channels belong to the PAGX spec §6.1 extension; XML round-tripping lands with
+      // that extension's implementation.
+      break;
   }
 }
 

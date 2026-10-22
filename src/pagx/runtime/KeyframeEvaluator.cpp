@@ -45,6 +45,10 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
       return LerpKeyframeValue<Matrix>(std::get<Matrix>(a), std::get<Matrix>(b), t);
     case ChannelValueType::PAGImage:
       return std::get<std::shared_ptr<PAGImage>>(a);
+    case ChannelValueType::Path:
+      // PathData channels are not wired into the runtime writers yet (PAGX spec §6.1
+      // extension); nothing to interpolate until that lands.
+      return a;
   }
   return a;
 }

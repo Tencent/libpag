@@ -50,6 +50,11 @@ enum class ChannelValueType : uint8_t {
   Color = 5,
   Matrix = 6,
   PAGImage = 7,
+  // PathData value for the Path.data channel (PAGX spec §6.1, "path" channel type). The
+  // variant alternative and the runtime channel table land with the spec-extension
+  // implementation; the binary format already reserves value 8 (spec/pag_binary_spec.md
+  // §9.10).
+  Path = 8,
 };
 
 }  // namespace pagx
