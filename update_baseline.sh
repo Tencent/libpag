@@ -107,14 +107,44 @@ if [ "$SKIP_IMAGES" -eq 1 ]; then
 fi
 cmake -S "$WORKSPACE" -B "$BUILD_DIR" "${CMAKE_BACKEND_ARGS[@]}" "${CMAKE_IMAGE_ARGS[@]}" \
       -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build "$BUILD_DIR" --target "UpdateBaseline_$TARGET_SUFFIX" -- -j 12
-if ! "$BUILD_DIR/UpdateBaseline_$TARGET_SUFFIX"; then
+BASELINE_TARGET="UpdateBaseline_$TARGET_SUFFIX"
+GENERATED_CACHE_DIR="$CACHE_DIR"
+TARGET_LIST="$BUILD_DIR/CMakeFiles/TargetDirectories.txt"
+if ! grep -Fxq "$BUILD_DIR/CMakeFiles/$BASELINE_TARGET.dir" "$TARGET_LIST"; then
+  if [ "$TARGET_SUFFIX" = OpenGL ] &&
+     grep -Fxq "$BUILD_DIR/CMakeFiles/UpdateBaseline.dir" "$TARGET_LIST"; then
+    BASELINE_TARGET=UpdateBaseline
+    GENERATED_CACHE_DIR="$WORKSPACE/test/baseline/.cache"
+    echo "Using the legacy OpenGL baseline target on main."
+  else
+    echo "Error: main does not provide $BASELINE_TARGET." >&2
+    exit 1
+  fi
+fi
+
+cmake --build "$BUILD_DIR" --target "$BASELINE_TARGET" -- -j 12
+# Older main revisions write their OpenGL results to the shared cache. Remove the previous MD5
+# file so a failed or incomplete refresh cannot be imported as a fresh per-backend cache.
+rm -f "$GENERATED_CACHE_DIR/md5.json"
+if ! "$BUILD_DIR/$BASELINE_TARGET"; then
   mkdir -p "$WORKSPACE/result"
   if [ -d "$WORKSPACE/test/out" ]; then
     cp -R "$WORKSPACE/test/out" "$WORKSPACE/result/"
   fi
   echo "Baseline cache refresh for '$BACKEND_NAME' failed." >&2
   exit 1
+fi
+if [ ! -s "$GENERATED_CACHE_DIR/md5.json" ] ||
+   [ ! -s "$GENERATED_CACHE_DIR/HEAD" ] ||
+   ! cmp -s "$WORKSPACE/test/baseline/version.json" "$GENERATED_CACHE_DIR/version.json"; then
+  echo "Error: $BASELINE_TARGET did not produce a complete baseline cache." >&2
+  exit 1
+fi
+if [ "$GENERATED_CACHE_DIR" != "$CACHE_DIR" ]; then
+  mkdir -p "$CACHE_DIR"
+  cp "$GENERATED_CACHE_DIR/md5.json" "$GENERATED_CACHE_DIR/version.json" \
+     "$GENERATED_CACHE_DIR/HEAD" "$CACHE_DIR/"
+  echo "Imported the legacy OpenGL cache into '$BACKEND_NAME'."
 fi
 RestoreWorkspace
 depsync
