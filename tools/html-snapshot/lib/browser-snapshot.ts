@@ -798,8 +798,6 @@ function readBorderSide(computed, side) {
 // bar should sit 1.5px from the inner padding edge, but emitting the raw
 // border-box-relative offset (2.5px) drifts it by the 1px border).
 function paddingBoxOrigin(rect, computed) {
-  // Asymmetric borders become paint overlays; the emitted host has no CSS border.
-  if (!isUniformBorder(computed)) return rect;
   const bt = borderWidthOf(computed, 'top');
   const bl = borderWidthOf(computed, 'left');
   if (bt === 0 && bl === 0) return rect;
@@ -1297,30 +1295,12 @@ function snapshotFontFamily(value, computed) {
   const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
   const request = { weight: String(weight), style: computed.getPropertyValue('font-style') || 'normal',
     stretch: computed.getPropertyValue('font-stretch') || '100%' };
-  const faces = [];
-  for (const part of (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || [])) {
+  return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
     const family = part.trim().replace(/^["']|["']$/g, '');
     const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
     matches.sort((a, b) => fontMatchCompare(request, a, b));
-    if (matches.length) {
-      // Later @font-face rules take precedence for overlapping unicode ranges.
-      faces.push(...matches.filter(face => fontMatchCompare(request, face, matches[0]) === 0).reverse());
-    } else {
-      // Numeric request labels avoid confusing a CSS weight with an exact native face named
-      // Thin/Light/etc. The native same-family matcher parses weight and width independently.
-      faces.push({ systemFamily: family, style: `${weight} ${request.stretch}` +
-        (request.style === 'italic' ? ' Italic' : request.style.startsWith('oblique') ? ' Oblique' : '') });
-    }
-  }
-  const bindings = window.__pagxFontBindings || (window.__pagxFontBindings = []);
-  const key = JSON.stringify(faces);
-  let binding = bindings.find(b => JSON.stringify(b.faces) === key);
-  if (!binding) {
-    binding = { family: 'pagx-snapshot-font-' + bindings.length, faces };
-    bindings.push(binding);
-  }
-  return "'" + binding.family + "'";
-
+    return matches.length ? `'${matches[0].to.replace(/'/g, "\\'")}'` : part.trim();
+  }).join(', ');
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -2983,19 +2963,17 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
       box: false, text: true,
     });
     let transformed = col.computed ? col.text : applyTextTransform(col.text, colComputed);
-    const positions = measureTextInlinePositions(textNode, col, colComputed, transformed, true);
+    const positions = colComputed.getPropertyValue('text-align') === 'justify'
+      ? measureTextInlinePositions(textNode, col, colComputed, transformed, true) : [];
     if (col.computed) {
       transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
     } else {
       if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
       if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
     }
-    const positionAttr = positions.length === Array.from(transformed).length && positions.length > 0
+    const positionAttr = positions.length === Array.from(transformed).length && positions.length > 1
       ? ` data-pagx-inline-positions="${positions.join(',')}"` : '';
-    if (!positionAttr && transformed) {
-      PAINT_CAPTURE.warnings.push('html-snapshot: vertical text positions unavailable; using natural shaping');
-    }
-    out.push(`<span${positionAttr} style="${withNowrap(base)};text-align:start">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${positionAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -5335,7 +5313,6 @@ const STYLE_SCHEMA = [
   { prop: 'text-decoration-line',  scope: 'text', defaults: ['none'], outProp: 'text-decoration' },
   { prop: 'text-decoration-color', scope: 'text', defaults: ['currentcolor'], skipIfEqualsTextColor: true },
   { prop: 'white-space',           scope: 'text', defaults: ['normal'] },
-  { prop: 'text-orientation',      scope: 'text', defaults: ['mixed'] },
   { prop: 'writing-mode',          scope: 'text', defaults: ['horizontal-tb'], normalize: normalizeWritingMode },
 ];
 const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));

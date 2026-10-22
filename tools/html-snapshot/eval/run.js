@@ -401,7 +401,6 @@ async function processCase(entry, outDir, opts, browser) {
         pagxBin: opts.pagxBin,
         pagxFile: subsetPagx,
         fontFiles: fontFallbacks,
-        fontManifest: opts.downloadFonts ? fontManifest : undefined,
         stderrPath: path.join(caseDir, 'font-embed.stderr.txt'),
       });
     }
@@ -413,7 +412,6 @@ async function processCase(entry, outDir, opts, browser) {
       output: subsetPng,
       scale: 1,
       fontFallbacks,
-      fontManifest: opts.downloadFonts ? fontManifest : undefined,
       stderrPath: path.join(caseDir, 'render.stderr.txt'),
     });
     row.renderMs = r.durationMs;

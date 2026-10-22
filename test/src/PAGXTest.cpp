@@ -92,10 +92,8 @@
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Padding.h"
 #include "pagx/utils/StringParser.h"
-#include "pagx/utils/TextUtils.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
-#include "renderer/TextShaper.h"
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
 #else
@@ -2843,50 +2841,6 @@ PAGX_TEST(PAGXTest, TextInlinePositionsPreserveLayoutAndScale) {
   params.textScale = 1;
   auto normal = pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params, &context);
   EXPECT_NEAR(normal.bounds.width, 40, 0.01f);
-}
-
-PAGX_TEST(PAGXTest, TextInlinePositionsResetAfterEqualLengthRuntimeEdit) {
-  auto doc = pagx::PAGXDocument::Make(200, 100);
-  auto* layer = doc->makeNode<pagx::Layer>();
-  layer->width = 200;
-  layer->height = 100;
-  doc->layers.push_back(layer);
-  auto* text = doc->makeNode<pagx::Text>();
-  text->text = "一二";
-  text->fontFamily = "PositionTest";
-  text->fontSize = 20;
-  text->inlinePositions = {0, 100};
-  auto* natural = doc->makeNode<pagx::Text>();
-  natural->text = "三四";
-  natural->fontFamily = text->fontFamily;
-  natural->fontSize = text->fontSize;
-  layer->contents = {text, natural, doc->makeNode<pagx::Fill>()};
-  pagx::FontConfig fonts;
-  fonts.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
-                     "PositionTest", "Regular");
-  doc->applyLayout(&fonts);
-  auto scene = pagx::PAGScene::Make(doc);
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 100);
-  ASSERT_NE(scene, nullptr);
-  ASSERT_NE(surface, nullptr);
-  ASSERT_TRUE(scene->draw(surface));
-  auto* binding = scene->mutableBinding();
-  auto runtimeText = binding->get<tgfx::Text>(text);
-  auto naturalText = binding->get<tgfx::Text>(natural);
-  ASSERT_NE(runtimeText, nullptr);
-  ASSERT_NE(naturalText, nullptr);
-  ASSERT_NE(runtimeText->textBlob(), nullptr);
-  ASSERT_NE(naturalText->textBlob(), nullptr);
-  float naturalWidth = naturalText->textBlob()->getBounds().width();
-  EXPECT_GT(runtimeText->textBlob()->getBounds().width(), naturalWidth + 50);
-
-  ASSERT_TRUE(binding->apply(text, "text", pagx::KeyValue{std::string("三四")}, 1));
-  ASSERT_TRUE(scene->draw(surface));
-  ASSERT_NE(runtimeText->textBlob(), nullptr);
-  EXPECT_NEAR(runtimeText->textBlob()->getBounds().width(), naturalWidth, 0.01f);
-  // Runtime edits leave the authored document untouched.
-  EXPECT_EQ(text->text, "一二");
-  EXPECT_EQ(text->inlinePositions, (std::vector<float>{0, 100}));
 }
 
 PAGX_TEST(PAGXTest, TextInlinePositionsKeepLigaturesAndCombiningClusters) {
@@ -5861,120 +5815,6 @@ PAGX_TEST(PAGXTest, FontEmbedderAppliesSynthesizedItalicExactlyOnce) {
 /**
  * Test case: Vertical text layout produces TextLayoutGlyphRun with rotations.
  */
-PAGX_TEST(PAGXTest, SidewaysShapingKeepsHorizontalClustersAndAdvances) {
-  pagx::FontConfig config;
-  pagx::LayoutContext context(&config);
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_NE(typeface, nullptr);
-  tgfx::Font font(typeface, 24);
-  std::string content = "AV office A\u0301（）";
-  auto horizontal = pagx::TextShaper::Shape(content, font, context);
-  auto sideways =
-      pagx::TextShaper::Shape(content, font, context, true, false, pagx::TextOrientation::Sideways);
-  ASSERT_EQ(horizontal.size(), sideways.size());
-  for (size_t i = 0; i < horizontal.size(); i++) {
-    EXPECT_EQ(horizontal[i].glyphID, sideways[i].glyphID);
-    EXPECT_EQ(horizontal[i].cluster, sideways[i].cluster);
-    EXPECT_FLOAT_EQ(horizontal[i].xAdvance, sideways[i].xAdvance);
-    EXPECT_FLOAT_EQ(horizontal[i].xOffset, sideways[i].xOffset);
-    EXPECT_FLOAT_EQ(horizontal[i].yOffset, sideways[i].yOffset);
-    EXPECT_TRUE(sideways[i].sideways);
-  }
-  auto mixed = pagx::TextShaper::Shape("（）：", font, context, true);
-  ASSERT_FALSE(mixed.empty());
-  for (const auto& glyph : mixed) EXPECT_FALSE(glyph.sideways);
-}
-
-PAGX_TEST(PAGXTest, VerticalOrientationAndEmbeddingPreserveShaping) {
-  auto doc = pagx::PAGXDocument::Make(300, 500);
-  auto* layer = doc->makeNode<pagx::Layer>();
-  doc->layers.push_back(layer);
-  layer->width = 300;
-  layer->height = 500;
-  auto* box = doc->makeNode<pagx::TextBox>();
-  box->width = 200;
-  box->height = 450;
-  box->writingMode = pagx::WritingMode::Vertical;
-  box->wordWrap = false;
-  auto* text = doc->makeNode<pagx::Text>();
-  text->text = "中文AV office A\u0301 2026（）";
-  text->fontFamily = "DocumentAlias";
-  text->fontSize = 24;
-  box->elements = {text};
-  layer->contents = {box};
-  pagx::FontConfig fonts;
-  fonts.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
-                     text->fontFamily, "Regular");
-  for (auto orientation : {pagx::TextOrientation::Mixed, pagx::TextOrientation::Upright,
-                           pagx::TextOrientation::Sideways}) {
-    pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc.get());
-    text->textOrientation = orientation;
-    doc->applyLayout(&fonts);
-    std::vector<pagx::Matrix> before;
-    bool hasRotation = false;
-    for (const auto& run : text->glyphData->layoutRuns) {
-      for (size_t i = 0; i < run.glyphs.size(); i++) {
-        pagx::Matrix matrix;
-        if (!run.xforms.empty()) {
-          const auto& xf = run.xforms[i];
-          matrix.a = matrix.d = xf.scos;
-          matrix.b = xf.ssin;
-          matrix.c = -xf.ssin;
-          matrix.tx = xf.tx;
-          matrix.ty = xf.ty;
-          hasRotation |= std::fabs(xf.ssin) > 0.1f;
-        } else {
-          matrix.tx = run.positions[i].x;
-          matrix.ty = run.positions[i].y;
-        }
-        before.push_back(matrix);
-      }
-    }
-    EXPECT_EQ(hasRotation, orientation != pagx::TextOrientation::Upright);
-    ASSERT_TRUE(pagx::FontEmbedder().embed(doc.get()));
-    size_t index = 0;
-    for (auto* run : text->glyphRuns) {
-      for (size_t i = 0; i < run->glyphs.size(); i++, index++) {
-        ASSERT_LT(index, before.size());
-        auto* glyph = run->font->glyphs[run->glyphs[i] - 1];
-        auto actual =
-            pagx::ComposeGlyphMatrix(run, i, glyph->advance * run->fontSize / run->font->unitsPerEm,
-                                     run->positions[i].x, run->positions[i].y);
-        EXPECT_NEAR(actual.a, before[index].a, 0.001f);
-        EXPECT_NEAR(actual.b, before[index].b, 0.001f);
-        EXPECT_NEAR(actual.c, before[index].c, 0.001f);
-        EXPECT_NEAR(actual.d, before[index].d, 0.001f);
-        EXPECT_NEAR(actual.tx, before[index].tx, 0.001f);
-        EXPECT_NEAR(actual.ty, before[index].ty, 0.001f);
-      }
-    }
-    EXPECT_EQ(index, before.size());
-  }
-}
-
-PAGX_TEST(PAGXTest, FontFaceBindingsKeepAliasSubsetsAndCSSOrder) {
-  pagx::FontConfig fonts;
-  pagx::FontConfig::FontFace first;
-  first.path = ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf");
-  first.unicodeRanges = {{'A', 'A'}};
-  pagx::FontConfig::FontFace second;
-  second.path = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  second.unicodeRanges = {{'A', 'Z'}};
-  ASSERT_TRUE(fonts.addFontFace("CSSAlias", first));
-  ASSERT_TRUE(fonts.addFontFace("CSSAlias", second));
-  // A globally registered face must not win over the explicit candidates of this family.
-  fonts.addFallbackFont(second.path, 0);
-  pagx::LayoutContext context(&fonts);
-  auto a = context.findTypeface("CSSAlias", "Regular", 'A');
-  auto b = context.findTypeface("CSSAlias", "Regular", 'B');
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-  EXPECT_NE(a->fontFamily(), b->fontFamily());
-  EXPECT_EQ(context.findTypeface("CSSAlias", "Regular", 0x4E00), nullptr);
-  EXPECT_EQ(context.findTypeface("CSSAlias", "Regular")->fontFamily(), a->fontFamily());
-}
-
 PAGX_TEST(PAGXTest, VerticalTextLayoutGlyphRun) {
   auto doc = pagx::PAGXDocument::Make(200, 300);
   auto layer = doc->makeNode<pagx::Layer>();

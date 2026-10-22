@@ -214,10 +214,6 @@ DEFINE_ENUM_CONVERSION(TextAnchor, TextAnchor::Start, {TextAnchor::Start, "start
 DEFINE_ENUM_CONVERSION(TextBaseline, TextBaseline::LineBox, {TextBaseline::LineBox, "lineBox"},
                        {TextBaseline::Alphabetic, "alphabetic"})
 
-DEFINE_ENUM_CONVERSION(TextOrientation, TextOrientation::Mixed, {TextOrientation::Mixed, "mixed"},
-                       {TextOrientation::Upright, "upright"},
-                       {TextOrientation::Sideways, "sideways"})
-
 DEFINE_ENUM_CONVERSION(WritingMode, WritingMode::Horizontal,
                        {WritingMode::Horizontal, "horizontal"}, {WritingMode::Vertical, "vertical"})
 

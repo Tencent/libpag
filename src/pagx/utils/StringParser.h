@@ -46,7 +46,6 @@
 #include "pagx/types/ScaleMode.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
-#include "pagx/types/TextOrientation.h"
 #include "pagx/types/TileMode.h"
 
 namespace pagx {
@@ -164,9 +163,6 @@ bool IsValidTextAnchorString(const std::string& str);
 std::string TextBaselineToString(TextBaseline baseline);
 TextBaseline TextBaselineFromString(const std::string& str);
 bool IsValidTextBaselineString(const std::string& str);
-std::string TextOrientationToString(TextOrientation orientation);
-TextOrientation TextOrientationFromString(const std::string& str);
-bool IsValidTextOrientationString(const std::string& str);
 std::string WritingModeToString(WritingMode mode);
 WritingMode WritingModeFromString(const std::string& str);
 bool IsValidWritingModeString(const std::string& str);

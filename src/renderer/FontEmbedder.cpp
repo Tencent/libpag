@@ -318,24 +318,13 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
   if (hasTransforms) {
     glyphRun->scales.reserve(indices.size());
     glyphRun->rotations.reserve(indices.size());
-    for (size_t i = 0; i < indices.size(); i++) {
-      auto idx = indices[i];
+    for (auto idx : indices) {
       if (idx < tlRun.xforms.size()) {
         auto& xf = tlRun.xforms[idx];
         float scale = std::hypot(xf.scos, xf.ssin);
         float rotation = std::atan2(xf.ssin, xf.scos) * 180.0f / static_cast<float>(M_PI);
         glyphRun->scales.push_back({scale, scale});
         glyphRun->rotations.push_back(rotation);
-        // Layout RSXforms already contain the final translation t. GlyphRun rotates around
-        // half the embedded glyph advance, so serialize p = t + (L - I) * anchor.
-        auto glyphID = glyphRun->glyphs[i];
-        float anchor = glyphID > 0 && glyphID <= embeddedFont->glyphs.size()
-                           ? embeddedFont->glyphs[glyphID - 1]->advance * fontSize /
-                                 embeddedFont->unitsPerEm * 0.5f
-                           : 0;
-        if (i < glyphRun->positions.size()) {
-          glyphRun->positions[i] = {xf.tx + (xf.scos - 1) * anchor, xf.ty + xf.ssin * anchor};
-        }
       }
     }
     bool hasNonDefaultScale = false;

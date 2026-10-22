@@ -4,7 +4,7 @@ const { it } = require('node:test');
 const { launchBrowser } = require('../../dist/lib/browser-engine');
 const { takeSnapshot } = require('../../dist/lib/browser-snapshot');
 
-it('captures inherited width and CSS-selected web font subsets', async () => {
+it('captures inherited width and CSS-selected web font aliases', async () => {
   const { browser } = await launchBrowser();
   try {
     const page = await browser.newPage();
@@ -17,17 +17,14 @@ it('captures inherited width and CSS-selected web font subsets', async () => {
     <div style="font-family:WebFixture,Helvetica;font-weight:800">Web text</div>`);
     await page.evaluate(() => {
       window.__pagxFontAliases = [
-        { from: 'WebFixture', path: '/normal.ttf', weight: '700', stretch: '100%' },
-        { from: 'WebFixture', path: '/narrow.ttf', weight: '900', stretch: '75%' },
+        { from: 'WebFixture', to: 'WebFixtureNormal', weight: '700', stretch: '100%' },
+        { from: 'WebFixture', to: 'WebFixtureNarrow', weight: '900', stretch: '75%' },
       ];
     });
     const snapshot = await page.evaluate(takeSnapshot);
     assert.match(snapshot.html, /font-stretch: 75%/);
-    const bindings = await page.evaluate(() => window.__pagxFontBindings);
-    assert.ok(bindings.some(b => b.faces.some(f => f.style === '800 75%')));
-    const web = bindings.find(b => b.faces.some(f => f.path === '/normal.ttf'));
-    assert.ok(web);
-    assert.ok(web.faces.every(f => f.path !== '/narrow.ttf'));
-    assert.ok(web.faces.some(f => f.style === '800 100%'));
+    assert.match(snapshot.html, /font-weight: 800/);
+    assert.match(snapshot.html, /font-family: [^;]*WebFixtureNormal[^;]*Helvetica/);
+    assert.doesNotMatch(snapshot.html, /WebFixtureNarrow/);
   } finally { await browser.close(); }
 });

@@ -55,8 +55,7 @@ class LayoutContext {
   // Finds a typeface for the given family/style. Searches user-registered fonts first,
   // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
-                                               const std::string& fontStyle,
-                                               int32_t codepoint = -1);
+                                               const std::string& fontStyle);
   // CSS selection returns a document registration key when one exists, preserving aliases.
   std::shared_ptr<tgfx::Typeface> matchTypeface(const std::string& family,
                                                 const CSSFontStyle& request,

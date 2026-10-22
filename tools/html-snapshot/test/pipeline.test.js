@@ -606,9 +606,7 @@ describe('runHtmlToPagx — orchestrator', () => {
     fakePagx.callsByCmd.embed = 0;
     const snapImplB = async (a) => {
       fs.mkdirSync(a.fontDir, { recursive: true });
-      const file = path.join(a.fontDir, 'Real.ttf');
-      fs.writeFileSync(file, 'fake');
-      fs.writeFileSync(a.fontManifest, JSON.stringify({ version: 1, files: [file], bindings: [] }));
+      fs.writeFileSync(path.join(a.fontDir, 'Real.ttf'), 'fake');
       fs.writeFileSync(a.output, '<html/>');
       return { code: 0, durationMs: 1, stdout: '', stderr: '' };
     };
@@ -630,11 +628,7 @@ describe('runHtmlToPagx — orchestrator', () => {
     const inputHtml = path.join(dir, 't.html');
     fs.writeFileSync(inputHtml, '<html></html>');
     const fakePagx = makeFakePagx();
-    const snapshotImpl = async (a) => {
-      fs.writeFileSync(a.output, '<html/>');
-      fs.writeFileSync(a.fontManifest, JSON.stringify({ version: 1, files: [], bindings: [] }));
-      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
-    };
+    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
     const outDir = path.join(dir, 't-out');
     const result = await runHtmlToPagx({
       input: inputHtml,
@@ -642,7 +636,6 @@ describe('runHtmlToPagx — orchestrator', () => {
       pagxBin: fakePagx.path,
       scriptDir: dir,
       keepSubsetHtml: false,
-      downloadFonts: true,
       doResolve: false,
       snapshotImpl,
       log: () => {},
@@ -653,8 +646,6 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(fs.existsSync(result.subsetHtml)).toBe(false);
     // The pagx file itself stays put under the requested outputDir.
     expect(fs.existsSync(result.pagx)).toBe(true);
-    expect(path.dirname(result.fontManifest)).toBe(outDir);
-    expect(fs.existsSync(result.fontManifest)).toBe(true);
   });
 
   test('URL inputs default outputDir to cwd and require outputName', async () => {

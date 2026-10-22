@@ -492,7 +492,6 @@ static std::vector<ChannelDef> BuildTextFields() {
       FIELD_BOOL(Text, "fauxBold", fauxBold, AnimLayout),
       FIELD_BOOL(Text, "fauxItalic", fauxItalic, AnimLayout),
       FIELD_ENUM(Text, "textAnchor", textAnchor, Layout, TextAnchor),
-      FIELD_ENUM(Text, "textOrientation", textOrientation, Layout, TextOrientation),
       FIELD_ENUM(Text, "baseline", baseline, Layout, TextBaseline),
   };
   AppendLayoutNodeFields<Text>(table);

@@ -26,7 +26,6 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/utils/TextUtils.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
@@ -202,22 +201,75 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
     font.setFauxItalic(text->fauxItalic);
     size_t count = run->glyphs.size();
 
-    for (size_t i = 0; i < count; i++) {
-      anchors.push_back(i < run->anchors.size() ? ToTGFX(run->anchors[i]) : tgfx::Point::Zero());
+    // Collect anchors for each glyph in this run.
+    if (!run->anchors.empty()) {
+      for (size_t i = 0; i < count; i++) {
+        if (i < run->anchors.size()) {
+          anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+        } else {
+          anchors.push_back(tgfx::Point::Zero());
+        }
+      }
     }
 
-    // Positions live in layout coordinates; glyph transforms must not rotate the pen.
+    // Step 1: Compute the final matrix for each glyph (source transform × inverseMatrix).
+    bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty();
     std::vector<tgfx::Matrix> glyphMatrices(count);
     float currentX = run->x;
     for (size_t i = 0; i < count; i++) {
       float posX = 0;
       float posY = 0;
-      ResolveGlyphPosition(run, i, run->x, run->y, currentX, &posX, &posY);
-      float advance = font.getAdvance(run->glyphs[i]);
-      currentX += advance;
-      auto matrix = ToTGFX(ComposeGlyphMatrix(run, i, advance, posX, posY));
-      matrix.postConcat(inverseMatrix);
-      glyphMatrices[i] = matrix;
+      if (i < run->positions.size()) {
+        posX = run->x + run->positions[i].x;
+        posY = run->y + run->positions[i].y;
+        if (i < run->xOffsets.size()) {
+          posX += run->xOffsets[i];
+        }
+      } else if (i < run->xOffsets.size()) {
+        posX = run->x + run->xOffsets[i];
+        posY = run->y;
+      } else {
+        posX = currentX;
+        posY = run->y;
+        currentX += font.getAdvance(run->glyphs[i]);
+      }
+
+      if (hasTransforms) {
+        float sx = (i < run->scales.size()) ? run->scales[i].x : 1.0f;
+        float sy = (i < run->scales.size()) ? run->scales[i].y : 1.0f;
+        float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
+        float skew = (i < run->skews.size()) ? run->skews[i] : 0.0f;
+
+        float anchorX = font.getAdvance(run->glyphs[i]) * 0.5f;
+        float anchorY = 0.0f;
+        if (i < run->anchors.size()) {
+          anchorX += run->anchors[i].x;
+          anchorY += run->anchors[i].y;
+        }
+
+        auto matrix = tgfx::Matrix::I();
+        matrix.preTranslate(-anchorX, -anchorY);
+        if (sx != 1.0f || sy != 1.0f) {
+          matrix.preScale(sx, sy);
+        }
+        if (skew != 0.0f) {
+          float skewRadians = skew * static_cast<float>(M_PI) / 180.0f;
+          auto skewMatrix = tgfx::Matrix::I();
+          skewMatrix.setSkewX(-std::tan(skewRadians));
+          matrix.preConcat(skewMatrix);
+        }
+        if (rotation != 0.0f) {
+          matrix.preRotate(rotation);
+        }
+        matrix.preTranslate(anchorX, anchorY);
+        matrix.preTranslate(posX, posY);
+        matrix.postConcat(inverseMatrix);
+        glyphMatrices[i] = matrix;
+      } else {
+        auto matrix = tgfx::Matrix::MakeTrans(posX, posY);
+        matrix.postConcat(inverseMatrix);
+        glyphMatrices[i] = matrix;
+      }
     }
 
     // Step 2: Classify all glyph matrices to find the most compact positioning mode.

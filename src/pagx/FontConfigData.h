@@ -44,11 +44,6 @@ struct FontConfig::Data {
 
   std::unordered_map<FontKey, TypefaceHolder, FontKeyHash> registeredTypefaces = {};
   std::vector<TypefaceHolder> fallbackTypefaces = {};
-  struct FaceCandidate {
-    TypefaceHolder holder;
-    std::vector<std::pair<uint32_t, uint32_t>> unicodeRanges;
-  };
-  std::unordered_map<std::string, std::vector<FaceCandidate>> fontFaces;
 };
 
 }  // namespace pagx

@@ -398,7 +398,6 @@ class HTMLParserContext {
   // exported PAGX carries names a host process can look up with an exact-matching font lookup
   // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
   // Registered fonts retain their family alias and the selected face's registration style key.
-  // Snapshot aliases already contain CSS-selected unicode-range composites and stay unchanged.
   // A platform substitution to another family keeps the authored name. Results are memoised.
   void resolveFontFaceNames(std::string& family, std::string& style, const CSSFontStyle& request);
 

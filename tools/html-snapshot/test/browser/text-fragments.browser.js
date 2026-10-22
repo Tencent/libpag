@@ -130,58 +130,6 @@ describe('browser text fragments', () => {
     assert.match(snapshot.html, /data-pagx-inline-positions=/);
   });
 
-  it('retains the origin of children when asymmetric borders become overlays', async () => {
-    await load('<div id="host"><span>竖排</span></div>',
-      '#host{position:absolute;left:20px;top:30px;border-top:7px solid black;padding:10px;writing-mode:vertical-rl}');
-    const expected = await page.$eval('#host span', node => node.getBoundingClientRect().top);
-    const snapshot = await page.evaluate(takeSnapshot);
-    await page.setContent(snapshot.html);
-    await page.addStyleTag({ content: 'html{padding:0!important;display:block!important}' });
-    const actual = await page.$$eval('span', nodes => {
-      const node = nodes.find(n => n.textContent === '竖排');
-      return node.getBoundingClientRect().top;
-    });
-    assert.ok(Math.abs(actual - expected) < 0.1, `${actual} vs ${expected}`);
-  });
-
-  for (const orientation of ['mixed', 'upright', 'sideways']) {
-    it(`captures vertical ${orientation} with measured anchors and column alignment`, async () => {
-      await load('<p id="host">竖排English 2026「引号」、句号。</p>',
-        `#host{writing-mode:vertical-rl;text-orientation:${orientation};height:190px;text-align:center}`);
-      const snapshot = await page.evaluate(takeSnapshot);
-      await page.setContent(snapshot.html);
-      const spans = await page.$$eval('span[data-pagx-inline-positions]', nodes => nodes.map(node => ({
-        text: node.textContent, positions: node.getAttribute('data-pagx-inline-positions').split(',').map(Number),
-        orientation: getComputedStyle(node).textOrientation, align: node.style.textAlign,
-      })));
-      assert.ok(spans.length > 0);
-      for (const span of spans) {
-        assert.equal(span.orientation, orientation);
-        assert.equal(span.positions.length, Array.from(span.text).length);
-        assert.equal(span.positions[0], 0);
-        assert.equal(span.align, 'start');
-      }
-    });
-  }
-
-  it('binds CSS families to resource candidates independently of font-internal names', async () => {
-    await load('<p id="host">中文 Latin</p>', '#host{font-family:Alias,Backup,sans-serif}');
-    await page.evaluate(() => {
-      window.__pagxFontAliases = [
-        {from:'Alias', path:'/fonts/cjk.ttf', weight:'400', style:'normal', unicodeRange:'U+4E00-9FFF'},
-        {from:'Alias', path:'/fonts/latin.ttf', weight:'400', style:'normal', unicodeRange:'U+0-7F'},
-        {from:'Backup', path:'/fonts/backup.ttf', weight:'400', style:'normal'},
-      ];
-    });
-    const snapshot = await page.evaluate(takeSnapshot);
-    const bindings = await page.evaluate(() => window.__pagxFontBindings);
-    const binding = bindings.find(b => b.faces.some(f => f.path === '/fonts/cjk.ttf'));
-    assert.ok(binding);
-    assert.deepEqual(binding.faces.map(f => f.path || f.systemFamily),
-      ['/fonts/latin.ttf', '/fonts/cjk.ttf', '/fonts/backup.ttf', 'sans-serif']);
-    assert.ok(snapshot.html.includes(binding.family));
-  });
-
   it('keeps RTL scalar positions in logical text order', async () => {
     await load('<p id="host">שלום עולם שלום עולם שלום עולם</p>', '#host{direction:rtl;text-align:justify}');
     const parts = await fragments();

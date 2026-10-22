@@ -204,16 +204,6 @@ inline std::string EscapeJson(const std::string& input) {
  */
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
 
-struct FontFaceBinding {
-  std::string family;
-  FontConfig::FontFace face;
-};
-
-// Parses the five arguments following --font-face. Range syntax is decimal lo-hi pairs.
-bool ParseFontFaceBinding(char* argv[], FontFaceBinding* binding);
-bool LoadFontFaces(FontConfig* config, const std::vector<FontFaceBinding>& bindings,
-                   const std::string& command);
-
 /**
  * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
  * given command name as prefix. Returns false on failure.
@@ -231,7 +221,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  * while the document requires no font at all is reported and skipped, and the call continues.
  */
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command, const std::vector<FontFaceBinding>& bindings = {});
+                const std::string& command);
 
 /**
  * Writes a string to a file. Prints errors to stderr using the given command name as prefix.

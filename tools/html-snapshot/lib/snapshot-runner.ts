@@ -1,4 +1,3 @@
-import type { FontBinding } from './font-manifest';
 // Reusable snapshot pipeline. Wraps the steps that snapshot.js (CLI) and
 // server.js (HTTP service) both need: open a fresh page in an already-
 // launched browser, settle it, inline images / canvases / icon fonts, and
@@ -336,7 +335,6 @@ export interface RunSnapshotResult {
   /** Painting features that require a model beyond the supported static 2D subset. */
   warnings?: string[];
   fonts: SavedFont[];
-  fontBindings?: FontBinding[];
   images: SavedImage[];
 }
 
@@ -743,7 +741,8 @@ export async function runSnapshot(
       if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
     }
 
-    // Bind CSS faces to captured resources; backend family-name decoding is not an identity.
+    // Finish fonts before emitting text, so CSS family aliases can be resolved to
+    // the names the native typeface loader reads from the actual font files.
     let fonts: SavedFont[] = [];
     if (downloadFonts && fontDir) {
       const faces = await page.evaluate(collectWebFontFaces) as Record<string, string>[];
@@ -766,9 +765,7 @@ export async function runSnapshot(
         const font = fonts.find((f) => f.url === url || f.urls?.includes(url));
         return font ? [{
           from: face['font-family'].replace(/^["']|["']$/g, ''),
-          path: font.path, faceIndex: 0, weight: face['font-weight'], style: face['font-style'],
-          unicodeRange: face['unicode-range'], stretch: face['font-stretch'],
-          variations: face['font-variation-settings'],
+          to: font.family, weight: face['font-weight'], style: face['font-style'],
         }] : [];
       });
       await page.evaluate((value: unknown) => {
@@ -806,9 +803,7 @@ export async function runSnapshot(
     // already in `fontBytesByUrl` by now (no page interaction needed). This
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
-    const fontBindings = await page.evaluate(() =>
-      (window as unknown as { __pagxFontBindings?: FontBinding[] }).__pagxFontBindings || []);
-    return { ...snapshot, fonts, fontBindings, images };
+    return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the

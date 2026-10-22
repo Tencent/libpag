@@ -20,17 +20,14 @@ test('descriptor ranges can match an interior value', () => {
     { weight: '550', stretch: '100%' })).toBeLessThan(0);
 });
 
-test('web aliases preserve source order, unicode subsets and numeric system requests', () => {
+test('web aliases match CSS width before weight and preserve the font stack', () => {
   global.window = { __pagxFontAliases: [
-    { from: 'Web', path: 'normal.ttf', weight: '700', stretch: '100%', unicodeRange: 'U+0000-00FF' },
-    { from: 'Web', path: 'cjk.ttf', weight: '700', stretch: '100%', unicodeRange: 'U+4E00-9FFF' },
-    { from: 'Web', path: 'narrow.ttf', weight: '900', stretch: '75%' },
+    { from: 'Web', to: 'Web Normal', weight: '700', stretch: '100%' },
+    { from: 'Web', to: 'Web Narrow', weight: '900', stretch: '75%' },
   ] };
   try {
     const values = { 'font-weight': '800', 'font-stretch': '100%', 'font-style': 'normal' };
-    snapshotFontFamily('Web, Helvetica', { getPropertyValue: key => values[key] || '' });
-    expect(window.__pagxFontBindings[0].faces.map(f => f.path || f.style))
-      .toEqual(['cjk.ttf', 'normal.ttf', '800 100%']);
-    expect(window.__pagxFontBindings[0].faces[0].unicodeRange).toBe('U+4E00-9FFF');
+    expect(snapshotFontFamily('Web, Helvetica', { getPropertyValue: key => values[key] || '' }))
+      .toBe("'Web Normal', Helvetica");
   } finally { delete global.window; }
 });

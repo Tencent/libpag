@@ -85,16 +85,6 @@ FontConfig& FontConfig::operator=(const FontConfig& other) {
 FontConfig::FontConfig(FontConfig&& other) noexcept = default;
 FontConfig& FontConfig::operator=(FontConfig&& other) noexcept = default;
 
-bool FontConfig::addFontFace(const std::string& family, const FontFace& face) {
-  auto typeface = face.path.empty() ? SystemFonts::ResolveTypeface(face.systemFont.fontFamily,
-                                                                   face.systemFont.fontStyle)
-                                    : tgfx::Typeface::MakeFromPath(face.path, face.faceIndex);
-  if (!typeface || family.empty()) return false;
-  data->fontFaces[family].push_back(
-      {TypefaceHolder(std::move(typeface), family, "Regular"), face.unicodeRanges});
-  return true;
-}
-
 void FontConfig::registerFont(const PAGFont& font, const std::string& path, int ttcIndex) {
   registerFont(path, ttcIndex, font.fontFamily, font.fontStyle);
 }
@@ -242,7 +232,6 @@ bool FontConfig::containsFamily(const std::string& fontFamily) const {
   if (fontFamily.empty()) {
     return false;
   }
-  if (data->fontFaces.count(fontFamily) != 0) return true;
   for (const auto& pair : data->registeredTypefaces) {
     if (pair.first.family == fontFamily) {
       return true;

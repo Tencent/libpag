@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
-#include <charconv>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -39,54 +38,6 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
     std::cerr << command << ": warning: " << error << "\n";
   }
   return document;
-}
-
-static bool ParseInt(const std::string& value, int* number) {
-  auto result = std::from_chars(value.data(), value.data() + value.size(), *number);
-  return result.ec == std::errc() && result.ptr == value.data() + value.size();
-}
-
-bool ParseFontFaceBinding(char* argv[], FontFaceBinding* binding) {
-  binding->family = argv[0];
-  int index = 0;
-  if (binding->family.empty() || argv[1][0] == '\0' || !ParseInt(argv[2], &index) || index < -1) {
-    return false;
-  }
-  if (index == -1) {
-    binding->face.systemFont.fontFamily = argv[1];
-    binding->face.systemFont.fontStyle = argv[3];
-  } else {
-    binding->face.path = argv[1];
-    binding->face.faceIndex = index;
-  }
-  std::string ranges = argv[4];
-  if (!ranges.empty() && ranges.back() == ',') return false;
-  size_t start = 0;
-  while (start < ranges.size()) {
-    auto end = ranges.find(',', start);
-    if (end == std::string::npos) end = ranges.size();
-    auto token = ranges.substr(start, end - start);
-    auto dash = token.find('-');
-    int lo = 0, hi = 0;
-    if (dash == std::string::npos || !ParseInt(token.substr(0, dash), &lo) ||
-        !ParseInt(token.substr(dash + 1), &hi) || lo < 0 || lo > hi || hi > 0x10ffff)
-      return false;
-    binding->face.unicodeRanges.emplace_back(lo, hi);
-    start = end + 1;
-  }
-  return true;
-}
-
-bool LoadFontFaces(FontConfig* config, const std::vector<FontFaceBinding>& bindings,
-                   const std::string& command) {
-  for (const auto& binding : bindings) {
-    if (config->addFontFace(binding.family, binding.face)) continue;
-    // An unavailable system family is a normal CSS fallback; captured files are required.
-    if (binding.face.path.empty()) continue;
-    std::cerr << command << ": failed to load bound font '" << binding.face.path << "'\n";
-    return false;
-  }
-  return true;
 }
 
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
@@ -134,7 +85,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
 }
 
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command, const std::vector<FontFaceBinding>& bindings) {
+                const std::string& command) {
   // Start from the document's own fallback chain: the HTML importer records the CSS font-family
   // stacks there, and applyLayout below replaces the whole config with the one passed in.
   FontConfig fontConfig = document->fontConfig();
@@ -169,7 +120,6 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
       fontConfig.addFallbackFont(font->file, 0);
     }
   }
-  if (!LoadFontFaces(&fontConfig, bindings, command)) return false;
   FontEmbedder::ClearEmbeddedGlyphRuns(document);
   document->applyLayout(&fontConfig);
   FontEmbedder embedder = {};

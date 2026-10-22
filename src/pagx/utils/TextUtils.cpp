@@ -75,6 +75,13 @@ const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
   return nullptr;
 }
 
+namespace {
+
+struct PositionedGlyph {
+  const Glyph* glyph = nullptr;
+  Matrix transform;
+};
+
 // Resolves the layer-space pen position for glyph `i` of `run`. The GlyphRun
 // exposes three positioning channels that take precedence in the order below;
 // only the highest-priority channel present for this glyph contributes.
@@ -86,8 +93,8 @@ const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
 //      the sum of all prior glyph advances in the same run.
 // `baseX`/`baseY` are the run origin (textPos + run->x / run->y) pre-hoisted
 // by WalkGlyphs so we don't re-add them per glyph.
-void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float baseY, float currentX,
-                          float* posX, float* posY) {
+static void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float baseY,
+                                 float currentX, float* posX, float* posY) {
   if (i < run->positions.size()) {
     *posX = baseX + run->positions[i].x;
     *posY = baseY + run->positions[i].y;
@@ -103,8 +110,16 @@ void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float base
   }
 }
 
-Matrix ComposeGlyphMatrix(const GlyphRun* run, size_t i, float advance, float posX, float posY) {
-  Matrix glyphMatrix = Matrix::Translate(posX, posY);
+// Builds the layer-space transform for a single glyph, mirroring
+// GlyphRunRenderer::BuildTextBlob: the font scale is applied first, then the
+// pen translation, then (only if any of rotation/skew/glyph-scale is non-trivial)
+// the rotation/skew/scale are composed around T(pos)*T(anchor). Anchor lives in
+// user (post-font-scale) units. Matching this exact order is what keeps scaled
+// glyphs from collapsing onto each other in PPT/SVG output.
+static Matrix ComposeGlyphMatrix(const Glyph* glyph, const GlyphRun* run, size_t i, float scale,
+                                 float posX, float posY) {
+  Matrix glyphMatrix = Matrix::Scale(scale, scale);
+  glyphMatrix = Matrix::Translate(posX, posY) * glyphMatrix;
 
   bool hasRotation = i < run->rotations.size() && run->rotations[i] != 0;
   bool hasGlyphScale = i < run->scales.size() && (run->scales[i].x != 1 || run->scales[i].y != 1);
@@ -114,16 +129,16 @@ Matrix ComposeGlyphMatrix(const GlyphRun* run, size_t i, float advance, float po
     return glyphMatrix;
   }
 
-  float anchorX = advance * 0.5f;
+  float anchorX = glyph->advance * 0.5f * scale;
   float anchorY = 0;
   if (i < run->anchors.size()) {
     anchorX += run->anchors[i].x;
     anchorY += run->anchors[i].y;
   }
 
-  glyphMatrix = glyphMatrix * Matrix::Translate(anchorX, anchorY);
+  glyphMatrix = Matrix::Translate(anchorX, anchorY) * glyphMatrix;
   if (hasRotation) {
-    glyphMatrix = glyphMatrix * Matrix::Rotate(run->rotations[i]);
+    glyphMatrix = Matrix::Rotate(run->rotations[i]) * glyphMatrix;
   }
   if (hasSkew) {
     // Match GlyphRunRenderer::BuildTextBlob: skewX = -tan(angle). The
@@ -131,21 +146,14 @@ Matrix ComposeGlyphMatrix(const GlyphRun* run, size_t i, float advance, float po
     // once it's combined with the ascender-negative-Y glyph path coords.
     Matrix shear = {};
     shear.c = -std::tan(pag::DegreesToRadians(run->skews[i]));
-    glyphMatrix = glyphMatrix * shear;
+    glyphMatrix = shear * glyphMatrix;
   }
   if (hasGlyphScale) {
-    glyphMatrix = glyphMatrix * Matrix::Scale(run->scales[i].x, run->scales[i].y);
+    glyphMatrix = Matrix::Scale(run->scales[i].x, run->scales[i].y) * glyphMatrix;
   }
-  glyphMatrix = glyphMatrix * Matrix::Translate(-anchorX, -anchorY);
+  glyphMatrix = Matrix::Translate(-anchorX, -anchorY) * glyphMatrix;
   return glyphMatrix;
 }
-
-namespace {
-
-struct PositionedGlyph {
-  const Glyph* glyph = nullptr;
-  Matrix transform;
-};
 
 // Shared per-glyph walker — both ComputeGlyphPaths (vector outlines) and
 // ComputeGlyphImages (bitmap glyphs) need exactly the same positioning logic
@@ -193,8 +201,7 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
       // glyphs land where the renderer expects them.
       currentX += glyph->advance * scale;
 
-      result.push_back({glyph, ComposeGlyphMatrix(run, i, glyph->advance * scale, posX, posY) *
-                                   Matrix::Scale(scale, scale)});
+      result.push_back({glyph, ComposeGlyphMatrix(glyph, run, i, scale, posX, posY)});
     }
   }
   return result;
@@ -593,7 +600,6 @@ TextGlyphParams MakeGlyphParams(const Text* text) {
   params.fontSize = text->fontSize;
   params.letterSpacing = text->letterSpacing;
   params.inlinePositions = text->inlinePositions;
-  params.textOrientation = text->textOrientation;
   params.fauxBold = text->fauxBold;
   params.fauxItalic = text->fauxItalic;
   return params;

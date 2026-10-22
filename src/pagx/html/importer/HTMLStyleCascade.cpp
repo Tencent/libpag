@@ -590,7 +590,6 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "text-decoration-color", out.textDecorationColor);
   CopyProperty(props, "white-space", out.whiteSpace);
   CopyProperty(props, "writing-mode", out.writingMode);
-  CopyProperty(props, "text-orientation", out.textOrientation);
   // Propagate the glyph fill from the nearest clip-to-text ancestor. Both `textFillImage` and
   // `textFillSolid` already inherit the parent's values via `out = parent`; we only override
   // when this element itself sets `background-clip: text`. Such an element's own background

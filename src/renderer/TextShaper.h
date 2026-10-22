@@ -22,7 +22,6 @@
 
 #include <string>
 #include <vector>
-#include "pagx/types/TextOrientation.h"
 #include "tgfx/core/Font.h"
 
 namespace pagx {
@@ -36,7 +35,6 @@ struct ShapedGlyph {
   float yAdvance = 0;
   float xOffset = 0;
   float yOffset = 0;
-  bool sideways = false;
   tgfx::Font font = {};
 };
 
@@ -49,10 +47,7 @@ class TextShaper {
    */
   static std::vector<ShapedGlyph> Shape(const std::string& text, const tgfx::Font& primaryFont,
                                         LayoutContext& layoutContext, bool vertical = false,
-                                        bool rtl = false,
-                                        TextOrientation orientation = TextOrientation::Mixed,
-                                        const std::string& family = "",
-                                        const std::string& style = "");
+                                        bool rtl = false);
 
   /**
    * Purges internal HarfBuzz font caches.

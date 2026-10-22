@@ -2080,51 +2080,6 @@ PAG_TEST(PAGXHTMLImporterTest, VerticalWritingModeProducesVerticalTextBox) {
   EXPECT_FLOAT_EQ(tb->percentHeight, 100.0f);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, VerticalOrientationIsInheritedWithoutMergingDifferentRuns) {
-  auto doc = ParseFromString(
-      "<html><body style=\"width:200px;height:300px\">"
-      "<p style=\"writing-mode:vertical-rl;text-orientation:upright\">"
-      "A<span style=\"text-orientation:sideways\">B</span>C</p></body></html>");
-  ASSERT_NE(doc, nullptr);
-  auto* box = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
-  ASSERT_NE(box, nullptr);
-  std::vector<pagx::Text*> texts;
-  std::vector<pagx::Fill*> fills;
-  GatherTextRuns(box->elements, &texts, &fills);
-  ASSERT_EQ(texts.size(), 3u);
-  EXPECT_EQ(texts[0]->textOrientation, pagx::TextOrientation::Upright);
-  EXPECT_EQ(texts[1]->textOrientation, pagx::TextOrientation::Sideways);
-  EXPECT_EQ(texts[2]->textOrientation, pagx::TextOrientation::Upright);
-  auto xml = pagx::PAGXExporter::ToXML(*doc);
-  auto roundTrip = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(roundTrip, nullptr);
-  auto* restoredBox = FindElementOfType<pagx::TextBox>(roundTrip->layers.front()->children.front());
-  ASSERT_NE(restoredBox, nullptr);
-  std::vector<pagx::Text*> restored;
-  GatherTextRuns(restoredBox->elements, &restored, &fills);
-  ASSERT_EQ(restored.size(), 3u);
-  EXPECT_EQ(restored[1]->textOrientation, pagx::TextOrientation::Sideways);
-}
-
-PAG_TEST(PAGXHTMLImporterTest, PositionedVerticalColumnRetainsMeasuredHeight) {
-  auto doc = ParseFromString(
-      "<html><body style=\"width:80px;height:300px\">"
-      "<span data-pagx-inline-positions=\"0,40\" "
-      "style=\"position:absolute;width:36px;height:80px;writing-mode:vertical-rl;"
-      "white-space:nowrap;font-size:20px;line-height:36px\">句。</span></body></html>");
-  ASSERT_NE(doc, nullptr);
-  auto* leaf = doc->layers.front()->children.front();
-  EXPECT_FLOAT_EQ(leaf->height, 80);
-  auto* box = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
-  ASSERT_NE(box, nullptr);
-  std::vector<pagx::Text*> texts;
-  std::vector<pagx::Fill*> fills;
-  GatherTextRuns(box->elements, &texts, &fills);
-  ASSERT_EQ(texts.size(), 1u);
-  ASSERT_EQ(texts[0]->inlinePositions.size(), 2u);
-  EXPECT_FLOAT_EQ(texts[0]->inlinePositions[1], 40);
-}
-
 // An unrecognised `text-align` value warns rather than silently mapping to a default.
 PAG_TEST(PAGXHTMLImporterTest, UnsupportedTextAlignWarns) {
   auto doc = ParseFromString(
@@ -5313,12 +5268,11 @@ PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffec
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* image = doc->layers.front()->children.front();
-  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 1u);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  auto* fill = FindBackgroundElement<pagx::Fill>(image);
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(As<pagx::LinearGradient>(fill->color), nullptr);
-  auto* stroke = FindElementOfType<pagx::Stroke>(image);
+  auto* stroke = FindBackgroundElement<pagx::Stroke>(image);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
   bool foundShadow = false;

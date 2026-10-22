@@ -185,7 +185,7 @@ Options:
 | `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; implies `--no-reduced-motion`; otherwise a single static frame is emitted |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
-| `--font-manifest <file>` | `<output>.fonts.json` | With `--download-fonts`, write a versioned JSON manifest with this page's files and CSS face bindings |
+| `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
 | `--download-images` | _disabled_ | Save external images to disk instead of inlining them as base64 data URIs |
 | `--image-dir <dir>` | `<output>.images/` | Destination for `--download-images` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
@@ -263,32 +263,39 @@ is preserved:
 ```bash
 node snapshot.js page.html --download-fonts
 # → page.subset.html
-# → page.subset.html.fonts.json
 # → page.fonts/Noto-Sans-SC-Black-1a2b3c4d5e6f7081.ttf, …
 ```
 
-`--font-manifest <file>` writes a version 1 JSON manifest containing the captured
-files and ordered face candidates for each document-local CSS font stack. Bindings retain
-file identity, face index, style/weight descriptors and `unicode-range`; they do not depend
-on a native backend decoding the same internal font name as the browser.
-With `--download-fonts`, this defaults to `<output>.fonts.json` (or
-`<font-dir>/fonts.json` when the HTML is written to stdout).
+When a single `--font-dir` is shared across many pages, pass `--font-manifest
+<file>` so the snapshot also records just *this* page's font files (one
+absolute path per line); feed that list — not the whole shared directory — to
+`pagx`.
 
-`html2pagx --download-fonts` and the evaluator pass the same bindings to both embedding
-and rendering. They also accept legacy manifests containing one path per line. The native
-`--font-face <alias> <source> <index> <style> <ranges>` option appends a candidate to a
-family without overwriting earlier subsets; index `-1` identifies a system font family,
-and ranges are comma-separated decimal `start-end` pairs (empty means all Unicode).
-Captured faces never become unrelated document-wide fallbacks.
+Hand the files to `pagx` so the document renders (or embeds) with the correct
+typeface — `--fallback` both registers the face (matching the document's
+`font-family`) and adds it to the per-glyph fallback chain, so multiple CJK
+subset files jointly cover the text:
+
+```bash
+pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
+pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
+```
+
+`html2pagx --download-fonts` wires all of this up automatically (see below).
 
 **Caveats:**
 
-- The pass saves the font resources fetched by the browser. CSS weight/style
-  matching and ordered `unicode-range` candidates select those files without
-  relying on their internal family names.
-- Variable-font axis instantiation and browser-synthesized weight/style are not
-  reproduced by the binding protocol. Pages relying on those features can still
-  differ in glyph appearance.
+- The pass saves what the browser actually fetched. For **Latin / single-file
+  web fonts** (Inter, Roboto, …) each weight is a distinct, correctly-named
+  file, so weights round-trip faithfully.
+- For **CJK families served as unicode-range subsets** (Google's Noto Sans
+  SC/TC/JP, …) the per-subset files carry unreliable, templated `name`-table
+  metadata — they frequently all report the same family/weight (e.g.
+  `Noto Sans SC Thin`, `usWeightClass: 100`) regardless of the weight the page
+  requested, and Chromium may fetch only a subset of the declared weights and
+  synthesize the rest. The captured glyphs render correctly (no tofu / system
+  fallback) but the *weight* may not match the design. When weight fidelity
+  matters for CJK, install the real font on the render host instead.
 
 ### One-shot pipeline
 

@@ -39,7 +39,9 @@ enum class VerticalOrientation {
 
 /**
  * VerticalTextUtils provides utilities for vertical text layout, including UTR#50 character
- * orientation classification and CJK punctuation transform rules.
+ * orientation classification and CJK punctuation transform rules. This implements the same
+ * approach as Adobe After Effects: manual transforms on horizontal glyphs rather than relying
+ * on OpenType 'vert' feature.
  */
 class VerticalTextUtils {
  public:
@@ -48,9 +50,6 @@ class VerticalTextUtils {
    * CJK characters are Upright; Latin letters, digits, and Western punctuation are Rotated.
    */
   static VerticalOrientation GetOrientation(int32_t unichar);
-
-  // Tr characters require vertical typesetting even when the font lacks an alternate.
-  static bool IsTransformedRotated(int32_t unichar);
 
   /**
    * Returns true if the character needs position offset in vertical text layout. Characters like

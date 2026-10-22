@@ -101,9 +101,8 @@ async function main() {
     // requested (even with zero fonts) so the caller can distinguish "no fonts"
     // from "snapshot never ran".
     if (opts.fontManifest) {
-      const manifest = { version: 1, files: (result.fonts || []).map(f => f.path),
-        bindings: result.fontBindings || [] };
-      fs.writeFileSync(opts.fontManifest, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+      const lines = (result.fonts || []).map((f) => f.path).filter(Boolean);
+      fs.writeFileSync(opts.fontManifest, lines.length ? lines.join('\n') + '\n' : '', 'utf8');
     }
   } finally {
     await engineHandle.browser.close();
