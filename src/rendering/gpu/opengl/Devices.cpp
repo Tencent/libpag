@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/gpu/Devices.h"
-
-#if defined(TGFX_USE_OPENGL)
-
-#include "rendering/gpu/GLRestorer.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -118,16 +114,4 @@ bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* dev
   return glDevice->sharableWith(glRef->nativeHandle);
 }
 
-std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-  return std::make_unique<GLRestorer>();
-#else
-  // Web builds rely on emscripten's GL state management; Windows historically opted out of state
-  // preservation and this refactor keeps that behavior.
-  return nullptr;
-#endif
-}
-
 }  // namespace pag
-
-#endif  // TGFX_USE_OPENGL

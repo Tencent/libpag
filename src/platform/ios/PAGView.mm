@@ -23,26 +23,11 @@
 
 #include <mutex>
 
-#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
-
 #import "PAGPlayer.h"
-#ifndef GLES_SILENCE_DEPRECATION
-#define GLES_SILENCE_DEPRECATION 1
-#endif
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
-
-#if defined(TGFX_USE_OPENGL)
-#import "PAGSurface+OpenGL.h"
-#import "platform/ios/private/opengl/EAGLDrawable.h"
-#endif
-
-#if defined(TGFX_USE_METAL)
-#import <Metal/Metal.h>
-#import "PAGSurface+Metal.h"
-#include "platform/cocoa/private/metal/MetalLayerHelper.h"
-#endif
+#include "platform/cocoa/private/PAGViewSurface.h"
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -84,16 +69,7 @@
                                            selector:@selector(applicationDidReceiveMemoryWarning:)
                                                name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
-#if defined(TGFX_USE_OPENGL)
-  // The async-surface-prepared dance is a GL-only workaround for issue #1870: creating a
-  // CAEAGLLayer surface off the main thread crashes, so EAGLDrawable defers creation to the main
-  // queue and notifies us to redraw. Metal does not need this — CAMetalLayer / nextDrawable
-  // support creating surfaces on the render thread, so MetalLayerDrawable creates them inline.
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(AsyncSurfacePrepared:)
-                                               name:pag::AsyncSurfacePreparedNotification
-                                             object:self.layer];
-#endif
+  pag::cocoa::PAGViewSurface::ObserveSurfacePrepared(self, @selector(onAsyncSurfacePrepared:));
 }
 
 - (void)dealloc {
@@ -114,33 +90,15 @@
 }
 
 + (Class)layerClass {
-#if defined(TGFX_USE_METAL)
-  return [CAMetalLayer class];
-#else
-  return [CAEAGLLayer class];
-#endif
-}
-
-- (void)updateLayerDrawableSize {
-#if defined(TGFX_USE_METAL)
-  pag::cocoa::UpdateMetalLayerDrawableSize((CAMetalLayer*)[self layer], self.bounds.size,
-                                           self.contentScaleFactor);
-#endif
+  return pag::cocoa::PAGViewSurface::LayerClass();
 }
 
 - (void)refreshSurfaceSize {
   if (pagSurface == nil) {
     return;
   }
-#if defined(TGFX_USE_METAL)
-  // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
-  // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
-  // The GL backend serializes updateSize against flush through the device lock already and
-  // has no drawableSize, so the lock is Metal-only.
-  std::lock_guard<std::mutex> autoLock(lock);
-#endif
-  [self updateLayerDrawableSize];
-  [pagSurface updateSize];
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
+  pag::cocoa::PAGViewSurface::UpdateSize(self, pagSurface);
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -172,23 +130,10 @@
 
 - (void)didMoveToWindow {
   [super didMoveToWindow];
-#if defined(TGFX_USE_METAL)
   if (self.window != nil) {
-    std::lock_guard<std::mutex> autoLock(lock);
-    if (pagSurface != nil) {
-      auto size = self.bounds.size;
-      auto scale = self.contentScaleFactor;
-      auto drawableSize = CGSizeMake(size.width * scale, size.height * scale);
-      auto layer = (CAMetalLayer*)self.layer;
-      // Window moves can change the scale without calling setContentScaleFactor:, but reattaching
-      // at the same size must not discard the rendering caches.
-      if (!CGSizeEqualToSize(layer.drawableSize, drawableSize)) {
-        [self updateLayerDrawableSize];
-        [pagSurface updateSize];
-      }
-    }
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
+    pag::cocoa::PAGViewSurface::UpdateWindowSize(self, pagSurface);
   }
-#endif
   [self checkVisible];
 }
 
@@ -219,19 +164,7 @@
 }
 
 - (void)initPAGSurface {
-#if defined(TGFX_USE_METAL)
-  CAMetalLayer* layer = (CAMetalLayer*)[self layer];
-  pag::cocoa::SetUpPAGMetalLayer(layer);
-  // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible. This has
-  // to happen before FromLayer: below, so refreshSurfaceSize() cannot be reused — it bails out
-  // while pagSurface is still nil.
-  [self updateLayerDrawableSize];
-  pagSurface = [[PAGSurface FromLayer:layer] retain];
-#else
-  CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
-  pagSurface = [[PAGSurface FromLayer:layer] retain];
-#endif
+  pagSurface = [pag::cocoa::PAGViewSurface::CreateSurface(self) retain];
   [pagPlayer setSurface:pagSurface];
   [animator update];
 }
@@ -497,11 +430,7 @@
   return CGRectNull;
 }
 
-#if defined(TGFX_USE_OPENGL)
-- (void)AsyncSurfacePrepared:(NSNotification*)notification {
+- (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
-#endif
 @end
-
-#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL

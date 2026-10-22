@@ -16,18 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include "platform/cocoa/private/metal/MetalLayerDrawable.h"
 
-#import "platform/ios/private/PAGSurfaceImpl.h"
+namespace pag::cocoa {
 
-#import <OpenGLES/EAGL.h>
-#import <QuartzCore/QuartzCore.h>
+std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  return PAGSurface::MakeFrom(MetalLayerDrawable::FromLayer(host));
+}
 
-@interface PAGSurfaceImpl (OpenGL)
-
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-
-@end
+}  // namespace pag::cocoa

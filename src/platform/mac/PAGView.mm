@@ -18,24 +18,10 @@
 
 #import "PAGView.h"
 
-#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
-
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
-
-#if defined(TGFX_USE_OPENGL)
-#import "PAGSurface+OpenGL.h"
-#import "platform/mac/private/opengl/CGLDrawable.h"
-#endif
-
-#if defined(TGFX_USE_METAL)
-#import <Metal/Metal.h>
-#import <QuartzCore/QuartzCore.h>
-#include <mutex>
-#import "PAGSurface+Metal.h"
-#include "platform/cocoa/private/metal/MetalLayerHelper.h"
-#endif
+#include "platform/cocoa/private/PAGViewSurface.h"
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -50,9 +36,7 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
-#if defined(TGFX_USE_METAL)
   std::mutex renderLock;
-#endif
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -62,25 +46,13 @@
   return self;
 }
 
-#if defined(TGFX_USE_METAL)
 - (CALayer*)makeBackingLayer {
-  return [CAMetalLayer layer];
+  Class layerClass = pag::cocoa::PAGViewSurface::LayerClass();
+  return layerClass == Nil ? [super makeBackingLayer] : [layerClass layer];
 }
-
-- (void)updateLayerDrawableSize {
-  // NSView's layer.contentsScale does not track window.backingScaleFactor automatically, so the
-  // scale is read from the window (defaulting to 1.0) and synced by the shared helper.
-  CGFloat scale = self.window.backingScaleFactor > 0 ? self.window.backingScaleFactor : 1.0;
-  pag::cocoa::UpdateMetalLayerDrawableSize((CAMetalLayer*)self.layer, self.bounds.size, scale);
-}
-#endif
 
 - (void)initPAG {
-#if defined(TGFX_USE_METAL)
-  // NSView is not layer-backed by default; enable it so makeBackingLayer creates the CAMetalLayer
-  // and self.layer returns a valid CAMetalLayer to render into.
-  self.wantsLayer = YES;
-#endif
+  pag::cocoa::PAGViewSurface::Configure(self);
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
@@ -94,12 +66,7 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
-#if defined(TGFX_USE_OPENGL)
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(onAsyncSurfacePrepared:)
-                                               name:pag::AsyncSurfacePreparedNotification
-                                             object:self];
-#endif
+  pag::cocoa::PAGViewSurface::ObserveSurfacePrepared(self, @selector(onAsyncSurfacePrepared:));
 }
 
 - (void)dealloc {
@@ -107,9 +74,7 @@
   [animator release];
   [animatorListenerProxy release];
   {
-#if defined(TGFX_USE_METAL)
-    std::lock_guard<std::mutex> autoLock(renderLock);
-#endif
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
     [pagPlayer release];
     pagPlayer = nil;
     [pagSurface release];
@@ -124,18 +89,11 @@
 }
 
 - (void)refreshSurfaceSize {
-#if defined(TGFX_USE_METAL)
-  // CVDisplayLink updates synchronously on its own thread, not the main thread. Keep the layer
-  // size write and the surface cache invalidation in the same critical section as rendering.
-  std::lock_guard<std::mutex> autoLock(renderLock);
-#endif
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
   if (pagSurface == nil) {
     return;
   }
-#if defined(TGFX_USE_METAL)
-  [self updateLayerDrawableSize];
-#endif
-  [pagSurface updateSize];
+  pag::cocoa::PAGViewSurface::UpdateSize(self, pagSurface);
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -173,15 +131,11 @@
   [self checkVisible];
 }
 
-#if defined(TGFX_USE_METAL)
 - (void)viewDidChangeBackingProperties {
   [super viewDidChangeBackingProperties];
-  // Moving the window between displays with different backing scales does not change bounds, so
-  // neither setBounds: nor setFrameSize: fires and contentsScale would stay stuck on the old
-  // display's scale (blurry or clipped content).
-  [self refreshSurfaceSize];
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+  pag::cocoa::PAGViewSurface::UpdateWindowSize(self, pagSurface);
 }
-#endif
 
 - (void)setAlphaValue:(CGFloat)alphaValue {
   [super setAlphaValue:alphaValue];
@@ -211,17 +165,8 @@
 
 - (void)initPAGSurface {
   {
-#if defined(TGFX_USE_METAL)
-    std::lock_guard<std::mutex> autoLock(renderLock);
-    CAMetalLayer* layer = (CAMetalLayer*)self.layer;
-    pag::cocoa::SetUpPAGMetalLayer(layer);
-    // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-    // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
-    [self updateLayerDrawableSize];
-    pagSurface = [[PAGSurface FromLayer:layer] retain];
-#else
-    pagSurface = [[PAGSurface FromView:self] retain];
-#endif
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+    pagSurface = [pag::cocoa::PAGViewSurface::CreateSurface(self) retain];
     [pagPlayer setSurface:pagSurface];
   }
   // Synchronous updates re-enter onAnimationFlush:, which acquires renderLock.
@@ -278,9 +223,7 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
-#if defined(TGFX_USE_METAL)
-  std::lock_guard<std::mutex> autoLock(renderLock);
-#endif
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -407,9 +350,7 @@
 }
 
 - (BOOL)flush {
-#if defined(TGFX_USE_METAL)
-  std::lock_guard<std::mutex> autoLock(renderLock);
-#endif
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
   return [pagPlayer flush];
 }
 
@@ -437,11 +378,7 @@
   return CGRectNull;
 }
 
-#if defined(TGFX_USE_OPENGL)
 - (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
-#endif
 @end
-
-#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL

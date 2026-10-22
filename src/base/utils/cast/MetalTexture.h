@@ -18,16 +18,12 @@
 
 #pragma once
 
-#import "platform/ios/private/PAGSurfaceImpl.h"
+namespace pag {
 
-#import <QuartzCore/QuartzCore.h>
+/**
+ * Reads the pixel format from a Metal texture, or returns zero without accessing the texture when
+ * the selected backend is not Metal. A null texture always returns zero.
+ */
+unsigned GetMetalTexturePixelFormat(const void* mtlTexture);
 
-@protocol MTLDevice;
-
-@interface PAGSurfaceImpl (Metal)
-
-+ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
-
-@end
+}  // namespace pag

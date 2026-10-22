@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(TGFX_USE_METAL)
-
+#include "base/utils/cast/MetalTexture.h"
 #import <Metal/Metal.h>
 
 namespace pag {
@@ -30,5 +29,3 @@ unsigned GetMetalTexturePixelFormat(const void* mtlTexture) {
 }
 
 }  // namespace pag
-
-#endif  // TGFX_USE_METAL
