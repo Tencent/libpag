@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Easing - steps</title>
+    <style>
+      @keyframes stepMove {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(180px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 100px; background-color: #1F2937;">
+    <div id="r"
+         style="position: absolute; left: 16px; top: 34px;
+                width: 32px; height: 32px;
+                background-color: #34D399;
+                animation: stepMove 2s steps(6) infinite;"></div>
+  </body>
+</html>
