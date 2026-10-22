@@ -591,4 +591,8 @@ const PAINT_CAPTURE = {
 };
 `;
 
-export { PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC, paintStyleRecord, planPaintContext };
+export {
+  PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC, paintStyleRecord, planPaintContext,
+  beginPaintCapture, capturePaintGeometry, markPaintSource, markPaintDecoration, markPaintSurface,
+  paintNeedsSeparateChildren, compilePaintMarkup, endPaintCapture,
+};

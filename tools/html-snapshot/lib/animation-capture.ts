@@ -2730,8 +2730,8 @@ export function pagxSeekAllToTime(timeMs: number): void {
           local = totalDur;
         }
         let iterIndex = Math.floor(local / dur);
-        if (!isFinite(iterations) || iterIndex >= iterations) {
-          iterIndex = isFinite(iterations) ? Math.max(0, iterations - 1) : 0;
+        if (isFinite(iterations) && iterIndex >= iterations) {
+          iterIndex = Math.max(0, iterations - 1);
         }
         let phase = local - iterIndex * dur;
         if (phase > dur) phase = dur;

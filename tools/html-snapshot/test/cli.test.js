@@ -18,6 +18,15 @@ describe('printUsage', () => {
 });
 
 describe('parseArgs — file inputs', () => {
+  test('--scroll-reveal enables lazy-content walking', () => {
+    expect(parseArgs(argv('/tmp/page.html', '--scroll-reveal')).scrollReveal).toBe(true);
+  });
+
+  test('rejects a whitespace-only header name', () => {
+    const result = captureExit(() => parseArgs(argv('/tmp/page.html', '--header', '  : value')));
+    expect(result.code).toBe(2);
+    expect(result.messages.join('\n')).toMatch(/empty header name/);
+  });
   test('derives the default sibling output for a local file', () => {
     const opts = parseArgs(argv('/tmp/page.html'));
     expect(opts.isUrl).toBe(false);

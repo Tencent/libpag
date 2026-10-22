@@ -560,9 +560,11 @@ pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
 Unit tests live in `test/` and run with [Jest](https://jestjs.io/). They cover
 the Node-side modules — CLI parsing, the HTTP query/header helpers, the
 browser-engine adapter, font download/SFNT conversion, the `pagx import`
-runner, icon-font parsing, and the bench/eval report + image-diff utilities —
-without launching a real headless browser (the engine, page, and `pagx` binary
-are stubbed).
+runner, icon-font parsing, and the bench/eval report + image-diff utilities.
+DOM tests use jsdom with explicit layout/style fixtures to exercise paint order,
+clipping, control isolation, text layout, and animation sampling. Browser protocol
+responses and subprocess fixtures keep the unit suite independent of Chromium,
+network access, system fonts, and a built `pagx` binary.
 
 ```bash
 cd tools/html-snapshot
@@ -572,19 +574,25 @@ npm test             # run the suite
 npm run test:coverage # run with a coverage report (written to coverage/)
 ```
 
-Browser regressions in `test/browser/` run separately with `npm run test:browser`
-after `npm run build`. They launch Puppeteer's Chromium to check CSS cascade,
+All three test commands compile the current TypeScript sources first. Coverage
+inputs are derived from those sources in `jest.config.js`, so stale `dist/` files
+from removed or renamed modules cannot affect the report. The coverage command
+enforces minimums of 97% statements, 90% branches, 98% functions, and 98% lines.
+Open `coverage/lcov-report/index.html` for the per-file report.
+
+Browser regressions in `test/browser/` run separately with `npm run test:browser`.
+They launch Puppeteer's Chromium to check CSS cascade,
 pseudo-element paint order, layout, and animation behavior against the source page.
 Set `PAGX_PAINT_TEST_BIN` to an absolute path to a built `pagx` binary to additionally
 import and render each paint-order fixture and compare its solid interior pixels.
 
-The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
-only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
+The browser snapshot implementation (`lib/browser-snapshot.ts`) and the modules that
+orchestrate a live browser (`lib/page-loader.ts`, `lib/snapshot-runner.ts`)
 are excluded from the coverage target — they are exercised end-to-end by the
 `eval/` and `bench/` harnesses against a headless Chromium instead. A few
 ESM-only dependencies (e.g. `pixelmatch`) are transformed for Jest via
-`babel.config.js`; the source tree itself stays plain CommonJS and is never
-Babel-compiled at runtime.
+`babel.config.js`; the TypeScript source tree compiles to CommonJS in `dist/`
+and is never Babel-compiled at runtime.
 
 ## Limitations
 

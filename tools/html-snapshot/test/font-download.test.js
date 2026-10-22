@@ -26,17 +26,21 @@ describe('toSfnt', () => {
   });
 
   test('decompresses a real WOFF2 web font to SFNT', async () => {
-    const woff2 = findWoff2Fixture();
-    if (!woff2) {
-      // No fixture available in this checkout — skip rather than fail.
-      return;
-    }
-    const out = await toSfnt(fs.readFileSync(woff2));
+    // Generate a valid, tiny font so this test also runs on a clean checkout.
+    const opentype = require('opentype.js');
+    const font = new opentype.Font({
+      familyName: 'Coverage Sans', styleName: 'Regular', unitsPerEm: 1000,
+      ascender: 800, descender: -200,
+      glyphs: [new opentype.Glyph({ name: '.notdef', advanceWidth: 500, path: new opentype.Path() })],
+    });
+    const woff2 = await require('wawoff2').compress(Buffer.from(font.toArrayBuffer()));
+    const out = await toSfnt(Buffer.from(woff2));
     expect(Buffer.isBuffer(out)).toBe(true);
     expect(out.length).toBeGreaterThan(0);
     // Decompressed output must be a raw SFNT, never a WOFF2 container.
     const sig = out.slice(0, 4).toString('binary');
     expect(sig).not.toBe('wOF2');
+    expect(readFontMeta(out).family).toBe('Coverage Sans');
   });
 });
 
@@ -299,34 +303,3 @@ describe('readFontMeta — name-table fallbacks', () => {
     expect(meta.ext).toBe('otf');
   });
 });
-
-// Locate any .woff2 web font already present in the checkout so the WOFF2
-// decode path can be exercised when fixtures exist, without bloating the
-// repo with a dedicated test asset.
-function findWoff2Fixture() {
-  const roots = [path.join(__dirname, '..', 'eval', 'out'), path.join(__dirname, '..', 'bench', 'out')];
-  for (const root of roots) {
-    const hit = walkForExt(root, '.woff2');
-    if (hit) return hit;
-  }
-  return null;
-}
-
-function walkForExt(dir, ext, depth = 0) {
-  if (depth > 6 || !fs.existsSync(dir)) return null;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name.toLowerCase().endsWith(ext)) return full;
-    if (entry.isDirectory()) {
-      const hit = walkForExt(full, ext, depth + 1);
-      if (hit) return hit;
-    }
-  }
-  return null;
-}
