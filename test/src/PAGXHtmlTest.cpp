@@ -3373,16 +3373,49 @@ CLI_TEST(PAGXHtmlTest, AnimationLoopModesAndDelay) {
   auto html = LoadXMLAndConvert(xml, opts);
   ASSERT_FALSE(html.empty());
 
-  EXPECT_NE(html.find("25% { opacity: 0.2; }"), std::string::npos);
-  EXPECT_NE(html.find("100% { opacity: 1; }"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
+                      "  0% { opacity: 0.2; }\n"
+                      "  25% { opacity: 0.2; }\n"
+                      "  100% { opacity: 1; }\n"
+                      "}"),
+            std::string::npos);
 
   auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
   ASSERT_FALSE(onceTag.empty());
-  EXPECT_NE(onceTag.find("2s linear 0.5s 1 forwards"), std::string::npos);
+  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
 
   auto pongTag = FindTagContaining(html, "id=\"pongBox\"");
   ASSERT_FALSE(pongTag.empty());
   EXPECT_NE(pongTag.find("1s linear infinite alternate"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationKeyframeBoundaryHold) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/keyframe_boundary_hold.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
+                      "  0% { opacity: 0.2; }\n"
+                      "  25% { opacity: 0.2; }\n"
+                      "  100% { opacity: 1; }\n"
+                      "}"),
+            std::string::npos);
+  auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
+  ASSERT_FALSE(onceTag.empty());
+  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
+
+  EXPECT_NE(html.find("@keyframes pagx_slider_1 {\n"
+                      "  0% { transform: translate(80px, 0px); }\n"
+                      "  25% { transform: translate(80px, 0px); }\n"
+                      "  75% { transform: translate(280px, 0px); }\n"
+                      "  100% { transform: translate(280px, 0px); }\n"
+                      "}"),
+            std::string::npos);
+  auto sliderTag = FindTagContaining(html, "id=\"slider\"");
+  ASSERT_FALSE(sliderTag.empty());
+  EXPECT_NE(sliderTag.find("2s linear infinite"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationXY) {

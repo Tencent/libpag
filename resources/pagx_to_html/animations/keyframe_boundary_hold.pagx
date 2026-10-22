@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: channels whose keys do not cover [0, duration] hold their first/last key values outside
+     the key range, and a Once animation with evaluationOffset shows the first key value during the
+     delay. The exported @keyframes must carry explicit 0%/100% stops so the browser does not
+     interpolate from the element's static style. -->
+<pagx width="400" height="160">
+  <Layer id="onceBox" left="20" top="20" width="40" height="40">
+    <Rectangle width="40" height="40"/>
+    <Fill color="#FF0000"/>
+    <Timelines>
+      <Animation ref="@onceAnim" evaluationOffset="30"/>
+    </Timelines>
+  </Layer>
+  <Layer id="slider" left="20" top="100" width="40" height="40">
+    <Rectangle width="40" height="40"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="onceAnim" duration="120" frameRate="60" loop="once">
+      <Object target="onceBox">
+        <Channel name="alpha" type="float">
+          <Key time="30" value="0.2" interpolation="linear"/>
+          <Key time="120" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="slideAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="slider">
+        <Channel name="x" type="float">
+          <Key time="30" value="100" interpolation="linear"/>
+          <Key time="90" value="300"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
