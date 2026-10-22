@@ -1685,6 +1685,48 @@ PAGX_TEST(PAGXTest, DetachInlineImportKeepsFileMountedWrapper) {
   EXPECT_EQ(wrapperCount, 1u);
 }
 
+/**
+ * Test case: inline content that cannot be parsed is remembered so repeated layouts neither retry
+ * nor re-append the same error, and detachInlineImport() is what clears that memory. It has to work
+ * even though a failed mount left nothing attached — otherwise a host that fixes the content and
+ * re-parses would stay skipped forever with hasUnresolvedImports() permanently true.
+ */
+PAGX_TEST(PAGXTest, InlineImportRetriesAfterContentFix) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->width = 40;
+  host->height = 40;
+  host->importDirective.format = "svg";
+  // A root element other than <svg> is what "cannot be parsed at all" means to the SVG importer.
+  host->importDirective.content = "<g/>";
+  doc->layers.push_back(host);
+
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  const auto errorCount = doc->errors.size();
+  EXPECT_GT(errorCount, 0u);
+
+  // The failure is remembered, so a repeated layout neither retries nor repeats the error.
+  doc->applyLayout();
+  EXPECT_EQ(doc->errors.size(), errorCount);
+
+  // Fixing the content alone still does not mount it: the remembered failure suppresses the retry.
+  host->importDirective.content =
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\"/>";
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+
+  // detachInlineImport() reports false (there is no mounted wrapper to remove) but still clears the
+  // failure, so the next layout mounts the fixed content.
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  doc->applyLayout();
+  ASSERT_NE(host->composition, nullptr);
+  EXPECT_NE(host->externalDoc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   // Valid keys.
   EXPECT_TRUE(pagx::IsValidCustomDataKey("role"));
@@ -2676,6 +2718,116 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   EXPECT_FLOAT_EQ(bounds.x, 30.0f);
   EXPECT_FLOAT_EQ(bounds.height, 160.0f);
   EXPECT_FLOAT_EQ(bounds.y, 20.0f);
+}
+
+/**
+ * Test case: the per-pass layout memo (LayoutContext::layoutTargets) must not change the resolved
+ * geometry. A second applyLayout() rebuilds the context with an empty memo, so a memo that wrongly
+ * skipped a subtree would surface as geometry differing between passes, and a freshly built
+ * document — which also starts from an empty memo — must agree with both.
+ */
+PAGX_TEST(PAGXTest, LayoutMemoDoesNotChangeResolvedGeometry) {
+  const int depth = 4;
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  ASSERT_TRUE(doc != nullptr);
+
+  // Nested content-measured layers: the outer ones defer their content-measured axes during pass 1
+  // and are re-descended in pass 2, which is what the memo exists to collapse.
+  pagx::Layer* chain[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    chain[i] = doc->makeNode<pagx::Layer>();
+    if (i > 0) {
+      chain[i - 1]->children = {chain[i]};
+    }
+  }
+  chain[depth - 1]->width = 100;
+  chain[depth - 1]->height = 100;
+  doc->layers.push_back(chain[0]);
+
+  doc->applyLayout();
+  pagx::Rect firstPass[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    firstPass[i] = chain[i]->layoutBounds();
+    ASSERT_FALSE(std::isnan(firstPass[i].width)) << i;
+    ASSERT_FALSE(std::isnan(firstPass[i].height)) << i;
+  }
+
+  doc->applyLayout();
+  for (int i = 0; i < depth; i++) {
+    auto bounds = chain[i]->layoutBounds();
+    EXPECT_FLOAT_EQ(bounds.width, firstPass[i].width) << i;
+    EXPECT_FLOAT_EQ(bounds.height, firstPass[i].height) << i;
+  }
+
+  auto fresh = pagx::PAGXDocument::Make(400, 400);
+  pagx::Layer* freshChain[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    freshChain[i] = fresh->makeNode<pagx::Layer>();
+    if (i > 0) {
+      freshChain[i - 1]->children = {freshChain[i]};
+    }
+  }
+  freshChain[depth - 1]->width = 100;
+  freshChain[depth - 1]->height = 100;
+  fresh->layers.push_back(freshChain[0]);
+  fresh->applyLayout();
+  for (int i = 0; i < depth; i++) {
+    EXPECT_FLOAT_EQ(freshChain[i]->layoutBounds().width, firstPass[i].width) << i;
+    EXPECT_FLOAT_EQ(freshChain[i]->layoutBounds().height, firstPass[i].height) << i;
+  }
+}
+
+/**
+ * Test case: StringParser::ParseDimension is the single dimension grammar behind the importer's
+ * attribute parsing, so an edit accepts exactly what a full reparse accepts. Accepted input writes
+ * one output and leaves the other NaN; rejected input leaves both NaN.
+ */
+PAGX_TEST(PAGXTest, ParseDimensionGrammar) {
+  struct Case {
+    const char* input;
+    bool percent;
+    float value;
+  };
+  const Case accepted[] = {
+      {"0", false, 0.0f}, {"100", false, 100.0f}, {"12.5", false, 12.5f},    {".5", false, 0.5f},
+      {"0%", true, 0.0f}, {"50%", true, 50.0f},   {"100.25%", true, 100.25f}};
+  for (const auto& item : accepted) {
+    float absolute = 0;
+    float percent = 0;
+    ASSERT_TRUE(pagx::ParseDimension(item.input, &absolute, &percent)) << item.input;
+    if (item.percent) {
+      EXPECT_FLOAT_EQ(percent, item.value) << item.input;
+      EXPECT_TRUE(std::isnan(absolute)) << item.input;
+    } else {
+      EXPECT_FLOAT_EQ(absolute, item.value) << item.input;
+      EXPECT_TRUE(std::isnan(percent)) << item.input;
+    }
+  }
+
+  // Rejected: empty, leading whitespace, a sign, a hex prefix, trailing junk, whitespace around the
+  // percent sign, and non-finite values.
+  const char* rejected[] = {"",     " 100", "\t100", "+1", "-1",  "0x10", "0X10",
+                            "10px", "50 %", "50% ",  "%",  "1,5", "inf",  "nan"};
+  for (const auto* input : rejected) {
+    float absolute = 0;
+    float percent = 0;
+    EXPECT_FALSE(pagx::ParseDimension(input, &absolute, &percent)) << input;
+    EXPECT_TRUE(std::isnan(absolute)) << input;
+    EXPECT_TRUE(std::isnan(percent)) << input;
+  }
+
+  // The importer runs the same grammar, so a string accepted above lands on the same member a full
+  // reparse writes: "50%" sets percentWidth and leaves width NaN, "120" sets height.
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="200" height="200">
+  <Layer id="d" width="50%" height="120"/>
+</pagx>)");
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = doc->findNode<pagx::Layer>("d");
+  ASSERT_TRUE(layer != nullptr);
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_FLOAT_EQ(layer->percentWidth, 50.0f);
+  EXPECT_FLOAT_EQ(layer->height, 120.0f);
+  EXPECT_TRUE(std::isnan(layer->percentHeight));
 }
 
 // =====================================================================================
@@ -8713,6 +8865,144 @@ PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
 
   auto miss = scene->getLayersUnderPoint(180, 180);
   EXPECT_TRUE(miss.empty());
+}
+
+/**
+ * Test case: getLayersUnderPoint's shapeHitTest argument selects how a layer's own content is
+ * tested. The corner of an ellipse's bounding box is inside the box but outside the filled ellipse,
+ * so the two modes disagree there while agreeing at the centre; false keeps the pre-existing
+ * bounding-box behaviour.
+ */
+PAGX_TEST(PAGXTest, HitTestShapeVersusBounds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>("ellipseId");
+  layer->name = "Ellipse";
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {50, 50};
+  ellipse->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // (5, 5) is inside the 100x100 bounding box but outside the ellipse inscribed in it, so the
+  // default bounding-box test hits and the shape test misses.
+  auto boundsHits = scene->getLayersUnderPoint(5, 5);
+  ASSERT_FALSE(boundsHits.empty());
+  EXPECT_EQ(boundsHits[0]->name(), "Ellipse");
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5, true).empty());
+
+  // The centre is inside the ellipse, so both modes hit the same layer.
+  auto centerHits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(centerHits.empty());
+  EXPECT_EQ(centerHits[0]->name(), "Ellipse");
+  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50, true).empty());
+
+  // The handle re-tests itself with the same switch.
+  EXPECT_TRUE(boundsHits[0]->hitTestPoint(5, 5));
+  EXPECT_FALSE(boundsHits[0]->hitTestPoint(5, 5, true));
+  EXPECT_TRUE(boundsHits[0]->hitTestPoint(50, 50, true));
+}
+
+/**
+ * Test case: the result is ordered deepest hit first and every ancestor of the hit layer follows
+ * it, ending at the root composition. Callers such as editor selection rely on that order.
+ */
+PAGX_TEST(PAGXTest, HitTestAncestorChainOrder) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto container = doc->makeNode<pagx::Layer>("containerId");
+  container->name = "Container";
+  container->width = 200;
+  container->height = 200;
+
+  auto leaf = doc->makeNode<pagx::Layer>("leafId");
+  leaf->name = "Leaf";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {60, 60};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 1, 0, 1};
+  fill->color = solid;
+  leaf->contents.push_back(rect);
+  leaf->contents.push_back(fill);
+
+  container->children = {leaf};
+  doc->layers.push_back(container);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  EXPECT_EQ(hits[1]->name(), "Container");
+  EXPECT_EQ(hits[2].get(), static_cast<pagx::PAGLayer*>(scene->rootComposition().get()));
+
+  // A container with no content of its own is not hit by itself, so a point outside the leaf's
+  // rect misses the whole tree even though it is inside the container's box.
+  EXPECT_TRUE(scene->getLayersUnderPoint(150, 150).empty());
+}
+
+/**
+ * Test case: a layer whose mask does not cover the point is skipped together with its subtree, so
+ * the point does not hit the layer's own content even though it falls inside its bounding box.
+ */
+PAGX_TEST(PAGXTest, HitTestMaskGating) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  // The mask is a normal layer in the document; it covers the left half only.
+  auto maskLayer = doc->makeNode<pagx::Layer>("maskId");
+  maskLayer->name = "Mask";
+  auto maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {50, 100};
+  maskRect->size = {100, 200};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto target = doc->makeNode<pagx::Layer>("targetId");
+  target->name = "Target";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {200, 200};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 1, 1};
+  fill->color = solid;
+  target->contents.push_back(rect);
+  target->contents.push_back(fill);
+  target->mask = maskLayer;
+
+  // The target is added last so it paints above the mask and is tested first.
+  doc->layers.push_back(maskLayer);
+  doc->layers.push_back(target);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Inside the mask's left half the target is hit.
+  auto inside = scene->getLayersUnderPoint(25, 100);
+  ASSERT_FALSE(inside.empty());
+  EXPECT_EQ(inside[0]->name(), "Target");
+
+  // Outside the mask the target's own content is gated away, so nothing is hit: the mask layer's
+  // content does not cover that point either.
+  EXPECT_TRUE(scene->getLayersUnderPoint(175, 100).empty());
 }
 
 /**

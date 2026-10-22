@@ -355,8 +355,7 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
     if (!doc->ownsNode(comp)) {
       continue;
     }
-    ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
-                  stats.errorCount);
+    ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
   }
 
   return stats;

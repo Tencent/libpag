@@ -599,15 +599,25 @@ bool PAGXDocument::detachInlineImport(Layer* layer) {
     return false;
   }
   auto* wrapper = layer->composition;
-  // Drop the wrapper's references into the sub-document before releasing the sub-document itself:
-  // the wrapper's layers/animations point at nodes owned by externalDoc, and clearing them first
-  // keeps the wrapper (and anything still reading it) from reaching into freed memory. The nodes
-  // stay owned by externalDoc until the reset below releases it.
+  // Take the sub-document off the layer, but keep it alive in a local handle until nothing else
+  // references it. A live scene's runtime tree holds nodes owned by the sub-document (PAGLayer::node
+  // and PAGComposition::document), so dropping the last reference here would leave them dangling.
+  auto subDocument = layer->externalDoc;
+  layer->externalDoc = nullptr;
+  layer->composition = nullptr;
+  // Rebuild every live scene's runtime tree while the wrapper and the sub-document are both still
+  // alive, so the tree being torn down can still read them. The rebuilt tree is generated from this
+  // document's node list and no longer references either, which is what makes the two releases
+  // below safe. Hosts therefore never have to tear a scene down before detaching.
+  rebuildLiveScenes();
+  // The wrapper's layers/animations point at nodes owned by the sub-document, so clear them before
+  // the wrapper outlives its contents; both are still alive here, so this only drops the references
+  // rather than rescuing them.
   wrapper->layers.clear();
   wrapper->animations.clear();
-  layer->composition = nullptr;
-  layer->externalDoc = nullptr;
   removeNodes({wrapper});
+  // `subDocument` releases the sub-document on return; the rebuild above already dropped every
+  // runtime reference to it.
   return true;
 }
 
@@ -624,8 +634,6 @@ std::vector<std::string> PAGXDocument::getExternalImagePaths() const {
   AppendExternalImagePaths(this, &paths, visited);
   return paths;
 }
-
-
 
 bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Data> data) {
   if (filePath.empty() || data == nullptr) {
@@ -1003,6 +1011,19 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
       it = liveScenes.erase(it);
     } else {
       ++it;
+    }
+  }
+}
+
+void PAGXDocument::rebuildLiveScenes() {
+  PruneExpiredScenes(&liveScenes);
+  for (auto& weakScene : liveScenes) {
+    auto scene = weakScene.lock();
+    if (scene != nullptr) {
+      // A full rebuild rather than an incremental refresh: the caller is about to destroy nodes the
+      // current tree references, and those nodes are gone from the document by then, so patching the
+      // tree in place would have to resolve references that no longer exist.
+      scene->buildRuntimeTree();
     }
   }
 }

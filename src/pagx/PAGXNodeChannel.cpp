@@ -418,11 +418,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 #define FIELD_OPT_COLOR(T, name, member, cls) \
   { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color }
 // The width/height dimension channels and their percent siblings. Both accessors cross-clear the
-// two members (see AccessDimensionAxis); the dimension flag routes SetNodeChannelFromString
-// through the XSD dimension parser instead of the plain float one, so "50%" is accepted and lands
-// on the percent member exactly like a full reparse.
+// two members (see AccessDimensionAxis), so writing one clears the other: a stale percent would
+// keep overriding a freshly written absolute value, and vice versa.
 #define FIELD_DIMENSION(T, name, cls, WidthAxis) \
-  { name, cls, &AccessDimensionAxis<T, WidthAxis, false>, ChannelValueType::Float, true }
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, false>, ChannelValueType::Float }
 #define FIELD_PERCENT(T, name, cls, WidthAxis) \
   { name, cls, &AccessDimensionAxis<T, WidthAxis, true>, ChannelValueType::Float }
 #define FIELD_ENUM(T, name, member, cls, E)                                                   \
@@ -1111,87 +1110,6 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
   }
   return true;
 }
-
-// Parses a raw attribute string into the KeyValue alternative the channel expects, matching the
-// importer's per-type parsing exactly so an incremental edit yields the same value a full reparse
-// would. Returns false (leaving out unset) when the string is not a valid value for that type.
-static bool ParseChannelValue(ChannelValueType type, const std::string& raw, KeyValue* out) {
-  switch (type) {
-    case ChannelValueType::Float: {
-      const char* start = raw.c_str();
-      char* endPtr = nullptr;
-      float value = strtof(start, &endPtr);
-      // Strict like ParseTypedValue<float> in PAGXImporter.cpp: the whole string must be consumed
-      // and be finite, so an incremental edit never accepts input a full reparse would reject.
-      if (endPtr == start || *endPtr != '\0' || !std::isfinite(value)) {
-        return false;
-      }
-      *out = value;
-      return true;
-    }
-    case ChannelValueType::Int: {
-      const char* start = raw.c_str();
-      char* endPtr = nullptr;
-      long value = strtol(start, &endPtr, 10);
-      if (endPtr == start || *endPtr != '\0' || value < INT_MIN || value > INT_MAX) {
-        return false;
-      }
-      *out = static_cast<int>(value);
-      return true;
-    }
-    case ChannelValueType::Bool: {
-      if (raw == "true" || raw == "1") {
-        *out = true;
-        return true;
-      }
-      if (raw == "false" || raw == "0") {
-        *out = false;
-        return true;
-      }
-      return false;
-    }
-    case ChannelValueType::Color: {
-      bool valid = false;
-      Color color = ParseColor(raw, &valid);
-      if (!valid) {
-        return false;
-      }
-      *out = color;
-      return true;
-    }
-    case ChannelValueType::String:
-      // Strings and enums are carried verbatim; enum validity is checked by the accessor.
-      *out = raw;
-      return true;
-    case ChannelValueType::ImageRef:
-    case ChannelValueType::Matrix:
-    case ChannelValueType::PAGImage:
-      // Not addressable through a raw attribute string: ImageRef/PAGImage need a resolved image
-      // handle and Matrix needs a full transform structure. Reject explicitly so callers see a
-      // dedicated "unsupported type" diagnostic rather than a generic accessor failure.
-      return false;
-  }
-  return false;
-}
-
-// Dimension strings are parsed by StringParser::ParseDimension, which the importer's
-// ReadDimension also calls. Sharing one grammar is what keeps an incremental edit from accepting
-// input a full reparse would reject (or vice versa) as the XSD rules evolve.
-
-// The sibling percent channel for a dimension channel ("width" -> "percentWidth"); a "50%" value
-// routes through it so the write lands on the percent member. Returns null for a channel that has
-// no percent sibling.
-static const char* DimensionPercentChannel(const std::string& channel) {
-  if (channel == "width") {
-    return "percentWidth";
-  }
-  if (channel == "height") {
-    return "percentHeight";
-  }
-  return nullptr;
-}
-
-
 
 bool ResetNodeChannel(Node* node, const std::string& channel) {
   if (node == nullptr) {

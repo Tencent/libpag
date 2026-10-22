@@ -146,8 +146,8 @@ class PAGXDocument : public Node {
    * "@id" references. Renaming happens inside this call, so a caller cannot forget the sequence
    * and merge duplicate ids into the document. Callers must not push into `nodes` directly — a
    * bypassed node keeps its old index (colliding with existing nodes) and is invisible to
-   * ownsNode(), breaking getNodeSourceMap() index-based lookups and any host that resolves a
-   * runtime layer back to a source node.
+   * ownsNode(), breaking index-based lookups and any host that resolves a runtime layer back
+   * to a source node.
    *
    * `other` is drained and invalidated: its node list, ownership set and id index are cleared, so
    * it can no longer answer ownsNode()/findNode() for nodes it has handed over. Passing *this is
@@ -195,10 +195,11 @@ class PAGXDocument : public Node {
    * through resolve so the layer renders the flattened contents instead of the composition
    * reference.
    *
-   * Must not be called while a live PAGScene built from this document is still alive: releasing
-   * the sub-document frees the nodes its layers point at, so any runtime PAGLayer still holding
-   * them (PAGLayer::node, PAGComposition::document) is left dangling. Callers that detach against
-   * a live document must rebuild the scene afterwards.
+   * Safe to call while PAGScene instances built from this document are still alive: every live
+   * scene rebuilds its runtime tree before the sub-document is released, so no runtime PAGLayer is
+   * left pointing at the freed nodes (PAGLayer::node, PAGComposition::document). Runtime handles
+   * cached by the host before this call are replaced by the rebuild, so re-query them afterwards
+   * instead of reusing the old ones.
    * @param layer the layer whose inline import should be detached.
    */
   bool detachInlineImport(Layer* layer);
@@ -383,6 +384,11 @@ class PAGXDocument : public Node {
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
+
+  // Rebuilds the runtime tree of every live scene built from this document. Called by operations
+  // that remove nodes an existing runtime tree may still reference: the tree is regenerated from
+  // the node list while those nodes are still alive, so nothing reads freed memory on the way out.
+  void rebuildLiveScenes();
 
   FontConfig _fontConfig;
   bool layoutApplied = false;

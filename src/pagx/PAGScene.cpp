@@ -757,8 +757,8 @@ bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, f
       childHit = true;
     }
   }
-  if (!childHit && !OwnContentContainsPoint(layer.get(), rootX, rootY, surfaceX, surfaceY,
-                                            shapeHitTest)) {
+  if (!childHit &&
+      !OwnContentContainsPoint(layer.get(), rootX, rootY, surfaceX, surfaceY, shapeHitTest)) {
     return false;
   }
   // Descendants are pushed before their parent so the deepest top-most hit ends up at the front,
@@ -767,8 +767,7 @@ bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, f
   return true;
 }
 
-std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
-                                                                     float surfaceY,
+std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX, float surfaceY,
                                                                      bool shapeHitTest) {
   float rootX = 0;
   float rootY = 0;
@@ -799,8 +798,6 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
   return FromTGFX(surfaceBounds);
 }
-
-
 
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
