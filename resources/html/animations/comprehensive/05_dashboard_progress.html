@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dashboard Progress Bars</title>
+    <style>
+      /* Width is not animatable in the subset, so the fill is a full-width
+         bar inside an overflow:hidden track, revealed by translateX.
+         Each fill also shifts background-color (color channel). */
+      @keyframes fill72 {
+        0%   { transform: translateX(-320px); background-color: #38BDF8; }
+        100% { transform: translateX(-90px); background-color: #6366F1; }
+      }
+      @keyframes fill55 {
+        0%   { transform: translateX(-320px); background-color: #34D399; }
+        100% { transform: translateX(-144px); background-color: #10B981; }
+      }
+      @keyframes fill88 {
+        0%   { transform: translateX(-320px); background-color: #FBBF24; }
+        100% { transform: translateX(-38px); background-color: #F472B6; }
+      }
+      .track {
+        width: 320px;
+        height: 18px;
+        border-radius: 9999px;
+        overflow: hidden;
+        background-color: #1E293B;
+      }
+      .fill {
+        width: 320px;
+        height: 18px;
+        border-radius: 9999px;
+      }
+      .row { display: flex; flex-direction: column; gap: 8px; }
+      .caption { font-size: 13px; font-weight: bold; color: #CBD5E1; letter-spacing: 1px; }
+    </style>
+  </head>
+  <body style="width: 460px; height: 320px; display: flex; flex-direction: column;
+               justify-content: center; gap: 28px; padding: 40px;
+               background-image: linear-gradient(135deg, #0F172A, #1E1B4B); font-family: Arial;">
+    <p style="font-size: 22px; font-weight: bold; color: #F8FAFC;">System Usage</p>
+    <div class="row">
+      <span class="caption">CPU</span>
+      <div class="track">
+        <div class="fill" style="background-color: #38BDF8; animation: fill72 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;"></div>
+      </div>
+    </div>
+    <div class="row">
+      <span class="caption">MEMORY</span>
+      <div class="track">
+        <div class="fill" style="background-color: #34D399; animation: fill55 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; animation-delay: 0.2s;"></div>
+      </div>
+    </div>
+    <div class="row">
+      <span class="caption">NETWORK</span>
+      <div class="track">
+        <div class="fill" style="background-color: #FBBF24; animation: fill88 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; animation-delay: 0.4s;"></div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG translateY - y channel</title>
+    <style>
+      @keyframes bounceY {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(96px); }
+      }
+    </style>
+  </head>
+  <body style="width: 180px; height: 200px; background-color: #1E1B4B;">
+    <!-- 内联 SVG 水滴，translateY → y 通道 (§13.2) -->
+    <div id="drop"
+         style="position: absolute; left: 66px; top: 16px; width: 48px; height: 48px;
+                animation: bounceY 1.1s cubic-bezier(0.5, 0, 0.5, 1) infinite alternate;">
+      <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2.5C12 2.5 5 11 5 15.5a7 7 0 0 0 14 0C19 11 12 2.5 12 2.5z"
+              fill="#22D3EE"/>
+      </svg>
+    </div>
+  </body>
+</html>

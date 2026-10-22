@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - fromTo (x + opacity)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 260px; height: 120px; background-color: #0B132B; position: relative; margin: 0;">
+    <div id="card"
+         style="position: absolute; left: 24px; top: 36px;
+                width: 120px; height: 48px; border-radius: 10px;
+                background-color: #5BC0BE;"></div>
+    <script>
+      // fromTo 显式给出起止值，同时驱动 x 与 opacity 两个通道
+      gsap.fromTo("#card",
+        { x: 0, opacity: 0 },
+        { x: 90, opacity: 1, duration: 2, ease: "none", repeat: -1 }
+      );
+    </script>
+  </body>
+</html>

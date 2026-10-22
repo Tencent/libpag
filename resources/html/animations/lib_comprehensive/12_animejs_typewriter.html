@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Typewriter</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #0A0F1E; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; justify-content: center; gap: 26px; width: 100%; height: 100%; padding: 64px;">
+
+      <p id="prompt" style="font-size: 14px; letter-spacing: 3px; color: #34D399; opacity: 0;">~ /terminal</p>
+
+      <div style="display: flex; flex-direction: row; align-items: center;">
+        <p id="line" style="font-size: 30px; font-weight: bold; color: #F8FAFC;"></p>
+        <div id="cursor" style="width: 4px; height: 34px; border-radius: 2px; background-color: #34D399; margin: 0 0 0 4px;"></div>
+      </div>
+
+      <p id="hint" style="font-size: 15px; color: #64748B; opacity: 0;">press any key to continue</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      // split text into per-character spans (snapshot captures the generated DOM)
+      const line = document.getElementById('line');
+      const text = 'Building the future, one frame.';
+      text.split('').forEach((ch) => {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        span.setAttribute('style', 'opacity: 0;');
+        line.appendChild(span);
+      });
+
+      anime({
+        targets: '#prompt',
+        opacity: [0, 1],
+        translateX: [-16, 0],
+        duration: 500,
+        easing: 'easeOutCubic'
+      });
+
+      // typewriter: each char snaps in (steps -> hold in PAGX)
+      anime({
+        targets: '.char',
+        opacity: [0, 1],
+        delay: anime.stagger(70, { start: 400 }),
+        duration: 1,
+        easing: 'steps(1)'
+      });
+
+      // blinking caret: hard on/off => steps timing => PAGX hold channel
+      anime({
+        targets: '#cursor',
+        opacity: [
+          { value: 1, duration: 1 },
+          { value: 0, duration: 1, delay: 480 }
+        ],
+        easing: 'steps(1)',
+        loop: true,
+        direction: 'alternate'
+      });
+
+      anime({
+        targets: '#hint',
+        opacity: [0, 1],
+        translateY: [12, 0],
+        delay: 2700,
+        duration: 600,
+        easing: 'easeOutCubic'
+      });
+    </script>
+  </body>
+</html>

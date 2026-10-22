@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG loading bars - real scene</title>
+    <style>
+      @keyframes barPulse {
+        0%, 100% { opacity: 0.3; transform: translateY(0px); }
+        50%      { opacity: 1; transform: translateY(-16px); }
+      }
+    </style>
+  </head>
+  <body style="width: 220px; height: 140px; background-color: #0F172A;">
+    <!--
+      真实加载场景：多个内联 SVG 竖条，opacity + translateY 双通道，
+      逗号选择器 0%,100% + 错峰 delay 形成均衡器/加载律动
+    -->
+    <div id="b1"
+         style="position: absolute; left: 60px; top: 56px; width: 16px; height: 40px;
+                animation: barPulse 1s ease-in-out 0s infinite;">
+      <svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="16" height="40" rx="8" fill="#22D3EE"/>
+      </svg>
+    </div>
+    <div id="b2"
+         style="position: absolute; left: 92px; top: 56px; width: 16px; height: 40px;
+                animation: barPulse 1s ease-in-out 0.15s infinite;">
+      <svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="16" height="40" rx="8" fill="#38BDF8"/>
+      </svg>
+    </div>
+    <div id="b3"
+         style="position: absolute; left: 124px; top: 56px; width: 16px; height: 40px;
+                animation: barPulse 1s ease-in-out 0.3s infinite;">
+      <svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="16" height="40" rx="8" fill="#818CF8"/>
+      </svg>
+    </div>
+    <div id="b4"
+         style="position: absolute; left: 156px; top: 56px; width: 16px; height: 40px;
+                animation: barPulse 1s ease-in-out 0.45s infinite;">
+      <svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="16" height="40" rx="8" fill="#C084FC"/>
+      </svg>
+    </div>
+  </body>
+</html>
