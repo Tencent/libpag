@@ -26,8 +26,9 @@ namespace pagx {
 
 /**
  * GPUDrawable adapts a browser canvas (selected by its element id) into the pagx Drawable
- * protocol. The underlying GPU device and surface are created lazily on first access and
- * tracked for canvas resize via updateSize().
+ * protocol. The underlying GPU device and surface are created lazily on first access. The canvas
+ * size is read once at construction; a canvas-resize entry point may be added later, for which
+ * updateSize() already drops the cached surface.
  */
 class GPUDrawable : public Drawable {
  public:
@@ -53,10 +54,10 @@ class GPUDrawable : public Drawable {
  private:
   explicit GPUDrawable(std::string canvasID);
 
-  std::string _canvasID;
+  std::string canvasID;
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::Window> _window = nullptr;
+  std::shared_ptr<tgfx::Window> window = nullptr;
 };
 
 }  // namespace pagx

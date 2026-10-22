@@ -3,11 +3,9 @@ import { AudioPlayer } from './module/audio-player';
 
 import type { PAGFile } from '../src/pag-file';
 import type { PAGView } from '../src/pag-view';
-import  {type PAG as PAGNamespace,LayerType } from '../src/types';
+import { type PAG as PAGNamespace } from '../src/types';
 import type { PAGComposition } from '../src/pag-composition';
 import type { PAGImageLayer } from '../src/pag-image-layer';
-import type * as Libpag from "../src/pag";
-import type {PAGTextLayer} from "../src/pag-text-layer";
 
 declare global {
   interface Window {
@@ -131,13 +129,6 @@ if (typeof window !== 'undefined') {
       PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
       console.log('=== 开启 ffavc 软件解码 ===');
     });
-    document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
-      if (window.ffavc) {
-        const FFAVC = await window.ffavc.FFAVCInit();
-        const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
-        PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
-      }
-    });
 
     // Get PAGFile duration
     document.getElementById('btn-pagfile-get-duration')?.addEventListener('click', () => {
@@ -201,6 +192,7 @@ if (typeof window !== 'undefined') {
       let progress = Number((document.getElementById('progress') as HTMLInputElement).value);
       if (!(progress >= 0 && progress <= 1)) {
         alert('请输入0～1之间');
+        return;
       }
       pagView.setProgress(progress);
       console.log(`已设置进度：${progress}`);
@@ -260,7 +252,7 @@ if (typeof window !== 'undefined') {
     document.getElementById('btn-freeCache')?.addEventListener('click', () => {
       pagView.freeCache();
     });
-    // freeCache
+    // makeSnapshot
     document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
       pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
     });
@@ -275,6 +267,7 @@ if (typeof window !== 'undefined') {
       let cacheScale = Number((document.getElementById('cacheScale') as HTMLInputElement).value);
       if (!(cacheScale >= 0 && cacheScale <= 1)) {
         alert('请输入0～1之间');
+        return;
       }
       pagView.setCacheScale(cacheScale);
     });

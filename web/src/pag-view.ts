@@ -72,33 +72,40 @@ export class PAGView {
     const pagView = new PAGView(pagPlayer, canvasElement);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
-    if (pagView.pagViewOptions.useCanvas2D) {
-      PAGModule.globalCanvas.retain();
-      if (!isWebGPUBackend()) {
-        pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
+    try {
+      if (pagView.pagViewOptions.useCanvas2D) {
+        PAGModule.globalCanvas.retain();
+        if (!isWebGPUBackend()) {
+          pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
+        }
+      } else {
+        pagView.renderCanvas = RenderCanvas.from(canvasElement);
+        pagView.renderCanvas.retain();
+        if (!isWebGPUBackend()) {
+          pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
+        }
       }
-    } else {
-      pagView.renderCanvas = RenderCanvas.from(canvasElement);
-      pagView.renderCanvas.retain();
-      if (!isWebGPUBackend()) {
-        pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
+      pagView.resetSize(pagView.pagViewOptions.useScale);
+      pagView.frameRate = file.frameRate();
+      pagView.pagSurface = this.makePAGSurface(
+        pagView.pagGlContext,
+        canvasElement,
+        pagView.rawWidth,
+        pagView.rawHeight,
+        pagView.pagViewOptions.useCanvas2D,
+      );
+      pagView.player.setSurface(pagView.pagSurface);
+      pagView.player.setComposition(file);
+      pagView.setProgress(0);
+      if (pagView.pagViewOptions.firstFrame) {
+        await pagView.flush();
+        pagView.playFrame = 0;
       }
-    }
-    pagView.resetSize(pagView.pagViewOptions.useScale);
-    pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(
-      pagView.pagGlContext,
-      canvasElement,
-      pagView.rawWidth,
-      pagView.rawHeight,
-      pagView.pagViewOptions.useCanvas2D,
-    );
-    pagView.player.setSurface(pagView.pagSurface);
-    pagView.player.setComposition(file);
-    pagView.setProgress(0);
-    if (pagView.pagViewOptions.firstFrame) {
-      await pagView.flush();
-      pagView.playFrame = 0;
+    } catch (error) {
+      // Roll back everything acquired above so a failed init() leaks neither the wasm player
+      // instance nor the retained canvas/GL registrations.
+      pagView.destroy();
+      throw error;
     }
     return pagView;
   }
