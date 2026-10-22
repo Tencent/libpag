@@ -1547,7 +1547,6 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 |-----------|------|---------|-------------|
 | `font` | idref | (required) | Font resource reference `@id` |
 | `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
-| `fauxBold`, `fauxItalic` | bool | inherit Text | Synthetic styles still required by these glyphs. Embedding writes explicit values to avoid applying a baked style twice, without changing the logical Text style. |
 | `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
 | `x` | float | 0 | Overall X offset |
 | `y` | float | 0 | Overall Y offset |
@@ -2012,25 +2011,6 @@ As a container, TextBox processes its child Text elements and text modifiers (Te
 | `overflow` | Overflow | visible | Overflow behavior when text exceeds the box height (horizontal mode) or width (vertical mode). Has no effect when that dimension is NaN |
 
 TextBox inherits all Group attributes (`position`, `anchor`, `rotation`, `scale`, `skew`, `skewAxis`, `alpha`, `padding`) and constraint attributes (see §4.3). For TextBox, `width`/`height` default to NaN (no boundary, auto-sizing); NaN means no boundary in that dimension, which may cause `wordWrap` or `overflow` to have no effect. The `padding` attribute insets the text layout area and the constraint reference frame for non-Text child elements. The `position` attribute specifies the top-left corner of the text area in the parent coordinate system. Prefer constraint attributes (`left`/`top`) for positioning — when constraints are set, `position` is computed automatically.
-
-Optional captured layout consists of a `layoutKey` attribute and `TextLayoutFragment` children
-after the vector elements. Each fragment has `textIndex` (zero-based Text traversal order),
-`start` and `length` (Unicode scalars), `position` (alphabetic baseline origin in content-box
-coordinates), `bounds` (line-fragment rectangle in the same coordinates), and `inlinePositions`
-(one scalar anchor relative to that origin). Fragments must cover all non-whitespace text, in
-source order within each run, without overlaps or splitting grapheme clusters. Gaps may contain
-only ASCII whitespace discarded at a wrap or an explicit newline. Ranges are validated before
-use; glyph shaping still preserves ligatures and combining clusters.
-
-The `v1-` key is a serialization-stable fingerprint produced by `TextLayout::CaptureKey` over the
-complete logical runs, shaping attributes, text-area dimensions/alignment, child transforms and
-fragment records. Captured layout supports horizontal text only. A matching record replays its
-baselines and anchors without additional wrapping, justification or punctuation compression.
-It survives XML serialization and font embedding. A mismatch invalidates the entire capture and
-its embedded GlyphRuns, then uses normal paragraph layout. Runtime text overrides likewise
-reshape instead of replaying embedded glyphs. Paint and outer-box transforms do not invalidate
-text layout. Removing `layoutKey`, fragments and embedded GlyphRuns explicitly opts into reflow.
-Readers without this extension may lay out the logical Text normally or use embedded GlyphRuns.
 
 **TextAlign (Text Alignment)**:
 

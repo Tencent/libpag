@@ -40,9 +40,6 @@ class PathData;
 // On failure, leaves positions empty.
 bool ParseTextInlinePositions(const std::string& text, const std::string& value,
                               std::vector<float>* positions);
-// The range-validated paragraph descriptor already knows its scalar count.
-bool ParseTextInlinePositions(size_t scalarCount, const std::string& value,
-                              std::vector<float>* positions);
 
 // Resolve a glyph's pen in layout coordinates. currentX includes all preceding advances.
 void ResolveGlyphPosition(const GlyphRun* run, size_t i, float baseX, float baseY, float currentX,

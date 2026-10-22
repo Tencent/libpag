@@ -677,12 +677,6 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(element, inherited);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
 
-  if (element->findAttribute("data-pagx-paragraph")) {
-    if (auto* paragraph =
-            _textFragmentBuilder->convertCapturedParagraph(element, box, childInherited)) {
-      return _layerBuilder->wrapForMargin(paragraph, box);
-    }
-  }
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
   }

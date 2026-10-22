@@ -1824,68 +1824,6 @@ PAG_TEST(PAGXHTMLImporterTest, InlinePositionsUseUnicodeScalarsAndRoundTrip) {
   EXPECT_EQ(restoredText->inlinePositions, text->inlinePositions);
 }
 
-static std::string CapturedParagraphHTML() {
-  return R"HTML(<html><body style="width:240px;height:120px">
-    <div data-pagx-paragraph="1" style="position:absolute;left:0;top:0;width:200px;height:60px;font-family:Arial;font-size:18px;line-height:30px">
-      <div data-pagx-run-text="A😀B &#10;CD" style="position:absolute;left:0;top:0;width:200px;height:60px">
-        <span data-pagx-start="0" data-pagx-baseline="23.5" data-pagx-inline-positions="0,18,42"
-          style="position:absolute;left:0;top:0;width:60px;height:30px;white-space:pre">A😀B</span>
-        <span data-pagx-start="5" data-pagx-baseline="23.5" data-pagx-inline-positions="0,18"
-          style="position:absolute;left:0;top:30px;width:36px;height:30px;white-space:pre">CD</span>
-      </div>
-    </div></body></html>)HTML";
-}
-
-PAG_TEST(PAGXHTMLImporterTest, CapturedParagraphIsOneTextWithNoSoftWrapNewlines) {
-  auto doc = ParseFromString(CapturedParagraphHTML());
-  ASSERT_NE(doc, nullptr);
-  auto* box = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
-  ASSERT_NE(box, nullptr);
-  ASSERT_FALSE(box->layoutKey.empty());
-  std::vector<pagx::Text*> texts;
-  pagx::TextLayout::CollectTextElements(box->elements, texts);
-  ASSERT_EQ(texts.size(), 1u);
-  EXPECT_EQ(texts.front()->text, "A😀B \nCD");
-  EXPECT_TRUE(texts.front()->inlinePositions.empty());
-  ASSERT_EQ(box->layoutFragments.size(), 2u);
-  EXPECT_EQ(box->layoutFragments[1].start, 5u);
-  EXPECT_FLOAT_EQ(box->layoutFragments[1].position.y, 53.5f);
-  auto restored = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
-  ASSERT_NE(restored, nullptr);
-  EXPECT_TRUE(restored->errors.empty());
-  auto* copy = FindElementOfType<pagx::TextBox>(restored->layers.front()->children.front());
-  ASSERT_NE(copy, nullptr);
-  EXPECT_EQ(copy->layoutKey, box->layoutKey);
-  EXPECT_EQ(copy->layoutFragments.size(), 2u);
-}
-
-PAG_TEST(PAGXHTMLImporterTest,
-         CapturedParagraphRejectsMalformedDescriptorsWithoutLosingVisualText) {
-  for (const auto& change : std::vector<std::pair<std::string, std::string>>{
-           {"data-pagx-start=\"5\"", "data-pagx-start=\"4\""},
-           {"data-pagx-baseline=\"23.5\"", "data-pagx-baseline=\"nan\""},
-           {"0,18,42", "0,18,42junk"},
-           {"left:0;top:30px", "filter:blur(1px);left:0;top:30px"},
-           {"data-pagx-run-text=\"A😀B &#10;CD\"", "data-pagx-run-text=\"A😀Z &#10;CD\""}}) {
-    auto html = CapturedParagraphHTML();
-    html.replace(html.find(change.first), change.first.size(), change.second);
-    auto doc = ParseFromString(html);
-    ASSERT_NE(doc, nullptr);
-    EXPECT_TRUE(HasDiagnosticContaining(doc, "captured paragraph"));
-    std::string content;
-    int textCount = 0;
-    for (auto& node : doc->nodes) {
-      if (auto* text = As<pagx::Text>(node.get())) {
-        content += text->text;
-        ++textCount;
-      }
-      if (auto* box = As<pagx::TextBox>(node.get())) EXPECT_TRUE(box->layoutKey.empty());
-    }
-    EXPECT_EQ(textCount, 2);
-    EXPECT_EQ(content, "A😀BCD");
-  }
-}
-
 PAG_TEST(PAGXHTMLImporterTest, InvalidInlinePositionsHaveADiagnosticAndUseNormalLayout) {
   for (const auto* value : {"0,30", "0,30,70,90", "0,nan,70", "0,30junk,70", "0,,70", "0,30,70,"}) {
     auto doc = ParseFromString(

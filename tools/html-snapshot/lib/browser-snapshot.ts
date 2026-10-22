@@ -2324,158 +2324,6 @@ function freezeSvg(svgEl, rect) {
 
 // ===== Multi-line text emission =====
 
-// A semantic paragraph accompanies (rather than replaces) the ordinary visual spans. The
-// descriptor is accepted atomically by the importer. Unsupported inline objects, effects,
-// scripts requiring paragraph BiDi context, and fragmented formatting contexts keep the old path.
-function renderCapturedParagraph(el, rect, left, top, computed, opts) {
-  if (opts.flexItem || computed.display !== 'block' ||
-      !/^(P|DIV|H[1-6]|LI|BLOCKQUOTE)$/.test(el.tagName)) return null;
-  const zeroBox = (cs) => ['padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width']
-    .every(p => !readNum(cs, p));
-  const safeText = (cs) => cs.getPropertyValue('writing-mode') === 'horizontal-tb' &&
-    cs.getPropertyValue('direction') !== 'rtl' &&
-    /^(normal|isolate)$/.test(cs.getPropertyValue('unicode-bidi')) &&
-    cs.getPropertyValue('visibility') === 'visible' &&
-    cs.getPropertyValue('text-transform') === 'none' &&
-    cs.getPropertyValue('text-shadow') === 'none' &&
-    cs.getPropertyValue('text-decoration-line') === 'none' &&
-    cs.getPropertyValue('transform') === 'none' &&
-    cs.getPropertyValue('animation-name') === 'none' &&
-    cs.getPropertyValue('vertical-align') === 'baseline';
-  if (!zeroBox(computed) || !safeText(computed) || computed.getPropertyValue('text-indent') !== '0px')
-    return null;
-  for (let host = el; host; host = host.parentElement) {
-    const cs = getComputedStyle(host);
-    if (cs.getPropertyValue('column-count') !== 'auto' ||
-        cs.getPropertyValue('column-width') !== 'auto' || cs.getPropertyValue('transform') !== 'none')
-      return null;
-  }
-  const firstLetter = getComputedStyle(el, '::first-letter');
-  if (['font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'float', 'color'].some(
-    p => firstLetter.getPropertyValue(p) !== computed.getPropertyValue(p))) return null;
-  const firstLine = getComputedStyle(el, '::first-line');
-  if (['font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'letter-spacing', 'color'].some(
-    p => firstLine.getPropertyValue(p) !== computed.getPropertyValue(p))) return null;
-  // A neighbouring float can make the available line width vary within a rectangular block.
-  // Keep its visual fragments rather than claiming that a regular TextBox can reflow that shape.
-  if (!window.__pagxParagraphFloatRects) {
-    window.__pagxParagraphFloatRects = [...document.querySelectorAll('*')]
-      .filter(node => getComputedStyle(node).getPropertyValue('float') !== 'none')
-      .map(node => node.getBoundingClientRect());
-  }
-  for (const floating of window.__pagxParagraphFloatRects) {
-    if (floating.bottom > rect.top && floating.top < rect.bottom &&
-        floating.right > rect.left && floating.left < rect.right) return null;
-  }
-  const records = [];
-  let valid = true;
-  let previousSpace = true;
-  const ws = computed.getPropertyValue('white-space');
-  const preserveSpaces = ws === 'pre' || ws === 'pre-wrap' || ws === 'break-spaces';
-  const preserveBreaks = preserveSpaces || ws === 'pre-line';
-  const visit = (node) => {
-    if (!valid) return;
-    if (node.nodeType === Node.TEXT_NODE) {
-      const cs = getComputedStyle(node.parentElement);
-      if (!safeText(cs) || cs.getPropertyValue('white-space') !== ws ||
-          /[\u00ad\u0590-\u08ff\u202a-\u202e\u2066-\u2069\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1eeff}]/u.test(node.nodeValue)) {
-        valid = false; return;
-      }
-      const record = { node, computed: cs, tokens: [] };
-      let offset = 0;
-      for (const ch of node.nodeValue) {
-        const start = offset;
-        offset += ch.length;
-        if (ch === '\r' || preserveSpaces && ch === '\t') { valid = false; return; }
-        let value = ch;
-        if (/[ \t\n\f]/.test(ch) && !preserveSpaces) {
-          if (ch === '\n' && preserveBreaks) value = '\n';
-          else {
-            if (previousSpace) continue;
-            value = ' ';
-          }
-        }
-        record.tokens.push({ value, start, end: offset });
-        previousSpace = value === ' ' || value === '\n';
-      }
-      records.push(record);
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.tagName === 'BR') {
-        if (!records.length) { valid = false; return; }
-        records.at(-1).tokens.push({ value: '\n', start: -1, end: -1 });
-        previousSpace = true;
-        return;
-      }
-      const cs = getComputedStyle(node);
-      if (!/^(SPAN|B|STRONG|I|EM|A|SMALL)$/.test(node.tagName) || cs.display !== 'inline' ||
-          cs.position !== 'static' || cs.getPropertyValue('float') !== 'none' ||
-          cs.opacity !== '1' || !zeroBox(cs) || hasBoxVisualsForInline(cs) || !safeText(cs) ||
-          ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'].some(p => readNum(cs, p)) ||
-          ['filter', 'backdrop-filter', 'clip-path', 'mask-image'].some(p => cs.getPropertyValue(p) !== 'none') ||
-          cs.getPropertyValue('mix-blend-mode') !== 'normal') {
-        valid = false; return;
-      }
-      for (const child of node.childNodes) visit(child);
-    }
-  };
-  for (const node of el.childNodes) visit(node);
-  if (!valid || !records.length) return null;
-  if (!preserveSpaces) {
-    for (let i = records.length - 1; i >= 0; --i) {
-      while (records[i].tokens.at(-1)?.value === ' ') records[i].tokens.pop();
-      if (records[i].tokens.length) break;
-    }
-  }
-  const attribute = s => escapeHtml(s).replace(/\n/g, '&#10;').replace(/\t/g, '&#9;');
-  const runs = [];
-  const baselines = [];
-  for (const record of records) {
-    const source = record.tokens.map(t => t.value).join('');
-    if (!source) continue;
-    const parts = measuredTextFragments(record.node, record.computed, 'y');
-    const spans = [];
-    let tokenIndex = 0;
-    let sourceEnd = 0;
-    for (const line of parts) {
-      if (line.initial || line.start === undefined || line.end === undefined || line.start < sourceEnd)
-        return null;
-      sourceEnd = line.end;
-      while (tokenIndex < record.tokens.length && record.tokens[tokenIndex].start < line.start) ++tokenIndex;
-      const indices = [];
-      while (tokenIndex < record.tokens.length) {
-        const token = record.tokens[tokenIndex];
-        if (token.start < 0 || token.end > line.end) break;
-        indices.push({ ...token, i: tokenIndex++ });
-      }
-      if (!indices.length || indices.map(t => t.value).join('') !== line.text) return null;
-      const cs = line.computed || record.computed;
-      const positions = measureTextInlinePositions(record.node, line, cs, line.text, false);
-      const baseline = measureTextBaseline(record.node, line);
-      if (baseline === null || positions.length !== Array.from(line.text).length) return null;
-      const lineHeight = readNum(cs, 'line-height') || line.rect.height;
-      const y = line.rect.top + (line.rect.height - lineHeight) / 2 - rect.top;
-      const x = line.rect.left - rect.left;
-      const style = buildStyle(x, y, line.rect.width, lineHeight, cs, { box: false, text: true });
-      spans.push(`<span data-pagx-text-clip="include" data-pagx-start="${indices[0].i}"` +
-        ` data-pagx-inline-positions="${positions.join(',')}"` +
-        ` data-pagx-baseline="${baseline - rect.top - geometryNumber(y)}"` +
-        ` style="${withNowrap(style)};white-space:pre">${escapeHtml(line.text)}</span>`);
-      baselines.push(baseline);
-    }
-    if (!spans.length && /[^ \n\t\f]/.test(source)) return null;
-    const runStyle = buildStyle(0, 0, rect.width, rect.height, record.computed, { box: false, text: true });
-    runs.push(`<div data-pagx-run-text="${attribute(source)}" data-pagx-text-clip="include"` +
-      ` style="${runStyle}">` +
-      spans.join('') + '</div>');
-  }
-  if (baselines.length < 2 || Math.max(...baselines) - Math.min(...baselines) < 1) return null;
-  // Generated content has no stable source range in the original paragraph.
-  if (records.some(r => r.node.parentElement.closest('[data-pagx-pseudo]'))) return null;
-  const style = buildStyle(left, top, rect.width, rect.height, computed, { box: true, text: true, ...opts });
-  return `<div data-pagx-paragraph="1" data-pagx-text-clip="include" style="${style}">${runs.join('')}</div>`;
-}
-
 function textFragmentStyle(computed, overrides) {
   return new Proxy(computed, {
     get(target, key) {
@@ -4938,8 +4786,6 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // so the scan is placed here where every remaining branch will actually
   // use the result.
   const { hasElementChild, directText } = scanChildNodes(el);
-  const paragraph = renderCapturedParagraph(el, rect, left, top, computed, opts);
-  if (paragraph) return paragraph;
   if (!hasElementChild && directText) {
     return renderTextLeaf(el, parentRect, rect, left, top, computed, directText, opts);
   }
@@ -5321,7 +5167,6 @@ ${clipDefsSvg}${content}
 // pre-pass. Normalise source-less placeholders here as a final safety net,
 // then always restore the live DOM once the flat snapshot has been built.
 function snapshotMain(opts) {
-  window.__pagxParagraphFloatRects = null;
   normalizeEmptyImagePlaceholders();
   window.__pagxInitialRunsUsed = new WeakSet();
   try {
@@ -5560,7 +5405,6 @@ const HELPER_FNS = [
   replacedImageStyle,
   isSvgSource,
   freezeSvg,
-  renderCapturedParagraph,
   textFragmentStyle,
   mapLayoutText,
   initialLayoutForText,

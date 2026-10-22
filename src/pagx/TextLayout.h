@@ -26,7 +26,6 @@
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/Rect.h"
-#include "pagx/types/TextLayoutFragment.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
@@ -150,7 +149,6 @@ class TextLayoutResult {
   std::unordered_map<Text*, std::vector<TextLayoutGlyphRun>> layoutGlyphRuns = {};
   std::unordered_map<Text*, std::vector<TextLayoutLineInfo>> textLines = {};
   friend class TextLayoutContext;
-  friend class TextLayout;
 };
 
 /**
@@ -162,13 +160,6 @@ class TextLayoutResult {
  */
 class TextLayout {
  public:
-  // Stable across serialization; excludes paints and the box's outer transform.
-  static std::string CaptureKey(const std::vector<TextElement>& elements,
-                                const TextLayoutParams& params);
-  static bool ValidateCapture(const std::vector<TextElement>& elements,
-                              const TextLayoutParams& params);
-  static bool ValidateFragments(const std::vector<TextElement>& elements,
-                                const std::vector<TextLayoutFragment>& fragments);
   /**
    * Performs text layout and returns TextLayoutResult with bounds and positioned glyph runs.
    * Shapes text, computes line/column breaks, but does not build TextBlob. The caller uses

@@ -24,18 +24,6 @@
 
 namespace pagx {
 
-static void InvalidateCapturedLayout(TextBox* box, const std::vector<Text*>& texts,
-                                     const TextLayoutParams& params) {
-  if (box->layoutKey.empty() ||
-      TextLayout::ValidateCapture(TextLayout::MakeElements(texts), params))
-    return;
-  box->layoutKey.clear();
-  box->layoutFragments.clear();
-  for (auto* text : texts) {
-    text->glyphRuns.clear();
-  }
-}
-
 static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWidth,
                                              float boxHeight) {
   TextLayoutParams params = {};
@@ -47,7 +35,6 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
   params.lineHeight = textBox->lineHeight;
   params.wordWrap = textBox->wordWrap;
   params.overflow = textBox->overflow;
-  params.capturedBox = textBox;
   return params;
 }
 
@@ -70,7 +57,6 @@ void TextBox::onMeasure(LayoutContext* context) {
   auto params = MakeTextLayoutParams(this, boxW, boxH);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  InvalidateCapturedLayout(this, childText, params);
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
@@ -152,13 +138,11 @@ void TextBox::updateLayout(LayoutContext* context) {
   auto params = MakeTextLayoutParams(this, cw, ch);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  InvalidateCapturedLayout(this, childText, params);
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     auto* text = childText[i];
     text->textBounds = result.getTextBounds(text);
     text->glyphData->layoutRuns = result.extractLayoutRuns(text);
-    text->glyphData->textBlob = nullptr;
     if (hasPadding) {
       text->textBounds.x += padding.left;
       text->textBounds.y += padding.top;

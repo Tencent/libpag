@@ -842,12 +842,6 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addAttribute("font", "@" + run->font->id);
           }
           xml.addAttribute("fontSize", run->fontSize, Default<GlyphRun>().fontSize);
-          if (run->fauxBold.has_value()) {
-            xml.addRequiredAttribute("fauxBold", *run->fauxBold ? "true" : "false");
-          }
-          if (run->fauxItalic.has_value()) {
-            xml.addRequiredAttribute("fauxItalic", *run->fauxItalic ? "true" : "false");
-          }
 
           // Write glyphs as comma-separated integers
           if (!run->glyphs.empty()) {
@@ -1108,7 +1102,6 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       auto textBox = static_cast<const TextBox*>(node);
       xml.openElement("TextBox");
       xml.addAttribute("id", textBox->id);
-      xml.addAttribute("layoutKey", textBox->layoutKey);
       // Group properties
       if (textBox->anchor != Default<TextBox>().anchor) {
         xml.addAttribute("anchor", PointToString(textBox->anchor));
@@ -1161,16 +1154,6 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.closeElementStart();
         for (const auto& element : textBox->elements) {
           WriteVectorElement(xml, element, options);
-        }
-        for (const auto& fragment : textBox->layoutFragments) {
-          xml.openElement("TextLayoutFragment");
-          xml.addRequiredAttribute("textIndex", std::to_string(fragment.textIndex));
-          xml.addRequiredAttribute("start", std::to_string(fragment.start));
-          xml.addRequiredAttribute("length", std::to_string(fragment.length));
-          xml.addRequiredAttribute("position", PointToString(fragment.position));
-          xml.addRequiredAttribute("bounds", RectToString(fragment.bounds));
-          xml.addRequiredAttribute("inlinePositions", FloatListToString(fragment.inlinePositions));
-          xml.closeElementSelfClosing();
         }
         xml.closeElement();
       }

@@ -30,8 +30,6 @@
 
 namespace pagx {
 
-class TextBox;
-
 // Per-Text shaping attributes consumed by the shaper. Produced from a Text node's document fields,
 // or supplied by a runtime holder with ViewModel-driven overrides applied. The shaper reads only
 // this struct, never the Text node, so text content can be reshaped without mutating the document.
@@ -69,7 +67,6 @@ struct TextLayoutParams {
   Overflow overflow = Overflow::Visible;
   TextBaseline baseline = TextBaseline::LineBox;
   float textScale = 1.0f;
-  const TextBox* capturedBox = nullptr;
 };
 
 }  // namespace pagx

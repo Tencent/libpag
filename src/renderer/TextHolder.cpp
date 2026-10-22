@@ -167,8 +167,7 @@ void TextHolder::flush(FontConfig* fontConfig) {
     elements.push_back({entry.node, entry.glyph});
   }
   LayoutContext context(fontConfig);
-  // A runtime shaping override must never replay the document's embedded glyphs.
-  auto result = TextLayout::Layout(elements, params, &context, false);
+  auto result = TextLayout::Layout(elements, params, &context);
   for (auto& entry : entries) {
     auto runs = result.extractLayoutRuns(entry.node);
     // Bake the container padding offset into the run positions the same way TextBox::updateLayout

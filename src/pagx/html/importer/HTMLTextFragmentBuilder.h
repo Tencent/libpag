@@ -114,11 +114,6 @@ class HTMLTextFragmentBuilder {
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                          const HTMLInheritedStyle& inherited);
 
-  // Null means the complete descriptor was rejected; the caller retains the visual children.
-  Layer* convertCapturedParagraph(const std::shared_ptr<DOMNode>& element,
-                                  const HTMLBoxAttributes& box,
-                                  const HTMLInheritedStyle& inherited);
-
   /** Converts a data-pagx-text container host (per-glyph / TextModifier / TextPath WOFF2
    *  export output) into a single semantic Text layer, restoring the original text and font
    *  semantics from the data-pagx-* attributes instead of the PUA glyph spans. */

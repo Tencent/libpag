@@ -21,7 +21,6 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PropertyData.h"
 #include "pagx/SuppressDelegation.h"
-#include "pagx/TextLayout.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
@@ -40,8 +39,6 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/utils/TextUtils.h"
-#include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
@@ -2797,72 +2794,63 @@ PAGX_TEST(PAGXViewModelTest, TextReshapePreservesRuntimePosition) {
 // tgfx::Text is reshaped in place and the document field is left untouched, mirroring the
 // standalone path.
 PAGX_TEST(PAGXViewModelTest, TextBoxChildReshapeFromViewModel) {
-  for (bool embeddedCapture : {false, true}) {
-    auto doc = pagx::PAGXDocument::Make(200, 200);
-    auto* schema = doc->makeNode<pagx::ViewModel>("TextVM");
-    auto* prop = doc->makeNode<pagx::ViewModelProperty>();
-    prop->name = "title";
-    prop->propertyType = pagx::ViewModelPropertyType::String;
-    prop->defaultString = "AB";
-    schema->properties.push_back(prop);
-    doc->viewModel = schema;
-    auto* layer = doc->makeNode<pagx::Layer>("textLayer");
-    layer->width = 200;
-    layer->height = 200;
-    auto* textBox = doc->makeNode<pagx::TextBox>("box");
-    textBox->width = 200;
-    textBox->height = 100;
-    auto* text = doc->makeNode<pagx::Text>("boxText");
-    text->text = "AB";
-    text->fontSize = 20;
-    auto* fill = doc->makeNode<pagx::Fill>();
-    auto* color = doc->makeNode<pagx::SolidColor>();
-    fill->color = color;
-    textBox->elements.push_back(text);
-    textBox->elements.push_back(fill);
-    layer->contents.push_back(textBox);
-    doc->layers.push_back(layer);
-    auto* db = doc->makeNode<pagx::DataBind>();
-    db->source = "$vm.title";
-    db->target = "@boxText";
-    db->channel = "text";
-    doc->dataBinds.push_back(db);
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TextVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "title";
+  prop->propertyType = pagx::ViewModelPropertyType::String;
+  prop->defaultString = "AB";
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto* layer = doc->makeNode<pagx::Layer>("textLayer");
+  layer->width = 200;
+  layer->height = 200;
+  auto* textBox = doc->makeNode<pagx::TextBox>("box");
+  textBox->width = 200;
+  textBox->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("boxText");
+  text->text = "AB";
+  text->fontSize = 20;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  fill->color = color;
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  auto* db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.title";
+  db->target = "@boxText";
+  db->channel = "text";
+  doc->dataBinds.push_back(db);
 
-    pagx::FontConfig fontConfig;
-    fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
-    if (embeddedCapture) {
-      textBox->layoutFragments = {{0, 0, 1, {0, 20}, {0, 0, 12, 25}, {0}},
-                                  {0, 1, 1, {0, 50}, {0, 30, 12, 25}, {0}}};
-      textBox->layoutKey = pagx::TextLayout::CaptureKey(pagx::TextLayout::MakeElements({text}),
-                                                        pagx::MakeTextBoxParams(textBox));
-    }
-    doc->applyLayout(&fontConfig);
-    if (embeddedCapture) ASSERT_TRUE(pagx::FontEmbedder().embed(doc.get()));
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  doc->applyLayout(&fontConfig);
 
-    auto scene = pagx::PAGScene::Make(
-        std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
-    ASSERT_NE(scene, nullptr);
-    auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-    ASSERT_NE(surface, nullptr);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
 
-    EXPECT_TRUE(scene->draw(surface));
-    auto binding = scene->mutableBinding();
-    ASSERT_NE(binding, nullptr);
-    auto runtimeText = binding->get<tgfx::Text>(text);
-    ASSERT_NE(runtimeText, nullptr);
-    ASSERT_NE(runtimeText->textBlob(), nullptr);
-    float originalWidth = runtimeText->textBlob()->getBounds().width();
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeText = binding->get<tgfx::Text>(text);
+  ASSERT_NE(runtimeText, nullptr);
+  ASSERT_NE(runtimeText->textBlob(), nullptr);
+  float originalWidth = runtimeText->textBlob()->getBounds().width();
 
-    scene->viewModel()->propertyString("title")->value("ABCDEF");
-    EXPECT_TRUE(scene->draw(surface));
+  scene->viewModel()->propertyString("title")->value("ABCDEF");
+  EXPECT_TRUE(scene->draw(surface));
 
-    auto reshaped = binding->get<tgfx::Text>(text);
-    ASSERT_NE(reshaped, nullptr);
-    EXPECT_EQ(reshaped.get(), runtimeText.get());
-    ASSERT_NE(reshaped->textBlob(), nullptr);
-    EXPECT_GT(reshaped->textBlob()->getBounds().width(), originalWidth);
-    EXPECT_EQ(text->text, "AB");
-  }
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  EXPECT_EQ(reshaped.get(), runtimeText.get());
+  ASSERT_NE(reshaped->textBlob(), nullptr);
+  EXPECT_GT(reshaped->textBlob()->getBounds().width(), originalWidth);
+  EXPECT_EQ(text->text, "AB");
 }
 
 // Baseline: a ViewModel string property drives a standalone Text's content; after the value is set

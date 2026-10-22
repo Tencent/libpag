@@ -22,7 +22,6 @@
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/TextAlign.h"
-#include "pagx/types/TextLayoutFragment.h"
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
@@ -86,13 +85,6 @@ class TextBox : public Group {
    * The default value is Visible.
    */
   Overflow overflow = Overflow::Visible;
-
-  /** Optional captured layout, guarded by a key of the complete logical text, shaping styles,
-   * and text-area parameters. A mismatch discards the capture and its embedded glyphs for the
-   * entire box. Empty means ordinary automatic layout. Existing inlinePositions are unchanged.
-   */
-  std::string layoutKey = {};
-  std::vector<TextLayoutFragment> layoutFragments = {};
 
   NodeType nodeType() const override {
     return NodeType::TextBox;

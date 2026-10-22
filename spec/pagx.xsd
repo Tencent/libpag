@@ -533,8 +533,6 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="font" type="IdRefType" use="required"/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
-    <xs:attribute name="fauxBold" type="BoolType"/>
-    <xs:attribute name="fauxItalic" type="BoolType"/>
     <xs:attribute name="glyphs" type="xs:string" use="required"/>
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
@@ -732,23 +730,13 @@
   </xs:complexType>
 
   <!-- TextBox -->
-  <xs:complexType name="TextLayoutFragmentType">
-    <xs:attribute name="textIndex" type="xs:unsignedInt" use="required"/>
-    <xs:attribute name="start" type="xs:unsignedInt" use="required"/>
-    <xs:attribute name="length" type="xs:positiveInteger" use="required"/>
-    <xs:attribute name="position" type="PointType" use="required"/>
-    <xs:attribute name="bounds" type="RectType" use="required"/>
-    <xs:attribute name="inlinePositions" type="FloatListType" use="required"/>
-  </xs:complexType>
   <xs:complexType name="TextBoxType">
     <xs:sequence>
       <xs:group ref="VectorElementGroup" minOccurs="0" maxOccurs="unbounded"/>
-      <xs:element name="TextLayoutFragment" type="TextLayoutFragmentType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attributeGroup ref="ConstraintAttributes"/>
     <xs:attribute name="padding" type="PaddingType"/>
-    <xs:attribute name="layoutKey" type="xs:string"/>
     <xs:attribute name="textAlign" type="TextAlignType" default="start"/>
     <xs:attribute name="paragraphAlign" type="ParagraphAlignType" default="near"/>
     <xs:attribute name="writingMode" type="WritingModeType" default="horizontal"/>

@@ -276,22 +276,6 @@ leaf whose box paints a background/border/shadow, a leaf anchored against its fa
 
 ### 4.6 Custom Data
 
-`data-pagx-paragraph="1"` marks a captured horizontal paragraph. Its direct run containers
-carry `data-pagx-run-text` (CSS-normalized logical text, including collapsed wrap spaces and
-explicit newlines). Their absolutely positioned line spans carry `data-pagx-start` (Unicode
-scalar offset within that run), `data-pagx-baseline`, and `data-pagx-inline-positions`.
-All ranges, text, styles and coordinates are validated together before importing one `TextBox`.
-Adjacent equal styles become one `Text`; different styles remain logical runs within that box.
-Soft wrapping adds no newlines. `TextLayoutFragment` children preserve line origins and anchors
-without depending on embedded fonts. Font embedding leaves the logical text and styles intact.
-Flex inference does not rewrite these measured boxes. Invalid descriptors use the ordinary
-visual spans and report a diagnostic; their protocol attributes are consumed as well.
-
-The snapshot currently captures rectangular horizontal blocks with plain inline text. Drop
-caps, columns, float intrusions, RTL context, transformed text, inline boxes/effects and
-unmappable source ranges retain the visual fragment path. Paragraph grouping comes from DOM
-ownership, never from proximity of unrelated text boxes.
-
 `data-pagx-baseline` is a finite alphabetic baseline offset in CSS pixels from the emitted
 text host's top. The snapshot measures it from browser layout for horizontal single-style
 lines. On a `nowrap`/`pre` leaf without line breaks or tabs, the importer preserves the host

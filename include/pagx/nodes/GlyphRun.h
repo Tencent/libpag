@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
@@ -44,14 +43,6 @@ class GlyphRun : public Node {
    * Font size for rendering. Actual scale = fontSize / font.unitsPerEm. The default value is 12.
    */
   float fontSize = 12.0f;
-
-  /**
-   * Synthetic styles still required when rendering these glyphs. Unset inherits the Text style
-   * for compatibility with authored glyph runs. Embedding sets explicit values so baked outlines
-   * are not styled twice and the Text's original style remains available for editing/reflow.
-   */
-  std::optional<bool> fauxBold = std::nullopt;
-  std::optional<bool> fauxItalic = std::nullopt;
 
   /**
    * GlyphID sequence. GlyphID 0 indicates missing glyph (not rendered).
