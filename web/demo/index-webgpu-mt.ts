@@ -272,7 +272,6 @@ if (typeof window !== 'undefined') {
       pagView.setCacheScale(cacheScale);
     });
   };
-
 }
 
 const existsLayer = (pagLayer: object) => {

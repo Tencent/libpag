@@ -3,7 +3,7 @@ import { AudioPlayer } from './module/audio-player';
 
 import type { PAGFile } from '../src/pag-file';
 import type { PAGView } from '../src/pag-view';
-import type { PAG as PAGNamespace } from '../src/types';
+import { type PAG as PAGNamespace } from '../src/types';
 import type { PAGComposition } from '../src/pag-composition';
 import type { PAGImageLayer } from '../src/pag-image-layer';
 
@@ -118,7 +118,6 @@ if (typeof window !== 'undefined') {
       textDoc.tracking = 600;
       pagFile.replaceText(0, textDoc);
       const newtextDoc=pagFile.getTextData(0);
-      console.log(newtextDoc);
       textDoc.delete();
       newtextDoc.delete();
       await pagView.flush();
