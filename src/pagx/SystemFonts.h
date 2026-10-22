@@ -92,13 +92,11 @@ class SystemFonts {
    * rejected. Returns nullptr when the requested family cannot be resolved.
    */
   static std::shared_ptr<tgfx::Typeface> ResolveTypeface(const std::string& family,
-                                                         const std::string& style,
-                                                         float size = 12.0f);
+                                                         const std::string& style);
 
   // CSS property matching does not treat a generated weight label as an exact face request.
   static std::shared_ptr<tgfx::Typeface> MatchTypeface(const std::string& family,
-                                                       const CSSFontStyle& request,
-                                                       float size = 12.0f);
+                                                       const CSSFontStyle& request);
   // Read actual font metadata; the supplied native/name properties only fill missing fields.
   static CSSFontStyle TypefaceStyle(const tgfx::Typeface* typeface, CSSFontStyle fallback);
   static CSSFontStyle TypefaceStyle(const tgfx::Typeface* typeface);

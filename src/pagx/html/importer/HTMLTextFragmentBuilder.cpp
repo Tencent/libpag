@@ -76,8 +76,6 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   auto t = _document->makeNode<Text>();
   t->text = fragment.text;
   t->fontFamily = fragment.fontFamily;
-  t->fontFamilyList = fragment.fontFamilyList;
-  t->fontVariantEmoji = fragment.fontVariantEmoji;
   // Round-trip fragments carry the exact PAGX fontStyle (empty means empty); only the ordinary
   // HTML path substitutes the canonical "Regular" name for an empty label.
   t->fontStyle = fragment.exactFontStyle ? fragment.fontStyleName
@@ -88,10 +86,6 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   t->letterSpacing = fragment.letterSpacing;
   t->inlinePositions = fragment.inlinePositions;
   t->textOrientation = fragment.textOrientation;
-  if (std::isfinite(fragment.measuredBaseline)) {
-    t->baseline = TextBaseline::Alphabetic;
-    t->position.y = fragment.measuredBaseline;
-  }
   return t;
 }
 
@@ -134,13 +128,6 @@ void HTMLTextFragmentBuilder::applyPagxTextMetadata(TextFragment& frag, const DO
   }
   if (const std::string* value = element->findAttribute("data-pagx-font-family")) {
     frag.fontFamily = *value;
-    frag.fontFamilyList.clear();
-  }
-  if (const auto* value = element->findAttribute("data-pagx-font-family-list")) {
-    frag.fontFamilyList = *value;
-  }
-  if (const auto* value = element->findAttribute("data-pagx-font-variant-emoji")) {
-    frag.fontVariantEmoji = *value;
   }
   if (const std::string* value = element->findAttribute("data-pagx-font-style")) {
     frag.fontStyleName = *value;
@@ -223,10 +210,14 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
     _diagnostics.warn("html: data-pagx-text host has no glyph span; restored from container style");
   }
   // Resolve the style chain through the container so any styles it contributes still apply,
-  // then through the first span. Font-family resolution remains local to this host.
-  HTMLInheritedStyle containerStyle = _styleCascade.resolveInheritedStyle(element, inherited);
+  // then through the first span. Both resolves are local to this host: the synthetic
+  // pagx-font-* family must not be forwarded to the FontConfig fallback sink.
+  HTMLInheritedStyle containerStyle =
+      _styleCascade.resolveInheritedStyle(element, inherited, /*recordFontFallbacks=*/false);
   HTMLInheritedStyle runStyle =
-      firstSpan ? _styleCascade.resolveInheritedStyle(firstSpan, containerStyle) : containerStyle;
+      firstSpan ? _styleCascade.resolveInheritedStyle(firstSpan, containerStyle,
+                                                      /*recordFontFallbacks=*/false)
+                : containerStyle;
   TextFragment frag = makeFragment(runStyle);
   applyPagxTextMetadata(frag, element.get());
   if (frag.text.empty()) {
@@ -258,8 +249,6 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   TextFragment frag;
   frag.fontFamily =
       inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY : inherited.primaryFontFamily;
-  frag.fontFamilyList = inherited.fontFamily;
-  frag.fontVariantEmoji = inherited.fontVariantEmoji;
   frag.fontStyleName = inherited.fontStyleName;
   frag.fauxBold = inherited.fauxBold;
   frag.fauxItalic = inherited.fauxItalic;
@@ -299,7 +288,6 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
   // the float fields. The tolerance is well below any visually-meaningful step.
   constexpr float epsilon = 1e-3f;
   return a.textOrientation == b.textOrientation && a.fontFamily == b.fontFamily &&
-         a.fontFamilyList == b.fontFamilyList && a.fontVariantEmoji == b.fontVariantEmoji &&
          a.fontStyleName == b.fontStyleName && a.fauxBold == b.fauxBold &&
          a.fauxItalic == b.fauxItalic && std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
@@ -322,10 +310,8 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
   bool incomingPreserveNewlines = false;
   ResolveWhiteSpaceFlags(inherited.whiteSpace, incomingCollapse, incomingPreserveNewlines);
   return a.textOrientation == TextOrientationFromString(ToLower(Trim(inherited.textOrientation))) &&
-         a.fontFamilyList == inherited.fontFamily &&
-         a.fontVariantEmoji == inherited.fontVariantEmoji && familyMatch &&
-         a.fontStyleName == inherited.fontStyleName && a.fauxBold == inherited.fauxBold &&
-         a.fauxItalic == inherited.fauxItalic &&
+         familyMatch && a.fontStyleName == inherited.fontStyleName &&
+         a.fauxBold == inherited.fauxBold && a.fauxItalic == inherited.fauxItalic &&
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
@@ -453,23 +439,6 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
                       ">' is downgraded to absolute on the surrounding Layer");
   }
 
-  if (auto value = element->findAttribute("data-pagx-baseline")) {
-    char* end = nullptr;
-    errno = 0;
-    float baseline = std::strtof(value->c_str(), &end);
-    if (fragments.size() == 1 && !value->empty() && end == value->c_str() + value->size() &&
-        errno != ERANGE && std::isfinite(baseline) &&
-        fragments[0].text.find_first_of("\r\n\t") == std::string::npos &&
-        (inherited.writingMode.empty() || inherited.writingMode == "horizontal-tb") &&
-        (inherited.whiteSpace == "nowrap" || inherited.whiteSpace == "pre")) {
-      fragments[0].measuredBaseline = baseline;
-    } else {
-      _diagnostics.warn(
-          "html: invalid data-pagx-baseline; expected a finite baseline on a horizontal single "
-          "line");
-    }
-  }
-
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   bool hasMultipleFragments = fragments.size() > 1;
   // CSS `white-space` suppresses automatic line breaking for both `nowrap` and `pre`
@@ -526,8 +495,6 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
       !hasNoWrap && (constrainedInlineSize || (box.flexGrowSet && box.flexGrow > 0));
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() || box.clipOverflow ||
                       isVertical || hasRealLineHeight || needsWrapping;
-  bool measuredBaseline = fragments.size() == 1 && std::isfinite(fragments[0].measuredBaseline);
-  if (measuredBaseline) needsTextBox = false;
 
   // CSS shrink-to-fit for inline text. The html-snapshot pipeline bakes the *browser's*
   // measured px width/height onto every text `<span>` (it flattens each run into an
@@ -550,7 +517,7 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   std::string textAlign = ToLower(Trim(inherited.textAlign));
   bool startAligned = textAlign.empty() || textAlign == "left" || textAlign == "start";
   bool shrinkToFit = inlineTag && hasNoWrap && !hasBgVisuals && notFlexGrow && startAligned;
-  bool shrinkWidth = shrinkToFit && !isVertical && !measuredBaseline && std::isnan(box.rightPx);
+  bool shrinkWidth = shrinkToFit && !isVertical && std::isnan(box.rightPx);
   bool hasInlinePositions = std::any_of(fragments.begin(), fragments.end(), [](const auto& frag) {
     return !frag.inlinePositions.empty();
   });

@@ -365,6 +365,11 @@ HTMLStyleCascade::HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& va
     : _diagnostics(sink), _valueParser(valueParser) {
 }
 
+void HTMLStyleCascade::setFontFallbackSink(FontFallbackThunk thunk, void* userData) {
+  _fontFallbackThunk = thunk;
+  _fontFallbackUserData = userData;
+}
+
 void HTMLStyleCascade::setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData) {
   _fontAvailabilityThunk = thunk;
   _fontAvailabilityUserData = userData;
@@ -519,20 +524,12 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
 }
 
 HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                                           const HTMLInheritedStyle& parent) {
+                                                           const HTMLInheritedStyle& parent,
+                                                           bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
-  auto emojiStyle = LookupLowerTrimmed(props, "font-variant-emoji");
-  if (emojiStyle == "normal" || emojiStyle == "text" || emojiStyle == "emoji" ||
-      emojiStyle == "unicode") {
-    out.fontVariantEmoji = emojiStyle;
-  } else if (emojiStyle == "initial" || emojiStyle == "revert") {
-    out.fontVariantEmoji = "normal";
-  } else if (!emojiStyle.empty() && emojiStyle != "inherit" && emojiStyle != "unset") {
-    _diagnostics.warn("html: invalid font-variant-emoji value '" + emojiStyle + "'; ignored");
-  }
   // Re-parse the CSS font-family stack only when the raw value actually changed at this
   // element. The cascade (`out = parent`) already carries the parent's parsed stack
   // through unchanged in the common case where descendants inherit verbatim.
@@ -540,9 +537,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
       (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
     out.fontFamilyChain.clear();
     out.primaryFontFamily.clear();
-    auto tokens = ParseCSSFontFamilyList(out.fontFamily, true);
+    auto tokens = html::ParseFontFamilyTokens(out.fontFamily);
     for (auto& token : tokens) {
-      std::string resolved = token;
+      std::string resolved = html::ResolveGenericFontFamily(token);
       if (resolved.empty()) {
         // Recognised generic with no concrete mapping on this platform (cursive,
         // fantasy, ...). Drop with a single diagnostic so a stack like
@@ -568,6 +565,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
           }
         }
       }
+    }
+    if (recordFontFallbacks && _fontFallbackThunk) {
+      _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
     }
   }
   CopyProperty(props, "font-size", out.fontSize);

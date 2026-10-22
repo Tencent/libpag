@@ -1187,7 +1187,6 @@ static bool IsInternalPagxTextProtocolKey(const std::string& key) {
       "pagx-text",        "pagx-text-part",        "pagx-font-family",
       "pagx-font-style",  "pagx-letter-spacing",   "pagx-faux-bold",
       "pagx-faux-italic", "pagx-text-orientation", "pagx-inline-positions",
-      "pagx-baseline",    "pagx-font-family-list", "pagx-font-variant-emoji",
   };
   for (const char* protocolKey : kProtocolKeys) {
     if (key == protocolKey) {

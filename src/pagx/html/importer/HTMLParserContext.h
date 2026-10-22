@@ -354,6 +354,12 @@ class HTMLParserContext {
   // see `HTMLDiagnosticSink` for the binding contract.
   std::unique_ptr<HTMLDiagnosticSink> _diagnostics = nullptr;
 
+  // Concrete (post-quote-strip, post-generic-map) family names seen anywhere in the
+  // document's font-family stacks. Insertion-ordered for deterministic FontConfig
+  // output; the set field deduplicates entries in O(1).
+  std::vector<std::string> _fallbackFamilyNames = {};
+  std::unordered_set<std::string> _fallbackFamilyNameSet = {};
+
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
@@ -368,6 +374,15 @@ class HTMLParserContext {
 
   float _canvasWidth = 0;
   float _canvasHeight = 0;
+  // Records concrete family names from a font-family stack into the document-wide
+  // dedup set. Empty inputs and duplicates are silently skipped.
+  void recordFontFallbacks(const std::vector<std::string>& chain);
+
+  // Static trampoline that adapts the cascade's `FontFallbackThunk` (function pointer + opaque
+  // user data) to the parser context's `recordFontFallbacks` member, so the cascade can stay
+  // independent of `HTMLParserContext` and we avoid `std::bind` / lambda at the wiring site.
+  static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
+
   // Reports whether `family` will resolve at render time without triggering system font
   // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
   // installed system font (the family the platform resolves matches the request). A name the
@@ -390,6 +405,11 @@ class HTMLParserContext {
   // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
   static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style,
                                        const CSSFontStyle& request);
+
+  // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
+  // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
+  // discovered during the walk is available for per-glyph fallback at layout time.
+  void flushFontFallbacksToDocument();
 };
 
 }  // namespace pagx

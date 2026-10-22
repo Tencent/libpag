@@ -49,8 +49,7 @@ int CompareCSSFontStyles(const CSSFontStyle& request, const CSSFontStyle& a, con
 int MatchCSSFontFace(const std::vector<CSSFontFace>& faces, const CSSFontStyle& request);
 double CSSFontWidthFromClass(int widthClass);
 
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value,
-                                                bool resolveGenerics = false);
+std::vector<std::string> ParseCSSFontFamilyList(const std::string& value);
 std::string ResolveCSSGenericFontFamily(const std::string& name);
 std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std::string& requested);
 

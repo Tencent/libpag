@@ -38,8 +38,6 @@ namespace pagx {
 struct TextGlyphParams {
   std::string text;
   std::string fontFamily;
-  std::string fontFamilyList;
-  std::string fontVariantEmoji = "normal";
   std::string fontStyle;
   float fontSize = 12.0f;
   float letterSpacing = 0.0f;

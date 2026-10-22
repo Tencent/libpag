@@ -19,7 +19,6 @@
 #include "LayoutContext.h"
 #include "FontConfigData.h"
 #include "SystemFonts.h"
-#include "renderer/TextUnicode.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -38,11 +37,7 @@ static int StylePriority(const std::string& style) {
 }
 
 static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& fontFamily,
-                                                             const std::string& fontStyle,
-                                                             float size) {
-#ifdef __APPLE__
-  return SystemFonts::ResolveTypeface(fontFamily, fontStyle, size);
-#else
+                                                             const std::string& fontStyle) {
   auto namedTypeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   auto exactLocation = SystemFonts::FindFont(fontFamily, fontStyle);
   // The platform reports the style under its own spelling, which may differ from the requested one
@@ -56,8 +51,7 @@ static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& 
     // metrics. The same-family fallback below is only needed when the requested style is absent.
     return namedTypeface;
   }
-  return SystemFonts::ResolveTypeface(fontFamily, fontStyle, size);
-#endif
+  return SystemFonts::ResolveTypeface(fontFamily, fontStyle);
 }
 
 // Memoised `ResolveLayoutTypeface`: the platform lookup walks the installed font list, and a
@@ -66,11 +60,11 @@ static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& 
 // A failed lookup is cached too — the platform answer does not change within one document.
 static std::shared_ptr<tgfx::Typeface> ResolveCachedLayoutTypeface(
     std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>>& cache,
-    const std::string& fontFamily, const std::string& fontStyle, float size = 12.0f) {
-  auto cacheKey = fontFamily + "\x1f" + fontStyle + "\x1f" + std::to_string(size);
+    const std::string& fontFamily, const std::string& fontStyle) {
+  auto cacheKey = fontFamily + "\x1f" + fontStyle;
   auto it = cache.find(cacheKey);
   if (it == cache.end()) {
-    it = cache.emplace(cacheKey, ResolveLayoutTypeface(fontFamily, fontStyle, size)).first;
+    it = cache.emplace(cacheKey, ResolveLayoutTypeface(fontFamily, fontStyle)).first;
   }
   return it->second;
 }
@@ -80,17 +74,16 @@ LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::matchTypeface(const std::string& family,
                                                              const CSSFontStyle& request,
-                                                             std::string* resolvedStyle,
-                                                             float size) {
+                                                             std::string* resolvedStyle) {
   if (fontConfig) {
     // Snapshot aliases contain an already CSS-selected, ordered unicode-range composite.
     if (fontConfig->data->fontFaces.count(family))
-      return findTypeface(family, FontStyleRequestName(request), -1, size);
+      return findTypeface(family, FontStyleRequestName(request), -1);
     std::vector<CSSFontFace> faces;
     std::vector<std::shared_ptr<tgfx::Typeface>> typefaces;
     auto append = [&](TypefaceHolder& holder) {
       if (holder.getFontFamily() != family) return;
-      auto face = holder.getTypeface(size);
+      auto face = holder.getTypeface();
       if (!face) return;
       faces.push_back({holder.getFontStyle(), SystemFonts::TypefaceStyle(face.get())});
       typefaces.push_back(std::move(face));
@@ -105,17 +98,17 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::matchTypeface(const std::string& 
       return typefaces[best];
     }
   }
-  auto face = SystemFonts::MatchTypeface(family, request, size);
+  auto face = SystemFonts::MatchTypeface(family, request);
   if (face && resolvedStyle) *resolvedStyle = face->fontStyle();
   return face;
 }
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& fontFamily,
                                                             const std::string& fontStyle,
-                                                            int32_t codepoint, float size) {
+                                                            int32_t codepoint) {
   if (fontConfig == nullptr) {
     if (!fontFamily.empty()) {
-      return ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle, size);
+      return ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
     }
     return nullptr;
   }
@@ -129,7 +122,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
                    static_cast<uint32_t>(codepoint) <= range.second;
       }
       if (!covered) continue;
-      auto typeface = face.holder.getTypeface(size);
+      auto typeface = face.holder.getTypeface();
       if (typeface && (codepoint < 0 || typeface->getGlyphID(codepoint) != 0)) return typeface;
     }
     return nullptr;
@@ -142,7 +135,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     key.style = fontStyle.empty() ? "Regular" : fontStyle;
     auto it = fontConfig->data->registeredTypefaces.find(key);
     if (it != fontConfig->data->registeredTypefaces.end()) {
-      return it->second.getTypeface(size);
+      return it->second.getTypeface();
     }
 
     // Stage 2: Family-name match in registered typefaces (prefer Regular style)
@@ -157,7 +150,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
       bool preferred = (bestTypeface == nullptr) || (priority < bestPriority) ||
                        (priority == bestPriority && pair.first.style < bestStyle);
       if (preferred) {
-        bestTypeface = pair.second.getTypeface(size);
+        bestTypeface = pair.second.getTypeface();
         bestPriority = priority;
         bestStyle = pair.first.style;
       }
@@ -171,7 +164,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   if (!fontFamily.empty()) {
     for (auto& holder : fontConfig->data->fallbackTypefaces) {
       if (holder.getFontFamily() == fontFamily) {
-        return holder.getTypeface(size);
+        return holder.getTypeface();
       }
     }
   }
@@ -179,14 +172,14 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 #ifdef PAG_BUILD_FOR_WEB
   // Stage 4: On web, prefer the first registered fallback typeface over browser fonts.
   if (!fontConfig->data->fallbackTypefaces.empty()) {
-    return fontConfig->data->fallbackTypefaces.front().getTypeface(size);
+    return fontConfig->data->fallbackTypefaces.front().getTypeface();
   }
 #endif
 
   // Stage 5: System font lookup, including another available style when the requested one is
   // absent from the family.
   if (!fontFamily.empty()) {
-    auto typeface = ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle, size);
+    auto typeface = ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
     if (typeface != nullptr) {
       return typeface;
     }
@@ -197,7 +190,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
     ensureSystemFallbacks();
     for (auto& holder : systemFallbacks) {
       if (holder.getFontFamily() == fontFamily) {
-        return holder.getTypeface(size);
+        return holder.getTypeface();
       }
     }
   }
@@ -207,51 +200,14 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
     int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
-  return fallbackTypeface(
-      [&](const auto& typeface) {
-        return typeface.get() != primaryTypeface && typeface->getGlyphID(codepoint) != 0;
-      },
-      12.0f);
-}
-
-std::shared_ptr<tgfx::Typeface> LayoutContext::findClusterTypeface(
-    const std::string& family, const std::string& style, float size,
-    const std::vector<int32_t>& codepoints, const TypefacePredicate& accepts) {
-  if (fontConfig) {
-    auto faces = fontConfig->data->fontFaces.find(family);
-    if (faces != fontConfig->data->fontFaces.end()) {
-      for (auto& face : faces->second) {
-        bool covered = true;
-        for (auto codepoint : codepoints) {
-          if (IsDefaultIgnorable(codepoint) || face.unicodeRanges.empty()) continue;
-          bool inRange = false;
-          for (const auto& range : face.unicodeRanges) {
-            inRange |= static_cast<uint32_t>(codepoint) >= range.first &&
-                       static_cast<uint32_t>(codepoint) <= range.second;
-          }
-          covered &= inRange;
-        }
-        if (!covered) continue;
-        auto typeface = face.holder.getTypeface(size);
-        if (typeface && accepts(typeface)) return typeface;
-      }
-      return nullptr;
-    }
-  }
-  auto typeface = findTypeface(family, style, -1, size);
-  return typeface && accepts(typeface) ? typeface : nullptr;
-}
-
-std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(const TypefacePredicate& accepts,
-                                                                float size) {
   if (fontConfig != nullptr) {
     // Search user-registered fallback fonts first.
     for (auto& holder : fontConfig->data->fallbackTypefaces) {
-      auto typeface = holder.getTypeface(size);
-      if (typeface == nullptr) {
+      auto typeface = holder.getTypeface();
+      if (typeface == nullptr || typeface.get() == primaryTypeface) {
         continue;
       }
-      if (accepts(typeface)) {
+      if (typeface->getGlyphID(codepoint) != 0) {
         return typeface;
       }
     }
@@ -259,13 +215,11 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(const TypefacePr
   // Search system fallback fonts.
   ensureSystemFallbacks();
   for (auto& holder : systemFallbacks) {
-    auto typeface = ResolveCachedLayoutTypeface(systemTypefaceCache, holder.getFontFamily(),
-                                                holder.getFontStyle(), size);
-    if (typeface == nullptr) typeface = holder.getTypeface(size);
-    if (typeface == nullptr) {
+    auto typeface = holder.getTypeface();
+    if (typeface == nullptr || typeface.get() == primaryTypeface) {
       continue;
     }
-    if (accepts(typeface)) {
+    if (typeface->getGlyphID(codepoint) != 0) {
       return typeface;
     }
   }

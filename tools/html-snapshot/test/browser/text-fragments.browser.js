@@ -130,34 +130,6 @@ describe('browser text fragments', () => {
     assert.match(snapshot.html, /data-pagx-inline-positions=/);
   });
 
-  for (const display of ['block', 'flex', 'grid'])
-  it(`measures wrapped baselines in ${display} without changing text or geometry`, async () => {
-    await load('<p id="host">😀 😂 🥹 😍 🤔 🫠 😎 🥳 😭 🤯 👍 🙏 👏 💪 🔥 ✨ 🎉 ❤️ 💜 🌈 ☀️ 🌙 ⭐</p>',
-      `#host{position:absolute;left:15.953125px;top:15.953125px;display:${display};font:44px/52.8px system-ui;width:330px}`);
-    const result = await page.evaluate(`(() => {
-      ${PAYLOAD_CONSTANTS_SRC}
-      ${HELPERS_SRC}
-      const host = document.querySelector('#host'), node = host.firstChild;
-      const source = node.nodeValue, style = getComputedStyle(host);
-      const lines = measuredTextFragments(node, style, 'y');
-      const baselines = lines.map(line => measureTextBaseline(node, line));
-      const after = measuredTextFragments(node, style, 'y');
-      return { baselines, sameNode:host.firstChild === node, text:node.nodeValue, source,
-        before:lines.map(x => x.rect.toJSON()), after:after.map(x => x.rect.toJSON()) };
-    })()`);
-    assert.ok(result.baselines.length > 2);
-    assert.equal(result.sameNode, true);
-    assert.equal(result.text, result.source);
-    assert.deepEqual(result.before, result.after);
-    for (let i = 0; i < result.baselines.length; ++i) {
-      assert.notEqual(result.baselines[i], null);
-      if (i) assert.ok(Math.abs(result.baselines[i] - result.baselines[i - 1] - 52.8) < 0.1);
-    }
-    const snapshot = await page.evaluate(takeSnapshot);
-    assert.match(snapshot.html, /data-pagx-baseline=/);
-    assert.match(snapshot.html, /top: 15\.953125px/);
-  });
-
   it('retains the origin of children when asymmetric borders become overlays', async () => {
     await load('<div id="host"><span>竖排</span></div>',
       '#host{position:absolute;left:20px;top:30px;border-top:7px solid black;padding:10px;writing-mode:vertical-rl}');

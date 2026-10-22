@@ -486,8 +486,6 @@ static std::vector<ChannelDef> BuildTextFields() {
       FIELD_POINT_X(Text, "x", position, AnimLayout),
       FIELD_POINT_Y(Text, "y", position, AnimLayout),
       FIELD_STRING(Text, "fontFamily", fontFamily, AnimLayout),
-      FIELD_STRING(Text, "fontFamilyList", fontFamilyList, Layout),
-      FIELD_STRING(Text, "fontVariantEmoji", fontVariantEmoji, Layout),
       FIELD_STRING(Text, "fontStyle", fontStyle, AnimLayout),
       FIELD_FLOAT(Text, "fontSize", fontSize, AnimLayout),
       FIELD_FLOAT(Text, "letterSpacing", letterSpacing, AnimLayout),

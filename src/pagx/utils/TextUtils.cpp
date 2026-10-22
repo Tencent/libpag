@@ -589,8 +589,6 @@ TextGlyphParams MakeGlyphParams(const Text* text) {
   TextGlyphParams params = {};
   params.text = text->text;
   params.fontFamily = text->fontFamily;
-  params.fontFamilyList = text->fontFamilyList;
-  params.fontVariantEmoji = text->fontVariantEmoji;
   params.fontStyle = text->fontStyle;
   params.fontSize = text->fontSize;
   params.letterSpacing = text->letterSpacing;

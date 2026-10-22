@@ -47,11 +47,12 @@ class TextShaper {
    * fallback. Returns shaped glyphs with positioning info. Glyphs with glyphID=0 could not be
    * shaped by any font.
    */
-  static std::vector<ShapedGlyph> Shape(
-      const std::string& text, const tgfx::Font& primaryFont, LayoutContext& layoutContext,
-      bool vertical = false, bool rtl = false, TextOrientation orientation = TextOrientation::Mixed,
-      const std::string& family = "", const std::string& style = "",
-      const std::string& familyList = "", const std::string& emojiStyle = "normal");
+  static std::vector<ShapedGlyph> Shape(const std::string& text, const tgfx::Font& primaryFont,
+                                        LayoutContext& layoutContext, bool vertical = false,
+                                        bool rtl = false,
+                                        TextOrientation orientation = TextOrientation::Mixed,
+                                        const std::string& family = "",
+                                        const std::string& style = "");
 
   /**
    * Purges internal HarfBuzz font caches.

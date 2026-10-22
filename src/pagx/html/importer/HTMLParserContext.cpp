@@ -105,6 +105,11 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
 // HTMLParserContext: top-level traversal
 //==================================================================================================
 
+void HTMLParserContext::RecordFontFallbacksThunk(void* userData,
+                                                 const std::vector<std::string>& chain) {
+  static_cast<HTMLParserContext*>(userData)->recordFontFallbacks(chain);
+}
+
 bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::string& family) {
   return static_cast<HTMLParserContext*>(userData)->isFontFamilyAvailable(family);
 }
@@ -127,7 +132,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
       std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter, *_idAllocator);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
-  // Each Text retains its own ordered family list; CSS lists must not pollute global fallbacks.
+  // Forward cascade-discovered font-family chains into the document-wide fallback pool.
+  _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
   // Let the cascade pick the first *resolvable* family from each font-family stack, so a leading
   // family the renderer can't resolve (e.g. the hidden "SF Mono" system font) doesn't get written
   // to `Text::fontFamily` and silently substituted with a mismatched proportional default.
@@ -147,7 +153,6 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (family.empty()) {
     return false;
   }
-  if (family == "system-ui") return SystemFonts::ResolveTypeface(family, "") != nullptr;
   // Two matching rules are used on purpose. Registered/embedded fonts must resolve exactly the
   // way `LayoutContext` resolves them, so honour them first via `containsFamily` (exact string
   // match) — loosening this would claim availability the renderer can't actually deliver. System
@@ -183,7 +188,7 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
 
 void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style,
                                              const CSSFontStyle& request) {
-  if (family.empty() || family == "system-ui") {
+  if (family.empty()) {
     return;
   }
   // The style label encodes the original numeric request here. Preserve family spelling because
@@ -312,7 +317,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _canvasHeight = canvasH;
   _document = PAGXDocument::Make(canvasW, canvasH);
 
-  // Preserve caller registrations and fallbacks; CSS family lists stay local to each Text.
+  // Seed the document's font registry from the caller-supplied FontConfig before any
+  // discovery happens, so registered typefaces and pre-configured fallbacks are in place
+  // when `flushFontFallbacksToDocument()` later layers the CSS-discovered family names on
+  // top as additional deferred fallbacks.
   if (_options.fontConfig != nullptr) {
     _document->fontConfig() = *_options.fontConfig;
   }
@@ -374,6 +382,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   coalesceAnimations();
   buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();
+  flushFontFallbacksToDocument();
   return _document;
 }
 
@@ -498,6 +507,26 @@ void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
          "an offscreen surface and cannot sample the page behind them, which would tint the box "
          "with its own colour instead of blurring the backdrop "
          "(subset:backdrop-blur-dropped-under-opacity-fade)");
+  }
+}
+
+void HTMLParserContext::recordFontFallbacks(const std::vector<std::string>& chain) {
+  for (auto& name : chain) {
+    if (name.empty()) continue;
+    if (_fallbackFamilyNameSet.insert(name).second) {
+      _fallbackFamilyNames.push_back(name);
+    }
+  }
+}
+
+void HTMLParserContext::flushFontFallbacksToDocument() {
+  if (!_document) return;
+  auto& cfg = _document->fontConfig();
+  for (auto& name : _fallbackFamilyNames) {
+    // Style is fixed to "Regular": LayoutContext's user-fallback path matches by family
+    // name only (style is ignored for per-glyph fallback), so registering a single
+    // deferred record per family is sufficient.
+    cfg.addFallbackFont(/*path=*/std::string(), /*ttcIndex=*/0, name, "Regular");
   }
 }
 
@@ -656,8 +685,6 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     text->text = "\n";
     text->fontFamily = inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY
                                                            : inherited.primaryFontFamily;
-    text->fontFamilyList = inherited.fontFamily;
-    text->fontVariantEmoji = inherited.fontVariantEmoji;
     text->fontStyle = ResolveHTMLFontStyleName(inherited.fontStyleName);
     text->fauxBold = inherited.fauxBold;
     text->fauxItalic = inherited.fauxItalic;
@@ -674,7 +701,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
-  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(element, inherited);
+  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
+      element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
 
   if (IsContainerTag(tag)) {

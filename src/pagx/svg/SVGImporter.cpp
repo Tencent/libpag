@@ -1091,7 +1091,7 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
     if (resolved.empty()) continue;
     if (firstFamily) text->fontFamily = resolved;
     firstFamily = false;
-    auto typeface = SystemFonts::MatchTypeface(resolved, request, text->fontSize);
+    auto typeface = SystemFonts::MatchTypeface(resolved, request);
     if (typeface != nullptr) {
       text->fontFamily = typeface->fontFamily();
       text->fontStyle = typeface->fontStyle();

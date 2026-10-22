@@ -875,8 +875,6 @@ if (PAG_BUILD_CLI)
 
     # Generate pagx_xsd.h from spec/pagx.xsd
     # Use HEX encoding to avoid MSVC string literal length limit (C2026)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT HEX)
     string(LENGTH "${PAGX_XSD_CONTENT}" PAGX_XSD_HEX_LEN)
     set(PAGX_XSD_BYTES "")

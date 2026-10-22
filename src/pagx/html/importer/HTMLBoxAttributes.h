@@ -73,7 +73,6 @@ static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.0001f;
 struct HTMLInheritedStyle {
   std::string color = {};
   std::string fontFamily = {};
-  std::string fontVariantEmoji = "normal";
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
@@ -128,8 +127,9 @@ struct HTMLInheritedStyle {
   // `resolveInheritedStyle`. `primaryFontFamily` is the first concrete name (after surrounding
   // quotes are stripped and generic keywords are mapped to platform fonts) and gets
   // written to `Text::fontFamily`. `fontFamilyChain` holds the same first name followed by
-  // every additional concrete name from the stack, in CSS order. The original list is also
-  // written to Text::fontFamilyList so matching remains scoped to each Text after serialization.
+  // every additional concrete name from the stack, in CSS order; the importer unions all
+  // chains across the document and registers the union as user fallback fonts on the
+  // document's FontConfig so per-glyph fallback in LayoutContext can pick them up.
   std::string primaryFontFamily = {};
   std::vector<std::string> fontFamilyChain = {};
 };

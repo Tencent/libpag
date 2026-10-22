@@ -1456,8 +1456,6 @@ Text is a geometry element that contributes glyphs (rather than a path) to the g
 | `text` | string | "" | Text content |
 | `position` | Point | 0,0 | Text start position (y is baseline), computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
 | `fontFamily` | string | "" | Font family (empty string means system default) |
-| `fontFamilyList` | string | "" | Optional ordered CSS font-family list, including quoted names and unquoted generic families. Overrides `fontFamily` for matching when nonempty. |
-| `fontVariantEmoji` | string | normal | Emoji presentation preference: `normal`, `text`, `emoji`, or `unicode`. Explicit VS15/VS16 selectors take precedence. |
 | `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
@@ -1517,7 +1515,7 @@ Controls how `position.y` is interpreted for vertical positioning.
 | `alphabetic` | `position.y` is the alphabetic baseline. Text is rendered directly at the baseline position |
 
 **Runtime Layout Rendering Flow**:
-1. Match complete Unicode extended grapheme clusters against `fontFamilyList` (or `fontFamily`) and `fontStyle`, then the configured/system fallback fonts. Lists belong to each Text node and do not alter other nodes' fallback order. Emoji presentation and shaping support are considered before accepting a face; ordinary spaces retain normal family matching. `normal` uses Unicode presentation defaults; `text`, `emoji`, and `unicode` apply implicit selectors to Unicode emoji variation bases. Explicit selectors override these defaults.
+1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
 2. Shape using `text` attribute (or CDATA child node); newlines trigger line breaks (default line height from font metrics: ascent + descent + leading, customizable via TextBox)
 3. Apply typography parameters: `fontSize`, `letterSpacing`
 4. Construct glyph list and accumulate to rendering context

@@ -232,8 +232,7 @@ remain supported.
 |-----|------|
 | `color: <color>` | `<Fill color="…"/>` next to the text (inherited) |
 | `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
-| `font-family: name, ...` | `Text.fontFamily` plus the ordered `Text.fontFamilyList`; fallback order is local to the text, not global to the document |
-| `font-variant-emoji: normal | text | emoji | unicode` | `Text.fontVariantEmoji`; explicit VS15/VS16 selectors override this preference |
+| `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
 | `font-weight: normal | bold | N` | CSS numeric weight (1–1000, without rounding) selects an available face after width and slant matching; the actual face name is written to `Text.fontStyle`, without synthetic bold |
 | `font-style: normal | italic | oblique` | selects the face slant before weight matching; synthetic italic remains a fallback for an upright face |
@@ -266,13 +265,6 @@ leaf whose box paints a background/border/shadow, a leaf anchored against its fa
 (`right` / `bottom`), or a flex-grow child.
 
 ### 4.6 Custom Data
-
-`data-pagx-baseline` is a finite alphabetic baseline offset in CSS pixels from the emitted
-text host's top. The snapshot measures it from browser layout for horizontal single-style
-lines. On a `nowrap`/`pre` leaf without line breaks or tabs, the importer preserves the host
-size and emits bare `Text` with `baseline="alphabetic"` and fractional `position.y`, avoiding
-a second baseline calculation from fallback font metrics. Unsupported or invalid input uses
-ordinary text layout. This protocol attribute is consumed, not copied as custom data.
 
 `data-pagx-inline-positions` on a single-style text leaf supplies comma-separated physical
 inline positions in pixels, one per Unicode scalar of the emitted text. It becomes

@@ -37,7 +37,6 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/utils/CSSFontStyle.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -483,11 +482,7 @@ static void AppendRequiredFonts(const PAGXDocument* document, std::vector<PAGFon
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Text) {
       auto* text = static_cast<Text*>(node.get());
-      if (!text->fontFamilyList.empty()) {
-        for (const auto& family : ParseCSSFontFamilyList(text->fontFamilyList, true)) {
-          if (!family.empty()) outFonts->emplace_back(family, text->fontStyle);
-        }
-      } else if (!text->fontFamily.empty()) {
+      if (!text->fontFamily.empty()) {
         outFonts->emplace_back(text->fontFamily, text->fontStyle);
       }
     } else if (node->nodeType() == NodeType::Layer) {

@@ -4297,7 +4297,29 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyRegisteredMatchNotPollutedByCasingVaria
   EXPECT_EQ(text->fontFamily, "My Custom Mono");
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontFamilyListsRemainScopedToEachText) {
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackRegistersFallbacksOnDocFontConfig) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style='font-family:"PingFang SC", "Helvetica Neue", monospace'>Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto names = doc->fontConfig().fallbackFamilyNames();
+  // The implicit "Arial" from <body>'s element default plus every concrete name from the
+  // span's stack should be present. The platform-mapped monospace family varies.
+  EXPECT_NE(std::find(names.begin(), names.end(), "Arial"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "PingFang SC"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "Helvetica Neue"), names.end());
+#if defined(__APPLE__)
+  EXPECT_NE(std::find(names.begin(), names.end(), "Menlo"), names.end());
+#elif defined(_WIN32)
+  EXPECT_NE(std::find(names.begin(), names.end(), "Consolas"), names.end());
+#else
+  EXPECT_NE(std::find(names.begin(), names.end(), "DejaVu Sans Mono"), names.end());
+#endif
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackDedupesAcrossElements) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style='font-family:"Inter", "Roboto"'>Hi</span>
@@ -4305,58 +4327,11 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyListsRemainScopedToEachText) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(doc->fontConfig().fallbackFamilyNames().empty());
-  auto* first = FindElementOfType<pagx::Text>(doc->layers.front()->children[0]);
-  auto* second = FindElementOfType<pagx::Text>(doc->layers.front()->children[1]);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->fontFamilyList, "\"Inter\", \"Roboto\"");
-  EXPECT_EQ(second->fontFamilyList, "\"Inter\", \"Noto Sans\"");
-}
-
-PAG_TEST(PAGXHTMLImporterTest, MeasuredBaselinePreservesFractionalPosition) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:80px">
-      <span data-pagx-baseline="42.5" style="position:absolute;top:10.2px;white-space:nowrap;
-        line-height:52.8px;font-size:44px;font-family:system-ui;font-variant-emoji:unicode">😀 ❤️</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->baseline, pagx::TextBaseline::Alphabetic);
-  EXPECT_FLOAT_EQ(text->position.y, 42.5f);
-  EXPECT_EQ(text->fontVariantEmoji, "unicode");
-  EXPECT_EQ(text->fontFamilyList, "system-ui");
-  EXPECT_EQ(FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front()), nullptr);
-  auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
-  ASSERT_NE(copy, nullptr);
-  auto* restored = FindElementOfType<pagx::Text>(copy->layers.front()->children.front());
-  ASSERT_NE(restored, nullptr);
-  EXPECT_FLOAT_EQ(restored->position.y, 42.5f);
-  EXPECT_EQ(restored->baseline, pagx::TextBaseline::Alphabetic);
-}
-
-PAG_TEST(PAGXHTMLImporterTest, EmojiPresentationCascadeRejectsInvalidValues) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:80px;font-variant-emoji:EMOJI">
-      <span style="font-variant-emoji:inherit">❤</span>
-      <span style="font-variant-emoji:invalid">❤</span>
-      <span style="font-variant-emoji:initial">❤</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto& children = doc->layers.front()->children;
-  ASSERT_EQ(children.size(), 3u);
-  const char* expected[] = {"emoji", "emoji", "normal"};
-  for (size_t i = 0; i < children.size(); ++i) {
-    auto text = FindElementOfType<pagx::Text>(children[i]);
-    ASSERT_NE(text, nullptr);
-    EXPECT_EQ(text->fontVariantEmoji, expected[i]);
-  }
-  auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
-  ASSERT_NE(copy, nullptr);
-  EXPECT_TRUE(copy->errors.empty());
+  auto names = doc->fontConfig().fallbackFamilyNames();
+  size_t interCount = static_cast<size_t>(std::count(names.begin(), names.end(), "Inter"));
+  EXPECT_EQ(interCount, 1u);
+  EXPECT_NE(std::find(names.begin(), names.end(), "Roboto"), names.end());
+  EXPECT_NE(std::find(names.begin(), names.end(), "Noto Sans"), names.end());
 }
 
 // Case-insensitive comparison of two font names, mirroring how the importer decides whether the
