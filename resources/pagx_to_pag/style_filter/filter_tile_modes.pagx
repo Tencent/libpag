@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BlurFilter / BackgroundBlurStyle tileMode variants. -->
+<pagx width="400" height="300">
+  <Layer left="20" top="20" width="170" height="100">
+    <Rectangle width="170" height="100" roundness="8"/>
+    <Fill color="#94A3B8"/>
+    <BlurFilter blurX="10" blurY="10" tileMode="clamp"/>
+  </Layer>
+  <Layer left="210" top="20" width="170" height="100">
+    <Rectangle width="170" height="100" roundness="8"/>
+    <Fill color="#94A3B8"/>
+    <BlurFilter blurX="10" blurY="10" tileMode="repeat"/>
+  </Layer>
+  <Layer left="20" top="150" width="170" height="100">
+    <Rectangle width="170" height="100" roundness="8"/>
+    <Fill color="#CBD5E1"/>
+    <BackgroundBlurStyle blurX="12" blurY="12" tileMode="mirror"/>
+  </Layer>
+  <Layer left="210" top="150" width="170" height="100">
+    <Rectangle width="170" height="100" roundness="8"/>
+    <Fill color="#CBD5E1"/>
+    <BackgroundBlurStyle blurX="12" blurY="12" tileMode="decal"/>
+  </Layer>
+</pagx>

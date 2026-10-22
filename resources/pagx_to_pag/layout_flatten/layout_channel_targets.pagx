@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Two channel kinds: size.width is animatable-over-layout (kept); a DataBind to
+     the layout-only channel flex is inert by spec, the exporter drops it with a
+     warning. Both cases are covered here for round-trip testing. -->
+<pagx width="400" height="200" viewModel="@layoutVM">
+  <Resources>
+    <ViewModel id="layoutVM">
+      <Property name="weight" type="number" default="1"/>
+      <Property name="stretch" type="number" default="2"/>
+    </ViewModel>
+  </Resources>
+  <Layer id="grow" left="40" top="40" width="120" height="40">
+    <Rectangle id="growRect" width="120" height="40" roundness="8"/>
+    <Fill color="#6366F1"/>
+  </Layer>
+  <Layer id="flexHost" left="40" top="120" width="320" height="40" layout="horizontal">
+    <Layer id="flexChild" width="40" height="40">
+      <Rectangle width="40" height="40"/>
+      <Fill color="#F59E0B"/>
+    </Layer>
+  </Layer>
+
+  <Animations>
+    <Animation id="growAnim" duration="60" frameRate="60" loop="pingPong">
+      <Object target="growRect">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="120" interpolation="linear"/>
+          <Key time="60" value="300"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+
+  <DataBind source="$vm.weight" target="@grow" channel="alpha"/>
+  <DataBind source="$vm.stretch" target="@flexChild" channel="flex"/>
+</pagx>

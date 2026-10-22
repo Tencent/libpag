@@ -537,6 +537,15 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
     if (type == NodeType::Layer || type == NodeType::Document || type == NodeType::Glyph) {
       continue;
     }
+    // A Font with a 'file' attribute is a font-source declaration: it is consumed by
+    // 'pagx embed' and by export-time measuring through fontFamily matching, not via
+    // @id references (the spec keeps Font 'file' for export-time registration only).
+    if (type == NodeType::Font) {
+      auto* font = static_cast<const Font*>(node);
+      if (!font->file.empty()) {
+        continue;
+      }
+    }
     // Behavior resources are not referenced via @id attributes: top-level Animations, ViewModels,
     // and DataBinds take effect directly on their owning document/composition, and the internal
     // sub-nodes of animations and state machines are structural children rather than referenceable

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every ViewModel property type: number (with min/max), string, boolean, color,
+     image (default referencing an Image resource), enum (with options), trigger. -->
+<pagx width="400" height="300" viewModel="@typesVM">
+  <Resources>
+    <Image id="avatar" source="pag_logo.png"/>
+    <ViewModel id="typesVM">
+      <Property name="ratio" type="number" default="0.5" min="0" max="1"/>
+      <Property name="caption" type="string" default="Hello PAG"/>
+      <Property name="enabled" type="boolean" default="true"/>
+      <Property name="tint" type="color" default="#6366F1"/>
+      <Property name="photo" type="image" default="@avatar"/>
+      <Property name="size" type="enum" options="small,medium,large" default="1"/>
+      <Property name="poke" type="trigger"/>
+    </ViewModel>
+  </Resources>
+
+  <Layer id="barTrack" left="40" top="40" width="320" height="12">
+    <Rectangle width="320" height="12" roundness="6"/>
+    <Fill color="#E2E8F0"/>
+  </Layer>
+  <Layer id="barFill" left="40" top="40" width="160" height="12">
+    <Rectangle width="160" height="12" roundness="6"/>
+    <Fill id="barColor" color="#6366F1"/>
+  </Layer>
+  <Layer id="captionLayer" left="40" top="70" width="320" height="40">
+    <TextBox textAlign="start" width="320" height="40">
+      <Text id="captionText" text="Hello PAG" fontFamily="Arial" fontSize="24"/>
+      <Fill color="#0F172A"/>
+    </TextBox>
+  </Layer>
+  <Layer id="badge" left="40" top="130" width="64" height="64">
+    <Rectangle width="64" height="64" roundness="12"/>
+    <Fill>
+      <ImagePattern image="@avatar" scaleMode="letterBox"/>
+    </Fill>
+  </Layer>
+  <Layer id="pill" left="120" top="150" width="80" height="24">
+    <Rectangle width="80" height="24" roundness="12"/>
+    <Fill id="pillFill" color="#6366F1"/>
+  </Layer>
+
+  <DataBind source="$vm.ratio" target="@barFill" channel="size.width"/>
+  <DataBind source="$vm.caption" target="@captionText" channel="text"/>
+  <DataBind source="$vm.enabled" target="@pill" channel="visible"/>
+  <DataBind source="$vm.tint" target="@barColor" channel="color"/>
+  <DataBind source="$vm.tint" target="@pillFill" channel="color"/>
+</pagx>

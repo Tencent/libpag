@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Static and animated content in one document: the background never changes,
+     one layer animates. -->
+<pagx width="400" height="300">
+  <Layer width="400" height="300">
+    <Rectangle width="400" height="300"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <Layer id="orbit" centerX="0" centerY="0" width="40" height="40">
+    <Ellipse width="40" height="40"/>
+    <Fill color="#22D3EE"/>
+  </Layer>
+  <Layer centerX="0" centerY="90" width="320" height="28">
+    <TextBox textAlign="center" width="320" height="28">
+      <Text text="Static label, animated dot" fontFamily="Arial" fontSize="18"/>
+      <Fill color="#94A3B8"/>
+    </TextBox>
+  </Layer>
+  <Animations>
+    <Animation id="orbitAnim" duration="90" frameRate="60" loop="loop">
+      <Object target="orbit">
+        <Channel name="x" type="float">
+          <Key time="0" value="-100" interpolation="linear"/>
+          <Key time="45" value="100" interpolation="linear"/>
+          <Key time="90" value="-100"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

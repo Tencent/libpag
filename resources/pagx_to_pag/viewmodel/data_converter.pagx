@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DataConverter: a rangeMapper converts a 0-100 percent into a bar width before
+     the value reaches the bound channel. -->
+<pagx width="400" height="200" viewModel="@meterVM">
+  <Resources>
+    <DataConverter id="percentToWidth" type="rangeMapper">
+      <Param name="inputMin" value="0"/>
+      <Param name="inputMax" value="100"/>
+      <Param name="outputMin" value="0"/>
+      <Param name="outputMax" value="320"/>
+    </DataConverter>
+    <ViewModel id="meterVM">
+      <Property name="percent" type="number" default="62" min="0" max="100"
+                dataConverter="@percentToWidth"/>
+    </ViewModel>
+  </Resources>
+
+  <Layer id="track" centerX="0" centerY="0" width="320" height="20">
+    <Rectangle width="320" height="20" roundness="10"/>
+    <Fill color="#E2E8F0"/>
+  </Layer>
+  <Layer id="fillBar" centerX="0" centerY="0" width="198.4" height="20">
+    <Rectangle width="198.4" height="20" roundness="10"/>
+    <Fill color="#22C55E"/>
+  </Layer>
+
+  <DataBind source="$vm.percent" target="@fillBar" channel="size.width"/>
+</pagx>

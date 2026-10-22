@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Composition-scoped animations auto-play on every instance without <Timelines>. -->
+<pagx width="400" height="300">
+  <Layer left="40" top="60" width="140" height="140">
+    <Rectangle width="140" height="140" roundness="20"/>
+    <Fill color="#E0E7FF"/>
+  </Layer>
+  <Layer left="60" top="80" width="100" height="100" composition="@pulsar"/>
+  <Layer left="220" top="60" width="140" height="140">
+    <Rectangle width="140" height="140" roundness="20"/>
+    <Fill color="#FCE7F3"/>
+  </Layer>
+  <Layer left="240" top="80" width="100" height="100" composition="@pulsar"/>
+
+  <Resources>
+    <Composition id="pulsar" width="100" height="100">
+      <Layer id="core" centerX="0" centerY="0" width="40" height="40">
+        <Ellipse width="40" height="40"/>
+        <Fill color="#6366F1"/>
+      </Layer>
+      <Animations>
+        <Animation id="pulse" duration="60" frameRate="60" loop="loop">
+          <Object target="core">
+            <Channel name="scale.x" type="float">
+              <Key time="0" value="1" interpolation="linear"/>
+              <Key time="30" value="1.6" interpolation="linear"/>
+              <Key time="60" value="1"/>
+            </Channel>
+            <Channel name="scale.y" type="float">
+              <Key time="0" value="1" interpolation="linear"/>
+              <Key time="30" value="1.6" interpolation="linear"/>
+              <Key time="60" value="1"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+    </Composition>
+  </Resources>
+</pagx>

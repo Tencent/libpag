@@ -1105,7 +1105,7 @@ CLI_TEST(PAGXCliTest, Verify_UnknownAttribute) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("attribute 'rotation' is not allowed") != std::string::npos);
+  EXPECT_TRUE(output.find("attribute 'notAnAttribute' is not allowed") != std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {

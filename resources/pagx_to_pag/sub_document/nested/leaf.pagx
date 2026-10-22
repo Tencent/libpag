@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Deepest sub-document. -->
+<pagx width="60" height="60">
+  <Layer centerX="0" centerY="0" width="32" height="32">
+    <Ellipse width="32" height="32"/>
+    <Fill color="#10B981"/>
+  </Layer>
+</pagx>

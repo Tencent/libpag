@@ -239,9 +239,10 @@ HEX 格式用于表示 sRGB 色域的颜色，使用 `#` 前缀的十六进制�
 
 **路径解析规则**：
 
-- **相对路径**：相对于 PAGX 文件所在目录解析，支持 `../` 引用父目录
+- **相对路径**：相对于**声明该引用的 PAGX 文件**所在目录解析，支持 `../` 引用父目录；外部子 PAGX（§8.3）内部再引用的子文档与图片，相对该子文档所在目录解析，与 `import`、Font `file` 的规则一致
 - **数据 URI**：以 `data:` 开头，格式为 `data:<mediatype>;base64,<data>`，仅支持 base64 编码
 - 路径分隔符统一使用 `/`（正斜杠），不支持 `\`（反斜杠）
+- **URL 不支持**：包含 `://` 的路径（http、https 等）无法解析，验证时给出告警
 
 ---
 
@@ -955,6 +956,11 @@ Layer 的子元素按类型自动归类为五个集合：
 | `blendMode` | BlendMode | normal | 混合模式 |
 | `x` | float | 0 | X 位置（推荐使用约束属性 `left`） |
 | `y` | float | 0 | Y 位置（推荐使用约束属性 `top`） |
+| `anchor` | Point | 0,0 | 变换锚点，语义与 Group 相同（见 §6.7） |
+| `rotation` | float | 0 | 旋转角度（度） |
+| `scale` | Point | 1,1 | 缩放 (sx,sy) |
+| `skew` | float | 0 | 倾斜角度（度） |
+| `skewAxis` | float | 0 | 倾斜轴角度（度） |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix | - | 3D 变换（16 个值，列优先） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
@@ -967,6 +973,8 @@ Layer 的子元素按类型自动归类为五个集合：
 | `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | Composition 引用 "@id" |
 | `vmContext` | string | "" | ViewModel 绑定上下文路径，用于解析 DataBind 源路径 |
+| `startTime` | float | 0 | 时间锁定挂载的起始偏移（秒），仅对引用 Composition 的 Layer 生效（见 §8.3.3） |
+| `timeScale` | float | 1 | 时间锁定挂载的倍速，见 §8.3.3 |
 | `import` | string | - | 待导入的外部文件路径（见 §7） |
 | `importFormat` | string | - | 强制指定导入格式（见 §7） |
 
@@ -976,10 +984,12 @@ Layer 的子元素按类型自动归类为五个集合：
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 
-**变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
-- 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
-- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值
-- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y` 的值
+**变换属性优先级**：`x`/`y` + 变换属性（`anchor`/`rotation`/`scale`/`skew`/`skewAxis`）、`matrix`、`matrix3D` 三者存在覆盖关系：
+- 仅设置 `x`/`y` 与变换属性：`x`/`y` 提供平移，变换属性按与 Group 相同的方式组合（围绕 `anchor` 应用缩放、斜切、旋转，见 §6.7）
+- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 与全部变换属性
+- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 与全部 2D 变换
+
+变换属性均可动画（通道见附录 D.1）。
 
 **MaskType（遮罩类型）**：
 
@@ -988,6 +998,9 @@ Layer 的子元素按类型自动归类为五个集合：
 | `alpha` | Alpha 遮罩：使用遮罩的 alpha 通道 |
 | `luminance` | 亮度遮罩：使用遮罩的亮度值 |
 | `contour` | 轮廓遮罩：使用遮罩的轮廓进行裁剪 |
+| `alphaInverted` | 反相 Alpha 遮罩：使用遮罩 alpha 通道的反相 |
+| `luminanceInverted` | 反相亮度遮罩：使用遮罩亮度值的反相 |
+| `contourInverted` | 反相轮廓遮罩：使用遮罩轮廓的反相进行裁剪 |
 
 **BlendMode**：见 2.9 节混合模式完整表格。
 
@@ -1423,6 +1436,8 @@ y = position.y + outerRadius * sin(angle)
 | `position` | Point | 0,0 | 路径坐标系原点的偏移。推荐使用约束属性（`left`/`top`）进行定位 |
 | `reversed` | bool | false | 反转路径方向 |
 
+**路径动画**：`data` 是可动画通道（通道类型 `path`，见 §8.1.3）：关键帧值为 SVG 路径数据或 PathData 资源引用。相邻关键帧命令序列相同时按点序逐点插值；不同时按 Hold 处理，并由 `pagx verify` 给出告警。Path 另有逐点通道 `point{i}.x` / `point{i}.y`，按点序号寻址，与 `path` 通道并存。
+
 **示例**:
 
 > [Sample](samples/path.pagx)
@@ -1438,15 +1453,20 @@ Text 是一种几何元素，向几何列表贡献字形（而非路径）。与
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `text` | string | "" | 文本内容 |
-| `position` | Point | 0,0 | 文本起点位置（y 为基线），设置约束属性时由约束系统自动计算。推荐使用约束属性（`left`/`top`）进行定位 |
+| `position` | Point | 0,0 | 文本起点位置（y 的语义由 `baseline` 决定），设置约束属性时由约束系统自动计算。推荐使用约束属性（`left`/`top`）进行定位 |
 | `fontFamily` | string | "" | 字体族（空字符串表示系统默认字体） |
 | `fontStyle` | string | "" | 字体变体（Regular, Bold, Italic, Bold Italic 等）。空字符串表示该字体的默认变体 |
 | `fontSize` | float | 12 | 字号 |
-| `letterSpacing` | float | 0 | 字间距 |
+| `letterSpacing` | float | 0 | 字间距（像素） |
+| `tracking` | float | - | 字距（1/1000 em）。与 `letterSpacing` 独立并存：有效字距 = `letterSpacing` + `tracking` × `fontSize` / 1000，未设置的项按 0 计 |
 | `fauxBold` | bool | false | 仿粗体效果 |
 | `fauxItalic` | bool | false | 仿斜体效果 |
 | `baseline` | TextBaseline | lineBox | 垂直定位基线模式。`lineBox`：position.y 是 linebox 顶部（基于字体指标行高）；`alphabetic`：position.y 是字母基线 |
 | `textAnchor` | TextAnchor | start | 文本锚点对齐——控制文本相对原点的位置（见下方）。有 TextBox 排版时忽略 |
+| `baselineShift` | float | 0 | 基线偏移（像素），正值向上移动整段文本 |
+| `firstBaseLine` | float | - | 首行基线相对文本区域顶部的位置（像素）；未设置时由排版引擎按字体度量自动决定 |
+| `backgroundColor` | Color | #000000 | 文本背景颜色，绘制在文本块边界内、字形之下 |
+| `backgroundAlpha` | float | 0 | 文本背景不透明度 0~1；0 表示不绘制背景 |
 
 子元素：`CDATA` 文本、`GlyphRun`*
 
@@ -1569,6 +1589,7 @@ finalY[i] = y + positions[i].y
 | `blendMode` | BlendMode | normal | 混合模式（见 2.9 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
 | `placement` | LayerPlacement | background | 绘制位置（见 6.3.3 节） |
+| `visible` | bool | true | 是否绘制该填充；设为 `false` 时不参与渲染 |
 
 子元素：可内嵌一个颜色源（SolidColor、LinearGradient、RadialGradient、ConicGradient、DiamondGradient、ImagePattern）
 
@@ -1604,6 +1625,7 @@ finalY[i] = y + positions[i].y
 | `dashAdaptive` | bool | false | 等长虚线段缩放 |
 | `align` | StrokeAlign | center | 描边对齐（见下方） |
 | `placement` | LayerPlacement | background | 绘制位置（见 6.3.3 节） |
+| `visible` | bool | true | 是否绘制该描边；设为 `false` 时不参与渲染 |
 
 **LineCap（线帽样式）**：
 
@@ -2240,6 +2262,13 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 
 `<Timelines>` 内的 `<Animation ref="@id"/>`（或 `<StateMachine ref="@id"/>`）通过 `ref` 属性选中要挂载的时间线。
 
+**默认时间线**：文档**根作用域**按声明顺序的第一个 `<Animation>` 或 `<StateMachine>` 是该文档的默认时间线，播放器（`PAGScene`）的播放、时长查询与进度控制都以它为准：
+- 默认时间线是 `Animation`：时长、帧率、循环模式取自它，进度可读写
+- 默认时间线是 `StateMachine`：按真实时间推进，没有固定时长（时长为 0），进度接口不生效
+- 根作用域没有时间线：作为静态画面处理，播放与进度接口不报错，也不产生重复渲染
+
+Composition 作用域内的动画仍按"顶层作用域"规则自动播放，不受默认时间线影响。需要多段内容并行播放时，可在根作用域最前声明一个多区域并行的 StateMachine 使其成为默认时间线。
+
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | (必填) | 唯一标识符，供 Layer 的 `<Timelines>` 引用 |
@@ -2318,8 +2347,11 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `image` | 图片资源引用 |
 | `color` | 颜色值（RGBA） |
 | `matrix` | 2D 变换矩阵 |
+| `path` | 路径数据（SVG 路径语法或 PathData 资源引用），用于 `Path.data` 等几何通道 |
 
-若省略 `type`，系统会根据第一个 `<Key>` 的 `value` 自动推断类型（color → bool → image → int → float → string）。
+若省略 `type`，系统会根据第一个 `<Key>` 的 `value` 自动推断类型（color → bool → image → int → float → string）；`path` 类型必须显式声明。
+
+`path` 类型关键帧的插值规则：相邻关键帧命令序列相同时按点序逐点插值；不同时按 Hold 处理，`pagx verify` 给出告警。
 
 **示例**：驱动透明度的通道。
 
@@ -2332,7 +2364,7 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 
 #### 8.1.4 关键帧（Key / Keyframe）
 
-关键帧保存特定时刻的属性值，以及如何过渡到下一个关键帧的插值方式和可选的贝塞尔控制柄。支持的值类型包括 `float`、`bool`、`int`、`string`、`image`、`color`、`matrix`。
+关键帧保存特定时刻的属性值，以及如何过渡到下一个关键帧的插值方式和可选的贝塞尔控制柄。支持的值类型包括 `float`、`bool`、`int`、`string`、`image`、`color`、`matrix`、`path`。
 
 **Frame**：`Frame` 是帧索引。`ZeroFrame = 0` 是动画的第一帧。
 
@@ -2518,6 +2550,8 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
 
 通过 `composition` 属性，Layer 可将外部 PAGX 文件作为 Composition 引入到当前文档中。引用 Composition 的 Layer 可在 `<Timelines>` 中挂载动画或状态机。每种驱动器通过元素名称区分：
 
+**外部文件路径规则**：`composition` 属性可以直接写外部 PAGX 文件路径（相对路径遵循 §2.11，基于声明该引用的文件所在目录；URL 不支持）。子文档中再引用的子文档沿引用链递归加载并检测环。运行时由宿主通过 `getExternalFilePaths()` 与 `loadFileData()` 提供文件数据；每个引用该文件的 Layer 各自解析出一份独立的文档实例，编辑与 ViewModel 互不影响。
+
 | 元素 | 说明 |
 |------|------|
 | `<Animation ref="@id"/>` | 挂载关键帧驱动的动画时间线 |
@@ -2542,19 +2576,19 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
       <Fill color="#14B8A6"/>
     </Layer>
   </Composition>
-
-  <Animations>
-    <Animation id="pulse" duration="60" frameRate="60" loop="loop">
-      <Object target="statusDot">
-        <Channel name="alpha" type="float">
-          <Key time="0" value="0.4" interpolation="linear"/>
-          <Key time="30" value="1" interpolation="linear"/>
-          <Key time="60" value="0.4" interpolation="linear"/>
-        </Channel>
-      </Object>
-    </Animation>
-  </Animations>
 </Resources>
+
+<Animations>
+  <Animation id="pulse" duration="60" frameRate="60" loop="loop">
+    <Object target="statusDot">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.4" interpolation="linear"/>
+        <Key time="30" value="1" interpolation="linear"/>
+        <Key time="60" value="0.4" interpolation="linear"/>
+      </Channel>
+    </Object>
+  </Animation>
+</Animations>
 
 <Layer composition="@badgeComp">
   <Timelines>
@@ -2562,6 +2596,8 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
   </Timelines>
 </Layer>
 ```
+
+> `<Animations>` 容器声明在文档或 Composition 的直接子级（与 `<Animations>` 内的动画作用域一致），不放在 `<Resources>` 内。
 
 #### 8.3.2 状态机时间线（StateMachineTimeline）
 
@@ -2582,6 +2618,30 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
 ```
 
 被引用的 `<StateMachine>` 定义在 `<Animations>` 容器中；其结构见 §8.2。可播放的状态机 sample 尚未提供（见 §8.2 末尾的说明）。
+
+#### 8.3.3 时间锁定挂载（Time-Locked Mounting）
+
+引用 Composition 的 Layer 可声明两个时间锁定属性：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `startTime` | float | 0 | 挂载起始偏移（秒） |
+| `timeScale` | float | 1 | 挂载倍速（每父时钟秒对应的子内容秒数） |
+
+**时间锁定模式**：声明任一时间锁定属性（值非默认）的挂载实例进入时间锁定模式——该实例内全部时间线（Composition 作用域自动播放的动画，以及 `<Timelines>` 挂载的动画与状态机）不再自行推进，时间统一由父时钟计算：
+
+```
+子时间 = (父时钟 − startTime) × timeScale
+```
+
+- **父时钟**：在主文档中，父时钟是文档默认时间线（必须是 `Animation`）的当前时间（秒）；在另一个时间锁定实例内部，父时钟是该实例的子时间（可逐级嵌套）。
+- 默认时间线不是 `Animation`（是 `StateMachine` 或没有时间线）时，锁定不生效，实例内时间线退回自行推进，`pagx verify` 给出告警。
+- **边界行为**（与旧 PAG 预合成的可观测行为对齐）：
+  - 子时间为负：按 0 处理（`Animation` 显示 0 时刻状态，`StateMachine` 停在初始状态）
+  - 子时间超出内容时长：`Animation` 按其 `loop` 模式处理（`once` 保持末帧，`loop`/`pingPong` 回绕）；`StateMachine` 按父时钟继续提供的增量推进
+  - `timeScale` 为 0：子时间恒为 0，画面静止
+  - `timeScale` 为负：子时间随父时间反向推进（产生的负子时间按上述规则处理），`pagx verify` 给出告警
+- 父时钟被定位（如 `setCurrentTime`）后，下一次绘制全部锁定的后代同步定位到对应子时间。
 
 ### 8.4 与数据绑定的关系
 
@@ -2899,7 +2959,7 @@ Layer / Group
 | 枚举 | 值 |
 |------|------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
+| **MaskType** | `alpha`, `luminance`, `contour`, `alphaInverted`, `luminanceInverted`, `contourInverted` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
@@ -3022,6 +3082,13 @@ Layer / Group
 | `blendMode` | enum | 混合模式 |
 | `x` ^Layout^ | float | 左上角 X 坐标 |
 | `y` ^Layout^ | float | 左上角 Y 坐标 |
+| `anchor.x` | float | 变换锚点 X |
+| `anchor.y` | float | 变换锚点 Y |
+| `rotation` | float | 旋转角度 |
+| `scale.x` | float | 缩放 X |
+| `scale.y` | float | 缩放 Y |
+| `skew` | float | 倾斜角度 |
+| `skewAxis` | float | 倾斜轴角度 |
 
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 
@@ -3039,8 +3106,9 @@ Layer / Group
 | `rotation` ^Layout^ | float | Polystar | 旋转角度 |
 | `outerRoundness` | float | Polystar | 外圆角 |
 | `innerRoundness` | float | Polystar | 内圆角 |
+| `data` | path | Path | 路径数据；命令序列相同的相邻关键帧逐点插值（见 §6.2.4） |
 
-> Path 的 `position.x/y` 仅可通过文档编辑修改，不支持动画驱动。
+> Path 的 `position.x/y` 仅可通过文档编辑修改，不支持动画驱动。Path 另有逐点通道 `point{i}.x`/`point{i}.y`，按点序号寻址，由 HTML 导入等变形场景使用。
 
 ### D.3 Text / TextBox
 
@@ -3048,8 +3116,35 @@ Layer / Group
 |------|--------|------|
 | `x` ^Layout^ | float | Text 锚点 X（Text 特有，非 `position.x`） |
 | `y` ^Layout^ | float | Text 锚点 Y（Text 特有，非 `position.y`） |
+| `text` ^Layout^ | string | 文本内容 |
+| `fontFamily` ^Layout^ | string | 字体族 |
+| `fontStyle` ^Layout^ | string | 字体变体 |
+| `fontSize` ^Layout^ | number | 字号 |
+| `letterSpacing` ^Layout^ | number | 字间距（像素） |
+| `tracking` ^Layout^ | number | 字距（1/1000 em） |
+| `fauxBold` ^Layout^ | boolean | 仿粗体 |
+| `fauxItalic` ^Layout^ | boolean | 仿斜体 |
+| `textAnchor` ^Layout^ | enum | 文本锚点 |
+| `baseline` ^Layout^ | enum | 基线模式 |
+| `baselineShift` | number | 基线偏移 |
+| `firstBaseLine` | number | 首行基线位置 |
+| `backgroundColor` | color | 文本背景色 |
+| `backgroundAlpha` | number | 文本背景不透明度 |
 
-> `fontSize`、`letterSpacing` 等文本属性仅可通过文档编辑修改，不支持动画驱动。
+> 文本塑形类通道（`text`、字体属性、字号、字距、锚点等）带运行时写入器：动画或 ViewModel 驱动后由运行时对受影响的 Text/TextBox 重新排版，周围布局保持不变。
+
+**TextBox 排版通道**（修改后重新排版）：
+
+| 通道 | 值类型 | 说明 |
+|------|--------|------|
+| `textAlign` ^Layout^ | enum | 行内对齐 |
+| `paragraphAlign` ^Layout^ | enum | 段落对齐 |
+| `writingMode` ^Layout^ | enum | 横排/竖排 |
+| `lineHeight` ^Layout^ | number | 行高（0 = 自动） |
+| `wordWrap` ^Layout^ | boolean | 自动换行 |
+| `overflow` ^Layout^ | enum | 溢出处理 |
+
+> 旧 PAG 文本编辑能力与此处的对应：`applyFill`/`applyStroke` → Fill/Stroke 的 `visible`；`strokeOverFill` → Fill/Stroke 的声明顺序（Fill 声明在 Stroke 之前 = stroke 在 fill 之上）；`justification` → `textAlign`/`textAnchor`；`leading` → `lineHeight`；`boxText`/`boxTextPos`/`boxTextSize` → TextBox 位置与 `width`/`height`；`direction` → `writingMode`。
 
 ### D.4 绘制器（Fill / Stroke）
 
@@ -3057,6 +3152,7 @@ Layer / Group
 |------|--------|----------|------|
 | `color` | color | Fill, Stroke | 绘制颜色（仅纯色时生效） |
 | `alpha` | number | Fill, Stroke | 透明度 |
+| `visible` | boolean | Fill, Stroke | 是否参与绘制 |
 | `width` | number | Stroke | 描边宽度 |
 | `miterLimit` | number | Stroke | 尖角限制 |
 | `dashOffset` | number | Stroke | 虚线偏移 |

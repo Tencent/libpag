@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Two parallel orthogonal regions: "motion" and "tint" advance independently,
+     sharing the same inputs. -->
+<pagx width="400" height="300">
+  <Layer id="slider" left="80" centerY="0" width="240" height="16">
+    <Rectangle width="240" height="16" roundness="8"/>
+    <Fill color="#E2E8F0"/>
+  </Layer>
+  <Layer id="tintable" centerX="0" centerY="70" width="60" height="60">
+    <Ellipse width="60" height="60"/>
+    <Fill id="tintFill" color="#0EA5E9"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="moveLeft" duration="30" frameRate="60" loop="loop">
+      <Object target="slider">
+        <Channel name="x" type="float">
+          <Key time="0" value="80" interpolation="linear"/>
+          <Key time="30" value="120"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="moveRight" duration="30" frameRate="60" loop="loop">
+      <Object target="slider">
+        <Channel name="x" type="float">
+          <Key time="0" value="120" interpolation="linear"/>
+          <Key time="30" value="80"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="warm" duration="30" frameRate="60" loop="once">
+      <Object target="tintFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#0EA5E9" interpolation="linear"/>
+          <Key time="30" value="#F97316"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="cool" duration="30" frameRate="60" loop="once">
+      <Object target="tintFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#F97316" interpolation="linear"/>
+          <Key time="30" value="#0EA5E9"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <StateMachine id="dualSM">
+      <Inputs>
+        <Input name="direction" type="bool" default="true"/>
+        <Input name="warmUp" type="bool" default="false"/>
+      </Inputs>
+      <StateRegion name="motion" initialState="left">
+        <States>
+          <State name="left" animation="@moveLeft"/>
+          <State name="right" animation="@moveRight"/>
+        </States>
+        <Transitions>
+          <Transition from="left" to="right">
+            <Condition input="direction" op="equal" value="true"/>
+          </Transition>
+          <Transition from="right" to="left">
+            <Condition input="direction" op="equal" value="false"/>
+          </Transition>
+        </Transitions>
+      </StateRegion>
+      <StateRegion name="tint" initialState="coolState">
+        <States>
+          <State name="coolState" animation="@cool"/>
+          <State name="warmState" animation="@warm"/>
+        </States>
+        <Transitions>
+          <Transition from="coolState" to="warmState">
+            <Condition input="warmUp" op="equal" value="true"/>
+          </Transition>
+          <Transition from="warmState" to="coolState">
+            <Condition input="warmUp" op="equal" value="false"/>
+          </Transition>
+        </Transitions>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>

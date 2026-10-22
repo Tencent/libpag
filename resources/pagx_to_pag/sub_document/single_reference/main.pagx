@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Single external reference: the binary packs child.pagx into SubDocumentTable
+     once; the referencing layer records the sub-document index. -->
+<pagx width="400" height="200">
+  <Layer left="140" top="40" width="120" height="120" composition="child.pagx"/>
+</pagx>

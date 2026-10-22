@@ -239,9 +239,10 @@ External resources are referenced via relative paths or data URIs, applicable to
 
 **Path Resolution Rules**:
 
-- **Relative paths**: Resolved relative to the directory containing the PAGX file; supports `../` to reference parent directories
+- **Relative paths**: Resolved relative to the directory containing **the PAGX file that declares the reference**; supports `../` to reference parent directories. References inside an external sub-PAGX (§8.3) resolve against that sub-document's own directory, consistent with `import` and Font `file`
 - **Data URIs**: Begin with `data:`, format is `data:<mediatype>;base64,<data>`; only base64 encoding is supported
 - Path separators must use `/` (forward slash); `\` (backslash) is not supported
+- **URLs are not supported**: paths containing `://` (http, https, etc.) cannot be resolved; validation reports a warning
 
 ---
 
@@ -955,6 +956,11 @@ Layer child elements are automatically categorized into five collections by type
 | `blendMode` | BlendMode | normal | Blend mode |
 | `x` | float | 0 | X position (prefer constraint attribute `left`) |
 | `y` | float | 0 | Y position (prefer constraint attribute `top`) |
+| `anchor` | Point | 0,0 | Transform anchor, same semantics as Group (see §6.7) |
+| `rotation` | float | 0 | Rotation angle (degrees) |
+| `scale` | Point | 1,1 | Scale (sx,sy) |
+| `skew` | float | 0 | Skew angle (degrees) |
+| `skewAxis` | float | 0 | Skew axis angle (degrees) |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
 | `preserve3D` | bool | false | Preserve 3D transform |
@@ -967,6 +973,8 @@ Layer child elements are automatically categorized into five collections by type
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
 | `vmContext` | string | "" | ViewModel binding context path for resolving DataBind sources |
+| `startTime` | float | 0 | Time-locked mounting start offset (seconds); only effective on Layers referencing a Composition (see §8.3.3) |
+| `timeScale` | float | 1 | Time-locked mounting rate; see §8.3.3 |
 | `import` | string | - | External file path to import (see §7) |
 | `importFormat` | string | - | Force import format (see §7) |
 
@@ -976,10 +984,12 @@ Layer child elements are automatically categorized into five collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
-- Only `x`/`y` set: Uses `x`/`y` for translation
-- `matrix` set: `matrix` overrides `x`/`y` values
-- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
+**Transform Attribute Priority**: `x`/`y` + transform attributes (`anchor`/`rotation`/`scale`/`skew`/`skewAxis`), `matrix`, and `matrix3D` have an override relationship:
+- Only `x`/`y` and transform attributes set: `x`/`y` provide translation; transform attributes combine the same way as Group (scale, skew, rotation applied around `anchor`, see §6.7)
+- `matrix` set: `matrix` overrides `x`/`y` and all transform attributes
+- `matrix3D` set: `matrix3D` overrides `matrix` and all 2D transforms
+
+Transform attributes are all animatable (channels listed in Appendix D.1).
 
 **MaskType**:
 
@@ -988,6 +998,9 @@ Layer child elements are automatically categorized into five collections by type
 | `alpha` | Alpha mask: Uses mask's alpha channel |
 | `luminance` | Luminance mask: Uses mask's luminance values |
 | `contour` | Contour mask: Uses mask's contour for clipping |
+| `alphaInverted` | Inverted alpha mask: Uses the inverse of mask's alpha channel |
+| `luminanceInverted` | Inverted luminance mask: Uses the inverse of mask's luminance values |
+| `contourInverted` | Inverted contour mask: Uses the inverse of mask's contour for clipping |
 
 **BlendMode**: See §2.9 for the complete blend mode table.
 
@@ -1423,6 +1436,8 @@ Defines arbitrary shapes using SVG path syntax, supporting inline data or refere
 | `position` | Point | 0,0 | Offset of the path coordinate system origin. Prefer constraint attributes (`left`/`top`) for positioning |
 | `reversed` | bool | false | Reverse path direction |
 
+**Path animation**: `data` is an animatable channel (channel type `path`, see §8.1.3): key values are SVG path data or PathData resource references. Consecutive keyframes with identical command sequences interpolate point-by-point in point order; otherwise they are treated as Hold, and `pagx verify` reports a warning. Path also has per-point channels `point{i}.x` / `point{i}.y`, addressed by point index, coexisting with the `path` channel.
+
 **Example**:
 
 > [Sample](samples/path.pagx)
@@ -1438,15 +1453,20 @@ Text is a geometry element that contributes glyphs (rather than a path) to the g
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | Point | 0,0 | Text start position (y is baseline), computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
+| `position` | Point | 0,0 | Text start position (the meaning of y is determined by `baseline`), computed from constraint attributes when set. Prefer constraint attributes (`left`/`top`) for positioning |
 | `fontFamily` | string | "" | Font family (empty string means system default) |
 | `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
-| `letterSpacing` | float | 0 | Letter spacing |
+| `letterSpacing` | float | 0 | Letter spacing (pixels) |
+| `tracking` | float | - | Tracking (1/1000 em). Coexists with `letterSpacing`: effective spacing = `letterSpacing` + `tracking` × `fontSize` / 1000, unset items count as 0 |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the linebox top (based on font metrics line height); `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
+| `baselineShift` | float | 0 | Baseline shift (pixels); positive values move the whole text block up |
+| `firstBaseLine` | float | - | Position of the first line's baseline relative to the top of the text area (pixels); when unset, determined automatically from font metrics |
+| `backgroundColor` | Color | #000000 | Text background color, drawn inside the text block bounds, below the glyphs |
+| `backgroundAlpha` | float | 0 | Text background opacity 0~1; 0 means no background |
 
 Child elements: `CDATA` text, `GlyphRun`*
 
@@ -1569,6 +1589,7 @@ Fill draws the interior region of geometry using a specified color source.
 | `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
 | `fillRule` | FillRule | winding | Fill rule (see below) |
 | `placement` | LayerPlacement | background | Rendering position (see §6.3.3) |
+| `visible` | bool | true | Whether this fill is drawn; `false` excludes it from rendering |
 
 Child elements: May embed one color source (SolidColor, LinearGradient, RadialGradient, ConicGradient, DiamondGradient, ImagePattern)
 
@@ -1604,6 +1625,7 @@ Stroke draws lines along geometry boundaries.
 | `dashAdaptive` | bool | false | Scale dashes to equal length |
 | `align` | StrokeAlign | center | Stroke alignment (see below) |
 | `placement` | LayerPlacement | background | Rendering position (see §6.3.3) |
+| `visible` | bool | true | Whether this stroke is drawn; `false` excludes it from rendering |
 
 **LineCap**:
 
@@ -2252,6 +2274,13 @@ PAGX animation system consists of two parts: keyframe-based Animations and input
 
 The `ref` attribute on `<Animation ref="@id"/>` (or `<StateMachine ref="@id"/>`) inside `<Timelines>` selects the timeline to mount.
 
+**Default timeline**: the first `<Animation>` or `<StateMachine>` in the document's **root scope**, in declaration order, is the document's default timeline. Playback, duration queries, and progress control all follow it:
+- Default timeline is an `Animation`: duration, frame rate, and loop mode come from it; progress is readable and writable
+- Default timeline is a `StateMachine`: advances in real time; no fixed duration (duration is 0); progress APIs have no effect
+- No timeline in the root scope: treated as a static picture; playback and progress APIs do not error and cause no repeated rendering
+
+Animations in a Composition scope still auto-play per the "top-level scope" rule, independent of the default timeline. To play multiple segments in parallel, declare a multi-region parallel StateMachine first in the root scope so it becomes the default timeline.
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `id` | string | (required) | Unique identifier, referenced from Layer `<Timelines>` |
@@ -2330,8 +2359,11 @@ The `type` attribute specifies the value type this channel carries. The schema e
 | `image` | Image resource reference |
 | `color` | Color value (RGBA) |
 | `matrix` | 2D transform matrix |
+| `path` | Path data (SVG path syntax or PathData resource reference), used by geometry channels such as `Path.data` |
 
-If `type` is omitted, it is inferred from the first `<Key>` value (color → bool → image → int → float → string).
+If `type` is omitted, it is inferred from the first `<Key>` value (color → bool → image → int → float → string); the `path` type must be declared explicitly.
+
+Interpolation rule for `path` keyframes: consecutive keyframes with identical command sequences interpolate point-by-point; otherwise they are treated as Hold, and `pagx verify` reports a warning.
 
 ```xml
 <Channel name="alpha" type="float">
@@ -2342,7 +2374,7 @@ If `type` is omitted, it is inferred from the first `<Key>` value (color → boo
 
 #### 8.1.4 Keyframes (Key)
 
-A keyframe holds a property value at a specific time, together with how it transitions to the next keyframe and optional bezier control handles. Supported value types are `float`, `bool`, `int`, `string`, `image`, `color`, and `matrix`.
+A keyframe holds a property value at a specific time, together with how it transitions to the next keyframe and optional bezier control handles. Supported value types are `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, and `path`.
 
 **Frame**: `Frame` is a frame index. `ZeroFrame = 0` is the first frame of any animation.
 
@@ -2528,6 +2560,8 @@ Type-specific attributes:
 
 Using the `composition` attribute, a Layer can import an external PAGX file as a Composition into the current document. A Layer referencing a Composition may declare a `<Timelines>` child element to attach animations or state machines. Each entry selects the timeline kind through the element name:
 
+**External file path rules**: the `composition` attribute may directly contain an external PAGX file path (relative paths follow §2.11, resolved against the directory of the file declaring the reference; URLs are not supported). Sub-documents referenced from within a sub-document are loaded recursively along the reference chain, with cycle detection. At runtime the host supplies file data via `getExternalFilePaths()` and `loadFileData()`; each Layer referencing the file parses its own independent document instance, so edits and ViewModels do not interfere across instances.
+
 | Element | Description |
 |---------|-------------|
 | `<Animation ref="@id"/>` | Attaches a keyframe-driven Animation timeline |
@@ -2550,19 +2584,19 @@ Using the `composition` attribute, a Layer can import an external PAGX file as a
       <Fill color="#14B8A6"/>
     </Layer>
   </Composition>
-
-  <Animations>
-    <Animation id="pulse" duration="60" frameRate="60" loop="loop">
-      <Object target="statusDot">
-        <Channel name="alpha" type="float">
-          <Key time="0" value="0.4" interpolation="linear"/>
-          <Key time="30" value="1" interpolation="linear"/>
-          <Key time="60" value="0.4" interpolation="linear"/>
-        </Channel>
-      </Object>
-    </Animation>
-  </Animations>
 </Resources>
+
+<Animations>
+  <Animation id="pulse" duration="60" frameRate="60" loop="loop">
+    <Object target="statusDot">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.4" interpolation="linear"/>
+        <Key time="30" value="1" interpolation="linear"/>
+        <Key time="60" value="0.4" interpolation="linear"/>
+      </Channel>
+    </Object>
+  </Animation>
+</Animations>
 
 <Layer composition="@badgeComp">
   <Timelines>
@@ -2590,6 +2624,30 @@ Unlike an AnimationTimeline, a StateMachineTimeline has no `playing` attribute: 
 ```
 
 The referenced `<StateMachine>` is defined in the `<Animations>` container; see §8.2 for its structure. A playable state machine sample is not yet available (see the note at the end of §8.2).
+
+#### 8.3.3 Time-Locked Mounting
+
+A Layer referencing a Composition may declare two time-locking attributes:
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `startTime` | float | 0 | Mounting start offset (seconds) |
+| `timeScale` | float | 1 | Mounting rate (child seconds per parent-clock second) |
+
+**Time-locked mode**: a mounted instance that declares either time-locking attribute (with a non-default value) enters time-locked mode — all timelines inside the instance (Composition-scoped auto-playing animations, plus animations and state machines mounted via `<Timelines>`) stop advancing on their own; their time is computed from the parent clock:
+
+```
+childTime = (parentClock − startTime) × timeScale
+```
+
+- **Parent clock**: in the main document, the parent clock is the current time (seconds) of the document's default timeline (which must be an `Animation`); inside another time-locked instance, the parent clock is that instance's child time (nesting applies level by level).
+- If the default timeline is not an `Animation` (it is a `StateMachine` or absent), locking has no effect; timelines inside the instance fall back to advancing on their own, and `pagx verify` reports a warning.
+- **Boundary behavior** (aligned with the observable behavior of legacy PAG precompositions):
+  - Negative child time: clamped to 0 (an `Animation` shows its 0-time state; a `StateMachine` stays in its initial state)
+  - Child time beyond content duration: an `Animation` follows its `loop` mode (`once` holds the final frame; `loop`/`pingPong` wrap around); a `StateMachine` keeps advancing on the increments the parent clock provides
+  - `timeScale` of 0: child time stays 0; the picture is frozen
+  - Negative `timeScale`: child time runs backward as parent time advances (resulting negative child times follow the rule above); `pagx verify` reports a warning
+- After the parent clock is repositioned (e.g. via `setCurrentTime`), the next draw repositions all locked descendants to their corresponding child times.
 
 ### 8.4 Relationship with Data Binding
 
@@ -2907,7 +2965,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | Enum | Values |
 |------|--------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
+| **MaskType** | `alpha`, `luminance`, `contour`, `alphaInverted`, `luminanceInverted`, `contourInverted` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |
@@ -3030,6 +3088,13 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `blendMode` | enum | Blend mode |
 | `x` ^Layout^ | float | Top-left X position |
 | `y` ^Layout^ | float | Top-left Y position |
+| `anchor.x` | float | Transform anchor X |
+| `anchor.y` | float | Transform anchor Y |
+| `rotation` | float | Rotation angle |
+| `scale.x` | float | Scale X |
+| `scale.y` | float | Scale Y |
+| `skew` | float | Skew angle |
+| `skewAxis` | float | Skew axis angle |
 
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 
@@ -3047,8 +3112,9 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `rotation` ^Layout^ | float | Polystar | Rotation angle |
 | `outerRoundness` | float | Polystar | Outer roundness |
 | `innerRoundness` | float | Polystar | Inner roundness |
+| `data` | path | Path | Path data; keyframes with identical command sequences interpolate point-by-point (see §6.2.4) |
 
-> Path's `position.x/y` can only be modified through document editing; animation is not supported.
+> Path's `position.x/y` can only be modified through document editing; animation is not supported. Path also has per-point channels `point{i}.x`/`point{i}.y`, addressed by point index, used by shape-morphing scenarios such as HTML import.
 
 ### D.3 Text / TextBox
 
@@ -3056,8 +3122,35 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 |---------|------------|-------------|
 | `x` ^Layout^ | float | Text anchor X (Text-specific, not `position.x`) |
 | `y` ^Layout^ | float | Text anchor Y (Text-specific, not `position.y`) |
+| `text` ^Layout^ | string | Text content |
+| `fontFamily` ^Layout^ | string | Font family |
+| `fontStyle` ^Layout^ | string | Font variant |
+| `fontSize` ^Layout^ | number | Font size |
+| `letterSpacing` ^Layout^ | number | Letter spacing (pixels) |
+| `tracking` ^Layout^ | number | Tracking (1/1000 em) |
+| `fauxBold` ^Layout^ | boolean | Faux bold |
+| `fauxItalic` ^Layout^ | boolean | Faux italic |
+| `textAnchor` ^Layout^ | enum | Text anchor |
+| `baseline` ^Layout^ | enum | Baseline mode |
+| `baselineShift` | number | Baseline shift |
+| `firstBaseLine` | number | First baseline position |
+| `backgroundColor` | color | Text background color |
+| `backgroundAlpha` | number | Text background opacity |
 
-> `fontSize`, `letterSpacing` and other text properties can only be modified through document editing; animation is not supported.
+> Text-shaping channels (`text`, font properties, font size, spacing, anchor, etc.) carry a runtime writer: after animation or ViewModel drives them, the runtime re-lays out the affected Text/TextBox while the surrounding layout stays unchanged.
+
+**TextBox layout channels** (changes trigger re-layout):
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `textAlign` ^Layout^ | enum | Inline alignment |
+| `paragraphAlign` ^Layout^ | enum | Paragraph alignment |
+| `writingMode` ^Layout^ | enum | Horizontal/vertical writing |
+| `lineHeight` ^Layout^ | number | Line height (0 = auto) |
+| `wordWrap` ^Layout^ | boolean | Word wrap |
+| `overflow` ^Layout^ | enum | Overflow behavior |
+
+> Legacy PAG text editing maps here: `applyFill`/`applyStroke` → Fill/Stroke `visible`; `strokeOverFill` → Fill/Stroke declaration order (Fill declared before Stroke = stroke over fill); `justification` → `textAlign`/`textAnchor`; `leading` → `lineHeight`; `boxText`/`boxTextPos`/`boxTextSize` → TextBox position and `width`/`height`; `direction` → `writingMode`.
 
 ### D.4 Painters (Fill / Stroke)
 
@@ -3065,6 +3158,7 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 |---------|------------|-------|-------------|
 | `color` | color | Fill, Stroke | Painter color (solid color only) |
 | `alpha` | number | Fill, Stroke | Opacity |
+| `visible` | boolean | Fill, Stroke | Whether the painter is drawn |
 | `width` | number | Stroke | Stroke width |
 | `miterLimit` | number | Stroke | Miter limit |
 | `dashOffset` | number | Stroke | Dash offset |

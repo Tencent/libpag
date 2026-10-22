@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TextBox with height unset (auto): line count decides the box height; content
+     -driven axes stay automatic across the flatten round-trip. -->
+<pagx width="400" height="300">
+  <Layer left="40" top="40" width="200">
+    <TextBox id="autoBox" textAlign="start" width="200" wordWrap="true">
+      <Text text="This paragraph wraps onto several lines inside a two hundred pixel wide text box."
+            fontFamily="Arial" fontSize="16"/>
+      <Fill color="#334155"/>
+    </TextBox>
+  </Layer>
+</pagx>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DropShadowFilter shadowOnly, and LayerStyle excludeChildEffects on a group. -->
+<pagx width="400" height="300">
+  <Layer left="40" top="40" width="140" height="90">
+    <Rectangle width="140" height="90" roundness="12"/>
+    <Fill color="#0EA5E9"/>
+    <DropShadowFilter offsetX="10" offsetY="10" blurX="12" blurY="12" color="#000000AA" shadowOnly="true"/>
+  </Layer>
+  <Layer left="220" top="40" width="140" height="90">
+    <Rectangle width="140" height="90" roundness="12"/>
+    <Fill color="#10B981"/>
+    <DropShadowStyle offsetX="8" offsetY="8" blurX="10" blurY="10" color="#00000066" excludeChildEffects="true"/>
+  </Layer>
+  <Layer left="220" top="40" width="60" height="90">
+    <Layer centerX="0" centerY="0" width="36" height="36">
+      <Ellipse width="36" height="36"/>
+      <Fill color="#F59E0B"/>
+      <DropShadowStyle offsetY="4" blurX="6" blurY="6" color="#000000AA"/>
+    </Layer>
+  </Layer>
+</pagx>

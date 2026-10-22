@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Mid-level document that itself references leaf.pagx. -->
+<pagx width="100" height="100">
+  <Layer centerX="0" centerY="0" width="70" height="70">
+    <Rectangle width="70" height="70" roundness="10"/>
+    <Fill color="#99F6E4"/>
+  </Layer>
+  <Layer left="20" top="20" width="60" height="60" composition="leaf.pagx"/>
+</pagx>

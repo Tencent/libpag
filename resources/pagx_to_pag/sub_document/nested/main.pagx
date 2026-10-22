@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Multi-level nesting: main -> mid.pagx -> leaf.pagx. The loader walks the
+     reference chain recursively and detects cycles. -->
+<pagx width="400" height="200">
+  <Layer left="150" top="50" width="100" height="100" composition="mid.pagx"/>
+</pagx>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pure static file: no timelines at all. After export it contains no
+     timeline tags and renders as a single frame. -->
+<pagx width="400" height="300">
+  <Layer centerX="0" centerY="0" width="140" height="140">
+    <Ellipse width="140" height="140"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop offset="0" color="#FDE68A"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>

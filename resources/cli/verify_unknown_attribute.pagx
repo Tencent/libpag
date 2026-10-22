@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Test file for lint: unknown attribute on Layer -->
+<!-- Test file for lint: unknown attribute on Layer. Uses a deliberately nonexistent
+     attribute name: real spec attributes (such as Layer rotation) must not be used
+     here, the schema legalizes them over time and breaks this test. -->
 <pagx width="400" height="300">
   <Layer name="root" width="400" height="300">
-    <Layer rotation="15">
+    <Layer notAnAttribute="15">
       <Ellipse width="100" height="100"/>
       <Fill color="#FF0000"/>
     </Layer>

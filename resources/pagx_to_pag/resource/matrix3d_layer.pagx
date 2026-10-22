@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Layer matrix3D (16 values, column-major): kept verbatim by flattening and
+     stored as 16 float32 in the binary. -->
+<pagx width="400" height="300">
+  <Layer centerX="0" centerY="0" width="200" height="140"
+         matrix3D="0.94,0.34,0,0,-0.34,0.94,0,0,0,0,1,0,0,0,0,1">
+    <Rectangle width="200" height="140" roundness="12"/>
+    <Fill color="#6366F1"/>
+    <Stroke color="#312E81" width="2"/>
+  </Layer>
+</pagx>

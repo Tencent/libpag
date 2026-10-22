@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vertical writing mode: columns flow right to left; lineHeight controls the
+     column width as a logical property. -->
+<pagx width="400" height="300">
+  <Layer centerX="0" centerY="0" width="220" height="240">
+    <TextBox textAlign="start" paragraphAlign="near" writingMode="vertical"
+             width="220" height="240" lineHeight="28">
+      <Text text="竖排文字示例" fontFamily="PingFang SC" fontSize="20"/>
+      <Fill color="#1E293B"/>
+    </TextBox>
+  </Layer>
+</pagx>

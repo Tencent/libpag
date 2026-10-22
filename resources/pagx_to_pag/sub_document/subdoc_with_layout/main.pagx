@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Host document mounting a sub-document that carries constraints, text, and
+     an image of its own. -->
+<pagx width="400" height="200">
+  <Layer left="100" top="40" width="200" height="120" composition="inner_content.pagx"/>
+</pagx>

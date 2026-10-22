@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Multiple root animations: the first in declaration order is the default timeline. -->
+<pagx width="400" height="300">
+  <Layer id="left" left="60" centerY="0" width="60" height="60">
+    <Ellipse width="60" height="60"/><Fill color="#0EA5E9"/>
+  </Layer>
+  <Layer id="right" right="60" centerY="0" width="60" height="60">
+    <Ellipse width="60" height="60"/><Fill color="#F97316"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="primary" duration="60" frameRate="60" loop="loop">
+      <Object target="left">
+        <Channel name="y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="-40" interpolation="linear"/>
+          <Key time="60" value="0"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="secondary" duration="60" frameRate="60" loop="loop">
+      <Object target="right">
+        <Channel name="y" type="float">
+          <Key time="0" value="-40" interpolation="linear"/>
+          <Key time="30" value="0" interpolation="linear"/>
+          <Key time="60" value="-40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

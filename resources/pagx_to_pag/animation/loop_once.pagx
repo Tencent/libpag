@@ -1,0 +1,18 @@
+<!-- Loop mode: once — plays once and stops at the final frame. -->
+<pagx width="400" height="200">
+  <Layer id="ball" centerX="0" centerY="0" width="40" height="40">
+    <Ellipse width="40" height="40"/>
+    <Fill color="#0EA5E9"/>
+  </Layer>
+  <Animations>
+    <Animation id="hop" duration="40" frameRate="60" loop="once">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="20" value="-60" interpolation="linear"/>
+          <Key time="40" value="0"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

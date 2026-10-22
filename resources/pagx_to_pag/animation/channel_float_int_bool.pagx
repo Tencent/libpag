@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Float / Int / Bool channel value types. Int targets a registered int channel
+     (RangeSelector.randomSeed); bool toggles Layer.visible. -->
+<pagx width="400" height="300">
+  <Layer id="bar" left="40" centerY="0" width="80" height="24">
+    <Rectangle width="80" height="24" roundness="8"/>
+    <Fill color="#14B8A6"/>
+  </Layer>
+  <Layer id="flag" centerX="0" centerY="70" width="60" height="20">
+    <Rectangle width="60" height="20" roundness="4"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer id="seedHost" centerX="0" centerY="-70" width="16" height="16">
+    <Ellipse width="16" height="16"/>
+    <Fill color="#6366F1"/>
+    <TextModifier>
+      <RangeSelector id="seedSel" end="1"/>
+    </TextModifier>
+  </Layer>
+
+  <Animations>
+    <Animation id="types" duration="60" frameRate="60" loop="loop">
+      <Object target="bar">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="30" value="0.25" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+      <Object target="seedSel">
+        <Channel name="randomSeed" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="60" value="7"/>
+        </Channel>
+      </Object>
+      <Object target="flag">
+        <Channel name="visible" type="bool">
+          <Key time="0" value="true" interpolation="hold"/>
+          <Key time="30" value="false" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

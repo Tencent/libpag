@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Missing external image: export writes a warning and an empty Image; the
+     referencing pattern simply does not draw. -->
+<pagx width="400" height="200">
+  <Layer centerX="0" centerY="0" width="120" height="120">
+    <Rectangle width="120" height="120" roundness="12"/>
+    <Fill>
+      <ImagePattern image="@absent" scaleMode="letterBox"/>
+    </Fill>
+  </Layer>
+  <Resources>
+    <Image id="absent" source="this_file_does_not_exist.png"/>
+  </Resources>
+</pagx>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Zero duration: kept verbatim with an export warning; runtime reports its
+     duration as 0. -->
+<pagx width="400" height="200">
+  <Layer centerX="0" centerY="0" width="120" height="60">
+    <Rectangle width="120" height="60" roundness="10"/>
+    <Fill color="#475569"/>
+  </Layer>
+  <Animations>
+    <Animation id="zero" duration="0" frameRate="60" loop="once">
+      <Object target="neverUsed">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Static content plus an editable ViewModel: no timelines, but hosts can still
+     drive the bound channels at runtime. -->
+<pagx width="400" height="200" viewModel="@uiVM">
+  <Resources>
+    <ViewModel id="uiVM">
+      <Property name="accent" type="color" default="#14B8A6"/>
+      <Property name="title" type="string" default="Editable static"/>
+    </ViewModel>
+  </Resources>
+  <Layer id="chip" centerX="0" centerY="-20" width="180" height="56">
+    <Rectangle width="180" height="56" roundness="14"/>
+    <Fill id="chipFill" color="#14B8A6"/>
+  </Layer>
+  <Layer id="titleLayer" centerX="0" centerY="30" width="320" height="32">
+    <TextBox textAlign="center" width="320" height="32">
+      <Text id="titleText" text="Editable static" fontFamily="Arial" fontSize="20"/>
+      <Fill color="#0F172A"/>
+    </TextBox>
+  </Layer>
+  <DataBind source="$vm.accent" target="@chipFill" channel="color"/>
+  <DataBind source="$vm.title" target="@titleText" channel="text"/>
+</pagx>

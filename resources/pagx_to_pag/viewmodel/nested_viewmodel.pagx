@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nested ViewModels: a viewModel-typed property references another schema; the
+     source path $vm.header.title walks into the nested instance. -->
+<pagx width="400" height="300" viewModel="@cardVM">
+  <Resources>
+    <ViewModel id="textVM">
+      <Property name="title" type="string" default="Nested VM"/>
+      <Property name="titleSize" type="number" default="28" min="8" max="64"/>
+    </ViewModel>
+    <ViewModel id="cardVM">
+      <Property name="corner" type="number" default="16" min="0" max="48"/>
+      <Property name="header" type="viewModel" viewModelRef="@textVM"/>
+    </ViewModel>
+  </Resources>
+
+  <Layer id="card" centerX="0" centerY="0" width="320" height="120">
+    <Rectangle id="cardRect" width="320" height="120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle offsetY="8" blurX="16" blurY="16" color="#00000033"/>
+  </Layer>
+  <Layer id="titleLayer" left="24" top="24" width="272" height="40">
+    <TextBox textAlign="start" width="272" height="40">
+      <Text id="titleText" text="Nested VM" fontFamily="Arial" fontSize="28"/>
+      <Fill color="#0F172A"/>
+    </TextBox>
+  </Layer>
+
+  <DataBind source="$vm.corner" target="@cardRect" channel="roundness"/>
+  <DataBind source="$vm.header.title" target="@titleText" channel="text"/>
+  <DataBind source="$vm.header.titleSize" target="@titleText" channel="fontSize"/>
+</pagx>

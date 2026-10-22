@@ -83,6 +83,14 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- A Composition reference: an @id within the document, or an external PAGX
+       file path (relative paths per §2.11; URLs are not supported). -->
+  <xs:simpleType name="CompositionRefType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(@\S+)|([A-Za-z0-9_.][A-Za-z0-9_./\-]*)"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="ColorType">
     <xs:union memberTypes="HexColorType FloatColorType IdRefType"/>
   </xs:simpleType>
@@ -163,6 +171,9 @@
       <xs:enumeration value="alpha"/>
       <xs:enumeration value="luminance"/>
       <xs:enumeration value="contour"/>
+      <xs:enumeration value="alphaInverted"/>
+      <xs:enumeration value="luminanceInverted"/>
+      <xs:enumeration value="contourInverted"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -599,6 +610,11 @@
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
     <xs:attribute name="fauxItalic" type="BoolType" default="false"/>
     <xs:attribute name="textAnchor" type="TextAnchorType" default="start"/>
+    <xs:attribute name="tracking" type="xs:decimal"/>
+    <xs:attribute name="baselineShift" type="xs:decimal" default="0"/>
+    <xs:attribute name="firstBaseLine" type="xs:decimal"/>
+    <xs:attribute name="backgroundColor" type="ColorType" default="#000000"/>
+    <xs:attribute name="backgroundAlpha" type="xs:decimal" default="0"/>
   </xs:complexType>
 
   <!-- ========================= Painters ========================= -->
@@ -614,6 +630,7 @@
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="fillRule" type="FillRuleType" default="winding"/>
     <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
+    <xs:attribute name="visible" type="BoolType" default="true"/>
   </xs:complexType>
 
   <!-- Stroke -->
@@ -634,6 +651,7 @@
     <xs:attribute name="dashAdaptive" type="BoolType" default="false"/>
     <xs:attribute name="align" type="StrokeAlignType" default="center"/>
     <xs:attribute name="placement" type="LayerPlacementType" default="background"/>
+    <xs:attribute name="visible" type="BoolType" default="true"/>
   </xs:complexType>
 
   <!-- ========================= Shape Modifiers ========================= -->
@@ -977,9 +995,16 @@
     <xs:attribute name="scrollRect" type="RectType"/>
     <xs:attribute name="mask" type="IdRefType"/>
     <xs:attribute name="maskType" type="MaskTypeType" default="alpha"/>
-    <xs:attribute name="composition" type="IdRefType"/>
+    <xs:attribute name="composition" type="CompositionRefType"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
+    <xs:attribute name="anchor" type="PointType" default="0,0"/>
+    <xs:attribute name="rotation" type="xs:decimal" default="0"/>
+    <xs:attribute name="scale" type="PointType" default="1,1"/>
+    <xs:attribute name="skew" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
+    <xs:attribute name="startTime" type="xs:decimal" default="0"/>
+    <xs:attribute name="timeScale" type="xs:decimal" default="1"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>
     <xs:attribute name="antiAlias" type="BoolType" default="true"/>
     <xs:attribute name="groupOpacity" type="BoolType" default="true"/>
@@ -1115,6 +1140,7 @@
       <xs:enumeration value="image"/>
       <xs:enumeration value="color"/>
       <xs:enumeration value="matrix"/>
+      <xs:enumeration value="path"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1268,10 +1294,13 @@
     <xs:attributeGroup ref="CommonAttributes"/>
   </xs:complexType>
 
-  <!-- A Layer's timeline driver: references a document-level Animation or StateMachine by id. -->
+  <!-- A Layer's timeline driver: references a document-level Animation or StateMachine by id.
+       evaluationOffset shifts the evaluation point in frames of the referenced
+       Animation's own frameRate (positive delays, negative skips ahead). -->
   <xs:complexType name="TimelineAnimationType">
     <xs:attribute name="ref" type="IdRefType" use="required"/>
     <xs:attribute name="playing" type="BoolType" default="true"/>
+    <xs:attribute name="evaluationOffset" type="xs:integer" default="0"/>
   </xs:complexType>
 
   <xs:complexType name="TimelineStateMachineType">

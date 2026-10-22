@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- clipToBounds: the flatten step rewrites it into an explicit scrollRect equal
+     to the layer's resolved bounds; a child overflows to prove the clip. -->
+<pagx width="400" height="240">
+  <Layer left="60" top="60" width="160" height="120" clipToBounds="true">
+    <Layer width="260" height="60">
+      <Rectangle width="260" height="60"/>
+      <Fill color="#F59E0B"/>
+    </Layer>
+    <Layer top="70" width="80" height="200">
+      <Rectangle width="80" height="200"/>
+      <Fill color="#10B981"/>
+    </Layer>
+  </Layer>
+</pagx>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Author-embedded vector glyph outlines: Font + GlyphRun keep rendering
+     identical across hosts with no registered fonts. -->
+<pagx width="400" height="200">
+  <Layer centerX="0" centerY="0">
+    <Text id="big" text="AG" fontFamily="Arial" fontStyle="Bold" fontSize="96">
+      <GlyphRun font="@vecFont" fontSize="96" glyphs="1,2" x="120" y="140" bounds="0,0,160,96"/>
+    </Text>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Resources>
+    <Font id="vecFont" unitsPerEm="1000">
+      <Glyph advance="722" path="M100 0L193 0L193 -299L314 -299C475 -299 584 -372 584 -531C584 -693 474 -750 310 -750L100 -750L100 0ZM193 -375L193 -674L298 -674C426 -674 492 -639 492 -531C492 -423 431 -375 301 -375L193 -375Z"/>
+      <Glyph advance="766" path="M292 0L400 0L205 -722L92 -722L-100 0L8 0L60 -190L240 -190ZM82 -280L150 -540C158 -576 164 -612 170 -650L174 -650C180 -612 187 -576 196 -540L262 -280Z"/>
+    </Font>
+  </Resources>
+</pagx>

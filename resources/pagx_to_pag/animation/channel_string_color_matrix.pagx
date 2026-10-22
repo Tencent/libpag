@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- String / Color / Matrix channel value types: string drives Text.text (runtime
+     re-layout), color drives a solid Fill, matrix drives the layer transform. -->
+<pagx width="400" height="300">
+  <Layer id="label" centerX="0" centerY="-60" width="360" height="40">
+    <TextBox textAlign="center" width="360" height="40">
+      <Text id="labelText" text="One" fontFamily="Arial" fontSize="28"/>
+      <Fill id="labelFill" color="#0F172A"/>
+    </TextBox>
+  </Layer>
+  <Layer id="chip" centerX="0" centerY="40" width="64" height="64">
+    <Rectangle width="64" height="64" roundness="12"/>
+    <Fill color="#6366F1"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="scm" duration="90" frameRate="60" loop="once">
+      <Object target="labelText">
+        <Channel name="text" type="string">
+          <Key time="0" value="One" interpolation="hold"/>
+          <Key time="45" value="Two" interpolation="hold"/>
+          <Key time="90" value="Three"/>
+        </Channel>
+      </Object>
+      <Object target="labelFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#0F172A" interpolation="linear"/>
+          <Key time="90" value="#DB2777"/>
+        </Channel>
+      </Object>
+      <Object target="chip">
+        <Channel name="matrix" type="matrix">
+          <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+          <Key time="90" value="1,0,0,1,40,20"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

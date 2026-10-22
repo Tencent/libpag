@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Animation with no objects: kept by the binary format (it still carries a
+     duration) even though it drives nothing. -->
+<pagx width="400" height="200">
+  <Layer centerX="0" centerY="0" width="120" height="60">
+    <Rectangle width="120" height="60" roundness="10"/>
+    <Fill color="#64748B"/>
+  </Layer>
+  <Animations>
+    <Animation id="empty" duration="120" frameRate="60" loop="once"/>
+  </Animations>
+</pagx>

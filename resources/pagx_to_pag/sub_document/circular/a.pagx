@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Cycle sample: a.pagx -> b.pagx -> a.pagx. Loading must detect the reference
+     chain cycle and fail with an error instead of recursing. -->
+<pagx width="100" height="100">
+  <Layer centerX="0" centerY="0" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="8"/>
+    <Fill color="#6366F1"/>
+  </Layer>
+  <Layer left="20" top="20" width="60" height="60" composition="b.pagx"/>
+</pagx>

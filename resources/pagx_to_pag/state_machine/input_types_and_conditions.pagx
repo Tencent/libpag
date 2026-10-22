@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- All three input types and every condition operator: bool inputs with
+     equal/notEqual, number inputs with the six comparison operators, and a
+     trigger input consumed once per advance. -->
+<pagx width="400" height="300">
+  <Layer id="lamp" centerX="0" centerY="0" width="80" height="80">
+    <Ellipse width="80" height="80"/>
+    <Fill id="lampFill" color="#64748B"/>
+  </Layer>
+
+  <Animations>
+    <StateMachine id="lampSM">
+      <Inputs>
+        <Input name="isOn" type="bool" default="false"/>
+        <Input name="brightness" type="number" default="0"/>
+        <Input name="strobe" type="trigger"/>
+      </Inputs>
+      <StateRegion name="main" initialState="off">
+        <States>
+          <State name="off"/>
+          <State name="on"/>
+        </States>
+        <Transitions>
+          <Transition from="off" to="on">
+            <Condition input="isOn" op="equal" value="true"/>
+          </Transition>
+          <Transition from="on" to="off">
+            <Condition input="isOn" op="notEqual" value="true"/>
+          </Transition>
+          <Transition from="any" to="on">
+            <Condition input="brightness" op="greaterThan" value="0.5"/>
+          </Transition>
+          <Transition from="on" to="off">
+            <Condition input="brightness" op="lessThanOrEqual" value="0.2"/>
+          </Transition>
+          <Transition from="off" to="on">
+            <Condition input="strobe" op="trigger"/>
+          </Transition>
+        </Transitions>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>

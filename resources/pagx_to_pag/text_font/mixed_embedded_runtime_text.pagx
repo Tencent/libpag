@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Mixed TextBox: one Text carries an embedded GlyphRun, the other relies on
+     runtime shaping. Exporting must warn and lay the whole group out at runtime. -->
+<pagx width="400" height="220">
+  <Layer centerX="0" centerY="0" width="360" height="160">
+    <TextBox textAlign="center" width="360" height="160" lineHeight="80">
+      <Text id="embedded" text="Embedded" fontFamily="Arial" fontStyle="Bold" fontSize="36">
+        <GlyphRun font="@mixFont" fontSize="36" glyphs="1,2,3,4,5,6,7,8" x="64" y="64" bounds="0,0,232,42"/>
+      </Text>
+      <Text id="runtime" text="Runtime shaped" fontFamily="Arial" fontSize="24"/>
+    </TextBox>
+    <Fill color="#1E293B"/>
+  </Layer>
+  <Resources>
+    <Font id="mixFont" unitsPerEm="1000">
+      <Glyph advance="611" path="M356 0L448 0L448 -556L338 -556L338 -160L341 -69L337 -69L321 -119L302 -174L227 -174L208 -119L192 -69L188 -69L191 -160L191 -556L81 -556L81 0L173 0L262 -219L264 -219Z"/>
+      <Glyph advance="611" path="M303 0C436 0 555 -103 555 -276C555 -451 436 -556 303 -556C170 -556 51 -451 51 -276C51 -103 170 0 303 0ZM303 -76C209 -76 146 -156 146 -276C146 -397 209 -479 303 -479C397 -479 461 -397 461 -276C461 -156 397 -76 303 -76Z"/>
+      <Glyph advance="333" path="M46 -250L301 -250L301 -320L46 -320L46 -250Z"/>
+      <Glyph advance="611" path="M100 0L534 0L534 -79L193 -79L193 -338L471 -338L471 -417L193 -417L193 -643L523 -643L523 -722L100 -722L100 0Z"/>
+      <Glyph advance="583" path="M217 0C284 0 344 -35 396 -77L400 -77L408 0L482 0L482 -323C482 -453 426 -542 295 -542C208 -542 131 -503 81 -470L117 -410C160 -438 217 -465 280 -465C368 -465 392 -400 392 -333C161 -307 58 -251 58 -136C58 -56 126 0 217 0ZM243 -73C189 -73 146 -96 146 -154C146 -219 209 -261 392 -282L392 -140C339 -96 296 -73 243 -73Z"/>
+      <Glyph advance="556" path="M311 0C385 0 443 -25 491 -56L458 -113C418 -88 375 -73 322 -73C219 -73 148 -142 142 -250L508 -250C510 -263 512 -282 512 -302C512 -456 434 -556 296 -556C170 -556 51 -446 51 -271C51 -102 167 0 311 0ZM141 -316C152 -421 220 -482 297 -482C382 -482 432 -424 432 -316L141 -316Z"/>
+      <Glyph advance="611" path="M277 0C342 0 399 -35 442 -77L445 -77L453 0L527 0L527 -794L437 -794L437 -586L441 -491C393 -531 352 -556 288 -556C164 -556 53 -445 53 -270C53 -102 141 0 277 0ZM297 -76C201 -76 147 -151 147 -278C147 -397 216 -478 304 -478C349 -478 390 -463 437 -423L437 -148C391 -100 347 -76 297 -76Z"/>
+      <Glyph advance="584" path="M100 0L193 0L193 -333L473 -333L473 -411L193 -411L193 -643L523 -643L523 -722L100 -722L100 0Z"/>
+    </Font>
+  </Resources>
+</pagx>

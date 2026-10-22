@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sub-document with its own constraints and an image: each sub-document is
+     laid out and flattened on its own, images land in the shared ImageTable. -->
+<pagx width="200" height="120">
+  <Layer left="20" top="20" right="20" height="40">
+    <Rectangle width="160" height="40" roundness="8"/>
+    <Fill color="#0EA5E9"/>
+  </Layer>
+  <Layer left="20" top="70" width="80" height="40">
+    <Rectangle width="80" height="40" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@childLogo" scaleMode="letterBox"/>
+    </Fill>
+  </Layer>
+  <Resources>
+    <Image id="childLogo" source="../resource/pag_logo.png"/>
+  </Resources>
+</pagx>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Per-point channels point{i}.x / point{i}.y morph a Path geometry over time
+     (same mechanism the HTML importer uses for animated clip-path contours). -->
+<pagx width="400" height="300">
+  <Layer centerX="0" centerY="0" width="240" height="240">
+    <Path id="morph" data="M 0,0 L 240,0 L 120,240 Z"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+  <Animations>
+    <Animation id="morphAnim" duration="60" frameRate="60" loop="pingPong">
+      <Object target="morph">
+        <Channel name="point0.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="120" interpolation="linear"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="point0.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="120" interpolation="linear"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="point2.x" type="float">
+          <Key time="0" value="120" interpolation="linear"/>
+          <Key time="30" value="60" interpolation="linear"/>
+          <Key time="60" value="120"/>
+        </Channel>
+        <Channel name="point2.y" type="float">
+          <Key time="0" value="240" interpolation="linear"/>
+          <Key time="30" value="120" interpolation="linear"/>
+          <Key time="60" value="240"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

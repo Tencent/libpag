@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A Path declared in a large coordinate space but constrained to a smaller
+     width: layout bakes the uniform scale into the geometry. -->
+<pagx width="400" height="240">
+  <Layer left="80" top="60" width="240" height="120">
+    <Path id="baked" data="M 0,0 L 480,0 L 240,240 Z" width="240"/>
+    <Fill color="#8B5CF6"/>
+  </Layer>
+</pagx>

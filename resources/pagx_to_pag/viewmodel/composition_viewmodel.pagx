@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Composition-scoped ViewModel: the instance owns its own schema and DataBinds;
+     two instances render independently. -->
+<pagx width="400" height="300">
+  <Layer left="40" top="40" width="150" height="70" composition="@badgeComp"/>
+  <Layer left="210" top="40" width="150" height="70" composition="@badgeComp"/>
+  <Layer left="40" top="140" width="320" height="24">
+    <TextBox textAlign="center" width="320" height="24">
+      <Text text="Two instances, one schema" fontFamily="Arial" fontSize="16"/>
+      <Fill color="#475569"/>
+    </TextBox>
+  </Layer>
+
+  <Resources>
+    <Composition id="badgeComp" width="150" height="70" viewModel="@badgeVM">
+      <Layer id="plate" left="0" top="0" width="150" height="70">
+        <Rectangle id="plateRect" width="150" height="70" roundness="14"/>
+        <Fill id="plateFill" color="#14B8A6"/>
+      </Layer>
+      <DataBind source="$vm.plateColor" target="@plateFill" channel="color"/>
+      <DataBind source="$vm.radius" target="@plateRect" channel="roundness"/>
+    </Composition>
+    <ViewModel id="badgeVM">
+      <Property name="plateColor" type="color" default="#14B8A6"/>
+      <Property name="radius" type="number" default="14" min="0" max="35"/>
+    </ViewModel>
+  </Resources>
+</pagx>

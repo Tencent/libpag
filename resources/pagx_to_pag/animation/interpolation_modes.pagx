@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One channel per interpolation type: none, linear, bezier (with handles), hold. -->
+<pagx width="400" height="300">
+  <Layer id="cNone" left="40" top="40" width="24" height="24">
+    <Ellipse width="24" height="24"/><Fill color="#EF4444"/>
+  </Layer>
+  <Layer id="cLinear" left="40" top="90" width="24" height="24">
+    <Ellipse width="24" height="24"/><Fill color="#F59E0B"/>
+  </Layer>
+  <Layer id="cBezier" left="40" top="140" width="24" height="24">
+    <Ellipse width="24" height="24"/><Fill color="#10B981"/>
+  </Layer>
+  <Layer id="cHold" left="40" top="190" width="24" height="24">
+    <Ellipse width="24" height="24"/><Fill color="#6366F1"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="modes" duration="60" frameRate="60" loop="loop">
+      <Object target="cNone">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="none"/>
+          <Key time="30" value="320" interpolation="none"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+      <Object target="cLinear">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="30" value="320" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+      <Object target="cBezier">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="bezier" bezierOut="0.4,0" bezierIn="0.2,1"/>
+          <Key time="30" value="320" interpolation="bezier" bezierOut="0.6,1" bezierIn="0.4,0"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+      <Object target="cHold">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="hold"/>
+          <Key time="30" value="320" interpolation="hold"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

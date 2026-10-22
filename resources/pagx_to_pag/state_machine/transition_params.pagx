@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Crossfade parameters: duration + frameRate, bezier interpolation with handles,
+     earlyExit, and pauseOnExit. -->
+<pagx width="400" height="300">
+  <Layer id="panel" centerX="0" centerY="0" width="160" height="80">
+    <Rectangle width="160" height="80" roundness="12"/>
+    <Fill color="#334155"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="showA" duration="30" frameRate="60" loop="once">
+      <Object target="panel">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="showB" duration="30" frameRate="60" loop="once">
+      <Object target="panel">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="30" value="0.2"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <StateMachine id="panelSM">
+      <Inputs>
+        <Input name="flip" type="trigger"/>
+      </Inputs>
+      <StateRegion name="main" initialState="a">
+        <States>
+          <State name="a" animation="@showA"/>
+          <State name="b" animation="@showB"/>
+        </States>
+        <Transitions>
+          <Transition from="a" to="b" duration="20" frameRate="60"
+                      interpolation="bezier" bezierOut="0.3,0" bezierIn="0.2,1"
+                      earlyExit="true" pauseOnExit="true">
+            <Condition input="flip" op="trigger"/>
+          </Transition>
+          <Transition from="b" to="a" duration="20" interpolation="linear">
+            <Condition input="flip" op="trigger"/>
+          </Transition>
+        </Transitions>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>

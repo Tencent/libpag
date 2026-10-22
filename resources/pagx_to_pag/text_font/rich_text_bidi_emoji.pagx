@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Rich text: several styled Text runs in one TextBox, bidirectional segments,
+     and an emoji relying on runtime font fallback. -->
+<pagx width="400" height="300">
+  <Layer centerX="0" centerY="0" width="340" height="200">
+    <TextBox textAlign="start" width="340" height="200" lineHeight="40">
+      <Text text="Regular and " fontFamily="Arial" fontSize="20"/>
+      <Group>
+        <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+        <Fill color="#DC2626"/>
+      </Group>
+      <Text text="He said: שלום, then continued in English." fontFamily="Arial" fontSize="18"/>
+      <Text text="Emoji: 🎉 rendered via fallback" fontFamily="Arial" fontSize="18"/>
+    </TextBox>
+    <Fill color="#334155"/>
+  </Layer>
+</pagx>

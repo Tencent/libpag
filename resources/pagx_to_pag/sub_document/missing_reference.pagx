@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Missing sub-document: export warns and the layer stays empty, matching the
+     XML runtime's unloaded state. -->
+<pagx width="400" height="200">
+  <Layer left="140" top="40" width="120" height="120" composition="not_on_disk.pagx"/>
+</pagx>

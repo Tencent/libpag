@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Text anchored by constraints with each textAnchor mode: start / center / end.
+     Flattening writes back resolved positions while keeping the anchor semantic. -->
+<pagx width="400" height="300">
+  <Layer top="40" width="400" height="30">
+    <Text id="t1" text="Start anchored" fontFamily="Arial" fontSize="20"
+          left="200" textAnchor="start"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <Layer top="120" width="400" height="30">
+    <Text id="t2" text="Center anchored" fontFamily="Arial" fontSize="20"
+          left="200" textAnchor="center"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <Layer top="200" width="400" height="30">
+    <Text id="t3" text="End anchored" fontFamily="Arial" fontSize="20"
+          left="200" textAnchor="end"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+</pagx>

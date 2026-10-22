@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Mounting timelines on a Composition instance: <Timelines> with playing and
+     evaluationOffset; a second instance mounts the same animation paused. -->
+<pagx width="400" height="300">
+  <Layer left="60" top="40" width="120" height="120" composition="@spinStage">
+    <Timelines>
+      <Animation ref="@spin" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Layer left="220" top="40" width="120" height="120" composition="@spinStage">
+    <Timelines>
+      <Animation ref="@spin" playing="false" evaluationOffset="20"/>
+    </Timelines>
+  </Layer>
+
+  <Resources>
+    <Composition id="spinStage" width="120" height="120">
+      <Layer id="blade" centerX="0" centerY="0" width="90" height="20">
+        <Rectangle width="90" height="20" roundness="10"/>
+        <Fill color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+
+  <Animations>
+    <Animation id="spin" duration="90" frameRate="60" loop="loop">
+      <Object target="blade">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="90" value="360"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

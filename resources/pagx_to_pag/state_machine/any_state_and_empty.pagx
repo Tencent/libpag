@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- from="any" matches every state in the region; an empty state (no animation)
+     acts as a pure control-flow node. -->
+<pagx width="400" height="300">
+  <Layer id="beacon" centerX="0" centerY="0" width="48" height="48">
+    <Ellipse width="48" height="48"/>
+    <Fill id="beaconFill" color="#94A3B8"/>
+  </Layer>
+
+  <Animations>
+    <Animation id="glow" duration="40" frameRate="60" loop="loop">
+      <Object target="beacon">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.3" interpolation="linear"/>
+          <Key time="20" value="1" interpolation="linear"/>
+          <Key time="40" value="0.3"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <StateMachine id="beaconSM">
+      <Inputs>
+        <Input name="power" type="bool" default="true"/>
+        <Input name="reset" type="trigger"/>
+      </Inputs>
+      <StateRegion name="main" initialState="idle">
+        <States>
+          <State name="idle"/>
+          <State name="lit" animation="@glow"/>
+        </States>
+        <Transitions>
+          <Transition from="idle" to="lit">
+            <Condition input="power" op="equal" value="true"/>
+          </Transition>
+          <Transition from="any" to="idle">
+            <Condition input="reset" op="trigger"/>
+          </Transition>
+        </Transitions>
+      </StateRegion>
+    </StateMachine>
+  </Animations>
+</pagx>

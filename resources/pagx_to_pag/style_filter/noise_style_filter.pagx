@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NoiseStyle in all three modes (mono / duo / multi) plus a NoiseFilter overlay. -->
+<pagx width="400" height="300">
+  <Layer left="20" top="20" width="110" height="80">
+    <Rectangle width="110" height="80" roundness="8"/>
+    <Fill color="#6366F1"/>
+    <NoiseStyle mode="mono" size="4" density="0.5" color="#FFFFFF"/>
+  </Layer>
+  <Layer left="145" top="20" width="110" height="80">
+    <Rectangle width="110" height="80" roundness="8"/>
+    <Fill color="#6366F1"/>
+    <NoiseStyle mode="duo" size="4" density="0.5" firstColor="#FDE047" secondColor="#1E293B"/>
+  </Layer>
+  <Layer left="270" top="20" width="110" height="80">
+    <Rectangle width="110" height="80" roundness="8"/>
+    <Fill color="#6366F1"/>
+    <NoiseStyle mode="multi" size="4" density="0.5" opacity="0.3"/>
+  </Layer>
+  <Layer left="82" top="130" width="240" height="140">
+    <Rectangle width="240" height="140" roundness="12"/>
+    <Fill color="#0EA5E9"/>
+    <NoiseFilter mode="mono" size="3" density="0.3" blendMode="screen" color="#FFFFFF"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Cycle sample: back-references a.pagx. -->
+<pagx width="100" height="100">
+  <Layer centerX="0" centerY="0" width="40" height="40">
+    <Ellipse width="40" height="40"/>
+    <Fill color="#F472B6"/>
+  </Layer>
+  <Layer left="30" top="30" width="60" height="60" composition="a.pagx"/>
+</pagx>

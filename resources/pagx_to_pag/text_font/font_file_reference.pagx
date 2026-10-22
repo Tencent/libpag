@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Font file reference: the exporter registers the external font for measuring
+     during layout; the path itself is stripped from the binary.
+     NOTE: 'pagx verify' reports an unreferenced-resource lint here because the
+     Font is a font-source declaration consumed via fontFamily matching, not an
+     @id reference (same as resources/cli/embed_font_file.pagx). Expected. -->
+<pagx width="400" height="200">
+  <Layer centerX="0" centerY="0" width="360" height="60">
+    <TextBox textAlign="center" width="360" height="60">
+      <Text text="Font from file" fontFamily="Noto Sans SC" fontSize="32"/>
+      <Fill color="#0F172A"/>
+    </TextBox>
+  </Layer>
+  <Resources>
+    <Font id="scFont" file="../../../font/NotoSansSC-Regular.otf"/>
+  </Resources>
+</pagx>
