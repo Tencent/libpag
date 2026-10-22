@@ -334,7 +334,8 @@ bool FindElementOpeningTagById(const std::string& html, const std::string& domId
       return false;
     }
     // Verify attribute boundary before `id=`.
-    if (idPos == 0 || (html[idPos - 1] != ' ' && html[idPos - 1] != '\t' && html[idPos - 1] != '\n')) {
+    if (idPos == 0 ||
+        (html[idPos - 1] != ' ' && html[idPos - 1] != '\t' && html[idPos - 1] != '\n')) {
       searchPos = idPos + needle.size();
       continue;
     }
@@ -661,9 +662,10 @@ struct BundleTimingInfo {
   SegmentEasing commonEasing = {};
 };
 
-void BindChannelToBundleSet(const Node* objTarget, const Channel* ch,
-                            const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
-                            BundleChannelSet& out) {
+void BindChannelToBundleSet(
+    const Node* objTarget, const Channel* ch,
+    const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
+    BundleChannelSet& out) {
   auto tType = objTarget->nodeType();
   if (tType == NodeType::Path) {
     size_t ptIdx = 0;
@@ -913,8 +915,8 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     }
     if (!FloatNearlyZero(anchor.x) || !FloatNearlyZero(anchor.y)) {
       if (!tf.empty()) tf += ' ';
-      tf += "translate(" + CssFloatToString(-anchor.x) + "px, " + CssFloatToString(-anchor.y) +
-            "px)";
+      tf +=
+          "translate(" + CssFloatToString(-anchor.x) + "px, " + CssFloatToString(-anchor.y) + "px)";
     }
     if (tf.empty()) {
       tf = "rotate(0deg)";
@@ -1028,8 +1030,8 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
 std::string MakeSafeKeyframesName(const std::string& domId, int animIndex) {
   std::string kfName = "pagx_" + domId + "_" + std::to_string(animIndex);
   for (char& c : kfName) {
-    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-          c == '_' || c == '-')) {
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
+          c == '-')) {
       c = '_';
     }
   }
@@ -1054,7 +1056,9 @@ std::string BuildAnimationShorthand(const Animation* anim, const std::string& kf
     shorthand +=
         (timing.bundleShiftFrames > 0) ? " infinite alternate both" : " infinite alternate";
   } else {
-    shorthand += (timing.bundleShiftFrames > 0) ? " 1 both" : " 1 forwards";
+    // PAGX shows the first key value while the evaluationOffset delay elapses, which maps to the
+    // backwards fill; the forwards fill keeps the last value after playback ends.
+    shorthand += " 1 both";
   }
   return shorthand;
 }
@@ -1137,7 +1141,13 @@ std::string EmitBundleKeyframesRule(const std::string& kfName, const DomTargetBu
                                     const BundleChannelSet& chSet, const BundleTimingInfo& timing,
                                     const std::string& tagName, bool& outNeedsZeroOrigin) {
   std::string rules = "@keyframes " + kfName + " {\n";
-  for (Frame t : chSet.keyTimes) {
+  // PAGX holds the first/last key value outside the key range, whereas CSS synthesizes missing
+  // 0%/100% stops from the element's static style. Always emit both boundary stops so the browser
+  // holds the key values instead of interpolating from the static style.
+  std::set<Frame> stopTimes = chSet.keyTimes;
+  stopTimes.insert(timing.bundleShiftFrames);
+  stopTimes.insert(timing.bundleShiftFrames + timing.effectiveDuration);
+  for (Frame t : stopTimes) {
     std::string decls =
         EvaluateKeyframeCssDecls(bundle, chSet, timing, tagName, t, outNeedsZeroOrigin);
     Frame relTime = (t >= timing.bundleShiftFrames) ? (t - timing.bundleShiftFrames) : 0;
