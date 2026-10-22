@@ -17,7 +17,6 @@
 
 #include <cstdlib>
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
-#include "pagx/html/importer/HTMLBoxGeometry.h"
 #include "pagx/html/importer/HTMLParserContext.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
@@ -120,7 +119,8 @@ void HTMLParserContext::emitImageContent(Layer* layer, const HTMLBoxAttributes& 
     return;
   }
   if (object.width <= 0 || object.height <= 0 || content.width <= 0 || content.height <= 0) return;
-  auto* clip = _document->makeNode<Layer>();
+  auto* clip = box.borderRadiusSet ? _layerBuilder->makeBackgroundClip(box, content)
+                                  : _document->makeNode<Layer>();
   clip->left = content.x;
   clip->top = content.y;
   clip->width = content.width;
@@ -128,24 +128,8 @@ void HTMLParserContext::emitImageContent(Layer* layer, const HTMLBoxAttributes& 
   clip->includeInLayout = false;
   clip->clipToBounds = true;
   layer->children.push_back(clip);
-  if (box.borderRadiusSet) {
-    auto* mask = _document->makeNode<Layer>();
-    mask->id = _idAllocator->generateUnique("imageClip");
-    mask->width = content.width;
-    mask->height = content.height;
-    mask->includeInLayout = false;
-    auto* data = _document->makeNode<PathData>();
-    BuildHTMLBoxPath(*data, box,
-                     {content.y, box.widthPx - content.x - content.width,
-                      box.heightPx - content.y - content.height, content.x});
-    data->transform(Matrix::Translate(-content.x, -content.y));
-    auto* path = _document->makeNode<Path>();
-    path->data = data;
-    mask->contents.push_back(path);
-    mask->contents.push_back(_layerBuilder->buildSolidFill(Color{1, 1, 1, 1}));
-    clip->mask = mask;
-    clip->maskType = MaskType::Contour;
-    clip->children.push_back(mask);
+  if (clip->mask) {
+    clip->mask->left = clip->mask->top = 0;
   }
   auto* objectLayer = _document->makeNode<Layer>();
   objectLayer->left = object.x - content.x;

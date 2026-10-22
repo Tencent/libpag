@@ -25,7 +25,6 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
@@ -1307,20 +1306,6 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
                             style->color);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
-      break;
-    }
-    case NodeType::BackgroundFilterStyle: {
-      auto* style = static_cast<const BackgroundFilterStyle*>(node);
-      xml.openElement("BackgroundFilterStyle");
-      xml.addAttribute("id", style->id);
-      if (style->blendMode != BlendMode::Normal)
-        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
-      xml.addAttribute("excludeChildEffects", style->excludeChildEffects, false);
-      if (style->clipPath) xml.addAttribute("clipPath", PathDataToSVGString(*style->clipPath));
-      WriteCustomData(xml, node);
-      xml.closeElementStart();
-      for (auto* filter : style->filters) WriteLayerFilter(xml, filter);
-      xml.closeElement();
       break;
     }
     case NodeType::BackgroundBlurStyle: {

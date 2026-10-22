@@ -266,9 +266,7 @@ enum class NodeType {
    * A converter that transforms ViewModel property values before they are applied to render node
    * channels.
    */
-  DataConverter,
-  /** An ordered filter chain applied to the layer backdrop. */
-  BackgroundFilterStyle
+  DataConverter
 };
 
 /**

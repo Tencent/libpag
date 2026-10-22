@@ -24,7 +24,6 @@
 #include "pagx/PAGXChannelTable.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -948,12 +947,6 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::InnerShadowStyle: {
       static const std::vector<ChannelDef> table = BuildInnerShadowStyleFields();
-      return table;
-    }
-    case NodeType::BackgroundFilterStyle: {
-      static const std::vector<ChannelDef> table = {
-          FIELD_ENUM(BackgroundFilterStyle, "blendMode", blendMode, NoFlags, BlendMode),
-          FIELD_BOOL(BackgroundFilterStyle, "excludeChildEffects", excludeChildEffects, NoFlags)};
       return table;
     }
     case NodeType::BackgroundBlurStyle: {

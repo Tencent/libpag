@@ -384,11 +384,10 @@ float HTMLValueParser::resolveLineHeightPx(const std::string& valueRaw, float fo
   return NAN;
 }
 
-std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(const std::string& value,
-                                                                          const Color& currentColor,
-                                                                          bool textShadow) {
+std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
+    const std::string& value) {
   std::vector<ShadowSpec> out;
-  if (value.empty() || ToLower(Trim(value)) == "none") return out;
+  if (value.empty()) return out;
   auto items = SplitTopLevelCommas(value);
   for (auto& item : items) {
     auto tokens = SplitTopLevelWhitespace(item);
@@ -414,21 +413,13 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(const 
       }
       nonLengths.push_back(t);
     }
-    if ((textShadow && (s.inset || lengths.size() > 3)) || lengths.size() > 4 ||
-        (lengths.size() >= 3 && lengths[2] < 0) ||
-        std::any_of(lengths.begin(), lengths.end(), [](float v) { return !std::isfinite(v); })) {
-      _diagnostics.warn("html: invalid shadow declaration '" + value + "'");
-      return {};
-    }
     if (lengths.size() >= 2) {
       s.offsetX = lengths[0];
       s.offsetY = lengths[1];
       if (lengths.size() >= 3) s.blur = lengths[2];
       if (lengths.size() >= 4) s.spread = lengths[3];
     } else {
-      _diagnostics.warn(std::string("html: malformed ") +
-                        (textShadow ? "text-shadow" : "box-shadow") + " '" + item + "'");
-      if (textShadow) return {};
+      _diagnostics.warn("html: malformed box-shadow '" + item + "'");
       continue;
     }
     if (!nonLengths.empty()) {
@@ -438,9 +429,9 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(const 
         if (i) colorStr.push_back(' ');
         colorStr += nonLengths[i];
       }
-      s.color = ToLower(colorStr) == "currentcolor" ? currentColor : parseColor(colorStr);
+      s.color = parseColor(colorStr);
     } else {
-      s.color = currentColor;
+      s.color = {0, 0, 0, 1.0f, ColorSpace::SRGB};
     }
     out.push_back(s);
   }

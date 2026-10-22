@@ -748,8 +748,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
 
   // Supply intrinsic preferred sizes for auto axes. Percentages, opposite-edge constraints,
   // and flex still take precedence in the normal layout pass.
-  float insetX = box.padding.left + box.padding.right + box.borderWidths.left + box.borderWidths.right;
-  float insetY = box.padding.top + box.padding.bottom + box.borderWidths.top + box.borderWidths.bottom;
+  float insetX = box.padding.left + box.padding.right + 2 * box.borderWidthPx;
+  float insetY = box.padding.top + box.padding.bottom + 2 * box.borderWidthPx;
   float preferredW = intrinsic.width, preferredH = intrinsic.height;
   if (intrinsic.ratio > 0) {
     if (std::isfinite(box.widthPx) && !std::isfinite(box.heightPx))

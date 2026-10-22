@@ -28,7 +28,6 @@
 #include "pagx/html/importer/HTMLLayerBuilder.h"
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLValueParser.h"
-#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
@@ -97,7 +96,20 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
 }
 
 Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
-  return _layerBuilder.buildSolidFill(fragment.color);
+  if (fragment.fillImage.empty()) {
+    // A clip-to-text ancestor painting the glyphs with a solid `background-color` outranks the
+    // element's own `color`, exactly as the gradient branch above does for gradients.
+    return _layerBuilder.buildSolidFill(fragment.fillSolidSet ? fragment.fillSolid
+                                                              : fragment.color);
+  }
+  auto fill = _document->makeNode<Fill>();
+  fill->color = _layerBuilder.parseGradientByValue(fragment.fillImage);
+  if (!fill->color) {
+    // Unparseable gradient: fall back to solid color so text stays visible. This mirrors
+    // what `applyBackgroundVisuals` does for an unparseable box gradient.
+    return _layerBuilder.buildSolidFill(fragment.color);
+  }
+  return fill;
 }
 
 Stroke* HTMLTextFragmentBuilder::buildTextStroke(const TextFragment& fragment) {
@@ -258,7 +270,9 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.textDecoration = inherited.textDecoration;
   frag.strokeWidth = inherited.textStrokeWidthPx;
   frag.strokeColor = inherited.textStrokeColor;
-  frag.textShadow = inherited.textShadow;
+  frag.fillImage = inherited.textFillImage;
+  frag.fillSolid = inherited.textFillSolid;
+  frag.fillSolidSet = inherited.textFillSolidSet;
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
@@ -289,7 +303,8 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
          a.fontStyleName == b.fontStyleName && a.fauxBold == b.fauxBold &&
          a.fauxItalic == b.fauxItalic && std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
-         a.textDecoration == b.textDecoration && a.textShadow == b.textShadow &&
+         a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
+         a.fillSolidSet == b.fillSolidSet && a.fillSolid == b.fillSolid &&
          StrokesMatch(a.strokeWidth, a.strokeColor, b.strokeWidth, b.strokeColor);
 }
 
@@ -314,7 +329,8 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
-         a.textShadow == inherited.textShadow && a.collapseWhitespace == incomingCollapse &&
+         a.fillImage == inherited.textFillImage && a.fillSolidSet == inherited.textFillSolidSet &&
+         a.fillSolid == inherited.textFillSolid && a.collapseWhitespace == incomingCollapse &&
          a.preserveNewlines == incomingPreserveNewlines &&
          StrokesMatch(a.strokeWidth, a.strokeColor, inherited.textStrokeWidthPx,
                       inherited.textStrokeColor);
@@ -432,6 +448,11 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
           "per Unicode scalar of a single-style line without tabs");
     }
   }
+  if (box.absolute) {
+    _diagnostics.warn("html: position: absolute on text leaf '<" + element->name +
+                      ">' is downgraded to absolute on the surrounding Layer");
+  }
+
   if (auto value = element->findAttribute("data-pagx-baseline")) {
     char* end = nullptr;
     errno = 0;
@@ -541,8 +562,6 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   populateTextHostContents(textHost, fragments, inherited, box, needsTextBox, isVertical,
                            hasNoWrap);
   emitTextDecorations(textHost, fragments, inherited);
-  emitTextShadows(textHost, fragments, inherited, box, needsTextBox, isVertical, hasNoWrap);
-  _layerBuilder.applyTextBackground(wrapper, box);
 
   _idAllocator.assign(wrapper, element);
   return wrapper;
@@ -732,56 +751,6 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
     }
   }
   textHost->contents.push_back(textBox);
-}
-
-void HTMLTextFragmentBuilder::emitTextShadows(Layer* textHost,
-                                              const std::vector<TextFragment>& fragments,
-                                              const HTMLInheritedStyle& inherited,
-                                              const HTMLBoxAttributes& box, bool needsTextBox,
-                                              bool isVertical, bool hasNoWrap) {
-  std::vector<size_t> groups;
-  for (size_t i = 0; i < fragments.size(); ++i) {
-    const auto& f = fragments[i];
-    if (f.textShadow.empty() || f.textShadow == "none") continue;
-    if (std::none_of(groups.begin(), groups.end(), [&](size_t j) {
-          return fragments[j].textShadow == f.textShadow && fragments[j].color == f.color;
-        }))
-      groups.push_back(i);
-  }
-  if (groups.empty()) return;
-  auto* foreground = _document->makeNode<Layer>();
-  foreground->contents = std::move(textHost->contents);
-  foreground->children = std::move(textHost->children);
-  foreground->percentWidth = 100;
-  for (size_t index : groups) {
-    const auto& f = fragments[index];
-    auto shadows = _valueParser.parseShadowList(f.textShadow, f.color, true);
-    for (auto it = shadows.rbegin(); it != shadows.rend(); ++it) {
-      auto coverage = fragments;
-      for (auto& run : coverage) {
-        const bool active = run.textShadow == f.textShadow && run.color == f.color;
-        run.color = {1, 1, 1, active ? 1.0f : 0.0f};
-        run.strokeColor = run.color;
-        if (!active) run.strokeWidth = NAN;
-      }
-      auto* source = _document->makeNode<Layer>();
-      source->percentWidth = source->percentHeight = 100;
-      source->includeInLayout = false;
-      source->customData["html-text-shadow"] = "true";
-      populateTextHostContents(source, coverage, inherited, box, needsTextBox, isVertical,
-                               hasNoWrap);
-      emitTextDecorations(source, coverage, inherited);
-      auto* filter = _document->makeNode<DropShadowFilter>();
-      filter->offsetX = it->offsetX;
-      filter->offsetY = it->offsetY;
-      filter->blurX = filter->blurY = it->blur * .5f;
-      filter->color = it->color;
-      filter->shadowOnly = true;
-      source->filters.push_back(filter);
-      textHost->children.push_back(source);
-    }
-  }
-  textHost->children.push_back(foreground);
 }
 
 void HTMLTextFragmentBuilder::emitTextDecorations(Layer* textHost,

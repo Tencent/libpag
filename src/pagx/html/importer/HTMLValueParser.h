@@ -93,9 +93,7 @@ class HTMLValueParser {
   float parseAbsoluteLengthPx(const std::string& valueRaw);
   float resolveLineHeightPx(const std::string& valueRaw, float fontSizePx);
 
-  std::vector<ShadowSpec> parseShadowList(const std::string& value,
-                                          const Color& currentColor = Color{0, 0, 0, 1},
-                                          bool textShadow = false);
+  std::vector<ShadowSpec> parseShadowList(const std::string& value);
   std::vector<FilterStep> parseFilterChain(const std::string& value);
 
   /** Parses a CSS `linear-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px;

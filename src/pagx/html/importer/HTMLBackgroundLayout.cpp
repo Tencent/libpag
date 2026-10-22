@@ -37,10 +37,9 @@ std::string BackgroundListEntry(const std::string& value, size_t index,
 HTMLBackgroundRect BackgroundBoxRect(const HTMLBoxAttributes& box, const std::string& keyword) {
   HTMLBackgroundRect r = {0, 0, box.widthPx, box.heightPx};
   if (keyword == "padding-box" || keyword == "content-box") {
-    r.x = box.borderWidths.left;
-    r.y = box.borderWidths.top;
-    r.width -= box.borderWidths.left + box.borderWidths.right;
-    r.height -= box.borderWidths.top + box.borderWidths.bottom;
+    r.x = r.y = box.borderWidthPx;
+    r.width -= 2 * box.borderWidthPx;
+    r.height -= 2 * box.borderWidthPx;
   }
   if (keyword == "content-box") {
     r.x += box.padding.left;
@@ -63,8 +62,7 @@ bool Length(const std::string& value, float base, HTMLValueParser& parser, float
 }
 
 bool IsBox(const std::string& value) {
-  return value == "border-box" || value == "padding-box" || value == "content-box" ||
-         value == "text";
+  return value == "border-box" || value == "padding-box" || value == "content-box";
 }
 
 bool IsRepeat(const std::string& value) {

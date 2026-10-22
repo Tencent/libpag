@@ -1606,8 +1606,7 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   // invisible.
   bool hasEffectiveStyle = false;
   for (const auto* style : styles) {
-    if (style->nodeType() != NodeType::BackgroundFilterStyle &&
-        style->nodeType() != NodeType::BackgroundBlurStyle &&
+    if (style->nodeType() != NodeType::BackgroundBlurStyle &&
         style->nodeType() != NodeType::GlassStyle) {
       hasEffectiveStyle = true;
       break;

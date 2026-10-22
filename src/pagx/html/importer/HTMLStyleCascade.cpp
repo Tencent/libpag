@@ -591,9 +591,28 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "white-space", out.whiteSpace);
   CopyProperty(props, "writing-mode", out.writingMode);
   CopyProperty(props, "text-orientation", out.textOrientation);
-  auto shadow = LookupProperty(props, "text-shadow");
-  if (!shadow.empty() && shadow != "inherit" && shadow != "unset")
-    out.textShadow = shadow == "initial" ? "none" : shadow;
+  // Propagate the glyph fill from the nearest clip-to-text ancestor. Both `textFillImage` and
+  // `textFillSolid` already inherit the parent's values via `out = parent`; we only override
+  // when this element itself sets `background-clip: text`. Such an element's own background
+  // paints its glyphs, so it replaces the inherited fill of the other channel and outranks
+  // `color` — CSS inherits a transparent text-fill-color through the subtree, leaving the
+  // clipped background as the only glyph paint.
+  std::string ownBgImage = LookupEffectiveBackgroundImage(props);
+  if (LookupLowerTrimmed(props, "background-clip") == "text") {
+    if (!ownBgImage.empty() && ToLower(ownBgImage).find("gradient") != std::string::npos) {
+      out.textFillImage = ownBgImage;
+      out.textFillSolidSet = false;
+    } else if (ownBgImage.empty()) {
+      // The solid-colour half of the same technique. A fully transparent colour carries no
+      // paint, so it keeps the box path untouched rather than blanking the text.
+      Color background = {};
+      if (resolveBackgroundColor(props, &background) && background.alpha > 0.0f) {
+        out.textFillSolid = background;
+        out.textFillSolidSet = true;
+        out.textFillImage.clear();
+      }
+    }
+  }
   // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
   // resolves plus the synthetic (faux) italic axis the renderer may emboss on top. Both axes are
   // written as real-face keywords (Bold / SemiBold / Italic / Medium Italic ...) so the renderer
@@ -928,10 +947,18 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   // lower-cased so the keyword comparison in applyBackgroundFill is case-insensitive; `normal`
   // is treated as "no blending" there.
   box.backgroundBlendMode = LookupLowerTrimmed(props, "background-blend-mode");
-  // Keep per-layer clips, including mixed text/box clips, in CSS painting order.
+  // `background-clip: text` routes the gradient onto descendant text fills. Any other
+  // non-empty list carries per-layer box clips (`padding-box`, comma-separated in CSS layer
+  // order) — kept raw so `applyBackgroundFill` can rebuild each layer with its own inset
+  // geometry (gradient borders). The subset transformer has already dropped all-default
+  // `border-box` lists, so a non-`text` value here always contains at least one
+  // `padding-box` / `content-box` layer.
   std::string bgClip = LookupLowerTrimmed(props, "background-clip");
-  box.backgroundClip = bgClip;
-  box.backgroundClipText = bgClip.find("text") != std::string::npos;
+  if (bgClip == "text") {
+    box.backgroundClipText = true;
+  } else if (!bgClip.empty()) {
+    box.backgroundClip = bgClip;
+  }
 
   const std::string& br = LookupProperty(props, "border-radius");
   if (!br.empty() && !deferBorderRadius) {
@@ -939,61 +966,8 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
 
   const std::string& border = LookupProperty(props, "border");
-  const auto& textColor = LookupProperty(props, "color");
-  Color currentColor = box.borderColor;
-  if (!textColor.empty()) currentColor = _valueParser.parseColor(textColor);
-  box.borderColor = currentColor;
   if (!border.empty()) {
     parseBorder(box, border);
-  }
-
-  float widths[4];
-  const char* sides[] = {"border-top", "border-right", "border-bottom", "border-left"};
-  for (int i = 0; i < 4; ++i) {
-    HTMLBoxAttributes side;
-    side.borderWidthPx = box.borderWidthPx;
-    side.borderColor = box.borderColor;
-    side.borderStyle = box.borderStyle;
-    const auto& authored = LookupProperty(props, sides[i]);
-    if (!authored.empty()) {
-      side.borderColor = currentColor;
-      parseBorder(side, authored);
-    }
-    widths[i] = side.borderWidthPx;
-    box.borderColors[i] = side.borderColor;
-    box.borderStyles[i] = side.borderStyle;
-    box.borderSet |= widths[i] > 0;
-    box.borderUniform &= widths[i] == box.borderWidthPx && side.borderColor == box.borderColor &&
-                         side.borderStyle == box.borderStyle;
-  }
-  box.borderWidths = {widths[0], widths[1], widths[2], widths[3]};
-  box.borderImageSource = LookupProperty(props, "border-image-source");
-  for (auto pair : {std::make_pair("border-image-slice", &box.borderImageSlice),
-                    std::make_pair("border-image-width", &box.borderImageWidth),
-                    std::make_pair("border-image-outset", &box.borderImageOutset),
-                    std::make_pair("border-image-repeat", &box.borderImageRepeat)}) {
-    auto value = LookupProperty(props, pair.first);
-    if (!value.empty()) *pair.second = value;
-  }
-  auto outline = LookupProperty(props, "outline");
-  if (outline.empty()) {
-    auto style = LookupProperty(props, "outline-style");
-    if (!style.empty() && style != "none") {
-      outline = LookupProperty(props, "outline-width") + " " + style + " " +
-                LookupProperty(props, "outline-color");
-    }
-  }
-  if (!outline.empty()) {
-    HTMLBoxAttributes paint;
-    paint.borderWidthPx = 3;
-    paint.borderColor = currentColor;
-    parseBorder(paint, outline);
-    box.outlineWidth = paint.borderWidthPx;
-    box.outlineColor = paint.borderColor;
-    box.outlineStyle = paint.borderStyle;
-    auto offset = LookupProperty(props, "outline-offset");
-    if (!offset.empty()) box.outlineOffset = _valueParser.parseAbsoluteLengthPx(offset);
-    if (!std::isfinite(box.outlineOffset)) box.outlineOffset = 0;
   }
 
   box.boxShadow = LookupProperty(props, "box-shadow");
@@ -1070,7 +1044,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     _diagnostics.warn("html: unsupported object-position '" + objectPosition + "'; using center");
   }
 
-  static const char* VisualsDisallowed[] = {"perspective"};
+  static const char* VisualsDisallowed[] = {"outline", "perspective"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
@@ -1229,8 +1203,7 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
         return false;
       }
     }
-    if (!std::isfinite(v) || v < 0) return false;
-    nums.push_back(v);
+    nums.push_back(std::max(v, 0.0f));
   }
   if (nums.empty()) {
     return false;
@@ -1249,59 +1222,138 @@ void HTMLStyleCascade::resolveUsedBoxSize(HTMLBoxAttributes& box,
 }
 
 void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props) {
-  const auto& value = LookupProperty(props, "border-radius");
-  auto slash = value.find('/');
-  if (slash != std::string::npos && value.find('/', slash + 1) != std::string::npos) return;
-  auto xTokens = SplitTopLevelWhitespace(value.substr(0, slash));
-  auto yTokens =
-      slash == std::string::npos ? xTokens : SplitTopLevelWhitespace(value.substr(slash + 1));
-  if (xTokens.empty() || xTokens.size() > 4 || yTokens.empty() || yTokens.size() > 4) return;
-  FourSidedValue x{}, y{};
-  if (!ResolveBorderRadiusAxis(xTokens, box.widthPx, _valueParser, _diagnostics, x) ||
-      !ResolveBorderRadiusAxis(yTokens, box.heightPx, _valueParser, _diagnostics, y))
+  // CSS `border-radius` shorthand accepts up to 4 lengths or percentages (top-left,
+  // top-right, bottom-right, bottom-left), with an optional '/' separating horizontal
+  // and vertical radii for elliptical corners. PAGX has two shapes that can carry the
+  // result — `Ellipse` (a center+size oval) and `Rectangle` (single uniform `roundness`):
+  //   - ellipse case: when every corner's horizontal radius equals half the box width and
+  //     every corner's vertical radius equals half the box height, the rounded rectangle
+  //     degenerates into an inscribed ellipse. This covers the canonical `border-radius: 50%`
+  //     (on both square and non-square boxes) and the explicit `50% / 50%` form, and is the
+  //     only configuration in which PAGX can represent a true two-axis radius. Marked with
+  //     `borderRadiusEllipse` so the layer builder emits an `Ellipse`.
+  //   - elliptical form (containing '/') that is NOT a full ellipse: PAGX has no per-axis
+  //     corner-radius primitive, so warn and drop the value.
+  //   - 1-4 length / percentage tokens: expand to per-corner (TL, TR, BR, BL). When all four
+  //     resolved values are equal the layer builder emits a `Rectangle` with that uniform
+  //     `roundness`; when they differ it synthesises a `Path` tracing the rounded outline so
+  //     the "single rounded corner" patterns used as corner decorations (e.g. Tailwind
+  //     `rounded-bl-full`) round-trip exactly.
+  //   - percentage tokens in the non-ellipse single-axis path resolve per corner against
+  //     `min(widthPx, heightPx)`. Percentages on elements without fixed px sizes are dropped
+  //     with a warning, and the affected corner stays at 0.
+  const std::string& br = LookupProperty(props, "border-radius");
+
+  // Split the optional '/' into horizontal and vertical token groups; without a '/' the vertical
+  // radii mirror the horizontal ones. Detect the inscribed-ellipse case first, before collapsing
+  // to the single-axis representation that loses the per-axis radii.
+  auto slashPos = br.find('/');
+  std::string hPart = slashPos == std::string::npos ? br : br.substr(0, slashPos);
+  std::string vPart = slashPos == std::string::npos ? br : br.substr(slashPos + 1);
+  auto hTokens = SplitTopLevelWhitespace(hPart);
+  auto vTokens = SplitTopLevelWhitespace(vPart);
+  if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx) && box.widthPx > 0 &&
+      box.heightPx > 0) {
+    FourSidedValue h{};
+    FourSidedValue v{};
+    if (ResolveBorderRadiusAxis(hTokens, box.widthPx, _valueParser, _diagnostics, h) &&
+        ResolveBorderRadiusAxis(vTokens, box.heightPx, _valueParser, _diagnostics, v)) {
+      float halfW = box.widthPx * 0.5f;
+      float halfH = box.heightPx * 0.5f;
+      bool hIsHalf = pag::FloatNearlyEqual(h.top, halfW) && pag::FloatNearlyEqual(h.right, halfW) &&
+                     pag::FloatNearlyEqual(h.bottom, halfW) && pag::FloatNearlyEqual(h.left, halfW);
+      bool vIsHalf = pag::FloatNearlyEqual(v.top, halfH) && pag::FloatNearlyEqual(v.right, halfH) &&
+                     pag::FloatNearlyEqual(v.bottom, halfH) && pag::FloatNearlyEqual(v.left, halfH);
+      if (hIsHalf && vIsHalf) {
+        box.borderRadiusTLPx = halfW;
+        box.borderRadiusTRPx = halfW;
+        box.borderRadiusBRPx = halfW;
+        box.borderRadiusBLPx = halfW;
+        box.borderRadiusUniform = true;
+        box.borderRadiusEllipse = true;
+        box.borderRadiusSet = true;
+        return;
+      }
+    }
+  }
+
+  if (slashPos != std::string::npos) {
+    _diagnostics.warn("html: elliptical border-radius '" + br +
+                      "' not supported by PAGX Rectangle; ignored");
     return;
-  float rx[] = {x.top, x.right, x.bottom, x.left};
-  float ry[] = {y.top, y.right, y.bottom, y.left};
-  // A zero on either axis makes a square corner. All eight used radii share one
-  // overlap scale, including percentages (x resolves against width, y against height).
-  for (int i = 0; i < 4; ++i)
-    if (rx[i] == 0 || ry[i] == 0) rx[i] = ry[i] = 0;
-  float scale = 1;
-  if (std::isfinite(box.widthPx)) {
-    ClampBorderRadiusScale(rx[0] + rx[1], box.widthPx, scale);
-    ClampBorderRadiusScale(rx[3] + rx[2], box.widthPx, scale);
   }
-  if (std::isfinite(box.heightPx)) {
-    ClampBorderRadiusScale(ry[0] + ry[3], box.heightPx, scale);
-    ClampBorderRadiusScale(ry[1] + ry[2], box.heightPx, scale);
+  auto tokens = hTokens;
+  std::vector<float> nums;
+  nums.reserve(tokens.size());
+  for (auto& t : tokens) {
+    std::string trimmed = Trim(t);
+    float v = NAN;
+    if (!trimmed.empty() && trimmed.back() == '%') {
+      float fraction = NAN;
+      if (!ParseCssPercentage(trimmed, fraction)) {
+        _diagnostics.warn("html: invalid border-radius token '" + t + "'");
+        continue;
+      }
+      if (std::isnan(box.widthPx) || std::isnan(box.heightPx)) {
+        _diagnostics.warn("html: percentage border-radius '" + t +
+                          "' requires fixed px width/height on the same element; ignored");
+        continue;
+      }
+      v = fraction * std::min(box.widthPx, box.heightPx);
+    } else {
+      v = _valueParser.parseAbsoluteLengthPx(trimmed);
+      if (std::isnan(v)) {
+        _diagnostics.warn("html: invalid border-radius token '" + t + "'");
+        continue;
+      }
+    }
+    nums.push_back(v);
   }
-  for (int i = 0; i < 4; ++i) {
-    rx[i] *= scale;
-    ry[i] *= scale;
+  if (nums.empty()) {
+    return;
   }
-  box.borderRadiusTLPx = rx[0];
-  box.borderRadiusTLYPx = ry[0];
-  box.borderRadiusTRPx = rx[1];
-  box.borderRadiusTRYPx = ry[1];
-  box.borderRadiusBRPx = rx[2];
-  box.borderRadiusBRYPx = ry[2];
-  box.borderRadiusBLPx = rx[3];
-  box.borderRadiusBLYPx = ry[3];
-  box.borderRadiusUniform = true;
-  box.borderRadiusEllipse = box.widthPx > 0 && box.heightPx > 0 &&
-                            (value.find('%') != std::string::npos || slash != std::string::npos);
-  for (int i = 0; i < 4; ++i) {
-    box.borderRadiusUniform &= rx[i] == rx[0] && ry[i] == rx[0];
-    box.borderRadiusEllipse &= pag::FloatNearlyEqual(rx[i], box.widthPx * .5f) &&
-                               pag::FloatNearlyEqual(ry[i], box.heightPx * .5f);
+
+  // CSS shorthand expansion. We tolerate the irregular 0/empty-token case by padding with 0s
+  // so a malformed input doesn't lose unrelated corner data. Slot mapping for `border-radius`
+  // is top-left / top-right / bottom-right / bottom-left.
+  FourSidedValue rs = ExpandFourSideShorthand(nums);
+  float tl = std::max(rs.top, 0.0f);
+  float tr = std::max(rs.right, 0.0f);
+  float brad = std::max(rs.bottom, 0.0f);
+  float bl = std::max(rs.left, 0.0f);
+
+  // CSS edge-overlap clamp: shrink all radii uniformly so the sum of the two radii on any
+  // edge never exceeds that edge's length. Pre-clamp values like `9999px` collapse to the
+  // box dimension here (so `rounded-bl-full` on a 380x380 box yields BL=380, not 9999).
+  if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx) && box.widthPx > 0 &&
+      box.heightPx > 0) {
+    float scale = 1.0f;
+    ClampBorderRadiusScale(tl + tr, box.widthPx, scale);
+    ClampBorderRadiusScale(bl + brad, box.widthPx, scale);
+    ClampBorderRadiusScale(tl + bl, box.heightPx, scale);
+    ClampBorderRadiusScale(tr + brad, box.heightPx, scale);
+    if (scale < 1.0f) {
+      tl *= scale;
+      tr *= scale;
+      brad *= scale;
+      bl *= scale;
+    }
   }
+  box.borderRadiusTLPx = tl;
+  box.borderRadiusTRPx = tr;
+  box.borderRadiusBRPx = brad;
+  box.borderRadiusBLPx = bl;
+  box.borderRadiusUniform = (tl == tr) && (tr == brad) && (brad == bl);
+  // Mirror the legacy behaviour: any successfully parsed border-radius (even all zeros)
+  // marks the box as "carrying border-radius styling". Downstream `hasBackgroundVisuals`
+  // uses this to decide whether the layer needs a background geometry; emitting a
+  // `Rectangle roundness=0` for an all-zero shorthand is harmless and keeps the legacy
+  // tests stable.
   box.borderRadiusSet = true;
 }
 
 void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& border) {
   auto tokens = SplitTopLevelWhitespace(border);
-  box.borderStyle = BorderStyle::Solid;
-  box.borderSet = false;
   // Collect candidate colour tokens — anything that's not a width / known style keyword.
   // Take the FIRST candidate as the border colour and warn on any subsequent ones so the
   // author notices `border: 1px solid red blue`-style mistakes (previously the second
@@ -1315,11 +1367,7 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
       continue;
     }
     std::string lt = ToLower(t);
-    if (lt == "solid") continue;
-    if (lt == "none" || lt == "hidden") {
-      box.borderWidthPx = 0;
-      return;
-    }
+    if (lt == "solid" || lt == "none") continue;
     if (lt == "dashed") {
       box.borderStyle = BorderStyle::Dashed;
       continue;
@@ -1329,15 +1377,7 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
       continue;
     }
     if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
-      if (lt == "double") box.borderStyle = BorderStyle::Double;
-      else if (lt == "groove")
-        box.borderStyle = BorderStyle::Groove;
-      else if (lt == "ridge")
-        box.borderStyle = BorderStyle::Ridge;
-      else if (lt == "inset")
-        box.borderStyle = BorderStyle::Inset;
-      else
-        box.borderStyle = BorderStyle::Outset;
+      _diagnostics.warn("html: border style '" + lt + "' not supported; treated as solid");
       continue;
     }
     if (colorToken.empty()) {
@@ -1350,7 +1390,7 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
     _diagnostics.warn("html: border value '" + border +
                       "' has multiple colour tokens; first one used");
   }
-  if (!colorToken.empty() && ToLower(colorToken) != "currentcolor") {
+  if (!colorToken.empty()) {
     box.borderColor = _valueParser.parseColor(colorToken);
   }
   box.borderSet = box.borderWidthPx > 0;

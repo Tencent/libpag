@@ -82,6 +82,8 @@ class HTMLLayerBuilder {
    *  the author requested per-corner radii on a sized box). */
   Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
 
+  Layer* makeBackgroundClip(const HTMLBoxAttributes& box, const HTMLBackgroundRect& rect);
+
   /** Emits the standard background visual chain (geometry + fill + stroke + shadows +
    *  backdrop filter). When `foregroundFill` is supplied, it is painted after the CSS background
    *  and before the border; this is used for replaced elements such as `<img>`. Returns true when
@@ -117,9 +119,6 @@ class HTMLLayerBuilder {
    *  pass NaN when unknown. */
   ColorSource* parseGradientByValue(const std::string& value, float boxWidth = NAN,
                                     float boxHeight = NAN);
-
-  // Paint background-clip:text after the descendant text geometry is available.
-  void applyTextBackground(Layer* layer, const HTMLBoxAttributes& box);
 
   // Inner host / wrappers --------------------------------------------------------------
   /** Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke
@@ -157,9 +156,7 @@ class HTMLLayerBuilder {
                               bool decorationColorDiffers, float bottom, float centerY);
 
  private:
-  bool applyBorderImage(Layer* layer, const HTMLBoxAttributes& box);
   bool applyBackgroundLayers(Layer* layer, const HTMLBoxAttributes& box);
-  Layer* makeBackgroundClip(const HTMLBoxAttributes& box, const HTMLBackgroundRect& rect);
   void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                            bool& emitted);
   void emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttributes& box, ColorSource* color,
@@ -175,7 +172,6 @@ class HTMLLayerBuilder {
   HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
   std::unordered_map<Layer*, std::vector<Layer*>> _outerBoxShadows;
-  std::unordered_map<Layer*, std::vector<Layer*>> _textBackgrounds;
   std::function<HTMLBackgroundImage(const std::string&)> _backgroundImageResolver;
 };
 

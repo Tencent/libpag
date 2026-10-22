@@ -167,35 +167,29 @@ body Layer 使用 `layoutRounding="none"` 并由后代继承。约束和 Flex �
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
-| `background-clip: text`（别名 `-webkit-background-clip: text`） | 在背景所属元素的坐标系中绘制各层背景，再用后代文字及装饰线的独立字形覆盖遮罩裁剪；文字前景颜色、描边和阴影保持独立。需要已解析的像素宽高。 |
+| `background-clip: text`（别名 `-webkit-background-clip: text`） | 元素背景下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变；无渐变层时为纯色），本元素的矩形背景被抑制。这与 CSS 一致：继承下来的 `text-fill-color` 为透明，被裁剪的背景是字形唯一的着色来源，因此背景优先于 `color`。存在渐变 `background-image` 时渐变优先于纯色 `background-color`（CSS 中纯色层在图片层之下）。背景色完全透明时不产生任何着色，该属性对该元素为无操作。 |
 | `background-image: url(...)` | 还原为背景矩形上的 `<ImagePattern>` 填充；`background-size` / `background-repeat` / `background-position` 决定该 pattern 的 `scaleMode` / 平铺模式 / 矩阵 |
 | `background-blend-mode: <mode>` | 在渐变 / 图像填充上设置 `Fill.blendMode`，使其与 `background-color` 混合；此时会保留底部的纯色 `<Fill>` 作为混合所需的背景。`normal`（默认）为空操作，不透明的渐变 / 图像仍会覆盖底色 |
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
 | `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。静态几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃——但*动画*的几何 `clip-path` 作为轮廓 mask 变形受支持（见 §13.2） |
-| `border-radius`（每轴 1–4 值，可用 `/` 分隔） | 横向百分比相对宽度、纵向百分比相对高度；八个半径共用重叠缩放系数。输出 `Rectangle`、`Ellipse` 或双轴圆角 `Path`，并供背景、边框、裁剪和阴影共用。 |
-| `border`、`border-{top,right,bottom,left}: W <style> C` | 支持 `solid`、`dashed`、`dotted`、`double`、`groove`、`ridge`、`inset`、`outset`。点线和虚线沿内缩中心线绘制；非均匀及多带边框使用共享圆角轮廓与分边遮罩。 |
-| `border-image-source/slice/width/outset/repeat` | 对渐变或图像做九宫格切片，支持 `fill`、百分比、倍数宽度、外扩及 `stretch/repeat/round/space`。不受 `border-radius` 裁剪。快照将简写展开为这些属性。 |
-| `outline`、`outline-width/style/color/offset` | 独立轮廓绘制于内容上方，不占布局空间，也不被元素自身的 overflow 裁剪。 |
-| `text-shadow` | 每个阴影从独立、不透明的文字覆盖源生成，首项在上方，前景最后绘制；CSS 模糊半径转换为一半的高斯 σ，透明前景仍能投影。 |
+| `border-radius: N`（px）、`N%`（按 `min(width, height)` 解析；固定 px 宽高且 `border-radius: 50%` 的元素会变成 `Ellipse`），或 1–4 值缩写（`T`、`T R`、`T R B`、`T R B L`） | `Rectangle.roundness = N`（`50%` 输出 `Ellipse`）。椭圆 `W / H` 双半径形式告警并忽略 |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`） |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
 | `isolation: isolate \| auto` | `isolate` 设置 `Layer.passThroughBackground = false`；`auto` 保留默认的背景穿透 |
 | `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
-| `backdrop-filter` | 一个 `<BackgroundFilterStyle>` 按声明顺序处理一次背景采样，支持模糊、颜色矩阵、投影及已支持的 SVG 滤镜引用；按元素圆角边界裁剪，元素自身内容随后绘制。 |
+| `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 | Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
 
-`background-clip: text` 保留背景层的原始绘制顺序和坐标。前景文字并不继承背景填充；
-普通流后代参与文字遮罩，绝对定位后代不参与。快照用 `data-pagx-text-clip` 保留扁平化前的
-流属性。背景色采用最底层图片的裁剪方式，较短的属性列表循环使用。
+`background-clip: text` 用于字形填充（见上表）。`border-box`（默认）静默折叠。`padding-box` /
+`content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
+`background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
-复杂边框、outline 和 border-image 需要已解析的像素宽高；border-image 最多生成 4096 个
-图块，超限或资源不可用时告警并回退到普通边框。3D 边框的明暗颜色由实现决定。
-
-禁用（告警并跳过）：单边宽度/颜色/样式长属性、单角 `border-*-radius`、`perspective`、
+禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
 `matrix3d` 的 3D `transform`。
 
@@ -375,7 +369,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | DocumentSkeleton | 合并重复的 `<head>` / `<body>`、小写化标签、去掉注释与处理指令、丢弃 `<head>` 中除 `<title>` / `<meta>` / `<style>` 之外的元素 | `<script>` 等不允许的 `<head>` 内容（`subset:unsupported-tag`）；外部 `<link rel="stylesheet">`（`subset:external-stylesheet`）；`<html>` 与 `<body>` 之间的多余顶层元素（`subset:unsupported-tag`） |
 | StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style；把 `-webkit-` 前缀声明合并到标准名（如 `-webkit-background-clip` → `background-clip`） | — |
-| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边宽度/颜色/样式长属性、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
+| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | MarginToGapPromotion | 当 `display: flex` 容器的在流子元素带有统一的逐子主轴 margin（leading 或 trailing 模式）时，把该 margin 提升到容器的 `gap` 并清除逐子 margin（`subset:margin-promoted-to-gap`） | 容器换行、已有正 `gap`、参与子元素少于两个、子元素带 `flex` grow、或 margin 非 px 时跳过（margin 留给 `wrapForMargin` 折叠） |
 | SpaceJustifyOverflowCollapse | 当使用 `space-between` / `space-around` / `space-evenly` 的 `display: flex` 容器子元素在主轴溢出时，把 `justify-content` 改写为 `flex-start`，避免 PAGX flex 引擎重叠（`subset:space-justify-collapsed-on-overflow`） | 尺寸数据不全（无显式 px 主轴尺寸、padding/gap 非 px、子元素尺寸无法解析、或子元素带 `flex` grow）时保持原样 |

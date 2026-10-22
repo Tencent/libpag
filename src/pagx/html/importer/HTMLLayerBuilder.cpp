@@ -23,14 +23,12 @@
 #include <utility>
 #include "pagx/PAGXDocument.h"
 #include "pagx/html/HTMLWriter.h"
-#include "pagx/html/importer/HTMLBoxGeometry.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
-#include "pagx/nodes/BackgroundFilterStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -61,6 +59,51 @@ namespace pagx {
 using namespace pagx::html;
 
 namespace {
+
+// Traces the outline of a rounded rectangle with per-corner radii (TL, TR, BR, BL) inside the
+// axis-aligned box (0, 0)-(W, H) onto `out`. Going clockwise starting at the top of the right
+// edge — matches the canonical PAGX rendering start point for rounded rectangles, so the path
+// reverses / orientation logic in shape modifiers (`ApplyRoundCorner`, `MergePath`, etc.) sees
+// the same winding it would from a uniform Rectangle. Corners with radius 0 collapse to a sharp
+// vertex (no cubic emitted). Caller is responsible for clamping the radii so adjacent pairs do
+// not exceed the box's edge length — see the CSS scaling clamp in `HTMLStyleCascade`.
+void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl, float tr,
+                                       float brad, float bl) {
+  const float k = 1.0f - BEZIER_KAPPA;
+  out.moveTo(w, tr);
+  // Right edge.
+  out.lineTo(w, h - brad);
+  if (brad > 0) {
+    out.cubicTo(w, h - brad * k, w - brad * k, h, w - brad, h);
+  }
+  // Bottom edge.
+  out.lineTo(bl, h);
+  if (bl > 0) {
+    out.cubicTo(bl * k, h, 0, h - bl * k, 0, h - bl);
+  }
+  // Left edge.
+  out.lineTo(0, tl);
+  if (tl > 0) {
+    out.cubicTo(0, tl * k, tl * k, 0, tl, 0);
+  }
+  // Top edge.
+  out.lineTo(w - tr, 0);
+  if (tr > 0) {
+    out.cubicTo(w - tr * k, 0, w, tr * k, w, tr);
+  }
+  out.close();
+}
+
+void BuildShadowBoxPath(PathData& out, float width, float height, const float radii[4],
+                        bool ellipse) {
+  if (ellipse) {
+    const float radius = width * 0.5f;
+    BuildPerCornerRoundedRectPathData(out, width, width, radius, radius, radius, radius);
+    out.transform(Matrix::Scale(1, height / width));
+  } else {
+    BuildPerCornerRoundedRectPathData(out, width, height, radii[0], radii[1], radii[2], radii[3]);
+  }
+}
 
 // Hands the parent-facing layout slot (positional anchors, percent sizing, and flex
 // participation) over from `inner` to `outer`. Used by the wrapper helpers that hoist a Layer
@@ -93,7 +136,13 @@ void ResetLayoutAnchors(Layer* inner) {
   inner->flex = 0.0f;
 }
 
-// Used by the legacy unsized-box path, where a concrete text mask cannot be built.
+// `background-clip: text` paints the glyphs with the element's background, so the rectangle that
+// would otherwise paint behind the text must not be emitted — the paint is consumed by the
+// descendant text fill instead (a gradient through `textFillImage`, a solid colour through
+// `textFillSolid`). Without a gradient layer or a solid `background-color` there is nothing to
+// redirect and the element keeps its normal box background. Keep this predicate separate from
+// the visual-emission code because replaced elements may still have a foreground fill, border,
+// shadow, or backdrop filter that must survive the redirect.
 bool ClipsBackgroundToText(const HTMLBoxAttributes& box) {
   if (!box.backgroundClipText) return false;
   if (ToLower(box.backgroundImage).find("gradient(") != std::string::npos) return true;
@@ -122,14 +171,14 @@ HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& va
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
   _outerBoxShadows.clear();
-  _textBackgrounds.clear();
   _filterDecoder.bindDocument(document);
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  bool hasBoxBackground = (box.backgroundColorSet || !box.backgroundImage.empty());
+  bool hasBoxBackground =
+      !ClipsBackgroundToText(box) && (box.backgroundColorSet || !box.backgroundImage.empty());
   return hasBoxBackground || box.borderRadiusSet || box.borderSet || !box.boxShadow.empty() ||
-         !box.backdropFilter.empty() || box.outlineWidth > 0 || !box.borderImageSource.empty();
+         !box.backdropFilter.empty();
 }
 
 bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
@@ -141,7 +190,7 @@ bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
   // Flex-flow children sit inside the CSS border edge. The importer models that edge as extra
   // padding on the layout host, so a bordered flex box still needs paint/layout isolation even
   // when its authored padding is zero.
-  return box.displayFlex && !box.borderWidths.isZero();
+  return box.displayFlex && box.borderSet && box.borderWidthPx > 0.0f;
 }
 
 Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
@@ -149,11 +198,11 @@ Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& 
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
   applyLayoutAttributes(inner, box);
-  if (box.borderSet && inner->layout != LayoutMode::None) {
-    inner->padding.top += box.borderWidths.top;
-    inner->padding.right += box.borderWidths.right;
-    inner->padding.bottom += box.borderWidths.bottom;
-    inner->padding.left += box.borderWidths.left;
+  if (box.borderSet && box.borderWidthPx > 0.0f && inner->layout != LayoutMode::None) {
+    inner->padding.top += box.borderWidthPx;
+    inner->padding.right += box.borderWidthPx;
+    inner->padding.bottom += box.borderWidthPx;
+    inner->padding.left += box.borderWidthPx;
   }
   outer->children.push_back(inner);
   return inner;
@@ -161,16 +210,16 @@ Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& 
 
 void HTMLLayerBuilder::appendCSSChild(Layer* host, Layer* child, const HTMLBoxAttributes& box) {
   if (!child->includeInLayout) {
-    const auto& border = box.borderWidths;
+    const float border = box.borderSet ? box.borderWidthPx : 0.0f;
     const auto& padding = host->padding;
-    if (padding.left != border.left || padding.right != border.right || padding.top != border.top ||
-        padding.bottom != border.bottom) {
+    if (padding.left != border || padding.right != border || padding.top != border ||
+        padding.bottom != border) {
       auto frame = _document->makeNode<Layer>();
       frame->includeInLayout = false;
-      frame->left = border.left - padding.left;
-      frame->right = border.right - padding.right;
-      frame->top = border.top - padding.top;
-      frame->bottom = border.bottom - padding.bottom;
+      frame->left = border - padding.left;
+      frame->right = border - padding.right;
+      frame->top = border - padding.top;
+      frame->bottom = border - padding.bottom;
       frame->children.push_back(child);
       host->children.push_back(frame);
       return;
@@ -327,7 +376,9 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   }
 
   auto* data = _document->makeNode<PathData>();
-  BuildHTMLBoxPath(*data, box);
+  BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
+                                    box.borderRadiusTRPx, box.borderRadiusBRPx,
+                                    box.borderRadiusBLPx);
   auto* path = _document->makeNode<Path>();
   path->data = data;
   // Path geometry uses the parent layer's local coordinate space (already laid out at the
@@ -340,7 +391,7 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
 
 bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
                                               Fill* foregroundFill) {
-  if (usesBackgroundLayout(box)) {
+  if (!ClipsBackgroundToText(box) && usesBackgroundLayout(box)) {
     bool emitted = applyBackgroundLayers(layer, box);
     applyBoxShadows(layer, box, emitted);
     // A Layer's contents paint below all of its children. Put replaced content and border
@@ -360,12 +411,11 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
     applyBackdropFilter(layer, box, emitted);
     return emitted;
   }
-  // Resolved boxes use the background stack above. Unsized text clips need a
-  // diagnostic, while independent border, shadow and foreground paint survives.
+  // `background-clip: text` redirects the background to descendant text fills (see
+  // `convertTextLeaf` -> `buildTextFill`, and `HTMLStyleCascade::resolveInheritedStyle` for the
+  // gradient / solid channels). Suppress only that box background. Replaced-element foregrounds
+  // and independent box visuals (border, shadow, backdrop filter) must still be emitted.
   bool clipsBackgroundToText = ClipsBackgroundToText(box);
-  if (clipsBackgroundToText) {
-    _diagnostics.warn("html: background-clip:text requires resolved box dimensions");
-  }
   bool emitted = false;
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
@@ -420,11 +470,46 @@ Layer* HTMLLayerBuilder::makeBackgroundClip(const HTMLBoxAttributes& box,
   mask->height = rect.height;
   mask->left = rect.x;
   mask->top = rect.y;
+  // CSS derives each inner corner by subtracting the corresponding two edge insets.
+  float rx[4] = {box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx,
+                 box.borderRadiusBLPx};
+  float ry[4] = {rx[0], rx[1], rx[2], rx[3]};
+  if (box.borderRadiusEllipse) {
+    for (int i = 0; i < 4; ++i) {
+      rx[i] = box.widthPx * .5f;
+      ry[i] = box.heightPx * .5f;
+    }
+  }
+  float right = box.widthPx - rect.x - rect.width;
+  float bottom = box.heightPx - rect.y - rect.height;
+  float dx[4] = {rect.x, right, right, rect.x};
+  float dy[4] = {rect.y, rect.y, bottom, bottom};
+  for (int i = 0; i < 4; ++i) {
+    rx[i] = std::max(0.0f, rx[i] - dx[i]);
+    ry[i] = std::max(0.0f, ry[i] - dy[i]);
+  }
+  float scale = 1;
+  for (auto pair :
+       {std::make_pair(rect.width, rx[0] + rx[1]), std::make_pair(rect.width, rx[2] + rx[3]),
+        std::make_pair(rect.height, ry[0] + ry[3]), std::make_pair(rect.height, ry[1] + ry[2])}) {
+    if (pair.second > 0) scale = std::min(scale, pair.first / pair.second);
+  }
+  for (int i = 0; i < 4; ++i) {
+    rx[i] *= scale;
+    ry[i] *= scale;
+  }
   auto* data = _document->makeNode<PathData>();
-  BuildHTMLBoxPath(
-      *data, box,
-      {rect.y, box.widthPx - rect.x - rect.width, box.heightPx - rect.y - rect.height, rect.x});
-  data->transform(Matrix::Translate(-rect.x, -rect.y));
+  float w = rect.width, h = rect.height, k = 1 - BEZIER_KAPPA;
+  data->moveTo(rx[0], 0);
+  data->lineTo(w - rx[1], 0);
+  data->cubicTo(w - rx[1] * k, 0, w, ry[1] * k, w, ry[1]);
+  data->lineTo(w, h - ry[2]);
+  data->cubicTo(w, h - ry[2] * k, w - rx[2] * k, h, w - rx[2], h);
+  data->lineTo(rx[3], h);
+  data->cubicTo(rx[3] * k, h, 0, h - ry[3] * k, 0, h - ry[3]);
+  data->lineTo(0, ry[0]);
+  data->cubicTo(0, ry[0] * k, rx[0] * k, 0, rx[0], 0);
+  data->close();
   auto* path = _document->makeNode<Path>();
   path->data = data;
   path->position = {0, 0};
@@ -446,19 +531,6 @@ bool HTMLLayerBuilder::applyBackgroundLayers(Layer* layer, const HTMLBoxAttribut
   // Background blend modes see only this element's background, not its ancestors or content.
   stack->passThroughBackground = false;
   layer->children.push_back(stack);
-  auto attach = [&](Layer* paint, size_t index) {
-    if (BackgroundListEntry(box.backgroundClip, index, "border-box") == "text") {
-      auto* clipped = _document->makeNode<Layer>();
-      clipped->width = box.widthPx;
-      clipped->height = box.heightPx;
-      clipped->includeInLayout = false;
-      clipped->visible = false;  // Enabled only after the text mask is attached.
-      clipped->children.push_back(paint);
-      _textBackgrounds[layer].push_back(clipped);
-      stack->children.push_back(clipped);
-    } else
-      stack->children.push_back(paint);
-  };
   if (box.backgroundColorSet) {
     auto rect = BackgroundBoxRect(
         box, BackgroundListEntry(box.backgroundClip, images.empty() ? 0 : images.size() - 1,
@@ -470,7 +542,7 @@ bool HTMLLayerBuilder::applyBackgroundLayers(Layer* layer, const HTMLBoxAttribut
     geometry->left = geometry->top = 0;
     color->contents.push_back(geometry);
     color->contents.push_back(buildSolidFill(box.backgroundColor));
-    attach(color, images.empty() ? 0 : images.size() - 1);
+    stack->children.push_back(color);
   }
   for (size_t i = images.size(); i-- > 0;) {
     auto value = Trim(images[i]);
@@ -506,7 +578,7 @@ bool HTMLLayerBuilder::applyBackgroundLayers(Layer* layer, const HTMLBoxAttribut
     auto* clip = makeBackgroundClip(box, layout.clip);
     clip->blendMode =
         resolveBackgroundBlendMode(BackgroundListEntry(box.backgroundBlendMode, i, "normal"));
-    attach(clip, i);
+    stack->children.push_back(clip);
     if (image.vectorTile) {
       for (int y = 0; y < layout.y.count; ++y) {
         for (int x = 0; x < layout.x.count; ++x) {
@@ -795,139 +867,28 @@ void HTMLLayerBuilder::emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttri
 
 void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,
                                          Element* geometry, bool& emitted) {
-  if (applyBorderImage(layer, box)) {
-    emitted = true;
-    return;
-  }
   if (!geometry || !box.borderSet) return;
-  const bool sized = std::isfinite(box.widthPx) && std::isfinite(box.heightPx);
-  // Keep the compact solid stroke for uniform borders. Dashed/dotted strokes must
-  // use an inset centerline: Inside doubles stroke width before clipping in TGFX.
-  if (box.borderUniform && box.borderStyle == BorderStyle::Solid) {
-    auto* stroke = _document->makeNode<Stroke>();
-    stroke->color = buildSolidFill(box.borderColor)->color;
-    stroke->width = box.borderWidthPx;
-    stroke->align = StrokeAlign::Inside;
-    layer->contents.push_back(stroke);
-    emitted = true;
-    return;
+  auto stroke = _document->makeNode<Stroke>();
+  auto solid = _document->makeNode<SolidColor>();
+  solid->color = box.borderColor;
+  stroke->color = solid;
+  stroke->width = box.borderWidthPx;
+  stroke->align = StrokeAlign::Inside;
+  // CSS `border-style: dashed | dotted` maps onto Stroke's dash pattern.
+  // Chromium-ish proportions: `dashed` paints rectangular dashes 2x the line
+  // width separated by 1x gaps; `dotted` paints round dots with diameter
+  // equal to the line width, spaced 1 width apart (a zero-length dash with
+  // a Round cap renders as a circle of radius w/2, and centre-to-centre
+  // spacing of 2w yields a 1w gap between dot edges).
+  if (box.borderStyle == BorderStyle::Dashed) {
+    const float w = box.borderWidthPx;
+    stroke->dashes = {2.0f * w, w};
+  } else if (box.borderStyle == BorderStyle::Dotted) {
+    const float w = box.borderWidthPx;
+    stroke->cap = LineCap::Round;
+    stroke->dashes = {0.0f, 2.0f * w};
   }
-  if (!sized) {
-    _diagnostics.warn("html: patterned or asymmetric borders require resolved box dimensions");
-    return;
-  }
-  const auto& bw = box.borderWidths;
-  float widths[] = {bw.top, bw.right, bw.bottom, bw.left};
-  float w = box.widthPx, h = box.heightPx;
-  auto insetAt = [&](float fraction) {
-    return Padding{bw.top * fraction, bw.right * fraction, bw.bottom * fraction,
-                   bw.left * fraction};
-  };
-  auto paint = [&](Layer* host, float start, float end, const Color& color) {
-    auto* data = _document->makeNode<PathData>();
-    BuildHTMLBoxPath(*data, box, insetAt(start));
-    BuildHTMLBoxPath(*data, box, insetAt(end));
-    auto* path = _document->makeNode<Path>();
-    path->data = data;
-    auto* fill = buildSolidFill(color);
-    fill->fillRule = FillRule::EvenOdd;
-    auto* group = _document->makeNode<Group>();
-    group->elements = {path, fill};
-    host->contents.push_back(group);
-  };
-  auto shaded = [](Color color, bool dark) {
-    // CSS leaves the exact 3D border colours to the UA. Use the conventional
-    // two-thirds dark shade, retaining alpha and colour space.
-    if (dark) {
-      color.red *= 2.0f / 3;
-      color.green *= 2.0f / 3;
-      color.blue *= 2.0f / 3;
-    }
-    return color;
-  };
-  for (int side = 0; side < 4; ++side) {
-    if (widths[side] <= 0) continue;
-    const auto style = box.borderStyles[side];
-    const auto color = box.borderColors[side];
-    auto* host = _document->makeNode<Layer>();
-    host->width = w;
-    host->height = h;
-    host->includeInLayout = false;
-    // Partition the complete ring by distance to each edge divided by its width.
-    // Extending these corner diagonals through the curved part is essential: a
-    // trapezoid ending at the straight inner edge would cut off large corner arcs.
-    auto* mask = _document->makeNode<Layer>();
-    mask->id = _idAllocator.generateUnique("borderSide");
-    mask->width = w;
-    mask->height = h;
-    mask->includeInLayout = false;
-    auto* data = _document->makeNode<PathData>();
-    std::vector<Point> polygon = {{0, 0}, {w, 0}, {w, h}, {0, h}};
-    auto distance = [&](Point p, int edge) {
-      if (edge == 0) return p.y;
-      if (edge == 1) return w - p.x;
-      if (edge == 2) return h - p.y;
-      return p.x;
-    };
-    for (int edge = 0; edge < 4; ++edge) {
-      if (edge == side || widths[edge] <= 0 || polygon.empty()) continue;
-      auto input = std::move(polygon);
-      polygon.clear();
-      auto value = [&](Point p) {
-        return distance(p, side) * widths[edge] - distance(p, edge) * widths[side];
-      };
-      auto previous = input.back();
-      float before = value(previous);
-      for (auto current : input) {
-        float after = value(current);
-        if ((before <= 0) != (after <= 0)) {
-          float t = before / (before - after);
-          polygon.push_back({previous.x + t * (current.x - previous.x),
-                             previous.y + t * (current.y - previous.y)});
-        }
-        if (after <= 0) polygon.push_back(current);
-        previous = current;
-        before = after;
-      }
-    }
-    if (polygon.empty()) continue;
-    data->moveTo(polygon.front().x, polygon.front().y);
-    for (size_t i = 1; i < polygon.size(); ++i) data->lineTo(polygon[i].x, polygon[i].y);
-    data->close();
-    auto* path = _document->makeNode<Path>();
-    path->data = data;
-    mask->contents = {path, buildSolidFill({1, 1, 1, 1})};
-    host->mask = mask;
-    host->maskType = MaskType::Contour;
-    host->children.push_back(mask);
-    layer->children.push_back(host);
-    if (style == BorderStyle::Dotted || style == BorderStyle::Dashed) {
-      auto* center = _document->makeNode<PathData>();
-      BuildHTMLBoxPath(*center, box, insetAt(.5f));
-      auto* line = _document->makeNode<Path>();
-      line->data = center;
-      auto* stroke = _document->makeNode<Stroke>();
-      stroke->color = buildSolidFill(color)->color;
-      stroke->width = widths[side];
-      if (style == BorderStyle::Dotted) {
-        stroke->cap = LineCap::Round;
-        stroke->dashes = {0, 2 * widths[side]};
-      } else
-        stroke->dashes = {2 * widths[side], widths[side]};
-      host->contents = {line, stroke};
-    } else if (style == BorderStyle::Double && widths[side] >= 3) {
-      paint(host, 0, 1.0f / 3, color);
-      paint(host, 2.0f / 3, 1, color);
-    } else if (style == BorderStyle::Groove || style == BorderStyle::Ridge) {
-      bool dark = (side == 0 || side == 3) == (style == BorderStyle::Groove);
-      paint(host, 0, .5f, shaded(color, dark));
-      paint(host, .5f, 1, shaded(color, !dark));
-    } else {
-      bool dark = ((side == 0 || side == 3) && style == BorderStyle::Inset) ||
-                  ((side == 1 || side == 2) && style == BorderStyle::Outset);
-      paint(host, 0, 1, shaded(color, dark));
-    }
-  }
+  layer->contents.push_back(stroke);
   emitted = true;
 }
 
@@ -949,43 +910,47 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
     // Paint back to front: the first CSS shadow is the topmost one.
     for (auto it = shadows.rbegin(); it != shadows.rend(); ++it) {
       const auto& s = *it;
-      const auto border = s.inset ? box.borderWidths : Padding{};
-      const float w = std::max(0.0f, box.widthPx - border.left - border.right);
-      const float h = std::max(0.0f, box.heightPx - border.top - border.bottom);
+      const float border = s.inset && box.borderSet ? box.borderWidthPx : 0;
+      const float w = std::max(0.0f, box.widthPx - 2 * border);
+      const float h = std::max(0.0f, box.heightPx - 2 * border);
       if (w <= 0 || h <= 0) continue;
+      float radii[] = {std::max(0.0f, box.borderRadiusTLPx - border),
+                       std::max(0.0f, box.borderRadiusTRPx - border),
+                       std::max(0.0f, box.borderRadiusBRPx - border),
+                       std::max(0.0f, box.borderRadiusBLPx - border)};
       const float spread = s.inset ? -s.spread : s.spread;
       const float sw = std::max(0.0f, w + 2 * spread);
       const float sh = std::max(0.0f, h + 2 * spread);
       if (!s.inset && (sw <= 0 || sh <= 0)) continue;
+      float expanded[4];
+      for (size_t i = 0; i < 4; i++) {
+        float adjustment = spread;
+        if (!s.inset && spread > 0 && radii[i] < spread) {
+          const float ratio = radii[i] / spread;
+          const float coverage = std::min(1.0f, 2 * radii[i] / std::max(w, h));
+          adjustment *= 1 - std::pow(1 - ratio, 3) * (1 - std::pow(coverage, 3));
+        }
+        expanded[i] = std::max(0.0f, radii[i] + adjustment);
+      }
+      // CSS scales overlapping corners by one common factor.
+      float scale = 1;
+      const float sums[] = {expanded[0] + expanded[1], expanded[3] + expanded[2],
+                            expanded[0] + expanded[3], expanded[1] + expanded[2]};
+      for (size_t i = 0; i < 4; i++) {
+        if (sums[i] > 0) scale = std::min(scale, (i < 2 ? sw : sh) / sums[i]);
+      }
+      for (auto& radius : expanded) radius *= scale;
       const float extent =
           std::abs(s.offsetX) + std::abs(s.offsetY) + std::abs(spread) + 2 * s.blur + 1;
       auto* sourceData = _document->makeNode<PathData>();
       if (sw > 0 && sh > 0) {
-        auto expanded = box;
-        expanded.widthPx = sw;
-        expanded.heightPx = sh;
-        float* radii[] = {&expanded.borderRadiusTLPx,  &expanded.borderRadiusTRPx,
-                          &expanded.borderRadiusBRPx,  &expanded.borderRadiusBLPx,
-                          &expanded.borderRadiusTLYPx, &expanded.borderRadiusTRYPx,
-                          &expanded.borderRadiusBRYPx, &expanded.borderRadiusBLYPx};
-        float insets[] = {border.left, border.right, border.right,  border.left,
-                          border.top,  border.top,   border.bottom, border.bottom};
-        for (int i = 0; i < 8; ++i) {
-          float radius = std::max(0.0f, *radii[i] - insets[i]);
-          float adjustment = spread;
-          if (!s.inset && spread > 0 && radius < spread) {
-            float ratio = radius / spread;
-            float coverage = std::min(1.0f, 2 * radius / std::max(w, h));
-            adjustment *= 1 - std::pow(1 - ratio, 3) * (1 - std::pow(coverage, 3));
-          }
-          *radii[i] = std::max(0.0f, radius + adjustment);
-        }
-        BuildHTMLBoxPath(*sourceData, expanded);
+        BuildShadowBoxPath(*sourceData, sw, sh, expanded, box.borderRadiusEllipse);
         sourceData->transform(
-            Matrix::Translate(border.left - spread + s.offsetX, border.top - spread + s.offsetY));
+            Matrix::Translate(border - spread + s.offsetX, border - spread + s.offsetY));
       }
       auto* clipData = _document->makeNode<PathData>();
-      BuildHTMLBoxPath(*clipData, box, border);
+      BuildShadowBoxPath(*clipData, w, h, radii, box.borderRadiusEllipse);
+      clipData->transform(Matrix::Translate(border, border));
       // An even-odd contour represents the complement without relying on the
       // opacity of the actual element. Its finite outer edge is beyond the
       // blur kernel, so it cannot affect the visible shadow.
@@ -1075,39 +1040,17 @@ void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes
                                            bool& emitted) {
   if (box.backdropFilter.empty()) return;
   auto steps = _valueParser.parseFilterChain(box.backdropFilter);
-  auto* style = _document->makeNode<BackgroundFilterStyle>();
-  for (const auto& step : steps) {
+  for (auto& step : steps) {
     if (step.kind == HTMLValueParser::FilterStep::Kind::Blur) {
-      auto* filter = _document->makeNode<BlurFilter>();
-      filter->blurX = step.blurX;
-      filter->blurY = step.blurY;
-      style->filters.push_back(filter);
-    } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
-      auto* filter = _document->makeNode<ColorMatrixFilter>();
-      filter->matrix = step.matrix;
-      style->filters.push_back(filter);
-    } else if (step.kind == HTMLValueParser::FilterStep::Kind::DropShadow) {
-      auto* filter = _document->makeNode<DropShadowFilter>();
-      filter->offsetX = step.shadow.offsetX;
-      filter->offsetY = step.shadow.offsetY;
-      filter->blurX = filter->blurY = step.shadow.blur;
-      filter->color = step.shadow.color;
-      style->filters.push_back(filter);
-    } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
-      auto decoded = _filterDecoder.decode(step.refId);
-      style->filters.insert(style->filters.end(), decoded.begin(), decoded.end());
+      auto bg = _document->makeNode<BackgroundBlurStyle>();
+      bg->blurX = step.blurX;
+      bg->blurY = step.blurY;
+      layer->styles.push_back(bg);
+      emitted = true;
     } else {
-      _diagnostics.warn("html: unsupported backdrop-filter step '" + step.raw + "'");
-      return;
+      _diagnostics.warn("html: backdrop-filter '" + step.raw + "' not supported");
     }
   }
-  if (style->filters.empty()) return;
-  if (std::isfinite(box.widthPx) && std::isfinite(box.heightPx)) {
-    style->clipPath = _document->makeNode<PathData>();
-    BuildHTMLBoxPath(*style->clipPath, box);
-  }
-  layer->styles.push_back(style);
-  emitted = true;
 }
 
 void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
@@ -1227,8 +1170,6 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
 
   // data-* attributes -> customData
   forwardDataAttributes(layer, element);
-  if (element && !element->findAttribute("data-pagx-text-clip"))
-    layer->customData["pagx-text-clip"] = box.absolute ? "exclude" : "include";
   // href on <a>
   if (element->name == "a") {
     auto* href = element->findAttribute("href");
@@ -1355,55 +1296,6 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
 
 Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& box) {
   if (inner == nullptr) return inner;
-  if (box.outlineWidth > 0 && std::isfinite(box.widthPx) && std::isfinite(box.heightPx)) {
-    auto* wrapper = _document->makeNode<Layer>();
-    MoveLayoutSlot(wrapper, inner);
-    wrapper->width = inner->width;
-    wrapper->height = inner->height;
-    wrapper->matrix = inner->matrix;
-    inner->matrix = {};
-    wrapper->alpha = inner->alpha;
-    inner->alpha = 1;
-    wrapper->blendMode = inner->blendMode;
-    inner->blendMode = BlendMode::Normal;
-    wrapper->filters = std::move(inner->filters);
-    wrapper->id = std::move(inner->id);
-    wrapper->customData = std::move(inner->customData);
-    ResetLayoutAnchors(inner);
-    inner->percentWidth = inner->percentHeight = 100;
-    wrapper->children.push_back(inner);
-    float outer = box.outlineOffset + box.outlineWidth;
-    HTMLBoxAttributes outline = box;
-    outline.widthPx = std::max(0.0f, box.widthPx + 2 * outer);
-    outline.heightPx = std::max(0.0f, box.heightPx + 2 * outer);
-    float* radii[] = {&outline.borderRadiusTLPx,  &outline.borderRadiusTRPx,
-                      &outline.borderRadiusBRPx,  &outline.borderRadiusBLPx,
-                      &outline.borderRadiusTLYPx, &outline.borderRadiusTRYPx,
-                      &outline.borderRadiusBRYPx, &outline.borderRadiusBLYPx};
-    for (auto* radius : radii)
-      if (*radius > 0) *radius = std::max(0.0f, *radius + outer);
-    outline.borderWidthPx = box.outlineWidth;
-    outline.borderWidths = {box.outlineWidth, box.outlineWidth, box.outlineWidth, box.outlineWidth};
-    outline.borderSet = outline.borderUniform = true;
-    outline.borderStyle = box.outlineStyle;
-    outline.borderColor = box.outlineColor;
-    outline.borderImageSource.clear();
-    for (int i = 0; i < 4; ++i) {
-      outline.borderStyles[i] = box.outlineStyle;
-      outline.borderColors[i] = box.outlineColor;
-    }
-    auto* paint = _document->makeNode<Layer>();
-    paint->left = paint->top = -outer;
-    paint->width = outline.widthPx;
-    paint->height = outline.heightPx;
-    paint->includeInLayout = false;
-    auto* shape = buildBackgroundGeometry(outline);
-    paint->contents.push_back(shape);
-    bool emitted = false;
-    applyBorderStroke(paint, outline, shape, emitted);
-    wrapper->children.push_back(paint);
-    inner = wrapper;
-  }
   if (box.marginTopPx == 0.0f && box.marginRightPx == 0.0f && box.marginBottomPx == 0.0f &&
       box.marginLeftPx == 0.0f) {
     return inner;
@@ -1453,7 +1345,6 @@ void HTMLLayerBuilder::emitTextDecorationLine(Layer* host, const Color& /*textCo
                                               bool decorationColorDiffers, float bottom,
                                               float centerY) {
   auto rect = _document->makeNode<Rectangle>();
-  rect->customData["html-text-decoration"] = "true";
   rect->percentWidth = 100.0f;
   rect->height = 1.0f;
   if (!std::isnan(bottom)) rect->bottom = bottom;
