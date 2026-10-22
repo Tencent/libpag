@@ -1053,10 +1053,11 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   if (maskLayer->id.empty()) {
     maskLayer->id = _idAllocator->generateUnique("mask");
   }
-  for (auto& node : svgDoc->nodes) {
-    _document->nodes.push_back(std::move(node));
-  }
-  svgDoc->nodes.clear();
+  // Adopt the mask's nodes. adoptNodes() renames the SVG importer's auto-generated ids (path1,
+  // color1, ...) first: they are numbered from scratch per document and would otherwise collide
+  // with ids this document already uses, which would report duplicates or hijack its "@id"
+  // references during registration.
+  _document->adoptNodes(*svgDoc);
   svgDoc->layers.clear();
 
   layer->mask = maskLayer;

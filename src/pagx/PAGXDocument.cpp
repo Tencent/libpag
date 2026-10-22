@@ -18,11 +18,18 @@
 
 #include "pagx/PAGXDocument.h"
 #include <algorithm>
+#if defined(PAG_BUILD_SVG)
+#include <cctype>
+#endif
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
+#if defined(PAG_BUILD_SVG)
+#include "pagx/SVGImporter.h"
+#endif
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -208,6 +215,10 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   if (config != nullptr) {
     _fontConfig = *config;
   }
+  // Mount inline import content as sub-documents before anything reads the tree: the wrapper
+  // compositions join the node list here, so the bounds snapshot below and every layout pass
+  // observe the mounted structure. Idempotent — already-mounted layers are skipped.
+  attachInlineImportDocuments();
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
@@ -305,6 +316,67 @@ Node* PAGXDocument::findNode(const std::string& id) const {
   return it != nodeMap.end() ? it->second : nullptr;
 }
 
+void PAGXDocument::adoptNodes(PAGXDocument& other) {
+  if (&other == this) {
+    // Self-adoption would append nodes to the very vector being iterated.
+    return;
+  }
+  // Rename before taking the nodes over: importer auto-generated ids (image1, path1, ...) collide
+  // as a matter of course when several inline SVGs merge into one document, and a caller that
+  // forgot this step would merge duplicate ids (illegal PAGX on export) with only an error to show
+  // for it. Doing it here makes the correct sequence the only one available.
+  renameCollidingIds(&other);
+  nodes.reserve(nodes.size() + other.nodes.size());
+  for (auto& node : other.nodes) {
+    node->index = static_cast<int>(nodes.size());
+    nodeSet.insert(node.get());
+    // Adopted content is part of this document after the transfer, so its ids join the id index
+    // exactly like import-time registration: findNode(), data-bind "@id" targets, and deferred
+    // mask resolution must see these nodes. A collision is reported and the HOST mapping is kept
+    // — registerNode would overwrite it with the adopted node, hijacking every host "@id"
+    // reference to it, which is worse than not registering the foreign id at all.
+    if (!node->id.empty() && nodeMap.find(node->id) != nodeMap.end()) {
+      errors.push_back("Duplicate node id '" + node->id + "'.");
+    } else {
+      registerNode(node.get(), node->id);
+    }
+    nodes.push_back(std::move(node));
+  }
+  // The nodes now belong to this document. Clearing the source's ownership set and id index
+  // alongside its list keeps it from answering ownsNode()/findNode() for memory it no longer owns.
+  other.nodes.clear();
+  other.nodeSet.clear();
+  other.nodeMap.clear();
+}
+
+void PAGXDocument::renameCollidingIds(PAGXDocument* other) {
+  if (other == nullptr || other == this) {
+    return;
+  }
+  std::unordered_set<std::string> usedIds = {};
+  for (auto& node : nodes) {
+    if (!node->id.empty()) {
+      usedIds.insert(node->id);
+    }
+  }
+  for (auto& node : other->nodes) {
+    if (node->id.empty()) {
+      continue;
+    }
+    if (usedIds.insert(node->id).second) {
+      continue;
+    }
+    std::string base = node->id;
+    std::string candidate = {};
+    int suffix = 2;
+    do {
+      candidate = base + "_" + std::to_string(suffix++);
+    } while (usedIds.count(candidate) > 0);
+    node->id = candidate;
+    usedIds.insert(candidate);
+  }
+}
+
 void PAGXDocument::registerNode(Node* node, const std::string& id) {
   if (id.empty()) {
     return;
@@ -334,6 +406,9 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
     }
   }
   nodes.resize(writeIdx);
+  for (size_t i = 0; i < nodes.size(); i++) {
+    nodes[i]->index = static_cast<int>(i);
+  }
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -355,7 +430,11 @@ void PAGXDocument::resetLayoutState() {
 
 static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   for (auto* layer : layers) {
-    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+    // An inline import that has been mounted as a sub-document (applyLayout mounts them) renders
+    // through its composition reference and no longer blocks consumers; only unmounted directives
+    // (inline content that failed to parse, or file-based import sources) count as unresolved.
+    if (layer->composition == nullptr &&
+        (!layer->importDirective.source.empty() || !layer->importDirective.content.empty())) {
       return true;
     }
     if (LayersHaveImports(layer->children)) {
@@ -364,6 +443,100 @@ static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   }
   return false;
 }
+
+// Mounting inline imports needs a parser for the inline format. The SVG importer is an optional
+// module (PAG_BUILD_SVG), so everything that parses content is compiled only when it is linked;
+// without it a document keeps its inline directives unmounted, which hasUnresolvedImports() reports
+// and 'pagx resolve' can still flatten.
+#if defined(PAG_BUILD_SVG)
+
+// Returns the lowercased tag name of the first element in the given XML content, mirroring the
+// CLI importer's InferFormatFromContent so an inline import without an explicit importFormat is
+// classified the same way 'pagx resolve' classifies it.
+static std::string FirstContentTagName(const std::string& content) {
+  auto pos = content.find('<');
+  while (pos != std::string::npos) {
+    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
+        content[pos + 1] != '?') {
+      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
+      if (tagEnd != std::string::npos) {
+        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
+        for (auto& ch : tagName) {
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        return tagName;
+      }
+    }
+    pos = content.find('<', pos + 1);
+  }
+  return {};
+}
+
+// True when the layer's inline import content is SVG: an explicit (case-insensitive) svg format
+// wins; an empty format sniffs the content's first tag, exactly like the resolve path.
+static bool IsInlineSvgImport(const Layer* layer) {
+  if (layer->importDirective.content.empty()) {
+    return false;
+  }
+  std::string format = layer->importDirective.format;
+  for (auto& ch : format) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (format.empty()) {
+    format = FirstContentTagName(layer->importDirective.content);
+  }
+  return format == "svg";
+}
+
+// Collects layers whose inline import content is not mounted yet. Recurses into child layers;
+// the SVG content itself never carries import directives, so mounted subtrees are not scanned.
+static void CollectLayersWithInlineImports(const std::vector<Layer*>& layers,
+                                           std::vector<Layer*>* out) {
+  for (auto* layer : layers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->composition == nullptr && layer->externalDoc == nullptr &&
+        IsInlineSvgImport(layer)) {
+      out->push_back(layer);
+    }
+    CollectLayersWithInlineImports(layer->children, out);
+  }
+}
+
+// Mounts the layer's inline import content as a sub-document, mirroring LoadExternalComposition:
+// the SVG parses into its own document (own id space and node list), a wrapper Composition with no
+// id registers in the host (layout, binding, and export walks find it; the id-less wrapper is
+// skipped by the exporter's Resources pass), and the layer renders through the composition
+// reference. The import directive is kept — it is the serialization anchor the exporter writes
+// back, and 'pagx resolve' still flattens it on demand. When the layer authors both dimensions,
+// they are passed as the importer's target size so the content is uniformly scaled to fit — the
+// same semantics 'pagx resolve' applies — and the sub-document's size equals the target, keeping
+// the wrapper-size == sub-document-size invariant of external compositions. Content that parses
+// but has no drawable layers (e.g. a defs-only SVG kept as a shared-resource carrier) mounts an
+// empty wrapper, which renders as nothing — exactly what that content should produce. Returns
+// false (leaving the directive unresolved) only when the content cannot be parsed at all.
+static bool AttachInlineImport(PAGXDocument* host, Layer* layer) {
+  SVGImporter::Options options = {};
+  if (!std::isnan(layer->width) && !std::isnan(layer->height)) {
+    options.targetWidth = layer->width;
+    options.targetHeight = layer->height;
+  }
+  auto svgDoc = SVGImporter::ParseString(layer->importDirective.content, options);
+  if (svgDoc == nullptr) {
+    return false;
+  }
+  auto* wrapper = host->makeNode<Composition>();
+  wrapper->width = svgDoc->width;
+  wrapper->height = svgDoc->height;
+  wrapper->layers = svgDoc->layers;
+  wrapper->animations = svgDoc->animations;
+  layer->composition = wrapper;
+  layer->externalDoc = svgDoc;
+  return true;
+}
+
+#endif  // PAG_BUILD_SVG
 
 bool PAGXDocument::hasUnresolvedImports() const {
   if (LayersHaveImports(layers)) {
@@ -378,6 +551,74 @@ bool PAGXDocument::hasUnresolvedImports() const {
     }
   }
   return false;
+}
+
+void PAGXDocument::attachInlineImportDocuments() {
+#if defined(PAG_BUILD_SVG)
+  // Snapshot the layers to mount before mounting any of them: AttachInlineImport calls
+  // makeNode<Composition>(), which push_back()s into nodes and would invalidate an active
+  // iterator over the composition list.
+  std::vector<Layer*> pending = {};
+  CollectLayersWithInlineImports(layers, &pending);
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      CollectLayersWithInlineImports(static_cast<Composition*>(node.get())->layers, &pending);
+    }
+  }
+  for (auto* layer : pending) {
+    // A layer whose content failed to parse once is not retried on every layout pass —
+    // applyLayout runs on each notifyChange, and each retry would append the same error again.
+    if (inlineImportMountFailures.find(layer) != inlineImportMountFailures.end()) {
+      continue;
+    }
+    if (!AttachInlineImport(this, layer)) {
+      inlineImportMountFailures.insert(layer);
+      errors.push_back("Failed to parse inline import content" +
+                       (layer->id.empty() ? std::string(".") : " on layer '" + layer->id + "'."));
+    }
+  }
+#endif
+}
+
+bool PAGXDocument::detachInlineImport(Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  // Clear any failure record up front, independently of whether a wrapper is really detached: a
+  // failed attach records the layer while composition is still null (nothing was mounted), so
+  // gating this erase behind the mount checks below would make it unreachable. That would break
+  // the retry promise in the header - a host fixing importDirective.content and re-parsing would
+  // still be skipped, leaving hasUnresolvedImports() permanently true.
+  inlineImportMountFailures.erase(layer);
+  // compositionFilePath is the precise discriminator between the two mount kinds: a file-loaded
+  // external composition retains it as its origin (LoadExternalComposition), while an inline
+  // import mount never sets it. A layer carrying BOTH a file composition and leftover inline
+  // content must not have its file wrapper detached here.
+  if (layer->composition == nullptr || layer->externalDoc == nullptr ||
+      !layer->compositionFilePath.empty() || layer->importDirective.content.empty()) {
+    return false;
+  }
+  auto* wrapper = layer->composition;
+  // Take the sub-document off the layer, but keep it alive in a local handle until nothing else
+  // references it. A live scene's runtime tree holds nodes owned by the sub-document (PAGLayer::node
+  // and PAGComposition::document), so dropping the last reference here would leave them dangling.
+  auto subDocument = layer->externalDoc;
+  layer->externalDoc = nullptr;
+  layer->composition = nullptr;
+  // Rebuild every live scene's runtime tree while the wrapper and the sub-document are both still
+  // alive, so the tree being torn down can still read them. The rebuilt tree is generated from this
+  // document's node list and no longer references either, which is what makes the two releases
+  // below safe. Hosts therefore never have to tear a scene down before detaching.
+  rebuildLiveScenes();
+  // The wrapper's layers/animations point at nodes owned by the sub-document, so clear them before
+  // the wrapper outlives its contents; both are still alive here, so this only drops the references
+  // rather than rescuing them.
+  wrapper->layers.clear();
+  wrapper->animations.clear();
+  removeNodes({wrapper});
+  // `subDocument` releases the sub-document on return; the rebuild above already dropped every
+  // runtime reference to it.
+  return true;
 }
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
@@ -714,8 +955,8 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // changed, and those are merged into ownedDirty below so refreshNodes re-syncs their runtime
   // transform too.
   if (layoutChanged) {
-    std::unordered_set<const PAGXDocument*> visited = {};
     std::vector<Layer*> layoutRepositioned = {};
+    std::unordered_set<const PAGXDocument*> visited = {};
     applyLayout(nullptr, visited, &layoutRepositioned);
     if (!layoutRepositioned.empty()) {
       ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
@@ -770,6 +1011,19 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
       it = liveScenes.erase(it);
     } else {
       ++it;
+    }
+  }
+}
+
+void PAGXDocument::rebuildLiveScenes() {
+  PruneExpiredScenes(&liveScenes);
+  for (auto& weakScene : liveScenes) {
+    auto scene = weakScene.lock();
+    if (scene != nullptr) {
+      // A full rebuild rather than an incremental refresh: the caller is about to destroy nodes the
+      // current tree references, and those nodes are gone from the document by then, so patching the
+      // tree in place would have to resolve references that no longer exist.
+      scene->buildRuntimeTree();
     }
   }
 }

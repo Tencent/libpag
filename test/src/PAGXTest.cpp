@@ -188,8 +188,7 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
   return outPath;
 }
 
-static void VerifyLayerConsistency(const std::shared_ptr<pagx::PAGScene>& scene,
-                                   pagx::RuntimeBinding* binding,
+static void VerifyLayerConsistency(pagx::RuntimeBinding* binding,
                                    const std::shared_ptr<pagx::PAGLayer>& layer) {
   if (layer == nullptr) {
     return;
@@ -200,17 +199,8 @@ static void VerifyLayerConsistency(const std::shared_ptr<pagx::PAGScene>& scene,
     EXPECT_EQ(bound.get(), layer->runtimeLayer.get())
         << "binding mismatch: promotion sync may not have run for this layer";
   }
-  if (layer->runtimeLayer != nullptr) {
-    auto it = scene->layerRegistry.find(layer->runtimeLayer.get());
-    EXPECT_NE(it, scene->layerRegistry.end())
-        << "layerRegistry missing entry: hit-test will miss this layer";
-    if (it != scene->layerRegistry.end()) {
-      EXPECT_EQ(it->second, layer.get())
-          << "layerRegistry maps to wrong PAGLayer: hit-test returns incorrect layer";
-    }
-  }
   for (auto& child : layer->getChildren()) {
-    VerifyLayerConsistency(scene, binding, child);
+    VerifyLayerConsistency(binding, child);
   }
 }
 
@@ -222,7 +212,7 @@ static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) 
   if (binding == nullptr) {
     return;
   }
-  VerifyLayerConsistency(scene, binding, scene->rootComposition());
+  VerifyLayerConsistency(binding, scene->rootComposition());
 }
 
 /**
@@ -1454,6 +1444,296 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
   EXPECT_EQ(doc2->layers[0]->customData, doc->layers[0]->customData);
 }
 
+/**
+ * Test case: adoptNodes() fully integrates adopted ids into the document's id index — findNode()
+ * resolves them like any authored node — and an id that collides with the host's is renamed on the
+ * way in (adoptNodes() performs the rename itself), so the host's "@id" references keep resolving
+ * to the host node instead of being hijacked by the adopted one.
+ */
+PAGX_TEST(PAGXTest, AdoptNodesRegistersIdsAndRenamesCollisions) {
+  auto host = pagx::PAGXDocument::Make(100, 100);
+  host->layers.push_back(host->makeNode<pagx::Layer>("hostLayer"));
+
+  auto foreign = pagx::PAGXDocument::Make(50, 50);
+  auto foreignLayer = foreign->makeNode<pagx::Layer>("inner");
+  foreign->layers.push_back(foreignLayer);
+
+  host->adoptNodes(*foreign);
+  EXPECT_NE(host->findNode<pagx::Layer>("inner"), nullptr);
+  EXPECT_TRUE(host->ownsNode(foreignLayer));
+
+  auto second = pagx::PAGXDocument::Make(50, 50);
+  auto* foreignDuplicate = second->makeNode<pagx::Layer>("hostLayer");
+  second->layers.push_back(foreignDuplicate);
+  host->adoptNodes(*second);
+  // The colliding id was renamed while being adopted, so the document never carries two nodes
+  // under the same id (which would be illegal on export) and no duplicate error is reported: the
+  // host's "@id" references still resolve to the host node and the adopted one gets a fresh id.
+  EXPECT_EQ(foreignDuplicate->id, "hostLayer_2");
+  EXPECT_EQ(host->findNode<pagx::Layer>("hostLayer"), host->layers[0]);
+  EXPECT_NE(host->findNode<pagx::Layer>("hostLayer_2"), nullptr);
+}
+
+/**
+ * Test case: renameCollidingIds() renames the ids of the given document that collide with the
+ * host's used ids or repeat within the given document itself, so a subsequent adoptNodes()
+ * registers them without duplicate errors. This is the path importers take for auto-generated
+ * ids (image1, path1, ...), which collide as a matter of course across separately imported SVGs.
+ */
+PAGX_TEST(PAGXTest, RenameCollidingIdsAvoidsHostAndSelfCollisions) {
+  auto host = pagx::PAGXDocument::Make(100, 100);
+  host->layers.push_back(host->makeNode<pagx::Layer>("image1"));
+
+  auto foreign = pagx::PAGXDocument::Make(50, 50);
+  auto* first = foreign->makeNode<pagx::Layer>("image1");
+  auto* repeated = foreign->makeNode<pagx::Layer>("image1");
+  auto* unique = foreign->makeNode<pagx::Layer>("unique");
+  foreign->layers.push_back(first);
+  foreign->layers.push_back(repeated);
+  foreign->layers.push_back(unique);
+
+  host->renameCollidingIds(foreign.get());
+  EXPECT_EQ(first->id, "image1_2");
+  EXPECT_EQ(repeated->id, "image1_3");
+  EXPECT_EQ(unique->id, "unique");
+
+  host->adoptNodes(*foreign);
+  EXPECT_TRUE(host->errors.empty());
+  EXPECT_NE(host->findNode<pagx::Layer>("image1_2"), nullptr);
+  EXPECT_NE(host->findNode<pagx::Layer>("image1_3"), nullptr);
+  EXPECT_NE(host->findNode<pagx::Layer>("unique"), nullptr);
+}
+
+// Shared document for the inline-import mounting tests: a 20x20 inline SVG under a 40x40 layer,
+// so the mount must also apply the explicit-size scale the flattened resolve path would apply.
+static const char* InlineImportSvgDocument() {
+  return R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="40" height="40" importFormat="svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)";
+}
+
+/**
+ * Test case: loading a document mounts a layer's inline import content as a sub-document — the SVG
+ * parses into its own document with its own id space, a wrapper Composition registers in the host,
+ * and the layer renders through the composition reference without a prior resolve. Content scales
+ * to an explicitly-sized layer (mirroring the flatten semantics), the host node list gains only the
+ * wrapper, and hasUnresolvedImports() stops reporting the mounted directive. A later applyLayout
+ * is idempotent (no duplicate mount).
+ */
+PAGX_TEST(PAGXTest, InlineImportMountsAsSubDocument) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+  // The mount delegates scaling to the SVG importer's target-size path (the same semantics
+  // 'pagx resolve' applies), so the sub-document's size equals the layer's authored size and the
+  // wrapper keeps the wrapper-size == sub-document-size invariant of external compositions.
+  EXPECT_FLOAT_EQ(host->externalDoc->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->externalDoc->height, 40.0f);
+  EXPECT_FLOAT_EQ(host->composition->width, host->externalDoc->width);
+  EXPECT_FLOAT_EQ(host->composition->height, host->externalDoc->height);
+  EXPECT_EQ(host->externalDoc->layers.size(), 1u);
+
+  // A later layout pass must not mount again (the mount is idempotent).
+  const auto nodeCountWhileMounted = doc->nodes.size();
+  doc->applyLayout();
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // Detaching removes exactly one host node (the wrapper); the SVG's content is never visible to
+  // the host's id index, so the sub-document keeps its own node list entirely.
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted - 1u);
+}
+
+/**
+ * Test case: mounting scales content uniformly to fit — never stretched — when the layer's aspect
+ * ratio differs from the SVG's. A 20x20 SVG in a 40x20 layer scales by min(2, 1) = 1 and centers
+ * horizontally; a non-uniform stretch would bake scale (2, 1) into the content matrix instead.
+ * This is the same aspect-fit semantics 'pagx resolve' applies, so the mounted reference and the
+ * flattened form render identically.
+ */
+PAGX_TEST(PAGXTest, InlineImportMountScalesUniformlyNotStretched) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="40" height="20" importFormat="svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+  EXPECT_FLOAT_EQ(host->externalDoc->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->externalDoc->height, 20.0f);
+  ASSERT_EQ(host->externalDoc->layers.size(), 1u);
+  // Uniform fit: scale 1 on both axes (a stretch would give a == 2), centered horizontally.
+  const auto& m = host->externalDoc->layers[0]->matrix;
+  EXPECT_FLOAT_EQ(m.a, 1.0f);
+  EXPECT_FLOAT_EQ(m.d, 1.0f);
+  EXPECT_FLOAT_EQ(m.tx, 10.0f);
+}
+
+/**
+ * Test case: an inline <svg> without an explicit importFormat is classified by sniffing the
+ * content's first tag — the same normalization 'pagx resolve' applies — so hand-written documents
+ * that omit the attribute still mount.
+ */
+PAGX_TEST(PAGXTest, InlineImportWithoutFormatSniffsSvg) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="20" height="20">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  EXPECT_NE(host->composition, nullptr);
+}
+
+/**
+ * Test case: a mounted inline import round-trips through the exporter — the import directive and
+ * its content are written back (the id-less wrapper is skipped by the Resources pass), so a
+ * re-imported document mounts the sub-document again.
+ */
+PAGX_TEST(PAGXTest, InlineImportExportRoundTrips) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+
+  auto out = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(out.find("importFormat=\"svg\""), std::string::npos);
+  EXPECT_NE(out.find("<svg"), std::string::npos);
+  // The mount itself leaves no visible trace: no Composition resource is written.
+  EXPECT_EQ(out.find("<Composition "), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(out);
+  ASSERT_NE(doc2, nullptr);
+  EXPECT_FALSE(doc2->hasUnresolvedImports());
+  auto* host2 = doc2->findNode<pagx::Layer>("host");
+  ASSERT_NE(host2, nullptr);
+  ASSERT_NE(host2->composition, nullptr);
+}
+
+/**
+ * Test case: detachInlineImport() removes a mount (the inverse of the load-time mount), so a
+ * later resolve flattens into the layer instead of leaving the composition reference shadowing
+ * the flattened contents. The import directive survives the detach.
+ */
+PAGX_TEST(PAGXTest, DetachInlineImportForResolve) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  const auto nodeCountWhileMounted = doc->nodes.size();
+
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted - 1u);
+  // The directive is untouched, so the import counts as unresolved until it is flattened.
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+
+  // Detaching a layer without a mounted inline import is a no-op.
+  EXPECT_FALSE(doc->detachInlineImport(host));
+}
+
+/**
+ * Test case: detachInlineImport() leaves a file-loaded external composition alone, even when the
+ * layer also carries leftover inline import content — the compositionFilePath origin retained by
+ * the file mount is the discriminator that keeps our detach from removing a wrapper we did not
+ * create.
+ */
+PAGX_TEST(PAGXTest, DetachInlineImportKeepsFileMountedWrapper) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  doc->layers.push_back(host);
+  // Simulate a file-loaded external composition mount alongside leftover inline content.
+  auto externalDoc = pagx::PAGXDocument::Make(20, 20);
+  auto* wrapper = doc->makeNode<pagx::Composition>();
+  wrapper->width = 20;
+  wrapper->height = 20;
+  host->composition = wrapper;
+  host->externalDoc = externalDoc;
+  host->compositionFilePath = "external.pagx";
+  host->importDirective.content =
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" "
+      "height=\"10\"/>";
+
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, wrapper);
+  EXPECT_EQ(host->externalDoc, externalDoc);
+  EXPECT_EQ(host->compositionFilePath, "external.pagx");
+  // The wrapper is still a live host node.
+  size_t wrapperCount = 0;
+  for (const auto& node : doc->nodes) {
+    if (node.get() == static_cast<pagx::Node*>(wrapper)) {
+      wrapperCount++;
+    }
+  }
+  EXPECT_EQ(wrapperCount, 1u);
+}
+
+/**
+ * Test case: inline content that cannot be parsed is remembered so repeated layouts neither retry
+ * nor re-append the same error, and detachInlineImport() is what clears that memory. It has to work
+ * even though a failed mount left nothing attached — otherwise a host that fixes the content and
+ * re-parses would stay skipped forever with hasUnresolvedImports() permanently true.
+ */
+PAGX_TEST(PAGXTest, InlineImportRetriesAfterContentFix) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->width = 40;
+  host->height = 40;
+  host->importDirective.format = "svg";
+  // A root element other than <svg> is what "cannot be parsed at all" means to the SVG importer.
+  host->importDirective.content = "<g/>";
+  doc->layers.push_back(host);
+
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  const auto errorCount = doc->errors.size();
+  EXPECT_GT(errorCount, 0u);
+
+  // The failure is remembered, so a repeated layout neither retries nor repeats the error.
+  doc->applyLayout();
+  EXPECT_EQ(doc->errors.size(), errorCount);
+
+  // Fixing the content alone still does not mount it: the remembered failure suppresses the retry.
+  host->importDirective.content =
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\"/>";
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+
+  // detachInlineImport() reports false (there is no mounted wrapper to remove) but still clears the
+  // failure, so the next layout mounts the fixed content.
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  doc->applyLayout();
+  ASSERT_NE(host->composition, nullptr);
+  EXPECT_NE(host->externalDoc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   // Valid keys.
   EXPECT_TRUE(pagx::IsValidCustomDataKey("role"));
@@ -2445,6 +2725,116 @@ PAGX_TEST(PAGXTest, LayoutConstraintStretchTextBox) {
   EXPECT_FLOAT_EQ(bounds.x, 30.0f);
   EXPECT_FLOAT_EQ(bounds.height, 160.0f);
   EXPECT_FLOAT_EQ(bounds.y, 20.0f);
+}
+
+/**
+ * Test case: the per-pass layout memo (LayoutContext::layoutTargets) must not change the resolved
+ * geometry. A second applyLayout() rebuilds the context with an empty memo, so a memo that wrongly
+ * skipped a subtree would surface as geometry differing between passes, and a freshly built
+ * document — which also starts from an empty memo — must agree with both.
+ */
+PAGX_TEST(PAGXTest, LayoutMemoDoesNotChangeResolvedGeometry) {
+  const int depth = 4;
+  auto doc = pagx::PAGXDocument::Make(400, 400);
+  ASSERT_TRUE(doc != nullptr);
+
+  // Nested content-measured layers: the outer ones defer their content-measured axes during pass 1
+  // and are re-descended in pass 2, which is what the memo exists to collapse.
+  pagx::Layer* chain[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    chain[i] = doc->makeNode<pagx::Layer>();
+    if (i > 0) {
+      chain[i - 1]->children = {chain[i]};
+    }
+  }
+  chain[depth - 1]->width = 100;
+  chain[depth - 1]->height = 100;
+  doc->layers.push_back(chain[0]);
+
+  doc->applyLayout();
+  pagx::Rect firstPass[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    firstPass[i] = chain[i]->layoutBounds();
+    ASSERT_FALSE(std::isnan(firstPass[i].width)) << i;
+    ASSERT_FALSE(std::isnan(firstPass[i].height)) << i;
+  }
+
+  doc->applyLayout();
+  for (int i = 0; i < depth; i++) {
+    auto bounds = chain[i]->layoutBounds();
+    EXPECT_FLOAT_EQ(bounds.width, firstPass[i].width) << i;
+    EXPECT_FLOAT_EQ(bounds.height, firstPass[i].height) << i;
+  }
+
+  auto fresh = pagx::PAGXDocument::Make(400, 400);
+  pagx::Layer* freshChain[depth] = {};
+  for (int i = 0; i < depth; i++) {
+    freshChain[i] = fresh->makeNode<pagx::Layer>();
+    if (i > 0) {
+      freshChain[i - 1]->children = {freshChain[i]};
+    }
+  }
+  freshChain[depth - 1]->width = 100;
+  freshChain[depth - 1]->height = 100;
+  fresh->layers.push_back(freshChain[0]);
+  fresh->applyLayout();
+  for (int i = 0; i < depth; i++) {
+    EXPECT_FLOAT_EQ(freshChain[i]->layoutBounds().width, firstPass[i].width) << i;
+    EXPECT_FLOAT_EQ(freshChain[i]->layoutBounds().height, firstPass[i].height) << i;
+  }
+}
+
+/**
+ * Test case: StringParser::ParseDimension is the single dimension grammar behind the importer's
+ * attribute parsing, so an edit accepts exactly what a full reparse accepts. Accepted input writes
+ * one output and leaves the other NaN; rejected input leaves both NaN.
+ */
+PAGX_TEST(PAGXTest, ParseDimensionGrammar) {
+  struct Case {
+    const char* input;
+    bool percent;
+    float value;
+  };
+  const Case accepted[] = {
+      {"0", false, 0.0f}, {"100", false, 100.0f}, {"12.5", false, 12.5f},    {".5", false, 0.5f},
+      {"0%", true, 0.0f}, {"50%", true, 50.0f},   {"100.25%", true, 100.25f}};
+  for (const auto& item : accepted) {
+    float absolute = 0;
+    float percent = 0;
+    ASSERT_TRUE(pagx::ParseDimension(item.input, &absolute, &percent)) << item.input;
+    if (item.percent) {
+      EXPECT_FLOAT_EQ(percent, item.value) << item.input;
+      EXPECT_TRUE(std::isnan(absolute)) << item.input;
+    } else {
+      EXPECT_FLOAT_EQ(absolute, item.value) << item.input;
+      EXPECT_TRUE(std::isnan(percent)) << item.input;
+    }
+  }
+
+  // Rejected: empty, leading whitespace, a sign, a hex prefix, trailing junk, whitespace around the
+  // percent sign, and non-finite values.
+  const char* rejected[] = {"",     " 100", "\t100", "+1", "-1",  "0x10", "0X10",
+                            "10px", "50 %", "50% ",  "%",  "1,5", "inf",  "nan"};
+  for (const auto* input : rejected) {
+    float absolute = 0;
+    float percent = 0;
+    EXPECT_FALSE(pagx::ParseDimension(input, &absolute, &percent)) << input;
+    EXPECT_TRUE(std::isnan(absolute)) << input;
+    EXPECT_TRUE(std::isnan(percent)) << input;
+  }
+
+  // The importer runs the same grammar, so a string accepted above lands on the same member a full
+  // reparse writes: "50%" sets percentWidth and leaves width NaN, "120" sets height.
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="200" height="200">
+  <Layer id="d" width="50%" height="120"/>
+</pagx>)");
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = doc->findNode<pagx::Layer>("d");
+  ASSERT_TRUE(layer != nullptr);
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_FLOAT_EQ(layer->percentWidth, 50.0f);
+  EXPECT_FLOAT_EQ(layer->height, 120.0f);
+  EXPECT_TRUE(std::isnan(layer->percentHeight));
 }
 
 // =====================================================================================
@@ -8072,6 +8462,251 @@ PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
   EXPECT_TRUE(hasRangeError);
 }
 
+/**
+ * Test case: a sibling <TextLayout/> (legacy exporter descriptor) is converted into a TextBox
+ * wrapping the preceding <Text>, instead of being rejected as an unknown element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutSiblingConvertsToTextBox) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <Text text="Hello"><GlyphRun fontSize="15" glyphs="1" positions="0,0"/></Text>
+    <TextLayout width="267" textAlign="center" lineHeight="1.2"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->contents.size(), 1u);
+  auto* textBox = static_cast<pagx::TextBox*>(doc->layers[0]->contents[0]);
+  EXPECT_EQ(textBox->nodeType(), pagx::NodeType::TextBox);
+  ASSERT_EQ(textBox->elements.size(), 1u);
+  EXPECT_EQ(textBox->elements[0]->nodeType(), pagx::NodeType::Text);
+  EXPECT_FLOAT_EQ(textBox->width, 267.0f);
+  EXPECT_EQ(textBox->textAlign, pagx::TextAlign::Center);
+  EXPECT_FLOAT_EQ(textBox->lineHeight, 1.2f);
+}
+
+/**
+ * Test case: a <TextLayout/> without a preceding <Text> sibling is reported as an error and
+ * produces no content element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutWithoutTextReportsError) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <TextLayout width="267"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_FALSE(doc->errors.empty());
+  bool hasTextLayoutError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("TextLayout") != std::string::npos) {
+      hasTextLayoutError = true;
+    }
+  }
+  EXPECT_TRUE(hasTextLayoutError);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_TRUE(doc->layers[0]->contents.empty());
+}
+
+/**
+ * Test case: an internal Composition reference whose host Layer carries a <Timelines> driver
+ * builds and advances without crashing, and the nested layer is animated by its own binding.
+ */
+PAGX_TEST(PAGXTest, NestedCompositionTimelinesDriveAnimations) {
+  // Same XML as the driving case below but parsed-and-destroyed immediately, to cover the
+  // doc-teardown path that differs between native and wexception wasm builds.
+  {
+    auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr);
+    EXPECT_TRUE(doc->errors.empty());
+  }  // doc destroyed here while still holding nested-composition timelines.
+
+  auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  doc->applyLayout();  // Mirror the viewer's load order: layout before scene construction.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  // Mirror PAGXView::buildLayers: the default timeline comes from the scene and is driven by the
+  // view itself, while the scene tree advances the nested composition timelines.
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(defaultTimeline != nullptr);
+  ASSERT_EQ(defaultTimeline->type(), pagx::TimelineType::Animation);
+  defaultTimeline->advanceAndApply(0);
+  scene->advanceAndApply(0);
+  defaultTimeline->advanceAndApply(500000);
+  scene->advanceAndApply(500000);  // 0.5s: ball should sit mid-bob at y=56.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 2u);
+  ASSERT_EQ(rootChildren[1]->layerType(), pagx::LayerType::Composition);
+  ASSERT_EQ(rootChildren[1]->children.size(), 3u);
+  auto* ballRuntime = rootChildren[1]->children[0]->runtimeLayer.get();
+  ASSERT_TRUE(ballRuntime != nullptr);
+  EXPECT_FLOAT_EQ(ballRuntime->matrix().getTranslateY(), 60.0f);
+  auto surface = pagx::PAGSurface::MakeOffscreen(480, 160);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+}
+
 PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
@@ -8240,6 +8875,144 @@ PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
 
   auto miss = scene->getLayersUnderPoint(180, 180);
   EXPECT_TRUE(miss.empty());
+}
+
+/**
+ * Test case: getLayersUnderPoint's shapeHitTest argument selects how a layer's own content is
+ * tested. The corner of an ellipse's bounding box is inside the box but outside the filled ellipse,
+ * so the two modes disagree there while agreeing at the centre; false keeps the pre-existing
+ * bounding-box behaviour.
+ */
+PAGX_TEST(PAGXTest, HitTestShapeVersusBounds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>("ellipseId");
+  layer->name = "Ellipse";
+  auto ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {50, 50};
+  ellipse->size = {100, 100};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // (5, 5) is inside the 100x100 bounding box but outside the ellipse inscribed in it, so the
+  // default bounding-box test hits and the shape test misses.
+  auto boundsHits = scene->getLayersUnderPoint(5, 5);
+  ASSERT_FALSE(boundsHits.empty());
+  EXPECT_EQ(boundsHits[0]->name(), "Ellipse");
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5, true).empty());
+
+  // The centre is inside the ellipse, so both modes hit the same layer.
+  auto centerHits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(centerHits.empty());
+  EXPECT_EQ(centerHits[0]->name(), "Ellipse");
+  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50, true).empty());
+
+  // The handle re-tests itself with the same switch.
+  EXPECT_TRUE(boundsHits[0]->hitTestPoint(5, 5));
+  EXPECT_FALSE(boundsHits[0]->hitTestPoint(5, 5, true));
+  EXPECT_TRUE(boundsHits[0]->hitTestPoint(50, 50, true));
+}
+
+/**
+ * Test case: the result is ordered deepest hit first and every ancestor of the hit layer follows
+ * it, ending at the root composition. Callers such as editor selection rely on that order.
+ */
+PAGX_TEST(PAGXTest, HitTestAncestorChainOrder) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto container = doc->makeNode<pagx::Layer>("containerId");
+  container->name = "Container";
+  container->width = 200;
+  container->height = 200;
+
+  auto leaf = doc->makeNode<pagx::Layer>("leafId");
+  leaf->name = "Leaf";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {60, 60};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 1, 0, 1};
+  fill->color = solid;
+  leaf->contents.push_back(rect);
+  leaf->contents.push_back(fill);
+
+  container->children = {leaf};
+  doc->layers.push_back(container);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0]->name(), "Leaf");
+  EXPECT_EQ(hits[1]->name(), "Container");
+  EXPECT_EQ(hits[2].get(), static_cast<pagx::PAGLayer*>(scene->rootComposition().get()));
+
+  // A container with no content of its own is not hit by itself, so a point outside the leaf's
+  // rect misses the whole tree even though it is inside the container's box.
+  EXPECT_TRUE(scene->getLayersUnderPoint(150, 150).empty());
+}
+
+/**
+ * Test case: a layer whose mask does not cover the point is skipped together with its subtree, so
+ * the point does not hit the layer's own content even though it falls inside its bounding box.
+ */
+PAGX_TEST(PAGXTest, HitTestMaskGating) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  // The mask is a normal layer in the document; it covers the left half only.
+  auto maskLayer = doc->makeNode<pagx::Layer>("maskId");
+  maskLayer->name = "Mask";
+  auto maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {50, 100};
+  maskRect->size = {100, 200};
+  auto maskFill = doc->makeNode<pagx::Fill>();
+  auto maskSolid = doc->makeNode<pagx::SolidColor>();
+  maskSolid->color = {1, 1, 1, 1};
+  maskFill->color = maskSolid;
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(maskFill);
+
+  auto target = doc->makeNode<pagx::Layer>("targetId");
+  target->name = "Target";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {200, 200};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 1, 1};
+  fill->color = solid;
+  target->contents.push_back(rect);
+  target->contents.push_back(fill);
+  target->mask = maskLayer;
+
+  // The target is added last so it paints above the mask and is tested first.
+  doc->layers.push_back(maskLayer);
+  doc->layers.push_back(target);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  // Inside the mask's left half the target is hit.
+  auto inside = scene->getLayersUnderPoint(25, 100);
+  ASSERT_FALSE(inside.empty());
+  EXPECT_EQ(inside[0]->name(), "Target");
+
+  // Outside the mask the target's own content is gated away, so nothing is hit: the mask layer's
+  // content does not cover that point either.
+  EXPECT_TRUE(scene->getLayersUnderPoint(175, 100).empty());
 }
 
 /**

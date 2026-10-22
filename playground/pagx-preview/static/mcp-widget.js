@@ -129,8 +129,8 @@ async function registerFonts(view) {
 async function uploadDocumentSummary(view) {
   try {
     const duration = view.durationMicros();
-    const width = view.contentWidth();
-    const height = view.contentHeight();
+    const width = view.contentWidth;
+    const height = view.contentHeight;
     const summary = {
       width,
       height,
