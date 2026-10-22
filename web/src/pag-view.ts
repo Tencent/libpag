@@ -71,11 +71,10 @@ export class PAGView {
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
     if (pagView.pagViewOptions.useCanvas2D) {
-      if (isWebGPUBackend()) {
-        throw new Error('PAGView: useCanvas2D is not supported on the WebGPU backend.');
-      }
       PAGModule.globalCanvas.retain();
-      pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
+      if (!isWebGPUBackend()) {
+        pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
+      }
     } else {
       pagView.renderCanvas = RenderCanvas.from(canvasElement);
       pagView.renderCanvas.retain();
@@ -90,6 +89,7 @@ export class PAGView {
       canvasElement,
       pagView.rawWidth,
       pagView.rawHeight,
+      pagView.pagViewOptions.useCanvas2D,
     );
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
@@ -106,10 +106,20 @@ export class PAGView {
     canvasElement: HTMLCanvasElement | OffscreenCanvas,
     width: number,
     height: number,
+    useCanvas2D = false,
   ): PAGSurface {
     if (isWebGPUBackend()) {
       // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
       // Width and height are read from the canvas by the C++ side.
+      if (useCanvas2D) {
+        // In canvas2D mode PAG renders into the shared global canvas and flush() composites it
+        // onto the target canvas with drawImage. Size the global canvas exactly, because the
+        // surface wraps the whole canvas and its content is top-left origin.
+        const globalCanvas = PAGModule.globalCanvas.canvas;
+        if (!globalCanvas) throw new Error('Global canvas is not initialized!');
+        PAGModule.globalCanvas.setCanvasSize(width, height);
+        return PAGSurface.fromCanvas(globalCanvas);
+      }
       if (isOffscreenCanvas(canvasElement)) {
         return PAGSurface.fromCanvas(canvasElement);
       }
@@ -345,10 +355,14 @@ export class PAGView {
         if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d') as CanvasRenderingContext2D;
         const compositeOperation = this.canvasContext!.globalCompositeOperation;
         this.canvasContext!.globalCompositeOperation = 'copy';
+        // On WebGL the render target is the default framebuffer (bottom-left origin) of a
+        // possibly larger global canvas, so the content sits at the bottom; on WebGPU the
+        // surface wraps the whole exactly-sized canvas with top-left origin.
+        const srcY = isWebGPUBackend() ? 0 : PAGModule.globalCanvas.canvas.height - this.rawHeight;
         this.canvasContext?.drawImage(
           PAGModule.globalCanvas.canvas,
           0,
-          PAGModule.globalCanvas.canvas.height - this.rawHeight,
+          srcY,
           this.rawWidth,
           this.rawHeight,
           0,
@@ -415,7 +429,13 @@ export class PAGView {
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
     if (isWebGPUBackend()) {
-      const webgpuSurface = PAGView.makePAGSurface(null, this.canvasElement, this.rawWidth, this.rawHeight);
+      const webgpuSurface = PAGView.makePAGSurface(
+        null,
+        this.canvasElement,
+        this.rawWidth,
+        this.rawHeight,
+        this.pagViewOptions.useCanvas2D,
+      );
       this.player.setSurface(webgpuSurface);
       this.pagSurface?.destroy();
       this.pagSurface = webgpuSurface;
