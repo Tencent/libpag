@@ -272,6 +272,18 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 
 namespace pag {
 
+// GL readback readiness is fence-based: it only flips after the GPU drains previously queued
+// work, so tests must poll instead of assuming immediate readiness.
+static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readback) {
+  for (int i = 0; i < 5000; i++) {
+    if (readback->isReady()) {
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return false;
+}
+
 /**
  * 用例描述: 测试 PAGSurface 异步回读会话，公共 API 覆盖全部后端。GL 回读基于 fence，
  * 就绪要等 GPU 排空之前堆积的任务，不能假定创建即就绪，必须与同步 readPixels 的结果
@@ -292,14 +304,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   ASSERT_TRUE(readback != nullptr);
   EXPECT_EQ(readback->width(), pagFile->width());
   EXPECT_EQ(readback->height(), pagFile->height());
-  auto ready = false;
-  for (int i = 0; i < 5000 && !ready; i++) {
-    ready = readback->isReady();
-    if (!ready) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-  }
-  ASSERT_TRUE(ready);
+  ASSERT_TRUE(WaitReadbackReady(readback));
 
   const auto width = readback->width();
   const auto height = readback->height();
@@ -311,6 +316,77 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   ASSERT_TRUE(pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
                                      syncPixels.data(), static_cast<size_t>(width * 4)));
   EXPECT_EQ(asyncPixels, syncPixels);
+}
+
+/**
+ * 用例描述: 异步回读的非法参数防御与 ALPHA_8 格式转换路径（回读数据为表面原生 RGBA
+ * 格式，经 Pixmap 转换到目标格式，结果须与同步 readPixels 一致）
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = pagSurface->asyncReadPixels();
+  ASSERT_TRUE(readback != nullptr);
+  const auto width = readback->width();
+  const auto height = readback->height();
+
+  // 未就绪时 readPixels 返回 false 且不拷贝（GL 上创建后可能已就绪，只在未就绪时断言）
+  if (!readback->isReady()) {
+    std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4), 0xFF);
+    EXPECT_FALSE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(),
+                                      static_cast<size_t>(width * 4)));
+  }
+  ASSERT_TRUE(WaitReadbackReady(readback));
+
+  std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
+  EXPECT_FALSE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, nullptr,
+                                    static_cast<size_t>(width * 4)));
+  EXPECT_FALSE(
+      readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(), 0));
+
+  std::vector<uint8_t> asyncAlpha(static_cast<size_t>(width * height));
+  ASSERT_TRUE(readback->readPixels(ColorType::ALPHA_8, AlphaType::Premultiplied, asyncAlpha.data(),
+                                   static_cast<size_t>(width)));
+  std::vector<uint8_t> syncAlpha(static_cast<size_t>(width * height));
+  ASSERT_TRUE(pagSurface->readPixels(ColorType::ALPHA_8, AlphaType::Premultiplied, syncAlpha.data(),
+                                     static_cast<size_t>(width)));
+  EXPECT_EQ(asyncAlpha, syncAlpha);
+}
+
+/**
+ * 用例描述: 回读会话持有 PAGSurface 的生命周期，外部释放 surface 与 player 后会话
+ * 仍能完成就绪等待与取像素
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixelsOutlivesSurface) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  std::shared_ptr<PAGSurfaceReadback> readback = nullptr;
+  {
+    auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+    ASSERT_TRUE(pagSurface != nullptr);
+    auto pagPlayer = std::make_shared<PAGPlayer>();
+    pagPlayer->setComposition(pagFile);
+    pagPlayer->setSurface(pagSurface);
+    pagPlayer->setProgress(0.5);
+    ASSERT_TRUE(pagPlayer->flush());
+    readback = pagSurface->asyncReadPixels();
+    ASSERT_TRUE(readback != nullptr);
+  }
+
+  ASSERT_TRUE(WaitReadbackReady(readback));
+  const auto width = readback->width();
+  const auto height = readback->height();
+  std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
+  EXPECT_TRUE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(),
+                                   static_cast<size_t>(width * 4)));
 }
 
 }  // namespace pag
