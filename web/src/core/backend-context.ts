@@ -57,6 +57,38 @@ export const unregisterWebGPUTexture = (handle: number): void => {
   }
 };
 
+export interface ResolvedTextureHandle {
+  // Value to pass to the wasm _FromTexture entry.
+  textureID: number;
+  // WGPUTextureFormat value on the WebGPU backend; 0 on the WebGL backend.
+  format: number;
+  // Registered WebGPU handle to release via unregisterWebGPUTexture() on destroy; 0 otherwise.
+  webGPUHandle: number;
+}
+
+/**
+ * Resolves the texture argument of PAGSurface.fromTexture()/PAGImage.fromTexture() into wasm-side
+ * values. On the WebGL backend only numeric handles registered via BackendContext.registerTexture()
+ * are accepted; on the WebGPU backend only GPUTexture objects are accepted and get registered in
+ * Emscripten's WebGPU runtime. Throws an apiName-prefixed error on invalid input.
+ */
+export const resolveTextureHandle = (
+  apiName: string,
+  texture: number | WebGPUTextureLike,
+): ResolvedTextureHandle => {
+  if (typeof texture === 'number') {
+    if (isWebGPUBackend()) {
+      throw new Error(`${apiName} requires a GPUTexture on the WebGPU backend.`);
+    }
+    return { textureID: texture, format: 0, webGPUHandle: 0 };
+  }
+  const registered = registerWebGPUTexture(texture);
+  if (!registered) {
+    throw new Error(`${apiName} failed to register the GPUTexture!`);
+  }
+  return { textureID: registered.handle, format: registered.format, webGPUHandle: registered.handle };
+};
+
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {
     if (gl instanceof BackendContext) {

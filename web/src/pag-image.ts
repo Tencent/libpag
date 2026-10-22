@@ -2,12 +2,7 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
-import {
-  isWebGPUBackend,
-  registerWebGPUTexture,
-  unregisterWebGPUTexture,
-  WebGPUTextureLike,
-} from './core/backend-context';
+import { resolveTextureHandle, unregisterWebGPUTexture, WebGPUTextureLike } from './core/backend-context';
 
 @destroyVerify
 export class PAGImage {
@@ -64,25 +59,13 @@ export class PAGImage {
    * PAGInit) and with the TEXTURE_BINDING usage flag.
    */
   public static fromTexture(texture: number | WebGPUTextureLike, width: number, height: number, flipY: boolean) {
-    let textureID = 0;
-    let format = 0;
-    if (typeof texture === 'number') {
-      if (isWebGPUBackend()) {
-        throw new Error('PAGImage.fromTexture() requires a GPUTexture on the WebGPU backend.');
-      }
-      textureID = texture;
-    } else {
-      const registered = registerWebGPUTexture(texture);
-      if (!registered) throw new Error('PAGImage.fromTexture() failed to register the GPUTexture!');
-      textureID = registered.handle;
-      format = registered.format;
-    }
+    const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGImage.fromTexture()', texture);
     const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format);
     if (!wasmIns) {
-      if (format > 0) unregisterWebGPUTexture(textureID);
+      if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
       throw new Error('Make PAGImage from texture fail!');
     }
-    return new PAGImage(wasmIns, format > 0 ? textureID : 0);
+    return new PAGImage(wasmIns, webGPUHandle);
   }
 
   public wasmIns;

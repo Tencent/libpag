@@ -47,6 +47,37 @@ static bool IsWebGPUBackend() {
 #endif
 }
 
+// Copies pixel data out of the wasm heap into a fresh JS-owned Uint8Array, so the result stays
+// valid after the temporary buffer is freed.
+static val CopyToNewUint8Array(const uint8_t* data, size_t dataSize) {
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView =
+      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(data), dataSize);
+  auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
+  auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
+  newUint8Array.call<void>("set", memoryView);
+  return newUint8Array;
+}
+
+// textureID convention: on WebGPU it is the numeric handle of the host GPUTexture registered in
+// Emscripten's WebGPU runtime (Module.WebGPU.mgrTexture) and format is the WGPUTextureFormat value
+// resolved from GPUTexture.format on the JS side; on WebGL it is the GL texture id and format is
+// ignored.
+static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int format) {
+#if defined(TGFX_USE_WEBGPU)
+  WgpuTextureInfo wgpuInfo = {};
+  wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
+  wgpuInfo.format = static_cast<unsigned>(format);
+  return BackendTexture(wgpuInfo, width, height);
+#else
+  GLTextureInfo glInfo = {};
+  glInfo.target = GL_TEXTURE_2D;
+  glInfo.id = static_cast<unsigned>(textureID);
+  glInfo.format = GL_RGBA8;
+  return BackendTexture(glInfo, width, height);
+#endif
+}
+
 std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   if (!emscriptenData.as<bool>()) {
     return nullptr;
@@ -377,14 +408,7 @@ bool PAGBindInit() {
                   if (uint8Array && session.readPixels(static_cast<ColorType>(colorType),
                                                        static_cast<AlphaType>(alphaType),
                                                        uint8Array.get(), dstRowBytes)) {
-                    auto memory = val::module_property("HEAPU8")["buffer"];
-                    auto memoryView =
-                        val::global("Uint8Array")
-                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
-                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
-                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
-                    newUint8Array.call<void>("set", memoryView);
-                    return newUint8Array;
+                    return CopyToNewUint8Array(uint8Array.get(), dataSize);
                   }
                   return val::null();
                 }));
@@ -402,21 +426,7 @@ bool PAGBindInit() {
       .class_function(
           "_FromTexture",
           optional_override([](int textureID, int width, int height, bool flipY, int format) {
-#if defined(TGFX_USE_WEBGPU)
-            // The textureID is the numeric handle of the host GPUTexture registered in
-            // Emscripten's WebGPU runtime (Module.WebGPU.mgrTexture); format is the
-            // WGPUTextureFormat value resolved from GPUTexture.format on the JS side.
-            WgpuTextureInfo wgpuInfo = {};
-            wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
-            wgpuInfo.format = static_cast<unsigned>(format);
-            BackendTexture backendTexture(wgpuInfo, width, height);
-#else
-            GLTextureInfo glInfo = {};
-            glInfo.target = GL_TEXTURE_2D;
-            glInfo.id = static_cast<unsigned>(textureID);
-            glInfo.format = GL_RGBA8;
-            BackendTexture backendTexture(glInfo, width, height);
-#endif
+            auto backendTexture = MakeBackendTextureFromID(textureID, width, height, format);
             auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
             return PAGSurface::MakeFrom(backendTexture, origin);
           }))
@@ -444,14 +454,7 @@ bool PAGBindInit() {
                   if (uint8Array && pagSurface.readPixels(static_cast<ColorType>(colorType),
                                                           static_cast<AlphaType>(alphaType),
                                                           uint8Array.get(), dstRowBytes)) {
-                    auto memory = val::module_property("HEAPU8")["buffer"];
-                    auto memoryView =
-                        val::global("Uint8Array")
-                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
-                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
-                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
-                    newUint8Array.call<void>("set", memoryView);
-                    return newUint8Array;
+                    return CopyToNewUint8Array(uint8Array.get(), dataSize);
                   }
                   return val::null();
                 }))
@@ -487,20 +490,7 @@ bool PAGBindInit() {
       .class_function(
           "_FromTexture",
           optional_override([](int textureID, int width, int height, bool flipY, int format) {
-#if defined(TGFX_USE_WEBGPU)
-            // Same handle convention as _PAGSurface._FromTexture: textureID is the
-            // host GPUTexture registered in Module.WebGPU.mgrTexture.
-            WgpuTextureInfo wgpuInfo = {};
-            wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
-            wgpuInfo.format = static_cast<unsigned>(format);
-            BackendTexture backendTexture(wgpuInfo, width, height);
-#else
-            GLTextureInfo glInfo = {};
-            glInfo.target = GL_TEXTURE_2D;
-            glInfo.id = static_cast<unsigned>(textureID);
-            glInfo.format = GL_RGBA8;
-            BackendTexture backendTexture(glInfo, width, height);
-#endif
+            auto backendTexture = MakeBackendTextureFromID(textureID, width, height, format);
             auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
             return PAGImage::FromTexture(backendTexture, origin);
           }))

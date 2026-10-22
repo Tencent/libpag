@@ -2,7 +2,7 @@ import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
 import {
   isWebGPUBackend,
-  registerWebGPUTexture,
+  resolveTextureHandle,
   unregisterWebGPUTexture,
   WebGPUTextureLike,
 } from './core/backend-context';
@@ -46,25 +46,13 @@ export class PAGSurface {
     height: number,
     flipY: boolean,
   ): PAGSurface {
-    let textureID = 0;
-    let format = 0;
-    if (typeof texture === 'number') {
-      if (isWebGPUBackend()) {
-        throw new Error('PAGSurface.fromTexture() requires a GPUTexture on the WebGPU backend.');
-      }
-      textureID = texture;
-    } else {
-      const registered = registerWebGPUTexture(texture);
-      if (!registered) throw new Error('PAGSurface.fromTexture() failed to register the GPUTexture!');
-      textureID = registered.handle;
-      format = registered.format;
-    }
+    const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGSurface.fromTexture()', texture);
     const wasmIns = PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format);
     if (!wasmIns) {
-      if (format > 0) unregisterWebGPUTexture(textureID);
+      if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
       throw new Error(`Make PAGSurface from texture fail!`);
     }
-    return new PAGSurface(wasmIns, format > 0 ? textureID : 0);
+    return new PAGSurface(wasmIns, webGPUHandle);
   }
   /**
    * Make a PAGSurface from frameBuffer. WebGL backend only; on the WebGPU backend a texture view
