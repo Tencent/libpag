@@ -69,7 +69,7 @@
 - **验收**：T1 渲染等价（PAGX XML 直接渲染 vs v4 渲染，同机同字体，静态样本）；嵌入字形样本
   （矢量 + 位图）渲染一致。
 
-### T8 外部子 PAGX（依赖 T5+T6）
+### T8 外部子 PAGX（依赖 T5+T6）✅ 已完成（2026-10-23，f066db59c：PAGXExternalFiles 递归加载、SubDocumentTable 内容去重编解码、逐引用独立实例）
 - 新增 `src/pagx/PAGXExternalFiles.h/.cpp`（接口草案 §5）；递归加载、按绝对路径去重、
   引用链环检测、展开上限（1024 实例 / 1M 节点，规范 §11）。
 - SubDocumentTable 编解码（规范 §6.5）、逐引用独立解码、包装 Composition 挂接
