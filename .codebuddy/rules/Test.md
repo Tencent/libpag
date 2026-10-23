@@ -32,7 +32,7 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
+- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline_{Backend}` target（包括 `UpdateBaseline_OpenGL`、`UpdateBaseline_Metal`）、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
 - 接受截图基准变更的**唯一方式**是用户主动执行 `/accept-baseline` 斜杠命令
 
 ## HTML 测试集（浏览器保真度评测）
@@ -71,5 +71,5 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DTGFX_DIR=../tgfx -B cmake-build-debuglocal
-cmake --build cmake-build-debuglocal --target PAGFullTest
+cmake --build cmake-build-debuglocal --target PAGFullTest_OpenGL
 ```
