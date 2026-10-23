@@ -18,7 +18,11 @@
 
 #include "pagx/PAGImporter.h"
 #include <fstream>
+#include <unordered_set>
+#include <utility>
 #include <vector>
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
@@ -64,6 +68,18 @@ struct DecodeContext {
   // Image nodes with their pending ImageTable refs; the ImageTable sits at the end of the body,
   // so entry data and decode metadata are backfilled after the whole body is parsed.
   std::vector<std::pair<Image*, uint32_t>> pendingImageRefs = {};
+  // SubDocumentTable entries (spec §6.5), decoded once; every referencing layer then gets an
+  // independent instance built from its template.
+  struct SubDocumentEntry {
+    std::string name = {};
+    std::shared_ptr<PAGXDocument> document = nullptr;
+    // Template-level pending refs: layer indices within the template's top-level layers that
+    // reference other table entries.
+    std::vector<std::pair<size_t, uint32_t>> pendingRefs = {};
+  };
+  std::vector<SubDocumentEntry> subDocuments = {};
+  // Root layers referencing sub-documents: attached after the table (later in the body) decodes.
+  std::vector<std::pair<Layer*, uint32_t>> pendingSubDocRefs = {};
   PAGXDocument* document = nullptr;
   uint16_t tagLevel = 0;
 
@@ -695,7 +711,8 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
   }
 }
 
-void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context) {
+void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
+                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs) {
   while (true) {
     auto header = ReadPAGTagHeader(tagStream);
     if (header.code == TagCode::End) break;
@@ -719,7 +736,7 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       bool hasScrollRect = reader.flag(14);
       bool hasMask = reader.flag(15);
       bool hasMaskType = reader.flag(16);
-      // flags 17/18 (hasComposition/hasSubDocument) are phase-2 features, ignored here.
+      bool hasSubDocument = reader.flag(18);
       bool hasVmContext = reader.flag(19);
       tagBytes.alignWithBytes();
       if (hasName) layer->name = context->getString(tagBytes.readEncodedUint32());
@@ -744,10 +761,11 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       }
       if (hasMask) tagBytes.readEncodedUint32();  // NodeRef, phase 1 always none
       if (hasMaskType) layer->maskType = static_cast<MaskType>(tagBytes.readUint8());
+      if (hasSubDocument) subDocRefs->push_back({layer, tagBytes.readEncodedUint32()});
       if (hasVmContext) layer->vmContext = context->getString(tagBytes.readEncodedUint32());
     } else if (header.code == TagCode::LayerBlock) {
       auto* child = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, child, context);
+      ReadLayerBlockContent(&tagBytes, child, context, subDocRefs);
       layer->children.push_back(child);
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);
@@ -776,8 +794,113 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, layer, context);
+      ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs);
       doc->layers.push_back(layer);
+    }
+  }
+}
+
+// Builds one independent instance of the table entry (spec §6.5: every referencing layer
+// decodes its own copy so edits and runtime state stay isolated). Nested references recurse
+// with `chain` guarding entry cycles; the wrapper composition attached through
+// AttachExternalDocument matches the XML load path exactly.
+std::shared_ptr<PAGXDocument> MakeSubDocumentInstance(uint32_t index,
+                                                      std::unordered_set<uint32_t>* chain,
+                                                      PAGXDocument* rootDocument,
+                                                      DecodeContext* context, int* instanceCount,
+                                                      int* nodeCount) {
+  if (index >= context->subDocuments.size() || chain->count(index) > 0 || *instanceCount >= 1024 ||
+      *nodeCount >= 1048576) {
+    if (index < context->subDocuments.size() && chain->count(index) > 0) {
+      rootDocument->errors.push_back("Cyclic external composition reference detected: '" +
+                                     context->subDocuments[index].name + "'.");
+    }
+    return nullptr;
+  }
+  auto& entry = context->subDocuments[index];
+  auto instance = PAGXImporter::FromXML(PAGXExporter::ToXML(*entry.document));
+  if (instance == nullptr) {
+    return nullptr;
+  }
+  (*instanceCount)++;
+  *nodeCount += static_cast<int>(instance->nodes.size());
+  instance->diagnosticName = entry.name;
+  chain->insert(index);
+  for (auto& pending : entry.pendingRefs) {
+    if (pending.first >= instance->layers.size()) {
+      continue;
+    }
+    auto nested = MakeSubDocumentInstance(pending.second, chain, rootDocument, context,
+                                          instanceCount, nodeCount);
+    if (nested != nullptr) {
+      PAGXDocument::AttachExternalDocument(instance.get(), instance->layers[pending.first], nested);
+    }
+  }
+  chain->erase(index);
+  return instance;
+}
+
+// SubDocument content (spec §6.5): varuint diagnosticName, DocumentAttributes(263),
+// [RetainedIdTable(264)], the sub-document's layers, End. Decoded once into a template.
+void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
+  if (context->subDocuments.size() >= 256) {
+    PAGThrowError(tagStream->context, "sub document table count exceeds the spec limit");
+    return;
+  }
+  DecodeContext::SubDocumentEntry entry = {};
+  entry.name = context->getString(tagStream->readEncodedUint32());
+  entry.document = PAGXDocument::Make(0, 0);
+  std::vector<std::pair<Layer*, uint32_t>> pendingRefs = {};
+  auto savedDocument = context->document;
+  context->document = entry.document.get();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::DocumentAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 4);
+      bool hasWidth = reader.flag(0);
+      bool hasHeight = reader.flag(1);
+      tagBytes.alignWithBytes();
+      if (hasWidth) entry.document->width = tagBytes.readFloat();
+      if (hasHeight) entry.document->height = tagBytes.readFloat();
+    } else if (header.code == TagCode::RetainedIdTable) {
+      auto count = tagBytes.readEncodedUint32();
+      for (uint32_t i = 0; i < count; i++) {
+        tagBytes.readEncodedUint32();
+        tagBytes.readEncodedUint32();
+      }
+    } else if (header.code == TagCode::LayerBlock) {
+      auto* layer = context->document->makeNode<Layer>();
+      ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs);
+      entry.document->layers.push_back(layer);
+    }
+  }
+  context->document = savedDocument;
+  // The pending refs record template layers; store their top-level indices.
+  for (auto& pending : pendingRefs) {
+    size_t layerIndex = entry.document->layers.size();
+    for (size_t i = 0; i < entry.document->layers.size(); i++) {
+      if (entry.document->layers[i] == pending.first) {
+        layerIndex = i;
+        break;
+      }
+    }
+    if (layerIndex < entry.document->layers.size()) {
+      entry.pendingRefs.push_back({layerIndex, pending.second});
+    }
+  }
+  context->subDocuments.push_back(std::move(entry));
+}
+
+// SubDocumentTable content (spec §6.5): SubDocument(261) tags in first-reference order, End.
+void ReadSubDocumentTable(pag::DecodeStream* tagStream, DecodeContext* context) {
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::SubDocument) {
+      ReadSubDocument(&tagBytes, context);
     }
   }
 }
@@ -884,6 +1007,9 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
       case TagCode::DocumentBlock:
         ReadDocumentBlock(&tagBytes, doc.get(), &context);
         break;
+      case TagCode::SubDocumentTable:
+        ReadSubDocumentTable(&tagBytes, &context);
+        break;
       case TagCode::ImageTable:
         // Entry byte ranges live inside the adopted file data at 16 + contentStartInBody +
         // in-table offset, which is what MakeSlice needs for zero-copy references.
@@ -908,6 +1034,27 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     pending.first->scaleFactor = entry.scaleFactor;
     pending.first->offsetX = entry.offsetX;
     pending.first->offsetY = entry.offsetY;
+  }
+
+  // Attach sub-document instances: every referencing root layer decodes an independent copy
+  // (spec §6.5) with the same wrapper composition the XML load path builds. Expansion caps
+  // follow spec §11; cycles mirror the loader's message so PAGScene::Make refuses them.
+  int subDocInstanceCount = 0;
+  int subDocNodeCount = static_cast<int>(doc->nodes.size());
+  for (auto& pending : context.pendingSubDocRefs) {
+    std::unordered_set<uint32_t> chain = {};
+    auto instance = MakeSubDocumentInstance(pending.second, &chain, doc.get(), &context,
+                                            &subDocInstanceCount, &subDocNodeCount);
+    if (instance != nullptr) {
+      PAGXDocument::AttachExternalDocument(doc.get(), pending.first, instance);
+    }
+  }
+  if (subDocInstanceCount > 1024 || subDocNodeCount > 1048576) {
+    if (result != nullptr) {
+      result->success = false;
+      result->error = "sub-document expansion exceeds the spec limits";
+    }
+    return nullptr;
   }
 
   if (bodyStream.context->hasException()) {

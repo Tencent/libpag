@@ -134,17 +134,26 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   for (const auto& error : externalDoc->errors) {
     document->errors.push_back("[" + filePath + "] " + error);
   }
-  auto* wrapper = document->makeNode<Composition>();
-  wrapper->width = externalDoc->width;
-  wrapper->height = externalDoc->height;
-  wrapper->layers = externalDoc->layers;
-  wrapper->animations = externalDoc->animations;
-  layer->composition = wrapper;
-  layer->externalDoc = externalDoc;
+  PAGXDocument::AttachExternalDocument(document, layer, externalDoc);
   // compositionFilePath is retained as the origin path of this externalDoc: it identifies the
   // ancestor source on the load chain for cycle detection, and lets the exporter round-trip the
   // external reference when the wrapper composition has no id.
   return true;
+}
+
+void PAGXDocument::AttachExternalDocument(PAGXDocument* parentDocument, Layer* layer,
+                                          std::shared_ptr<PAGXDocument> externalDocument) {
+  if (parentDocument == nullptr || layer == nullptr || externalDocument == nullptr ||
+      layer->externalDoc != nullptr) {
+    return;
+  }
+  auto* wrapper = parentDocument->makeNode<Composition>();
+  wrapper->width = externalDocument->width;
+  wrapper->height = externalDocument->height;
+  wrapper->layers = externalDocument->layers;
+  wrapper->animations = externalDocument->animations;
+  layer->composition = wrapper;
+  layer->externalDoc = std::move(externalDocument);
 }
 
 static bool LoadFileDataInChain(

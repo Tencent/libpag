@@ -13,6 +13,6 @@
     </Fill>
   </Layer>
   <Resources>
-    <Image id="childLogo" source="../resource/pag_logo.png"/>
+    <Image id="childLogo" source="../../resource/pag_logo.png"/>
   </Resources>
 </pagx>

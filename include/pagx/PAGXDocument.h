@@ -131,6 +131,13 @@ class PAGXDocument : public Node {
   std::vector<std::unique_ptr<Node>> nodes = {};
 
   /**
+   * Diagnostic name for externally mounted sub-documents (the v4 SubDocumentTable's
+   * diagnosticName, spec §6.5: the original relative path, load purpose only). Populated by the
+   * v4 decoder so re-export writes the same name; never serialized to XML.
+   */
+  std::string diagnosticName = {};
+
+  /**
    * Errors collected during parsing. Non-empty errors indicate structural issues in the source
    * document but do not prevent the document from being returned. The parsed content may be
    * incomplete where errors occurred.
@@ -171,6 +178,19 @@ class PAGXDocument : public Node {
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
+
+  /**
+   * Attaches an already-decoded external sub-document to a composition layer: the layer keeps
+   * the document instance in externalDoc and receives a wrapper Composition node (owned by
+   * parentDocument) mirroring the sub-document's size, layers, and animations, exactly like
+   * loadFileData()'s external-composition path. Shared by the XML loader, the v4 decoder, and
+   * the v4 exporter so all three produce the same structure.
+   * @param parentDocument the document owning the layer and the wrapper node.
+   * @param layer the composition layer to mount the sub-document on.
+   * @param externalDocument the decoded sub-document instance.
+   */
+  static void AttachExternalDocument(PAGXDocument* parentDocument, Layer* layer,
+                                     std::shared_ptr<PAGXDocument> externalDocument);
 
   /**
    * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches

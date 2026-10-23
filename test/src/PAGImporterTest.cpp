@@ -25,7 +25,9 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -428,6 +430,141 @@ PAGX_TEST(PAGImporterTest, StaticSamplesRenderEquivalence) {
     ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4)) << rel;
     EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << rel;
   }
+}
+
+static void RenderToPixels(const std::shared_ptr<PAGXDocument>& doc, std::vector<uint8_t>* pixels,
+                           int width, int height) {
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  pixels->resize(static_cast<size_t>(width) * height * 4);
+  ASSERT_TRUE(surface->readPixels(pixels->data(), static_cast<size_t>(width) * 4));
+}
+
+PAGX_TEST(PAGImporterTest, SubDocumentRoundTrip) {
+  struct Sample {
+    const char* dir;
+  };
+  const std::string base = "resources/pagx_to_pag/sub_document/";
+  const std::vector<std::string> dirs = {
+      base + "single_reference",
+      base + "multi_reference",
+      base + "nested",
+      base + "subdoc_with_layout",
+  };
+  for (auto& dir : dirs) {
+    auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(dir + "/main.pagx"));
+    ASSERT_TRUE(doc != nullptr) << dir;
+    ASSERT_TRUE(PAGXExternalFiles::Load(doc.get(), pag::ProjectPath::Absolute(dir + "/"))) << dir;
+    auto r1 = PAGExporter::ExportToPAG(doc, "/tmp/subdoc_rt1.pag");
+    ASSERT_TRUE(r1.success) << dir;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_rt1.pag");
+    ASSERT_TRUE(decoded != nullptr) << dir;
+    auto r2 = PAGExporter::ExportToPAG(decoded, "/tmp/subdoc_rt2.pag");
+    ASSERT_TRUE(r2.success) << dir;
+    auto bytes1 = ReadFileBytes("/tmp/subdoc_rt1.pag");
+    auto bytes2 = ReadFileBytes("/tmp/subdoc_rt2.pag");
+    ASSERT_EQ(bytes1.size(), bytes2.size()) << dir;
+    EXPECT_EQ(memcmp(bytes1.data(), bytes2.data(), bytes1.size()), 0) << dir;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, SubDocumentInstancesAreIndependent) {
+  const std::string dir = "resources/pagx_to_pag/sub_document/multi_reference";
+  auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(dir + "/main.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGXExternalFiles::Load(doc.get(), pag::ProjectPath::Absolute(dir + "/")));
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/subdoc_multi.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_multi.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 2u);
+  auto* first = decoded->layers[0];
+  auto* second = decoded->layers[1];
+  ASSERT_TRUE(first->externalDoc != nullptr);
+  ASSERT_TRUE(second->externalDoc != nullptr);
+  // Every referencing layer decodes its own instance (spec §6.5).
+  EXPECT_NE(first->externalDoc.get(), second->externalDoc.get());
+  EXPECT_TRUE(first->composition != nullptr);
+  EXPECT_TRUE(second->composition != nullptr);
+  // The wrapper compositions mirror the sub-document's size.
+  EXPECT_EQ(first->composition->width, 80.0f);
+  EXPECT_EQ(first->composition->height, 80.0f);
+}
+
+PAGX_TEST(PAGImporterTest, NestedSubDocumentDecodes) {
+  const std::string dir = "resources/pagx_to_pag/sub_document/nested";
+  auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(dir + "/main.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGXExternalFiles::Load(doc.get(), pag::ProjectPath::Absolute(dir + "/")));
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/subdoc_nested.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_nested.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  auto* rootLayer = decoded->layers[0];
+  ASSERT_TRUE(rootLayer->externalDoc != nullptr);
+  auto& mid = rootLayer->externalDoc;
+  EXPECT_EQ(mid->width, 100.0f);
+  // mid's own layers reference leaf (the second layer).
+  ASSERT_GE(mid->layers.size(), 2u);
+  ASSERT_TRUE(mid->layers[1]->externalDoc != nullptr);
+  EXPECT_EQ(mid->layers[1]->externalDoc->width, 60.0f);
+  // The diagnostic names survive for byte-identical re-export.
+  EXPECT_EQ(mid->diagnosticName, "mid.pagx");
+  EXPECT_EQ(mid->layers[1]->externalDoc->diagnosticName, "leaf.pagx");
+}
+
+PAGX_TEST(PAGImporterTest, SubDocumentRenderEquivalence) {
+  const std::string base = "resources/pagx_to_pag/sub_document/";
+  const std::vector<std::string> dirs = {
+      base + "single_reference",
+      base + "multi_reference",
+      base + "nested",
+      base + "subdoc_with_layout",
+  };
+  for (auto& dir : dirs) {
+    auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(dir + "/main.pagx"));
+    ASSERT_TRUE(doc != nullptr) << dir;
+    ASSERT_TRUE(PAGXExternalFiles::Load(doc.get(), pag::ProjectPath::Absolute(dir + "/"))) << dir;
+    ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/subdoc_equiv.pag").success) << dir;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_equiv.pag");
+    ASSERT_TRUE(decoded != nullptr) << dir;
+    int width = static_cast<int>(doc->width);
+    int height = static_cast<int>(doc->height);
+    std::vector<uint8_t> pixelsA = {};
+    std::vector<uint8_t> pixelsB = {};
+    RenderToPixels(doc, &pixelsA, width, height);
+    RenderToPixels(decoded, &pixelsB, width, height);
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << dir;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, MissingSubDocumentWarnsAndExportsEmpty) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/sub_document/missing_reference.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_FALSE(PAGXExternalFiles::Load(
+      doc.get(), pag::ProjectPath::Absolute("resources/pagx_to_pag/sub_document/")));
+  auto result = PAGExporter::ExportToPAG(doc, "/tmp/subdoc_missing.pag");
+  ASSERT_TRUE(result.success);
+  bool warned = false;
+  for (auto& issue : result.warnings) {
+    if (issue.code == PAGExportWarning::MissingSubDocument) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+  // The unloaded layer exports as an empty composition layer and decodes/render identically.
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_missing.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_TRUE(decoded->layers[0]->externalDoc == nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  std::vector<uint8_t> pixelsA = {};
+  std::vector<uint8_t> pixelsB = {};
+  RenderToPixels(doc, &pixelsA, width, height);
+  RenderToPixels(decoded, &pixelsB, width, height);
+  EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
 }
 
 PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {

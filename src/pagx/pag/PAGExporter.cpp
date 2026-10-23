@@ -75,6 +75,12 @@ struct StringTableBuilder {
   }
 };
 
+// SubDocumentTable entry (spec §6.5): a working-copy document plus its diagnostic name.
+struct SubDocumentEntry {
+  std::string name = {};
+  std::shared_ptr<PAGXDocument> document = nullptr;
+};
+
 // Shared encoding state threaded through all tag writers.
 struct EncodeState {
   StringTableBuilder strings;
@@ -97,6 +103,18 @@ struct EncodeState {
   // trip (resource @id), so node-based counting is stable.
   std::vector<Font*> sharedFontOrder;
   std::unordered_map<const Font*, uint32_t> fontResourceSlots;
+  // SubDocumentTable entries (spec §6.5) in first-reference order. Content is the identity
+  // (the instance's deterministic XML), so multiple references — and a decode -> re-encode
+  // hop — map to one entry and the bytes stay stable.
+  std::vector<SubDocumentEntry> subDocuments;
+  std::unordered_map<std::string, uint32_t> subDocIndexByKey;
+  // Marks layers that reference a sub-document entry (root clone layers and template layers
+  // alike) with the table index to write into LayerAttributes' hasSubDocument/subDocRef.
+  std::unordered_map<const Layer*, uint32_t> layerSubDocRefs;
+  // Expansion accounting (spec §11): every layer that references a sub-document counts as one
+  // runtime instance and adds the instance's node count.
+  int subDocInstanceCount = 0;
+  int subDocNodeCount = 0;
 
   uint32_t intern(const std::string& text) {
     return strings.intern(text);
@@ -1009,7 +1027,9 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     writer.writeFlag(hasMask);
     writer.writeFlag(hasMaskType);
     writer.writeFlag(false);  // hasComposition, phase 2
-    writer.writeFlag(false);  // hasSubDocument, phase 2
+    auto subDocIt = state->layerSubDocRefs.find(layer);
+    auto hasSubDocument = subDocIt != state->layerSubDocRefs.end();
+    writer.writeFlag(hasSubDocument);
     writer.writeFlag(hasVmContext);
     auto* v = writer.valueStream();
     if (hasName) v->writeEncodedUint32(state->intern(layer->name));
@@ -1033,6 +1053,7 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     }
     if (hasMask) v->writeEncodedUint32(0);  // NodeRef, phase 1 always none
     if (hasMaskType) v->writeUint8(static_cast<uint8_t>(layer->maskType));
+    if (hasSubDocument) v->writeEncodedUint32(subDocIt->second);
     if (hasVmContext) v->writeEncodedUint32(state->intern(layer->vmContext));
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::LayerAttributes, static_cast<uint32_t>(block->length()));
@@ -1049,6 +1070,91 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
 }
 
 }  // namespace
+
+// Interns one external sub-document instance into the table. Nested references inside the
+// instance are interned depth-first so the table keeps first-reference order. refererName is
+// the referencing layer's composition path (XML source) or the instance's own diagnostic name
+// (v4 source); the v4 name wins when present so re-export writes the same bytes.
+uint32_t InternSubDocument(const std::shared_ptr<PAGXDocument>& instance,
+                           const std::string& refererName, EncodeState* state,
+                           PAGExportResult* result) {
+  auto xmlKey = PAGXExporter::ToXML(*instance);
+  auto existing = state->subDocIndexByKey.find(xmlKey);
+  if (existing != state->subDocIndexByKey.end()) {
+    return existing->second;
+  }
+  auto templateDoc = PAGXImporter::FromXML(xmlKey);
+  if (templateDoc == nullptr) {
+    // Unreachable in practice (the instance serializes fine by construction); keep the table
+    // aligned with a stub entry so later indices stay correct.
+    PAGExportIssue issue = {};
+    issue.code = PAGExportWarning::MissingSubDocument;
+    issue.message = "sub-document working copy failed to parse";
+    result->warnings.push_back(issue);
+    templateDoc = PAGXDocument::Make(0, 0);
+  }
+  auto index = static_cast<uint32_t>(state->subDocuments.size());
+  state->subDocIndexByKey[xmlKey] = index;
+  SubDocumentEntry entry = {};
+  entry.name = !instance->diagnosticName.empty() ? instance->diagnosticName : refererName;
+  entry.document = templateDoc;
+  state->subDocuments.push_back(std::move(entry));
+  // The template's layers mirror the instance's layers in order, so zip-walk and intern the
+  // instance's own nested references depth-first.
+  auto count = std::min(instance->layers.size(), templateDoc->layers.size());
+  for (size_t i = 0; i < count; i++) {
+    auto* srcLayer = instance->layers[i];
+    auto* templateLayer = templateDoc->layers[i];
+    if (srcLayer->externalDoc == nullptr) {
+      continue;
+    }
+    auto nested =
+        InternSubDocument(srcLayer->externalDoc, srcLayer->compositionFilePath, state, result);
+    if (nested == UINT32_MAX) {
+      continue;
+    }
+    state->layerSubDocRefs[templateLayer] = nested;
+    state->subDocInstanceCount++;
+    state->subDocNodeCount += static_cast<int>(srcLayer->externalDoc->nodes.size());
+    // Attach the nested template once so layout and image collection reach it through the
+    // wrapper composition.
+    if (templateLayer->externalDoc == nullptr) {
+      PAGXDocument::AttachExternalDocument(templateDoc.get(), templateLayer,
+                                           state->subDocuments[nested].document);
+    }
+  }
+  return index;
+}
+
+// Collects the input document's loaded external sub-documents (design §4.8), marks the clone's
+// layers with their table indices, and attaches the first referencing clone layer per entry so
+// applyLayout and ImageProcessor reach the templates. Layers whose external file never loaded
+// warn and stay in the runtime's empty "unloaded" state.
+void CollectSubDocumentReferences(PAGXDocument* input, PAGXDocument* clone, EncodeState* state,
+                                  PAGExportResult* result) {
+  auto count = std::min(input->layers.size(), clone->layers.size());
+  for (size_t i = 0; i < count; i++) {
+    auto* src = input->layers[i];
+    auto* dst = clone->layers[i];
+    if (src->externalDoc != nullptr) {
+      auto index = InternSubDocument(src->externalDoc, src->compositionFilePath, state, result);
+      if (index == UINT32_MAX) {
+        continue;
+      }
+      state->layerSubDocRefs[dst] = index;
+      state->subDocInstanceCount++;
+      state->subDocNodeCount += static_cast<int>(src->externalDoc->nodes.size());
+      if (dst->externalDoc == nullptr) {
+        PAGXDocument::AttachExternalDocument(clone, dst, state->subDocuments[index].document);
+      }
+    } else if (!src->compositionFilePath.empty()) {
+      PAGExportIssue issue = {};
+      issue.code = PAGExportWarning::MissingSubDocument;
+      issue.message = "external composition not loaded: " + src->compositionFilePath;
+      result->warnings.push_back(issue);
+    }
+  }
+}
 
 PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                                          const std::string& filePath,
@@ -1095,12 +1201,34 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   if (doc == nullptr) {
     return result;
   }
+  auto state = std::make_unique<EncodeState>();
+  CollectSubDocumentReferences(document.get(), doc.get(), state.get(), &result);
+  if (state->subDocInstanceCount > 1024 || state->subDocNodeCount > 1048576 ||
+      state->subDocuments.size() > 256) {
+    PAGExportIssue issue = {};
+    issue.code = PAGExportWarning::SubDocumentExpansionLimit;
+    issue.message = "sub-document expansion exceeds the spec limits (instances " +
+                    std::to_string(state->subDocInstanceCount) + ", nodes " +
+                    std::to_string(state->subDocNodeCount) + ")";
+    result.warnings.push_back(issue);
+    result.success = false;
+    return result;
+  }
   doc->applyLayout();
   LayoutFlattener::Flatten(doc.get());
+  for (auto& sub : state->subDocuments) {
+    LayoutFlattener::Flatten(sub.document.get());
+  }
   auto retainedIds = Stripper::CollectRetainedIds(doc.get());
   Stripper::StripMetadata(doc.get());
   Stripper::StripIds(doc.get(), retainedIds);
   Stripper::RemoveDeadNodes(doc.get(), retainedIds);
+  for (auto& sub : state->subDocuments) {
+    auto subRetainedIds = Stripper::CollectRetainedIds(sub.document.get());
+    Stripper::StripMetadata(sub.document.get());
+    Stripper::StripIds(sub.document.get(), subRetainedIds);
+    Stripper::RemoveDeadNodes(sub.document.get(), subRetainedIds);
+  }
   auto imageResult = ImageProcessor::Process(doc.get());
   result.warnings.insert(result.warnings.end(), imageResult.warnings.begin(),
                          imageResult.warnings.end());
@@ -1110,7 +1238,6 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     issue.message = "animated content skipped in phase 1";
     result.warnings.push_back(issue);
   }
-  auto state = std::make_unique<EncodeState>();
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
   // Shared-image placement (spec §5.3): count references per ImageTable entry; entries
@@ -1120,6 +1247,11 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     std::vector<Image*> imageRefs = {};
     for (auto* layer : doc->layers) {
       CollectImageReferencesFromLayer(layer, &imageRefs);
+    }
+    for (auto& sub : state->subDocuments) {
+      for (auto* layer : sub.document->layers) {
+        CollectImageReferencesFromLayer(layer, &imageRefs);
+      }
     }
     std::vector<Image*> entryFirstNode = {};
     std::vector<int> entryRefCount = {};
@@ -1158,6 +1290,11 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* layer : doc->layers) {
       CollectFontReferencesFromLayer(layer, &fontRefs);
     }
+    for (auto& sub : state->subDocuments) {
+      for (auto* layer : sub.document->layers) {
+        CollectFontReferencesFromLayer(layer, &fontRefs);
+      }
+    }
     std::unordered_map<const Font*, int> fontCounts = {};
     for (auto* font : fontRefs) {
       fontCounts[font]++;
@@ -1172,6 +1309,12 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   }
   for (auto* layer : doc->layers) {
     CollectStringsFromLayer(layer, state.get());
+  }
+  for (auto& sub : state->subDocuments) {
+    state->intern(sub.name);
+    for (auto* layer : sub.document->layers) {
+      CollectStringsFromLayer(layer, state.get());
+    }
   }
   pag::EncodeStream body(&state->streamContext);
   WritePAGTagHeader(&body, TagCode::FileAttributes, 0);
@@ -1218,6 +1361,41 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     }
     WritePAGTagHeader(&docContent, TagCode::End, 0);
     WriteTag(&body, TagCode::DocumentBlock, &docContent);
+  }
+  if (!state->subDocuments.empty()) {
+    pag::EncodeStream tableContent(&state->streamContext);
+    for (auto& sub : state->subDocuments) {
+      pag::EncodeStream subContent(&state->streamContext);
+      // varuint diagnosticName, then the sub-document's own block (spec §6.5).
+      subContent.writeEncodedUint32(state->intern(sub.name));
+      {
+        PAGAttributeBlockWriter writer(&state->streamContext);
+        writer.writeFlag(true);   // width
+        writer.writeFlag(true);   // height
+        writer.writeFlag(false);  // dataKeys, phase 2
+        writer.writeFlag(false);  // dataValues, phase 2
+        auto* v = writer.valueStream();
+        v->writeFloat(sub.document->width);
+        v->writeFloat(sub.document->height);
+        auto block = writer.release();
+        WritePAGTagHeader(&subContent, TagCode::DocumentAttributes,
+                          static_cast<uint32_t>(block->length()));
+        subContent.writeBytes(const_cast<uint8_t*>(block->data()),
+                              static_cast<uint32_t>(block->length()));
+      }
+      {
+        pag::EncodeStream idContent(&state->streamContext);
+        idContent.writeEncodedUint32(0);
+        WriteTag(&subContent, TagCode::RetainedIdTable, &idContent);
+      }
+      for (auto* layer : sub.document->layers) {
+        WriteLayerTag(&subContent, layer, state.get());
+      }
+      WritePAGTagHeader(&subContent, TagCode::End, 0);
+      WriteTag(&tableContent, TagCode::SubDocument, &subContent);
+    }
+    WritePAGTagHeader(&tableContent, TagCode::End, 0);
+    WriteTag(&body, TagCode::SubDocumentTable, &tableContent);
   }
   {
     pag::EncodeStream imgContent(&state->streamContext);
