@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Refresh the selected backend's local baseline cache from main.
+# Refresh the selected backend's local baseline cache from origin/main.
 # Usage: ./update_baseline.sh [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL] [--skip-images]
 # Screenshot outputs and version metadata remain shared, so run backends sequentially.
 
@@ -45,9 +45,12 @@ case "$BACKEND_ARG" in
     ;;
 esac
 
+git fetch origin main
+MAIN_COMMIT=$(git rev-parse --verify 'origin/main^{commit}')
+MAIN_VERSION=$(git show "$MAIN_COMMIT:test/baseline/version.json")
+
 CACHE_DIR="$WORKSPACE/test/baseline/.cache/$BACKEND_NAME"
 if [ -f "$CACHE_DIR/version.json" ] && [ -f "$CACHE_DIR/md5.json" ]; then
-  MAIN_VERSION=$(git show origin/main:test/baseline/version.json)
   CACHE_VERSION=$(cat "$CACHE_DIR/version.json")
   if [ "$MAIN_VERSION" = "$CACHE_VERSION" ]; then
     echo "Baseline cache for '$BACKEND_NAME' is up to date."
@@ -96,7 +99,7 @@ STASH_AFTER=$(git rev-parse --verify -q refs/stash || true)
 if [ "$STASH_BEFORE" != "$STASH_AFTER" ]; then
   STASH_CREATED=1
 fi
-git switch main --quiet
+git switch --detach "$MAIN_COMMIT" --quiet
 ./install_tools.sh
 depsync
 
