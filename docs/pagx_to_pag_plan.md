@@ -76,7 +76,7 @@
   （复用 `LoadExternalComposition` 逻辑）。
 - **验收**：T11 引用与作用域用例（多级嵌套、同文件多引用、跨目录相对路径、缺失、环、超限）。
 
-### T9 CLI 与工具（依赖 T5+T6+T8）
+### T9 CLI 与工具（依赖 T5+T6+T8）✅ 已完成（2026-10-23，e2f62d056：--format pag/--strict/--report/--fallback、全命令 v4 输入）
 - `src/cli/CommandExport.cpp`：`--format pag`、`--strict`、`--report`、`--fallback`。
 - `CommandRender`/`CommandVerify`/`CommandInfo` 支持 v4 输入（verify 走 v4 解码 + PAGX 规则）。
 - **验收**：CLI 全命令冒烟；report.json 结构与接口草案 §4 一致。
