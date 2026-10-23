@@ -35,6 +35,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -121,6 +122,8 @@ struct EncodeState {
   // runtime instance and adds the instance's node count.
   int subDocInstanceCount = 0;
   int subDocNodeCount = 0;
+  // Spec §5.1 node indices in emission order, backing NodeRef fields (Layer.mask).
+  std::unordered_map<Node*, uint32_t> nodeIndices;
 
   uint32_t intern(const std::string& text) {
     return strings.intern(text);
@@ -1180,7 +1183,15 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
       v->writeFloat(layer->scrollRect.width);
       v->writeFloat(layer->scrollRect.height);
     }
-    if (hasMask) v->writeEncodedUint32(0);  // NodeRef, phase 1 always none
+    if (hasMask) {
+      // NodeRef (spec §5.2): k = node index k-1 in this document's emission order.
+      uint32_t maskRef = 0;
+      auto maskIt = state->nodeIndices.find(layer->mask);
+      if (maskIt != state->nodeIndices.end()) {
+        maskRef = maskIt->second + 1;
+      }
+      v->writeEncodedUint32(maskRef);
+    }
     if (hasMaskType) v->writeUint8(static_cast<uint8_t>(layer->maskType));
     if (hasSubDocument) v->writeEncodedUint32(subDocIt->second);
     if (hasVmContext) v->writeEncodedUint32(state->intern(layer->vmContext));
@@ -1464,6 +1475,97 @@ void CollectSubDocumentReferences(PAGXDocument* input, PAGXDocument* clone, Enco
   }
 }
 
+// Assigns spec §5.1 node indices in emission order: shared resources first (images, then
+// fonts with their glyph subtrees), then the document tree in pre-order (layer, contents with
+// their inline subtrees, children recursively). Only nodes actually emitted get indices;
+// nodes dropped from the output get none, and referencing them is invalid.
+void AssignFontNodeIndices(Font* font, EncodeState* state, uint32_t* index) {
+  if (state->nodeIndices.count(font) > 0) {
+    return;
+  }
+  state->nodeIndices[font] = (*index)++;
+  for (auto* glyph : font->glyphs) {
+    if (state->nodeIndices.count(glyph) == 0) {
+      state->nodeIndices[glyph] = (*index)++;
+    }
+    if (glyph->image != nullptr && state->nodeIndices.count(glyph->image) == 0) {
+      state->nodeIndices[glyph->image] = (*index)++;
+    }
+    if (glyph->path != nullptr && state->nodeIndices.count(glyph->path) == 0) {
+      state->nodeIndices[glyph->path] = (*index)++;
+    }
+  }
+}
+
+void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* index) {
+  if (element == nullptr || state->nodeIndices.count(element) > 0) {
+    return;
+  }
+  state->nodeIndices[element] = (*index)++;
+  switch (element->nodeType()) {
+    case NodeType::Fill: {
+      auto* color = static_cast<Fill*>(element)->color;
+      if (color != nullptr && state->nodeIndices.count(color) == 0) {
+        state->nodeIndices[color] = (*index)++;
+      }
+      break;
+    }
+    case NodeType::Stroke: {
+      auto* color = static_cast<Stroke*>(element)->color;
+      if (color != nullptr && state->nodeIndices.count(color) == 0) {
+        state->nodeIndices[color] = (*index)++;
+      }
+      break;
+    }
+    case NodeType::Path: {
+      auto* data = static_cast<Path*>(element)->data;
+      if (data != nullptr && state->nodeIndices.count(data) == 0) {
+        state->nodeIndices[data] = (*index)++;
+      }
+      break;
+    }
+    case NodeType::TextPath: {
+      auto* data = static_cast<TextPath*>(element)->path;
+      if (data != nullptr && state->nodeIndices.count(data) == 0) {
+        state->nodeIndices[data] = (*index)++;
+      }
+      break;
+    }
+    case NodeType::Text: {
+      auto* text = static_cast<Text*>(element);
+      for (auto* run : text->glyphRuns) {
+        if (state->nodeIndices.count(run) == 0) {
+          state->nodeIndices[run] = (*index)++;
+        }
+        if (run->font != nullptr) {
+          AssignFontNodeIndices(run->font, state, index);
+        }
+      }
+      break;
+    }
+    case NodeType::Group:
+      for (auto* child : static_cast<Group*>(element)->elements) {
+        AssignElementNodeIndices(child, state, index);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
+  if (state->nodeIndices.count(layer) > 0) {
+    return;
+  }
+  state->nodeIndices[layer] = (*index)++;
+  for (auto* element : layer->contents) {
+    AssignElementNodeIndices(element, state, index);
+  }
+  for (auto* child : layer->children) {
+    AssignLayerNodeIndices(child, state, index);
+  }
+}
+
 PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                                          const std::string& filePath,
                                          const PAGExportOptions& options) {
@@ -1643,6 +1745,23 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     state->intern(sub.name);
     for (auto* layer : sub.document->layers) {
       CollectStringsFromLayer(layer, state.get());
+    }
+  }
+  // Node indices (spec §5.1) back the NodeRef fields (Layer.mask): shared resources first,
+  // then the document tree in emission pre-order.
+  {
+    uint32_t nextIndex = 0;
+    for (auto* image : state->sharedImageOrder) {
+      auto* imageNode = static_cast<Node*>(image);
+      if (state->nodeIndices.count(imageNode) == 0) {
+        state->nodeIndices[imageNode] = nextIndex++;
+      }
+    }
+    for (auto* font : state->sharedFontOrder) {
+      AssignFontNodeIndices(font, state.get(), &nextIndex);
+    }
+    for (auto* layer : doc->layers) {
+      AssignLayerNodeIndices(layer, state.get(), &nextIndex);
     }
   }
   pag::EncodeStream body(&state->streamContext);

@@ -85,6 +85,9 @@ struct DecodeContext {
   std::vector<SubDocumentEntry> subDocuments = {};
   // Root layers referencing sub-documents: attached after the table (later in the body) decodes.
   std::vector<std::pair<Layer*, uint32_t>> pendingSubDocRefs = {};
+  // Layer mask NodeRefs: backfilled after the whole body decodes, when the node table
+  // (creation order = emission order, spec §5.1) is complete.
+  std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
   PAGXDocument* document = nullptr;
   uint16_t tagLevel = 0;
 
@@ -821,7 +824,8 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
 }
 
 void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
-                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs) {
+                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
+                           std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget) {
   while (true) {
     auto header = ReadPAGTagHeader(tagStream);
     if (header.code == TagCode::End) break;
@@ -868,13 +872,15 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
         layer->scrollRect.height = tagBytes.readFloat();
         layer->hasScrollRect = true;
       }
-      if (hasMask) tagBytes.readEncodedUint32();  // NodeRef, phase 1 always none
+      if (hasMask) {
+        pendingMaskRefsTarget->push_back({layer, tagBytes.readEncodedUint32()});
+      }
       if (hasMaskType) layer->maskType = static_cast<MaskType>(tagBytes.readUint8());
       if (hasSubDocument) subDocRefs->push_back({layer, tagBytes.readEncodedUint32()});
       if (hasVmContext) layer->vmContext = context->getString(tagBytes.readEncodedUint32());
     } else if (header.code == TagCode::LayerBlock) {
       auto* child = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, child, context, subDocRefs);
+      ReadLayerBlockContent(&tagBytes, child, context, subDocRefs, pendingMaskRefsTarget);
       layer->children.push_back(child);
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);
@@ -903,7 +909,8 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs);
+      ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
+                            &context->pendingMaskRefs);
       doc->layers.push_back(layer);
     }
   }
@@ -960,6 +967,7 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
   entry.name = context->getString(tagStream->readEncodedUint32());
   entry.document = PAGXDocument::Make(0, 0);
   std::vector<std::pair<Layer*, uint32_t>> pendingRefs = {};
+  std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
   auto savedDocument = context->document;
   context->document = entry.document.get();
   while (true) {
@@ -981,11 +989,21 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs);
+      ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs, &pendingMaskRefs);
       entry.document->layers.push_back(layer);
     }
   }
   context->document = savedDocument;
+  // Backfill the sub-document's own mask refs against its node table (its own §5.1 namespace).
+  for (auto& pending : pendingMaskRefs) {
+    if (pending.second == 0 || pending.second > entry.document->nodes.size()) {
+      continue;
+    }
+    auto* node = entry.document->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::Layer) {
+      pending.first->mask = static_cast<Layer*>(node);
+    }
+  }
   // The pending refs record template layers; store their top-level indices.
   for (auto& pending : pendingRefs) {
     size_t layerIndex = entry.document->layers.size();
@@ -1164,6 +1182,19 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
       result->error = "sub-document expansion exceeds the spec limits";
     }
     return nullptr;
+  }
+
+  // Backfill layer mask NodeRefs against the root document's node table (creation order =
+  // emission order, spec §5.1). Wrapper compositions appended by sub-document attach sit after
+  // every indexed node, so indices stay valid.
+  for (auto& pending : context.pendingMaskRefs) {
+    if (pending.second == 0 || pending.second > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::Layer) {
+      pending.first->mask = static_cast<Layer*>(node);
+    }
   }
 
   if (bodyStream.context->hasException()) {

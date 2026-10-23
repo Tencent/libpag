@@ -395,6 +395,41 @@ PAGX_TEST(PAGImporterTest, EmbeddedGlyphRunRoundTrip) {
             0);
 }
 
+PAGX_TEST(PAGImporterTest, LayerMaskNodeRefRoundTrip) {
+  // Regression: Layer.mask NodeRef (spec §5.2) survives export → decode with the mask
+  // layer resolved by emission-order node index.
+  const std::vector<std::string> paths = {
+      "resources/cli/verify_c13_simple_rect_mask.pagx",
+      "spec/samples/masking.pagx",
+  };
+  for (auto& rel : paths) {
+    auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(rel));
+    ASSERT_TRUE(doc != nullptr) << rel;
+    ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/mask_rt.pag").success) << rel;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/mask_rt.pag");
+    ASSERT_TRUE(decoded != nullptr) << rel;
+    // Find the layer that had a mask in the source and verify the decoded one has it too.
+    Layer* sourceMasked = nullptr;
+    for (auto* layer : doc->layers) {
+      if (layer->mask != nullptr) {
+        sourceMasked = layer;
+        break;
+      }
+    }
+    ASSERT_TRUE(sourceMasked != nullptr) << rel;
+    Layer* decodedMasked = nullptr;
+    for (auto* layer : decoded->layers) {
+      if (layer->mask != nullptr) {
+        decodedMasked = layer;
+        break;
+      }
+    }
+    ASSERT_TRUE(decodedMasked != nullptr) << rel;
+    ASSERT_TRUE(decodedMasked->mask->mask != nullptr ? false : true) << rel;
+    EXPECT_EQ(decodedMasked->mask->maskType, sourceMasked->maskType) << rel;
+  }
+}
+
 PAGX_TEST(PAGImporterTest, StaticSamplesRenderEquivalence) {
   // T7-d acceptance: every fully supported static sample must render pixel-identically from the
   // original PAGX XML document and from the exported v4 binary (same machine, no font or image

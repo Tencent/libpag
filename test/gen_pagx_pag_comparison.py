@@ -215,14 +215,14 @@ body {
   max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 4px;
   background: repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 50%/16px 16px;
 }
-.fail {
+.failcard {
   display: inline-block; min-width: 240px; padding: 18px 24px;
   background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5;
   border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-align: left;
 }
-.fail-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #b91c1c; margin-bottom: 4px; }
-.fail-reason { font-size: 13px; word-break: break-word; }
+.failcard-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #b91c1c; margin-bottom: 4px; }
+.failcard-reason { font-size: 13px; word-break: break-word; }
 .warning-list {
   font-size: 12px; color: #92400e; background: #fffbeb;
   border: 1px solid #fde68a; border-radius: 6px; padding: 8px 14px;
@@ -307,16 +307,16 @@ function cardHtml(section, index, sample, showDiff) {
         '.png" alt="' + sample.name + ' (PAGX)" loading="lazy"></div>';
   } else {
     html += '<div><div class="lbl"><label>1：PAGX 直接渲染</label>' + sourceLink + '</div>' +
-        '<div class="fail"><div class="fail-title">RENDER FAILED</div>' +
-        '<div class="fail-reason">pagx render 无法渲染该样本</div></div></div>';
+        '<div class="failcard"><div class="failcard-title">RENDER FAILED</div>' +
+        '<div class="failcard-reason">pagx render 无法渲染该样本</div></div></div>';
   }
   if (!compared) {
     var reason = sample.status === 'export-failed'
         ? 'pagx export --format pag 失败'
         : 'v4 渲染失败';
     html += '<div><div class="lbl"><label>2：PAG v4 渲染</label></div>' +
-        '<div class="fail"><div class="fail-title">FAILED</div>' +
-        '<div class="fail-reason">' + reason + '</div></div></div>';
+        '<div class="failcard"><div class="failcard-title">FAILED</div>' +
+        '<div class="failcard-reason">' + reason + '</div></div></div>';
     if (showDiff) {
       html += '<div><div class="lbl"><label>3：像素 diff</label></div></div>';
     }
