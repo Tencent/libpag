@@ -81,7 +81,7 @@
 - `CommandRender`/`CommandVerify`/`CommandInfo` 支持 v4 输入（verify 走 v4 解码 + PAGX 规则）。
 - **验收**：CLI 全命令冒烟；report.json 结构与接口草案 §4 一致。
 
-### T10 对比页与样本（依赖 T9；M0-7 样本就绪后扩展）
+### T10 对比页与样本（依赖 T9；M0-7 样本就绪后扩展）✅ 已完成（2026-10-23，1833267e7：三列对比页、目录标签、diff 过滤排序、体积/告警卡片、render 外部文件加载）
 - 新增 `test/gen_pagx_pag_comparison.sh/.py`（§10.3：三列、目录标签页、差异过滤、体积对比、告警数）。
 - 接入 317 仓库样本 + `resources/pagx_to_pag/`。
 - **验收**：对比页生成并通过人工抽查；静态样本 diff 阈值与 Baseline::Compare 一致。
