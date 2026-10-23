@@ -58,6 +58,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -1066,6 +1067,7 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
 }
 
 void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* state);
+void WriteRepeaterTag(pag::EncodeStream* stream, Repeater* repeater, EncodeState* state);
 void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* state);
 
 void WriteGroupTag(pag::EncodeStream* stream, Group* group, EncodeState* state) {
@@ -1153,6 +1155,9 @@ void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* s
       break;
     case NodeType::TextBox:
       WriteTextBoxTag(stream, static_cast<TextBox*>(element), state);
+      break;
+    case NodeType::Repeater:
+      WriteRepeaterTag(stream, static_cast<Repeater*>(element), state);
       break;
     default:
       break;
@@ -1243,6 +1248,55 @@ void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* s
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::TextBoxBlock, &content);
+}
+
+// Repeater tag (spec §9.3 #435): 12 exist bits.
+void WriteRepeaterTag(pag::EncodeStream* stream, Repeater* repeater, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasCopies = repeater->copies != 3.0f;
+  auto hasOffset = repeater->offset != 0.0f;
+  auto hasOrder = repeater->order != RepeaterOrder::BelowOriginal;
+  auto hasAnchorX = repeater->anchor.x != 0.0f;
+  auto hasAnchorY = repeater->anchor.y != 0.0f;
+  auto hasPosX = repeater->position.x != 100.0f;
+  auto hasPosY = repeater->position.y != 100.0f;
+  auto hasRotation = repeater->rotation != 0.0f;
+  auto hasScaleX = repeater->scale.x != 1.0f;
+  auto hasScaleY = repeater->scale.y != 1.0f;
+  auto hasStartAlpha = repeater->startAlpha != 1.0f;
+  auto hasEndAlpha = repeater->endAlpha != 1.0f;
+  writer.writeFlag(hasCopies);
+  writer.writeFlag(hasOffset);
+  writer.writeFlag(hasOrder);
+  writer.writeFlag(hasAnchorX);
+  writer.writeFlag(hasAnchorY);
+  writer.writeFlag(hasPosX);
+  writer.writeFlag(hasPosY);
+  writer.writeFlag(hasRotation);
+  writer.writeFlag(hasScaleX);
+  writer.writeFlag(hasScaleY);
+  writer.writeFlag(hasStartAlpha);
+  writer.writeFlag(hasEndAlpha);
+  auto* v = writer.valueStream();
+  if (hasCopies) v->writeFloat(repeater->copies);
+  if (hasOffset) v->writeFloat(repeater->offset);
+  if (hasOrder) v->writeUint8(static_cast<uint8_t>(repeater->order));
+  if (hasAnchorX) v->writeFloat(repeater->anchor.x);
+  if (hasAnchorY) v->writeFloat(repeater->anchor.y);
+  if (hasPosX) v->writeFloat(repeater->position.x);
+  if (hasPosY) v->writeFloat(repeater->position.y);
+  if (hasRotation) v->writeFloat(repeater->rotation);
+  if (hasScaleX) v->writeFloat(repeater->scale.x);
+  if (hasScaleY) v->writeFloat(repeater->scale.y);
+  if (hasStartAlpha) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(repeater->startAlpha * 255.0f)));
+  }
+  if (hasEndAlpha) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(repeater->endAlpha * 255.0f)));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::Repeater, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
 }
 
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);

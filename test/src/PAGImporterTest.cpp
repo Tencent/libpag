@@ -50,6 +50,7 @@
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -1154,6 +1155,91 @@ PAGX_TEST(PAGImporterTest, TextBoxRoundTrip) {
   // Steady-state idempotency.
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "textbox", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, RepeaterRoundTrip) {
+  // Repeater (spec §9.3 #435) survives export → decode with all fields intact.
+  auto doc = PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 300;
+  layer->height = 300;
+  doc->layers.push_back(layer);
+
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 50;
+  rect->size.height = 50;
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.8f, 0.2f, 0.2f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto* repeater = doc->makeNode<Repeater>();
+  repeater->copies = 5.0f;
+  repeater->offset = 0.5f;
+  repeater->order = RepeaterOrder::AboveOriginal;
+  repeater->anchor = {25.0f, 25.0f};
+  repeater->position = {30.0f, 20.0f};
+  repeater->rotation = 15.0f;
+  repeater->scale = {0.9f, 0.95f};
+  repeater->startAlpha = 1.0f;
+  repeater->endAlpha = 0.3f;
+  layer->contents.push_back(repeater);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/repeater_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/repeater_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers[0]->contents.size(), 3u);
+
+  auto* dRepeater = static_cast<Repeater*>(decoded->layers[0]->contents[2]);
+  ASSERT_EQ(dRepeater->nodeType(), NodeType::Repeater);
+  EXPECT_EQ(dRepeater->copies, 5.0f);
+  EXPECT_EQ(dRepeater->offset, 0.5f);
+  EXPECT_EQ(dRepeater->order, RepeaterOrder::AboveOriginal);
+  EXPECT_EQ(dRepeater->anchor.x, 25.0f);
+  EXPECT_EQ(dRepeater->position.x, 30.0f);
+  EXPECT_EQ(dRepeater->rotation, 15.0f);
+  EXPECT_EQ(dRepeater->scale.x, 0.9f);
+  EXPECT_NEAR(dRepeater->endAlpha, 0.3f, 0.01f);
+
+  // Render equivalence: repeater copies render identically.
+  auto sceneA = PAGScene::Make(doc);
+  auto sceneB = PAGScene::Make(decoded);
+  ASSERT_TRUE(sceneA != nullptr && sceneB != nullptr);
+  auto surfaceA = PAGSurface::MakeOffscreen(300, 300);
+  auto surfaceB = PAGSurface::MakeOffscreen(300, 300);
+  ASSERT_TRUE(surfaceA != nullptr && surfaceB != nullptr);
+  ASSERT_TRUE(sceneA->draw(surfaceA));
+  ASSERT_TRUE(sceneB->draw(surfaceB));
+  std::vector<uint8_t> pixelsA(300 * 300 * 4);
+  std::vector<uint8_t> pixelsB(300 * 300 * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), 300 * 4));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), 300 * 4));
+  // Repeater alpha goes through u8 quantization; allow quantization-level tolerance.
+  {
+    auto total = static_cast<size_t>(300) * 300;
+    size_t diffPixels = 0;
+    uint8_t maxChannelDiff = 0;
+    for (size_t i = 0; i < total; i++) {
+      const uint8_t* pa = pixelsA.data() + i * 4;
+      const uint8_t* pb = pixelsB.data() + i * 4;
+      for (int c = 0; c < 4; c++) {
+        auto delta = static_cast<uint8_t>(std::abs(static_cast<int>(pa[c]) - pb[c]));
+        if (delta > maxChannelDiff) {
+          maxChannelDiff = delta;
+        }
+      }
+      if (pa[0] != pb[0] || pa[1] != pb[1] || pa[2] != pb[2] || pa[3] != pb[3]) {
+        diffPixels++;
+      }
+    }
+    EXPECT_LE(maxChannelDiff, 8);
+    EXPECT_LE(diffPixels, total / 50);
+  }
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "repeater", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {

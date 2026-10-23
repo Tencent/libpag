@@ -54,6 +54,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -813,6 +814,41 @@ Element* ReadTextBoxTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   return textBox;
 }
 
+Element* ReadRepeaterTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* repeater = context->document->makeNode<Repeater>();
+  PAGAttributeBlockReader reader(tagStream, 12);
+  bool hasCopies = reader.flag(0);
+  bool hasOffset = reader.flag(1);
+  bool hasOrder = reader.flag(2);
+  bool hasAnchorX = reader.flag(3);
+  bool hasAnchorY = reader.flag(4);
+  bool hasPosX = reader.flag(5);
+  bool hasPosY = reader.flag(6);
+  bool hasRotation = reader.flag(7);
+  bool hasScaleX = reader.flag(8);
+  bool hasScaleY = reader.flag(9);
+  bool hasStartAlpha = reader.flag(10);
+  bool hasEndAlpha = reader.flag(11);
+  tagStream->alignWithBytes();
+  if (hasCopies) repeater->copies = tagStream->readFloat();
+  if (hasOffset) repeater->offset = tagStream->readFloat();
+  if (hasOrder) repeater->order = static_cast<RepeaterOrder>(tagStream->readUint8());
+  if (hasAnchorX) repeater->anchor.x = tagStream->readFloat();
+  if (hasAnchorY) repeater->anchor.y = tagStream->readFloat();
+  if (hasPosX) repeater->position.x = tagStream->readFloat();
+  if (hasPosY) repeater->position.y = tagStream->readFloat();
+  if (hasRotation) repeater->rotation = tagStream->readFloat();
+  if (hasScaleX) repeater->scale.x = tagStream->readFloat();
+  if (hasScaleY) repeater->scale.y = tagStream->readFloat();
+  if (hasStartAlpha) {
+    repeater->startAlpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
+  }
+  if (hasEndAlpha) {
+    repeater->endAlpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
+  }
+  return repeater;
+}
+
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* fill = context->document->makeNode<Fill>();
   PAGAttributeBlockReader reader(tagStream, 5);
@@ -1159,6 +1195,8 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
       return ReadGroupTag(tagStream, context);
     case TagCode::TextBoxBlock:
       return ReadTextBoxTag(tagStream, context);
+    case TagCode::Repeater:
+      return ReadRepeaterTag(tagStream, context);
     default:
       return nullptr;
   }
