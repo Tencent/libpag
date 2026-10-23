@@ -19,7 +19,8 @@
 #pragma once
 
 #include "gtest/gtest.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
+#include "tgfx/gpu/Device.h"
 
 namespace pag {
 class PAGTest : public testing::Test {
@@ -64,22 +65,15 @@ class PAGTest : public testing::Test {
 
 class PAGXTest : public PAGTest {
  public:
-  std::shared_ptr<tgfx::GLDevice> device = nullptr;
-  tgfx::Context* context = nullptr;
-
   void SetUp() override {
     PAGTest::SetUp();
-    device = tgfx::GLDevice::Make();
-    ASSERT_TRUE(device != nullptr);
-    context = device->lockContext();
-    ASSERT_TRUE(context != nullptr);
-  }
-
-  void TearDown() override {
-    if (device) {
-      device->unlock();
-    }
-    PAGTest::TearDown();
+    // Probe that the default device can be created and locked, then release it immediately:
+    // the test body must be free to run code that locks the device (directly or through
+    // libpag's internal renderers). Since tgfx deduplicates devices per native GPU object
+    // (#1581), holding the lock across the whole test would deadlock any such call on the
+    // shared device. Tests that need a locked context create a pag::DeviceLockScope locally.
+    DeviceLockScope probe;
+    ASSERT_TRUE(static_cast<bool>(probe));
   }
 };
 

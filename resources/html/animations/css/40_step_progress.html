@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Step Progress</title>
+    <style>
+      /* Onboarding stepper: a connector fill is revealed by translateX
+         inside an overflow:hidden track (width can't animate), while the
+         step dots light up in sequence through the color channel. */
+      @keyframes fillGrow {
+        0%   { transform: translateX(-330px); }
+        12%  { transform: translateX(-330px); }
+        38%  { transform: translateX(-220px); }
+        50%  { transform: translateX(-220px); }
+        72%  { transform: translateX(-110px); }
+        84%  { transform: translateX(-110px); }
+        96%  { transform: translateX(0px); }
+        100% { transform: translateX(0px); }
+      }
+      @keyframes dotOn {
+        0%   { background-color: #CBD5E1; }
+        100% { background-color: #6366F1; }
+      }
+      .dot {
+        position: absolute; top: 30px;
+        display: flex; align-items: center; justify-content: center;
+        width: 40px; height: 40px; border-radius: 9999px;
+        background-color: #CBD5E1;
+        box-shadow: 0 6px 14px #6366F133;
+      }
+      .cap { position: absolute; top: 78px; width: 90px; font-size: 12px;
+             font-weight: bold; color: #64748B; text-align: center; }
+    </style>
+  </head>
+  <body style="width: 480px; height: 220px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center;
+               background-color: #F8FAFC; font-family: Arial;">
+    <div style="width: 380px; height: 130px;">
+      <div style="position: absolute; top: 48px; left: 30px; width: 330px; height: 5px;
+                  border-radius: 9999px; background-color: #E2E8F0;"></div>
+      <div style="position: absolute; top: 48px; left: 30px; width: 330px; height: 5px;
+                  border-radius: 9999px; overflow: hidden;">
+        <div style="width: 330px; height: 5px; border-radius: 9999px;
+                    background-image: linear-gradient(90deg, #6366F1, #8B5CF6);
+                    animation: fillGrow 3.2s ease-in-out infinite;"></div>
+      </div>
+
+      <div class="dot" style="left: 10px;  animation: dotOn 3.2s ease-in-out infinite; animation-delay: 0s;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="dot" style="left: 120px; animation: dotOn 3.2s ease-in-out infinite; animation-delay: 0.7s;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="dot" style="left: 230px; animation: dotOn 3.2s ease-in-out infinite; animation-delay: 1.4s;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="dot" style="left: 340px; animation: dotOn 3.2s ease-in-out infinite; animation-delay: 2.1s;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <span class="cap" style="left: -15px;">Cart</span>
+      <span class="cap" style="left: 95px;">Address</span>
+      <span class="cap" style="left: 205px;">Payment</span>
+      <span class="cap" style="left: 315px;">Done</span>
+    </div>
+  </body>
+</html>

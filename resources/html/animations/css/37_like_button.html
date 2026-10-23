@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Like Button</title>
+    <style>
+      /* Like microinteraction: the button bobs (translateY) and its
+         fill flips gray to red through the color channel, while burst
+         particles travel outward via translate(x, y) + opacity. */
+      @keyframes likePop {
+        0%   { transform: translateY(0px); background-color: #94A3B8; }
+        25%  { transform: translateY(-12px); background-color: #EF4444; }
+        55%  { transform: translateY(0px); background-color: #EF4444; }
+        100% { transform: translateY(0px); background-color: #94A3B8; }
+      }
+      @keyframes sparkUp    { 0%,18% { opacity: 0; transform: translate(0px, 0px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(0px, -64px); } }
+      @keyframes sparkUR    { 0%,18% { opacity: 0; transform: translate(0px, 0px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(54px, -34px); } }
+      @keyframes sparkDR    { 0%,18% { opacity: 0; transform: translate(0px, 0px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(54px, 34px); } }
+      @keyframes sparkUL    { 0%,18% { opacity: 0; transform: translate(0px, 0px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-54px, -34px); } }
+      @keyframes sparkDL    { 0%,18% { opacity: 0; transform: translate(0px, 0px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-54px, 34px); } }
+      .spark { position: absolute; top: 130px; left: 205px; width: 10px; height: 10px; border-radius: 9999px; }
+    </style>
+  </head>
+  <body style="width: 420px; height: 300px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center;
+               background-color: #FFF1F2; font-family: Arial;">
+
+    <div class="spark" style="background-color: #FB7185; animation: sparkUp 2s ease-out infinite;"></div>
+    <div class="spark" style="background-color: #FBBF24; animation: sparkUR 2s ease-out infinite;"></div>
+    <div class="spark" style="background-color: #F472B6; animation: sparkDR 2s ease-out infinite;"></div>
+    <div class="spark" style="background-color: #FBBF24; animation: sparkUL 2s ease-out infinite;"></div>
+    <div class="spark" style="background-color: #FB7185; animation: sparkDL 2s ease-out infinite;"></div>
+
+    <div style="display: flex; align-items: center; justify-content: center;
+                width: 80px; height: 80px; border-radius: 9999px;
+                background-color: #94A3B8;
+                box-shadow: 0 12px 26px #EF44444D;
+                animation: likePop 2s ease-in-out infinite;">
+      <svg width="40" height="40" viewBox="0 0 24 24">
+        <path d="M12 21s-7-4.4-9.5-8.5C1 9.6 2.2 6 5.5 6 7.5 6 9 7.3 12 10c3-2.7 4.5-4 6.5-4 3.3 0 4.5 3.6 3 6.5C19 16.6 12 21 12 21z" fill="#FFFFFF"/>
+      </svg>
+    </div>
+    <span style="font-size: 16px; font-weight: bold; color: #BE123C; letter-spacing: 1px;">1.2K likes</span>
+  </body>
+</html>

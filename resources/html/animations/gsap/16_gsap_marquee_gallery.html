@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Marquee Gallery</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #FAFAF9; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; gap: 32px; width: 100%; height: 100%; padding: 56px 0;">
+
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 56px;">
+        <p id="eyebrow" style="font-size: 13px; letter-spacing: 4px; color: #DB2777; opacity: 0;">FEATURED</p>
+        <p id="title" style="font-size: 30px; font-weight: bold; color: #1C1917; opacity: 0;">Curated Collection</p>
+      </div>
+
+      <div style="width: 100%; height: 280px; overflow: hidden;">
+        <div id="track" style="display: flex; flex-direction: row; gap: 24px; padding: 0 56px;">
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #F472B6, #BE185D); box-shadow: 0 18px 40px #BE185D33; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Rose Quartz</p>
+            <p style="font-size: 13px; color: #FBCFE8;">warm gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #818CF8, #4338CA); box-shadow: 0 18px 40px #4338CA33; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Indigo Dusk</p>
+            <p style="font-size: 13px; color: #C7D2FE;">cool gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #34D399, #047857); box-shadow: 0 18px 40px #04785733; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Emerald Tide</p>
+            <p style="font-size: 13px; color: #A7F3D0;">fresh gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #FBBF24, #B45309); box-shadow: 0 18px 40px #B4530933; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Amber Glow</p>
+            <p style="font-size: 13px; color: #FDE68A;">golden gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #22D3EE, #0E7490); box-shadow: 0 18px 40px #0E749033; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Cyan Mist</p>
+            <p style="font-size: 13px; color: #A5F3FC;">aqua gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #F472B6, #BE185D); box-shadow: 0 18px 40px #BE185D33; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Rose Quartz</p>
+            <p style="font-size: 13px; color: #FBCFE8;">warm gradient set</p>
+          </div>
+          <div class="tile" style="display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; width: 220px; height: 280px; padding: 22px; border-radius: 22px; background-image: linear-gradient(160deg, #818CF8, #4338CA); box-shadow: 0 18px 40px #4338CA33; opacity: 0;">
+            <p style="font-size: 18px; font-weight: bold; color: #FFFFFF;">Indigo Dusk</p>
+            <p style="font-size: 13px; color: #C7D2FE;">cool gradient set</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const intro = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      intro.fromTo('#eyebrow', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5 })
+           .fromTo('#title', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5 }, '-=0.3')
+           .fromTo('.tile',
+             { opacity: 0, y: 40 },
+             { opacity: 1, y: 0, duration: 0.6, stagger: 0.1 }, '-=0.2');
+
+      // continuous marquee: shift the track by one card+gap span, looping seamlessly
+      gsap.to('#track', {
+        x: -244 * 5,
+        duration: 14,
+        ease: 'none',
+        repeat: -1
+      });
+    </script>
+  </body>
+</html>

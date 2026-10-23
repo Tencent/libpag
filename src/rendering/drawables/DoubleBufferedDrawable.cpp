@@ -18,7 +18,6 @@
 
 #include "DoubleBufferedDrawable.h"
 #include "base/utils/TGFXCast.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {

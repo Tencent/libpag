@@ -12,12 +12,12 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "35be4ca2d1b52c4f385bbc9f88a0baa54725e1cd",
+        "commit": "c082e89d94e84bb7e53c015dbeffb42823f49e1a",
         "dir": "third_party/tgfx"
       },
       {
         "url": "${PAG_GROUP}/libavc.git",
-        "commit": "c2bf4c84a6d39788929e59514417e819185af98e",
+        "commit": "11425ab670b84afd2c204a5fbfcf92473cc76f5d",
         "dir": "third_party/libavc"
       },
       {

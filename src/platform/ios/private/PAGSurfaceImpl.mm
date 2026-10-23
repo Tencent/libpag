@@ -9,23 +9,32 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGSurface+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
+
+#if defined(TGFX_USE_OPENGL)
+#import "platform/ios/private/opengl/EAGLDrawable.h"
+#import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
+#elif defined(TGFX_USE_METAL)
+#import "platform/cocoa/private/metal/MetalLayerDrawable.h"
+#import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
+#endif
 
 @interface PAGSurfaceImpl ()
 
@@ -41,46 +50,13 @@
   return _pagSurface;
 }
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
-  auto drawable = pag::GPUDrawable::FromLayer(layer);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-}
-
-#if TARGET_IPHONE_SIMULATOR
-
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:].");
-  return nil;
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:context:].");
-  return nil;
-}
-
-#else
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+#if defined(TGFX_USE_OPENGL)
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:nil];
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
-  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
-}
-
+#else
+  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:nil];
 #endif
+}
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),
@@ -163,3 +139,64 @@
                                  rowBytes);
 }
 @end
+
+// The default pixel-buffer factory dispatches to these methods. Static linking must load them
+// whenever the PAGSurfaceImpl class is referenced.
+#if defined(TGFX_USE_OPENGL)
+@implementation PAGSurfaceImpl (OpenGL)
+
++ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
+  auto drawable = pag::EAGLDrawable::FromLayer(layer);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                             context:(EAGLContext*)eaglContext {
+#if TARGET_IPHONE_SIMULATOR
+  // Only the EAGL backend disables hardware buffers on the simulator.
+  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:context:].");
+  return nil;
+#else
+  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
+  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
+#endif
+}
+
+@end
+#elif defined(TGFX_USE_METAL)
+@implementation PAGSurfaceImpl (Metal)
+
++ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer {
+  auto drawable = pag::MetalLayerDrawable::FromLayer(layer);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
+  // Metal hardware buffers are supported on arm64 simulators through CVMetalTextureCache.
+  std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
+  if (device != nil) {
+    metalDevice = tgfx::MetalDevice::MakeFrom(device);
+  }
+  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, metalDevice);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
+}
+
+@end
+#endif

@@ -31,6 +31,7 @@
 
 class QQuickWindow;
 class QTimer;
+class QEvent;
 
 namespace pag {
 
@@ -99,6 +100,42 @@ class PAGXViewModel : public ContentViewModel {
    * quickTextDocument argument is the edit element's textDocument property value.
    */
   Q_INVOKABLE void attachHighlighter(QObject* quickTextDocument);
+
+  /**
+   * Editor geometry helpers backed by real per-block layout heights. CJK lines render taller
+   * than ASCII lines under font fallback, so a uniform line height underestimates the content
+   * height (bottom lines become unreachable by scrolling) and desynchronizes the gutter line
+   * numbers from the text. The height table is rebuilt debounced after edits and refreshed
+   * before editorLoadFinished, so these queries are O(1) on the QML side. editorLineHeight()
+   * returns the real height of a plain ASCII line (the shortest entry in the table), which the
+   * gutter uses to size the line-number pool and position numbers; it is more accurate than the
+   * font-metrics line spacing, which underestimates the layout line height.
+   */
+  Q_INVOKABLE qreal editorContentHeight() const;
+  Q_INVOKABLE qreal editorLineHeight() const;
+  Q_INVOKABLE qreal editorLineTopY(int line) const;
+  Q_INVOKABLE int editorLineAtY(qreal y) const;
+
+  /**
+   * Forces the given QQuickTextEdit to drop its cached text nodes and rebuild the ones
+   * intersecting the current viewport. Works around the ItemObservesViewport defect where
+   * rebuilding wipes every cached node but keeps the accumulated rendered-region extent, so
+   * scrolling back into a previously covered band renders blank lines that only recover when
+   * something else dirties the nodes (e.g. a text selection drag). Invoked from the editor's
+   * scroll handler for horizontal and backward scrolls (forward vertical scrolling already
+   * rebuilds natively). Returns false when the internal slot is unavailable; the slot is probed
+   * once and the failure logged a single time, so a Qt upgrade removing it only brings back the
+   * blank-band symptom, not a per-frame warning flood.
+   */
+  Q_INVOKABLE bool refreshEditorRendering(QObject* textEditItem);
+
+  /**
+   * Installs a wheel-event axis lock on the given editor Flickable: when a scroll gesture
+   * clearly favors one axis, the orthogonal (noise) delta is zeroed before the Flickable sees
+   * it, so a vertical trackpad swipe cannot accumulate horizontal drift. Deliberate diagonal
+   * gestures (both axes comparable) are passed through untouched.
+   */
+  Q_INVOKABLE void lockWheelAxis(QObject* flickable);
 
   /**
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
@@ -191,6 +228,8 @@ class PAGXViewModel : public ContentViewModel {
   Q_SIGNAL void editorLoadFinished(double maxLineWidth);
   // Loading progress in the 0..1 range, emitted once per inserted chunk.
   Q_SIGNAL void editorLoadProgress(double progress);
+  // Emitted after the per-block height table was rebuilt and the geometry answers changed.
+  Q_SIGNAL void editorGeometryChanged();
 
   /**
    * Called by PAGXView when the render thread completes a render.
@@ -200,11 +239,15 @@ class PAGXViewModel : public ContentViewModel {
 
  protected:
   void onViewTransformChanged() override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
  private:
   void clearContent();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
+  Q_SLOT void onEditorContentsChange();
+  void rebuildEditorGeometry();
+  int editorLineCount() const;
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -241,6 +284,19 @@ class PAGXViewModel : public ContentViewModel {
   QPointer<XmlDocumentHighlighter> highlighter = {};
   // Folded long lines of the currently loaded document.
   QList<ElidedLine> elidedLines = {};
+  // The persistent editor's QTextDocument; connected for contentsChange so edits invalidate
+  // the geometry table through the debounce timer. Distinct from loaderDocument, which only
+  // tracks the document while a chunked load is running.
+  QPointer<QTextDocument> editorDocument = {};
+  // Prefix sums of real block heights: editorBlockTops[i] is the content-space y of line i's
+  // top; the last element is the total content height. Empty when no document is attached.
+  QVector<qreal> editorBlockTops = {};
+  // Height of the shortest block (a plain ASCII line), captured while building editorBlockTops
+  // so editorLineHeight() is O(1). 0 when no document is attached.
+  qreal editorBaseLineHeight = 0;
+  QTimer* editorGeometryTimer = nullptr;
+  // Guards eventFilter against re-entering on the axis-locked wheel event it redelivers itself.
+  bool forwardingLockedWheelEvent = false;
   // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};

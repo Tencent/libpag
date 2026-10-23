@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - translateX + opacity</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 260px; height: 120px; background-color: #0B132B; position: relative; margin: 0;">
+    <div id="card"
+         style="position: absolute; left: 24px; top: 36px;
+                width: 120px; height: 48px; border-radius: 10px;
+                background-color: #5BC0BE;"></div>
+    <script>
+      // 用数组指定 [from, to]，同时驱动 translateX(x) 与 opacity(alpha) 两个通道
+      anime({
+        targets: "#card",
+        translateX: [0, 90],
+        opacity: [0, 1],
+        duration: 2000,
+        easing: "linear",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

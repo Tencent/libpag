@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Chat Conversation</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #E5DDD5; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; gap: 14px; width: 100%; height: 100%; padding: 36px 48px;">
+
+      <div id="day" style="display: flex; align-items: center; justify-content: center; opacity: 0;">
+        <div style="padding: 6px 14px; border-radius: 12px; background-color: #FFFFFF80;">
+          <p style="font-size: 12px; color: #54656F;">Today</p>
+        </div>
+      </div>
+
+      <div class="row" style="display: flex; flex-direction: row; justify-content: flex-start; opacity: 0;">
+        <div style="max-width: 360px; padding: 12px 16px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 1px 2px #00000026;">
+          <p style="font-size: 15px; color: #111B21;">Hey! Did the new build land?</p>
+        </div>
+      </div>
+
+      <div class="row" style="display: flex; flex-direction: row; justify-content: flex-end; opacity: 0;">
+        <div style="max-width: 360px; padding: 12px 16px; border-radius: 16px; background-color: #D9FDD3; box-shadow: 0 1px 2px #00000026;">
+          <p style="font-size: 15px; color: #111B21;">Yep, just deployed to staging.</p>
+        </div>
+      </div>
+
+      <div class="row" style="display: flex; flex-direction: row; justify-content: flex-end; opacity: 0;">
+        <div style="max-width: 360px; padding: 12px 16px; border-radius: 16px; background-color: #D9FDD3; box-shadow: 0 1px 2px #00000026;">
+          <p style="font-size: 15px; color: #111B21;">Animations look buttery smooth now.</p>
+        </div>
+      </div>
+
+      <div class="row" style="display: flex; flex-direction: row; justify-content: flex-start; opacity: 0;">
+        <div style="max-width: 360px; padding: 12px 16px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 1px 2px #00000026;">
+          <p style="font-size: 15px; color: #111B21;">Amazing. Shipping it today.</p>
+        </div>
+      </div>
+
+      <div id="typing" style="display: flex; flex-direction: row; justify-content: flex-start; opacity: 0;">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 14px 16px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 1px 2px #00000026;">
+          <div class="tdot" style="width: 8px; height: 8px; border-radius: 4px; background-color: #9AA6AC;"></div>
+          <div class="tdot" style="width: 8px; height: 8px; border-radius: 4px; background-color: #9AA6AC;"></div>
+          <div class="tdot" style="width: 8px; height: 8px; border-radius: 4px; background-color: #9AA6AC;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const tl = gsap.timeline({ defaults: { ease: 'back.out(1.6)', duration: 0.5 } });
+      tl.fromTo('#day', { opacity: 0, y: -10 }, { opacity: 1, y: 0, ease: 'power2.out' });
+
+      gsap.utils.toArray('.row').forEach((row, i) => {
+        const fromLeft = row.style.justifyContent === 'flex-start';
+        tl.fromTo(row,
+          { opacity: 0, x: fromLeft ? -40 : 40, y: 12 },
+          { opacity: 1, x: 0, y: 0 },
+          '+=0.45'
+        );
+      });
+
+      tl.fromTo('#typing', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4 }, '+=0.4');
+
+      // looping typing-indicator bounce, runs independently
+      gsap.to('.tdot', {
+        y: -6,
+        duration: 0.35,
+        ease: 'sine.inOut',
+        stagger: 0.15,
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

@@ -86,7 +86,7 @@ std::string BrightnessContrastFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> BrightnessContrastFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void BrightnessContrastFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
