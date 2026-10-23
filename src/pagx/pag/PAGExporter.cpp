@@ -124,6 +124,11 @@ struct EncodeState {
   int subDocNodeCount = 0;
   // Spec §5.1 node indices in emission order, backing NodeRef fields (Layer.mask).
   std::unordered_map<Node*, uint32_t> nodeIndices;
+  // Shared-composition placement (spec §5.3): compositions referenced by two or more layers go
+  // into the ResourceBlock in first-reference order; single-use compositions are inlined as a
+  // CompositionBlock right after the referencing layer's LayerAttributes.
+  std::vector<Composition*> sharedCompositionOrder;
+  std::unordered_map<const Composition*, uint32_t> compositionResourceSlots;
 
   uint32_t intern(const std::string& text) {
     return strings.intern(text);
@@ -300,6 +305,17 @@ void CollectFontReferencesFromLayer(Layer* layer, std::vector<Font*>* references
   }
   for (auto* child : layer->children) {
     CollectFontReferencesFromLayer(child, references);
+  }
+}
+
+// Collects composition references from layers (spec §5.3 first-reference order). Every
+// reference is appended, including repeats.
+void CollectCompositionReferencesFromLayer(Layer* layer, std::vector<Composition*>* references) {
+  if (layer->composition != nullptr) {
+    references->push_back(layer->composition);
+  }
+  for (auto* child : layer->children) {
+    CollectCompositionReferencesFromLayer(child, references);
   }
 }
 
@@ -1120,6 +1136,34 @@ void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* s
   }
 }
 
+void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
+
+// CompositionBlock (spec §9.1 #297): CompositionAttributes (298: width/height) followed by
+// the composition's layer tags, End-terminated.
+void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
+                           EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    writer.writeFlag(true);   // width
+    writer.writeFlag(true);   // height
+    writer.writeFlag(false);  // phase-2 fields
+    writer.writeFlag(false);
+    auto* v = writer.valueStream();
+    v->writeFloat(composition->width);
+    v->writeFloat(composition->height);
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::DocumentAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* compLayer : composition->layers) {
+    WriteLayerTag(&content, compLayer, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::CompositionBlock, &content);
+}
+
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) {
   pag::EncodeStream content(&state->streamContext);
   {
@@ -1158,7 +1202,7 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     writer.writeFlag(hasScrollRect);
     writer.writeFlag(hasMask);
     writer.writeFlag(hasMaskType);
-    writer.writeFlag(false);  // hasComposition, phase 2
+    writer.writeFlag(layer->composition != nullptr);
     auto subDocIt = state->layerSubDocRefs.find(layer);
     auto hasSubDocument = subDocIt != state->layerSubDocRefs.end();
     writer.writeFlag(hasSubDocument);
@@ -1192,12 +1236,25 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
       }
       v->writeEncodedUint32(maskRef);
     }
+    if (layer->composition != nullptr) {
+      // ResourceRef: 0 = inline CompositionBlock after LayerAttributes, k = ResourceBlock k-1.
+      uint32_t compositionRef = 0;
+      auto compIt = state->compositionResourceSlots.find(layer->composition);
+      if (compIt != state->compositionResourceSlots.end()) {
+        compositionRef = compIt->second + 1;
+      }
+      v->writeEncodedUint32(compositionRef);
+    }
     if (hasMaskType) v->writeUint8(static_cast<uint8_t>(layer->maskType));
     if (hasSubDocument) v->writeEncodedUint32(subDocIt->second);
     if (hasVmContext) v->writeEncodedUint32(state->intern(layer->vmContext));
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::LayerAttributes, static_cast<uint32_t>(block->length()));
     content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  if (layer->composition != nullptr && state->compositionResourceSlots.find(layer->composition) ==
+                                           state->compositionResourceSlots.end()) {
+    WriteCompositionBlock(&content, layer->composition, state);
   }
   for (auto* element : layer->contents) {
     WriteElementTag(&content, element, state);
@@ -1558,6 +1615,17 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
     return;
   }
   state->nodeIndices[layer] = (*index)++;
+  if (layer->composition != nullptr &&
+      state->compositionResourceSlots.count(layer->composition) == 0) {
+    // Inline composition: its subtree is numbered at this reference position.
+    auto* composition = layer->composition;
+    if (state->nodeIndices.count(composition) == 0) {
+      state->nodeIndices[composition] = (*index)++;
+      for (auto* compLayer : composition->layers) {
+        AssignLayerNodeIndices(compLayer, state, index);
+      }
+    }
+  }
   for (auto* element : layer->contents) {
     AssignElementNodeIndices(element, state, index);
   }
@@ -1679,6 +1747,13 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* layer : doc->layers) {
       CollectImageReferencesFromLayer(layer, &imageRefs);
     }
+    for (auto& node : doc->nodes) {
+      if (node->nodeType() == NodeType::Composition) {
+        for (auto* compLayer : static_cast<Composition*>(node.get())->layers) {
+          CollectImageReferencesFromLayer(compLayer, &imageRefs);
+        }
+      }
+    }
     for (auto& sub : state->subDocuments) {
       for (auto* layer : sub.document->layers) {
         CollectImageReferencesFromLayer(layer, &imageRefs);
@@ -1721,6 +1796,13 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* layer : doc->layers) {
       CollectFontReferencesFromLayer(layer, &fontRefs);
     }
+    for (auto& node : doc->nodes) {
+      if (node->nodeType() == NodeType::Composition) {
+        for (auto* compLayer : static_cast<Composition*>(node.get())->layers) {
+          CollectFontReferencesFromLayer(compLayer, &fontRefs);
+        }
+      }
+    }
     for (auto& sub : state->subDocuments) {
       for (auto* layer : sub.document->layers) {
         CollectFontReferencesFromLayer(layer, &fontRefs);
@@ -1738,8 +1820,37 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       }
     }
   }
+  // Shared-composition placement (spec §5.3): count layer references per composition; two or
+  // more references go into the ResourceBlock in first-reference order.
+  {
+    std::vector<Composition*> compositionRefs = {};
+    for (auto* layer : doc->layers) {
+      CollectCompositionReferencesFromLayer(layer, &compositionRefs);
+    }
+    std::unordered_map<const Composition*, int> compositionCounts = {};
+    for (auto* composition : compositionRefs) {
+      compositionCounts[composition]++;
+    }
+    for (auto* composition : compositionRefs) {
+      if (compositionCounts[composition] >= 2 &&
+          state->compositionResourceSlots.find(composition) ==
+              state->compositionResourceSlots.end()) {
+        state->compositionResourceSlots[composition] =
+            static_cast<uint32_t>(state->sharedCompositionOrder.size());
+        state->sharedCompositionOrder.push_back(composition);
+      }
+    }
+  }
   for (auto* layer : doc->layers) {
     CollectStringsFromLayer(layer, state.get());
+  }
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* composition = static_cast<Composition*>(node.get());
+      for (auto* compLayer : composition->layers) {
+        CollectStringsFromLayer(compLayer, state.get());
+      }
+    }
   }
   for (auto& sub : state->subDocuments) {
     state->intern(sub.name);
@@ -1760,6 +1871,14 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* font : state->sharedFontOrder) {
       AssignFontNodeIndices(font, state.get(), &nextIndex);
     }
+    for (auto* composition : state->sharedCompositionOrder) {
+      if (state->nodeIndices.count(composition) == 0) {
+        state->nodeIndices[composition] = nextIndex++;
+      }
+      for (auto* compLayer : composition->layers) {
+        AssignLayerNodeIndices(compLayer, state.get(), &nextIndex);
+      }
+    }
     for (auto* layer : doc->layers) {
       AssignLayerNodeIndices(layer, state.get(), &nextIndex);
     }
@@ -1778,6 +1897,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     }
     for (auto* font : state->sharedFontOrder) {
       WriteFontTag(&resContent, font, state.get());
+    }
+    for (auto* composition : state->sharedCompositionOrder) {
+      WriteCompositionBlock(&resContent, composition, state.get());
     }
     WritePAGTagHeader(&resContent, TagCode::End, 0);
     WriteTag(&body, TagCode::ResourceBlock, &resContent);

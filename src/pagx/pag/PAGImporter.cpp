@@ -24,6 +24,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/ColorStop.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Ellipse.h"
@@ -70,6 +71,11 @@ struct DecodeContext {
   std::vector<Image*> resourceImages = {};
   // ResourceBlock Font nodes in table order; GlyphRun refs resolve against this list.
   std::vector<Font*> resourceFonts = {};
+  // ResourceBlock Compositions in table order; layer composition refs resolve against this list.
+  std::vector<Composition*> resourceCompositions = {};
+  // Layer composition refs (inline handled during decode); resource refs backfill after the
+  // ResourceBlock is read.
+  std::vector<std::pair<Layer*, uint32_t>> pendingCompositionRefs = {};
   // Image nodes with their pending ImageTable refs; the ImageTable sits at the end of the body,
   // so entry data and decode metadata are backfilled after the whole body is parsed.
   std::vector<std::pair<Image*, uint32_t>> pendingImageRefs = {};
@@ -111,6 +117,11 @@ Image* ReadImageTag(pag::DecodeStream* tagStream, DecodeContext* context) {
 // ResourceBlock content (spec §6.3): resource tags in first-reference order, End-terminated.
 Font* ReadFontTag(pag::DecodeStream* tagStream, DecodeContext* context);
 
+Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* context);
+void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
+                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
+                           std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget);
+
 // Unknown resource tags are skipped (§4.2).
 void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
   while (true) {
@@ -121,6 +132,8 @@ void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
       context->resourceImages.push_back(ReadImageTag(&tagBytes, context));
     } else if (header.code == TagCode::Font) {
       context->resourceFonts.push_back(ReadFontTag(&tagBytes, context));
+    } else if (header.code == TagCode::CompositionBlock) {
+      context->resourceCompositions.push_back(ReadCompositionBlock(&tagBytes, context));
     }
   }
 }
@@ -472,6 +485,30 @@ Element* ReadTextPathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
     }
   }
   return textPath;
+}
+
+// CompositionBlock (spec §9.1 #297): CompositionAttributes (298) + layers + End.
+Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* composition = context->document->makeNode<Composition>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::DocumentAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 4);
+      bool hasWidth = reader.flag(0);
+      bool hasHeight = reader.flag(1);
+      tagBytes.alignWithBytes();
+      if (hasWidth) composition->width = tagBytes.readFloat();
+      if (hasHeight) composition->height = tagBytes.readFloat();
+    } else if (header.code == TagCode::LayerBlock) {
+      auto* layer = context->document->makeNode<Layer>();
+      ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
+                            &context->pendingMaskRefs);
+      composition->layers.push_back(layer);
+    }
+  }
+  return composition;
 }
 
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
@@ -849,6 +886,7 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       bool hasScrollRect = reader.flag(14);
       bool hasMask = reader.flag(15);
       bool hasMaskType = reader.flag(16);
+      bool hasComposition = reader.flag(17);
       bool hasSubDocument = reader.flag(18);
       bool hasVmContext = reader.flag(19);
       tagBytes.alignWithBytes();
@@ -875,6 +913,9 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       if (hasMask) {
         pendingMaskRefsTarget->push_back({layer, tagBytes.readEncodedUint32()});
       }
+      if (hasComposition) {
+        context->pendingCompositionRefs.push_back({layer, tagBytes.readEncodedUint32()});
+      }
       if (hasMaskType) layer->maskType = static_cast<MaskType>(tagBytes.readUint8());
       if (hasSubDocument) subDocRefs->push_back({layer, tagBytes.readEncodedUint32()});
       if (hasVmContext) layer->vmContext = context->getString(tagBytes.readEncodedUint32());
@@ -882,6 +923,8 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       auto* child = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, child, context, subDocRefs, pendingMaskRefsTarget);
       layer->children.push_back(child);
+    } else if (header.code == TagCode::CompositionBlock) {
+      layer->composition = ReadCompositionBlock(&tagBytes, context);
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);
       if (element != nullptr) layer->contents.push_back(element);
@@ -1182,6 +1225,14 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
       result->error = "sub-document expansion exceeds the spec limits";
     }
     return nullptr;
+  }
+
+  // Backfill layer composition refs: resource-block entries resolve against
+  // resourceCompositions (the ResourceBlock precedes the DocumentBlock in the body).
+  for (auto& pending : context.pendingCompositionRefs) {
+    if (pending.second > 0 && pending.second <= context.resourceCompositions.size()) {
+      pending.first->composition = context.resourceCompositions[pending.second - 1];
+    }
   }
 
   // Backfill layer mask NodeRefs against the root document's node table (creation order =
