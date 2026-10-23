@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG timing - cubic-bezier overshoot</title>
+    <style>
+      @keyframes drop {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(120px); }
+      }
+    </style>
+  </head>
+  <body style="width: 160px; height: 220px; background-color: #18181B;">
+    <!-- 自定义 cubic-bezier 过冲 → bezier (§13.3)，落地回弹手感 -->
+    <div id="pin"
+         style="position: absolute; left: 56px; top: 16px; width: 48px; height: 48px;
+                animation: drop 1.4s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;">
+      <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill="#FB7185"/>
+        <circle cx="12" cy="9" r="2.6" fill="#18181B"/>
+      </svg>
+    </div>
+  </body>
+</html>

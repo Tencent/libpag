@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG timing - linear</title>
+    <style>
+      @keyframes flyX {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(196px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 120px; background-color: #0C4A6E;">
+    <!-- timing-function: linear → PAGX linear (§13.3)，匀速横向漂移 -->
+    <div id="cloud"
+         style="position: absolute; left: 8px; top: 40px; width: 56px; height: 40px;
+                animation: flyX 3s linear infinite;">
+      <svg width="56" height="40" viewBox="0 0 28 20" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7 17a5 5 0 0 1 0-10 6 6 0 0 1 11.3-1.6A4.5 4.5 0 0 1 22 17z"
+              fill="#E0F2FE"/>
+      </svg>
+    </div>
+  </body>
+</html>

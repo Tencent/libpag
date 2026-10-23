@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - loading dots (timeline + stagger)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 200px; height: 100px; background-color: #0F172A; position: relative; margin: 0;">
+    <div class="dot" id="d1"
+         style="position: absolute; left: 60px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8;"></div>
+    <div class="dot" id="d2"
+         style="position: absolute; left: 92px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8;"></div>
+    <div class="dot" id="d3"
+         style="position: absolute; left: 124px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8;"></div>
+    <script>
+      // 真实加载点：opacity + y 双通道，stagger 错峰，无限 yoyo
+      gsap.to(".dot", {
+        y: -12,
+        opacity: 1,
+        duration: 0.5,
+        ease: "sine.inOut",
+        repeat: -1,
+        yoyo: true,
+        stagger: 0.15
+      });
+      gsap.set(".dot", { opacity: 0.2 });
+    </script>
+  </body>
+</html>

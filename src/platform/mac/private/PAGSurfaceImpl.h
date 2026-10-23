@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,9 +26,9 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
+// Backend factory declarations live in the opengl/ and metal/ category headers. The selected
+// category implementation shares PAGSurfaceImpl.mm with the class for ordinary static linking.
 @interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view;
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 

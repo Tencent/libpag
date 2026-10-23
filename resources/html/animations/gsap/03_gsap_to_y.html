@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - to y (translateY)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 160px; height: 220px; background-color: #052E16; position: relative; margin: 0;">
+    <div id="ball"
+         style="position: absolute; left: 56px; top: 16px;
+                width: 48px; height: 48px; border-radius: 24px;
+                background-color: #4ADE80;"></div>
+    <script>
+      // gsap 的 y 即 transform: translateY -> y 通道
+      gsap.to("#ball", {
+        y: 120,
+        duration: 1.2,
+        ease: "power1.inOut",
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

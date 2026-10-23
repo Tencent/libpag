@@ -17,10 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGView.h"
+
+#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
+
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
-#import "platform/mac/private/GPUDrawable.h"
+
+#if defined(TGFX_USE_OPENGL)
+#import "PAGSurface+OpenGL.h"
+#import "platform/mac/private/opengl/CGLDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include <mutex>
+#import "PAGSurface+Metal.h"
+#include "platform/cocoa/private/metal/MetalLayerHelper.h"
+#endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -35,6 +50,9 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
+#if defined(TGFX_USE_METAL)
+  std::mutex renderLock;
+#endif
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -44,7 +62,25 @@
   return self;
 }
 
+#if defined(TGFX_USE_METAL)
+- (CALayer*)makeBackingLayer {
+  return [CAMetalLayer layer];
+}
+
+- (void)updateLayerDrawableSize {
+  // NSView's layer.contentsScale does not track window.backingScaleFactor automatically, so the
+  // scale is read from the window (defaulting to 1.0) and synced by the shared helper.
+  CGFloat scale = self.window.backingScaleFactor > 0 ? self.window.backingScaleFactor : 1.0;
+  pag::cocoa::UpdateMetalLayerDrawableSize((CAMetalLayer*)self.layer, self.bounds.size, scale);
+}
+#endif
+
 - (void)initPAG {
+#if defined(TGFX_USE_METAL)
+  // NSView is not layer-backed by default; enable it so makeBackingLayer creates the CAMetalLayer
+  // and self.layer returns a valid CAMetalLayer to render into.
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
@@ -58,18 +94,27 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
+#if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onAsyncSurfacePrepared:)
                                                name:pag::AsyncSurfacePreparedNotification
                                              object:self];
+#endif
 }
 
 - (void)dealloc {
   [animator cancel];
   [animator release];
   [animatorListenerProxy release];
-  [pagPlayer release];
-  [pagSurface release];
+  {
+#if defined(TGFX_USE_METAL)
+    std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
+    [pagPlayer release];
+    pagPlayer = nil;
+    [pagSurface release];
+    pagSurface = nil;
+  }
   [pagFile release];
   [filePath release];
   [listeners release];
@@ -78,25 +123,46 @@
   [super dealloc];
 }
 
+- (void)refreshSurfaceSize {
+#if defined(TGFX_USE_METAL)
+  // CVDisplayLink updates synchronously on its own thread, not the main thread. Keep the layer
+  // size write and the surface cache invalidation in the same critical section as rendering.
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
+  if (pagSurface == nil) {
+    return;
+  }
+#if defined(TGFX_USE_METAL)
+  [self updateLayerDrawableSize];
+#endif
+  [pagSurface updateSize];
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // Resizing the view's coordinate system directly does not necessarily go through
+  // setFrameSize:, and AppKit does not document which internal paths call which setter. Both
+  // overrides therefore call the same helper, and the size comparison here keeps an
+  // already-applied change from being applied twice.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
     }
   }
 }
 
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+- (void)setFrameSize:(NSSize)newSize {
+  NSSize oldSize = self.bounds.size;
+  [super setFrameSize:newSize];
+  // setFrame: calls this internally, and autoresizing / Auto Layout drive it directly, so this is
+  // the main entry for frame-driven resizes. Handling the same change in setFrame: as well would
+  // run updateSize twice per resize.
+  if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
+    [self refreshSurfaceSize];
+    if (oldSize.width == 0 || oldSize.height == 0) {
       [animator update];
     }
   }
@@ -106,6 +172,16 @@
   [super viewDidMoveToWindow];
   [self checkVisible];
 }
+
+#if defined(TGFX_USE_METAL)
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  // Moving the window between displays with different backing scales does not change bounds, so
+  // neither setBounds: nor setFrameSize: fires and contentsScale would stay stuck on the old
+  // display's scale (blurry or clipped content).
+  [self refreshSurfaceSize];
+}
+#endif
 
 - (void)setAlphaValue:(CGFloat)alphaValue {
   [super setAlphaValue:alphaValue];
@@ -134,8 +210,21 @@
 }
 
 - (void)initPAGSurface {
-  pagSurface = [[PAGSurface FromView:self] retain];
-  [pagPlayer setSurface:pagSurface];
+  {
+#if defined(TGFX_USE_METAL)
+    std::lock_guard<std::mutex> autoLock(renderLock);
+    CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+    pag::cocoa::SetUpPAGMetalLayer(layer);
+    // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
+    // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+    [self updateLayerDrawableSize];
+    pagSurface = [[PAGSurface FromLayer:layer] retain];
+#else
+    pagSurface = [[PAGSurface FromView:self] retain];
+#endif
+    [pagPlayer setSurface:pagSurface];
+  }
+  // Synchronous updates re-enter onAnimationFlush:, which acquires renderLock.
   [animator update];
 }
 
@@ -189,6 +278,9 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -315,6 +407,9 @@
 }
 
 - (BOOL)flush {
+#if defined(TGFX_USE_METAL)
+  std::lock_guard<std::mutex> autoLock(renderLock);
+#endif
   return [pagPlayer flush];
 }
 
@@ -342,7 +437,11 @@
   return CGRectNull;
 }
 
+#if defined(TGFX_USE_OPENGL)
 - (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
+#endif
 @end
+
+#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL

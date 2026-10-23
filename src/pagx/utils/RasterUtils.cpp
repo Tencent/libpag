@@ -22,6 +22,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
@@ -31,7 +32,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -210,23 +210,29 @@ struct TiledPatternDrawer {
 
 }  // namespace
 
-GPUContext::~GPUContext() {
-  _device = nullptr;
-}
+GPUContext::~GPUContext() = default;
 
 tgfx::Context* GPUContext::lockContext() {
-  if (!_device) {
-    _device = tgfx::GLDevice::Make();
-    if (!_device) {
+  // Cache the device across sequential rasterizations so creating a new GL context for each
+  // asset does not repeatedly discard the shader and resource caches.
+  if (_device == nullptr) {
+    _device = pag::Devices::MakeDefault();
+    if (_device == nullptr) {
       return nullptr;
     }
   }
-  return _device->lockContext();
+  auto scope = std::make_unique<pag::DeviceLockScope>(_device);
+  if (!*scope) {
+    return nullptr;
+  }
+  auto* context = scope->context();
+  _lockStack.push_back(std::move(scope));
+  return context;
 }
 
 void GPUContext::unlock() {
-  if (_device) {
-    _device->unlock();
+  if (!_lockStack.empty()) {
+    _lockStack.pop_back();
   }
 }
 

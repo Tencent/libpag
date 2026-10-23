@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG direction - alternate (pingPong)</title>
+    <style>
+      @keyframes pong {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(180px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 110px; background-color: #1C1917;">
+    <!-- direction: alternate → Animation.loop="pingPong" (§13.3)，往返运动 -->
+    <div id="ball"
+         style="position: absolute; left: 16px; top: 35px; width: 40px; height: 40px;
+                animation: pong 1s ease-in-out infinite alternate;">
+      <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#FACC15"/>
+        <path d="M12 2a10 10 0 0 0 0 20M2 12h20" fill="none" stroke="#1C1917" stroke-width="1.2"/>
+      </svg>
+    </div>
+  </body>
+</html>

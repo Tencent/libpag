@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - translateY</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 160px; height: 220px; background-color: #052E16; position: relative; margin: 0;">
+    <div id="ball"
+         style="position: absolute; left: 56px; top: 16px;
+                width: 48px; height: 48px; border-radius: 24px;
+                background-color: #4ADE80;"></div>
+    <script>
+      // translateY -> y 通道
+      anime({
+        targets: "#ball",
+        translateY: 120,
+        duration: 1200,
+        easing: "easeInOutSine",
+        direction: "alternate",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

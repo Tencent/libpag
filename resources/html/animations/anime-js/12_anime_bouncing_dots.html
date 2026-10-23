@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Loading Dots</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #111827; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; width: 100%; height: 100%;">
+
+      <div style="display: flex; flex-direction: row; align-items: flex-end; gap: 22px; height: 80px; padding: 24px;">
+        <div class="dot" style="width: 28px; height: 28px; border-radius: 14px; background-color: #22D3EE;"></div>
+        <div class="dot" style="width: 28px; height: 28px; border-radius: 14px; background-color: #22D3EE;"></div>
+        <div class="dot" style="width: 28px; height: 28px; border-radius: 14px; background-color: #22D3EE;"></div>
+        <div class="dot" style="width: 28px; height: 28px; border-radius: 14px; background-color: #22D3EE;"></div>
+        <div class="dot" style="width: 28px; height: 28px; border-radius: 14px; background-color: #22D3EE;"></div>
+      </div>
+
+      <p id="label" style="font-size: 16px; letter-spacing: 4px; color: #94A3B8;">LOADING</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      anime({
+        targets: '.dot',
+        translateY: [
+          { value: -36, duration: 320, easing: 'easeOutQuad' },
+          { value: 0, duration: 320, easing: 'easeInQuad' }
+        ],
+        backgroundColor: [
+          { value: '#A855F7', duration: 320 },
+          { value: '#22D3EE', duration: 320 }
+        ],
+        delay: anime.stagger(120),
+        loop: true
+      });
+
+      anime({
+        targets: '#label',
+        opacity: [
+          { value: 0.35, duration: 700 },
+          { value: 1, duration: 700 }
+        ],
+        easing: 'easeInOutSine',
+        loop: true,
+        direction: 'alternate'
+      });
+    </script>
+  </body>
+</html>

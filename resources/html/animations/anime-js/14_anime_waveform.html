@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Audio Waveform</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #08080F; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; width: 100%; height: 100%; padding: 40px;">
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+        <p id="now" style="font-size: 13px; letter-spacing: 4px; color: #6366F1; opacity: 0;">NOW PLAYING</p>
+        <p id="track" style="font-size: 26px; font-weight: bold; color: #F8FAFC; opacity: 0;">Midnight Frequencies</p>
+      </div>
+
+      <div id="wave" style="display: flex; flex-direction: row; align-items: center; gap: 5px; height: 180px;"></div>
+
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 18px;">
+        <p style="font-size: 13px; color: #64748B;">1:24</p>
+        <div style="width: 360px; height: 6px; border-radius: 3px; background-color: #1E293B; overflow: hidden;">
+          <div id="progress" style="width: 140px; height: 100%; border-radius: 3px; background-image: linear-gradient(90deg, #6366F1, #EC4899);"></div>
+        </div>
+        <p style="font-size: 13px; color: #64748B;">3:58</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      const wave = document.getElementById('wave');
+      const BARS = 48;
+      for (let i = 0; i < BARS; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.setAttribute('style', 'width: 8px; height: 90px; border-radius: 4px; background-color: #6366F1;');
+        wave.appendChild(bar);
+      }
+
+      anime({
+        targets: '.bar',
+        translateY: function (el, i) {
+          // build a standing-wave envelope across the bar field
+          const phase = Math.sin((i / BARS) * Math.PI);
+          return [{ value: -60 * phase - 8 }, { value: 60 * phase + 8 }];
+        },
+        backgroundColor: [
+          { value: '#6366F1' },
+          { value: '#EC4899' },
+          { value: '#22D3EE' }
+        ],
+        duration: 900,
+        easing: 'easeInOutSine',
+        delay: anime.stagger(40, { from: 'center' }),
+        loop: true,
+        direction: 'alternate'
+      });
+
+      anime({
+        targets: '#now',
+        opacity: [0, 1],
+        translateY: [-14, 0],
+        duration: 600,
+        easing: 'easeOutCubic'
+      });
+      anime({
+        targets: '#track',
+        opacity: [0, 1],
+        translateY: [-16, 0],
+        delay: 150,
+        duration: 600,
+        easing: 'easeOutCubic'
+      });
+    </script>
+  </body>
+</html>
