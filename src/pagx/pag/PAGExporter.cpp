@@ -57,6 +57,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -64,6 +65,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
@@ -1068,6 +1070,8 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
 
 void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* state);
 void WriteRepeaterTag(pag::EncodeStream* stream, Repeater* repeater, EncodeState* state);
+void WriteRangeSelectorTag(pag::EncodeStream* stream, RangeSelector* selector, EncodeState* state);
+void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, EncodeState* state);
 void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* state);
 
 void WriteGroupTag(pag::EncodeStream* stream, Group* group, EncodeState* state) {
@@ -1158,6 +1162,9 @@ void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* s
       break;
     case NodeType::Repeater:
       WriteRepeaterTag(stream, static_cast<Repeater*>(element), state);
+      break;
+    case NodeType::TextModifier:
+      WriteTextModifierTag(stream, static_cast<TextModifier*>(element), state);
       break;
     default:
       break;
@@ -1297,6 +1304,105 @@ void WriteRepeaterTag(pag::EncodeStream* stream, Repeater* repeater, EncodeState
   auto block = writer.release();
   WritePAGTagHeader(stream, TagCode::Repeater, static_cast<uint32_t>(block->length()));
   stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// RangeSelector tag (spec §9.4 #429): 11 exist bits.
+void WriteRangeSelectorTag(pag::EncodeStream* stream, RangeSelector* selector, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(selector->start != 0.0f);
+  writer.writeFlag(selector->end != 1.0f);
+  writer.writeFlag(selector->offset != 0.0f);
+  writer.writeFlag(selector->unit != SelectorUnit::Percentage);
+  writer.writeFlag(selector->shape != SelectorShape::Square);
+  writer.writeFlag(selector->easeIn != 0.0f);
+  writer.writeFlag(selector->easeOut != 0.0f);
+  writer.writeFlag(selector->mode != SelectorMode::Add);
+  writer.writeFlag(selector->weight != 1.0f);
+  writer.writeFlag(selector->randomOrder);
+  writer.writeFlag(selector->randomSeed != 0);
+  auto* v = writer.valueStream();
+  if (selector->start != 0.0f) v->writeFloat(selector->start);
+  if (selector->end != 1.0f) v->writeFloat(selector->end);
+  if (selector->offset != 0.0f) v->writeFloat(selector->offset);
+  if (selector->unit != SelectorUnit::Percentage) {
+    v->writeUint8(static_cast<uint8_t>(selector->unit));
+  }
+  if (selector->shape != SelectorShape::Square) {
+    v->writeUint8(static_cast<uint8_t>(selector->shape));
+  }
+  if (selector->easeIn != 0.0f) v->writeFloat(selector->easeIn);
+  if (selector->easeOut != 0.0f) v->writeFloat(selector->easeOut);
+  if (selector->mode != SelectorMode::Add) {
+    v->writeUint8(static_cast<uint8_t>(selector->mode));
+  }
+  if (selector->weight != 1.0f) v->writeFloat(selector->weight);
+  if (selector->randomSeed != 0) {
+    v->writeEncodedUint32(static_cast<uint32_t>(selector->randomSeed));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::RangeSelector, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// TextModifierBlock tag (spec §9.4 #428/#436): 12 exist bits, then RangeSelectors, End.
+void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasAnchorX = modifier->anchor.x != 0.0f;
+    auto hasAnchorY = modifier->anchor.y != 0.0f;
+    auto hasPosX = modifier->position.x != 0.0f;
+    auto hasPosY = modifier->position.y != 0.0f;
+    auto hasRotation = modifier->rotation != 0.0f;
+    auto hasScaleX = modifier->scale.x != 1.0f;
+    auto hasScaleY = modifier->scale.y != 1.0f;
+    auto hasSkew = modifier->skew != 0.0f;
+    auto hasSkewAxis = modifier->skewAxis != 0.0f;
+    auto hasAlpha = modifier->alpha != 1.0f;
+    auto hasFillColor = modifier->fillColor.has_value();
+    auto hasStrokeColor = modifier->strokeColor.has_value();
+    auto hasStrokeWidth = modifier->strokeWidth.has_value();
+    writer.writeFlag(hasAnchorX);
+    writer.writeFlag(hasAnchorY);
+    writer.writeFlag(hasPosX);
+    writer.writeFlag(hasPosY);
+    writer.writeFlag(hasRotation);
+    writer.writeFlag(hasScaleX);
+    writer.writeFlag(hasScaleY);
+    writer.writeFlag(hasSkew);
+    writer.writeFlag(hasSkewAxis);
+    writer.writeFlag(hasAlpha);
+    writer.writeFlag(hasFillColor);
+    writer.writeFlag(hasStrokeColor);
+    writer.writeFlag(hasStrokeWidth);
+    auto* v = writer.valueStream();
+    if (hasAnchorX) v->writeFloat(modifier->anchor.x);
+    if (hasAnchorY) v->writeFloat(modifier->anchor.y);
+    if (hasPosX) v->writeFloat(modifier->position.x);
+    if (hasPosY) v->writeFloat(modifier->position.y);
+    if (hasRotation) v->writeFloat(modifier->rotation);
+    if (hasScaleX) v->writeFloat(modifier->scale.x);
+    if (hasScaleY) v->writeFloat(modifier->scale.y);
+    if (hasSkew) v->writeFloat(modifier->skew);
+    if (hasSkewAxis) v->writeFloat(modifier->skewAxis);
+    if (hasAlpha) {
+      v->writeUint8(static_cast<uint8_t>(lroundf(modifier->alpha * 255.0f)));
+    }
+    if (hasFillColor) WritePAGColor(v, modifier->fillColor.value());
+    if (hasStrokeColor) WritePAGColor(v, modifier->strokeColor.value());
+    if (hasStrokeWidth) v->writeFloat(modifier->strokeWidth.value());
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::TextModifierAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* selector : modifier->selectors) {
+    if (selector->nodeType() == NodeType::RangeSelector) {
+      WriteRangeSelectorTag(&content, static_cast<RangeSelector*>(selector), state);
+    }
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::TextModifierBlock, &content);
 }
 
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);

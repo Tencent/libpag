@@ -53,6 +53,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -60,6 +61,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
@@ -849,6 +851,83 @@ Element* ReadRepeaterTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   return repeater;
 }
 
+RangeSelector* ReadRangeSelectorTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* selector = context->document->makeNode<RangeSelector>();
+  PAGAttributeBlockReader reader(tagStream, 11);
+  bool hasStart = reader.flag(0);
+  bool hasEnd = reader.flag(1);
+  bool hasOffset = reader.flag(2);
+  bool hasUnit = reader.flag(3);
+  bool hasShape = reader.flag(4);
+  bool hasEaseIn = reader.flag(5);
+  bool hasEaseOut = reader.flag(6);
+  bool hasMode = reader.flag(7);
+  bool hasWeight = reader.flag(8);
+  selector->randomOrder = reader.flag(9);
+  bool hasSeed = reader.flag(10);
+  tagStream->alignWithBytes();
+  if (hasStart) selector->start = tagStream->readFloat();
+  if (hasEnd) selector->end = tagStream->readFloat();
+  if (hasOffset) selector->offset = tagStream->readFloat();
+  if (hasUnit) selector->unit = static_cast<SelectorUnit>(tagStream->readUint8());
+  if (hasShape) selector->shape = static_cast<SelectorShape>(tagStream->readUint8());
+  if (hasEaseIn) selector->easeIn = tagStream->readFloat();
+  if (hasEaseOut) selector->easeOut = tagStream->readFloat();
+  if (hasMode) selector->mode = static_cast<SelectorMode>(tagStream->readUint8());
+  if (hasWeight) selector->weight = tagStream->readFloat();
+  if (hasSeed) {
+    selector->randomSeed = static_cast<int>(tagStream->readEncodedUint32());
+  }
+  return selector;
+}
+
+Element* ReadTextModifierTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* modifier = context->document->makeNode<TextModifier>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::TextModifierAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 13);
+      bool hasAnchorX = reader.flag(0);
+      bool hasAnchorY = reader.flag(1);
+      bool hasPosX = reader.flag(2);
+      bool hasPosY = reader.flag(3);
+      bool hasRotation = reader.flag(4);
+      bool hasScaleX = reader.flag(5);
+      bool hasScaleY = reader.flag(6);
+      bool hasSkew = reader.flag(7);
+      bool hasSkewAxis = reader.flag(8);
+      bool hasAlpha = reader.flag(9);
+      bool hasFillColor = reader.flag(10);
+      bool hasStrokeColor = reader.flag(11);
+      bool hasStrokeWidth = reader.flag(12);
+      tagBytes.alignWithBytes();
+      if (hasAnchorX) modifier->anchor.x = tagBytes.readFloat();
+      if (hasAnchorY) modifier->anchor.y = tagBytes.readFloat();
+      if (hasPosX) modifier->position.x = tagBytes.readFloat();
+      if (hasPosY) modifier->position.y = tagBytes.readFloat();
+      if (hasRotation) modifier->rotation = tagBytes.readFloat();
+      if (hasScaleX) modifier->scale.x = tagBytes.readFloat();
+      if (hasScaleY) modifier->scale.y = tagBytes.readFloat();
+      if (hasSkew) modifier->skew = tagBytes.readFloat();
+      if (hasSkewAxis) modifier->skewAxis = tagBytes.readFloat();
+      if (hasAlpha) {
+        modifier->alpha = static_cast<float>(tagBytes.readUint8()) / 255.0f;
+      }
+      if (hasFillColor) modifier->fillColor = ReadPAGColor(&tagBytes);
+      if (hasStrokeColor) modifier->strokeColor = ReadPAGColor(&tagBytes);
+      if (hasStrokeWidth) modifier->strokeWidth = tagBytes.readFloat();
+    } else if (header.code == TagCode::RangeSelector) {
+      auto* selector = ReadRangeSelectorTag(&tagBytes, context);
+      if (selector != nullptr) {
+        modifier->selectors.push_back(selector);
+      }
+    }
+  }
+  return modifier;
+}
+
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* fill = context->document->makeNode<Fill>();
   PAGAttributeBlockReader reader(tagStream, 5);
@@ -1197,6 +1276,8 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
       return ReadTextBoxTag(tagStream, context);
     case TagCode::Repeater:
       return ReadRepeaterTag(tagStream, context);
+    case TagCode::TextModifierBlock:
+      return ReadTextModifierTag(tagStream, context);
     default:
       return nullptr;
   }

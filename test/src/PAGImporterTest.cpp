@@ -49,12 +49,14 @@
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -1240,6 +1242,82 @@ PAGX_TEST(PAGImporterTest, RepeaterRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "repeater", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, TextModifierRoundTrip) {
+  // TextModifier + RangeSelector (spec §9.4 #428/#429/#436) round-trip with full fields.
+  auto doc = PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 400;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto* group = doc->makeNode<Group>();
+  auto* text = doc->makeNode<Text>();
+  text->text = "Animate";
+  text->fontSize = 24.0f;
+  group->elements.push_back(text);
+  auto* fill = doc->makeNode<Fill>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.2f, 0.6f, 0.4f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+  group->elements.push_back(fill);
+
+  auto* modifier = doc->makeNode<TextModifier>();
+  modifier->position = {5.0f, -10.0f};
+  modifier->rotation = 30.0f;
+  modifier->scale = {1.2f, 0.8f};
+  modifier->alpha = 0.6f;
+  modifier->fillColor = Color{0.9f, 0.1f, 0.5f, 1.0f, ColorSpace::SRGB};
+  modifier->strokeWidth = 2.5f;
+
+  auto* selector = doc->makeNode<RangeSelector>();
+  selector->start = 0.2f;
+  selector->end = 0.8f;
+  selector->offset = 0.1f;
+  selector->unit = SelectorUnit::Index;
+  selector->shape = SelectorShape::RampUp;
+  selector->easeIn = 0.3f;
+  selector->easeOut = 0.4f;
+  selector->mode = SelectorMode::Intersect;
+  selector->weight = 0.7f;
+  selector->randomOrder = true;
+  selector->randomSeed = 42;
+  modifier->selectors.push_back(selector);
+  group->elements.push_back(modifier);
+  layer->contents.push_back(group);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/textmod_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/textmod_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers[0]->contents.size(), 1u);
+  auto* dGroup = static_cast<Group*>(decoded->layers[0]->contents[0]);
+  ASSERT_EQ(dGroup->elements.size(), 3u);
+
+  auto* dModifier = static_cast<TextModifier*>(dGroup->elements[2]);
+  ASSERT_EQ(dModifier->nodeType(), NodeType::TextModifier);
+  EXPECT_EQ(dModifier->position.x, 5.0f);
+  EXPECT_EQ(dModifier->rotation, 30.0f);
+  EXPECT_EQ(dModifier->scale.x, 1.2f);
+  EXPECT_NEAR(dModifier->alpha, 0.6f, 0.01f);
+  ASSERT_TRUE(dModifier->fillColor.has_value());
+  EXPECT_NEAR(dModifier->fillColor->red, 0.9f, 0.01f);
+  ASSERT_TRUE(dModifier->strokeWidth.has_value());
+  EXPECT_EQ(dModifier->strokeWidth.value(), 2.5f);
+
+  ASSERT_EQ(dModifier->selectors.size(), 1u);
+  auto* dSelector = static_cast<RangeSelector*>(dModifier->selectors[0]);
+  EXPECT_EQ(dSelector->start, 0.2f);
+  EXPECT_EQ(dSelector->end, 0.8f);
+  EXPECT_EQ(dSelector->unit, SelectorUnit::Index);
+  EXPECT_EQ(dSelector->shape, SelectorShape::RampUp);
+  EXPECT_EQ(dSelector->mode, SelectorMode::Intersect);
+  EXPECT_NEAR(dSelector->weight, 0.7f, 0.001f);
+  EXPECT_TRUE(dSelector->randomOrder);
+  EXPECT_EQ(dSelector->randomSeed, 42);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "text-modifier", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
