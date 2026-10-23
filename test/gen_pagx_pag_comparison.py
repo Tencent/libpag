@@ -143,11 +143,9 @@ body {
 .controls select { cursor: pointer; font: inherit; }
 .controls .summary { margin-left: auto; color: #64748b; font-size: 12px; font-variant-numeric: tabular-nums; }
 .topbar .tabs {
-  display: flex; gap: 6px; margin-top: 10px; overflow-x: auto;
-  scrollbar-width: thin; padding-bottom: 2px;
+  display: flex; gap: 6px; margin-top: 10px;
+  flex-wrap: wrap; padding-bottom: 2px;
 }
-.topbar .tabs::-webkit-scrollbar { height: 6px; }
-.topbar .tabs::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.12); border-radius: 3px; }
 .topbar .tab {
   flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
   padding: 7px 14px; font-size: 13px; font-weight: 500; font-family: inherit;
@@ -191,6 +189,7 @@ body {
   gap: 12px; flex-wrap: wrap;
 }
 .hd h3 { margin: 0; font-size: 14px; color: #334155; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.hd-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .hd .chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 11px; padding: 2px 9px; border-radius: 999px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .chip.pass { background: #dcfce7; color: #166534; }
@@ -215,7 +214,6 @@ body {
 .cmp img {
   max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 4px;
   background: repeating-conic-gradient(#f0f0f0 0% 25%, white 0% 50%) 50%/16px 16px;
-  image-rendering: pixelated;
 }
 .fail {
   display: inline-block; min-width: 240px; padding: 18px 24px;
@@ -275,7 +273,7 @@ function statusChip(sample) {
       : '<span class="chip fail">有差异</span>';
 }
 function cardHtml(section, index, sample, showDiff) {
-  var chips = statusChip(sample);
+  var chips = '';
   if (sample.width > 0) {
     chips += '<span class="chip info">' + sample.width + '×' + sample.height + '</span>';
   }
@@ -297,7 +295,8 @@ function cardHtml(section, index, sample, showDiff) {
     chips += '<span class="chip warn">告警 ' + warningCount + '</span>';
   }
   var html = '<div class="card" id="' + section.id + '--' + sample.name + '">' +
-      '<div class="hd"><h3>' + (index + 1) + '. ' + sample.name + '</h3>' +
+      '<div class="hd"><div class="hd-left"><h3>' + (index + 1) + '. ' + sample.name +
+      '</h3>' + statusChip(sample) + '</div>' +
       '<div class="chips">' + chips + '</div></div>';
   html += '<div class="cmp">';
   var sourceLink = '<a class="open" href="../../../' + sample.source +
