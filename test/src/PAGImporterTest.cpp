@@ -37,6 +37,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -44,6 +45,7 @@
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
+#include "pagx/types/ColorSpace.h"
 #include "utils/ProjectPath.h"
 
 namespace pagx {
@@ -683,6 +685,138 @@ PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {
   ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
   ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
   EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, FontRoundTripIdempotency) {
+  // Regression: fonts decoded from the v4 binary carry no ids, but the exporter's internal
+  // XML round trip links GlyphRun -> Font by @id. The id synthesis (pag-v4-font-N) must keep
+  // the linkage so the decoded document re-exports with the same font content — and the
+  // pipeline must be byte-idempotent from the decoded state (export2 == export3).
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/font_rt1.pag").success);
+  auto decoded1 = PAGImporter::LoadFromPAG("/tmp/font_rt1.pag");
+  ASSERT_TRUE(decoded1 != nullptr);
+
+  // The decoded document's glyph runs must still reference their fonts.
+  Text* text = nullptr;
+  for (auto* layer : decoded1->layers) {
+    for (auto* element : layer->contents) {
+      if (element->nodeType() == NodeType::Text) {
+        text = static_cast<Text*>(element);
+        break;
+      }
+    }
+    if (text != nullptr) break;
+  }
+  ASSERT_TRUE(text != nullptr);
+  ASSERT_EQ(text->glyphRuns.size(), 1u);
+  auto* run = text->glyphRuns[0];
+  ASSERT_TRUE(run->font != nullptr);
+  EXPECT_EQ(run->font->unitsPerEm, 1000);
+  ASSERT_EQ(run->font->glyphs.size(), 2u);
+  ASSERT_TRUE(run->font->glyphs[0]->path != nullptr);
+
+  // Byte identity from the decoded state: export1 == export2 for this sample (no orphan
+  // resources to normalize), and export2 == export3 for steady-state idempotency.
+  auto r2 = PAGExporter::ExportToPAG(decoded1, "/tmp/font_rt2.pag");
+  ASSERT_TRUE(r2.success);
+  auto bytes1 = ReadFileBytes("/tmp/font_rt1.pag");
+  auto bytes2 = ReadFileBytes("/tmp/font_rt2.pag");
+  ASSERT_EQ(bytes1.size(), bytes2.size());
+  EXPECT_EQ(memcmp(bytes1.data(), bytes2.data(), bytes1.size()), 0);
+
+  auto decoded2 = PAGImporter::LoadFromPAG("/tmp/font_rt2.pag");
+  ASSERT_TRUE(decoded2 != nullptr);
+  auto r3 = PAGExporter::ExportToPAG(decoded2, "/tmp/font_rt3.pag");
+  ASSERT_TRUE(r3.success);
+  auto bytes3 = ReadFileBytes("/tmp/font_rt3.pag");
+  ASSERT_EQ(bytes2.size(), bytes3.size());
+  EXPECT_EQ(memcmp(bytes2.data(), bytes3.data(), bytes2.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, SharedFontRoundTripIdempotency) {
+  // A font referenced by two glyph runs goes through the ResourceBlock (spec §5.3). The
+  // decoded document gets two independent references to the same font node; re-export must
+  // still share it and produce identical bytes.
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 200;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto* font = doc->makeNode<Font>();
+  font->unitsPerEm = 2048;
+  auto* glyph = doc->makeNode<Glyph>();
+  glyph->advance = 500.0f;
+  font->glyphs.push_back(glyph);
+
+  for (int i = 0; i < 2; i++) {
+    auto* text = doc->makeNode<Text>();
+    text->text = i == 0 ? "A" : "B";
+    text->fontSize = 24.0f;
+    text->position.x = 20.0f + i * 100.0f;
+    text->position.y = 100.0f;
+    auto* run = doc->makeNode<GlyphRun>();
+    run->font = font;
+    run->fontSize = 24.0f;
+    run->glyphs = {1};
+    run->x = 20.0f + i * 100.0f;
+    run->y = 100.0f;
+    text->glyphRuns.push_back(run);
+    layer->contents.push_back(text);
+  }
+  auto* fill = doc->makeNode<Fill>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.1f, 0.2f, 0.3f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto r1 = PAGExporter::ExportToPAG(doc, "/tmp/shared_font_rt1.pag");
+  ASSERT_TRUE(r1.success);
+  auto decoded1 = PAGImporter::LoadFromPAG("/tmp/shared_font_rt1.pag");
+  ASSERT_TRUE(decoded1 != nullptr);
+
+  // Both texts' glyph runs reference the same font (shared via ResourceBlock).
+  Font* firstFont = nullptr;
+  Font* secondFont = nullptr;
+  int runIndex = 0;
+  for (auto* layerNode : decoded1->layers) {
+    for (auto* element : layerNode->contents) {
+      if (element->nodeType() != NodeType::Text) {
+        continue;
+      }
+      auto* text = static_cast<Text*>(element);
+      for (auto* glyphRun : text->glyphRuns) {
+        ASSERT_TRUE(glyphRun->font != nullptr);
+        if (runIndex == 0) {
+          firstFont = glyphRun->font;
+        } else if (runIndex == 1) {
+          secondFont = glyphRun->font;
+        }
+        runIndex++;
+      }
+    }
+  }
+  ASSERT_EQ(runIndex, 2);
+  ASSERT_TRUE(firstFont != nullptr);
+  ASSERT_TRUE(secondFont != nullptr);
+  EXPECT_EQ(firstFont, secondFont);
+  EXPECT_EQ(firstFont->unitsPerEm, 2048);
+  ASSERT_EQ(firstFont->glyphs.size(), 1u);
+
+  // Steady-state idempotency: export2 == export3.
+  auto r2 = PAGExporter::ExportToPAG(decoded1, "/tmp/shared_font_rt2.pag");
+  ASSERT_TRUE(r2.success);
+  auto decoded2 = PAGImporter::LoadFromPAG("/tmp/shared_font_rt2.pag");
+  ASSERT_TRUE(decoded2 != nullptr);
+  auto r3 = PAGExporter::ExportToPAG(decoded2, "/tmp/shared_font_rt3.pag");
+  ASSERT_TRUE(r3.success);
+  auto bytes2 = ReadFileBytes("/tmp/shared_font_rt2.pag");
+  auto bytes3 = ReadFileBytes("/tmp/shared_font_rt3.pag");
+  ASSERT_EQ(bytes2.size(), bytes3.size());
+  EXPECT_EQ(memcmp(bytes2.data(), bytes3.data(), bytes2.size()), 0);
 }
 
 PAGX_TEST(PAGImporterTest, CompositionRoundTrip) {
