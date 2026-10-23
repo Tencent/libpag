@@ -1641,12 +1641,13 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   if (document == nullptr) {
     return result;
   }
-  // The internal XML round trip links GlyphRun -> Font by resource id, but documents decoded
-  // from the v4 binary carry no ids (the binary keeps node identity by reference). Synthesize
-  // deterministic ids on id-less fonts so the XML hop preserves the linkage, and restore the
-  // original ids afterwards; StripIds clears them in the working copy anyway, so the written
-  // bytes do not depend on the synthesized names.
+  // The internal XML round trip links GlyphRun -> Font and Layer -> Composition by resource
+  // id, but documents decoded from the v4 binary carry no ids (the binary keeps node identity
+  // by reference). Synthesize deterministic ids on id-less fonts and compositions so the XML
+  // hop preserves the linkages, and restore the original ids afterwards; StripIds clears them
+  // in the working copy anyway, so the written bytes do not depend on the synthesized names.
   std::vector<std::pair<Font*, std::string>> restoredFontIds = {};
+  std::vector<std::pair<Composition*, std::string>> restoredCompositionIds = {};
   std::unordered_set<std::string> takenIds = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -1654,25 +1655,42 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       if (!font->id.empty()) {
         takenIds.insert(font->id);
       }
+    } else if (node->nodeType() == NodeType::Composition) {
+      auto* composition = static_cast<Composition*>(node.get());
+      if (!composition->id.empty()) {
+        takenIds.insert(composition->id);
+      }
     }
   }
   int synthIndex = 0;
   for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::Font) {
-      continue;
+    if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (!font->id.empty()) {
+        continue;
+      }
+      restoredFontIds.push_back({font, font->id});
+      do {
+        font->id = "pag-v4-font-" + std::to_string(synthIndex++);
+      } while (takenIds.count(font->id) > 0);
+      takenIds.insert(font->id);
+    } else if (node->nodeType() == NodeType::Composition) {
+      auto* composition = static_cast<Composition*>(node.get());
+      if (!composition->id.empty()) {
+        continue;
+      }
+      restoredCompositionIds.push_back({composition, composition->id});
+      do {
+        composition->id = "pag-v4-comp-" + std::to_string(synthIndex++);
+      } while (takenIds.count(composition->id) > 0);
+      takenIds.insert(composition->id);
     }
-    auto* font = static_cast<Font*>(node.get());
-    if (!font->id.empty()) {
-      continue;
-    }
-    restoredFontIds.push_back({font, font->id});
-    do {
-      font->id = "pag-v4-font-" + std::to_string(synthIndex++);
-    } while (takenIds.count(font->id) > 0);
-    takenIds.insert(font->id);
   }
   auto xml = PAGXExporter::ToXML(*document);
   for (auto& restore : restoredFontIds) {
+    restore.first->id = restore.second;
+  }
+  for (auto& restore : restoredCompositionIds) {
     restore.first->id = restore.second;
   }
   auto doc = PAGXImporter::FromXML(xml);

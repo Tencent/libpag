@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <gtest/gtest.h>
+#include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include "base/PAGTest.h"
@@ -681,6 +683,126 @@ PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {
   ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
   ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
   EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, CompositionRoundTrip) {
+  // Regression: internal Composition blocks (spec §9.1 #297) survive export → decode with
+  // their layers, sizes, and referencing layer links intact.
+  auto doc =
+      PAGXImporter::FromFile(pag::ProjectPath::Absolute("resources/cli/optimizer_all_rules.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/composition_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/composition_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  // Find the composition-referencing layer in both trees and compare structure.
+  Layer* sourceCompLayer = nullptr;
+  for (auto* layer : doc->layers) {
+    if (layer->composition != nullptr) {
+      sourceCompLayer = layer;
+      break;
+    }
+  }
+  ASSERT_TRUE(sourceCompLayer != nullptr);
+  auto* sourceComposition = sourceCompLayer->composition;
+  EXPECT_GT(sourceComposition->width, 0.0f);
+  EXPECT_GT(sourceComposition->height, 0.0f);
+  auto sourceLayerCount = sourceComposition->layers.size();
+  EXPECT_GT(sourceLayerCount, 0u);
+
+  Layer* decodedCompLayer = nullptr;
+  for (auto* layer : decoded->layers) {
+    if (layer->composition != nullptr) {
+      decodedCompLayer = layer;
+      break;
+    }
+  }
+  ASSERT_TRUE(decodedCompLayer != nullptr);
+  auto* decodedComposition = decodedCompLayer->composition;
+  ASSERT_TRUE(decodedComposition != nullptr);
+  EXPECT_EQ(decodedComposition->width, sourceComposition->width);
+  EXPECT_EQ(decodedComposition->height, sourceComposition->height);
+  ASSERT_EQ(decodedComposition->layers.size(), sourceLayerCount);
+
+  // The composition's layers carry their own geometry and fills: compare non-empty contents.
+  int contentsChecked = 0;
+  for (size_t i = 0; i < sourceLayerCount; i++) {
+    auto* sourceLayer = sourceComposition->layers[i];
+    auto* decodedLayer = decodedComposition->layers[i];
+    if (sourceLayer->contents.empty()) {
+      continue;
+    }
+    ASSERT_FALSE(decodedLayer->contents.empty());
+    ASSERT_EQ(sourceLayer->contents.size(), decodedLayer->contents.size());
+    contentsChecked++;
+  }
+  EXPECT_GT(contentsChecked, 0);
+
+  // Byte identity from the decoded state: the optimizer fixture's first export normalizes
+  // its structures (orphan resources, shared PathData references, empty composition layers),
+  // so export1 legitimately differs from export2. From the decoded state the pipeline is
+  // idempotent: export2 == export3.
+  auto r2 = PAGExporter::ExportToPAG(decoded, "/tmp/composition_rt2.pag");
+  ASSERT_TRUE(r2.success);
+  auto decoded2 = PAGImporter::LoadFromPAG("/tmp/composition_rt2.pag");
+  ASSERT_TRUE(decoded2 != nullptr);
+  auto r3 = PAGExporter::ExportToPAG(decoded2, "/tmp/composition_rt3.pag");
+  ASSERT_TRUE(r3.success);
+  auto bytes2 = ReadFileBytes("/tmp/composition_rt2.pag");
+  auto bytes3 = ReadFileBytes("/tmp/composition_rt3.pag");
+  ASSERT_EQ(bytes2.size(), bytes3.size());
+  EXPECT_EQ(memcmp(bytes2.data(), bytes3.data(), bytes2.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, CompositionRenderEquivalence) {
+  // T7-d scope extension: the optimizer fixture with internal compositions renders within
+  // quantization noise (u8 gradient stop colors inside the composition produce ≤ 4/255 shifts).
+  auto doc =
+      PAGXImporter::FromFile(pag::ProjectPath::Absolute("resources/cli/optimizer_all_rules.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/composition_render.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/composition_render.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  auto sceneA = PAGScene::Make(doc);
+  auto sceneB = PAGScene::Make(decoded);
+  ASSERT_TRUE(sceneA != nullptr);
+  ASSERT_TRUE(sceneB != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+  auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+  ASSERT_TRUE(sceneA->draw(surfaceA));
+  ASSERT_TRUE(sceneB->draw(surfaceB));
+  std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+  std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+
+  // Allow only the quantization residual: every channel within 5/255 and at most 0.1% of
+  // pixels differing at all (measured residual: 406 px of 2.56M = 0.016%, max 4/255).
+  auto total = static_cast<size_t>(width) * height;
+  size_t diffPixels = 0;
+  uint8_t maxChannelDiff = 0;
+  for (size_t i = 0; i < total; i++) {
+    const uint8_t* pa = pixelsA.data() + i * 4;
+    const uint8_t* pb = pixelsB.data() + i * 4;
+    for (int c = 0; c < 4; c++) {
+      auto delta = static_cast<uint8_t>(std::abs(static_cast<int>(pa[c]) - pb[c]));
+      if (delta > 0) {
+        if (delta > maxChannelDiff) {
+          maxChannelDiff = delta;
+        }
+      }
+    }
+    if (pa[0] != pb[0] || pa[1] != pb[1] || pa[2] != pb[2] || pa[3] != pb[3]) {
+      diffPixels++;
+    }
+  }
+  EXPECT_LE(maxChannelDiff, 5);
+  EXPECT_LE(diffPixels, total / 1000);
 }
 
 }  // namespace pagx
