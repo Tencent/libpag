@@ -58,6 +58,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
@@ -737,6 +738,81 @@ LayerFilter* ReadLayerFilterTag(pag::DecodeStream* tagStream, TagCode code,
   }
 }
 
+Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContext* context);
+
+// TextBoxBlock tag (spec §9.2 #431/#432): 19 exist bits, then child elements, End.
+Element* ReadTextBoxTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* textBox = context->document->makeNode<TextBox>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::TextBoxAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 19);
+      bool hasAnchorX = reader.flag(0);
+      bool hasAnchorY = reader.flag(1);
+      bool hasPosX = reader.flag(2);
+      bool hasPosY = reader.flag(3);
+      bool hasRotation = reader.flag(4);
+      bool hasScaleX = reader.flag(5);
+      bool hasScaleY = reader.flag(6);
+      bool hasSkew = reader.flag(7);
+      bool hasSkewAxis = reader.flag(8);
+      bool hasAlpha = reader.flag(9);
+      bool hasWidth = reader.flag(10);
+      bool hasHeight = reader.flag(11);
+      bool hasPadding = reader.flag(12);
+      bool hasTextAlign = reader.flag(13);
+      bool hasParagraphAlign = reader.flag(14);
+      bool hasWritingMode = reader.flag(15);
+      bool hasLineHeight = reader.flag(16);
+      bool notWordWrap = reader.flag(17);
+      bool hasOverflow = reader.flag(18);
+      tagBytes.alignWithBytes();
+      if (hasAnchorX) textBox->anchor.x = tagBytes.readFloat();
+      if (hasAnchorY) textBox->anchor.y = tagBytes.readFloat();
+      if (hasPosX) textBox->position.x = tagBytes.readFloat();
+      if (hasPosY) textBox->position.y = tagBytes.readFloat();
+      if (hasRotation) textBox->rotation = tagBytes.readFloat();
+      if (hasScaleX) textBox->scale.x = tagBytes.readFloat();
+      if (hasScaleY) textBox->scale.y = tagBytes.readFloat();
+      if (hasSkew) textBox->skew = tagBytes.readFloat();
+      if (hasSkewAxis) textBox->skewAxis = tagBytes.readFloat();
+      if (hasAlpha) {
+        textBox->alpha = static_cast<float>(tagBytes.readUint8()) / 255.0f;
+      }
+      if (hasWidth) textBox->width = tagBytes.readFloat();
+      if (hasHeight) textBox->height = tagBytes.readFloat();
+      if (hasPadding) {
+        textBox->padding.top = tagBytes.readFloat();
+        textBox->padding.right = tagBytes.readFloat();
+        textBox->padding.bottom = tagBytes.readFloat();
+        textBox->padding.left = tagBytes.readFloat();
+      }
+      if (hasTextAlign) {
+        textBox->textAlign = static_cast<TextAlign>(tagBytes.readUint8());
+      }
+      if (hasParagraphAlign) {
+        textBox->paragraphAlign = static_cast<ParagraphAlign>(tagBytes.readUint8());
+      }
+      if (hasWritingMode) {
+        textBox->writingMode = static_cast<WritingMode>(tagBytes.readUint8());
+      }
+      if (hasLineHeight) textBox->lineHeight = tagBytes.readFloat();
+      if (notWordWrap) textBox->wordWrap = tagBytes.readBoolean();
+      if (hasOverflow) {
+        textBox->overflow = static_cast<Overflow>(tagBytes.readUint8());
+      }
+    } else {
+      auto* element = ReadElementTag(&tagBytes, header.code, context);
+      if (element != nullptr) {
+        textBox->elements.push_back(element);
+      }
+    }
+  }
+  return textBox;
+}
+
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* fill = context->document->makeNode<Fill>();
   PAGAttributeBlockReader reader(tagStream, 5);
@@ -1081,6 +1157,8 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
       return ReadTextTag(tagStream, context);
     case TagCode::GroupBlock:
       return ReadGroupTag(tagStream, context);
+    case TagCode::TextBoxBlock:
+      return ReadTextBoxTag(tagStream, context);
     default:
       return nullptr;
   }

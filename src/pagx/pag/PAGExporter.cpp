@@ -299,6 +299,12 @@ void CollectFontReference(Element* element, std::vector<Font*>* references) {
     }
     return;
   }
+  if (element->nodeType() == NodeType::TextBox) {
+    for (auto* child : static_cast<TextBox*>(element)->elements) {
+      CollectFontReference(child, references);
+    }
+    return;
+  }
   if (element->nodeType() == NodeType::Group) {
     for (auto* child : static_cast<Group*>(element)->elements) {
       CollectFontReference(child, references);
@@ -1059,6 +1065,7 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
   WriteTag(stream, TagCode::TextBlock, &content);
 }
 
+void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* state);
 void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* state);
 
 void WriteGroupTag(pag::EncodeStream* stream, Group* group, EncodeState* state) {
@@ -1144,9 +1151,98 @@ void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* s
     case NodeType::Group:
       WriteGroupTag(stream, static_cast<Group*>(element), state);
       break;
+    case NodeType::TextBox:
+      WriteTextBoxTag(stream, static_cast<TextBox*>(element), state);
+      break;
     default:
       break;
   }
+}
+
+// TextBoxBlock tag (spec §9.2 #431/#432): TextBoxAttributes (432 = GroupAttributes 434's 12
+// fields + padding + 6 text-layout fields = 19 exist bits) followed by child elements, End.
+void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* state);
+
+void WriteTextBoxTag(pag::EncodeStream* stream, TextBox* textBox, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasAnchorX = textBox->anchor.x != 0.0f;
+    auto hasAnchorY = textBox->anchor.y != 0.0f;
+    auto hasPosX = textBox->position.x != 0.0f;
+    auto hasPosY = textBox->position.y != 0.0f;
+    auto hasRotation = textBox->rotation != 0.0f;
+    auto hasScaleX = textBox->scale.x != 1.0f;
+    auto hasScaleY = textBox->scale.y != 1.0f;
+    auto hasSkew = textBox->skew != 0.0f;
+    auto hasSkewAxis = textBox->skewAxis != 0.0f;
+    auto hasAlpha = textBox->alpha != 1.0f;
+    auto hasWidth = !std::isnan(textBox->width);
+    auto hasHeight = !std::isnan(textBox->height);
+    auto hasPadding = !textBox->padding.isZero();
+    auto hasTextAlign = textBox->textAlign != TextAlign::Start;
+    auto hasParagraphAlign = textBox->paragraphAlign != ParagraphAlign::Near;
+    auto hasWritingMode = textBox->writingMode != WritingMode::Horizontal;
+    auto hasLineHeight = textBox->lineHeight != 0.0f;
+    auto notWordWrap = !textBox->wordWrap;
+    auto hasOverflow = textBox->overflow != Overflow::Visible;
+    writer.writeFlag(hasAnchorX);
+    writer.writeFlag(hasAnchorY);
+    writer.writeFlag(hasPosX);
+    writer.writeFlag(hasPosY);
+    writer.writeFlag(hasRotation);
+    writer.writeFlag(hasScaleX);
+    writer.writeFlag(hasScaleY);
+    writer.writeFlag(hasSkew);
+    writer.writeFlag(hasSkewAxis);
+    writer.writeFlag(hasAlpha);
+    writer.writeFlag(hasWidth);
+    writer.writeFlag(hasHeight);
+    writer.writeFlag(hasPadding);
+    writer.writeFlag(hasTextAlign);
+    writer.writeFlag(hasParagraphAlign);
+    writer.writeFlag(hasWritingMode);
+    writer.writeFlag(hasLineHeight);
+    writer.writeFlag(notWordWrap);
+    writer.writeFlag(hasOverflow);
+    auto* v = writer.valueStream();
+    if (hasAnchorX) v->writeFloat(textBox->anchor.x);
+    if (hasAnchorY) v->writeFloat(textBox->anchor.y);
+    if (hasPosX) v->writeFloat(textBox->position.x);
+    if (hasPosY) v->writeFloat(textBox->position.y);
+    if (hasRotation) v->writeFloat(textBox->rotation);
+    if (hasScaleX) v->writeFloat(textBox->scale.x);
+    if (hasScaleY) v->writeFloat(textBox->scale.y);
+    if (hasSkew) v->writeFloat(textBox->skew);
+    if (hasSkewAxis) v->writeFloat(textBox->skewAxis);
+    if (hasAlpha) v->writeUint8(static_cast<uint8_t>(lroundf(textBox->alpha * 255.0f)));
+    if (hasWidth) v->writeFloat(textBox->width);
+    if (hasHeight) v->writeFloat(textBox->height);
+    if (hasPadding) {
+      v->writeFloat(textBox->padding.top);
+      v->writeFloat(textBox->padding.right);
+      v->writeFloat(textBox->padding.bottom);
+      v->writeFloat(textBox->padding.left);
+    }
+    if (hasTextAlign) v->writeUint8(static_cast<uint8_t>(textBox->textAlign));
+    if (hasParagraphAlign) {
+      v->writeUint8(static_cast<uint8_t>(textBox->paragraphAlign));
+    }
+    if (hasWritingMode) {
+      v->writeUint8(static_cast<uint8_t>(textBox->writingMode));
+    }
+    if (hasLineHeight) v->writeFloat(textBox->lineHeight);
+    if (notWordWrap) v->writeBoolean(textBox->wordWrap);
+    if (hasOverflow) v->writeUint8(static_cast<uint8_t>(textBox->overflow));
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::TextBoxAttributes, static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* element : textBox->elements) {
+    WriteElementTag(&content, element, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::TextBoxBlock, &content);
 }
 
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
@@ -1938,6 +2034,11 @@ void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* in
     }
     case NodeType::Group:
       for (auto* child : static_cast<Group*>(element)->elements) {
+        AssignElementNodeIndices(child, state, index);
+      }
+      break;
+    case NodeType::TextBox:
+      for (auto* child : static_cast<TextBox*>(element)->elements) {
         AssignElementNodeIndices(child, state, index);
       }
       break;

@@ -53,6 +53,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -1052,6 +1053,107 @@ PAGX_TEST(PAGImporterTest, LayerFilterRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "layer-filters", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, TextBoxRoundTrip) {
+  // TextBox (spec §9.2 #431/432) survives export → decode with all layout fields and child
+  // Text elements intact.
+  auto doc = PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto* textBox = doc->makeNode<TextBox>();
+  textBox->position.x = 20.0f;
+  textBox->position.y = 30.0f;
+  textBox->width = 200.0f;
+  textBox->height = 100.0f;
+  textBox->padding = {5.0f, 10.0f, 15.0f, 20.0f};
+  textBox->textAlign = TextAlign::Center;
+  textBox->paragraphAlign = ParagraphAlign::Middle;
+  textBox->writingMode = WritingMode::Vertical;
+  textBox->lineHeight = 24.0f;
+  textBox->wordWrap = false;
+  textBox->overflow = Overflow::Hidden;
+  textBox->alpha = 0.8f;
+
+  auto* text = doc->makeNode<Text>();
+  text->text = "Hello";
+  text->fontSize = 16.0f;
+  auto* fill = doc->makeNode<Fill>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.1f, 0.5f, 0.9f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/textbox_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/textbox_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  ASSERT_EQ(decoded->layers[0]->contents.size(), 1u);
+
+  auto* dTextBox = static_cast<TextBox*>(decoded->layers[0]->contents[0]);
+  ASSERT_EQ(dTextBox->nodeType(), NodeType::TextBox);
+  EXPECT_EQ(dTextBox->position.x, 20.0f);
+  EXPECT_EQ(dTextBox->width, 200.0f);
+  EXPECT_EQ(dTextBox->padding.top, 5.0f);
+  EXPECT_EQ(dTextBox->padding.left, 20.0f);
+  EXPECT_EQ(dTextBox->textAlign, TextAlign::Center);
+  EXPECT_EQ(dTextBox->paragraphAlign, ParagraphAlign::Middle);
+  EXPECT_EQ(dTextBox->writingMode, WritingMode::Vertical);
+  EXPECT_EQ(dTextBox->lineHeight, 24.0f);
+  EXPECT_FALSE(dTextBox->wordWrap);
+  EXPECT_EQ(dTextBox->overflow, Overflow::Hidden);
+  EXPECT_NEAR(dTextBox->alpha, 0.8f, 0.01f);
+  ASSERT_EQ(dTextBox->elements.size(), 2u);
+  auto* dText = static_cast<Text*>(dTextBox->elements[0]);
+  EXPECT_EQ(dText->text, "Hello");
+  EXPECT_EQ(dText->fontSize, 16.0f);
+  auto* dFill = static_cast<Fill*>(dTextBox->elements[1]);
+  ASSERT_TRUE(dFill->color != nullptr);
+
+  // Render equivalence: same machine, same fonts.
+  auto sceneA = PAGScene::Make(doc);
+  auto sceneB = PAGScene::Make(decoded);
+  ASSERT_TRUE(sceneA != nullptr);
+  ASSERT_TRUE(sceneB != nullptr);
+  auto surfaceA = PAGSurface::MakeOffscreen(300, 200);
+  auto surfaceB = PAGSurface::MakeOffscreen(300, 200);
+  ASSERT_TRUE(surfaceA != nullptr && surfaceB != nullptr);
+  ASSERT_TRUE(sceneA->draw(surfaceA));
+  ASSERT_TRUE(sceneB->draw(surfaceB));
+  std::vector<uint8_t> pixelsA(300 * 200 * 4);
+  std::vector<uint8_t> pixelsB(300 * 200 * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), 300 * 4));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), 300 * 4));
+  // TextBox re-measures text at render time; allow quantization-level tolerance.
+  {
+    auto total = static_cast<size_t>(300) * 200;
+    size_t diffPixels = 0;
+    uint8_t maxChannelDiff = 0;
+    for (size_t i = 0; i < total; i++) {
+      const uint8_t* pa = pixelsA.data() + i * 4;
+      const uint8_t* pb = pixelsB.data() + i * 4;
+      for (int c = 0; c < 4; c++) {
+        auto delta = static_cast<uint8_t>(std::abs(static_cast<int>(pa[c]) - pb[c]));
+        if (delta > maxChannelDiff) {
+          maxChannelDiff = delta;
+        }
+      }
+      if (pa[0] != pb[0] || pa[1] != pb[1] || pa[2] != pb[2] || pa[3] != pb[3]) {
+        diffPixels++;
+      }
+    }
+    EXPECT_LE(maxChannelDiff, 5);
+    EXPECT_LE(diffPixels, total / 100);
+  }
+
+  // Steady-state idempotency.
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "textbox", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
