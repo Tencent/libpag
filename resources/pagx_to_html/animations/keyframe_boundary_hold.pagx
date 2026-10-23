@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: channels whose keys do not cover [0, duration] hold their first/last key values outside
-     the key range, and a Once animation with evaluationOffset shows the first key value during the
-     delay. The exported @keyframes must carry explicit 0%/100% stops so the browser does not
-     interpolate from the element's static style. -->
+<!-- Tests: keys that do not cover [0, duration] hold their first and last values outside the key
+     range, and a Once animation with evaluationOffset shows the first key value during the delay, so
+     the exported keyframes need explicit 0% and 100% stops instead of interpolating from the
+     element's static style.
+     Target: Layer  Channel: alpha,x  Type: float
+     Expect: supported
+     Ref: - -->
 <pagx width="400" height="160">
   <Layer id="onceBox" left="20" top="20" width="40" height="40">
     <Rectangle width="40" height="40"/>
