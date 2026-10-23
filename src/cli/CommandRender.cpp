@@ -502,12 +502,7 @@ tgfx::Bitmap RenderToBitmap(int argc, char* argv[]) {
   return RenderCore(options);
 }
 
-int RunRender(int argc, char* argv[]) {
-  RenderOptions options = {};
-  auto parseResult = ParseRenderOptions(argc, argv, &options);
-  if (parseResult != 0) {
-    return parseResult == -1 ? 0 : parseResult;
-  }
+static int RenderFile(const RenderOptions& options, bool report) {
   auto bitmap = RenderCore(options);
   if (bitmap.isEmpty()) {
     return 1;
@@ -523,9 +518,27 @@ int RunRender(int argc, char* argv[]) {
     std::cerr << "pagx render: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
-  std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"
-            << bitmap.height() << ")\n";
+  if (report)
+    std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"
+              << bitmap.height() << ")\n";
   return 0;
+}
+
+int RunRender(int argc, char* argv[]) {
+  RenderOptions options = {};
+  auto parseResult = ParseRenderOptions(argc, argv, &options);
+  if (parseResult != 0) return parseResult == -1 ? 0 : parseResult;
+  return RenderFile(options, true);
+}
+
+bool RenderPNG(const std::string& input, const std::string& output, float scale,
+               const std::vector<std::string>& fallbacks) {
+  RenderOptions options;
+  options.inputFile = input;
+  options.outputFile = output;
+  options.scale = scale;
+  options.fallbacks = fallbacks;
+  return RenderFile(options, false) == 0;
 }
 
 }  // namespace pagx::cli

@@ -61,6 +61,10 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 
+// Only enabled while converting an inert, computed-style copy. Its viewport,
+// root layout, scroll offsets and sampled animation values must stay intact.
+let SNAPSHOT_CURRENT_STATE = false;
+
 // Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
 // pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
 // `applyEnglishTypography` rewrites "to perform" / "But nowhere" into "to\u00a0perform" /
@@ -2216,6 +2220,18 @@ function freezeSvg(svgEl, rect) {
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
       if (dst.style) {
+        // Current-state collection already resolved the cascade and removed
+        // author stylesheets. Its inline !important markers only protect the
+        // inert mirror's layout; the native SVG parser treats them as part of
+        // paint values (e.g. "none !important" becomes a black fill). Remove
+        // those priorities from the detached export, never the source page.
+        if (SNAPSHOT_CURRENT_STATE) {
+          for (const name of Array.from(dst.style)) {
+            if (dst.style.getPropertyPriority(name)) {
+              dst.style.setProperty(name, dst.style.getPropertyValue(name));
+            }
+          }
+        }
         if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
         if (dst.style.fill === 'currentColor') dst.style.fill = here;
         if (dst.style.color === 'currentColor') dst.style.color = here;
@@ -2619,7 +2635,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    const intrinsicMode = opts && opts.intrinsicWidth;
+    const intrinsicMode = !SNAPSHOT_CURRENT_STATE && opts && opts.intrinsicWidth;
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
       : '';
@@ -4292,7 +4308,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
     intrinsicWidth,
   });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
+  const intrinsicAttr = !SNAPSHOT_CURRENT_STATE && intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a
@@ -4486,7 +4502,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // asymmetric borders, stray text, display:contents middlemen) fall
   // through to the absolute path below — the inference pass remains a
   // backstop.
-  const flexChildren = classifyFlexContainer(el, computed);
+  const flexChildren = SNAPSHOT_CURRENT_STATE ? null : classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
   }
@@ -4849,6 +4865,47 @@ function visibleContentExtent() {
 
 function snapshotMainImpl(opts) {
   opts = opts || {};
+  if (SNAPSHOT_CURRENT_STATE) {
+    window.__pagxClipDefs = [];
+    window.__pagxClipDefMap = {};
+    const full = opts.extent === 'document';
+    const width = full ? Math.max(innerWidth, document.documentElement.scrollWidth) : innerWidth;
+    const height = full ? Math.max(innerHeight, document.documentElement.scrollHeight) : innerHeight;
+    if (full && height > MAX_CAPTURE_HEIGHT_PX) {
+      throw new Error(`Current document height ${height}px exceeds the ${MAX_CAPTURE_HEIGHT_PX}px capture limit`);
+    }
+    const origin = { left: full ? -scrollX : 0, top: full ? -scrollY : 0, width, height };
+    const htmlStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body);
+    const propagatesBody = ['rgba(0, 0, 0, 0)', 'transparent'].includes(htmlStyle.backgroundColor) &&
+      htmlStyle.backgroundImage === 'none';
+    const backgroundNode = propagatesBody ? document.body : document.documentElement;
+    const backgroundColor = propagatesBody ? bodyStyle.backgroundColor : htmlStyle.backgroundColor;
+    // Chromium's default canvas is white. A propagated body/root color paints
+    // that canvas once, rather than a second time inside the body's box.
+    const pixel = document.createElement('canvas');
+    pixel.width = pixel.height = 1;
+    const ctx = pixel.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = backgroundColor; ctx.fillRect(0, 0, 1, 1);
+    const rgba = ctx.getImageData(0, 0, 1, 1).data;
+    const rootBackground = `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})`;
+    const savedColor = backgroundNode.style.getPropertyValue('background-color');
+    const savedPriority = backgroundNode.style.getPropertyPriority('background-color');
+    backgroundNode.style.setProperty('background-color', 'transparent', 'important');
+    let content;
+    try { content = render(document.documentElement, origin); }
+    finally {
+      if (savedColor) backgroundNode.style.setProperty('background-color', savedColor, savedPriority);
+      else backgroundNode.style.removeProperty('background-color');
+    }
+    const defs = (window.__pagxClipDefs || []).join('');
+    return { width, height, html: `<!DOCTYPE html><html><head><style>` +
+      `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
+      `</style></head><body data-pagx-capture-mode="current-state" style="width:${width}px;height:${height}px;overflow:hidden;background-color:${rootBackground}">` +
+      (defs ? `<svg width="0" height="0" style="display:none"><defs>${defs}</defs></svg>` : '') +
+      content + '</body></html>' };
+  }
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
   // passes the dimensions it measured *before* the resize via
@@ -4984,6 +5041,11 @@ ${clipDefsSvg}${parts.join('')}
 // pre-pass. Normalise source-less placeholders here as a final safety net,
 // then always restore the live DOM once the flat snapshot has been built.
 function snapshotMain(opts) {
+  if (opts && opts.mode === 'current-state') {
+    SNAPSHOT_CURRENT_STATE = true;
+    try { return snapshotMainImpl(opts); }
+    finally { SNAPSHOT_CURRENT_STATE = false; }
+  }
   normalizeEmptyImagePlaceholders();
   try {
     return snapshotMainImpl(opts);
@@ -5002,6 +5064,7 @@ function snapshotMain(opts) {
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
+let SNAPSHOT_CURRENT_STATE = false;
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
 const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
@@ -5791,7 +5854,7 @@ async function inlineCanvases() {
 // actually consults; copying every CSS property would balloon the inline
 // style attribute without adding visible information. Border longhands are
 // emitted per side so asymmetric borders survive.
-async function materializeDecorativePseudoElements() {
+async function materializeDecorativePseudoElements(opts) {
   // Helper functions duplicated locally so this function stays self-contained
   // when shipped through `page.evaluate`. The Node-side helpers are not in
   // scope inside the browser context — Puppeteer/Playwright serialise the
@@ -5951,12 +6014,13 @@ async function materializeDecorativePseudoElements() {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
+    const inlineText = opts && opts.includeInlineText && pseudoText !== '';
+    if (pseudoText !== '' && !outOfFlow && !inlineText) {
       return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    if (widthPx <= 0 && heightPx <= 0 && !inlineText) {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };

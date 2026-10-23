@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/Tencent/libpag#readme",
   "engines": {
-    "node": ">=16.7.0"
+    "node": ">=18"
   },
   "bin": {
     "pagx": "bin/pagx.js"
@@ -31,7 +31,8 @@
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
     "check:binaries": "node scripts/check-binaries.js",
     "check:preview": "node scripts/check-preview.js",
-    "prepack": "node scripts/build-html-snapshot.js",
+    "check:import": "node scripts/check-import.js",
+    "prepack": "node scripts/build-html-snapshot.js && node scripts/check-import.js",
     "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
   "os": [
@@ -52,6 +53,7 @@
     "bin/",
     "html-snapshot/",
     "preview/",
-    "README.md"
+    "README.md",
+    "process.js"
   ]
 }

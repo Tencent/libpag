@@ -251,7 +251,7 @@ COLLECT_CGROUP=${CGROUP:-0}
 # Web-font download: off by default. When on, each snapshot.js call gets
 # --download-fonts plus a per-case --font-dir under $OUT_DIR (never under the
 # read-only /inputs mount), so the bench measures the cost of capturing the
-# page's web fonts. The fallback embed/render steps html2pagx performs are
+# page's web fonts. The fallback embed/render steps pagx import performs are
 # out of scope here — the bench only measures snapshot.js itself.
 DOWNLOAD_FONTS=${DOWNLOAD_FONTS:-0}
 

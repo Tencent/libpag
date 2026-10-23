@@ -9,10 +9,9 @@
  *                         → render) → out/<case>.subset.html / .pagx / .png
  *     3. compare.js                → metrics row
  *
- * Step 2 shares its implementation with the html2pagx CLI through
- * tools/html-snapshot/lib/pipeline.js. Anything this script does on top of
- * that pipeline (baseline rendering, pixel/flex metrics, shared font/image
- * caches across cases, concurrency) lives in this file.
+ * Step 2 uses native command helpers from tools/html-snapshot/lib/pipeline.ts.
+ * This evaluation script owns baseline rendering, pixel/flex metrics, shared
+ * font/image caches across cases and concurrency.
  *
  * Outputs:
  *   out/report.csv         — one row per case
@@ -335,11 +334,8 @@ async function processCase(entry, outDir, opts, browser) {
       downloadFonts: opts.downloadFonts,
       fontDir: opts.downloadFonts ? opts.fontCacheDir : '',
       fontManifest: opts.downloadFonts ? fontManifest : '',
-      // Image download writes the page's images into the shared cache and
-      // rewrites the subset HTML to reference them by absolute path. Unlike
-      // fonts, the path is baked into the .pagx by `pagx import`, so render
-      // reads the files directly — no per-case manifest / `--fallback`
-      // wiring needed.
+      // Snapshot images use a shared cache; import reads those bytes and the
+      // subsequent resolve step applies the requested PAGX image storage mode.
       downloadImages: opts.downloadImages,
       imageDir: opts.downloadImages ? opts.imageCacheDir : '',
       stderrPath: snapshotStderr,
