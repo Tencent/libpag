@@ -26,6 +26,8 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -41,12 +43,23 @@
 #include "pagx/pag/PAGPathIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
+#include "pagx/pag/exporter/ImageProcessor.h"
 
 namespace pagx {
 namespace {
 
 struct DecodeContext {
   std::vector<std::string> strings;
+  // Zero-copy backing buffer for all decoded image slices: the adopted whole-file data. Slices
+  // keep this parent alive (spec §5.1), so no image bytes are ever copied.
+  std::shared_ptr<Data> fileData = nullptr;
+  // ImageTable entries (spec §6.6); entry data are slices into fileData.
+  std::vector<ImageTableEntry> imageEntries = {};
+  // ResourceBlock Image nodes in table order; ImagePattern refs resolve against this list.
+  std::vector<Image*> resourceImages = {};
+  // Image nodes with their pending ImageTable refs; the ImageTable sits at the end of the body,
+  // so entry data and decode metadata are backfilled after the whole body is parsed.
+  std::vector<std::pair<Image*, uint32_t>> pendingImageRefs = {};
   PAGXDocument* document = nullptr;
   uint16_t tagLevel = 0;
 
@@ -56,6 +69,67 @@ struct DecodeContext {
     return strings[index];
   }
 };
+
+// Image tag (spec §9.1 §288): a single Fixed varuint — the ImageTable reference (1-based,
+// 0 = no data after a missing-image export warning). The entry data and decode metadata are
+// backfilled once the ImageTable has been read.
+Image* ReadImageTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* image = context->document->makeNode<Image>();
+  auto ref = tagStream->readEncodedUint32();
+  context->pendingImageRefs.push_back({image, ref});
+  return image;
+}
+
+// ResourceBlock content (spec §6.3): resource tags in first-reference order, End-terminated.
+// Unknown resource tags are skipped (§4.2).
+void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::Image) {
+      context->resourceImages.push_back(ReadImageTag(&tagBytes, context));
+    }
+  }
+}
+
+// ImageTable content (spec §6.6). contentFileOffset is the table content's offset within the
+// adopted file data, so each entry's byte range becomes a zero-copy slice.
+void ReadImageTable(pag::DecodeStream* tagStream, size_t contentFileOffset,
+                    DecodeContext* context) {
+  auto count = tagStream->readEncodedUint32();
+  if (count > 65536) {
+    PAGThrowError(tagStream->context, "image table count exceeds the spec limit");
+    return;
+  }
+  context->imageEntries.resize(count);
+  for (uint32_t i = 0; i < count; i++) {
+    auto& entry = context->imageEntries[i];
+    entry.mediaType = tagStream->readUint8();
+    auto byteLength = tagStream->readEncodedUint32();
+    if (byteLength > 256u * 1024 * 1024) {
+      PAGThrowError(tagStream->context, "image data length exceeds the spec limit");
+      return;
+    }
+    auto offsetInContent = tagStream->position();
+    auto dataOffset = contentFileOffset + offsetInContent;
+    if (byteLength > tagStream->bytesAvailable()) {
+      PAGThrowError(tagStream->context, "image data extends past the image table");
+      return;
+    }
+    if (entry.mediaType <= 1 && byteLength > 0) {
+      entry.data = Data::MakeSlice(context->fileData, dataOffset, byteLength);
+    }
+    // Unknown mediaType (>1, phase 3): the bytes are consumed but the entry stays empty and
+    // referencing images render as empty (§6.6).
+    tagStream->readBytes(byteLength);
+    entry.logicalWidth = tagStream->readUint32();
+    entry.logicalHeight = tagStream->readUint32();
+    entry.scaleFactor = tagStream->readFloat();
+    entry.offsetX = tagStream->readFloat();
+    entry.offsetY = tagStream->readFloat();
+  }
+}
 
 Rectangle* ReadRectangleTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* rect = context->document->makeNode<Rectangle>();
@@ -127,6 +201,67 @@ void ReadGradientStops(pag::DecodeStream* tagStream, Gradient* gradient, DecodeC
     stop->color = ReadPAGColor(tagStream);
     gradient->colorStops.push_back(stop);
   }
+}
+
+// ImagePattern tag (spec §9.1 #295). The image ref is 0 = inline Image sub-tag at the
+// value-area end, or k = the ResourceBlock's (k-1)-th entry.
+ColorSource* ReadImagePatternTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* pattern = context->document->makeNode<ImagePattern>();
+  PAGAttributeBlockReader reader(tagStream, 9);
+  bool hasImage = reader.flag(0);
+  bool hasTileModeX = reader.flag(1);
+  bool hasTileModeY = reader.flag(2);
+  bool hasFilterMode = reader.flag(3);
+  bool hasMipmapMode = reader.flag(4);
+  bool hasMatrix = reader.flag(5);
+  bool hasScaleMode = reader.flag(6);
+  bool hasDataKeys = reader.flag(7);
+  bool hasDataValues = reader.flag(8);
+  // Values follow flag order, so the image ref comes first; its inline sub-tag still sits at
+  // the value-area end (§9.0) and is read after all values.
+  uint32_t imageRef = 0;
+  if (hasImage) {
+    imageRef = tagStream->readEncodedUint32();
+  }
+  if (hasTileModeX) pattern->tileModeX = static_cast<TileMode>(tagStream->readUint8());
+  if (hasTileModeY) pattern->tileModeY = static_cast<TileMode>(tagStream->readUint8());
+  if (hasFilterMode) pattern->filterMode = static_cast<FilterMode>(tagStream->readUint8());
+  if (hasMipmapMode) pattern->mipmapMode = static_cast<MipmapMode>(tagStream->readUint8());
+  if (hasMatrix) pattern->matrix = ReadPAGMatrix(tagStream);
+  if (hasScaleMode) pattern->scaleMode = static_cast<ScaleMode>(tagStream->readUint8());
+  std::vector<std::string> keys = {};
+  if (hasDataKeys) {
+    auto keyCount = tagStream->readEncodedUint32();
+    if (keyCount > 65536) {
+      PAGThrowError(tagStream->context, "image pattern data key count exceeds the spec limit");
+      return pattern;
+    }
+    keys.resize(keyCount);
+    for (uint32_t i = 0; i < keyCount; i++) {
+      keys[i] = context->getString(tagStream->readEncodedUint32());
+    }
+  }
+  if (hasDataValues) {
+    auto valueCount = tagStream->readEncodedUint32();
+    for (uint32_t i = 0; i < valueCount; i++) {
+      auto value = context->getString(tagStream->readEncodedUint32());
+      if (i < keys.size()) {
+        pattern->customData[keys[i]] = value;
+      }
+    }
+  }
+  if (hasImage) {
+    if (imageRef == 0) {
+      auto imageHeader = ReadPAGTagHeader(tagStream);
+      auto imageBytes = tagStream->readBytes(imageHeader.length);
+      if (imageHeader.code == TagCode::Image) {
+        pattern->image = ReadImageTag(&imageBytes, context);
+      }
+    } else if (imageRef <= context->resourceImages.size()) {
+      pattern->image = context->resourceImages[imageRef - 1];
+    }
+  }
+  return pattern;
 }
 
 ColorSource* ReadColorSourceTag(pag::DecodeStream* tagStream, TagCode code,
@@ -211,6 +346,8 @@ ColorSource* ReadColorSourceTag(pag::DecodeStream* tagStream, TagCode code,
       ReadGradientStops(tagStream, grad, context);
       return grad;
     }
+    case TagCode::ImagePattern:
+      return ReadImagePatternTag(tagStream, context);
     default:
       return nullptr;
   }
@@ -533,9 +670,12 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
   auto buffer = std::make_unique<uint8_t[]>(fileSize);
   in.read(reinterpret_cast<char*>(buffer.get()), static_cast<std::streamsize>(fileSize));
   in.close();
+  // The buffer is adopted by a Data so decoded image slices can reference the raw file bytes
+  // without copying (spec §5.1 zero-copy image references).
+  auto fileData = Data::MakeAdopt(buffer.release(), fileSize);
 
   PAGFileHeader header = {};
-  if (!header.parse(buffer.get(), fileSize) || header.version != 4) {
+  if (!header.parse(fileData->bytes(), fileSize) || header.version != 4) {
     if (result != nullptr) result->error = "invalid PAG v4 header";
     return nullptr;
   }
@@ -547,9 +687,10 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
   auto doc = PAGXDocument::Make(0, 0);
   DecodeContext context = {};
   context.document = doc.get();
+  context.fileData = fileData;
 
   pag::StreamContext streamContext;
-  pag::DecodeStream bodyStream(&streamContext, buffer.get() + 16, header.bodyLength);
+  pag::DecodeStream bodyStream(&streamContext, fileData->bytes() + 16, header.bodyLength);
 
   while (true) {
     auto tagHeader = ReadPAGTagHeader(&bodyStream);
@@ -558,18 +699,42 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     }
     if (tagHeader.code == TagCode::End) break;
     if (bodyStream.context->hasException()) break;
+    auto contentStartInBody = bodyStream.position();
     auto tagBytes = bodyStream.readBytes(tagHeader.length);
     switch (tagHeader.code) {
       case TagCode::StringTable:
         ReadPAGStringTable(&tagBytes, &context.strings);
         break;
+      case TagCode::ResourceBlock:
+        ReadResourceBlock(&tagBytes, &context);
+        break;
       case TagCode::DocumentBlock:
         ReadDocumentBlock(&tagBytes, doc.get(), &context);
+        break;
+      case TagCode::ImageTable:
+        // Entry byte ranges live inside the adopted file data at 16 + contentStartInBody +
+        // in-table offset, which is what MakeSlice needs for zero-copy references.
+        ReadImageTable(&tagBytes, 16 + contentStartInBody, &context);
         break;
       default:
         break;
     }
     if (bodyStream.context->hasException()) break;
+  }
+
+  // Backfill image refs: the ImageTable sits after the document in the body, so Image nodes
+  // only recorded their refs during decoding (spec §5.1 unified backfill pass).
+  for (auto& pending : context.pendingImageRefs) {
+    if (pending.second == 0 || pending.second > context.imageEntries.size()) {
+      continue;
+    }
+    auto& entry = context.imageEntries[pending.second - 1];
+    pending.first->data = entry.data;
+    pending.first->logicalWidth = entry.logicalWidth;
+    pending.first->logicalHeight = entry.logicalHeight;
+    pending.first->scaleFactor = entry.scaleFactor;
+    pending.first->offsetX = entry.offsetX;
+    pending.first->offsetY = entry.offsetY;
   }
 
   if (bodyStream.context->hasException()) {

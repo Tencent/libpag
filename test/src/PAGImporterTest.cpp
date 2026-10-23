@@ -26,6 +26,12 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Rectangle.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -67,6 +73,8 @@ PAGX_TEST(PAGImporterTest, RoundTripByteIdentity) {
   std::vector<std::string> paths = {
       "resources/pagx_to_pag/static_animated/pure_static.pagx",
       "resources/pagx_to_pag/layout_flatten/clip_to_bounds.pagx",
+      "resources/pagx_to_pag/resource/image_external_shared.pagx",
+      "resources/pagx_to_pag/resource/image_data_uri.pagx",
   };
   for (auto& rel : paths) {
     auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(rel));
@@ -166,6 +174,174 @@ PAGX_TEST(PAGImporterTest, StaticSceneHasContentChanged) {
   // skipped (hasContentChanged stays false, T9 static render semantics).
   EXPECT_FALSE(scene->hasContentChanged());
   EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGImporterTest, ImagePatternDecodeZeroCopy) {
+  const std::string sharedPath =
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/resource/image_external_shared.pagx");
+  auto doc = PAGXImporter::FromFile(sharedPath);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/image_shared.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/image_shared.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  Image* images[2] = {nullptr, nullptr};
+  int patternIndex = 0;
+  for (auto* layer : decoded->layers) {
+    for (auto* element : layer->contents) {
+      if (element->nodeType() != NodeType::Fill) {
+        continue;
+      }
+      auto* fill = static_cast<Fill*>(element);
+      ASSERT_TRUE(fill->color != nullptr);
+      ASSERT_EQ(fill->color->nodeType(), NodeType::ImagePattern);
+      auto* pattern = static_cast<ImagePattern*>(fill->color);
+      ASSERT_LT(patternIndex, 2);
+      images[patternIndex++] = pattern->image;
+    }
+  }
+  ASSERT_EQ(patternIndex, 2);
+  ASSERT_TRUE(images[0] != nullptr);
+  // Referenced by two patterns: shared through the ResourceBlock, both resolve to one node.
+  EXPECT_EQ(images[0], images[1]);
+  // Passthrough bytes: the entry data is the original PNG, referenced zero-copy from the file.
+  auto logoBytes =
+      ReadFileBytes(pag::ProjectPath::Absolute("resources/pagx_to_pag/resource/pag_logo.png"));
+  ASSERT_FALSE(logoBytes.empty());
+  ASSERT_TRUE(images[0]->data != nullptr);
+  EXPECT_EQ(images[0]->data->size(), logoBytes.size());
+  EXPECT_EQ(memcmp(images[0]->data->bytes(), logoBytes.data(), logoBytes.size()), 0);
+  EXPECT_GT(images[0]->logicalWidth, 0u);
+  EXPECT_GT(images[0]->logicalHeight, 0u);
+  EXPECT_EQ(images[0]->scaleFactor, 1.0f);
+  EXPECT_EQ(images[0]->offsetX, 0.0f);
+  EXPECT_EQ(images[0]->offsetY, 0.0f);
+
+  // Single-reference sample: the Image is inlined at the pattern's value-area end and its
+  // bytes match the source data-URI image.
+  const std::string inlinePath =
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/resource/image_data_uri.pagx");
+  auto inlineDoc = PAGXImporter::FromFile(inlinePath);
+  ASSERT_TRUE(inlineDoc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(inlineDoc, "/tmp/image_inline.pag").success);
+  auto decodedInline = PAGImporter::LoadFromPAG("/tmp/image_inline.pag");
+  ASSERT_TRUE(decodedInline != nullptr);
+  Image* decodedImage = nullptr;
+  Image* originalImage = nullptr;
+  for (auto& node : decodedInline->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      decodedImage = static_cast<Image*>(node.get());
+    }
+  }
+  for (auto& node : inlineDoc->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      originalImage = static_cast<Image*>(node.get());
+    }
+  }
+  ASSERT_TRUE(decodedImage != nullptr);
+  ASSERT_TRUE(originalImage != nullptr);
+  ASSERT_TRUE(originalImage->data != nullptr);
+  ASSERT_TRUE(decodedImage->data != nullptr);
+  EXPECT_EQ(decodedImage->data->size(), originalImage->data->size());
+  EXPECT_EQ(memcmp(decodedImage->data->bytes(), originalImage->data->bytes(),
+                   originalImage->data->size()),
+            0);
+}
+
+PAGX_TEST(PAGImporterTest, ImagePatternFieldsRoundTrip) {
+  // A pattern whose every field is non-default with distinct byte values: any value-area
+  // ordering mismatch between encoder and decoder desynchronizes the read and fails here,
+  // instead of hiding behind symmetric bytes.
+  auto doc = PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 200;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* pattern = doc->makeNode<ImagePattern>();
+  auto* image = doc->makeNode<Image>();
+  auto logoBytes =
+      ReadFileBytes(pag::ProjectPath::Absolute("resources/pagx_to_pag/resource/pag_logo.png"));
+  ASSERT_FALSE(logoBytes.empty());
+  image->data = Data::MakeWithCopy(logoBytes.data(), logoBytes.size());
+  pattern->image = image;
+  pattern->tileModeX = TileMode::Mirror;
+  pattern->tileModeY = TileMode::Repeat;
+  pattern->filterMode = FilterMode::Nearest;
+  pattern->mipmapMode = MipmapMode::Nearest;
+  pattern->scaleMode = ScaleMode::Zoom;
+  pattern->matrix.a = 2.0f;
+  pattern->matrix.d = 3.0f;
+  pattern->matrix.tx = 4.0f;
+  pattern->matrix.ty = 5.0f;
+  pattern->customData = {{"z", "26"}, {"a", "13"}};
+  fill->color = pattern;
+  layer->contents.push_back(fill);
+
+  auto r1 = PAGExporter::ExportToPAG(doc, "/tmp/pattern_fields_rt1.pag");
+  ASSERT_TRUE(r1.success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/pattern_fields_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  auto* decodedPattern =
+      static_cast<ImagePattern*>(static_cast<Fill*>(decoded->layers[0]->contents[1])->color);
+  ASSERT_TRUE(decodedPattern != nullptr);
+  EXPECT_EQ(decodedPattern->tileModeX, TileMode::Mirror);
+  EXPECT_EQ(decodedPattern->tileModeY, TileMode::Repeat);
+  EXPECT_EQ(decodedPattern->filterMode, FilterMode::Nearest);
+  EXPECT_EQ(decodedPattern->mipmapMode, MipmapMode::Nearest);
+  EXPECT_EQ(decodedPattern->scaleMode, ScaleMode::Zoom);
+  EXPECT_EQ(decodedPattern->matrix.a, 2.0f);
+  EXPECT_EQ(decodedPattern->matrix.d, 3.0f);
+  EXPECT_EQ(decodedPattern->matrix.tx, 4.0f);
+  EXPECT_EQ(decodedPattern->matrix.ty, 5.0f);
+  ASSERT_EQ(decodedPattern->customData.size(), 2u);
+  EXPECT_EQ(decodedPattern->customData.at("z"), "26");
+  EXPECT_EQ(decodedPattern->customData.at("a"), "13");
+  ASSERT_TRUE(decodedPattern->image != nullptr);
+  ASSERT_TRUE(decodedPattern->image->data != nullptr);
+  EXPECT_EQ(decodedPattern->image->data->size(), logoBytes.size());
+
+  auto r2 = PAGExporter::ExportToPAG(decoded, "/tmp/pattern_fields_rt2.pag");
+  ASSERT_TRUE(r2.success);
+  auto bytes1 = ReadFileBytes("/tmp/pattern_fields_rt1.pag");
+  auto bytes2 = ReadFileBytes("/tmp/pattern_fields_rt2.pag");
+  ASSERT_EQ(bytes1.size(), bytes2.size());
+  EXPECT_EQ(memcmp(bytes1.data(), bytes2.data(), bytes1.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/resource/image_data_uri.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/image_render.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/image_render.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  auto sceneA = PAGScene::Make(doc);
+  auto sceneB = PAGScene::Make(decoded);
+  ASSERT_TRUE(sceneA != nullptr);
+  ASSERT_TRUE(sceneB != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+  auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+  ASSERT_TRUE(sceneA->draw(surfaceA));
+  ASSERT_TRUE(sceneB->draw(surfaceB));
+
+  // The passthrough pipeline keeps the image bytes, so the decoded document must render
+  // pixel-identically to the original XML document.
+  std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+  std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+  EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
 }
 
 }  // namespace pagx

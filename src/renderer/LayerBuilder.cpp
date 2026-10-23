@@ -2017,7 +2017,17 @@ class LayerBuilderContext {
         _result.binding.trackImage(imageNode, node);
       }
       pattern->setScaleMode(ToTGFX(node->scaleMode));
-      if (!node->matrix.isIdentity()) {
+      if (imageNode->logicalWidth > 0) {
+        // v4 decode metadata (design §4.5): the stored bitmap is crop(original) scaled by
+        // scaleFactor. Map stored pixels back into the pattern's logical image space first —
+        // scale by 1/scaleFactor, then translate by the crop origin (old-PAG semantics) — and
+        // let the user matrix apply on top of that, so the pattern behaves exactly like the
+        // original full-resolution image.
+        tgfx::Matrix matrix = ToTGFX(node->matrix);
+        matrix.postTranslate(imageNode->offsetX, imageNode->offsetY);
+        matrix.postScale(1.0f / imageNode->scaleFactor, 1.0f / imageNode->scaleFactor);
+        pattern->setMatrix(matrix);
+      } else if (!node->matrix.isIdentity()) {
         pattern->setMatrix(ToTGFX(node->matrix));
       }
     }

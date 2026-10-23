@@ -82,6 +82,15 @@ struct EncodeState {
   std::vector<PAGExportIssue> warnings;
   std::vector<ImageTableEntry> imageEntries;
   std::unordered_map<const Image*, uint32_t> imageIndices;
+  // Shared-image placement (spec §5.3, §12): sharing is content-based — patterns referencing
+  // the same ImageTable entry (T4 already dedups identical bytes into one entry) share one
+  // ResourceBlock slot in first-reference order (sharedImageOrder holds the representative
+  // node per entry, entryResourceSlots maps the entry index to the 0-based slot); single-use
+  // entries are inlined at the referencing pattern's value-area end. Content-based counting
+  // keeps decode/re-encode byte-identical when the internal XML round trip splits a shared
+  // node into per-pattern nodes with equal bytes.
+  std::vector<Image*> sharedImageOrder;
+  std::unordered_map<uint32_t, uint32_t> entryResourceSlots;
 
   uint32_t intern(const std::string& text) {
     return strings.intern(text);
@@ -111,9 +120,17 @@ void CollectStringsFromColorSource(ColorSource* source, EncodeState* state) {
   }
   if (source->nodeType() == NodeType::ImagePattern) {
     auto* pattern = static_cast<ImagePattern*>(source);
+    // Sorted by key: the map iteration order is insertion-dependent, so both passes sort to
+    // keep string indices (and therefore bytes) deterministic across decode/re-encode (§12).
+    std::vector<std::string> keys = {};
+    keys.reserve(pattern->customData.size());
     for (auto& [key, value] : pattern->customData) {
+      keys.push_back(key);
+    }
+    std::sort(keys.begin(), keys.end());
+    for (auto& key : keys) {
       state->intern(key);
-      state->intern(value);
+      state->intern(pattern->customData[key]);
     }
   }
 }
@@ -179,6 +196,56 @@ void CollectStringsFromLayer(Layer* layer, EncodeState* state) {
 // ---------------------------------------------------------------------------
 // Pass 2: tag writing.
 // ---------------------------------------------------------------------------
+
+// Collects ImagePattern image references in traversal order (spec §5.3 first-reference
+// order). Every reference is appended, including repeats of the same node.
+void CollectImageReference(Element* element, std::vector<Image*>* references) {
+  if (element == nullptr) {
+    return;
+  }
+  ColorSource* source = nullptr;
+  if (element->nodeType() == NodeType::Fill) {
+    source = static_cast<Fill*>(element)->color;
+  } else if (element->nodeType() == NodeType::Stroke) {
+    source = static_cast<Stroke*>(element)->color;
+  } else if (element->nodeType() == NodeType::Group) {
+    for (auto* child : static_cast<Group*>(element)->elements) {
+      CollectImageReference(child, references);
+    }
+  } else if (element->nodeType() == NodeType::TextBox) {
+    for (auto* child : static_cast<TextBox*>(element)->elements) {
+      CollectImageReference(child, references);
+    }
+  }
+  if (source != nullptr && source->nodeType() == NodeType::ImagePattern) {
+    auto* image = static_cast<ImagePattern*>(source)->image;
+    if (image != nullptr) {
+      references->push_back(image);
+    }
+  }
+}
+
+void CollectImageReferencesFromLayer(Layer* layer, std::vector<Image*>* references) {
+  for (auto* element : layer->contents) {
+    CollectImageReference(element, references);
+  }
+  for (auto* child : layer->children) {
+    CollectImageReferencesFromLayer(child, references);
+  }
+}
+
+// Image tag (spec §9.1 #288): a single Fixed varuint — the ImageTable reference (1-based;
+// 0 = no data after a missing-image export warning). No exist bits.
+void WriteImageTag(pag::EncodeStream* stream, Image* image, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  uint32_t ref = 0;
+  auto it = state->imageIndices.find(image);
+  if (it != state->imageIndices.end()) {
+    ref = it->second + 1;
+  }
+  content.writeEncodedUint32(ref);
+  WriteTag(stream, TagCode::Image, &content);
+}
 
 // Writes the columnar gradient stop tail (spec §9.1): stopCount varuint, one packed FloatList
 // of offsets (GRADIENT_PRECISION 0.00002), then byte-aligned colors.
@@ -330,8 +397,78 @@ bool WriteColorSourceInline(pag::EncodeStream* content, ColorSource* source, Enc
       WriteTag(content, TagCode::DiamondGradient, &tag);
       return true;
     }
+    case NodeType::ImagePattern: {
+      auto* pattern = static_cast<ImagePattern*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasImage = pattern->image != nullptr;
+      writer.writeFlag(hasImage);
+      writer.writeFlag(pattern->tileModeX != TileMode::Decal);
+      writer.writeFlag(pattern->tileModeY != TileMode::Decal);
+      writer.writeFlag(pattern->filterMode != FilterMode::Linear);
+      writer.writeFlag(pattern->mipmapMode != MipmapMode::Linear);
+      writer.writeFlag(!pattern->matrix.isIdentity());
+      writer.writeFlag(pattern->scaleMode != ScaleMode::LetterBox);
+      auto hasData = !pattern->customData.empty();
+      writer.writeFlag(hasData);
+      writer.writeFlag(hasData);
+      auto* v = writer.valueStream();
+      uint32_t imageRef = 0;
+      if (hasImage) {
+        auto entryIt = state->imageIndices.find(pattern->image);
+        if (entryIt != state->imageIndices.end()) {
+          auto slotIt = state->entryResourceSlots.find(entryIt->second);
+          if (slotIt != state->entryResourceSlots.end()) {
+            imageRef = slotIt->second + 1;
+          }
+        }
+        // imageRef 0 stays = the image is written inline at the value-area end below.
+        v->writeEncodedUint32(imageRef);
+      }
+      if (pattern->tileModeX != TileMode::Decal) {
+        v->writeUint8(static_cast<uint8_t>(pattern->tileModeX));
+      }
+      if (pattern->tileModeY != TileMode::Decal) {
+        v->writeUint8(static_cast<uint8_t>(pattern->tileModeY));
+      }
+      if (pattern->filterMode != FilterMode::Linear) {
+        v->writeUint8(static_cast<uint8_t>(pattern->filterMode));
+      }
+      if (pattern->mipmapMode != MipmapMode::Linear) {
+        v->writeUint8(static_cast<uint8_t>(pattern->mipmapMode));
+      }
+      if (!pattern->matrix.isIdentity()) {
+        WritePAGMatrix(v, pattern->matrix);
+      }
+      if (pattern->scaleMode != ScaleMode::LetterBox) {
+        v->writeUint8(static_cast<uint8_t>(pattern->scaleMode));
+      }
+      if (hasData) {
+        // Sorted by key so decode/re-encode stays byte-identical (§12 determinism).
+        std::vector<std::string> keys = {};
+        keys.reserve(pattern->customData.size());
+        for (auto& [key, value] : pattern->customData) {
+          keys.push_back(key);
+        }
+        std::sort(keys.begin(), keys.end());
+        v->writeEncodedUint32(static_cast<uint32_t>(keys.size()));
+        for (auto& key : keys) {
+          v->writeEncodedUint32(state->intern(key));
+        }
+        v->writeEncodedUint32(static_cast<uint32_t>(keys.size()));
+        for (auto& key : keys) {
+          v->writeEncodedUint32(state->intern(pattern->customData[key]));
+        }
+      }
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      if (hasImage && imageRef == 0) {
+        WriteImageTag(&tag, pattern->image, state);
+      }
+      WriteTag(content, TagCode::ImagePattern, &tag);
+      return true;
+    }
     default:
-      // ImagePattern has no phase-1 encoding yet; callers warn and drop the reference.
+      // Color source types without a phase-1 encoding; callers warn and drop the reference.
       return false;
   }
 }
@@ -738,6 +875,43 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   auto state = std::make_unique<EncodeState>();
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
+  // Shared-image placement (spec §5.3): count references per ImageTable entry; entries
+  // referenced by two or more patterns go into the ResourceBlock (first-reference order),
+  // single-use entries are inlined at the referencing pattern's value-area end.
+  {
+    std::vector<Image*> imageRefs = {};
+    for (auto* layer : doc->layers) {
+      CollectImageReferencesFromLayer(layer, &imageRefs);
+    }
+    std::vector<Image*> entryFirstNode = {};
+    std::vector<int> entryRefCount = {};
+    for (auto* image : imageRefs) {
+      auto it = state->imageIndices.find(image);
+      if (it == state->imageIndices.end()) {
+        continue;
+      }
+      if (it->second >= entryFirstNode.size()) {
+        entryFirstNode.resize(it->second + 1, nullptr);
+        entryRefCount.resize(it->second + 1, 0);
+      }
+      if (entryFirstNode[it->second] == nullptr) {
+        entryFirstNode[it->second] = image;
+      }
+      entryRefCount[it->second]++;
+    }
+    for (auto* image : imageRefs) {
+      auto it = state->imageIndices.find(image);
+      if (it == state->imageIndices.end()) {
+        continue;
+      }
+      if (entryRefCount[it->second] >= 2 &&
+          state->entryResourceSlots.find(it->second) == state->entryResourceSlots.end()) {
+        state->entryResourceSlots[it->second] =
+            static_cast<uint32_t>(state->sharedImageOrder.size());
+        state->sharedImageOrder.push_back(entryFirstNode[it->second]);
+      }
+    }
+  }
   for (auto* layer : doc->layers) {
     CollectStringsFromLayer(layer, state.get());
   }
@@ -750,6 +924,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   }
   {
     pag::EncodeStream resContent(&state->streamContext);
+    for (auto* image : state->sharedImageOrder) {
+      WriteImageTag(&resContent, image, state.get());
+    }
     WritePAGTagHeader(&resContent, TagCode::End, 0);
     WriteTag(&body, TagCode::ResourceBlock, &resContent);
   }

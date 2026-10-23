@@ -44,6 +44,21 @@ class Image : public Node {
    */
   std::string filePath = {};
 
+  /**
+   * v4 decode metadata (design doc §4.5), populated by the PAG v4 decoder from the ImageTable
+   * entry and never serialized to XML. logicalWidth/logicalHeight are the original image
+   * dimensions the pattern space must present. The stored data bitmap equals crop(original)
+   * scaled by scaleFactor (shrink only, scaleFactor <= 1); offsetX/offsetY are the crop origin
+   * in original image space, so logical = translate(offset) * scale(1/scaleFactor) * bitmap
+   * maps stored pixels back into the pattern space. Defaults keep the XML behavior (data
+   * carries the natural size).
+   */
+  uint32_t logicalWidth = 0;
+  uint32_t logicalHeight = 0;
+  float scaleFactor = 1.0f;
+  float offsetX = 0.0f;
+  float offsetY = 0.0f;
+
   NodeType nodeType() const override {
     return NodeType::Image;
   }
