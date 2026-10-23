@@ -25,10 +25,13 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
@@ -36,6 +39,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -176,61 +180,180 @@ void CollectStringsFromLayer(Layer* layer, EncodeState* state) {
 // Pass 2: tag writing.
 // ---------------------------------------------------------------------------
 
-// Writes a color source as an inline sub-tag inside the parent tag's value area (§9.0).
-void WriteColorSourceInline(pag::EncodeStream* content, ColorSource* source, EncodeState* state) {
-  if (source == nullptr) {
-    return;
+// Writes the columnar gradient stop tail (spec §9.1): stopCount varuint, one packed FloatList
+// of offsets (GRADIENT_PRECISION 0.00002), then byte-aligned colors.
+void WriteGradientStops(pag::EncodeStream* tag, Gradient* gradient) {
+  auto stopCount = static_cast<uint32_t>(gradient->colorStops.size());
+  tag->writeEncodedUint32(stopCount);
+  std::vector<float> offsets;
+  offsets.reserve(stopCount);
+  for (auto* stop : gradient->colorStops) {
+    offsets.push_back(stop->offset);
   }
-  switch (source->nodeType()) {
-    case NodeType::SolidColor: {
-      auto* solid = static_cast<SolidColor*>(source);
-      pag::EncodeStream tag(&state->streamContext);
-      tag.writeUBits(1, 1);  // color always exists
-      WritePAGColor(&tag, solid->color);
-      WriteTag(content, TagCode::SolidColor, &tag);
-      break;
-    }
-    case NodeType::LinearGradient: {
-      auto* grad = static_cast<LinearGradient*>(source);
-      pag::EncodeStream tag(&state->streamContext);
-      tag.writeUBits(1, 1);  // startPoint
-      tag.writeUBits(1, 1);  // endPoint
-      tag.writeUBits(0, 1);  // fitsToGeometry (default true, not written)
-      tag.writeUBits(0, 1);  // matrix (identity)
-      tag.writeUBits(1, 1);  // stopCount exists (always)
-      tag.alignWithBytes();
-      tag.writeFloat(grad->startPoint.x);
-      tag.writeFloat(grad->startPoint.y);
-      tag.writeFloat(grad->endPoint.x);
-      tag.writeFloat(grad->endPoint.y);
-      tag.writeEncodedUint32(static_cast<uint32_t>(grad->colorStops.size()));
-      for (auto* stop : grad->colorStops) {
-        tag.writeFloatList(&stop->offset, 1, 0.00002f);
-      }
-      for (auto* stop : grad->colorStops) {
-        WritePAGColor(&tag, stop->color);
-      }
-      WriteTag(content, TagCode::LinearGradient, &tag);
-      break;
-    }
-    default:
-      // Other color sources (radial/conic/diamond gradients, image patterns) follow the
-      // same pattern; added incrementally.
-      break;
+  tag->writeFloatList(offsets.data(), stopCount, 0.00002f);
+  tag->alignWithBytes();
+  for (auto* stop : gradient->colorStops) {
+    WritePAGColor(tag, stop->color);
   }
 }
 
-// Writes a painter (Fill or Stroke) tag. The color source reference (varuint) goes in the
-// value area; the inline color source sub-tag follows at the end (§9.0).
+// Gradient common exist bits (matrix, fitsToGeometry), written after the type-specific ones.
+void WriteGradientCommonFlags(PAGAttributeBlockWriter* writer, Gradient* gradient) {
+  writer->writeFlag(!gradient->matrix.isIdentity());
+  writer->writeFlag(!gradient->fitsToGeometry);
+}
+
+// Gradient common values, written after the type-specific ones to match flag order.
+void WriteGradientCommonValues(pag::EncodeStream* v, Gradient* gradient) {
+  if (!gradient->matrix.isIdentity()) {
+    WritePAGMatrix(v, gradient->matrix);
+  }
+  if (!gradient->fitsToGeometry) {
+    v->writeBoolean(gradient->fitsToGeometry);
+  }
+}
+
+// Writes a color source as an inline sub-tag appended to the parent tag's value area (§9.0).
+// Returns false when the source type has no phase-1 encoding yet; the caller must then clear
+// the owning reference flag and emit an UnsupportedColorSource warning.
+bool WriteColorSourceInline(pag::EncodeStream* content, ColorSource* source, EncodeState* state) {
+  if (source == nullptr) {
+    return false;
+  }
+  pag::EncodeStream tag(&state->streamContext);
+  switch (source->nodeType()) {
+    case NodeType::SolidColor: {
+      auto* solid = static_cast<SolidColor*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      writer.writeFlag(true);  // color always exists
+      WritePAGColor(writer.valueStream(), solid->color);
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      WriteTag(content, TagCode::SolidColor, &tag);
+      return true;
+    }
+    case NodeType::LinearGradient: {
+      auto* grad = static_cast<LinearGradient*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasStart = grad->startPoint.x != 0.0f || grad->startPoint.y != 0.0f;
+      auto hasEnd = grad->endPoint.x != 1.0f || grad->endPoint.y != 0.0f;
+      writer.writeFlag(hasStart);
+      writer.writeFlag(hasEnd);
+      WriteGradientCommonFlags(&writer, grad);
+      auto* v = writer.valueStream();
+      if (hasStart) {
+        v->writeFloat(grad->startPoint.x);
+        v->writeFloat(grad->startPoint.y);
+      }
+      if (hasEnd) {
+        v->writeFloat(grad->endPoint.x);
+        v->writeFloat(grad->endPoint.y);
+      }
+      WriteGradientCommonValues(v, grad);
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      WriteGradientStops(&tag, grad);
+      WriteTag(content, TagCode::LinearGradient, &tag);
+      return true;
+    }
+    case NodeType::RadialGradient: {
+      auto* grad = static_cast<RadialGradient*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasCenter = grad->center.x != 0.5f || grad->center.y != 0.5f;
+      auto hasRadius = grad->radius != 0.5f;
+      writer.writeFlag(hasCenter);
+      writer.writeFlag(hasRadius);
+      WriteGradientCommonFlags(&writer, grad);
+      auto* v = writer.valueStream();
+      if (hasCenter) {
+        v->writeFloat(grad->center.x);
+        v->writeFloat(grad->center.y);
+      }
+      if (hasRadius) {
+        v->writeFloat(grad->radius);
+      }
+      WriteGradientCommonValues(v, grad);
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      WriteGradientStops(&tag, grad);
+      WriteTag(content, TagCode::RadialGradient, &tag);
+      return true;
+    }
+    case NodeType::ConicGradient: {
+      auto* grad = static_cast<ConicGradient*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasCenter = grad->center.x != 0.5f || grad->center.y != 0.5f;
+      auto hasStart = grad->startAngle != 0.0f;
+      auto hasEnd = grad->endAngle != 360.0f;
+      writer.writeFlag(hasCenter);
+      writer.writeFlag(hasStart);
+      writer.writeFlag(hasEnd);
+      WriteGradientCommonFlags(&writer, grad);
+      auto* v = writer.valueStream();
+      if (hasCenter) {
+        v->writeFloat(grad->center.x);
+        v->writeFloat(grad->center.y);
+      }
+      if (hasStart) {
+        v->writeFloat(grad->startAngle);
+      }
+      if (hasEnd) {
+        v->writeFloat(grad->endAngle);
+      }
+      WriteGradientCommonValues(v, grad);
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      WriteGradientStops(&tag, grad);
+      WriteTag(content, TagCode::ConicGradient, &tag);
+      return true;
+    }
+    case NodeType::DiamondGradient: {
+      auto* grad = static_cast<DiamondGradient*>(source);
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasCenter = grad->center.x != 0.5f || grad->center.y != 0.5f;
+      auto hasRadius = grad->radius != 0.5f;
+      writer.writeFlag(hasCenter);
+      writer.writeFlag(hasRadius);
+      WriteGradientCommonFlags(&writer, grad);
+      auto* v = writer.valueStream();
+      if (hasCenter) {
+        v->writeFloat(grad->center.x);
+        v->writeFloat(grad->center.y);
+      }
+      if (hasRadius) {
+        v->writeFloat(grad->radius);
+      }
+      WriteGradientCommonValues(v, grad);
+      auto block = writer.release();
+      tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+      WriteGradientStops(&tag, grad);
+      WriteTag(content, TagCode::DiamondGradient, &tag);
+      return true;
+    }
+    default:
+      // ImagePattern has no phase-1 encoding yet; callers warn and drop the reference.
+      return false;
+  }
+}
+
+// Writes a Fill tag. The content is the attribute block (colorRef varuint in the value area)
+// followed by the inline color source sub-tag at the value-area end (spec §10.3), so the
+// declared tag length covers both.
 void WriteFillTag(pag::EncodeStream* stream, Fill* fill, EncodeState* state) {
+  pag::EncodeStream colorTag(&state->streamContext);
+  auto hasColor = WriteColorSourceInline(&colorTag, fill->color, state);
+  if (fill->color != nullptr && !hasColor) {
+    state->warn(PAGExportWarning::UnsupportedColorSource,
+                "color source has no binary encoding yet");
+  }
   PAGAttributeBlockWriter writer(&state->streamContext);
-  writer.writeFlag(fill->color != nullptr);
+  writer.writeFlag(hasColor);
   writer.writeFlag(fill->alpha != 1.0f);
   writer.writeFlag(fill->blendMode != BlendMode::Normal);
   writer.writeFlag(fill->fillRule != FillRule::Winding);
   writer.writeFlag(fill->placement != LayerPlacement::Background);
   auto* v = writer.valueStream();
-  if (fill->color != nullptr) {
+  if (hasColor) {
     v->writeEncodedUint32(0);  // 0 = inline color source
   }
   if (fill->alpha != 1.0f) {
@@ -246,19 +369,29 @@ void WriteFillTag(pag::EncodeStream* stream, Fill* fill, EncodeState* state) {
     v->writeUint8(static_cast<uint8_t>(fill->placement));
   }
   auto block = writer.release();
-  WritePAGTagHeader(stream, TagCode::Fill, static_cast<uint32_t>(block->length()));
-  stream->writeByteData(block.get());
-  if (fill->color != nullptr) {
-    WriteColorSourceInline(stream, fill->color, state);
+  pag::EncodeStream content(&state->streamContext);
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  if (hasColor) {
+    content.writeBytes(&colorTag);
   }
+  WriteTag(stream, TagCode::Fill, &content);
 }
 
+// Writes a Stroke tag (spec §9.3 field order: color, width, alpha, blendMode, cap, join,
+// miterLimit, dashes, dashOffset, dashAdaptive, align, placement). The inline color source
+// sub-tag sits at the value-area end inside the declared length.
 void WriteStrokeTag(pag::EncodeStream* stream, Stroke* stroke, EncodeState* state) {
+  pag::EncodeStream colorTag(&state->streamContext);
+  auto hasColor = WriteColorSourceInline(&colorTag, stroke->color, state);
+  if (stroke->color != nullptr && !hasColor) {
+    state->warn(PAGExportWarning::UnsupportedColorSource,
+                "color source has no binary encoding yet");
+  }
   PAGAttributeBlockWriter writer(&state->streamContext);
-  writer.writeFlag(stroke->color != nullptr);
+  writer.writeFlag(hasColor);
+  writer.writeFlag(stroke->width != 1.0f);
   writer.writeFlag(stroke->alpha != 1.0f);
   writer.writeFlag(stroke->blendMode != BlendMode::Normal);
-  writer.writeFlag(stroke->width != 1.0f);
   writer.writeFlag(stroke->cap != LineCap::Butt);
   writer.writeFlag(stroke->join != LineJoin::Miter);
   writer.writeFlag(stroke->miterLimit != 4.0f);
@@ -268,17 +401,17 @@ void WriteStrokeTag(pag::EncodeStream* stream, Stroke* stroke, EncodeState* stat
   writer.writeFlag(stroke->align != StrokeAlign::Center);
   writer.writeFlag(stroke->placement != LayerPlacement::Background);
   auto* v = writer.valueStream();
-  if (stroke->color != nullptr) {
-    v->writeEncodedUint32(0);
+  if (hasColor) {
+    v->writeEncodedUint32(0);  // 0 = inline color source
+  }
+  if (stroke->width != 1.0f) {
+    v->writeFloat(stroke->width);
   }
   if (stroke->alpha != 1.0f) {
     v->writeUint8(static_cast<uint8_t>(lroundf(stroke->alpha * 255.0f)));
   }
   if (stroke->blendMode != BlendMode::Normal) {
     v->writeUint8(static_cast<uint8_t>(stroke->blendMode));
-  }
-  if (stroke->width != 1.0f) {
-    v->writeFloat(stroke->width);
   }
   if (stroke->cap != LineCap::Butt) {
     v->writeUint8(static_cast<uint8_t>(stroke->cap));
@@ -298,9 +431,6 @@ void WriteStrokeTag(pag::EncodeStream* stream, Stroke* stroke, EncodeState* stat
   if (stroke->dashOffset != 0.0f) {
     v->writeFloat(stroke->dashOffset);
   }
-  if (stroke->dashAdaptive) {
-    v->writeBoolean(true);
-  }
   if (stroke->align != StrokeAlign::Center) {
     v->writeUint8(static_cast<uint8_t>(stroke->align));
   }
@@ -308,11 +438,12 @@ void WriteStrokeTag(pag::EncodeStream* stream, Stroke* stroke, EncodeState* stat
     v->writeUint8(static_cast<uint8_t>(stroke->placement));
   }
   auto block = writer.release();
-  WritePAGTagHeader(stream, TagCode::Stroke, static_cast<uint32_t>(block->length()));
-  stream->writeByteData(block.get());
-  if (stroke->color != nullptr) {
-    WriteColorSourceInline(stream, stroke->color, state);
+  pag::EncodeStream content(&state->streamContext);
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  if (hasColor) {
+    content.writeBytes(&colorTag);
   }
+  WriteTag(stream, TagCode::Stroke, &content);
 }
 
 void WriteRectangleTag(pag::EncodeStream* stream, Rectangle* rect, EncodeState* state) {
@@ -334,7 +465,7 @@ void WriteRectangleTag(pag::EncodeStream* stream, Rectangle* rect, EncodeState* 
   if (hasRoundness) v->writeFloat(rect->roundness);
   auto block = writer.release();
   WritePAGTagHeader(stream, TagCode::Rectangle, static_cast<uint32_t>(block->length()));
-  stream->writeByteData(block.get());
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
 }
 
 void WriteEllipseTag(pag::EncodeStream* stream, Ellipse* ellipse, EncodeState* state) {
@@ -353,9 +484,11 @@ void WriteEllipseTag(pag::EncodeStream* stream, Ellipse* ellipse, EncodeState* s
   v->writeFloat(ellipse->size.height);
   auto block = writer.release();
   WritePAGTagHeader(stream, TagCode::Ellipse, static_cast<uint32_t>(block->length()));
-  stream->writeByteData(block.get());
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
 }
 
+// Writes a Path tag (spec §10.5): the inline PathData sub-tag sits at the value-area end
+// inside the declared tag length.
 void WritePathTag(pag::EncodeStream* stream, Path* path, EncodeState* state) {
   PAGAttributeBlockWriter writer(&state->streamContext);
   writer.writeFlag(path->data != nullptr);
@@ -364,18 +497,19 @@ void WritePathTag(pag::EncodeStream* stream, Path* path, EncodeState* state) {
   writer.writeFlag(path->reversed);
   auto* v = writer.valueStream();
   if (path->data != nullptr) {
-    v->writeEncodedUint32(0);
+    v->writeEncodedUint32(0);  // 0 = inline path data
   }
   if (path->position.x != 0.0f) v->writeFloat(path->position.x);
   if (path->position.y != 0.0f) v->writeFloat(path->position.y);
   auto block = writer.release();
-  WritePAGTagHeader(stream, TagCode::Path, static_cast<uint32_t>(block->length()));
-  stream->writeByteData(block.get());
+  pag::EncodeStream content(&state->streamContext);
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   if (path->data != nullptr) {
     pag::EncodeStream pathTag(&state->streamContext);
     WritePAGPath(&pathTag, path->data, 0);
-    WriteTag(stream, TagCode::PathData, &pathTag);
+    WriteTag(&content, TagCode::PathData, &pathTag);
   }
+  WriteTag(stream, TagCode::Path, &content);
 }
 
 void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
@@ -413,7 +547,7 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     }
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::TextAttributes, static_cast<uint32_t>(block->length()));
-    content.writeByteData(block.get());
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::TextBlock, &content);
@@ -454,7 +588,7 @@ void WriteGroupTag(pag::EncodeStream* stream, Group* group, EncodeState* state) 
     if (!std::isnan(group->height)) v->writeFloat(group->height);
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::GroupAttributes, static_cast<uint32_t>(block->length()));
-    content.writeByteData(block.get());
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   }
   for (auto* element : group->elements) {
     WriteElementTag(&content, element, state);
@@ -501,11 +635,16 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     auto hasName = !layer->name.empty();
     auto hasX = layer->x != 0.0f;
     auto hasY = layer->y != 0.0f;
-    auto notVisible = !layer->visible;
+    auto notVisible = layer->visible != true;
     auto hasAlpha = layer->alpha != 1.0f;
     auto hasBlend = layer->blendMode != BlendMode::Normal;
     auto hasMatrix = !layer->matrix.isIdentity();
     auto hasMatrix3D = !layer->matrix3D.isIdentity();
+    auto hasAntiAlias = layer->antiAlias != true;
+    auto hasGroupOpacity = layer->groupOpacity != true;
+    auto hasPassThrough = layer->passThroughBackground != true;
+    auto hasWidth = !std::isnan(layer->width);
+    auto hasHeight = !std::isnan(layer->height);
     auto hasScrollRect = layer->scrollRect.width > 0 || layer->scrollRect.height > 0;
     auto hasMask = layer->mask != nullptr;
     auto hasMaskType = layer->maskType != MaskType::Alpha;
@@ -518,39 +657,44 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     writer.writeFlag(hasBlend);
     writer.writeFlag(hasMatrix);
     writer.writeFlag(hasMatrix3D);
-    writer.writeFlag(!layer->preserve3D);
-    writer.writeFlag(!layer->antiAlias);
-    writer.writeFlag(!layer->groupOpacity);
-    writer.writeFlag(!layer->passThroughBackground);
-    writer.writeFlag(false);
-    writer.writeFlag(false);
+    writer.writeFlag(layer->preserve3D);  // BitFlag (default false): the bit is the value.
+    writer.writeFlag(hasAntiAlias);
+    writer.writeFlag(hasGroupOpacity);
+    writer.writeFlag(hasPassThrough);
+    writer.writeFlag(hasWidth);
+    writer.writeFlag(hasHeight);
     writer.writeFlag(hasScrollRect);
     writer.writeFlag(hasMask);
     writer.writeFlag(hasMaskType);
-    writer.writeFlag(false);
-    writer.writeFlag(false);
+    writer.writeFlag(false);  // hasComposition, phase 2
+    writer.writeFlag(false);  // hasSubDocument, phase 2
     writer.writeFlag(hasVmContext);
     auto* v = writer.valueStream();
     if (hasName) v->writeEncodedUint32(state->intern(layer->name));
     if (hasX) v->writeFloat(layer->x);
     if (hasY) v->writeFloat(layer->y);
-    if (notVisible) v->writeBoolean(false);
+    if (notVisible) v->writeBoolean(layer->visible);
     if (hasAlpha) v->writeUint8(static_cast<uint8_t>(lroundf(layer->alpha * 255.0f)));
     if (hasBlend) v->writeUint8(static_cast<uint8_t>(layer->blendMode));
     if (hasMatrix) WritePAGMatrix(v, layer->matrix);
     if (hasMatrix3D) WritePAGMatrix3D(v, layer->matrix3D);
+    if (hasAntiAlias) v->writeBoolean(layer->antiAlias);
+    if (hasGroupOpacity) v->writeBoolean(layer->groupOpacity);
+    if (hasPassThrough) v->writeBoolean(layer->passThroughBackground);
+    if (hasWidth) v->writeFloat(layer->width);
+    if (hasHeight) v->writeFloat(layer->height);
     if (hasScrollRect) {
       v->writeFloat(layer->scrollRect.x);
       v->writeFloat(layer->scrollRect.y);
       v->writeFloat(layer->scrollRect.width);
       v->writeFloat(layer->scrollRect.height);
     }
-    if (hasMask) v->writeEncodedUint32(0);
+    if (hasMask) v->writeEncodedUint32(0);  // NodeRef, phase 1 always none
     if (hasMaskType) v->writeUint8(static_cast<uint8_t>(layer->maskType));
     if (hasVmContext) v->writeEncodedUint32(state->intern(layer->vmContext));
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::LayerAttributes, static_cast<uint32_t>(block->length()));
-    content.writeByteData(block.get());
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   }
   for (auto* element : layer->contents) {
     WriteElementTag(&content, element, state);
@@ -623,7 +767,8 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       auto block = writer.release();
       WritePAGTagHeader(&docContent, TagCode::DocumentAttributes,
                         static_cast<uint32_t>(block->length()));
-      docContent.writeByteData(block.get());
+      docContent.writeBytes(const_cast<uint8_t*>(block->data()),
+                            static_cast<uint32_t>(block->length()));
     }
     {
       pag::EncodeStream idContent(&state->streamContext);

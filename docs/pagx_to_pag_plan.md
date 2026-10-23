@@ -46,7 +46,7 @@
 - ImageTable 编码（规范 §6.6，mediaType 一期只产生 0/1）。
 - **验收**：decal 裁边/repeat 不裁、缩小、原样写入、去重、缺失用例；内存峰值记录给 M0-8。
 
-### T5 编码器主体（依赖 T1、T3、T4）
+### T5 编码器主体（依赖 T1、T3、T4）✅ 已完成（2026-10-22，7c3bc5d8e）
 - 新增 `src/pagx/pag/PAGExporter.cpp`：Body 组装（FileAttributes/StringTable/ResourceBlock/
   DocumentBlock/[SubDocumentTable]/ImageTable/End）、文件头、4GB 检查、报告数据。
 - 新增 `src/pagx/pag/tags/`：全部一期节点 Tag 写出（Layer/Group/TextBox/Text/GlyphRun/Font/
@@ -55,7 +55,7 @@
 - **验收**：317 个仓库样本全部可导出（动效样本按静态画面 + 告警）；往返导出字节稳定；
   体积对比 XML 记入 T7 基准。
 
-### T6 v4 解码器（依赖 T1；与 T5 并行开发，T7 联调）
+### T6 v4 解码器（依赖 T1；与 T5 并行开发，T7 联调）✅ 已完成（2026-10-23，含编码侧内联子 Tag/布尔语义/渐变规范化修复）
 - 新增 `src/pagx/pag/PAGImporter.cpp`：LoadFromPAG、Tag 读取、未知 Tag 跳过、tagLevel 统计、
   上限检查（规范 §11）、引用回填、RetainedIdTable、`VerifyAndMake` 式校验（环/深度/类型）。
 - 新增 `src/pagx/pag/tags/` 读取侧。

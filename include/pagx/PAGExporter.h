@@ -36,6 +36,7 @@ enum class PAGExportWarning {
   InvalidAnimationTiming,
   NonFiniteValue,
   ImageScaledDown,
+  UnsupportedColorSource,
 };
 
 struct PAGExportIssue {
