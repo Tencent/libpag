@@ -23,7 +23,7 @@ import {
   type SpawnCaptureResult,
   type SnapshotImpl,
 } from './pipeline';
-import type { FontMapRule } from './font-metadata';
+import type { AvailableFont } from './font-matcher';
 
 // Walk `root` recursively and collect every regular file whose name ends
 // with `.html` or `.htm`, dropping `.subset.html` / `.subset.htm` outputs.
@@ -157,8 +157,8 @@ export interface RunBatchOptions {
   viewportHeight?: number;
   waitMs?: number;
   selector?: string;
-  // The same explicit replacement rules apply to each page in the batch.
-  fontMap?: FontMapRule[];
+  // Match each page against the same available font catalog.
+  availableFonts?: AvailableFont[];
 }
 
 export interface RunBatchResult {
@@ -264,7 +264,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           viewportHeight: opts.viewportHeight,
           waitMs: opts.waitMs,
           selector: opts.selector,
-          fontMap: opts.fontMap,
+          availableFonts: opts.availableFonts,
           log: (line: string) => process.stdout.write(line + '\n'),
           snapshotImpl,
         });

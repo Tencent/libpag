@@ -628,114 +628,48 @@ Babel-compiled at runtime.
 - The page is force-scrolled to `(0, 0)` before measurement so that scroll
   position never leaks into the captured coordinates.
 
-### Original HTML font inventory
+### Match available editor fonts
 
-`html2pagx` writes the inventory immediately after the browser snapshot, before native import.
-It writes `<output-name>.fonts.json` next to the PAGX,
-including single-file, URL and batch conversions. No additional flag is needed. The inventory
-is also written with `--no-render`, `--no-resolve`, or `--no-subset-html`, and does not require
-font downloading, embedding or a replacement map:
-
-```sh
-./html2pagx page.html --no-render
-# page.pagx + page.fonts.json
-```
-
-```json
-{
-  "version": 1,
-  "fonts": [
-    {
-      "families": ["PingFang SC", "Microsoft YaHei", "sans-serif"],
-      "weight": 600,
-      "weightName": "SemiBold",
-      "style": "normal"
-    }
-  ],
-  "missingRequests": 0
-}
-```
-
-`families` is the original ordered CSS family stack; `weight` is the numeric computed CSS
-weight before PAGX face bucketing (650 stays 650), and `style` is `normal`, `italic` or `oblique`.
-`weightName` is a display label: 100–900 in steps of 100 map to `Thin`, `ExtraLight`,
-`Light`, `Regular`, `Medium`, `SemiBold`, `Bold`, `ExtraBold`, and `Black`. Other weights
-use their exact numeric string (for example, 650 becomes `"650"`). It does not participate
-in matching and is not the editor's actual font face name.
-Explicit `variations` and inherited `lang` are included only when present. Requests are
-deduplicated in first-use order, comparing family names case-insensitively and variation axes
-independently of property order. Different axes or languages remain separate records.
-
-The inventory describes text requests in the captured HTML, including inline runs, line splits
-and materialized pseudo/first-letter text. Native conversion failures do not prevent an already
-captured inventory from being available. It never substitutes Linux fallback or
-mapped editor font names for the source request. Requests are read from standard CSS and `lang`
-attributes, without private request attributes. Snapshot text runs without a CSS family are
-counted in `missingRequests`; their fonts are not guessed. Inline SVG retains authored markup
-rather than computed text styles and remains outside HTML font matching; its text also counts
-as `missingRequests`. Original text,
-coordinates, glyph data and Text IDs are not copied into this file.
-
-Use the inventory to prepare the explicit `from` / `to` rules below: serialize `families` as
-the `from.font-family` CSS stack, copy `weight` and `style` to `from.font-weight` and
-`from.font-style`, and choose the exact `to` family/face from the editor's available fonts.
-The inventory contains no inferred target. Ardot still imports the final PAGX directly.
-Module callers receive the absolute JSON path as `runHtmlToPagx(...).fontMetadataPath`.
-The inventory is collected from the HTML snapshot, not reconstructed from a PAGX.
-Service integrations can call `collectSnapshotFontMetadata(snapshotHtml)` from `lib/snapshot-fonts`
-to return this JSON before conversion, persist the same snapshot and its inlined resources, then
-accept an external `from` / `to` map to resume conversion. `validateSnapshotFontMap` rejects map
-sources that are absent from that snapshot. The CLI continues directly through the pipeline.
-
-### Explicit font replacement
-
-Pass a JSON array of `from` / `to` rules with `--font-map`:
-
-```sh
-./html2pagx page.html --font-map font-map.json --no-render
-```
+Provide the frontend's available font catalog in the same conversion request. The converter
+reads original CSS family stacks, numeric weights and slants from the snapshot in memory,
+selects a catalog face and passes its exact family/style to native import before layout.
+No source-font JSON file or matching round trip is required.
 
 ```json
 [
-  {
-    "from": {
-      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
-      "font-weight": "600",
-      "font-style": "normal",
-      "font-weight-style": "Semi Bold"
-    },
-    "to": {
-      "font-family": "Source Han Sans CN",
-      "font-weight": "600",
-      "font-style": "normal",
-      "font-weight-style": "Bold"
-    }
-  }
+  { "fontName": { "family": "ZCOOL XiaoWei", "style": "Regular" } },
+  { "fontName": { "family": "Noto Sans", "style": "Regular" } },
+  { "fontName": { "family": "Noto Sans", "style": "Bold" } }
 ]
 ```
 
-The matcher compares the original ordered family stack, numeric CSS weight and CSS style.
-Quoting, separator whitespace and family case do not affect the comparison. The source face
-label is descriptive. The target `font-weight-style` selects the exact face and takes precedence
-over the target numeric weight: the example above selects Bold, not SemiBold. Unmatched fonts
-retain normal resolution; no default target is inferred. Conflicting rules are rejected before
-conversion. The converter must have the target fonts available to shape and embed their glyphs.
-For a captured font whose internal family and face match the target (ignoring case and redundant
-whitespace), the HTML importer registers that file under the exact target spelling. For example,
-CSS `LongCang` backed by a `Long Cang / Regular` font can output `long cang / Regular` while using
-the same glyphs. A different target font must be supplied or installed separately.
+CLI: `./html2pagx page.html --available-fonts available-fonts.json --no-render`.
+Module API: `runHtmlToPagx({ input, availableFonts, ... })`, `runBatch({ availableFonts, ... })`,
+or `runPagxImport({ pagxBin, html: snapshotHtml, availableFonts })`. The last helper returns
+only PAGX text. CLI and batch conversions no longer generate `<output-name>.fonts.json`.
+The former `--font-map` / `fontMap` / `fontMetadataPath` contract has been removed.
 
-Matching runs before native import, using the original CSS values before face rounding.
-`prepareSnapshotFontReplacements(snapshotHtml, fontMap)` produces conversion options passed to
-`HTMLImporter::Options::fontReplacements`. The native CLI accepts the same options through the
-repeatable `--font-replacement <families> <weight> <style> <target-family> <target-face>` flag.
-The importer applies the target family and exact face before layout and embedding, so glyphs
-and text metrics come from the target font. There is no post-conversion PAGX rewrite and no
-source-request metadata in subset HTML or PAGX. The snapshot and `.fonts.json` keep the original
-CSS requests and are not overwritten by mapping.
+Matching follows the ordered CSS family stack. Each family tries literal identity, unique
+Unicode NFKC/case/whitespace normalization, then unique normalization of spaces, hyphens and
+underscores. Fuzzy matching requires at least six normalized characters, at most 64, a score
+of at least 0.85 and a margin of at least 0.08 over the runner-up. A unique vendor-prefix
+suffix match (for example `XiaoWei` → `ZCOOL XiaoWei`, length ratio at least 0.5) scores 0.94;
+otherwise at most two character edits are considered. Ambiguities stay unmatched. Generic
+families such as `sans-serif` and `system-ui` are skipped because the catalog defines no
+generic-to-family policy. Missing/empty catalogs preserve existing conversion behavior.
 
-Both single-file and batch runs support the flag. Module callers pass the same JSON array
-as `runHtmlToPagx({ fontMap, ... })` (or `runBatch`). Mapping is independent of resolve, embedding
-and PNG rendering. The returned `fontMapping` counts matched, unmatched and request-less
-snapshot text runs. Request-less runs are left unchanged and reported in the log; they are
-never matched by guessed Linux font names.
+Within a family, prefer the requested slant (italic and oblique may approximate one another),
+then a known nearest numeric weight. Common face labels and numeric face names are recognized;
+unknown labels are not assumed to weigh 400. Equal distances prefer the lighter face at
+weights up to 500, the heavier face above 500. Remaining ties use the original style string's
+code-unit order, independent of catalog ordering. Arbitrary variable axes and glyph coverage
+are not inferred from names. The original catalog names are copied verbatim to the native
+replacement arguments; no family or face is synthesized. The converter still needs the
+selected font file installed or captured from the page to lay out that target correctly.
+
+Invalid catalog entries are rejected before browser work. At most 100,000 faces are accepted;
+each family/style must be a nonempty string of at most 256 characters without control codes.
+Requests are cached within the conversion. `fontMapping` and `[font-map]` logs count matched,
+unmatched and request-less text runs; they do not publish a font inventory. Inline SVG text
+retains authored markup and is outside computed HTML font matching. Existing icon-to-vector
+handling is unchanged.

@@ -25,9 +25,9 @@ import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import type { CapturedFontRef } from './font-download';
-import { FontMappingError, FontMappingErrorCode, validateFontMap } from './font-metadata';
-import type { FontMapRule } from './font-metadata';
-import { collectSnapshotFontMetadata, prepareSnapshotFontReplacements } from './snapshot-fonts';
+import { FontMappingError, FontMappingErrorCode } from './font-metadata';
+import { validateAvailableFonts, type AvailableFont } from './font-matcher';
+import { prepareSnapshotFontReplacements } from './snapshot-fonts';
 import type { FontMappingResult, FontReplacement } from './snapshot-fonts';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
@@ -393,8 +393,8 @@ export interface RunHtmlToPagxOptions {
   selector?: string;
   snapshotImpl?: SnapshotImpl;
   snapshotExtraArgs?: string[];
-  /** Explicit from/to rules, applied during native import before layout and embedding. Unmatched fonts stay unchanged. */
-  fontMap?: FontMapRule[];
+  /** Available frontend faces, matched before native layout. Unmatched fonts stay unchanged. */
+  availableFonts?: AvailableFont[];
 }
 
 export interface RunHtmlToPagxResult {
@@ -402,8 +402,6 @@ export interface RunHtmlToPagxResult {
   pagx: string;
   png: string | null;
   fonts: CapturedFontRef[];
-  /** Deduplicated original HTML font requests, written even without fontMap or embedding. */
-  fontMetadataPath: string;
   fontMapping?: FontMappingResult;
 }
 
@@ -454,16 +452,15 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   }
   const pagxFile = path.join(outputDir, `${baseName}.pagx`);
   const pngFile = path.join(outputDir, `${baseName}.png`);
-  const fontMetadataPath = path.join(outputDir, `${baseName}.fonts.json`);
 
   const doResolve = opts.doResolve !== false;
   const doRender = opts.doRender !== false && doResolve;
   const embedFonts = !!opts.embedFonts;
   const downloadFonts = !!opts.downloadFonts || embedFonts;
   const downloadImages = !!opts.downloadImages;
-  if (opts.fontMap !== undefined) {
-    const errors = validateFontMap(opts.fontMap);
-    if (errors.length) throw new FontMappingError(FontMappingErrorCode.InvalidFontMap, errors.join('; '));
+  if (opts.availableFonts !== undefined) {
+    const errors = validateAvailableFonts(opts.availableFonts);
+    if (errors.length) throw new FontMappingError(FontMappingErrorCode.InvalidAvailableFonts, errors.join('; '));
   }
 
 
@@ -517,20 +514,15 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     assertStepOk('snapshot', snapshotResult);
 
     const snapshotHtml = fs.readFileSync(subsetHtml, 'utf8');
-    const fontMetadata = collectSnapshotFontMetadata(snapshotHtml);
-    fs.writeFileSync(fontMetadataPath, JSON.stringify(fontMetadata, null, 2) + '\n', 'utf8');
-    log(`[font-metadata] ${fontMetadata.fonts.length} source request(s), ` +
-      `${fontMetadata.missingRequests} without source requests -> ${fontMetadataPath}`);
-
     let fontMapping: FontMappingResult | undefined;
     let fontReplacements: FontReplacement[] = [];
-    if (opts.fontMap !== undefined) {
-      const mapped = prepareSnapshotFontReplacements(snapshotHtml, opts.fontMap);
+    if (opts.availableFonts !== undefined) {
+      const mapped = prepareSnapshotFontReplacements(snapshotHtml, opts.availableFonts);
       fontReplacements = mapped.replacements;
       fontMapping = mapped.mapping;
       log(`[font-map] ${fontMapping.replaced} replaced, ${fontMapping.unmatched} unmatched`);
     }
-    const fontResult = { fontMetadataPath, ...(fontMapping ? { fontMapping } : {}) };
+    const fontResult = fontMapping ? { fontMapping } : {};
 
     let fonts: CapturedFontRef[] = [];
     if (downloadFonts) {

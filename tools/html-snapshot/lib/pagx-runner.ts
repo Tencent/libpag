@@ -26,9 +26,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
-import { collectSnapshotFontMetadata, prepareSnapshotFontReplacements } from './snapshot-fonts';
+import { prepareSnapshotFontReplacements } from './snapshot-fonts';
 import type { FontReplacement } from './snapshot-fonts';
-import type { FontMapRule, HtmlFontMetadata } from './font-metadata';
+import type { AvailableFont } from './font-matcher';
 
 // Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
@@ -153,7 +153,7 @@ export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
   log?: ((msg: string) => void) | null;
-  fontMap?: FontMapRule[];
+  availableFonts?: AvailableFont[];
 }
 
 // Convenience wrapper: drop the snapshot HTML into a per-call temp dir,
@@ -167,28 +167,15 @@ export interface RunPagxImportOptions {
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
 export async function runPagxImport(
-  options: RunPagxImportOptions = {},
+  { pagxBin, html, log, availableFonts }: RunPagxImportOptions = {},
 ): Promise<string> {
-  return (await runPagxImportWithMetadata(options)).pagx;
-}
-
-export interface PagxImportResult {
-  pagx: string;
-  fontMetadata: HtmlFontMetadata;
-}
-
-/** Apply external font selections before native conversion, retaining the original inventory. */
-export async function runPagxImportWithMetadata(
-  { pagxBin, html, log, fontMap }: RunPagxImportOptions = {},
-): Promise<PagxImportResult> {
   if (typeof pagxBin !== 'string' || !pagxBin) {
     throw new PagxImportError('pagxBin is required');
   }
   if (typeof html !== 'string' || !html) {
     throw new PagxImportError('html payload is required');
   }
-  const prepared = fontMap === undefined ? undefined : prepareSnapshotFontReplacements(html, fontMap);
-  const fontMetadata = collectSnapshotFontMetadata(html);
+  const prepared = availableFonts === undefined ? undefined : prepareSnapshotFontReplacements(html, availableFonts);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'html-snapshot-pagx-'));
   const htmlPath = path.join(dir, 'input.subset.html');
   const pagxPath = path.join(dir, 'output.pagx');
@@ -214,7 +201,7 @@ export async function runPagxImportWithMetadata(
       const { replaced, unmatched, missingRequests } = prepared.mapping;
       log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
     }
-    return { pagx: fs.readFileSync(pagxPath, 'utf8'), fontMetadata };
+    return fs.readFileSync(pagxPath, 'utf8');
   } finally {
     try {
       fs.rmSync(dir, { recursive: true, force: true });

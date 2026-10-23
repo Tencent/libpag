@@ -2,12 +2,11 @@
 
 import { DOMParser } from '@xmldom/xmldom';
 import type { Element, Node } from '@xmldom/xmldom';
-import { FontMatcher } from './font-matcher';
+import { FontMatcher, type AvailableFont } from './font-matcher';
 import {
-  collectFontMetadata, fontRequestKey, parseFontFamilyStack, fontWeightNumber,
-  validateFontMap,
+  collectFontMetadata, parseFontFamilyStack, fontWeightNumber,
 } from './font-metadata';
-import type { FontMapRule, HtmlFontMetadata, HtmlFontRequest } from './font-metadata';
+import type { HtmlFontMetadata, HtmlFontRequest } from './font-metadata';
 
 export interface FontMappingResult {
   replaced: number;
@@ -113,11 +112,11 @@ export interface FontReplacement {
   targetStyle: string;
 }
 
-/** Resolve external matching results before native conversion, keeping the snapshot unchanged. */
-export function prepareSnapshotFontReplacements(html: string, rules: FontMapRule[]): {
+/** Match the available catalog before native conversion, keeping the snapshot unchanged. */
+export function prepareSnapshotFontReplacements(html: string, availableFonts: AvailableFont[]): {
   replacements: FontReplacement[]; mapping: FontMappingResult;
 } {
-  const matcher = new FontMatcher(rules);
+  const matcher = new FontMatcher(availableFonts);
   const { runs } = readSnapshot(html);
   const mapping = { replaced: 0, unmatched: 0, missingRequests: 0 };
   const replacements = new Map<string, FontReplacement>();
@@ -133,20 +132,4 @@ export function prepareSnapshotFontReplacements(html: string, rules: FontMapRule
     mapping.replaced++;
   }
   return { replacements: [...replacements.values()], mapping };
-}
-
-/** Reject rules for fonts outside the prepared snapshot before starting native conversion. */
-export function validateSnapshotFontMap(fontMap: unknown, metadata: HtmlFontMetadata): string[] {
-  const errors = validateFontMap(fontMap);
-  if (errors.length) return errors;
-  const sources = new Set(metadata.fonts.map(fontRequestKey));
-  for (const [index, rule] of (fontMap as FontMapRule[]).entries()) {
-    const key = fontRequestKey({
-      families: parseFontFamilyStack(rule.from['font-family']),
-      weight: fontWeightNumber(rule.from['font-weight'])!,
-      style: rule.from['font-style'],
-    });
-    if (!sources.has(key)) errors.push(`font map[${index}].from is not in the prepared snapshot`);
-  }
-  return errors;
 }

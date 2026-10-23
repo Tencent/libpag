@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
-// Explicit HTML font replacement rules. No editor catalog or Text identity is required.
+// Internal original HTML font requests used during conversion.
 
 export type CssFontStyle = 'normal' | 'italic' | 'oblique';
 
@@ -24,25 +24,13 @@ export interface HtmlFontMetadata {
   missingRequests: number;
 }
 
-export interface FontMapDescriptor {
-  'font-family': string;
-  'font-weight': number | string;
-  'font-style': CssFontStyle;
-  'font-weight-style'?: string;
-}
-
-export interface FontMapRule {
-  from: FontMapDescriptor;
-  to: FontMapDescriptor & { 'font-weight-style': string };
-}
-
 export interface FontTarget {
   family: string;
   style: string;
 }
 
 export const FontMappingErrorCode = {
-  InvalidFontMap: 'INVALID_FONT_MAP',
+  InvalidAvailableFonts: 'INVALID_AVAILABLE_FONTS',
   FontMetadataMismatch: 'FONT_METADATA_MISMATCH',
 } as const;
 
@@ -119,54 +107,6 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-/** Validate before starting conversion; conflicting rules must never depend on row order. */
-export function validateFontMap(value: unknown): string[] {
-  if (!Array.isArray(value)) return ['font map must be an array of from/to rules'];
-  const errors: string[] = [];
-  const targets = new Map<string, string>();
-  for (const [i, rule] of value.entries()) {
-    const start = errors.length;
-    if (!isObject(rule)) {
-      errors.push(`font map[${i}] must be a from/to object`);
-      continue;
-    }
-    for (const side of ['from', 'to']) {
-      const descriptor = rule[side];
-      const label = `font map[${i}].${side}`;
-      if (!isObject(descriptor)) {
-        errors.push(`${label} must be an object`);
-        continue;
-      }
-      if (!isText(descriptor['font-family'])) errors.push(`${label}.font-family is required`);
-      else if (side === 'from') {
-        try {
-          if (!parseFontFamilyStack(descriptor['font-family']).length) errors.push(`${label}.font-family is empty`);
-        } catch (error) {
-          errors.push(`${label}.font-family: ${(error as Error).message}`);
-        }
-      }
-      if (fontWeightNumber(descriptor['font-weight']) === null) errors.push(`${label}.font-weight must be 1–1000`);
-      if (!['normal', 'italic', 'oblique'].includes(String(descriptor['font-style']))) {
-        errors.push(`${label}.font-style must be normal, italic or oblique`);
-      }
-      if ((side === 'to' || descriptor['font-weight-style'] !== undefined) && !isText(descriptor['font-weight-style'])) {
-        errors.push(`${label}.font-weight-style must be a non-empty face name`);
-      }
-    }
-    if (errors.length !== start) continue;
-    const valid = rule as unknown as FontMapRule;
-    const key = fontRequestKey({
-      families: parseFontFamilyStack(valid.from['font-family']),
-      weight: fontWeightNumber(valid.from['font-weight']) as number,
-      style: valid.from['font-style'],
-    });
-    const target = JSON.stringify([valid.to['font-family'], valid.to['font-weight-style']]);
-    if (targets.has(key) && targets.get(key) !== target) errors.push(`font map[${i}] conflicts with another from rule`);
-    targets.set(key, target);
-  }
-  return errors;
 }
 
 export function validateFontRequest(value: unknown): value is HtmlFontRequest {
