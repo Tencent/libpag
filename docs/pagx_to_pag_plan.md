@@ -61,7 +61,7 @@
 - 新增 `src/pagx/pag/tags/` 读取侧。
 - **验收**：T3 兼容性用例（未知 Tag、补充 Tag、截断、超限、fuzz）；导出→解码→再导出字节一致。
 
-### T7 运行时接入与往返等价（依赖 T5+T6）
+### T7 运行时接入与往返等价（依赖 T5+T6）✅ 已完成（2026-10-23，e8d5f6692/7f3be7a04/114c69982/93f53c471：路径校验、全局字体注册、图片零拷贝渲染、GlyphRun/Font 编解码与渲染等价验收）
 - `PAGScene::Make` 路径验证：解码文档不标记已布局，加载期排版（§4.2）；静态文件
   `hasContentChanged()` 语义（T9 静态部分）。
 - `PAGFont::RegisterFont`/`SetFallbackFontNames` 全局注册接 `FontConfig`（接口草案 §3）。
