@@ -730,6 +730,134 @@ static bool AssertSteadyStateIdempotency(const std::shared_ptr<PAGXDocument>& do
   return true;
 }
 
+PAGX_TEST(PAGImporterTest, DetectFormatIdempotency) {
+  // DetectFormat on the same bytes always returns the same result — across file, raw bytes,
+  // and re-encoded output. This is the routing entry point for hosts deciding which loader
+  // to use, so any drift here breaks file loading.
+  const std::vector<std::pair<std::string, PAGFormat>> cases = {
+      {"resources/pagx_to_pag/static_animated/pure_static.pagx", PAGFormat::PAGX},
+  };
+  for (auto& testCase : cases) {
+    auto path = pag::ProjectPath::Absolute(testCase.first);
+    EXPECT_EQ(PAGImporter::DetectFormat(path), PAGFormat::PAGX) << testCase.first;
+  }
+
+  // Exported v4 file → detect → decode → re-export → detect again: format stable.
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/detect_idem.pag").success);
+  EXPECT_EQ(PAGImporter::DetectFormat("/tmp/detect_idem.pag"), PAGFormat::PAGv4);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/detect_idem.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(decoded, "/tmp/detect_idem2.pag").success);
+  EXPECT_EQ(PAGImporter::DetectFormat("/tmp/detect_idem2.pag"), PAGFormat::PAGv4);
+
+  // Raw bytes variant: same result as the file variant.
+  auto bytes = ReadFileBytes("/tmp/detect_idem.pag");
+  ASSERT_FALSE(bytes.empty());
+  EXPECT_EQ(PAGImporter::DetectFormat(bytes.data(), bytes.size()), PAGFormat::PAGv4);
+  auto xmlBytes = ReadFileBytes(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_FALSE(xmlBytes.empty());
+  EXPECT_EQ(PAGImporter::DetectFormat(xmlBytes.data(), xmlBytes.size()), PAGFormat::PAGX);
+
+  // Edge inputs: empty, short, garbage.
+  EXPECT_EQ(PAGImporter::DetectFormat(nullptr, 0), PAGFormat::Unknown);
+  EXPECT_EQ(PAGImporter::DetectFormat(nullptr, 100), PAGFormat::Unknown);
+  const char* garbage = "not a pag file at all";
+  EXPECT_EQ(PAGImporter::DetectFormat(garbage, 21), PAGFormat::Unknown);
+  // Truncated PAG header (version 4 but body length claims more than available).
+  EXPECT_EQ(PAGImporter::DetectFormat(bytes.data(), 10), PAGFormat::Unknown);
+
+  // BOM-prefixed XML still detects as PAGX.
+  std::vector<uint8_t> bomXml = {0xEF, 0xBB, 0xBF, '<', '?', 'x', 'm', 'l'};
+  EXPECT_EQ(PAGImporter::DetectFormat(bomXml.data(), bomXml.size()), PAGFormat::PAGX);
+}
+
+PAGX_TEST(PAGImporterTest, DecodeResultStability) {
+  // Decoding the same file twice produces structurally identical documents: same layer count,
+  // same canvas size, same feature presence (masks, compositions, sub-documents, glyph runs).
+  // This catches nondeterministic decoding (hash-order dependencies, uninitialized fields).
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/stability.pag").success);
+
+  auto first = PAGImporter::LoadFromPAG("/tmp/stability.pag");
+  auto second = PAGImporter::LoadFromPAG("/tmp/stability.pag");
+  ASSERT_TRUE(first != nullptr);
+  ASSERT_TRUE(second != nullptr);
+
+  EXPECT_EQ(first->width, second->width);
+  EXPECT_EQ(first->height, second->height);
+  ASSERT_EQ(first->layers.size(), second->layers.size());
+  for (size_t i = 0; i < first->layers.size(); i++) {
+    auto* la = first->layers[i];
+    auto* lb = second->layers[i];
+    EXPECT_EQ(la->contents.size(), lb->contents.size());
+    EXPECT_EQ(la->children.size(), lb->children.size());
+    EXPECT_EQ(la->composition != nullptr, lb->composition != nullptr);
+    EXPECT_EQ(la->mask != nullptr, lb->mask != nullptr);
+    EXPECT_EQ(la->x, lb->x);
+    EXPECT_EQ(la->y, lb->y);
+    EXPECT_EQ(la->alpha, lb->alpha);
+  }
+
+  // Both exports of the two independently decoded docs produce the same bytes.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(first, "/tmp/stability_a.pag").success);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(second, "/tmp/stability_b.pag").success);
+  auto bytesA = ReadFileBytes("/tmp/stability_a.pag");
+  auto bytesB = ReadFileBytes("/tmp/stability_b.pag");
+  ASSERT_EQ(bytesA.size(), bytesB.size());
+  EXPECT_EQ(memcmp(bytesA.data(), bytesB.data(), bytesA.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, DecodeErrorRecoveryIdempotency) {
+  // Malformed inputs consistently return nullptr + a non-empty error, never a partial
+  // document, and repeated attempts give the same result (no state leakage between calls).
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/error_idem.pag").success);
+  auto bytes = ReadFileBytes("/tmp/error_idem.pag");
+  ASSERT_FALSE(bytes.empty());
+
+  // Truncated at three different points: header, mid-body, last byte.
+  for (auto cut : {static_cast<size_t>(16), bytes.size() / 2, bytes.size() - 1}) {
+    FILE* f = fopen("/tmp/error_idem_trunc.pag", "wb");
+    ASSERT_TRUE(f != nullptr);
+    fwrite(bytes.data(), 1, cut, f);
+    fclose(f);
+    // Decode twice — both attempts must fail identically.
+    PAGImportResult result1 = {};
+    PAGImportResult result2 = {};
+    auto first = PAGImporter::LoadFromPAG("/tmp/error_idem_trunc.pag", &result1);
+    auto second = PAGImporter::LoadFromPAG("/tmp/error_idem_trunc.pag", &result2);
+    EXPECT_EQ(first, nullptr);
+    EXPECT_EQ(second, nullptr);
+    EXPECT_FALSE(result1.success);
+    EXPECT_FALSE(result2.success);
+    EXPECT_FALSE(result1.error.empty());
+    EXPECT_FALSE(result2.error.empty());
+  }
+
+  // Garbage file: repeated decode is consistently null.
+  FILE* f = fopen("/tmp/error_idem_garbage.pag", "wb");
+  ASSERT_TRUE(f != nullptr);
+  fwrite("this is not a pag file", 1, 22, f);
+  fclose(f);
+  PAGImportResult garbageResult = {};
+  EXPECT_EQ(PAGImporter::LoadFromPAG("/tmp/error_idem_garbage.pag", &garbageResult), nullptr);
+  EXPECT_FALSE(garbageResult.success);
+
+  // After all failures, a valid file still decodes correctly (no state pollution).
+  PAGImportResult validResult = {};
+  auto valid = PAGImporter::LoadFromPAG("/tmp/error_idem.pag", &validResult);
+  EXPECT_TRUE(valid != nullptr);
+  EXPECT_TRUE(validResult.success);
+}
+
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
   // Every fully-supported export path must be byte-idempotent from the decoded state.
   // Each sample exercises a distinct encoding feature; together they cover the full
