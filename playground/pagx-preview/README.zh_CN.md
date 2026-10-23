@@ -164,8 +164,8 @@ npm run build                # 一键构建 pagx-viewer(单线程) + pagx-player
 file.pagx`，服务器会发送所需的 COOP/COEP 头）下可用；在 MCP 宿主中 widget 会回退到打开浏览器
 URL。
 
-如果上游产物已经构建好（或克隆的仓库已自带产物），可以只运行 `npm run prebuild` 仅拷贝而不
-重新构建。`prebuild` 会自动：
+如果上游产物已经构建好（或克隆的仓库已自带产物），可以只运行 `npm run stage` 仅拷贝而不
+重新构建。`stage` 会自动：
 - 检测 viewer 构建变体（MT/ST），复制 wasm + glue 到 `static/viewer/`
 - 复制 pagx-player ESM bundle 到 `static/player/`
 - 复制 ext-apps SDK bundle 到 `static/ext/`

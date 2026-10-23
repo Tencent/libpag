@@ -169,6 +169,14 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
       binding->setTarget(sm, std::make_unique<StateMachineInputTarget>(smTimeline, sm));
+      // A timeline rebuild replaces the state-machine instance, dropping bound inputs back to
+      // their declared defaults while the data-bind entries stay clean (no ViewModel change is
+      // pending). Re-push the ViewModel's current values now, scoped to this composition's
+      // binding so sibling instances of the same source node are untouched; during initial
+      // construction the bind pass has not run yet, so this is a harmless no-op then.
+      if (scene != nullptr) {
+        scene->reapplyDataBindsForTarget(sm, binding.get());
+      }
       timelines.push_back(std::move(smTimeline));
     }
   }
@@ -217,13 +225,16 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
   if (!scene) {
     return;
   }
-  BuildChildren(binding.get(), layers, children, scene, visited);
+  // The root composition has no parent (parent stays null); pass this as the parent for its
+  // direct children so the parent chain is wired correctly from the tree root downward.
+  BuildChildren(binding.get(), layers, children, scene, visited, shared_from_this());
 }
 
 void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
                                    std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                                    const std::shared_ptr<PAGScene>& scene,
-                                   std::unordered_set<const Composition*>& visited) {
+                                   std::unordered_set<const Composition*>& visited,
+                                   const std::shared_ptr<PAGLayer>& parentForChildren) {
   if (binding == nullptr || scene == nullptr) {
     return;
   }
@@ -233,6 +244,7 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
     }
     auto child = BuildChildLayer(layer, binding, scene, visited);
     if (child != nullptr) {
+      child->parent = parentForChildren;
       outChildren.push_back(std::move(child));
     }
   }
@@ -342,7 +354,7 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
   }
   auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
   if (!layer->children.empty()) {
-    BuildChildren(binding, layer->children, child->children, scene, visited);
+    BuildChildren(binding, layer->children, child->children, scene, visited, child);
     for (auto& nestedChild : child->children) {
       auto nestedSlot = binding->get<tgfx::Layer>(nestedChild->node);
       if (nestedSlot != nullptr && child->runtimeLayer != nullptr) {
@@ -398,6 +410,14 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
     binding->remove(child->node);
   }
   children = std::move(newChildren);
+  // Re-parent every direct child so the parent chain matches the rebuilt tree. Existing children
+  // may carry a stale parent pointer (e.g. a plain-layer container whose parent was replaced
+  // during a prior sync), and freshly built children have no parent set yet.
+  for (auto& child : children) {
+    if (child != nullptr) {
+      child->parent = shared_from_this();
+    }
+  }
   // Reorder this parent's direct tgfx children to match the document order. addChild on a layer
   // already parented here moves it to the top, so appending in source order yields document order.
   for (auto& child : children) {
@@ -460,6 +480,12 @@ void PAGComposition::refreshPlainContainerChildren(
         binding->remove(oldChild->node);
       }
       container->children = std::move(newChildren);
+      // Re-parent the container's direct children so the parent chain matches the rebuilt subtree.
+      for (auto& child : container->children) {
+        if (child != nullptr) {
+          child->parent = container->shared_from_this();
+        }
+      }
       if (container->runtimeLayer != nullptr) {
         for (auto& child : container->children) {
           if (child == nullptr || child->node == nullptr) {
