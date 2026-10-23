@@ -36,8 +36,7 @@ std::shared_ptr<Data> Data::MakeAdopt(uint8_t* data, size_t length) {
   return std::shared_ptr<Data>(new Data(data, length, true));
 }
 
-std::shared_ptr<Data> Data::MakeSlice(std::shared_ptr<Data> parent, size_t offset,
-                                      size_t length) {
+std::shared_ptr<Data> Data::MakeSlice(std::shared_ptr<Data> parent, size_t offset, size_t length) {
   if (parent == nullptr || offset + length > parent->size()) {
     return nullptr;
   }

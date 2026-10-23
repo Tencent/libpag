@@ -39,7 +39,7 @@
   内联 vs 共享决策、两趟发射序号分配（规范 §5.1）、RetainedIdTable 生成。
 - **验收**：id 保留/剥离清单用例；两次导出逐字节相同（确定性）；内联/共享用例（规范 §10.3 字节）。
 
-### T4 图片处理（依赖 T2）
+### T4 图片处理（依赖 T2）✅ 已完成（2026-10-22，bfdf38043）
 - 新增 `src/pagx/pag/exporter/ImageProcessor.cpp`：最大显示缩放（实例×变换统一计算，§12.2 预留关键帧）、
   factor、裁边、WebP q80、已是 WebP 不重编码、去重、动图取首帧、缺失告警。
 - `pagx::Data` 切片构造（父缓冲 + 偏移 + 长度，§5.1 零拷贝）→ `include/pagx/types/Data.h` + `src/pagx/Data.cpp`。
