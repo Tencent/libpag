@@ -95,6 +95,18 @@ describe('PipelineStepError', () => {
 });
 
 describe('spawnCapture', () => {
+  test('returns diagnostics when spawn throws synchronously, even if stderr cannot be written', async () => {
+    const stderrPath = path.join(dir, 'spawn.stderr');
+    // NUL is rejected synchronously by child_process before any child exists.
+    const result = await spawnCapture('bad\0command', [], { stderrPath });
+    expect(result).toMatchObject({ code: null, stdout: '' });
+    expect(result.stderr).toMatch(/null bytes/);
+    expect(fs.readFileSync(stderrPath, 'utf8')).toBe(result.stderr);
+    const unwritable = await spawnCapture('bad\0command', [], { stderrPath: path.join(dir, 'missing', 'stderr') });
+    expect(unwritable.code).toBeNull();
+    expect(unwritable.stderr).toBe(result.stderr);
+    expect((await spawnCapture('bad\0command', [])).code).toBeNull();
+  });
   test('captures stdout, stderr, and a zero exit code', async () => {
     const cmd = makeArgvCapturingScript({
       stdout: 'hello',
@@ -387,6 +399,31 @@ describe('isHttpUrl re-export', () => {
 });
 
 describe('runHtmlToPagx — orchestrator', () => {
+  test('defaults the image directory and cleans a temporary subset after an import failure', async () => {
+    const input = path.join(dir, 'images.html');
+    fs.writeFileSync(input, '<html/>');
+    const outputDir = path.join(dir, 'image-output');
+    const pagxBin = makeArgvCapturingScript({ exitCode: 7, stderr: 'warning: invalid image' });
+    const stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    let args;
+    try {
+      await expect(runHtmlToPagx({
+        input, outputDir, pagxBin, scriptDir: dir, downloadImages: true, keepSubsetHtml: false,
+        snapshotImpl: async options => {
+          args = options;
+          fs.writeFileSync(options.output, '<html/>');
+          return { code: 0, durationMs: 0, stdout: '', stderr: '' };
+        },
+        log: () => {},
+      })).rejects.toMatchObject({ step: 'pagx import', code: 7 });
+      expect(args.imageDir).toBe(path.join(outputDir, 'images.images'));
+      expect(args.downloadImages).toBe(true);
+      expect(stderr).toHaveBeenCalledWith(expect.stringContaining('warning: invalid image'));
+      expect(fs.existsSync(path.dirname(args.output))).toBe(false);
+    } finally {
+      stderr.mockRestore();
+    }
+  });
   test('rejects when scriptDir is missing', async () => {
     await expect(runHtmlToPagx({ input: '/foo.html' }))
       .rejects.toThrow(/scriptDir is required/);

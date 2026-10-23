@@ -14,31 +14,12 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "build:browser": "node build-browser-bundle.js",
+    "pretest": "npm run build",
     "test": "jest",
+    "pretest:browser": "npm run build",
+    "test:browser": "node --test test/browser/*.browser.js",
+    "pretest:coverage": "npm run build",
     "test:coverage": "jest --coverage"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": [
-      "<rootDir>/test/**/*.test.js"
-    ],
-    "transformIgnorePatterns": [
-      "/node_modules/(?!(pixelmatch)/)"
-    ],
-    "collectCoverageFrom": [
-      "dist/lib/**/*.js",
-      "bench/report-utils.js",
-      "eval/compare.js",
-      "!dist/lib/browser-snapshot.js",
-      "!dist/lib/page-loader.js",
-      "!dist/lib/snapshot-runner.js"
-    ],
-    "coverageDirectory": "<rootDir>/coverage",
-    "coverageReporters": [
-      "text",
-      "text-summary",
-      "lcov"
-    ]
   },
   "dependencies": {
     "opentype.js": "^2.0.0",
@@ -56,6 +37,7 @@
     "@types/pngjs": "^6.0.5",
     "babel-jest": "^30.4.1",
     "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.5.2",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "typescript": "^5.9.3"

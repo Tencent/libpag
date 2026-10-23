@@ -1120,6 +1120,31 @@ CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {
   EXPECT_TRUE(output.find("includeInLayout=\"false\" has no effect") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Verify_SiblingMaskIsExcludedFromIneffectiveLayoutWarning) {
+  auto path = TempDir() + "/verify_sibling_mask.pagx";
+  std::ofstream(path) << R"(<pagx width="100" height="100">
+    <Layer id="wrapper">
+      <Layer id="mask" visible="false" includeInLayout="false">
+        <Ellipse position="30,30" size="40,40"/><Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer id="owner" mask="@mask" maskType="alpha">
+        <Rectangle position="50,50" size="100,100"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  for (const auto* id : {"", "mask", "wrapper"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+    EXPECT_EQ(output.str().find("includeInLayout=\"false\" has no effect"), std::string::npos);
+  }
+}
+
 CLI_TEST(PAGXCliTest, Verify_FlexNoParentLayout) {
   auto inputPath = TestResourcePath("verify_flex_no_parent_layout.pagx");
   std::streambuf* old = std::cerr.rdbuf();

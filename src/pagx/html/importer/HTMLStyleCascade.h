@@ -63,7 +63,8 @@ class HTMLStyleCascade {
   // the pair written to `Text::fontFamily` / `Text::fontStyle` can be looked up by name outside
   // this process — an editor consuming the exported PAGX resolves fonts with its own, usually
   // exact-matching, font lookup. Same function-pointer + opaque-user-data shape as the sinks above.
-  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style);
+  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style,
+                                    const CSSFontStyle& request);
 
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
@@ -104,6 +105,10 @@ class HTMLStyleCascade {
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
+  // Re-resolves size-dependent corner geometry after percentage/flex layout.
+  void resolveUsedBoxSize(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                          float width, float height);
+
   /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
    *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
   const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
@@ -118,7 +123,8 @@ class HTMLStyleCascade {
   void parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
-  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props);
+  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                        bool deferBorderRadius = false);
   void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);

@@ -19,8 +19,39 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace pagx {
+
+enum class CSSFontSlant { Normal, Italic, Oblique };
+
+// A CSS request is distinct from an exact platform face name. Keep numeric values intact;
+// rounding a weight before matching changes the CSS search order.
+struct CSSFontStyle {
+  double weight = 400;
+  double width = 100;
+  CSSFontSlant slant = CSSFontSlant::Normal;
+};
+
+struct CSSFontFace {
+  std::string name;
+  CSSFontStyle style;
+};
+
+CSSFontStyle ParseCSSFontStyle(const std::string& weight, const std::string& slant,
+                               const std::string& width = "");
+CSSFontStyle FontStyleFromName(const std::string& name);
+std::string FontStyleRequestName(const CSSFontStyle& style);
+// Negative/zero/positive means a is preferred/equivalent/b is preferred. Width, slant and
+// weight are compared lexicographically, never combined into a weighted distance.
+int CompareCSSFontStyles(const CSSFontStyle& request, const CSSFontStyle& a, const CSSFontStyle& b);
+// Returns an index, or -1 for an empty list. Face names only break equivalent-property ties.
+int MatchCSSFontFace(const std::vector<CSSFontFace>& faces, const CSSFontStyle& request);
+double CSSFontWidthFromClass(int widthClass);
+
+std::vector<std::string> ParseCSSFontFamilyList(const std::string& value);
+std::string ResolveCSSGenericFontFamily(const std::string& name);
+std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std::string& requested);
 
 // Resolves a CSS font-weight string and a CSS font-style string into the PAGX `fontStyle`
 // attribute value. Supported font-weight inputs are numeric values (1-1000) and the

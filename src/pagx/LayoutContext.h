@@ -18,12 +18,15 @@
 
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
+#include "pagx/types/LayoutRounding.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace tgfx {
 class Typeface;
@@ -39,10 +42,25 @@ class LayoutContext {
  public:
   explicit LayoutContext(FontConfig* fontConfig);
 
+  LayoutRounding layoutRounding = LayoutRounding::Pixel;
+
+  float roundLayoutPosition(float value) const {
+    return layoutRounding == LayoutRounding::None ? value : std::round(value);
+  }
+
+  float roundLayoutSize(float value) const {
+    return layoutRounding == LayoutRounding::None ? value : std::ceil(value);
+  }
+
   // Finds a typeface for the given family/style. Searches user-registered fonts first,
   // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle);
+  // CSS selection returns a document registration key when one exists, preserving aliases.
+  std::shared_ptr<tgfx::Typeface> matchTypeface(const std::string& family,
+                                                const CSSFontStyle& request,
+                                                std::string* resolvedStyle = nullptr);
+
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
   // fonts first, then system fallback fonts. Typefaces are created on demand.
@@ -63,6 +81,27 @@ class LayoutContext {
   // one typeface instance. Glyph collection keys glyphs by typeface identity, so a fresh instance
   // per text node would store the same outline once per text.
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> systemTypefaceCache = {};
+};
+
+// Layout recursively enters child containers during both measurement and allocation. Restore the
+// enclosing policy on every exit so an override never affects siblings or other compositions.
+class ScopedLayoutRounding {
+ public:
+  ScopedLayoutRounding(LayoutContext* context, LayoutRounding rounding) : context(context) {
+    if (context) {
+      previous = context->layoutRounding;
+      if (rounding != LayoutRounding::Inherit) context->layoutRounding = rounding;
+    }
+  }
+  ~ScopedLayoutRounding() {
+    if (context) context->layoutRounding = previous;
+  }
+  ScopedLayoutRounding(const ScopedLayoutRounding&) = delete;
+  ScopedLayoutRounding& operator=(const ScopedLayoutRounding&) = delete;
+
+ private:
+  LayoutContext* context;
+  LayoutRounding previous = LayoutRounding::Pixel;
 };
 
 }  // namespace pagx

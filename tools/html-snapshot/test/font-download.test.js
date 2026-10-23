@@ -6,6 +6,7 @@ const path = require('path');
 const {
   toSfnt,
   readFontMeta,
+  decodeDataFont,
   makeFontCaptureListener,
   saveDownloadedFonts,
 } = require('../dist/lib/font-download');
@@ -25,17 +26,21 @@ describe('toSfnt', () => {
   });
 
   test('decompresses a real WOFF2 web font to SFNT', async () => {
-    const woff2 = findWoff2Fixture();
-    if (!woff2) {
-      // No fixture available in this checkout — skip rather than fail.
-      return;
-    }
-    const out = await toSfnt(fs.readFileSync(woff2));
+    // Generate a valid, tiny font so this test also runs on a clean checkout.
+    const opentype = require('opentype.js');
+    const font = new opentype.Font({
+      familyName: 'Coverage Sans', styleName: 'Regular', unitsPerEm: 1000,
+      ascender: 800, descender: -200,
+      glyphs: [new opentype.Glyph({ name: '.notdef', advanceWidth: 500, path: new opentype.Path() })],
+    });
+    const woff2 = await require('wawoff2').compress(Buffer.from(font.toArrayBuffer()));
+    const out = await toSfnt(Buffer.from(woff2));
     expect(Buffer.isBuffer(out)).toBe(true);
     expect(out.length).toBeGreaterThan(0);
     // Decompressed output must be a raw SFNT, never a WOFF2 container.
     const sig = out.slice(0, 4).toString('binary');
     expect(sig).not.toBe('wOF2');
+    expect(readFontMeta(out).family).toBe('Coverage Sans');
   });
 });
 
@@ -76,12 +81,13 @@ describe('makeFontCaptureListener', () => {
     expect(cache.size).toBe(0);
   });
 
-  test('ignores data: URLs and non-OK responses', async () => {
+  test('captures inline font bytes but ignores non-OK responses', async () => {
     const cache = new Map();
     const listener = makeFontCaptureListener('puppeteer', cache);
     await listener(makeResp({ url: 'data:font/woff2;base64,AAAA' }));
     await listener(makeResp({ url: 'https://x/b.woff2', ok: false }));
-    expect(cache.size).toBe(0);
+    expect(cache.get('data:font/woff2;base64,AAAA')).toEqual(Buffer.from([0, 0, 0]));
+    expect(cache.size).toBe(1);
   });
 
   test('does not re-fetch a URL already in the cache', async () => {
@@ -109,6 +115,35 @@ describe('makeFontCaptureListener', () => {
     });
     expect(cache.size).toBe(0);
     expect(logs[0]).toMatch(/font capture skipped: detached/);
+  });
+});
+
+describe('inline fonts and partial SFNT tables', () => {
+  test('decodes base64 and percent-encoded binary without UTF-8 corruption', () => {
+    expect(decodeDataFont('data:font/ttf;base64,AP%2BA')).toEqual(Buffer.from([0, 255, 128]));
+    expect(decodeDataFont('data:font/ttf,%00%ff%80')).toEqual(Buffer.from([0, 255, 128]));
+    expect(() => decodeDataFont('not-a-font')).toThrow();
+  });
+
+  test('reads Unicode family names without parsing glyph or GSUB tables', () => {
+    const family = Buffer.from('测试字体', 'utf16le').swap16();
+    const sfnt = Buffer.alloc(46 + family.length);
+    sfnt.writeUInt32BE(0x00010000, 0);
+    sfnt.writeUInt16BE(1, 4);
+    sfnt.write('name', 12);
+    sfnt.writeUInt32BE(28, 20);
+    sfnt.writeUInt32BE(18 + family.length, 24);
+    sfnt.writeUInt16BE(1, 30);
+    sfnt.writeUInt16BE(18, 32);
+    sfnt.writeUInt16BE(3, 34);
+    sfnt.writeUInt16BE(1, 36);
+    sfnt.writeUInt16BE(0x409, 38);
+    sfnt.writeUInt16BE(1, 40);
+    sfnt.writeUInt16BE(family.length, 42);
+    family.copy(sfnt, 46);
+    expect(readFontMeta(sfnt).family).toBe('测试字体');
+    sfnt.writeUInt32BE(0xffffffff, 20);
+    expect(readFontMeta(sfnt).family).toBe('font');
   });
 });
 
@@ -143,6 +178,7 @@ describe('saveDownloadedFonts', () => {
     ]);
     const saved = await saveDownloadedFonts(map, outDir);
     expect(saved).toHaveLength(1);
+    expect(saved[0].urls).toEqual(['https://x/a.ttf', 'https://y/b.ttf']);
     expect(fs.readdirSync(outDir)).toHaveLength(1);
   });
 
@@ -267,34 +303,3 @@ describe('readFontMeta — name-table fallbacks', () => {
     expect(meta.ext).toBe('otf');
   });
 });
-
-// Locate any .woff2 web font already present in the checkout so the WOFF2
-// decode path can be exercised when fixtures exist, without bloating the
-// repo with a dedicated test asset.
-function findWoff2Fixture() {
-  const roots = [path.join(__dirname, '..', 'eval', 'out'), path.join(__dirname, '..', 'bench', 'out')];
-  for (const root of roots) {
-    const hit = walkForExt(root, '.woff2');
-    if (hit) return hit;
-  }
-  return null;
-}
-
-function walkForExt(dir, ext, depth = 0) {
-  if (depth > 6 || !fs.existsSync(dir)) return null;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isFile() && entry.name.toLowerCase().endsWith(ext)) return full;
-    if (entry.isDirectory()) {
-      const hit = walkForExt(full, ext, depth + 1);
-      if (hit) return hit;
-    }
-  }
-  return null;
-}

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <utility>
 #include "pagx/FontConfig.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
@@ -114,8 +115,8 @@ bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::st
 }
 
 void HTMLParserContext::ResolveFontFaceNamesThunk(void* userData, std::string& family,
-                                                  std::string& style) {
-  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style);
+                                                  std::string& style, const CSSFontStyle& request) {
+  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style, request);
 }
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
@@ -127,7 +128,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
   _animationBuilder =
       std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
+  _layerBuilder =
+      std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter, *_idAllocator);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
@@ -184,19 +186,13 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   return available;
 }
 
-void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style) {
+void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style,
+                                             const CSSFontStyle& request) {
   if (family.empty()) {
     return;
   }
-  // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
-  // key, so their names must stay verbatim — renaming them would miss the registration and fall
-  // through to a system face instead.
-  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
-    return;
-  }
-  // The cache is keyed on the exact pair rather than a case-insensitive normalisation: the style
-  // half of the platform lookup is case-sensitive on some backends, so spelling variants of one
-  // family can genuinely resolve to different faces.
+  // The style label encodes the original numeric request here. Preserve family spelling because
+  // document-local registration keys are case-sensitive.
   std::string cacheKey = family + "\n" + style;
   auto cached = _fontFaceNameCache.find(cacheKey);
   if (cached != _fontFaceNameCache.end()) {
@@ -206,7 +202,15 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   std::string resolvedFamily = family;
   std::string resolvedStyle = style;
-  auto typeface = SystemFonts::ResolveTypeface(family, style);
+  if (_document && _document->fontConfig().containsFamily(family)) {
+    // Return the registration key, not the physical font's name: aliases are document-local.
+    LayoutContext context(&_document->fontConfig());
+    context.matchTypeface(family, request, &resolvedStyle);
+    _fontFaceNameCache.emplace(cacheKey, std::make_pair(family, resolvedStyle));
+    style = std::move(resolvedStyle);
+    return;
+  }
+  auto typeface = SystemFonts::MatchTypeface(family, request);
   // A family mismatch means the platform substituted a different face, so the authored name is
   // kept instead of baking the substitution into the exported document.
   if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
@@ -326,6 +330,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _valueParser->bindDocument(_document.get());
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
+  _layerBuilder->setBackgroundImageResolver(
+      [this](const std::string& value) { return resolveBackgroundImage(value); });
   _textFragmentBuilder->bindDocument(_document.get());
   _animationBuilder->bindDocument(_document.get());
   _animationBuilder->setKeyframes(&_styleCascade->keyframes());
@@ -355,8 +361,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     return nullptr;
   }
   if (bodyLayer) {
+    bodyLayer->layoutRounding = LayoutRounding::None;
     _document->layers.push_back(bodyLayer);
   }
+  finishImageLayouts();
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
@@ -597,7 +605,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }
@@ -621,7 +629,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, 1);
       if (childLayer) {
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -750,7 +758,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     // A `url(...)` background is recovered as an ImagePattern fill here (it needs the image
     // registry + native-size decoding the layer builder has no access to). Runs right after the
     // background geometry is emitted so the fill stacks on top of it.
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }
@@ -782,17 +790,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        // CSS border-box: position:absolute descendants are positioned relative to the
-        // parent's padding box, which sits inside the border. Shift their explicit
-        // left/right/top/bottom offsets by the border width so they don't overlap the
-        // border stroke.
-        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
-          if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
-          if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
-          if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
-          if (!std::isnan(childLayer->bottom)) childLayer->bottom += box.borderWidthPx;
-        }
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);

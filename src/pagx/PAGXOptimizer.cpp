@@ -1330,7 +1330,7 @@ bool ChildHasNoPaintAffectingEffect(const Layer* child) {
          child->compositionFilePath.empty() && child->externalDoc == nullptr &&
          child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
          child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
-         child->layout == LayoutMode::None;
+         child->layout == LayoutMode::None && child->layoutRounding == LayoutRounding::Inherit;
 }
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,

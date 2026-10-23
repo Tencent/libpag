@@ -16,11 +16,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 #include "base/PAGTest.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pag {
+
+CLI_TEST(StringParserTest, FloatToStringPreservesFiniteValuesWithoutExponentNotation) {
+  // Sample every finite exponent and representative mantissas, including subnormals and the
+  // largest finite float. This checks the serialization contract across the entire float range.
+  for (uint32_t exponent = 0; exponent < 255; ++exponent) {
+    for (uint32_t mantissa : {0u, 1u, 0x123456u, 0x400000u, 0x7fffffu}) {
+      for (uint32_t sign : {0u, 0x80000000u}) {
+        auto bits = sign | (exponent << 23) | mantissa;
+        float value;
+        std::memcpy(&value, &bits, sizeof(value));
+        auto serialized = pagx::FloatToString(value);
+        SCOPED_TRACE(serialized);
+        EXPECT_EQ(serialized.find_first_not_of("-0123456789."), std::string::npos);
+        char* end = nullptr;
+        auto restored = std::strtof(serialized.c_str(), &end);
+        EXPECT_EQ(end, serialized.c_str() + serialized.size());
+        EXPECT_EQ(restored, value);
+      }
+    }
+  }
+  EXPECT_EQ(pagx::FloatToString(-0.f), "0");
+  EXPECT_EQ(pagx::FloatToString(NAN), "0");
+  EXPECT_EQ(pagx::FloatToString(std::numeric_limits<float>::infinity()), "0");
+  EXPECT_EQ(pagx::FloatToString(-std::numeric_limits<float>::infinity()), "0");
+}
 
 // CssFloatToString: fixed 3-decimal-place format with trailing-zero stripping.
 // Used for every numeric CSS/HTML value other than px coordinates (which go through

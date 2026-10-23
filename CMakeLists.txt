@@ -328,6 +328,13 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_FILES
             src/pagx/html/importer/HTMLAnimationBuilder.cpp
             src/pagx/html/importer/HTMLAnimationBuilder.h
+            src/pagx/html/importer/HTMLBackgroundLayout.cpp
+            src/pagx/html/importer/HTMLBackgroundLayout.h
+            src/pagx/html/importer/HTMLCSSPosition.cpp
+            src/pagx/html/importer/HTMLCSSPosition.h
+            src/pagx/html/importer/HTMLObjectLayout.cpp
+            src/pagx/html/importer/HTMLObjectLayout.h
+            src/pagx/html/importer/HTMLImageLayout.cpp
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h

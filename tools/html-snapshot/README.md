@@ -5,6 +5,46 @@ absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
 fed directly to `pagx import --format html`.
 
+Measured geometry retains fractional CSS pixels through snapshot and PAGX serialization. HTML
+import uses `layoutRounding="none"` on the body Layer so nested positions and percentage backgrounds
+remain aligned. Only the final raster canvas extent is rounded outward to integer pixels.
+Snapshot, baseline screenshots and viewport checks share the same body-based canvas measurement,
+including the body's offset from the document origin. Collapsed trailing margins outside the body
+remain outside this capture; a small fixed canvas is not expanded to the viewport's minimum height.
+
+Text capture uses Chromium layout text fragments for source boundaries and effective styles
+(including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
+This preserves drop caps, columns, and overlapping line boxes without relying on global
+Y ordering. Justified runs carry `data-pagx-inline-positions`; the PAGX importer applies
+them after shaping, preserving ligatures and combining clusters. The browser-only bundle
+accepts the same metadata through `HtmlSnapshot.installTextLayout(data)` from
+`lib/text-layout.ts`; without a provider, it uses DOM fragment measurements.
+First letters originating in generated content/shadow trees without a DOM Range are
+diagnosed. Length-changing text transforms use measured source fragments and natural
+cluster spacing when the browser cannot expose individual output-character positions.
+
+Form text is captured from Chromium's UA layout: live values, placeholder styles,
+password masks and textarea line breaks remain editable text. Password DOM values
+are never copied into snapshot metadata. Native surfaces (date/select decorations,
+checkboxes, radios, range/color, progress/meter, etc.) use isolated transparent PNGs;
+ancestor backgrounds and effects are reapplied by the normal paint pipeline. Fieldset
+captures only its decoration, retaining editable legend/content and the browser's
+legend cutout. Radios, checkboxes and selects using `appearance:none` keep their
+authored CSS boxes.
+Generated `::before`/`::after` text joins the measured flow, including resolved
+counters and `attr()` content when protocol capture is available.
+
+The browser bundle accepts native surfaces through `installControlPaints(paints)`
+(`ControlPaint[]` in `lib/control-capture.ts`) and control text through the optional
+`controls` field of `installTextLayout(data)` (`TextLayoutData`). Without
+these providers it retains control positions and emits diagnostics for missing
+native paint/approximate text. Capture and install providers immediately before
+`takeSnapshot()`, after viewport, fonts and live control state have settled.
+
+Use `--embed-fonts` for portable output with the page's web fonts. Font capture includes
+inline `data:` sources, resolves CSS family aliases to the saved font's internal family,
+and copies WOFF2 decoder memory before another decode can reuse it.
+
 ## Why
 
 The PAGX `HTMLImporter` (`src/pagx/html/HTMLImporter.cpp`) and its
@@ -19,7 +59,8 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - every box is `position: absolute` with `left/top/width/height` taken from
   `getBoundingClientRect()`, relative to its parent;
 - only the visual CSS properties allowed by the subset are forwarded
-  (`background-color`, `background-image` for gradients, `border`,
+  (`background-color`, layered `background-image` with per-layer size, position,
+  repeat, origin and clip, `border`,
   `border-radius`, `box-shadow`, `color`, `font-*`, `letter-spacing`,
   `line-height`, `text-align`, `text-decoration`, `text-decoration-color`,
   `opacity`, `overflow`, `backdrop-filter`, …);
@@ -52,6 +93,19 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
   property only models same-on-all-sides borders;
 - relative `<img src>` paths are preserved so the importer can still resolve
   them.
+
+Painting is planned across DOM ancestors, using the original computed positioning and
+stacking-context properties before transforms are temporarily removed for measurement.
+Negative, in-flow, floating, inline, zero-level and positive-level paints follow CSS painting
+order; `z-index: auto` remains distinct from an explicit `0`. Flex/grid items use
+order-modified tree order. Real stacking contexts remain compositing groups, while
+positioned descendants of non-context containers can participate in their enclosing context.
+Overflow clips follow the source containing-block chain, including absolute descendants
+that bypass an intermediate overflow container.
+
+The emitted `data-pagx-paint-order="fixed"` attribute prevents the importer's flex inference
+from rearranging planned fragments. Ordinary flex subtrees stay as flex where their children
+can be emitted together. `isolation: isolate` preserves context boundaries for blending.
 
 The output still has to pass through `pagx import --format html` to be turned
 into PAGX. The importer's normaliser handles any final cleanup (unit
@@ -506,9 +560,11 @@ pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
 Unit tests live in `test/` and run with [Jest](https://jestjs.io/). They cover
 the Node-side modules — CLI parsing, the HTTP query/header helpers, the
 browser-engine adapter, font download/SFNT conversion, the `pagx import`
-runner, icon-font parsing, and the bench/eval report + image-diff utilities —
-without launching a real headless browser (the engine, page, and `pagx` binary
-are stubbed).
+runner, icon-font parsing, and the bench/eval report + image-diff utilities.
+DOM tests use jsdom with explicit layout/style fixtures to exercise paint order,
+clipping, control isolation, text layout, and animation sampling. Browser protocol
+responses and subprocess fixtures keep the unit suite independent of Chromium,
+network access, system fonts, and a built `pagx` binary.
 
 ```bash
 cd tools/html-snapshot
@@ -518,16 +574,34 @@ npm test             # run the suite
 npm run test:coverage # run with a coverage report (written to coverage/)
 ```
 
-The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
-only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
+All three test commands compile the current TypeScript sources first. Coverage
+inputs are derived from those sources in `jest.config.js`, so stale `dist/` files
+from removed or renamed modules cannot affect the report. The coverage command
+enforces minimums of 97% statements, 90% branches, 98% functions, and 98% lines.
+Open `coverage/lcov-report/index.html` for the per-file report.
+
+Browser regressions in `test/browser/` run separately with `npm run test:browser`.
+They launch Puppeteer's Chromium to check CSS cascade,
+pseudo-element paint order, layout, and animation behavior against the source page.
+Set `PAGX_PAINT_TEST_BIN` to an absolute path to a built `pagx` binary to additionally
+import and render each paint-order fixture and compare its solid interior pixels.
+
+The browser snapshot implementation (`lib/browser-snapshot.ts`) and the modules that
+orchestrate a live browser (`lib/page-loader.ts`, `lib/snapshot-runner.ts`)
 are excluded from the coverage target — they are exercised end-to-end by the
 `eval/` and `bench/` harnesses against a headless Chromium instead. A few
 ESM-only dependencies (e.g. `pixelmatch`) are transformed for Jest via
-`babel.config.js`; the source tree itself stays plain CommonJS and is never
-Babel-compiled at runtime.
+`babel.config.js`; the TypeScript source tree compiles to CommonJS in `dist/`
+and is never Babel-compiled at runtime.
 
 ## Limitations
 
+- CSS `preserve-3d` and top-layer elements need painting models beyond the supported 2D
+  subset. The snapshot returns `paint:preserve-3d` / `paint:top-layer` warnings for these
+  cases; the CLI logs them. Their existing supported representation is retained.
+- Captured animations that change the stacking topology (`z-index`, `position`, `display`,
+  `isolation`, `contain`) return `paint:animated-stacking`. The emitted paint order is static;
+  captured opacity/transform channels retain their compositing groups.
 - Animation capture is **off by default** — the snapshot emits a single static
   frame. Pass `--capture-animations` (`snapshot.js` / `html2pagx` /
   `pagx import`), set `captureAnimations: true` on the `runSnapshot` /

@@ -154,6 +154,7 @@ class PathData : public Node {
   friend class PAGXDocument;
   friend class SVGParserContext;
   friend PathData PathDataFromSVGString(const std::string& d);
+  friend PathData PathDataFromSVGString(const std::string& d, std::vector<size_t>* commandEnds);
 };
 
 }  // namespace pagx

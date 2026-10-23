@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace tgfx {
 class Typeface;
@@ -46,6 +47,8 @@ struct FontLocation {
 struct FontFamilyEntry {
   std::string family = {};
   std::vector<std::string> styles = {};
+  // Native descriptors, in the same family. Names remain available separately for the CLI.
+  std::vector<CSSFontFace> faces = {};
 
   bool operator<(const FontFamilyEntry& other) const {
     return family < other.family;
@@ -90,6 +93,13 @@ class SystemFonts {
    */
   static std::shared_ptr<tgfx::Typeface> ResolveTypeface(const std::string& family,
                                                          const std::string& style);
+
+  // CSS property matching does not treat a generated weight label as an exact face request.
+  static std::shared_ptr<tgfx::Typeface> MatchTypeface(const std::string& family,
+                                                       const CSSFontStyle& request);
+  // Read actual font metadata; the supplied native/name properties only fill missing fields.
+  static CSSFontStyle TypefaceStyle(const tgfx::Typeface* typeface, CSSFontStyle fallback);
+  static CSSFontStyle TypefaceStyle(const tgfx::Typeface* typeface);
 
   /**
    * Normalises a font family or style name for comparison: lower-cased, leading/trailing
