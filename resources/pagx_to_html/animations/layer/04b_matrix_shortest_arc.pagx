@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a matrix tween between 170 and 190 degrees takes the 20 degree shortest arc through 180
+     instead of the 340 degree way around.
+     Target: Layer  Channel: matrix  Type: matrix
+     Expect: supported
+     Ref: test/src/PAGXTest.cpp:10289 -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="arcBox" x="160" y="100" width="80" height="80">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="arcTurn" duration="60" frameRate="60" loop="once">
+      <Object target="arcBox">
+        <Channel name="matrix" type="matrix">
+          <Key time="0" value="-0.9848,0.1736,-0.1736,-0.9848,0,0" interpolation="linear"/>
+          <Key time="60" value="-0.9848,-0.1736,0.1736,-0.9848,0,0" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

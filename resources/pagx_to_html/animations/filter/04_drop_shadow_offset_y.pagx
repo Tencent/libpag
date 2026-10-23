@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: DropShadowFilter offsetY moves a hard shadow from behind the box to below it.
+     Target: DropShadowFilter  Channel: offsetY  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer x="110" y="40" width="100" height="60">
+    <Rectangle position="50,30" size="100,60" roundness="8"/>
+    <Fill color="#2563EB"/>
+    <DropShadowFilter id="shadowOffsetY" offsetX="0" offsetY="0" blurX="0" blurY="0" color="#1E3A8A"/>
+  </Layer>
+  <Animations>
+    <Animation id="shadowSlideY" duration="60" frameRate="60" loop="once">
+      <Object target="shadowOffsetY">
+        <Channel name="offsetY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="80" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

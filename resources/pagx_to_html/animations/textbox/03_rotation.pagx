@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox rotation turns the laid out text around the text area origin.
+     Target: TextBox  Channel: rotation  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <TextBox id="spinTextBox" left="110" top="80" width="140" height="48" rotation="0">
+      <Text text="AB" fontFamily="Arial" fontSize="32"/>
+      <Fill color="#1D4ED8"/>
+    </TextBox>
+  </Layer>
+  <Animations>
+    <Animation id="textBoxSpin" duration="60" frameRate="60" loop="once">
+      <Object target="spinTextBox">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="45" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: when the first key sits at frame 30 the channel holds that value for the frames before it.
+     Target: Layer  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="lateKeyBox" x="120" y="60" width="80" height="80">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="lateKeyFade" duration="120" frameRate="60" loop="once">
+      <Object target="lateKeyBox">
+        <Channel name="alpha" type="float">
+          <Key time="30" value="0.2" interpolation="linear"/>
+          <Key time="120" value="1" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

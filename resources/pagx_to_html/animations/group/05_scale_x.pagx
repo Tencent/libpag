@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group scale.x stretches the group contents horizontally while the height stays fixed.
+     Target: Group  Channel: scale.x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="scaleGroupX" position="100,60" scale="1,1">
+      <Rectangle size="80,80" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupStretchX" duration="60" frameRate="60" loop="once">
+      <Object target="scaleGroupX">
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="2" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

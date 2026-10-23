@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a bezier alpha channel with keys only at 0 and 60 shares one object with a linear x
+     channel that carries an extra key at 30, so the two channels must split into separate
+     keyframe timelines.
+     Target: Layer  Channel: alpha,x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="splitBox" x="40" y="60" width="80" height="80">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="splitChannels" duration="60" frameRate="60" loop="once">
+      <Object target="splitBox">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.2" interpolation="bezier" bezierOut="0.42,0"/>
+          <Key time="60" value="1" bezierIn="0.58,1"/>
+        </Channel>
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="30" value="160" interpolation="linear"/>
+          <Key time="60" value="240" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

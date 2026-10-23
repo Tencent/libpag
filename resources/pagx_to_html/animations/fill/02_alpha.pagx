@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Fill alpha fades a solid fill from 0.2 to fully opaque over the background.
+     Target: Fill  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="160,120" roundness="8"/>
+    <Fill id="alphaFill" color="#2563EB" alpha="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="fillAlphaFade" duration="60" frameRate="60" loop="once">
+      <Object target="alphaFill">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.2" interpolation="linear"/>
+          <Key time="60" value="1" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
