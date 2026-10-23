@@ -193,7 +193,7 @@ body {
 .hd .chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 11px; padding: 2px 9px; border-radius: 999px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .chip.pass { background: #dcfce7; color: #166534; }
-.chip.fail { background: #fee2e2; color: #991b1b; font-weight: 600; }
+.chip.fail { background: #fee2e2; color: #991b1b; }
 .chip.info { background: #f1f5f9; color: #475569; }
 .chip.warn { background: #fef9c3; color: #854d0e; }
 .cmp { display: flex; }

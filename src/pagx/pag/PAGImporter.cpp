@@ -36,13 +36,18 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
 #include "pagx/pag/PAGFileHeader.h"
@@ -190,20 +195,22 @@ Path* ReadPathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   bool hasPosX = reader.flag(1);
   bool hasPosY = reader.flag(2);
   path->reversed = reader.flag(3);
+  uint32_t dataRef = 0;
   if (hasData) {
-    auto dataRef = tagStream->readEncodedUint32();
-    if (dataRef == 0) {
-      auto csHeader = ReadPAGTagHeader(tagStream);
-      auto csBytes = tagStream->readBytes(csHeader.length);
-      if (csHeader.code == TagCode::PathData) {
-        auto* pathData = context->document->makeNode<PathData>();
-        ReadPAGPath(&csBytes, pathData);
-        path->data = pathData;
-      }
-    }
+    dataRef = tagStream->readEncodedUint32();
   }
   if (hasPosX) path->position.x = tagStream->readFloat();
   if (hasPosY) path->position.y = tagStream->readFloat();
+  // The inline PathData sub-tag sits at the value-area END (spec §9.0).
+  if (hasData && dataRef == 0) {
+    auto dataHeader = ReadPAGTagHeader(tagStream);
+    auto dataBytes = tagStream->readBytes(dataHeader.length);
+    if (dataHeader.code == TagCode::PathData) {
+      auto* pathData = context->document->makeNode<PathData>();
+      ReadPAGPath(&dataBytes, pathData);
+      path->data = pathData;
+    }
+  }
   return path;
 }
 
@@ -377,6 +384,93 @@ ColorSource* ReadColorSourceTag(pag::DecodeStream* tagStream, TagCode code,
   }
 }
 
+Element* ReadPolystarTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* polystar = context->document->makeNode<Polystar>();
+  PAGAttributeBlockReader reader(tagStream, 10);
+  bool hasPosX = reader.flag(0);
+  bool hasPosY = reader.flag(1);
+  bool hasType = reader.flag(2);
+  bool hasPointCount = reader.flag(3);
+  bool hasOuterRadius = reader.flag(4);
+  bool hasInnerRadius = reader.flag(5);
+  bool hasRotation = reader.flag(6);
+  bool hasOuterRoundness = reader.flag(7);
+  bool hasInnerRoundness = reader.flag(8);
+  polystar->reversed = reader.flag(9);
+  if (hasPosX) polystar->position.x = tagStream->readFloat();
+  if (hasPosY) polystar->position.y = tagStream->readFloat();
+  if (hasType) polystar->type = static_cast<PolystarType>(tagStream->readUint8());
+  if (hasPointCount) polystar->pointCount = tagStream->readFloat();
+  if (hasOuterRadius) polystar->outerRadius = tagStream->readFloat();
+  if (hasInnerRadius) polystar->innerRadius = tagStream->readFloat();
+  if (hasRotation) polystar->rotation = tagStream->readFloat();
+  if (hasOuterRoundness) polystar->outerRoundness = tagStream->readFloat();
+  if (hasInnerRoundness) polystar->innerRoundness = tagStream->readFloat();
+  return polystar;
+}
+
+Element* ReadTrimPathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* trim = context->document->makeNode<TrimPath>();
+  PAGAttributeBlockReader reader(tagStream, 4);
+  bool hasStart = reader.flag(0);
+  bool hasEnd = reader.flag(1);
+  bool hasOffset = reader.flag(2);
+  bool hasType = reader.flag(3);
+  if (hasStart) trim->start = tagStream->readFloat();
+  if (hasEnd) trim->end = tagStream->readFloat();
+  if (hasOffset) trim->offset = tagStream->readFloat();
+  if (hasType) trim->type = static_cast<TrimType>(tagStream->readUint8());
+  return trim;
+}
+
+Element* ReadRoundCornerTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* round = context->document->makeNode<RoundCorner>();
+  PAGAttributeBlockReader reader(tagStream, 1);
+  if (reader.flag(0)) round->radius = tagStream->readFloat();
+  return round;
+}
+
+Element* ReadMergePathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* merge = context->document->makeNode<MergePath>();
+  PAGAttributeBlockReader reader(tagStream, 1);
+  if (reader.flag(0)) merge->mode = static_cast<MergePathMode>(tagStream->readUint8());
+  return merge;
+}
+
+Element* ReadTextPathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* textPath = context->document->makeNode<TextPath>();
+  PAGAttributeBlockReader reader(tagStream, 9);
+  bool hasPath = reader.flag(0);
+  bool hasOriginX = reader.flag(1);
+  bool hasOriginY = reader.flag(2);
+  bool hasAngle = reader.flag(3);
+  bool hasFirstMargin = reader.flag(4);
+  bool hasLastMargin = reader.flag(5);
+  bool notPerpendicular = reader.flag(6);
+  textPath->reversed = reader.flag(7);
+  textPath->forceAlignment = reader.flag(8);
+  uint32_t pathRef = 0;
+  if (hasPath) {
+    pathRef = tagStream->readEncodedUint32();
+  }
+  if (hasOriginX) textPath->baselineOrigin.x = tagStream->readFloat();
+  if (hasOriginY) textPath->baselineOrigin.y = tagStream->readFloat();
+  if (hasAngle) textPath->baselineAngle = tagStream->readFloat();
+  if (hasFirstMargin) textPath->firstMargin = tagStream->readFloat();
+  if (hasLastMargin) textPath->lastMargin = tagStream->readFloat();
+  if (notPerpendicular) textPath->perpendicular = tagStream->readBoolean();
+  if (hasPath && pathRef == 0) {
+    auto dataHeader = ReadPAGTagHeader(tagStream);
+    auto dataBytes = tagStream->readBytes(dataHeader.length);
+    if (dataHeader.code == TagCode::PathData) {
+      auto* pathData = context->document->makeNode<PathData>();
+      ReadPAGPath(&dataBytes, pathData);
+      textPath->path = pathData;
+    }
+  }
+  return textPath;
+}
+
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* fill = context->document->makeNode<Fill>();
   PAGAttributeBlockReader reader(tagStream, 5);
@@ -385,18 +479,21 @@ Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   bool hasBlend = reader.flag(2);
   bool hasFillRule = reader.flag(3);
   bool hasPlacement = reader.flag(4);
+  // The color reference is a value-area entry; the inline color source sub-tag it may point
+  // to sits at the value-area END (spec §9.0), so it is read after all values below.
+  uint32_t colorRef = 0;
   if (hasColor) {
-    auto colorRef = tagStream->readEncodedUint32();
-    if (colorRef == 0) {
-      auto csHeader = ReadPAGTagHeader(tagStream);
-      auto csBytes = tagStream->readBytes(csHeader.length);
-      fill->color = ReadColorSourceTag(&csBytes, csHeader.code, context);
-    }
+    colorRef = tagStream->readEncodedUint32();
   }
   if (hasAlpha) fill->alpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
   if (hasBlend) fill->blendMode = static_cast<BlendMode>(tagStream->readUint8());
   if (hasFillRule) fill->fillRule = static_cast<FillRule>(tagStream->readUint8());
   if (hasPlacement) fill->placement = static_cast<LayerPlacement>(tagStream->readUint8());
+  if (hasColor && colorRef == 0) {
+    auto csHeader = ReadPAGTagHeader(tagStream);
+    auto csBytes = tagStream->readBytes(csHeader.length);
+    fill->color = ReadColorSourceTag(&csBytes, csHeader.code, context);
+  }
   return fill;
 }
 
@@ -415,13 +512,9 @@ Element* ReadStrokeTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   stroke->dashAdaptive = reader.flag(9);
   bool hasAlign = reader.flag(10);
   bool hasPlacement = reader.flag(11);
+  uint32_t colorRef = 0;
   if (hasColor) {
-    auto colorRef = tagStream->readEncodedUint32();
-    if (colorRef == 0) {
-      auto csHeader = ReadPAGTagHeader(tagStream);
-      auto csBytes = tagStream->readBytes(csHeader.length);
-      stroke->color = ReadColorSourceTag(&csBytes, csHeader.code, context);
-    }
+    colorRef = tagStream->readEncodedUint32();
   }
   if (hasWidth) stroke->width = tagStream->readFloat();
   if (hasAlpha) stroke->alpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
@@ -441,6 +534,12 @@ Element* ReadStrokeTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   if (hasDashOffset) stroke->dashOffset = tagStream->readFloat();
   if (hasAlign) stroke->align = static_cast<StrokeAlign>(tagStream->readUint8());
   if (hasPlacement) stroke->placement = static_cast<LayerPlacement>(tagStream->readUint8());
+  // The inline color source sub-tag sits at the value-area END (spec §9.0).
+  if (hasColor && colorRef == 0) {
+    auto csHeader = ReadPAGTagHeader(tagStream);
+    auto csBytes = tagStream->readBytes(csHeader.length);
+    stroke->color = ReadColorSourceTag(&csBytes, csHeader.code, context);
+  }
   return stroke;
 }
 
@@ -696,6 +795,16 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
       return ReadRectangleTag(tagStream, context);
     case TagCode::Ellipse:
       return ReadEllipseTag(tagStream, context);
+    case TagCode::Polystar:
+      return ReadPolystarTag(tagStream, context);
+    case TagCode::TrimPath:
+      return ReadTrimPathTag(tagStream, context);
+    case TagCode::RoundCorner:
+      return ReadRoundCornerTag(tagStream, context);
+    case TagCode::MergePath:
+      return ReadMergePathTag(tagStream, context);
+    case TagCode::TextPath:
+      return ReadTextPathTag(tagStream, context);
     case TagCode::Path:
       return ReadPathTag(tagStream, context);
     case TagCode::Fill:

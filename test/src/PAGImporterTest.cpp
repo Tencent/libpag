@@ -36,6 +36,8 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
@@ -565,6 +567,55 @@ PAGX_TEST(PAGImporterTest, MissingSubDocumentWarnsAndExportsEmpty) {
   RenderToPixels(doc, &pixelsA, width, height);
   RenderToPixels(decoded, &pixelsB, width, height);
   EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, StrokeWithDashesRoundTrip) {
+  // Regression: a Stroke whose value area carries more than the color reference (dashes)
+  // must keep the inline color source sub-tag at the value-area END (spec §9.0). The
+  // decoder used to read the sub-tag right after the colorRef and desynced on the dashes.
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 80;
+  rect->size.height = 80;
+  layer->contents.push_back(rect);
+  auto* stroke = doc->makeNode<Stroke>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.8f, 0.84f, 0.88f, 1.0f, ColorSpace::SRGB};
+  stroke->color = solid;
+  stroke->width = 2.0f;
+  stroke->dashes = {4.0f, 3.0f};
+  layer->contents.push_back(stroke);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/stroke_dashes.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/stroke_dashes.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  auto* decodedStroke = static_cast<Stroke*>(decoded->layers[0]->contents[1]);
+  ASSERT_TRUE(decodedStroke->color != nullptr);
+  auto* decodedSolid = static_cast<SolidColor*>(decodedStroke->color);
+  EXPECT_NEAR(decodedSolid->color.red, 0.8f, 0.01f);
+  EXPECT_EQ(decodedStroke->width, 2.0f);
+  ASSERT_EQ(decodedStroke->dashes.size(), 2u);
+  EXPECT_EQ(decodedStroke->dashes[0], 4.0f);
+  EXPECT_EQ(decodedStroke->dashes[1], 3.0f);
+
+  // Fill with extra values after the color reference (alpha) hits the same layout.
+  auto* fill = doc->makeNode<Fill>();
+  auto* fillSolid = doc->makeNode<SolidColor>();
+  fillSolid->color = {0.2f, 0.4f, 0.9f, 1.0f, ColorSpace::SRGB};
+  fill->color = fillSolid;
+  fill->alpha = 0.5f;
+  layer->contents.push_back(fill);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/fill_alpha.pag").success);
+  auto decodedFill = PAGImporter::LoadFromPAG("/tmp/fill_alpha.pag");
+  ASSERT_TRUE(decodedFill != nullptr);
+  auto* fillBack = static_cast<Fill*>(decodedFill->layers[0]->contents[2]);
+  ASSERT_TRUE(fillBack->color != nullptr);
+  EXPECT_NEAR(static_cast<SolidColor*>(fillBack->color)->color.blue, 0.9f, 0.01f);
+  EXPECT_NEAR(fillBack->alpha, 0.5f, 0.01f);
 }
 
 PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {

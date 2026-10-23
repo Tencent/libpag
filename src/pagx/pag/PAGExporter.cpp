@@ -38,15 +38,19 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
 #include "pagx/pag/PAGFileHeader.h"
@@ -535,6 +539,114 @@ bool WriteColorSourceInline(pag::EncodeStream* content, ColorSource* source, Enc
   }
 }
 
+// Polystar tag (spec §9.3 #418): 10 exist bits, position defaults NaN.
+void WritePolystarTag(pag::EncodeStream* stream, Polystar* polystar, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasPosX = !std::isnan(polystar->position.x);
+  auto hasPosY = !std::isnan(polystar->position.y);
+  writer.writeFlag(hasPosX);
+  writer.writeFlag(hasPosY);
+  writer.writeFlag(polystar->type != PolystarType::Star);
+  writer.writeFlag(polystar->pointCount != 5.0f);
+  writer.writeFlag(polystar->outerRadius != 100.0f);
+  writer.writeFlag(polystar->innerRadius != 50.0f);
+  writer.writeFlag(polystar->rotation != 0.0f);
+  writer.writeFlag(polystar->outerRoundness != 0.0f);
+  writer.writeFlag(polystar->innerRoundness != 0.0f);
+  writer.writeFlag(polystar->reversed);
+  auto* v = writer.valueStream();
+  if (hasPosX) v->writeFloat(polystar->position.x);
+  if (hasPosY) v->writeFloat(polystar->position.y);
+  if (polystar->type != PolystarType::Star) {
+    v->writeUint8(static_cast<uint8_t>(polystar->type));
+  }
+  if (polystar->pointCount != 5.0f) v->writeFloat(polystar->pointCount);
+  if (polystar->outerRadius != 100.0f) v->writeFloat(polystar->outerRadius);
+  if (polystar->innerRadius != 50.0f) v->writeFloat(polystar->innerRadius);
+  if (polystar->rotation != 0.0f) v->writeFloat(polystar->rotation);
+  if (polystar->outerRoundness != 0.0f) v->writeFloat(polystar->outerRoundness);
+  if (polystar->innerRoundness != 0.0f) v->writeFloat(polystar->innerRoundness);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::Polystar, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// TrimPath tag (spec §9.3 #425).
+void WriteTrimPathTag(pag::EncodeStream* stream, TrimPath* trim, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(trim->start != 0.0f);
+  writer.writeFlag(trim->end != 1.0f);
+  writer.writeFlag(trim->offset != 0.0f);
+  writer.writeFlag(trim->type != TrimType::Separate);
+  auto* v = writer.valueStream();
+  if (trim->start != 0.0f) v->writeFloat(trim->start);
+  if (trim->end != 1.0f) v->writeFloat(trim->end);
+  if (trim->offset != 0.0f) v->writeFloat(trim->offset);
+  if (trim->type != TrimType::Separate) v->writeUint8(static_cast<uint8_t>(trim->type));
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::TrimPath, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// RoundCorner tag (spec §9.3 #426).
+void WriteRoundCornerTag(pag::EncodeStream* stream, RoundCorner* round, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(round->radius != 10.0f);
+  auto* v = writer.valueStream();
+  if (round->radius != 10.0f) v->writeFloat(round->radius);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::RoundCorner, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// MergePath tag (spec §9.3 #427).
+void WriteMergePathTag(pag::EncodeStream* stream, MergePath* merge, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(merge->mode != MergePathMode::Append);
+  auto* v = writer.valueStream();
+  if (merge->mode != MergePathMode::Append) {
+    v->writeUint8(static_cast<uint8_t>(merge->mode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::MergePath, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// TextPath tag (spec §9.3 #430): 9 exist bits; the inline PathData sub-tag sits at the
+// value-area end.
+void WriteTextPathTag(pag::EncodeStream* stream, TextPath* textPath, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasPath = textPath->path != nullptr;
+  writer.writeFlag(hasPath);
+  writer.writeFlag(textPath->baselineOrigin.x != 0.0f);
+  writer.writeFlag(textPath->baselineOrigin.y != 0.0f);
+  writer.writeFlag(textPath->baselineAngle != 0.0f);
+  writer.writeFlag(textPath->firstMargin != 0.0f);
+  writer.writeFlag(textPath->lastMargin != 0.0f);
+  writer.writeFlag(!textPath->perpendicular);
+  writer.writeFlag(textPath->reversed);
+  writer.writeFlag(textPath->forceAlignment);
+  auto* v = writer.valueStream();
+  if (hasPath) {
+    v->writeEncodedUint32(0);  // 0 = inline path data
+  }
+  if (textPath->baselineOrigin.x != 0.0f) v->writeFloat(textPath->baselineOrigin.x);
+  if (textPath->baselineOrigin.y != 0.0f) v->writeFloat(textPath->baselineOrigin.y);
+  if (textPath->baselineAngle != 0.0f) v->writeFloat(textPath->baselineAngle);
+  if (textPath->firstMargin != 0.0f) v->writeFloat(textPath->firstMargin);
+  if (textPath->lastMargin != 0.0f) v->writeFloat(textPath->lastMargin);
+  if (!textPath->perpendicular) v->writeBoolean(textPath->perpendicular);
+  auto block = writer.release();
+  pag::EncodeStream content(&state->streamContext);
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  if (hasPath) {
+    pag::EncodeStream pathTag(&state->streamContext);
+    WritePAGPath(&pathTag, textPath->path, 0);
+    WriteTag(&content, TagCode::PathData, &pathTag);
+  }
+  WriteTag(stream, TagCode::TextPath, &content);
+}
+
 // Writes a Fill tag. The content is the attribute block (colorRef varuint in the value area)
 // followed by the inline color source sub-tag at the value-area end (spec §10.3), so the
 // declared tag length covers both.
@@ -969,6 +1081,21 @@ void WriteElementTag(pag::EncodeStream* stream, Element* element, EncodeState* s
       break;
     case NodeType::Ellipse:
       WriteEllipseTag(stream, static_cast<Ellipse*>(element), state);
+      break;
+    case NodeType::Polystar:
+      WritePolystarTag(stream, static_cast<Polystar*>(element), state);
+      break;
+    case NodeType::TrimPath:
+      WriteTrimPathTag(stream, static_cast<TrimPath*>(element), state);
+      break;
+    case NodeType::RoundCorner:
+      WriteRoundCornerTag(stream, static_cast<RoundCorner*>(element), state);
+      break;
+    case NodeType::MergePath:
+      WriteMergePathTag(stream, static_cast<MergePath*>(element), state);
+      break;
+    case NodeType::TextPath:
+      WriteTextPathTag(stream, static_cast<TextPath*>(element), state);
       break;
     case NodeType::Path:
       WritePathTag(stream, static_cast<Path*>(element), state);
