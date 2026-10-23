@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  or required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,21 +25,23 @@
 namespace pagx {
 
 /**
- * Data holds an immutable byte buffer.
+ * Data holds an immutable byte buffer. Slice variants reference a parent buffer and keep it
+ * alive; the parent stays resident for the slice's whole lifetime (the v4 decoder relies on
+ * this for zero-copy image references, spec §5.1).
  */
 class Data {
  public:
-  /**
-   * Creates a Data object by copying the specified data.
-   */
   static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
 
-  /**
-   * Creates a Data object that takes ownership of the given buffer.
-   * @param data A buffer allocated with new[]. Data takes ownership and will delete[] it.
-   * @param length The byte size of the buffer.
-   */
   static std::shared_ptr<Data> MakeAdopt(uint8_t* data, size_t length);
+
+  /**
+   * Creates a Data slice referencing [offset, offset+length) inside the parent buffer. The
+   * parent buffer stays alive for the slice's whole lifetime. Returns nullptr when the
+   * range is out of bounds.
+   */
+  static std::shared_ptr<Data> MakeSlice(std::shared_ptr<Data> parent, size_t offset,
+                                         size_t length);
 
   ~Data();
 
@@ -48,30 +50,18 @@ class Data {
   Data(Data&&) = delete;
   Data& operator=(Data&&) = delete;
 
-  /**
-   * Returns the memory address of the data.
-   */
   const void* data() const {
     return _data;
   }
 
-  /**
-   * Returns the read-only memory address of the data cast to uint8_t*.
-   */
   const uint8_t* bytes() const {
     return _data;
   }
 
-  /**
-   * Returns the byte size.
-   */
   size_t size() const {
     return _size;
   }
 
-  /**
-   * Returns true if the Data is empty.
-   */
   bool empty() const {
     return _size == 0;
   }
@@ -79,7 +69,11 @@ class Data {
  private:
   Data(const void* data, size_t length);
   Data(uint8_t* data, size_t length, bool adopt);
+  Data(std::shared_ptr<Data> parent, size_t offset, size_t length);
 
+  // Non-null for slices; keeps the parent buffer alive and marks the destructor not to free
+  // the borrowed pointer.
+  std::shared_ptr<Data> _parent = {};
   const uint8_t* _data = nullptr;
   size_t _size = 0;
 };

@@ -32,7 +32,7 @@
 - **验收**：T10 场景用例（textAnchor×3、缩放 Text、TextBox 自动高度、逐点通道缩放 Path、
   clipToBounds、布局通道动画告警）；扁平化前后逐像素一致。
 
-### T3 剥离与资源收集（依赖 T2）
+### T3 剥离与资源收集（依赖 T2）✅ 已完成（2026-10-22，70a835d1d）
 - 新增 `src/pagx/pag/exporter/Stripper.cpp`：§4.6 清单（data-* 三处保留、id 按保留集、死节点、
   资源合并）；存活根 = 渲染树（§12.2 预留"被引用目标"根）。
 - 新增 `src/pagx/pag/exporter/ResourceCollector.cpp`：字符串表/资源表收集、首次引用顺序、
