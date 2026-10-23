@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Fill color animates from blue to orange on a solid white rectangle.
+     Target: Fill  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="160,120" roundness="8"/>
+    <Fill id="colorFill" color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="fillColorShift" duration="60" frameRate="60" loop="once">
+      <Object target="colorFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

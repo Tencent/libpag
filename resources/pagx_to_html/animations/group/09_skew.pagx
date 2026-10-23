@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group skew shears the group contents along the default skew axis.
+     Target: Group  Channel: skew  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="skewGroup" position="120,60" skew="0">
+      <Rectangle size="80,80" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupSkew" duration="60" frameRate="60" loop="once">
+      <Object target="skewGroup">
+        <Channel name="skew" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="45" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

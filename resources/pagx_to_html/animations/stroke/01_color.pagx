@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke color animates from blue to orange on a thick outline.
+     Target: Stroke  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="160,120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <Stroke id="colorStroke" color="#2563EB" width="12"/>
+  </Layer>
+  <Animations>
+    <Animation id="strokeColorShift" duration="60" frameRate="60" loop="once">
+      <Object target="colorStroke">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

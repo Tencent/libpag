@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group anchor.x shifts the group contents because the content is translated by the
+     negated anchor before the position is applied.
+     Target: Group  Channel: anchor.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="anchorGroupX" position="180,60" anchor="0,0">
+      <Rectangle size="80,80" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupAnchorMove" duration="60" frameRate="60" loop="once">
+      <Object target="anchorGroupX">
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="80" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

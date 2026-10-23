@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a contour mask Path collapses by moving its two right edge points on the x axis, so the
+     masked content is fully visible at the start and almost fully clipped at the end.
+     Target: Path  Channel: point1.x,point2.x  Type: float
+     Expect: supported
+     Ref: test/src/PAGXTest.cpp:11010 -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Layer id="clipMask" visible="false">
+      <Path id="clipPath" data="M 40 20 L 280 20 L 280 180 L 40 180 Z"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer mask="@clipMask" maskType="contour">
+      <Rectangle position="160,100" size="240,160"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+  </Layer>
+  <Animations>
+    <Animation id="clipCollapse" duration="60" frameRate="60" loop="once">
+      <Object target="clipPath">
+        <Channel name="point1.x" type="float">
+          <Key time="0" value="280" interpolation="linear"/>
+          <Key time="60" value="40" interpolation="linear"/>
+        </Channel>
+        <Channel name="point2.x" type="float">
+          <Key time="0" value="280" interpolation="linear"/>
+          <Key time="60" value="40" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a keyframed color that already carries half alpha is multiplied by the static Fill
+     alpha of 0.5, so the animated fill must never exceed a quarter opacity.
+     Target: Fill  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="160,120" roundness="8"/>
+    <Fill id="tintedFill" color="#2563EB80" alpha="0.5"/>
+  </Layer>
+  <Animations>
+    <Animation id="fillTintShift" duration="60" frameRate="60" loop="once">
+      <Object target="tintedFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB80" interpolation="linear"/>
+          <Key time="60" value="#F9731680" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TrimPath end shrinks from the whole outline to nothing, revealing the stroke
+     progressively along the path.
+     Target: TrimPath  Channel: end  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="240,140" roundness="16"/>
+    <TrimPath id="trimPath" start="0" end="1" type="separate"/>
+    <Stroke color="#2563EB" width="12" cap="round"/>
+  </Layer>
+  <Animations>
+    <Animation id="trimRetract" duration="60" frameRate="60" loop="once">
+      <Object target="trimPath">
+        <Channel name="end" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

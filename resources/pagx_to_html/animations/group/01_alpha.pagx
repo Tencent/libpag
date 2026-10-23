@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group alpha fades the group contents from 0.2 to fully opaque.
+     Target: Group  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="fadeGroup" position="120,60" alpha="1">
+      <Rectangle size="80,80" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupFade" duration="60" frameRate="60" loop="once">
+      <Object target="fadeGroup">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.2" interpolation="linear"/>
+          <Key time="60" value="1" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

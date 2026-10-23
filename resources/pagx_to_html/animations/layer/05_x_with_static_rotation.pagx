@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: an animated x channel stacks on top of a static 30 degree matrix instead of replacing it.
+     Target: Layer  Channel: x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="tiltBox" x="40" y="80" width="80" height="80" matrix="0.866,0.5,-0.5,0.866,0,0">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="tiltSlide" duration="60" frameRate="60" loop="once">
+      <Object target="tiltBox">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="160" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

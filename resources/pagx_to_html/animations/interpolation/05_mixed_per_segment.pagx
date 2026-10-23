@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: one channel mixes a linear segment, a bezier segment and a hold segment in that order.
+     Target: Layer  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="mixedBox" x="120" y="60" width="80" height="80">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="mixedFade" duration="180" frameRate="60" loop="once">
+      <Object target="mixedBox">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.2" interpolation="linear"/>
+          <Key time="60" value="0.5" interpolation="bezier" bezierOut="0.42,0"/>
+          <Key time="120" value="0.8" interpolation="hold" bezierIn="0.58,1"/>
+          <Key time="180" value="1" interpolation="hold"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Ellipse size.width stretches the ellipse horizontally around its center position.
+     Target: Ellipse  Channel: size.width  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse id="growEllipse" position="160,100" size="80,120"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="ellipseWidthGrow" duration="60" frameRate="60" loop="once">
+      <Object target="growEllipse">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="80" interpolation="linear"/>
+          <Key time="60" value="240" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

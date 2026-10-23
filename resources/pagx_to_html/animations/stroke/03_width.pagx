@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke width grows from a thin outline to a heavy outline on the same rectangle.
+     Target: Stroke  Channel: width  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="160,120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <Stroke id="widthStroke" color="#2563EB" width="4"/>
+  </Layer>
+  <Animations>
+    <Animation id="strokeWidthGrow" duration="60" frameRate="60" loop="once">
+      <Object target="widthStroke">
+        <Channel name="width" type="float">
+          <Key time="0" value="4" interpolation="linear"/>
+          <Key time="60" value="24" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
