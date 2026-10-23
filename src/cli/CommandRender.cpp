@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
@@ -35,6 +36,7 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExternalFiles.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
@@ -339,6 +341,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
     return {};
   }
+  // Load external sub PAGX files and images from the input's directory (interface draft §5) so
+  // locally rendered XML documents show the same sub-document content as an exported v4 file.
+  // Decoded v4 documents are self-contained, so the call is a no-op for them.
+  auto baseDir = std::filesystem::path(options.inputFile).parent_path().string();
+  PAGXExternalFiles::Load(document.get(), baseDir);
 
   FontConfig fontConfig = {};
   if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
