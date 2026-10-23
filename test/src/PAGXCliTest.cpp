@@ -35,6 +35,7 @@
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
+#include "pagx/PAGImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -42,6 +43,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -3757,6 +3759,96 @@ CLI_TEST(PAGXCliTest, Embed_Usage_NoInputErrors_HelpPrints) {
   EXPECT_NE(helpOutput.find("Usage: pagx embed"), std::string::npos);
   EXPECT_NE(helpOutput.find("--skip-fonts"), std::string::npos);
   EXPECT_NE(helpOutput.find("--skip-images"), std::string::npos);
+}
+
+// T9: pagx export --format pag writes a valid v4 binary that decodes back.
+CLI_TEST(PAGXCliTest, Export_PagSmoke) {
+  auto inputPath = CopyResourceToTemp("resources/pagx_to_pag/static_animated/pure_static.pagx",
+                                      "export_pag_smoke.pagx");
+  auto outputPath = TempDir() + "/export_pag_smoke.pag";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_EQ(pagx::PAGImporter::DetectFormat(outputPath), pagx::PAGFormat::PAGv4);
+  auto decoded = pagx::PAGImporter::LoadFromPAG(outputPath);
+  EXPECT_TRUE(decoded != nullptr);
+}
+
+// T9: --report writes a deterministic JSON report; two exports produce identical bytes.
+CLI_TEST(PAGXCliTest, Export_PagReportDeterministic) {
+  auto inputPath = CopyResourceToTemp("resources/pagx_to_pag/static_animated/pure_static.pagx",
+                                      "export_pag_report.pagx");
+  auto outputPath = TempDir() + "/export_pag_report.pag";
+  auto reportA = TempDir() + "/export_pag_report_a.json";
+  auto reportB = TempDir() + "/export_pag_report_b.json";
+  auto ret = CallRun(pagx::cli::RunExport,
+                     {"export", "--input", inputPath, "--output", outputPath, "--report", reportA});
+  EXPECT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunExport,
+                {"export", "--input", inputPath, "--output", outputPath, "--report", reportB});
+  EXPECT_EQ(ret, 0);
+  auto reportContent = ReadFile(reportA);
+  EXPECT_TRUE(reportContent.find("compressionRatio") != std::string::npos);
+  EXPECT_TRUE(reportContent.find("documents") != std::string::npos);
+  EXPECT_TRUE(reportContent.find("input") != std::string::npos);
+  EXPECT_EQ(reportContent, ReadFile(reportB));
+}
+
+// T9: external sub PAGX files load from the input's directory and survive the export.
+CLI_TEST(PAGXCliTest, Export_PagSubDocuments) {
+  CopyResourceToTemp("resources/pagx_to_pag/sub_document/nested/main.pagx", "nested_main.pagx");
+  CopyResourceToTemp("resources/pagx_to_pag/sub_document/nested/mid.pagx", "mid.pagx");
+  CopyResourceToTemp("resources/pagx_to_pag/sub_document/nested/leaf.pagx", "leaf.pagx");
+  auto inputPath = TempDir() + "/nested_main.pagx";
+  auto outputPath = TempDir() + "/nested_main.pag";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto decoded = pagx::PAGImporter::LoadFromPAG(outputPath);
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  EXPECT_TRUE(decoded->layers[0]->externalDoc != nullptr);
+  EXPECT_TRUE(decoded->layers[0]->externalDoc->layers[1]->externalDoc != nullptr);
+}
+
+// T9: --strict turns warnings into failures; without it the export succeeds with the layer in
+// its empty "unloaded" state.
+CLI_TEST(PAGXCliTest, Export_PagStrictFailsOnMissing) {
+  auto inputPath = CopyResourceToTemp("resources/pagx_to_pag/sub_document/missing_reference.pagx",
+                                      "export_missing.pagx");
+  auto outputPath = TempDir() + "/export_missing.pag";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunExport,
+                {"export", "--input", inputPath, "--output", outputPath, "--strict"});
+  EXPECT_NE(ret, 0);
+}
+
+// T9: pagx verify accepts a v4 binary input (decoded, then checked against PAGX rules).
+CLI_TEST(PAGXCliTest, Verify_AcceptsV4) {
+  auto inputPath = CopyResourceToTemp("resources/pagx_to_pag/static_animated/pure_static.pagx",
+                                      "verify_v4.pagx");
+  auto outputPath = TempDir() + "/verify_v4.pag";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", outputPath});
+  EXPECT_EQ(ret, 0);
+}
+
+// T9: pagx render accepts a v4 binary input and produces the frame image.
+CLI_TEST(PAGXCliTest, Render_AcceptsV4) {
+  auto inputPath = CopyResourceToTemp("resources/pagx_to_pag/static_animated/pure_static.pagx",
+                                      "render_v4.pagx");
+  auto outputPath = TempDir() + "/render_v4.pag";
+  auto pngPath = TempDir() + "/render_v4.png";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  ret = CallRun(pagx::cli::RunRender, {"render", "-o", pngPath, outputPath});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(pngPath));
 }
 
 }  // namespace pag

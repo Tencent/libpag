@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/FontRegistration.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
@@ -40,33 +41,6 @@ inline size_t FindLastPathSeparator(const std::string& path) {
   if (slash == std::string::npos) return backslash;
   if (backslash == std::string::npos) return slash;
   return std::max(slash, backslash);
-}
-
-/**
- * Resolves a fallback font specifier to a Typeface. Accepts either a font file path (containing
- * a path separator or ending with a known font extension) or a font name in "family[,style]" format.
- */
-inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string& specifier) {
-  bool isFilePath =
-      specifier.find('/') != std::string::npos || specifier.find('\\') != std::string::npos;
-  if (!isFilePath) {
-    auto dot = specifier.rfind('.');
-    if (dot != std::string::npos) {
-      auto ext = specifier.substr(dot);
-      for (auto& ch : ext) {
-        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-      }
-      isFilePath =
-          ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" || ext == ".woff2";
-    }
-  }
-  if (isFilePath) {
-    return tgfx::Typeface::MakeFromPath(specifier);
-  }
-  auto commaPos = specifier.find(',');
-  auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
-  auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
-  return SystemFonts::ResolveTypeface(family, style);
 }
 
 /**

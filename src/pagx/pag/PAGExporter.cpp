@@ -19,8 +19,10 @@
 #include "pagx/PAGExporter.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <unordered_map>
+#include "pagx/FontRegistration.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -1071,6 +1073,185 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
 
 }  // namespace
 
+// True when any Font node carries a file declaration, meaning export-time text measurement
+// should register them before laying out.
+bool DocumentDeclaresFontFiles(PAGXDocument* document) {
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Font && !static_cast<Font*>(node.get())->file.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Counts the layers of the given document that reference a sub-document entry.
+int CountSubDocumentReferences(PAGXDocument* document,
+                               const std::unordered_map<const Layer*, uint32_t>& layerRefs) {
+  int count = 0;
+  for (auto* layer : document->layers) {
+    if (layerRefs.count(layer) > 0) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Counts the Image nodes owned by the document.
+int CountImageNodes(PAGXDocument* document) {
+  int count = 0;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      count++;
+    }
+  }
+  return count;
+}
+
+std::string JsonEscape(const std::string& text) {
+  std::string escaped = {};
+  escaped.reserve(text.size());
+  for (char ch : text) {
+    if (ch == '"' || ch == '\\') {
+      escaped += '\\';
+      escaped += ch;
+    } else if (static_cast<unsigned char>(ch) < 0x20) {
+      char buffer[8] = {};
+      snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned char>(ch));
+      escaped += buffer;
+    } else {
+      escaped += ch;
+    }
+  }
+  return escaped;
+}
+
+std::string WarningCodeName(PAGExportWarning code) {
+  switch (code) {
+    case PAGExportWarning::MissingFont:
+      return "MissingFont";
+    case PAGExportWarning::MissingImage:
+      return "MissingImage";
+    case PAGExportWarning::MissingSubDocument:
+      return "MissingSubDocument";
+    case PAGExportWarning::UnsupportedURL:
+      return "UnsupportedURL";
+    case PAGExportWarning::AnimatedContentSkipped:
+      return "AnimatedContentSkipped";
+    case PAGExportWarning::LayoutChannelDropped:
+      return "LayoutChannelDropped";
+    case PAGExportWarning::MixedEmbeddedText:
+      return "MixedEmbeddedText";
+    case PAGExportWarning::EmbeddedTextBound:
+      return "EmbeddedTextBound";
+    case PAGExportWarning::InvalidAnimationTiming:
+      return "InvalidAnimationTiming";
+    case PAGExportWarning::NonFiniteValue:
+      return "NonFiniteValue";
+    case PAGExportWarning::ImageScaledDown:
+      return "ImageScaledDown";
+    case PAGExportWarning::UnsupportedColorSource:
+      return "UnsupportedColorSource";
+    case PAGExportWarning::SubDocumentExpansionLimit:
+      return "SubDocumentExpansionLimit";
+  }
+  return "Unknown";
+}
+
+// Writes the deterministic export report (interface draft §4). No timestamps or other
+// machine-varying values: two exports of the same input produce identical bytes.
+void WriteExportReport(const PAGExportOptions& options, const PAGExportResult& result,
+                       PAGXDocument* clone, const EncodeState& state, const std::string& xml,
+                       const std::string& outputFilePath) {
+  std::string json = "{\n";
+  json += "  \"input\": \"" + JsonEscape(options.inputPath) + "\",\n";
+  json += "  \"output\": \"" + JsonEscape(outputFilePath) + "\",\n";
+  json += std::string("  \"success\": ") + (result.success ? "true" : "false") + ",\n";
+  json += "  \"byteSize\": " + std::to_string(result.byteSize) + ",\n";
+  json += "  \"xmlSize\": " + std::to_string(xml.size()) + ",\n";
+  char ratio[32] = {};
+  snprintf(
+      ratio, sizeof(ratio), "%.3f",
+      xml.empty() ? 0.0 : static_cast<double>(result.byteSize) / static_cast<double>(xml.size()));
+  json += std::string("  \"compressionRatio\": ") + ratio + ",\n";
+  json += "  \"documents\": [\n";
+  std::vector<std::string> documentLines = {};
+  {
+    char line[512] = {};
+    snprintf(line, sizeof(line),
+             "    { \"name\": \"main\", \"layers\": %zu, \"nodes\": %zu, \"images\": %d, "
+             "\"subDocuments\": %d }",
+             clone->layers.size(), clone->nodes.size(), CountImageNodes(clone),
+             CountSubDocumentReferences(clone, state.layerSubDocRefs));
+    documentLines.push_back(line);
+  }
+  for (auto& sub : state.subDocuments) {
+    char line[512] = {};
+    snprintf(line, sizeof(line),
+             "    { \"name\": \"%s\", \"layers\": %zu, \"nodes\": %zu, \"images\": %d, "
+             "\"subDocuments\": %d }",
+             JsonEscape(sub.name).c_str(), sub.document->layers.size(), sub.document->nodes.size(),
+             CountImageNodes(sub.document.get()),
+             CountSubDocumentReferences(sub.document.get(), state.layerSubDocRefs));
+    documentLines.push_back(line);
+  }
+  for (size_t i = 0; i < documentLines.size(); i++) {
+    json += documentLines[i];
+    json += (i + 1 < documentLines.size()) ? ",\n" : "\n";
+  }
+  json += "  ],\n";
+  json += "  \"warnings\": [\n";
+  for (size_t i = 0; i < result.warnings.size(); i++) {
+    auto& issue = result.warnings[i];
+    json += "    { \"code\": \"" + WarningCodeName(issue.code) + "\", \"scope\": \"main\", ";
+    json += "\"nodePath\": \"\", \"message\": \"" + JsonEscape(issue.message) + "\" }";
+    json += (i + 1 < result.warnings.size()) ? ",\n" : "\n";
+  }
+  json += "  ],\n";
+  // Required fonts, sorted for determinism. A font is "embedded" when every text using it
+  // carries pre-shaped glyph runs (rendering no longer depends on the host's fonts).
+  auto requiredFonts = clone->getRequiredFonts();
+  std::sort(requiredFonts.begin(), requiredFonts.end());
+  json += "  \"fonts\": [\n";
+  std::vector<std::string> fontLines = {};
+  for (auto& font : requiredFonts) {
+    bool embedded = false;
+    bool anyText = false;
+    for (auto& node : clone->nodes) {
+      if (node->nodeType() != NodeType::Text) {
+        continue;
+      }
+      auto* text = static_cast<Text*>(node.get());
+      if (text->fontFamily != font.fontFamily) {
+        continue;
+      }
+      anyText = true;
+      if (text->glyphRuns.empty()) {
+        embedded = false;
+        break;
+      }
+      embedded = true;
+    }
+    if (!anyText) {
+      embedded = false;
+    }
+    fontLines.push_back("    { \"family\": \"" + JsonEscape(font.fontFamily) + "\", \"style\": \"" +
+                        JsonEscape(font.fontStyle) + "\", \"source\": \"" +
+                        (embedded ? "embedded" : "external") + "\" }");
+  }
+  for (size_t i = 0; i < fontLines.size(); i++) {
+    json += fontLines[i];
+    json += (i + 1 < fontLines.size()) ? ",\n" : "\n";
+  }
+  json += "  ],\n";
+  json += "  \"skipped\": []\n";
+  json += "}\n";
+  std::ofstream out(options.reportPath, std::ios::binary | std::ios::trunc);
+  if (out.is_open()) {
+    out.write(json.data(), static_cast<std::streamsize>(json.size()));
+    out.close();
+  }
+}
+
 // Interns one external sub-document instance into the table. Nested references inside the
 // instance are interned depth-first so the table keeps first-reference order. refererName is
 // the referencing layer's composition path (XML source) or the instance's own diagnostic name
@@ -1201,6 +1382,27 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   if (doc == nullptr) {
     return result;
   }
+  // Export-time font setup (design doc §4.3): the document's own Font file declarations
+  // register first, then the caller's fallback fonts supplement them. The resulting config
+  // measures the clone's layout; without either source the document's config applies.
+  auto fontConfig = std::unique_ptr<FontConfig>(nullptr);
+  if (!options.fallbackFonts.empty() || DocumentDeclaresFontFiles(document.get())) {
+    fontConfig = std::make_unique<FontConfig>(document->fontConfig());
+    auto failedFiles = RegisterDocumentFontFiles(document.get(), fontConfig.get());
+    for (const auto& fontFile : failedFiles) {
+      PAGExportIssue issue = {};
+      issue.code = PAGExportWarning::MissingFont;
+      issue.message = "font source failed to load: " + fontFile;
+      result.warnings.push_back(issue);
+    }
+    auto failedFallbacks = RegisterFallbackFonts(fontConfig.get(), options.fallbackFonts);
+    for (const auto& fallback : failedFallbacks) {
+      PAGExportIssue issue = {};
+      issue.code = PAGExportWarning::MissingFont;
+      issue.message = "fallback font not found: " + fallback;
+      result.warnings.push_back(issue);
+    }
+  }
   auto state = std::make_unique<EncodeState>();
   CollectSubDocumentReferences(document.get(), doc.get(), state.get(), &result);
   if (state->subDocInstanceCount > 1024 || state->subDocNodeCount > 1048576 ||
@@ -1214,7 +1416,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     result.success = false;
     return result;
   }
-  doc->applyLayout();
+  doc->applyLayout(fontConfig.get());
   LayoutFlattener::Flatten(doc.get());
   for (auto& sub : state->subDocuments) {
     LayoutFlattener::Flatten(sub.document.get());
@@ -1436,6 +1638,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   out.close();
   result.success = !options.strict || result.warnings.empty();
   result.byteSize = fileData->length();
+  if (!options.reportPath.empty()) {
+    WriteExportReport(options, result, doc.get(), *state, xml, filePath);
+  }
   return result;
 }
 

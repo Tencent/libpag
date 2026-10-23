@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "pagx/PAGImporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
 #include "renderer/FontEmbedder.h"
@@ -29,7 +30,12 @@ namespace pagx::cli {
 
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
                                            const std::string& command) {
-  auto document = PAGXImporter::FromFile(filePath);
+  std::shared_ptr<PAGXDocument> document = nullptr;
+  if (PAGImporter::DetectFormat(filePath) == PAGFormat::PAGv4) {
+    document = PAGImporter::LoadFromPAG(filePath);
+  } else {
+    document = PAGXImporter::FromFile(filePath);
+  }
   if (document == nullptr) {
     std::cerr << command << ": failed to load '" << filePath << "'\n";
     return nullptr;
@@ -50,36 +56,9 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
     }
     fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());
   }
-  for (const auto& fallbackStr : fallbacks) {
-    bool isFilePath = fallbackStr.find('/') != std::string::npos;
-    if (!isFilePath) {
-      auto dot = fallbackStr.rfind('.');
-      if (dot != std::string::npos) {
-        auto ext = fallbackStr.substr(dot);
-        isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
-                     ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
-      }
-    }
-    if (isFilePath) {
-      // Register as both a main font (precise family match) and a fallback font, matching the
-      // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
-      auto typeface = tgfx::Typeface::MakeFromPath(fallbackStr);
-      if (typeface == nullptr) {
-        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->registerFont(fallbackStr, 0, typeface->fontFamily(), typeface->fontStyle());
-        fontConfig->addFallbackFont(fallbackStr, 0);
-      }
-    } else {
-      auto commaPos = fallbackStr.find(',');
-      auto family = commaPos != std::string::npos ? fallbackStr.substr(0, commaPos) : fallbackStr;
-      auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
-      if (!fontConfig->registerSystemFont(family, style)) {
-        std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->addFallbackSystemFont(family, style);
-      }
-    }
+  auto failedFallbacks = RegisterFallbackFonts(fontConfig, fallbacks);
+  for (const auto& fallbackStr : failedFallbacks) {
+    std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
   }
   return true;
 }
@@ -96,29 +75,19 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   // proven unused while any Text still asks for a font: shaping would silently fall back to a
   // substituted font with different outlines. Only a document that needs no font at all can skip
   // such a source.
+  // A source file is the only record of the family/style it provides, so a missing one cannot
+  // be proven unused while any Text still asks for a font: shaping would silently fall back to
+  // a substituted font with different outlines. Only a document that needs no font at all can
+  // skip such a source.
   bool requiresFonts = !document->getRequiredFonts().empty();
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::Font) {
-      continue;
+  auto failedFiles = RegisterDocumentFontFiles(document, &fontConfig);
+  for (const auto& fontFile : failedFiles) {
+    if (requiresFonts) {
+      std::cerr << command << ": failed to load font '" << fontFile << "'\n";
+      return false;
     }
-    auto* font = static_cast<Font*>(node.get());
-    if (!font->file.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(font->file);
-      if (typeface == nullptr) {
-        if (requiresFonts) {
-          std::cerr << command << ": failed to load font '" << font->file << "'\n";
-          return false;
-        }
-        std::cerr << command << ": failed to load font '" << font->file
-                  << "', skipped because the document needs no font\n";
-        continue;
-      }
-      fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
-      // Also reach this file through the fallback chain: a (family, style) key holds one primary
-      // registration, so unicode-range subset files sharing that key would otherwise overwrite
-      // each other and drop every glyph that lives in an earlier subset.
-      fontConfig.addFallbackFont(font->file, 0);
-    }
+    std::cerr << command << ": failed to load font '" << fontFile
+              << "', skipped because the document needs no font\n";
   }
   FontEmbedder::ClearEmbeddedGlyphRuns(document);
   document->applyLayout(&fontConfig);

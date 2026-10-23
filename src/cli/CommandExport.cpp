@@ -25,6 +25,8 @@
 #include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/HTMLExporter.h"
+#include "pagx/PAGExporter.h"
+#include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
@@ -40,6 +42,9 @@ struct ExportOptions {
   bool textToPath = false;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
+  bool pagStrict = false;
+  std::string pagReportPath = {};
+  std::vector<std::string> pagFallbacks = {};
 };
 
 static void PrintUsage() {
@@ -52,9 +57,15 @@ static void PrintUsage() {
       << "  --input <file>              Input PAGX file (required; repeat to add more slides,\n"
       << "                              pptx only). Each --input becomes one slide in the deck.\n"
       << "  --output <file>             Output file (default: <first input>.<format>)\n"
-      << "  --format <format>           Output format (svg, pptx, html; inferred from --output "
-         "extension)\n"
+      << "  --format <format>           Output format (svg, pptx, html, pag; inferred from "
+         "--output extension)\n"
       << "  --text-to-path              Convert text to path geometry (default: native text)\n"
+      << "\n"
+      << "PAG options:\n"
+      << "  --strict                    Fail the export when any warning is produced\n"
+      << "  --report <file>             Write a deterministic JSON export report to <file>\n"
+      << "  --fallback <path|name>      Add a fallback font file or system font name for text\n"
+      << "                              measurement (can be repeated)\n"
       << "\n"
       << "SVG options:\n"
       << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
@@ -131,6 +142,12 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptBakeUnsupported = false;
     } else if (arg == "--ppt-ignore-glyphruns") {
       options->pptIgnoreGlyphRuns = true;
+    } else if (arg == "--strict") {
+      options->pagStrict = true;
+    } else if (arg == "--report" && i + 1 < argc) {
+      options->pagReportPath = argv[++i];
+    } else if (arg == "--fallback" && i + 1 < argc) {
+      options->pagFallbacks.push_back(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -260,6 +277,40 @@ static int ExportToPPT(const ExportOptions& options) {
   return 0;
 }
 
+static int ExportToPAGBinary(const ExportOptions& options) {
+  const auto& inputFile = options.inputFiles.front();
+  auto document = LoadDocument(inputFile, "pagx export");
+  if (document == nullptr) {
+    return 1;
+  }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
+  // External sub PAGX files and images load from the input file's directory (design doc §4.8);
+  // missing files keep the referencing layer in the runtime's empty state and warn downstream.
+  auto baseDir = std::filesystem::path(inputFile).parent_path().string();
+  if (!PAGXExternalFiles::Load(document.get(), baseDir)) {
+    std::cerr << "pagx export: warning: some external files could not be loaded\n";
+  }
+  PAGExportOptions pagOptions = {};
+  pagOptions.strict = options.pagStrict;
+  pagOptions.reportPath = options.pagReportPath;
+  pagOptions.inputPath = inputFile;
+  pagOptions.fallbackFonts = options.pagFallbacks;
+  auto result = PAGExporter::ExportToPAG(document, options.outputFile, pagOptions);
+  for (const auto& issue : result.warnings) {
+    std::cerr << "pagx export: warning: " << issue.message << "\n";
+  }
+  if (!result.success) {
+    std::cerr << "pagx export: error: export failed\n";
+    return 1;
+  }
+  std::cout << "pagx export: wrote " << options.outputFile << " (" << result.byteSize
+            << " bytes)\n";
+  return 0;
+}
+
 int RunExport(int argc, char* argv[]) {
   ExportOptions options = {};
   auto parseResult = ParseOptions(argc, argv, &options);
@@ -269,6 +320,9 @@ int RunExport(int argc, char* argv[]) {
 
   if (options.format == "svg") {
     return ExportToSVG(options);
+  }
+  if (options.format == "pag") {
+    return ExportToPAGBinary(options);
   }
   if (options.format == "pptx") {
     return ExportToPPT(options);

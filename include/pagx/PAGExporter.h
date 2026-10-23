@@ -49,7 +49,26 @@ struct PAGExportIssue {
 
 struct PAGExportOptions {
   bool strict = false;
+
+  /**
+   * When non-empty, a deterministic export report (JSON, interface draft §4) is written to this
+   * path: sizes, per-document statistics, warnings, and required fonts. Two exports of the same
+   * input produce byte-identical reports.
+   */
   std::string reportPath;
+
+  /**
+   * The input file's path, recorded in the report's "input" field. Empty when the document did
+   * not come from a file.
+   */
+  std::string inputPath;
+
+  /**
+   * Fallback fonts for export-time text measurement (design doc §4.3), same semantics as the
+   * embed and render commands: each entry is a font file path or a system font name in
+   * "family[,style]" form. The document's own Font file declarations register first; these
+   * supplement them. Entries that cannot be resolved produce MissingFont warnings.
+   */
   std::vector<std::string> fallbackFonts;
 };
 

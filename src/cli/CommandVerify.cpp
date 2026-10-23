@@ -37,6 +37,7 @@
 #include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
+#include "pagx/PAGImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -3040,15 +3041,18 @@ int RunVerify(int argc, char* argv[]) {
     return rc == -1 ? 0 : rc;
   }
 
-  // Step 1: Resolve all import directives in the file (full file, idempotent).
-  std::vector<std::string> resolveArgs = {"pagx-verify", opts.inputFile};
-  std::vector<char*> resolveArgv;
-  for (auto& arg : resolveArgs) {
-    resolveArgv.push_back(const_cast<char*>(arg.c_str()));
-  }
-  resolveArgv.push_back(nullptr);
-  if (RunResolve(static_cast<int>(resolveArgs.size()), resolveArgv.data()) != 0) {
-    std::cerr << "pagx verify: warning: resolve failed for '" << opts.inputFile << "'\n";
+  // Step 1: Resolve all import directives in the file (full file, idempotent). A v4 binary
+  // input is already self-contained and cannot carry import directives, so it skips this step.
+  if (PAGImporter::DetectFormat(opts.inputFile) != PAGFormat::PAGv4) {
+    std::vector<std::string> resolveArgs = {"pagx-verify", opts.inputFile};
+    std::vector<char*> resolveArgv;
+    for (auto& arg : resolveArgs) {
+      resolveArgv.push_back(const_cast<char*>(arg.c_str()));
+    }
+    resolveArgv.push_back(nullptr);
+    if (RunResolve(static_cast<int>(resolveArgs.size()), resolveArgv.data()) != 0) {
+      std::cerr << "pagx verify: warning: resolve failed for '" << opts.inputFile << "'\n";
+    }
   }
 
   // Step 2: Load document and compute layout.
