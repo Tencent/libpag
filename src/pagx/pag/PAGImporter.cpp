@@ -23,21 +23,26 @@
 #include <vector>
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -118,6 +123,7 @@ Image* ReadImageTag(pag::DecodeStream* tagStream, DecodeContext* context) {
 Font* ReadFontTag(pag::DecodeStream* tagStream, DecodeContext* context);
 
 Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* context);
+LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, DecodeContext* context);
 void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
                            std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
                            std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget);
@@ -509,6 +515,118 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
     }
   }
   return composition;
+}
+
+LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, DecodeContext* context) {
+  switch (code) {
+    case TagCode::DropShadowStyle: {
+      auto* style = context->document->makeNode<DropShadowStyle>();
+      PAGAttributeBlockReader reader(tagStream, 8);
+      bool hasBlend = reader.flag(0);
+      style->excludeChildEffects = reader.flag(1);
+      bool hasOffsetX = reader.flag(2);
+      bool hasOffsetY = reader.flag(3);
+      bool hasBlurX = reader.flag(4);
+      bool hasBlurY = reader.flag(5);
+      bool hasColor = reader.flag(6);
+      bool notShowBehind = reader.flag(7);
+      tagStream->alignWithBytes();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasOffsetX) style->offsetX = tagStream->readFloat();
+      if (hasOffsetY) style->offsetY = tagStream->readFloat();
+      if (hasBlurX) style->blurX = tagStream->readFloat();
+      if (hasBlurY) style->blurY = tagStream->readFloat();
+      if (hasColor) style->color = ReadPAGColor(tagStream);
+      if (notShowBehind) style->showBehindLayer = tagStream->readBoolean();
+      return style;
+    }
+    case TagCode::InnerShadowStyle: {
+      auto* style = context->document->makeNode<InnerShadowStyle>();
+      PAGAttributeBlockReader reader(tagStream, 7);
+      bool hasBlend = reader.flag(0);
+      style->excludeChildEffects = reader.flag(1);
+      bool hasOffsetX = reader.flag(2);
+      bool hasOffsetY = reader.flag(3);
+      bool hasBlurX = reader.flag(4);
+      bool hasBlurY = reader.flag(5);
+      bool hasColor = reader.flag(6);
+      tagStream->alignWithBytes();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasOffsetX) style->offsetX = tagStream->readFloat();
+      if (hasOffsetY) style->offsetY = tagStream->readFloat();
+      if (hasBlurX) style->blurX = tagStream->readFloat();
+      if (hasBlurY) style->blurY = tagStream->readFloat();
+      if (hasColor) style->color = ReadPAGColor(tagStream);
+      return style;
+    }
+    case TagCode::BackgroundBlurStyle: {
+      auto* style = context->document->makeNode<BackgroundBlurStyle>();
+      PAGAttributeBlockReader reader(tagStream, 5);
+      bool hasBlend = reader.flag(0);
+      style->excludeChildEffects = reader.flag(1);
+      bool hasBlurX = reader.flag(2);
+      bool hasBlurY = reader.flag(3);
+      bool hasTileMode = reader.flag(4);
+      tagStream->alignWithBytes();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasBlurX) style->blurX = tagStream->readFloat();
+      if (hasBlurY) style->blurY = tagStream->readFloat();
+      if (hasTileMode) style->tileMode = static_cast<TileMode>(tagStream->readUint8());
+      return style;
+    }
+    case TagCode::NoiseStyle: {
+      auto* style = context->document->makeNode<NoiseStyle>();
+      PAGAttributeBlockReader reader(tagStream, 10);
+      bool hasBlend = reader.flag(0);
+      style->excludeChildEffects = reader.flag(1);
+      bool hasMode = reader.flag(2);
+      bool hasSize = reader.flag(3);
+      bool hasDensity = reader.flag(4);
+      bool hasSeed = reader.flag(5);
+      bool hasColor = reader.flag(6);
+      bool hasFirstColor = reader.flag(7);
+      bool hasSecondColor = reader.flag(8);
+      bool hasOpacity = reader.flag(9);
+      tagStream->alignWithBytes();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasMode) style->mode = static_cast<NoiseMode>(tagStream->readUint8());
+      if (hasSize) style->size = tagStream->readFloat();
+      if (hasDensity) style->density = tagStream->readFloat();
+      if (hasSeed) style->seed = tagStream->readFloat();
+      if (hasColor) style->color = ReadPAGColor(tagStream);
+      if (hasFirstColor) style->firstColor = ReadPAGColor(tagStream);
+      if (hasSecondColor) style->secondColor = ReadPAGColor(tagStream);
+      if (hasOpacity) {
+        style->opacity = static_cast<float>(tagStream->readUint8()) / 255.0f;
+      }
+      return style;
+    }
+    case TagCode::GlassStyle: {
+      auto* style = context->document->makeNode<GlassStyle>();
+      PAGAttributeBlockReader reader(tagStream, 9);
+      bool hasBlend = reader.flag(0);
+      style->excludeChildEffects = reader.flag(1);
+      bool hasRefraction = reader.flag(2);
+      bool hasDepth = reader.flag(3);
+      bool hasFrost = reader.flag(4);
+      bool hasDispersion = reader.flag(5);
+      bool hasSplay = reader.flag(6);
+      bool hasLightAngle = reader.flag(7);
+      bool hasLightIntensity = reader.flag(8);
+      tagStream->alignWithBytes();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasRefraction) style->refraction = tagStream->readFloat();
+      if (hasDepth) style->depth = tagStream->readFloat();
+      if (hasFrost) style->frost = tagStream->readFloat();
+      if (hasDispersion) style->dispersion = tagStream->readFloat();
+      if (hasSplay) style->splay = tagStream->readFloat();
+      if (hasLightAngle) style->lightAngle = tagStream->readFloat();
+      if (hasLightIntensity) style->lightIntensity = tagStream->readFloat();
+      return style;
+    }
+    default:
+      return nullptr;
+  }
 }
 
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
@@ -925,6 +1043,14 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       layer->children.push_back(child);
     } else if (header.code == TagCode::CompositionBlock) {
       layer->composition = ReadCompositionBlock(&tagBytes, context);
+    } else if (header.code == TagCode::DropShadowStyle ||
+               header.code == TagCode::InnerShadowStyle ||
+               header.code == TagCode::BackgroundBlurStyle || header.code == TagCode::NoiseStyle ||
+               header.code == TagCode::GlassStyle) {
+      auto* style = ReadLayerStyleTag(&tagBytes, header.code, context);
+      if (style != nullptr) {
+        layer->styles.push_back(style);
+      }
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);
       if (element != nullptr) layer->contents.push_back(element);

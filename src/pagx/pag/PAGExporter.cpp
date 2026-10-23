@@ -26,20 +26,26 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -1164,6 +1170,167 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
   WriteTag(stream, TagCode::CompositionBlock, &content);
 }
 
+// DropShadowStyle tag (spec §9.5 #355).
+void WriteDropShadowStyleTag(pag::EncodeStream* stream, DropShadowStyle* style,
+                             EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(style->offsetX != 0.0f);
+  writer.writeFlag(style->offsetY != 0.0f);
+  writer.writeFlag(style->blurX != 0.0f);
+  writer.writeFlag(style->blurY != 0.0f);
+  writer.writeFlag(
+      true);  // color always written (opaque black is the default but colors are fixed-width)
+  writer.writeFlag(!style->showBehindLayer);
+  auto* v = writer.valueStream();
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  if (style->offsetX != 0.0f) v->writeFloat(style->offsetX);
+  if (style->offsetY != 0.0f) v->writeFloat(style->offsetY);
+  if (style->blurX != 0.0f) v->writeFloat(style->blurX);
+  if (style->blurY != 0.0f) v->writeFloat(style->blurY);
+  WritePAGColor(v, style->color);
+  if (!style->showBehindLayer) v->writeBoolean(style->showBehindLayer);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::DropShadowStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// InnerShadowStyle tag (spec §9.5 #356).
+void WriteInnerShadowStyleTag(pag::EncodeStream* stream, InnerShadowStyle* style,
+                              EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(style->offsetX != 0.0f);
+  writer.writeFlag(style->offsetY != 0.0f);
+  writer.writeFlag(style->blurX != 0.0f);
+  writer.writeFlag(style->blurY != 0.0f);
+  writer.writeFlag(true);  // color
+  auto* v = writer.valueStream();
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  if (style->offsetX != 0.0f) v->writeFloat(style->offsetX);
+  if (style->offsetY != 0.0f) v->writeFloat(style->offsetY);
+  if (style->blurX != 0.0f) v->writeFloat(style->blurX);
+  if (style->blurY != 0.0f) v->writeFloat(style->blurY);
+  WritePAGColor(v, style->color);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::InnerShadowStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// BackgroundBlurStyle tag (spec §9.5 #357).
+void WriteBackgroundBlurStyleTag(pag::EncodeStream* stream, BackgroundBlurStyle* style,
+                                 EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(style->blurX != 0.0f);
+  writer.writeFlag(style->blurY != 0.0f);
+  writer.writeFlag(style->tileMode != TileMode::Mirror);
+  auto* v = writer.valueStream();
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  if (style->blurX != 0.0f) v->writeFloat(style->blurX);
+  if (style->blurY != 0.0f) v->writeFloat(style->blurY);
+  if (style->tileMode != TileMode::Mirror) {
+    v->writeUint8(static_cast<uint8_t>(style->tileMode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::BackgroundBlurStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// NoiseStyle tag (spec §9.5 #358).
+void WriteNoiseStyleTag(pag::EncodeStream* stream, NoiseStyle* style, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(style->mode != NoiseMode::Mono);
+  writer.writeFlag(style->size != 4.0f);
+  writer.writeFlag(style->density != 0.5f);
+  writer.writeFlag(style->seed != 0.0f);
+  writer.writeFlag(true);  // color
+  writer.writeFlag(true);  // firstColor
+  writer.writeFlag(true);  // secondColor
+  writer.writeFlag(style->opacity != 0.15f);
+  auto* v = writer.valueStream();
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  if (style->mode != NoiseMode::Mono) {
+    v->writeUint8(static_cast<uint8_t>(style->mode));
+  }
+  if (style->size != 4.0f) v->writeFloat(style->size);
+  if (style->density != 0.5f) v->writeFloat(style->density);
+  if (style->seed != 0.0f) v->writeFloat(style->seed);
+  WritePAGColor(v, style->color);
+  WritePAGColor(v, style->firstColor);
+  WritePAGColor(v, style->secondColor);
+  if (style->opacity != 0.15f) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(style->opacity * 255.0f)));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::NoiseStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// GlassStyle tag (spec §9.5 #359).
+void WriteGlassStyleTag(pag::EncodeStream* stream, GlassStyle* style, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(style->refraction != 80.0f);
+  writer.writeFlag(style->depth != 20.0f);
+  writer.writeFlag(style->frost != 5.0f);
+  writer.writeFlag(style->dispersion != 50.0f);
+  writer.writeFlag(style->splay != 0.0f);
+  writer.writeFlag(style->lightAngle != 45.0f);
+  writer.writeFlag(style->lightIntensity != 80.0f);
+  auto* v = writer.valueStream();
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  if (style->refraction != 80.0f) v->writeFloat(style->refraction);
+  if (style->depth != 20.0f) v->writeFloat(style->depth);
+  if (style->frost != 5.0f) v->writeFloat(style->frost);
+  if (style->dispersion != 50.0f) v->writeFloat(style->dispersion);
+  if (style->splay != 0.0f) v->writeFloat(style->splay);
+  if (style->lightAngle != 45.0f) v->writeFloat(style->lightAngle);
+  if (style->lightIntensity != 80.0f) v->writeFloat(style->lightIntensity);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::GlassStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// Dispatches a layer style tag by node type.
+void WriteLayerStyleTag(pag::EncodeStream* stream, LayerStyle* style, EncodeState* state) {
+  switch (style->nodeType()) {
+    case NodeType::DropShadowStyle:
+      WriteDropShadowStyleTag(stream, static_cast<DropShadowStyle*>(style), state);
+      break;
+    case NodeType::InnerShadowStyle:
+      WriteInnerShadowStyleTag(stream, static_cast<InnerShadowStyle*>(style), state);
+      break;
+    case NodeType::BackgroundBlurStyle:
+      WriteBackgroundBlurStyleTag(stream, static_cast<BackgroundBlurStyle*>(style), state);
+      break;
+    case NodeType::NoiseStyle:
+      WriteNoiseStyleTag(stream, static_cast<NoiseStyle*>(style), state);
+      break;
+    case NodeType::GlassStyle:
+      WriteGlassStyleTag(stream, static_cast<GlassStyle*>(style), state);
+      break;
+    default:
+      break;
+  }
+}
+
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) {
   pag::EncodeStream content(&state->streamContext);
   {
@@ -1258,6 +1425,9 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
   }
   for (auto* element : layer->contents) {
     WriteElementTag(&content, element, state);
+  }
+  for (auto* style : layer->styles) {
+    WriteLayerStyleTag(&content, style, state);
   }
   for (auto* child : layer->children) {
     WriteLayerTag(&content, child, state);

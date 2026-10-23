@@ -29,14 +29,19 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -856,6 +861,109 @@ PAGX_TEST(PAGImporterTest, DecodeErrorRecoveryIdempotency) {
   auto valid = PAGImporter::LoadFromPAG("/tmp/error_idem.pag", &validResult);
   EXPECT_TRUE(valid != nullptr);
   EXPECT_TRUE(validResult.success);
+}
+
+PAGX_TEST(PAGImporterTest, LayerStyleRoundTrip) {
+  // All five layer styles (spec §9.5 #355-359) survive export → decode with every field
+  // intact, and the pipeline is byte-idempotent from the decoded state.
+  auto doc = PAGXDocument::Make(200, 300);
+  struct StyleCase {
+    const char* name;
+    LayerStyle* style;
+  };
+  std::vector<StyleCase> cases = {};
+
+  auto* dropShadow = doc->makeNode<DropShadowStyle>();
+  dropShadow->offsetX = 4.0f;
+  dropShadow->offsetY = 6.0f;
+  dropShadow->blurX = 8.0f;
+  dropShadow->blurY = 8.0f;
+  dropShadow->color = {0.5f, 0.0f, 0.0f, 0.6f, ColorSpace::SRGB};
+  dropShadow->showBehindLayer = false;
+  dropShadow->blendMode = BlendMode::Multiply;
+  dropShadow->excludeChildEffects = true;
+  cases.push_back({"dropShadow", dropShadow});
+
+  auto* innerShadow = doc->makeNode<InnerShadowStyle>();
+  innerShadow->offsetX = 2.0f;
+  innerShadow->offsetY = 3.0f;
+  innerShadow->blurX = 5.0f;
+  innerShadow->color = {0.0f, 0.0f, 0.5f, 0.8f, ColorSpace::SRGB};
+  cases.push_back({"innerShadow", innerShadow});
+
+  auto* backgroundBlur = doc->makeNode<BackgroundBlurStyle>();
+  backgroundBlur->blurX = 10.0f;
+  backgroundBlur->blurY = 12.0f;
+  backgroundBlur->tileMode = TileMode::Repeat;
+  cases.push_back({"backgroundBlur", backgroundBlur});
+
+  auto* noise = doc->makeNode<NoiseStyle>();
+  noise->mode = NoiseMode::Duo;
+  noise->size = 6.0f;
+  noise->density = 0.7f;
+  noise->seed = 42.0f;
+  noise->color = {0.1f, 0.2f, 0.3f, 1.0f, ColorSpace::SRGB};
+  noise->firstColor = {0.0f, 0.0f, 0.0f, 1.0f, ColorSpace::SRGB};
+  noise->secondColor = {1.0f, 1.0f, 1.0f, 1.0f, ColorSpace::SRGB};
+  noise->opacity = 0.3f;
+  cases.push_back({"noise", noise});
+
+  auto* glass = doc->makeNode<GlassStyle>();
+  glass->refraction = 60.0f;
+  glass->depth = 15.0f;
+  glass->frost = 8.0f;
+  glass->dispersion = 40.0f;
+  glass->splay = 10.0f;
+  glass->lightAngle = 90.0f;
+  glass->lightIntensity = 70.0f;
+  cases.push_back({"glass", glass});
+
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 200;
+  layer->height = 300;
+  for (auto& styleCase : cases) {
+    layer->styles.push_back(styleCase.style);
+  }
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/style_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/style_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  ASSERT_EQ(decoded->layers[0]->styles.size(), 5u);
+
+  auto* ds = static_cast<DropShadowStyle*>(decoded->layers[0]->styles[0]);
+  EXPECT_EQ(ds->offsetX, 4.0f);
+  EXPECT_EQ(ds->offsetY, 6.0f);
+  EXPECT_EQ(ds->blurX, 8.0f);
+  EXPECT_NEAR(ds->color.red, 0.5f, 0.01f);
+  EXPECT_FALSE(ds->showBehindLayer);
+  EXPECT_EQ(ds->blendMode, BlendMode::Multiply);
+  EXPECT_TRUE(ds->excludeChildEffects);
+
+  auto* is = static_cast<InnerShadowStyle*>(decoded->layers[0]->styles[1]);
+  EXPECT_EQ(is->offsetX, 2.0f);
+  EXPECT_EQ(is->blurX, 5.0f);
+  EXPECT_NEAR(is->color.blue, 0.5f, 0.01f);
+
+  auto* bb = static_cast<BackgroundBlurStyle*>(decoded->layers[0]->styles[2]);
+  EXPECT_EQ(bb->blurX, 10.0f);
+  EXPECT_EQ(bb->tileMode, TileMode::Repeat);
+
+  auto* ns = static_cast<NoiseStyle*>(decoded->layers[0]->styles[3]);
+  EXPECT_EQ(ns->mode, NoiseMode::Duo);
+  EXPECT_EQ(ns->size, 6.0f);
+  EXPECT_EQ(ns->seed, 42.0f);
+  EXPECT_NEAR(ns->opacity, 0.3f, 0.01f);
+
+  auto* gs = static_cast<GlassStyle*>(decoded->layers[0]->styles[4]);
+  EXPECT_EQ(gs->refraction, 60.0f);
+  EXPECT_EQ(gs->lightAngle, 90.0f);
+
+  // Steady-state idempotency.
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "layer-styles", &byteCount));
+  EXPECT_GT(byteCount, 0);
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
