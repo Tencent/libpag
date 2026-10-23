@@ -572,10 +572,21 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     if (bodyStream.context->hasException()) break;
   }
 
+  if (bodyStream.context->hasException()) {
+    // Failed decodes return nullptr (interface draft §2): handing a partially decoded document
+    // to PAGScene::Make would render a malformed tree, so the doc never escapes on failure.
+    if (result != nullptr) {
+      result->success = false;
+      result->tagLevel = context.tagLevel;
+      result->error = bodyStream.context->errorMessages.empty()
+                          ? "decode stream error"
+                          : bodyStream.context->errorMessages.front();
+    }
+    return nullptr;
+  }
   if (result != nullptr) {
-    result->success = !bodyStream.context->hasException();
+    result->success = true;
     result->tagLevel = context.tagLevel;
-    if (bodyStream.context->hasException()) result->error = "decode stream error";
   }
   return doc;
 }

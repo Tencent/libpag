@@ -22,6 +22,9 @@
 #include "base/PAGTest.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGImporter.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGSurface.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
@@ -94,6 +97,75 @@ PAGX_TEST(PAGImporterTest, DetectExportedFile) {
   PAGImporter::LoadFromPAG("/tmp/detect_v4.pag", &result);
   EXPECT_EQ(result.format, PAGFormat::PAGv4);
   EXPECT_TRUE(result.success);
+}
+
+PAGX_TEST(PAGImporterTest, DecodeFailureReturnsNull) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/null_contract.pag").success);
+  auto bytes = ReadFileBytes("/tmp/null_contract.pag");
+  ASSERT_FALSE(bytes.empty());
+
+  PAGImportResult ok = {};
+  EXPECT_TRUE(PAGImporter::LoadFromPAG("/tmp/null_contract.pag", &ok) != nullptr);
+  EXPECT_TRUE(ok.success);
+
+  for (auto cut : {static_cast<size_t>(16), bytes.size() / 2, bytes.size() - 1}) {
+    FILE* f = fopen("/tmp/null_contract_trunc.pag", "wb");
+    ASSERT_TRUE(f != nullptr);
+    fwrite(bytes.data(), 1, cut, f);
+    fclose(f);
+    PAGImportResult bad = {};
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/null_contract_trunc.pag", &bad);
+    EXPECT_EQ(decoded, nullptr);
+    EXPECT_FALSE(bad.success);
+    EXPECT_FALSE(bad.error.empty());
+  }
+}
+
+PAGX_TEST(PAGImporterTest, DecodedDocumentLayoutAppliedAtLoad) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/layout_at_load.pag").success);
+
+  PAGImportResult importResult = {};
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/layout_at_load.pag", &importResult);
+  ASSERT_TRUE(decoded != nullptr);
+  EXPECT_FALSE(decoded->isLayoutApplied());
+  auto scene = PAGScene::Make(decoded);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_TRUE(decoded->isLayoutApplied());
+
+  // Empty and zero-size documents are legal (spec §4.2) and still produce a scene.
+  auto empty = PAGXDocument::Make(0, 0);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(empty, "/tmp/layout_at_load_empty.pag").success);
+  auto decodedEmpty = PAGImporter::LoadFromPAG("/tmp/layout_at_load_empty.pag");
+  ASSERT_TRUE(decodedEmpty != nullptr);
+  EXPECT_FALSE(decodedEmpty->isLayoutApplied());
+  EXPECT_TRUE(PAGScene::Make(decodedEmpty) != nullptr);
+}
+
+PAGX_TEST(PAGImporterTest, StaticSceneHasContentChanged) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/static_animated/pure_static.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/static_content_changed.pag").success);
+  PAGImportResult importResult = {};
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/static_content_changed.pag", &importResult);
+  ASSERT_TRUE(decoded != nullptr);
+
+  auto scene = PAGScene::Make(decoded);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = PAGSurface::MakeOffscreen(static_cast<int>(decoded->width),
+                                           static_cast<int>(decoded->height));
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  // Static v4 files settle after the first draw: nothing drives the tree, so idle frames can be
+  // skipped (hasContentChanged stays false, T9 static render semantics).
+  EXPECT_FALSE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->hasContentChanged());
 }
 
 }  // namespace pagx
