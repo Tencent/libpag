@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: one animated SolidColor resource backs two separate Fills so both shapes must change
-     color together from the single animation object.
+<!-- Tests: one animated SolidColor resource backs two Fills in separate layers so both shapes must
+     change color together, and this case currently passes for the wrong reason because the runtime
+     binds the shared color source to only the last Fill and the export drops the same one.
      Target: SolidColor  Channel: color  Type: color
      Expect: supported
      Ref: - -->
@@ -15,6 +16,8 @@
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle position="80,100" size="100,100" roundness="8"/>
     <Fill color="@sharedColor"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle position="240,100" size="100,100" roundness="8"/>
     <Fill color="@sharedColor"/>
   </Layer>

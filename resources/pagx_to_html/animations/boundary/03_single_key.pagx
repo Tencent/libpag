@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: a channel with a single key holds that value for the whole duration.
+<!-- Tests: a channel with a single key holds that value for the whole duration, so this case only
+     smoke tests that a single key still exports instead of feeding a per-frame pixel comparison.
      Target: Layer  Channel: alpha  Type: float
      Expect: supported
      Ref: - -->
