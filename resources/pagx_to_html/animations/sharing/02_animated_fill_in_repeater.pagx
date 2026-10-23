@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a Repeater copies one painter four times, so the single animated Fill has to drive every
+     copy instead of only the original.
+     Target: Fill  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="50,100" size="60,60" roundness="8"/>
+    <Fill id="repeatedFill" color="#2563EB"/>
+    <Repeater copies="4" position="70,0"/>
+  </Layer>
+  <Animations>
+    <Animation id="repeatedFillShift" duration="60" frameRate="60" loop="once">
+      <Object target="repeatedFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

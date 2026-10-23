@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: one animated SolidColor resource backs two separate Fills so both shapes must change
+     color together from the single animation object.
+     Target: SolidColor  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Resources>
+    <SolidColor id="sharedColor" color="#2563EB"/>
+  </Resources>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,100" size="100,100" roundness="8"/>
+    <Fill color="@sharedColor"/>
+    <Rectangle position="240,100" size="100,100" roundness="8"/>
+    <Fill color="@sharedColor"/>
+  </Layer>
+  <Animations>
+    <Animation id="sharedColorShift" duration="60" frameRate="60" loop="once">
+      <Object target="sharedColor">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

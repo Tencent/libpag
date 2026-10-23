@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox alpha fades the text box from 0.2 to fully opaque.
+     Target: TextBox  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <TextBox id="fadeTextBox" left="100" top="80" width="140" height="48" alpha="1">
+      <Text text="AB" fontFamily="Arial" fontSize="32"/>
+      <Fill color="#1D4ED8"/>
+    </TextBox>
+  </Layer>
+  <Animations>
+    <Animation id="textBoxFade" duration="60" frameRate="60" loop="once">
+      <Object target="fadeTextBox">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.2" interpolation="linear"/>
+          <Key time="60" value="1" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

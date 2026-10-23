@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a visible channel with hold keys hides the layer, shows it between frame 30 and 60, then
+     hides it again.
+     Target: Layer  Channel: visible  Type: bool
+     Expect: gap
+     Ref: test/src/PAGXRuntimeTest.cpp:807 -->
+<pagx width="320" height="200">
+  <Resources>
+    <Composition id="visComp" width="160" height="120">
+      <Layer id="visChild" width="160" height="120">
+        <Rectangle position="80,60" size="160,120" roundness="8"/>
+        <Fill color="#2563EB"/>
+      </Layer>
+      <Animations>
+        <Animation id="visWindow" duration="60" frameRate="60" loop="once">
+          <Object target="visChild">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="false" interpolation="hold"/>
+              <Key time="30" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+    </Composition>
+  </Resources>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="visSlot" x="80" y="40" width="160" height="120" composition="@visComp">
+    <Timelines>
+      <Animation ref="@visWindow"/>
+    </Timelines>
+  </Layer>
+</pagx>
