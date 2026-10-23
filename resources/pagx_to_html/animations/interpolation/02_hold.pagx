@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: hold interpolation keeps the first alpha value for the whole span and jumps at the end.
+<!-- Tests: hold interpolation keeps each key value flat until the next key, so the alpha steps land in
+     the middle of the timeline instead of at the end of it.
      Target: Layer  Channel: alpha  Type: float
      Expect: supported
      Ref: - -->
@@ -17,6 +18,8 @@
       <Object target="holdBox">
         <Channel name="alpha" type="float">
           <Key time="0" value="0.2" interpolation="hold"/>
+          <Key time="20" value="0.7" interpolation="hold"/>
+          <Key time="40" value="1" interpolation="hold"/>
           <Key time="60" value="1" interpolation="hold"/>
         </Channel>
       </Object>
