@@ -219,6 +219,10 @@ bool FontConfig::addFallbackSystemFont(const PAGFont& font) {
   return addFallbackSystemFont(font.fontFamily, font.fontStyle);
 }
 
+void FontConfig::clearFallbackFonts() {
+  data->fallbackTypefaces.clear();
+}
+
 std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   std::vector<std::string> names = {};
   names.reserve(data->fallbackTypefaces.size());

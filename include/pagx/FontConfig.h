@@ -152,6 +152,12 @@ class FontConfig {
   bool addFallbackSystemFont(const PAGFont& font);
 
   /**
+   * Removes all user-registered fallback fonts. Primarily registered fonts are kept. Backs the
+   * replace semantics of the process-wide fallback list (PAGFont::SetFallbackFontNames).
+   */
+  void clearFallbackFonts();
+
+  /**
    * Returns the family names of all fallback typefaces in registration order. Primarily
    * intended for diagnostics and tests; callers should not rely on this for font lookup
    * (use `applyLayout` and let `LayoutContext` resolve typefaces internally).

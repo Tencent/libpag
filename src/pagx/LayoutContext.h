@@ -39,13 +39,15 @@ class LayoutContext {
  public:
   explicit LayoutContext(FontConfig* fontConfig);
 
-  // Finds a typeface for the given family/style. Searches user-registered fonts first,
-  // then falls back to system font lookup via MakeFromName.
+  // Finds a typeface for the given family/style. Searches the document's registered fonts
+  // first, then the process-wide registry (PAGFont::RegisterFont / SetFallbackFontNames), then
+  // falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle);
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
-  // fonts first, then system fallback fonts. Typefaces are created on demand.
+  // fonts first, then the process-wide fallback fonts, then system fallback fonts.
+  // Typefaces are created on demand.
   std::shared_ptr<tgfx::Typeface> fallbackTypeface(int32_t codepoint,
                                                    const tgfx::Typeface* primaryTypeface);
 
@@ -54,6 +56,10 @@ class LayoutContext {
   }
 
  private:
+  static std::shared_ptr<tgfx::Typeface> FindInFontConfig(FontConfig* config,
+                                                          const std::string& fontFamily,
+                                                          const std::string& fontStyle);
+
   void ensureSystemFallbacks();
 
   FontConfig* fontConfig = nullptr;
