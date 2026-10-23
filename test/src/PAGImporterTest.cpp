@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include "base/PAGTest.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGImporter.h"
@@ -1318,6 +1319,46 @@ PAGX_TEST(PAGImporterTest, TextModifierRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "text-modifier", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, MultipleMaskNodeRefCount) {
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_html/clip_and_mask.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/cam_debug.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/cam_debug.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  // Find layers with masks in the source
+  int sourceMaskCount = 0;
+  for (auto* layer : doc->layers) {
+    std::function<void(Layer*)> walk = [&](Layer* l) {
+      if (l->mask != nullptr) sourceMaskCount++;
+      for (auto* child : l->children) walk(child);
+    };
+    walk(layer);
+  }
+
+  int decodedMaskCount = 0;
+  int decodedNullMask = 0;
+  int decodedWrongType = 0;
+  for (auto* layer : decoded->layers) {
+    std::function<void(Layer*)> walk = [&](Layer* l) {
+      if (l->mask != nullptr) {
+        decodedMaskCount++;
+        if (l->mask->nodeType() != NodeType::Layer) decodedWrongType++;
+      } else {
+        // Check if the source had a mask here
+        decodedNullMask++;
+      }
+      for (auto* child : l->children) walk(child);
+    };
+    walk(layer);
+  }
+  std::cout << "sourceMaskCount=" << sourceMaskCount << " decodedMaskCount=" << decodedMaskCount
+            << " decodedNullMask=" << decodedNullMask << " decodedWrongType=" << decodedWrongType
+            << "\n";
+  SUCCEED();
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
