@@ -91,6 +91,12 @@ struct EncodeState {
   // node into per-pattern nodes with equal bytes.
   std::vector<Image*> sharedImageOrder;
   std::unordered_map<uint32_t, uint32_t> entryResourceSlots;
+  // Shared-font placement (spec §5.3): fonts referenced by two or more glyph runs go into the
+  // ResourceBlock in first-reference order (sharedFontOrder), single-use fonts are inlined at
+  // the referencing glyph run's value-area end. Fonts keep node identity through the XML round
+  // trip (resource @id), so node-based counting is stable.
+  std::vector<Font*> sharedFontOrder;
+  std::unordered_map<const Font*, uint32_t> fontResourceSlots;
 
   uint32_t intern(const std::string& text) {
     return strings.intern(text);
@@ -231,6 +237,42 @@ void CollectImageReferencesFromLayer(Layer* layer, std::vector<Image*>* referenc
   }
   for (auto* child : layer->children) {
     CollectImageReferencesFromLayer(child, references);
+  }
+}
+
+// Collects Font references from glyph runs in traversal order (spec §5.3 first-reference
+// order). Every reference is appended, including repeats of the same node.
+void CollectFontReference(Element* element, std::vector<Font*>* references) {
+  if (element == nullptr) {
+    return;
+  }
+  if (element->nodeType() == NodeType::Text) {
+    for (auto* run : static_cast<Text*>(element)->glyphRuns) {
+      if (run->font != nullptr) {
+        references->push_back(run->font);
+      }
+    }
+    return;
+  }
+  if (element->nodeType() == NodeType::Group) {
+    for (auto* child : static_cast<Group*>(element)->elements) {
+      CollectFontReference(child, references);
+    }
+    return;
+  }
+  if (element->nodeType() == NodeType::TextBox) {
+    for (auto* child : static_cast<TextBox*>(element)->elements) {
+      CollectFontReference(child, references);
+    }
+  }
+}
+
+void CollectFontReferencesFromLayer(Layer* layer, std::vector<Font*>* references) {
+  for (auto* element : layer->contents) {
+    CollectFontReference(element, references);
+  }
+  for (auto* child : layer->children) {
+    CollectFontReferencesFromLayer(child, references);
   }
 }
 
@@ -649,6 +691,166 @@ void WritePathTag(pag::EncodeStream* stream, Path* path, EncodeState* state) {
   WriteTag(stream, TagCode::Path, &content);
 }
 
+// Font tag (spec §9.1 #296): unitsPerEm exist bit (default 1000), glyphCount (Fixed), then
+// the glyph entries. Each entry: u8 flags (bit0 hasPath, bit1 hasImage), advance/offset f32s,
+// the image table ref for bitmap glyphs, and the §7 path layout for vector glyphs (font units,
+// stepExponent fixed 0).
+void WriteFontTag(pag::EncodeStream* stream, Font* font, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasUnitsPerEm = font->unitsPerEm != 1000;
+  writer.writeFlag(hasUnitsPerEm);
+  auto* v = writer.valueStream();
+  if (hasUnitsPerEm) {
+    v->writeEncodedUint32(static_cast<uint32_t>(font->unitsPerEm));
+  }
+  auto block = writer.release();
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  content.writeEncodedUint32(static_cast<uint32_t>(font->glyphs.size()));
+  for (auto* glyph : font->glyphs) {
+    auto hasPath = glyph->path != nullptr;
+    auto hasImage = glyph->image != nullptr;
+    uint8_t flags = static_cast<uint8_t>((hasPath ? 1 : 0) | (hasImage ? 2 : 0));
+    content.writeUint8(flags);
+    content.writeFloat(glyph->advance);
+    content.writeFloat(glyph->offset.x);
+    content.writeFloat(glyph->offset.y);
+    if (hasImage) {
+      uint32_t imageRef = 0;
+      auto it = state->imageIndices.find(glyph->image);
+      if (it != state->imageIndices.end()) {
+        imageRef = it->second + 1;
+      }
+      content.writeEncodedUint32(imageRef);
+    }
+    if (hasPath) {
+      WritePAGPath(&content, glyph->path, 0);
+    }
+  }
+  WriteTag(stream, TagCode::Font, &content);
+}
+
+// GlyphRun tag (spec §9.2 #422, 11 exist bits + two Fixed columns). Glyph ids are bit-packed
+// with a 5-bit numBits prefix (§3.4) and byte-aligned before the following values; the inline
+// Font sub-tag sits at the value-area end (§9.0).
+void WriteGlyphRunTag(pag::EncodeStream* stream, GlyphRun* run, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  auto hasFont = run->font != nullptr;
+  uint32_t fontRef = 0;
+  if (hasFont) {
+    auto slot = state->fontResourceSlots.find(run->font);
+    if (slot != state->fontResourceSlots.end()) {
+      fontRef = slot->second + 1;
+    }
+  }
+  auto glyphCount = static_cast<uint32_t>(run->glyphs.size());
+  auto hasFontSize = run->fontSize != 12.0f;
+  auto hasX = run->x != 0.0f;
+  auto hasY = run->y != 0.0f;
+  auto hasXOffsets = !run->xOffsets.empty();
+  auto hasPositions = !run->positions.empty();
+  auto hasAnchors = !run->anchors.empty();
+  auto hasScales = !run->scales.empty();
+  auto hasRotations = !run->rotations.empty();
+  auto hasSkews = !run->skews.empty();
+  auto hasBounds = run->bounds.width > 0 || run->bounds.height > 0;
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(hasFont);
+  writer.writeFlag(hasFontSize);
+  writer.writeFlag(hasX);
+  writer.writeFlag(hasY);
+  writer.writeFlag(hasXOffsets);
+  writer.writeFlag(hasPositions);
+  writer.writeFlag(hasAnchors);
+  writer.writeFlag(hasScales);
+  writer.writeFlag(hasRotations);
+  writer.writeFlag(hasSkews);
+  writer.writeFlag(hasBounds);
+  auto* v = writer.valueStream();
+  if (hasFont) {
+    v->writeEncodedUint32(fontRef);
+  }
+  if (hasFontSize) {
+    v->writeFloat(run->fontSize);
+  }
+  v->writeEncodedUint32(glyphCount);
+  uint32_t numBits = 1;
+  for (auto id : run->glyphs) {
+    uint32_t length = 1;
+    auto value = static_cast<uint32_t>(id);
+    while ((value >>= 1) != 0) {
+      length++;
+    }
+    if (length > numBits) {
+      numBits = length;
+    }
+  }
+  v->writeUBits(numBits - 1, 5);
+  for (auto id : run->glyphs) {
+    v->writeUBits(id, static_cast<uint8_t>(numBits));
+  }
+  v->alignWithBytes();
+  if (hasX) {
+    v->writeFloat(run->x);
+  }
+  if (hasY) {
+    v->writeFloat(run->y);
+  }
+  if (hasXOffsets) {
+    v->writeFloatList(run->xOffsets.data(), glyphCount, 0.05f);
+    v->alignWithBytes();
+  }
+  if (hasPositions) {
+    std::vector<pag::Point> points(glyphCount);
+    for (uint32_t i = 0; i < glyphCount; i++) {
+      points[i].x = run->positions[i].x;
+      points[i].y = run->positions[i].y;
+    }
+    v->writePoint2DList(points.data(), glyphCount, 0.05f);
+    v->alignWithBytes();
+  }
+  if (hasAnchors) {
+    std::vector<pag::Point> points(glyphCount);
+    for (uint32_t i = 0; i < glyphCount; i++) {
+      points[i].x = run->anchors[i].x;
+      points[i].y = run->anchors[i].y;
+    }
+    v->writePoint2DList(points.data(), glyphCount, 0.05f);
+    v->alignWithBytes();
+  }
+  if (hasScales) {
+    v->writeEncodedUint32(static_cast<uint32_t>(run->scales.size()));
+    for (auto& scale : run->scales) {
+      v->writeFloat(scale.x);
+      v->writeFloat(scale.y);
+    }
+  }
+  if (hasRotations) {
+    v->writeEncodedUint32(static_cast<uint32_t>(run->rotations.size()));
+    for (auto rotation : run->rotations) {
+      v->writeFloat(rotation);
+    }
+  }
+  if (hasSkews) {
+    v->writeEncodedUint32(static_cast<uint32_t>(run->skews.size()));
+    for (auto skew : run->skews) {
+      v->writeFloat(skew);
+    }
+  }
+  if (hasBounds) {
+    v->writeFloat(run->bounds.x);
+    v->writeFloat(run->bounds.y);
+    v->writeFloat(run->bounds.width);
+    v->writeFloat(run->bounds.height);
+  }
+  auto block = writer.release();
+  content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  if (hasFont && fontRef == 0) {
+    WriteFontTag(&content, run->font, state);
+  }
+  WriteTag(stream, TagCode::GlyphRun, &content);
+}
+
 void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
   pag::EncodeStream content(&state->streamContext);
   {
@@ -685,6 +887,9 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::TextAttributes, static_cast<uint32_t>(block->length()));
     content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* run : text->glyphRuns) {
+    WriteGlyphRunTag(&content, run, state);
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::TextBlock, &content);
@@ -852,7 +1057,40 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   if (document == nullptr) {
     return result;
   }
+  // The internal XML round trip links GlyphRun -> Font by resource id, but documents decoded
+  // from the v4 binary carry no ids (the binary keeps node identity by reference). Synthesize
+  // deterministic ids on id-less fonts so the XML hop preserves the linkage, and restore the
+  // original ids afterwards; StripIds clears them in the working copy anyway, so the written
+  // bytes do not depend on the synthesized names.
+  std::vector<std::pair<Font*, std::string>> restoredFontIds = {};
+  std::unordered_set<std::string> takenIds = {};
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (!font->id.empty()) {
+        takenIds.insert(font->id);
+      }
+    }
+  }
+  int synthIndex = 0;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(node.get());
+    if (!font->id.empty()) {
+      continue;
+    }
+    restoredFontIds.push_back({font, font->id});
+    do {
+      font->id = "pag-v4-font-" + std::to_string(synthIndex++);
+    } while (takenIds.count(font->id) > 0);
+    takenIds.insert(font->id);
+  }
   auto xml = PAGXExporter::ToXML(*document);
+  for (auto& restore : restoredFontIds) {
+    restore.first->id = restore.second;
+  }
   auto doc = PAGXImporter::FromXML(xml);
   if (doc == nullptr) {
     return result;
@@ -912,6 +1150,26 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       }
     }
   }
+  // Shared-font placement (spec §5.3): count glyph-run references per font node; fonts
+  // referenced by two or more runs go into the ResourceBlock (first-reference order), single-use
+  // fonts are inlined at the referencing run's value-area end.
+  {
+    std::vector<Font*> fontRefs = {};
+    for (auto* layer : doc->layers) {
+      CollectFontReferencesFromLayer(layer, &fontRefs);
+    }
+    std::unordered_map<const Font*, int> fontCounts = {};
+    for (auto* font : fontRefs) {
+      fontCounts[font]++;
+    }
+    for (auto* font : fontRefs) {
+      if (fontCounts[font] >= 2 &&
+          state->fontResourceSlots.find(font) == state->fontResourceSlots.end()) {
+        state->fontResourceSlots[font] = static_cast<uint32_t>(state->sharedFontOrder.size());
+        state->sharedFontOrder.push_back(font);
+      }
+    }
+  }
   for (auto* layer : doc->layers) {
     CollectStringsFromLayer(layer, state.get());
   }
@@ -926,6 +1184,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     pag::EncodeStream resContent(&state->streamContext);
     for (auto* image : state->sharedImageOrder) {
       WriteImageTag(&resContent, image, state.get());
+    }
+    for (auto* font : state->sharedFontOrder) {
+      WriteFontTag(&resContent, font, state.get());
     }
     WritePAGTagHeader(&resContent, TagCode::End, 0);
     WriteTag(&body, TagCode::ResourceBlock, &resContent);

@@ -27,11 +27,14 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -75,6 +78,8 @@ PAGX_TEST(PAGImporterTest, RoundTripByteIdentity) {
       "resources/pagx_to_pag/layout_flatten/clip_to_bounds.pagx",
       "resources/pagx_to_pag/resource/image_external_shared.pagx",
       "resources/pagx_to_pag/resource/image_data_uri.pagx",
+      "resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx",
+      "resources/pagx_to_pag/text_font/embedded_bitmap_glyphs.pagx",
   };
   for (auto& rel : paths) {
     auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(rel));
@@ -312,6 +317,117 @@ PAGX_TEST(PAGImporterTest, ImagePatternFieldsRoundTrip) {
   auto bytes2 = ReadFileBytes("/tmp/pattern_fields_rt2.pag");
   ASSERT_EQ(bytes1.size(), bytes2.size());
   EXPECT_EQ(memcmp(bytes1.data(), bytes2.data(), bytes1.size()), 0);
+}
+
+PAGX_TEST(PAGImporterTest, EmbeddedGlyphRunRoundTrip) {
+  // Vector outlines: the font is inlined at the single glyph run's value-area end; glyph
+  // advances, ids, placement, and bounds survive the round trip.
+  const std::string vectorPath =
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx");
+  auto vectorDoc = PAGXImporter::FromFile(vectorPath);
+  ASSERT_TRUE(vectorDoc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(vectorDoc, "/tmp/glyph_vector.pag").success);
+  auto vectorDecoded = PAGImporter::LoadFromPAG("/tmp/glyph_vector.pag");
+  ASSERT_TRUE(vectorDecoded != nullptr);
+  auto* vectorText = static_cast<Text*>(vectorDecoded->layers[0]->contents[0]);
+  ASSERT_EQ(vectorText->nodeType(), NodeType::Text);
+  ASSERT_EQ(vectorText->glyphRuns.size(), 1u);
+  auto* run = vectorText->glyphRuns[0];
+  EXPECT_EQ(run->glyphs, (std::vector<uint16_t>{1, 2}));
+  EXPECT_EQ(run->x, 120.0f);
+  EXPECT_EQ(run->y, 140.0f);
+  EXPECT_EQ(run->bounds.width, 160.0f);
+  EXPECT_EQ(run->bounds.height, 96.0f);
+  ASSERT_TRUE(run->font != nullptr);
+  EXPECT_EQ(run->font->unitsPerEm, 1000);
+  ASSERT_EQ(run->font->glyphs.size(), 2u);
+  EXPECT_EQ(run->font->glyphs[0]->advance, 722.0f);
+  EXPECT_EQ(run->font->glyphs[1]->advance, 766.0f);
+  ASSERT_TRUE(run->font->glyphs[0]->path != nullptr);
+  ASSERT_TRUE(run->font->glyphs[1]->path != nullptr);
+  EXPECT_TRUE(run->font->glyphs[0]->image == nullptr);
+
+  // Bitmap glyphs: the images ride the ImageTable as mediaType 1 and keep their raw bytes.
+  const std::string bitmapPath =
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/text_font/embedded_bitmap_glyphs.pagx");
+  auto bitmapDoc = PAGXImporter::FromFile(bitmapPath);
+  ASSERT_TRUE(bitmapDoc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(bitmapDoc, "/tmp/glyph_bitmap.pag").success);
+  auto bitmapDecoded = PAGImporter::LoadFromPAG("/tmp/glyph_bitmap.pag");
+  ASSERT_TRUE(bitmapDecoded != nullptr);
+  auto* bitmapText = static_cast<Text*>(bitmapDecoded->layers[0]->contents[0]);
+  ASSERT_EQ(bitmapText->glyphRuns.size(), 1u);
+  auto* bitmapRun = bitmapText->glyphRuns[0];
+  ASSERT_TRUE(bitmapRun->font != nullptr);
+  EXPECT_EQ(bitmapRun->font->unitsPerEm, 100);
+  ASSERT_EQ(bitmapRun->font->glyphs.size(), 2u);
+  Image* originalImages[2] = {nullptr, nullptr};
+  int originalIndex = 0;
+  for (auto& node : bitmapDoc->nodes) {
+    if (node->nodeType() == NodeType::Glyph) {
+      auto* glyph = static_cast<Glyph*>(node.get());
+      if (glyph->image != nullptr && originalIndex < 2) {
+        originalImages[originalIndex++] = glyph->image;
+      }
+    }
+  }
+  Image* decodedImages[2] = {nullptr, nullptr};
+  int decodedIndex = 0;
+  for (auto* glyph : bitmapRun->font->glyphs) {
+    ASSERT_TRUE(glyph->image != nullptr);
+    ASSERT_TRUE(glyph->image->data != nullptr);
+    ASSERT_LT(decodedIndex, 2);
+    decodedImages[decodedIndex++] = glyph->image;
+  }
+  ASSERT_TRUE(originalImages[0] != nullptr);
+  ASSERT_TRUE(originalImages[1] != nullptr);
+  EXPECT_EQ(decodedImages[0]->data->size(), originalImages[0]->data->size());
+  EXPECT_EQ(memcmp(decodedImages[0]->data->bytes(), originalImages[0]->data->bytes(),
+                   originalImages[0]->data->size()),
+            0);
+  EXPECT_EQ(decodedImages[1]->data->size(), originalImages[1]->data->size());
+  EXPECT_EQ(memcmp(decodedImages[1]->data->bytes(), originalImages[1]->data->bytes(),
+                   originalImages[1]->data->size()),
+            0);
+}
+
+PAGX_TEST(PAGImporterTest, StaticSamplesRenderEquivalence) {
+  // T7-d acceptance: every fully supported static sample must render pixel-identically from the
+  // original PAGX XML document and from the exported v4 binary (same machine, no font or image
+  // divergence: embedded glyphs carry their own outlines/bitmaps, image bytes pass through).
+  std::vector<std::string> paths = {
+      "resources/pagx_to_pag/static_animated/pure_static.pagx",
+      "resources/pagx_to_pag/layout_flatten/clip_to_bounds.pagx",
+      "resources/pagx_to_pag/resource/image_external_shared.pagx",
+      "resources/pagx_to_pag/resource/image_data_uri.pagx",
+      "resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx",
+      "resources/pagx_to_pag/text_font/embedded_bitmap_glyphs.pagx",
+  };
+  for (auto& rel : paths) {
+    auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(rel));
+    ASSERT_TRUE(doc != nullptr) << rel;
+    ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/equiv_export.pag").success) << rel;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/equiv_export.pag");
+    ASSERT_TRUE(decoded != nullptr) << rel;
+
+    auto sceneA = PAGScene::Make(doc);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr) << rel;
+    ASSERT_TRUE(sceneB != nullptr) << rel;
+    int width = static_cast<int>(doc->width);
+    int height = static_cast<int>(doc->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(surfaceA != nullptr) << rel;
+    ASSERT_TRUE(surfaceB != nullptr) << rel;
+    ASSERT_TRUE(sceneA->draw(surfaceA)) << rel;
+    ASSERT_TRUE(sceneB->draw(surfaceB)) << rel;
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4)) << rel;
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4)) << rel;
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << rel;
+  }
 }
 
 PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {

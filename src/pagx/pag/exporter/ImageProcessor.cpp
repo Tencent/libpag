@@ -22,10 +22,13 @@
 #include "pagx/PAGExporter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
@@ -288,6 +291,50 @@ ImageProcessor::Result ImageProcessor::Process(PAGXDocument* document) {
 
     result.imageIndices[image] = static_cast<uint32_t>(result.entries.size());
     result.entries.push_back(entry);
+  }
+
+  // Bitmap glyph images (spec §6.6 mediaType 1): raw bytes with no scaling, cropping, or
+  // re-encoding; logical size equals the source image size and scaleFactor stays 1. Fonts are
+  // walked in document node order (stable across decode/re-encode because the XML round trip
+  // preserves resource order), appended after the pattern images, and deduplicated through the
+  // same content hash.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(node.get());
+    for (auto* glyph : font->glyphs) {
+      auto* image = glyph->image;
+      if (image == nullptr || result.imageIndices.find(image) != result.imageIndices.end()) {
+        continue;
+      }
+      auto data = GetImageData(image);
+      if (data == nullptr || data->empty()) {
+        PAGExportIssue issue = {};
+        issue.code = PAGExportWarning::MissingImage;
+        issue.message = "bitmap glyph image data is missing or failed to decode";
+        result.warnings.push_back(issue);
+        continue;
+      }
+      auto hash = ImageContentHash(data->bytes(), data->size());
+      auto existing = dedupTable.find(hash);
+      if (existing != dedupTable.end()) {
+        result.imageIndices[image] = existing->second;
+        continue;
+      }
+      ImageTableEntry entry = {};
+      entry.mediaType = 1;
+      entry.data = Data::MakeWithCopy(data->bytes(), data->size());
+      int width = 0;
+      int height = 0;
+      if (GetImageDimensions(image, &width, &height)) {
+        entry.logicalWidth = static_cast<uint32_t>(width);
+        entry.logicalHeight = static_cast<uint32_t>(height);
+      }
+      dedupTable[hash] = static_cast<uint32_t>(result.entries.size());
+      result.imageIndices[image] = static_cast<uint32_t>(result.entries.size());
+      result.entries.push_back(entry);
+    }
   }
 
   // Handle images with no references (unreferenced): they were stripped by T3, but a

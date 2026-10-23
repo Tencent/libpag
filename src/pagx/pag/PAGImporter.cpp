@@ -24,6 +24,8 @@
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -57,6 +59,8 @@ struct DecodeContext {
   std::vector<ImageTableEntry> imageEntries = {};
   // ResourceBlock Image nodes in table order; ImagePattern refs resolve against this list.
   std::vector<Image*> resourceImages = {};
+  // ResourceBlock Font nodes in table order; GlyphRun refs resolve against this list.
+  std::vector<Font*> resourceFonts = {};
   // Image nodes with their pending ImageTable refs; the ImageTable sits at the end of the body,
   // so entry data and decode metadata are backfilled after the whole body is parsed.
   std::vector<std::pair<Image*, uint32_t>> pendingImageRefs = {};
@@ -81,6 +85,8 @@ Image* ReadImageTag(pag::DecodeStream* tagStream, DecodeContext* context) {
 }
 
 // ResourceBlock content (spec §6.3): resource tags in first-reference order, End-terminated.
+Font* ReadFontTag(pag::DecodeStream* tagStream, DecodeContext* context);
+
 // Unknown resource tags are skipped (§4.2).
 void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
   while (true) {
@@ -89,6 +95,8 @@ void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::Image) {
       context->resourceImages.push_back(ReadImageTag(&tagBytes, context));
+    } else if (header.code == TagCode::Font) {
+      context->resourceFonts.push_back(ReadFontTag(&tagBytes, context));
     }
   }
 }
@@ -420,6 +428,166 @@ Element* ReadStrokeTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   return stroke;
 }
 
+// Font tag (spec §9.1 #296). Bitmap glyph images record pending refs; the ImageTable sits at
+// the end of the body, so entry data is backfilled after the whole file is parsed.
+Font* ReadFontTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* font = context->document->makeNode<Font>();
+  PAGAttributeBlockReader reader(tagStream, 1);
+  bool hasUnitsPerEm = reader.flag(0);
+  // Values follow declaration order: unitsPerEm (exist bit) first, glyphCount (Fixed) after.
+  if (hasUnitsPerEm) {
+    font->unitsPerEm = static_cast<int>(tagStream->readEncodedUint32());
+  }
+  auto glyphCount = tagStream->readEncodedUint32();
+  if (glyphCount > 65535) {
+    PAGThrowError(tagStream->context, "font glyph count exceeds the spec limit");
+    return font;
+  }
+  for (uint32_t i = 0; i < glyphCount; i++) {
+    auto* glyph = context->document->makeNode<Glyph>();
+    auto flags = tagStream->readUint8();
+    glyph->advance = tagStream->readFloat();
+    glyph->offset.x = tagStream->readFloat();
+    glyph->offset.y = tagStream->readFloat();
+    if ((flags & 2) != 0) {
+      auto* image = context->document->makeNode<Image>();
+      auto imageRef = tagStream->readEncodedUint32();
+      glyph->image = image;
+      context->pendingImageRefs.push_back({image, imageRef});
+    }
+    if ((flags & 1) != 0) {
+      auto* pathData = context->document->makeNode<PathData>();
+      if (!ReadPAGPath(tagStream, pathData)) {
+        PAGThrowError(tagStream->context, "glyph outline path is malformed");
+        return font;
+      }
+      glyph->path = pathData;
+    }
+    font->glyphs.push_back(glyph);
+  }
+  return font;
+}
+
+// GlyphRun tag (spec §9.2 #422): 11 exist bits, glyphCount + bit-packed glyph ids (Fixed),
+// then the per-glyph columns. The font ref is 0 = inline Font sub-tag at the value-area end,
+// or k = the ResourceBlock's (k-1)-th entry.
+GlyphRun* ReadGlyphRunTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* run = context->document->makeNode<GlyphRun>();
+  PAGAttributeBlockReader reader(tagStream, 11);
+  bool hasFont = reader.flag(0);
+  bool hasFontSize = reader.flag(1);
+  bool hasX = reader.flag(2);
+  bool hasY = reader.flag(3);
+  bool hasXOffsets = reader.flag(4);
+  bool hasPositions = reader.flag(5);
+  bool hasAnchors = reader.flag(6);
+  bool hasScales = reader.flag(7);
+  bool hasRotations = reader.flag(8);
+  bool hasSkews = reader.flag(9);
+  bool hasBounds = reader.flag(10);
+  uint32_t fontRef = 0;
+  if (hasFont) {
+    fontRef = tagStream->readEncodedUint32();
+  }
+  if (hasFontSize) {
+    run->fontSize = tagStream->readFloat();
+  }
+  auto glyphCount = tagStream->readEncodedUint32();
+  if (glyphCount > 65536) {
+    PAGThrowError(tagStream->context, "glyph count exceeds the spec limit");
+    return run;
+  }
+  auto numBits = static_cast<uint8_t>(tagStream->readUBits(5) + 1);
+  run->glyphs.resize(glyphCount);
+  for (uint32_t i = 0; i < glyphCount; i++) {
+    run->glyphs[i] = static_cast<uint16_t>(tagStream->readUBits(numBits));
+  }
+  tagStream->alignWithBytes();
+  if (hasX) {
+    run->x = tagStream->readFloat();
+  }
+  if (hasY) {
+    run->y = tagStream->readFloat();
+  }
+  if (hasXOffsets) {
+    run->xOffsets.resize(glyphCount);
+    tagStream->readFloatList(run->xOffsets.data(), glyphCount, 0.05f);
+    tagStream->alignWithBytes();
+  }
+  if (hasPositions) {
+    std::vector<pag::Point> points(glyphCount);
+    tagStream->readPoint2DList(points.data(), glyphCount, 0.05f);
+    tagStream->alignWithBytes();
+    run->positions.resize(glyphCount);
+    for (uint32_t i = 0; i < glyphCount; i++) {
+      run->positions[i].x = points[i].x;
+      run->positions[i].y = points[i].y;
+    }
+  }
+  if (hasAnchors) {
+    std::vector<pag::Point> points(glyphCount);
+    tagStream->readPoint2DList(points.data(), glyphCount, 0.05f);
+    tagStream->alignWithBytes();
+    run->anchors.resize(glyphCount);
+    for (uint32_t i = 0; i < glyphCount; i++) {
+      run->anchors[i].x = points[i].x;
+      run->anchors[i].y = points[i].y;
+    }
+  }
+  if (hasScales) {
+    auto count = tagStream->readEncodedUint32();
+    if (count > 65536) {
+      PAGThrowError(tagStream->context, "glyph scale count exceeds the spec limit");
+      return run;
+    }
+    run->scales.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+      run->scales[i].x = tagStream->readFloat();
+      run->scales[i].y = tagStream->readFloat();
+    }
+  }
+  if (hasRotations) {
+    auto count = tagStream->readEncodedUint32();
+    if (count > 65536) {
+      PAGThrowError(tagStream->context, "glyph rotation count exceeds the spec limit");
+      return run;
+    }
+    run->rotations.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+      run->rotations[i] = tagStream->readFloat();
+    }
+  }
+  if (hasSkews) {
+    auto count = tagStream->readEncodedUint32();
+    if (count > 65536) {
+      PAGThrowError(tagStream->context, "glyph skew count exceeds the spec limit");
+      return run;
+    }
+    run->skews.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+      run->skews[i] = tagStream->readFloat();
+    }
+  }
+  if (hasBounds) {
+    run->bounds.x = tagStream->readFloat();
+    run->bounds.y = tagStream->readFloat();
+    run->bounds.width = tagStream->readFloat();
+    run->bounds.height = tagStream->readFloat();
+  }
+  if (hasFont) {
+    if (fontRef == 0) {
+      auto fontHeader = ReadPAGTagHeader(tagStream);
+      auto fontBytes = tagStream->readBytes(fontHeader.length);
+      if (fontHeader.code == TagCode::Font) {
+        run->font = ReadFontTag(&fontBytes, context);
+      }
+    } else if (fontRef <= context->resourceFonts.size()) {
+      run->font = context->resourceFonts[fontRef - 1];
+    }
+  }
+  return run;
+}
+
 Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* text = context->document->makeNode<Text>();
   while (true) {
@@ -453,6 +621,11 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       if (hasSpacing) text->letterSpacing = tagBytes.readFloat();
       if (hasAnchor) text->textAnchor = static_cast<TextAnchor>(tagBytes.readUint8());
       if (hasBaseline) text->baseline = static_cast<TextBaseline>(tagBytes.readUint8());
+    } else if (header.code == TagCode::GlyphRun) {
+      auto* run = ReadGlyphRunTag(&tagBytes, context);
+      if (run != nullptr) {
+        text->glyphRuns.push_back(run);
+      }
     }
   }
   return text;
