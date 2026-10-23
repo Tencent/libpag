@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: one animated Fill paints both a rectangle and a text glyph run in the same layer, so the
+     animation must reach the geometry and the text paint site alike.
+     Target: Fill  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,100" size="100,100" roundness="8"/>
+    <Text text="AB" fontFamily="Arial" fontSize="32" position="200,110"/>
+    <Fill id="sharedPainter" color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="sharedPainterShift" duration="60" frameRate="60" loop="once">
+      <Object target="sharedPainter">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

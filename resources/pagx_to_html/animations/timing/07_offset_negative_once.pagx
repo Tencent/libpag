@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a negative evaluationOffset skips the animation ahead so the color is already red at the
+     first frames of the mount.
+     Target: SolidColor  Channel: color  Type: color
+     Expect: supported
+     Ref: test/src/PAGXRuntimeTest.cpp:735 -->
+<pagx width="320" height="200">
+  <Resources>
+    <Composition id="inner" width="120" height="120">
+      <Layer id="childLayer" width="120" height="120">
+        <Rectangle position="60,60" size="120,120" roundness="8"/>
+        <Fill>
+          <SolidColor id="cardColor" color="#00FF00"/>
+        </Fill>
+      </Layer>
+      <Animations>
+        <Animation id="shift" duration="20" frameRate="60" loop="once">
+          <Object target="cardColor">
+            <Channel name="color" type="color">
+              <Key time="0" value="#00FF00" interpolation="hold"/>
+              <Key time="10" value="#FF0000" interpolation="hold"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+    </Composition>
+  </Resources>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="slot" x="100" y="40" width="120" height="120" composition="@inner">
+    <Timelines>
+      <Animation ref="@shift" evaluationOffset="-10"/>
+    </Timelines>
+  </Layer>
+</pagx>

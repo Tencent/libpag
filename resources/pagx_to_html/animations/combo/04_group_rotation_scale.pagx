@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group rotation and scale.x / scale.y animate together so the contents both turn and grow.
+     Target: Group  Channel: rotation,scale.x,scale.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="growSpinGroup" position="130,50" rotation="0" scale="1,1">
+      <Rectangle size="60,60" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupGrowSpin" duration="60" frameRate="60" loop="once">
+      <Object target="growSpinGroup">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="30" interpolation="linear"/>
+        </Channel>
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="1.5" interpolation="linear"/>
+        </Channel>
+        <Channel name="scale.y" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="1.5" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

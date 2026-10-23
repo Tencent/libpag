@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox position.x slides the text layout area to the right.
+     Target: TextBox  Channel: position.x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <TextBox id="moveTextBox" left="60" top="80" width="140" height="48">
+      <Text text="AB" fontFamily="Arial" fontSize="32"/>
+      <Fill color="#1D4ED8"/>
+    </TextBox>
+  </Layer>
+  <Animations>
+    <Animation id="textBoxSlideX" duration="60" frameRate="60" loop="once">
+      <Object target="moveTextBox">
+        <Channel name="position.x" type="float">
+          <Key time="0" value="60" interpolation="linear"/>
+          <Key time="60" value="200" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

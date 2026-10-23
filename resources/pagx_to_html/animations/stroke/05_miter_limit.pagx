@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Stroke miterLimit raises the join limit on a sharp star, turning bevel joins into long
+     miter spikes.
+     Target: Stroke  Channel: miterLimit  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar position="160,100" type="star" pointCount="5" outerRadius="60" innerRadius="24" rotation="-90"/>
+    <Stroke id="miterStroke" color="#1D4ED8" width="14" join="miter" miterLimit="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="strokeMiterGrow" duration="60" frameRate="60" loop="once">
+      <Object target="miterStroke">
+        <Channel name="miterLimit" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="20" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
