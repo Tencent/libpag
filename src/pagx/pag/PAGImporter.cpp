@@ -24,10 +24,14 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -38,10 +42,12 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
@@ -629,6 +635,108 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
   }
 }
 
+LayerFilter* ReadLayerFilterTag(pag::DecodeStream* tagStream, TagCode code,
+                                DecodeContext* context) {
+  switch (code) {
+    case TagCode::BlurFilter: {
+      auto* filter = context->document->makeNode<BlurFilter>();
+      PAGAttributeBlockReader reader(tagStream, 3);
+      bool hasBlurX = reader.flag(0);
+      bool hasBlurY = reader.flag(1);
+      bool hasTileMode = reader.flag(2);
+      tagStream->alignWithBytes();
+      if (hasBlurX) filter->blurX = tagStream->readFloat();
+      if (hasBlurY) filter->blurY = tagStream->readFloat();
+      if (hasTileMode) filter->tileMode = static_cast<TileMode>(tagStream->readUint8());
+      return filter;
+    }
+    case TagCode::DropShadowFilter: {
+      auto* filter = context->document->makeNode<DropShadowFilter>();
+      PAGAttributeBlockReader reader(tagStream, 6);
+      bool hasOffsetX = reader.flag(0);
+      bool hasOffsetY = reader.flag(1);
+      bool hasBlurX = reader.flag(2);
+      bool hasBlurY = reader.flag(3);
+      bool hasColor = reader.flag(4);
+      filter->shadowOnly = reader.flag(5);
+      tagStream->alignWithBytes();
+      if (hasOffsetX) filter->offsetX = tagStream->readFloat();
+      if (hasOffsetY) filter->offsetY = tagStream->readFloat();
+      if (hasBlurX) filter->blurX = tagStream->readFloat();
+      if (hasBlurY) filter->blurY = tagStream->readFloat();
+      if (hasColor) filter->color = ReadPAGColor(tagStream);
+      return filter;
+    }
+    case TagCode::InnerShadowFilter: {
+      auto* filter = context->document->makeNode<InnerShadowFilter>();
+      PAGAttributeBlockReader reader(tagStream, 6);
+      bool hasOffsetX = reader.flag(0);
+      bool hasOffsetY = reader.flag(1);
+      bool hasBlurX = reader.flag(2);
+      bool hasBlurY = reader.flag(3);
+      bool hasColor = reader.flag(4);
+      filter->shadowOnly = reader.flag(5);
+      tagStream->alignWithBytes();
+      if (hasOffsetX) filter->offsetX = tagStream->readFloat();
+      if (hasOffsetY) filter->offsetY = tagStream->readFloat();
+      if (hasBlurX) filter->blurX = tagStream->readFloat();
+      if (hasBlurY) filter->blurY = tagStream->readFloat();
+      if (hasColor) filter->color = ReadPAGColor(tagStream);
+      return filter;
+    }
+    case TagCode::BlendFilter: {
+      auto* filter = context->document->makeNode<BlendFilter>();
+      PAGAttributeBlockReader reader(tagStream, 2);
+      bool hasColor = reader.flag(0);
+      bool hasBlend = reader.flag(1);
+      tagStream->alignWithBytes();
+      if (hasColor) filter->color = ReadPAGColor(tagStream);
+      if (hasBlend) filter->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      return filter;
+    }
+    case TagCode::ColorMatrixFilter: {
+      auto* filter = context->document->makeNode<ColorMatrixFilter>();
+      PAGAttributeBlockReader reader(tagStream, 1);
+      bool hasMatrix = reader.flag(0);
+      tagStream->alignWithBytes();
+      if (hasMatrix) {
+        for (int i = 0; i < 20; i++) {
+          filter->matrix[i] = tagStream->readFloat();
+        }
+      }
+      return filter;
+    }
+    case TagCode::NoiseFilter: {
+      auto* filter = context->document->makeNode<NoiseFilter>();
+      PAGAttributeBlockReader reader(tagStream, 9);
+      bool hasMode = reader.flag(0);
+      bool hasSize = reader.flag(1);
+      bool hasDensity = reader.flag(2);
+      bool hasSeed = reader.flag(3);
+      bool hasBlend = reader.flag(4);
+      bool hasColor = reader.flag(5);
+      bool hasFirstColor = reader.flag(6);
+      bool hasSecondColor = reader.flag(7);
+      bool hasOpacity = reader.flag(8);
+      tagStream->alignWithBytes();
+      if (hasMode) filter->mode = static_cast<NoiseMode>(tagStream->readUint8());
+      if (hasSize) filter->size = tagStream->readFloat();
+      if (hasDensity) filter->density = tagStream->readFloat();
+      if (hasSeed) filter->seed = tagStream->readFloat();
+      if (hasBlend) filter->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasColor) filter->color = ReadPAGColor(tagStream);
+      if (hasFirstColor) filter->firstColor = ReadPAGColor(tagStream);
+      if (hasSecondColor) filter->secondColor = ReadPAGColor(tagStream);
+      if (hasOpacity) {
+        filter->opacity = static_cast<float>(tagStream->readUint8()) / 255.0f;
+      }
+      return filter;
+    }
+    default:
+      return nullptr;
+  }
+}
+
 Element* ReadFillTag(pag::DecodeStream* tagStream, DecodeContext* context) {
   auto* fill = context->document->makeNode<Fill>();
   PAGAttributeBlockReader reader(tagStream, 5);
@@ -1050,6 +1158,13 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       auto* style = ReadLayerStyleTag(&tagBytes, header.code, context);
       if (style != nullptr) {
         layer->styles.push_back(style);
+      }
+    } else if (header.code == TagCode::BlurFilter || header.code == TagCode::DropShadowFilter ||
+               header.code == TagCode::InnerShadowFilter || header.code == TagCode::BlendFilter ||
+               header.code == TagCode::ColorMatrixFilter || header.code == TagCode::NoiseFilter) {
+      auto* filter = ReadLayerFilterTag(&tagBytes, header.code, context);
+      if (filter != nullptr) {
+        layer->filters.push_back(filter);
       }
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);

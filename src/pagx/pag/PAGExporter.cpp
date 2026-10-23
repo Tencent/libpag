@@ -27,9 +27,13 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -40,11 +44,14 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
@@ -1170,6 +1177,162 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
   WriteTag(stream, TagCode::CompositionBlock, &content);
 }
 
+// BlurFilter tag (spec §9.5 #360).
+void WriteBlurFilterTag(pag::EncodeStream* stream, BlurFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->blurX != 0.0f);
+  writer.writeFlag(filter->blurY != 0.0f);
+  writer.writeFlag(filter->tileMode != TileMode::Decal);
+  auto* v = writer.valueStream();
+  if (filter->blurX != 0.0f) v->writeFloat(filter->blurX);
+  if (filter->blurY != 0.0f) v->writeFloat(filter->blurY);
+  if (filter->tileMode != TileMode::Decal) {
+    v->writeUint8(static_cast<uint8_t>(filter->tileMode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::BlurFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// Shared shadow-filter layout (spec §9.5 #361/#362): DropShadowFilter and InnerShadowFilter
+// have identical fields.
+struct ShadowFilterFields {
+  float offsetX;
+  float offsetY;
+  float blurX;
+  float blurY;
+  Color color;
+  bool shadowOnly;
+};
+
+void WriteShadowFilterLayout(pag::EncodeStream* stream, TagCode code,
+                             const ShadowFilterFields& fields, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(fields.offsetX != 0.0f);
+  writer.writeFlag(fields.offsetY != 0.0f);
+  writer.writeFlag(fields.blurX != 0.0f);
+  writer.writeFlag(fields.blurY != 0.0f);
+  writer.writeFlag(true);  // color
+  writer.writeFlag(fields.shadowOnly);
+  auto* v = writer.valueStream();
+  if (fields.offsetX != 0.0f) v->writeFloat(fields.offsetX);
+  if (fields.offsetY != 0.0f) v->writeFloat(fields.offsetY);
+  if (fields.blurX != 0.0f) v->writeFloat(fields.blurX);
+  if (fields.blurY != 0.0f) v->writeFloat(fields.blurY);
+  WritePAGColor(v, fields.color);
+  if (fields.shadowOnly) v->writeBoolean(fields.shadowOnly);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, code, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// BlendFilter tag (spec §9.5 #363).
+void WriteBlendFilterTag(pag::EncodeStream* stream, BlendFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(true);  // color
+  writer.writeFlag(filter->blendMode != BlendMode::Normal);
+  auto* v = writer.valueStream();
+  WritePAGColor(v, filter->color);
+  if (filter->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(filter->blendMode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::BlendFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// ColorMatrixFilter tag (spec §9.5 #364): 20 f32 values, row-major, identity default.
+void WriteColorMatrixFilterTag(pag::EncodeStream* stream, ColorMatrixFilter* filter,
+                               EncodeState* state) {
+  static constexpr float kIdentity[20] = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+  bool isIdentity = true;
+  for (int i = 0; i < 20; i++) {
+    if (filter->matrix[i] != kIdentity[i]) {
+      isIdentity = false;
+      break;
+    }
+  }
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(!isIdentity);
+  auto* v = writer.valueStream();
+  if (!isIdentity) {
+    for (int i = 0; i < 20; i++) {
+      v->writeFloat(filter->matrix[i]);
+    }
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::ColorMatrixFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// NoiseFilter tag (spec §9.5 #365).
+void WriteNoiseFilterTag(pag::EncodeStream* stream, NoiseFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->mode != NoiseMode::Mono);
+  writer.writeFlag(filter->size != 4.0f);
+  writer.writeFlag(filter->density != 0.5f);
+  writer.writeFlag(filter->seed != 0.0f);
+  writer.writeFlag(filter->blendMode != BlendMode::Normal);
+  writer.writeFlag(true);  // color
+  writer.writeFlag(true);  // firstColor
+  writer.writeFlag(true);  // secondColor
+  writer.writeFlag(filter->opacity != 0.15f);
+  auto* v = writer.valueStream();
+  if (filter->mode != NoiseMode::Mono) {
+    v->writeUint8(static_cast<uint8_t>(filter->mode));
+  }
+  if (filter->size != 4.0f) v->writeFloat(filter->size);
+  if (filter->density != 0.5f) v->writeFloat(filter->density);
+  if (filter->seed != 0.0f) v->writeFloat(filter->seed);
+  if (filter->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(filter->blendMode));
+  }
+  WritePAGColor(v, filter->color);
+  WritePAGColor(v, filter->firstColor);
+  WritePAGColor(v, filter->secondColor);
+  if (filter->opacity != 0.15f) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(filter->opacity * 255.0f)));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::NoiseFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// Dispatches a layer filter tag by node type.
+void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeState* state) {
+  switch (filter->nodeType()) {
+    case NodeType::BlurFilter:
+      WriteBlurFilterTag(stream, static_cast<BlurFilter*>(filter), state);
+      break;
+    case NodeType::DropShadowFilter: {
+      auto* f = static_cast<DropShadowFilter*>(filter);
+      ShadowFilterFields fields = {f->offsetX, f->offsetY, f->blurX,
+                                   f->blurY,   f->color,   f->shadowOnly};
+      WriteShadowFilterLayout(stream, TagCode::DropShadowFilter, fields, state);
+      break;
+    }
+    case NodeType::InnerShadowFilter: {
+      auto* f = static_cast<InnerShadowFilter*>(filter);
+      ShadowFilterFields fields = {f->offsetX, f->offsetY, f->blurX,
+                                   f->blurY,   f->color,   f->shadowOnly};
+      WriteShadowFilterLayout(stream, TagCode::InnerShadowFilter, fields, state);
+      break;
+    }
+    case NodeType::BlendFilter:
+      WriteBlendFilterTag(stream, static_cast<BlendFilter*>(filter), state);
+      break;
+    case NodeType::ColorMatrixFilter:
+      WriteColorMatrixFilterTag(stream, static_cast<ColorMatrixFilter*>(filter), state);
+      break;
+    case NodeType::NoiseFilter:
+      WriteNoiseFilterTag(stream, static_cast<NoiseFilter*>(filter), state);
+      break;
+    default:
+      break;
+  }
+}
+
 // DropShadowStyle tag (spec §9.5 #355).
 void WriteDropShadowStyleTag(pag::EncodeStream* stream, DropShadowStyle* style,
                              EncodeState* state) {
@@ -1428,6 +1591,9 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
   }
   for (auto* style : layer->styles) {
     WriteLayerStyleTag(&content, style, state);
+  }
+  for (auto* filter : layer->filters) {
+    WriteLayerFilterTag(&content, filter, state);
   }
   for (auto* child : layer->children) {
     WriteLayerTag(&content, child, state);

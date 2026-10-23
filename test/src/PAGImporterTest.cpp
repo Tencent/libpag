@@ -30,7 +30,11 @@
 #include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -38,9 +42,11 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
@@ -964,6 +970,88 @@ PAGX_TEST(PAGImporterTest, LayerStyleRoundTrip) {
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "layer-styles", &byteCount));
   EXPECT_GT(byteCount, 0);
+}
+
+PAGX_TEST(PAGImporterTest, LayerFilterRoundTrip) {
+  // All six layer filters (spec §9.5 #360-365) survive export → decode with fields intact.
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 200;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+
+  auto* blur = doc->makeNode<BlurFilter>();
+  blur->blurX = 5.0f;
+  blur->blurY = 7.0f;
+  blur->tileMode = TileMode::Repeat;
+  layer->filters.push_back(blur);
+
+  auto* dropShadow = doc->makeNode<DropShadowFilter>();
+  dropShadow->offsetX = 3.0f;
+  dropShadow->blurX = 4.0f;
+  dropShadow->color = {0.2f, 0.4f, 0.6f, 0.8f, ColorSpace::SRGB};
+  dropShadow->shadowOnly = true;
+  layer->filters.push_back(dropShadow);
+
+  auto* innerShadow = doc->makeNode<InnerShadowFilter>();
+  innerShadow->offsetY = 5.0f;
+  innerShadow->blurY = 6.0f;
+  layer->filters.push_back(innerShadow);
+
+  auto* blend = doc->makeNode<BlendFilter>();
+  blend->color = {0.9f, 0.1f, 0.1f, 1.0f, ColorSpace::SRGB};
+  blend->blendMode = BlendMode::Screen;
+  layer->filters.push_back(blend);
+
+  auto* colorMatrix = doc->makeNode<ColorMatrixFilter>();
+  colorMatrix->matrix = {1.5f, 0, 0, 0, 0.1f, 0, 0.8f, 0, 0, 0, 0, 0, 1.2f, 0, 0, 0, 0, 0, 1, 0};
+  layer->filters.push_back(colorMatrix);
+
+  auto* noise = doc->makeNode<NoiseFilter>();
+  noise->mode = NoiseMode::Multi;
+  noise->size = 8.0f;
+  noise->density = 0.9f;
+  noise->seed = 123.0f;
+  noise->blendMode = BlendMode::Overlay;
+  noise->opacity = 0.4f;
+  layer->filters.push_back(noise);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/filter_rt1.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/filter_rt1.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers[0]->filters.size(), 6u);
+
+  auto* dBlur = static_cast<BlurFilter*>(decoded->layers[0]->filters[0]);
+  EXPECT_EQ(dBlur->blurX, 5.0f);
+  EXPECT_EQ(dBlur->blurY, 7.0f);
+  EXPECT_EQ(dBlur->tileMode, TileMode::Repeat);
+
+  auto* dDrop = static_cast<DropShadowFilter*>(decoded->layers[0]->filters[1]);
+  EXPECT_EQ(dDrop->offsetX, 3.0f);
+  EXPECT_EQ(dDrop->blurX, 4.0f);
+  EXPECT_NEAR(dDrop->color.alpha, 0.8f, 0.01f);
+  EXPECT_TRUE(dDrop->shadowOnly);
+
+  auto* dInner = static_cast<InnerShadowFilter*>(decoded->layers[0]->filters[2]);
+  EXPECT_EQ(dInner->offsetY, 5.0f);
+  EXPECT_EQ(dInner->blurY, 6.0f);
+
+  auto* dBlend = static_cast<BlendFilter*>(decoded->layers[0]->filters[3]);
+  EXPECT_NEAR(dBlend->color.red, 0.9f, 0.01f);
+  EXPECT_EQ(dBlend->blendMode, BlendMode::Screen);
+
+  auto* dMatrix = static_cast<ColorMatrixFilter*>(decoded->layers[0]->filters[4]);
+  EXPECT_EQ(dMatrix->matrix[0], 1.5f);
+  EXPECT_EQ(dMatrix->matrix[2 * 5 + 2], 1.2f);
+
+  auto* dNoise = static_cast<NoiseFilter*>(decoded->layers[0]->filters[5]);
+  EXPECT_EQ(dNoise->mode, NoiseMode::Multi);
+  EXPECT_EQ(dNoise->size, 8.0f);
+  EXPECT_EQ(dNoise->seed, 123.0f);
+  EXPECT_NEAR(dNoise->opacity, 0.4f, 0.01f);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "layer-filters", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
