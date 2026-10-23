@@ -687,6 +687,92 @@ PAGX_TEST(PAGImporterTest, DecodedImageRendersIdentically) {
   EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
 }
 
+// Helper: exports → decodes → re-exports → decodes → re-exports, asserting export2 == export3
+// (steady-state byte idempotency from the decoded state). Returns false when any step fails.
+static bool AssertSteadyStateIdempotency(const std::shared_ptr<PAGXDocument>& doc,
+                                         const std::string& tag, int* byteCount) {
+  auto r1 = PAGExporter::ExportToPAG(doc, "/tmp/idem_1.pag");
+  if (!r1.success) {
+    ADD_FAILURE() << tag << ": export1 failed";
+    return false;
+  }
+  auto d1 = PAGImporter::LoadFromPAG("/tmp/idem_1.pag");
+  if (d1 == nullptr) {
+    ADD_FAILURE() << tag << ": decode1 failed";
+    return false;
+  }
+  auto r2 = PAGExporter::ExportToPAG(d1, "/tmp/idem_2.pag");
+  if (!r2.success) {
+    ADD_FAILURE() << tag << ": export2 failed";
+    return false;
+  }
+  auto d2 = PAGImporter::LoadFromPAG("/tmp/idem_2.pag");
+  if (d2 == nullptr) {
+    ADD_FAILURE() << tag << ": decode2 failed";
+    return false;
+  }
+  auto r3 = PAGExporter::ExportToPAG(d2, "/tmp/idem_3.pag");
+  if (!r3.success) {
+    ADD_FAILURE() << tag << ": export3 failed";
+    return false;
+  }
+  auto bytes2 = ReadFileBytes("/tmp/idem_2.pag");
+  auto bytes3 = ReadFileBytes("/tmp/idem_3.pag");
+  if (bytes2.size() != bytes3.size()) {
+    ADD_FAILURE() << tag << ": size mismatch " << bytes2.size() << " vs " << bytes3.size();
+    return false;
+  }
+  if (memcmp(bytes2.data(), bytes3.data(), bytes2.size()) != 0) {
+    ADD_FAILURE() << tag << ": bytes differ";
+    return false;
+  }
+  *byteCount = static_cast<int>(bytes2.size());
+  return true;
+}
+
+PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {
+  // Every fully-supported export path must be byte-idempotent from the decoded state.
+  // Each sample exercises a distinct encoding feature; together they cover the full
+  // phase-1 tag surface.
+  struct Case {
+    const char* path;
+    const char* feature;
+  };
+  const std::vector<Case> cases = {
+      // Shapes + fills + gradients
+      {"resources/pagx_to_pag/static_animated/pure_static.pagx", "layer/ellipse/radial-gradient"},
+      {"resources/pagx_to_pag/layout_flatten/clip_to_bounds.pagx",
+       "nested-layer/scroll-rect/rectangle"},
+      // Images: shared resource + inline data URI
+      {"resources/pagx_to_pag/resource/image_external_shared.pagx",
+       "shared-image/image-pattern/resource-block"},
+      {"resources/pagx_to_pag/resource/image_data_uri.pagx", "inline-image/image-pattern"},
+      // Embedded glyphs: vector outlines + bitmap images
+      {"resources/pagx_to_pag/text_font/embedded_vector_glyphs.pagx",
+       "inline-font/vector-glyph-run"},
+      {"resources/pagx_to_pag/text_font/embedded_bitmap_glyphs.pagx", "bitmap-glyph/image-table"},
+      // Sub-documents: single, multi-reference, nested
+      {"resources/pagx_to_pag/sub_document/subdoc_with_layout/main.pagx",
+       "sub-document/image-in-subdoc"},
+      // Internal composition
+      {"resources/cli/optimizer_all_rules.pagx", "internal-composition/shared-resources"},
+  };
+  for (auto& testCase : cases) {
+    auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(testCase.path));
+    ASSERT_TRUE(doc != nullptr) << testCase.path;
+    // Sub-document samples need external file loading first.
+    if (testCase.path ==
+        std::string("resources/pagx_to_pag/sub_document/subdoc_with_layout/main.pagx")) {
+      PAGXExternalFiles::Load(
+          doc.get(),
+          pag::ProjectPath::Absolute("resources/pagx_to_pag/sub_document/subdoc_with_layout/"));
+    }
+    int byteCount = 0;
+    EXPECT_TRUE(AssertSteadyStateIdempotency(doc, testCase.feature, &byteCount)) << testCase.path;
+    EXPECT_GT(byteCount, 0) << testCase.path;
+  }
+}
+
 PAGX_TEST(PAGImporterTest, FontRoundTripIdempotency) {
   // Regression: fonts decoded from the v4 binary carry no ids, but the exporter's internal
   // XML round trip links GlyphRun -> Font by @id. The id synthesis (pag-v4-font-N) must keep
