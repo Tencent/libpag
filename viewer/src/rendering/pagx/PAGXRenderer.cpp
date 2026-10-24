@@ -100,7 +100,11 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     playbackFinishNotified = false;
   }
 
-  if (state.isPlaying && state.animation != nullptr && state.animation->duration() > 0) {
+  if (state.stateMachine != nullptr && state.isPlaying) {
+    // A StateMachine default timeline plays by real-time advancement only (spec 8.1.1 / C23):
+    // no seek, no progress reporting, no finish notification — it has no fixed duration.
+    advanceStateMachine(state);
+  } else if (state.isPlaying && state.animation != nullptr && state.animation->duration() > 0) {
     advancePlayback(state, reseat);
   } else if (state.animation != nullptr && state.animation->duration() > 0) {
     seekPaused(state, reseat);
@@ -134,6 +138,19 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   metrics.rendered = true;
   device->unlock();
   return metrics;
+}
+
+void PAGXRenderer::advanceStateMachine(PAGXViewModel::RenderState& state) {
+  auto now = tgfx::Clock::Now();
+  if (lastAdvanceTimeUs < 0) {
+    lastAdvanceTimeUs = now;
+  }
+  int64_t deltaUs = now - lastAdvanceTimeUs;
+  lastAdvanceTimeUs = now;
+  if (deltaUs > 0) {
+    state.stateMachine->advance(deltaUs);
+    state.scene->advanceAndApply(deltaUs);
+  }
 }
 
 void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool reseat) {

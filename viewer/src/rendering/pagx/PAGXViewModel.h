@@ -25,6 +25,7 @@
 #include <mutex>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
 #include "rendering/pagx/XmlDocumentHighlighter.h"
@@ -180,6 +181,7 @@ class PAGXViewModel : public ContentViewModel {
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
     std::shared_ptr<pagx::PAGAnimation> animation;
+    std::shared_ptr<pagx::PAGStateMachine> stateMachine;
     pagx::LoopMode loopMode = pagx::LoopMode::Once;
     int contentWidth = 0;
     int contentHeight = 0;
@@ -274,6 +276,9 @@ class PAGXViewModel : public ContentViewModel {
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<pagx::PAGScene> scene = nullptr;
   std::shared_ptr<pagx::PAGAnimation> defaultAnimation = nullptr;
+  // The default timeline may be a StateMachine (spec 8.1.1 / C23): it plays by real-time
+  // advancement with no duration or progress, so the Animation-specific fields stay null.
+  std::shared_ptr<pagx::PAGStateMachine> defaultStateMachine = nullptr;
   pagx::LoopMode defaultLoopMode = pagx::LoopMode::Once;
   int pagxWidth = 0;
   int pagxHeight = 0;

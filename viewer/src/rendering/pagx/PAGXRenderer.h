@@ -44,6 +44,7 @@ class PAGXRenderer : public IContentRenderer {
   // (generation bump), which re-arms the timeline (seek to the shown progress or rewind a finished
   // one, then play).
   void advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
+  void advanceStateMachine(PAGXViewModel::RenderState& state);
 
   // Handles the paused timeline: on a play-state transition or content reload it reports the
   // timeline's actual position so the UI catches up; in steady state it seeks to the requested

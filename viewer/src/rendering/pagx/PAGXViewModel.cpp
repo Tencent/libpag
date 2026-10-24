@@ -312,6 +312,7 @@ PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
   return {scene,
           defaultAnimation,
+          defaultStateMachine,
           defaultLoopMode,
           pagxWidth,
           pagxHeight,
@@ -542,27 +543,41 @@ void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
   scene = nullptr;
   defaultAnimation = nullptr;
+  defaultStateMachine = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
 }
 
 void PAGXViewModel::resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document) {
   defaultAnimation = nullptr;
+  defaultStateMachine = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
-  if (!document->animations.empty()) {
-    auto* firstAnim = document->animations[0];
-    if (firstAnim != nullptr && firstAnim->nodeType() == pagx::NodeType::Animation) {
-      auto* anim = static_cast<pagx::Animation*>(firstAnim);
+  // The default timeline is the root scope's first Animation or StateMachine (spec 8.1.1 /
+  // C23), resolved through the scene so both node kinds drive playback uniformly. A
+  // StateMachine plays by real-time advancement; it reports no duration, so the progress UI
+  // falls back to the undetermined state (totalFrames stays 1).
+  for (auto* node : document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == pagx::NodeType::Animation) {
+      auto* anim = static_cast<pagx::Animation*>(node);
       defaultAnimation = scene->getAnimation(anim->id);
       defaultLoopMode = anim->loop;
+      return;
+    }
+    if (node->nodeType() == pagx::NodeType::StateMachine) {
+      defaultStateMachine =
+          scene->getStateMachineTimeline(static_cast<pagx::StateMachine*>(node)->id);
+      return;
     }
   }
 }
 
 void PAGXViewModel::emitContentStateReset() {
   Q_EMIT progressChanged(0.0);
-  Q_EMIT isPlayingChanged(hasAnimation());
+  Q_EMIT isPlayingChanged(hasAnimation() || defaultStateMachine != nullptr);
   Q_EMIT totalFrameChanged();
-  Q_EMIT hasAnimationChanged(hasAnimation());
+  Q_EMIT hasAnimationChanged(hasAnimation() || defaultStateMachine != nullptr);
 }
 
 void PAGXViewModel::updateAnimationState() {
@@ -586,7 +601,9 @@ void PAGXViewModel::updateAnimationState() {
   // queued from the previously loaded content is treated as stale and dropped on the main thread,
   // even when the new content does not animate.
   playbackGeneration++;
-  isPlaying_ = hasAnimation();
+  // A StateMachine default timeline counts as animated content even though it has no fixed
+  // frame count (totalFrames stays 1); it plays by real-time advancement.
+  isPlaying_ = hasAnimation() || defaultStateMachine != nullptr;
 }
 
 QString PAGXViewModel::documentXml() const {

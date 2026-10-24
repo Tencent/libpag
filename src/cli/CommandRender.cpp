@@ -31,8 +31,10 @@
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
@@ -271,10 +273,14 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
   return written == data->size();
 }
 
-// Renders a single animation frame through the runtime animation path. The document's top-level
-// timelines are all seeked to `options.timeSeconds` and applied before drawing, so an animated
-// element's alpha / position / color reflect that playback time. Static documents (no animations)
-// fall through to a plain draw, which is equivalent to the layer-tree path at the default state.
+// Renders a single animation frame through the runtime animation path. The document's default
+// timeline (spec 8.1.1 / C23: the root scope's first Animation or StateMachine in declaration
+// order) is positioned at the requested playback time before drawing, so an animated element's
+// alpha / position / color reflect that time. An Animation timeline seeks directly; a
+// StateMachine has no progress interface, so it advances from its initial state in frame steps
+// up to the requested time (the same semantics the comparison page uses). Static documents (no
+// animations) fall through to a plain draw, which is equivalent to the layer-tree path at the
+// default state.
 static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& document,
                                         const RenderOptions& options) {
   auto scene = PAGScene::Make(document);
@@ -284,13 +290,24 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   }
 
   auto timeUs = static_cast<int64_t>(llround(static_cast<double>(options.timeSeconds) * 1e6));
-  for (const auto& id : scene->getAnimationIds()) {
-    auto animation = scene->getAnimation(id);
-    if (animation == nullptr) {
-      continue;
+  auto defaultTimeline = scene->getDefaultTimeline();
+  if (defaultTimeline != nullptr) {
+    auto animation = std::dynamic_pointer_cast<PAGAnimation>(defaultTimeline);
+    if (animation != nullptr) {
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    } else {
+      auto stateMachine = std::dynamic_pointer_cast<PAGStateMachine>(defaultTimeline);
+      if (stateMachine != nullptr) {
+        constexpr int64_t FrameStepUs = 16667;
+        auto advanced = static_cast<int64_t>(0);
+        while (advanced < timeUs) {
+          auto step = std::min(FrameStepUs, timeUs - advanced);
+          stateMachine->advance(step);
+          advanced += step;
+        }
+      }
     }
-    animation->setCurrentTime(timeUs);
-    animation->apply(1.0f);
   }
 
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
