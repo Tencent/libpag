@@ -47,6 +47,11 @@ class PAGImporter {
    */
   static std::shared_ptr<PAGXDocument> LoadFromPAG(const std::string& filePath,
                                                     PAGImportResult* result = nullptr);
+
+  // Restores RetainedIdTable entries (spec §9.0) onto the document's emission-order node
+  // list and registers each id so findNode resolves it.
+  static void RestoreRetainedIds(PAGXDocument* document,
+                                 const std::vector<std::pair<uint32_t, std::string>>& retainedIds);
 };
 
 }  // namespace pagx

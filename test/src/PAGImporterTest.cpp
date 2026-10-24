@@ -29,9 +29,12 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -1677,6 +1680,102 @@ PAGX_TEST(PAGImporterTest, SharedReferenceMaskNodeRefRoundTrip) {
   EXPECT_FALSE(sampleMaskedLayer->mask->visible);
   ASSERT_FALSE(sampleMaskedLayer->mask->contents.empty());
   EXPECT_EQ(sampleMaskedLayer->mask->contents[0]->nodeType(), NodeType::Ellipse);
+}
+
+PAGX_TEST(PAGImporterTest, AnimationRoundTrip) {
+  // Animation core round trip (spec §9.7): every animation sample must export, decode and
+  // render bit-identically to the XML source at multiple playback times. The structure
+  // assertions pin the decoded tree (ids via RetainedIdTable, targets, channels, keyframes)
+  // and the render loop exercises every value type plus bezier interpolation and all loop
+  // modes through the runtime animation path.
+  const std::vector<std::string> samples = {
+      "channel_float_int_bool",
+      "channel_string_color_matrix",
+      "composition_scope_autoplay",
+      "interpolation_modes",
+      "layer_timeline_mount",
+      "loop_loop",
+      "loop_once",
+      "loop_pingpong",
+      "multiple_root_animations",
+      "path_point_channels",
+  };
+  for (auto& name : samples) {
+    auto source = PAGXImporter::FromFile(
+        pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/" + name + ".pagx"));
+    ASSERT_TRUE(source != nullptr) << name;
+    ASSERT_TRUE(PAGExporter::ExportToPAG(source, "/tmp/anim_rt.pag").success) << name;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/anim_rt.pag");
+    ASSERT_TRUE(decoded != nullptr) << name;
+    // Every source animation survives with its id, objects and channels.
+    ASSERT_EQ(decoded->animations.size(), source->animations.size()) << name;
+    for (size_t i = 0; i < source->animations.size(); i++) {
+      auto* srcNode = source->animations[i];
+      auto* dstNode = decoded->animations[i];
+      ASSERT_EQ(dstNode->nodeType(), NodeType::Animation) << name;
+      ASSERT_EQ(dstNode->id, srcNode->id) << name;
+      auto* src = static_cast<Animation*>(srcNode);
+      auto* dst = static_cast<Animation*>(dstNode);
+      EXPECT_EQ(dst->duration, src->duration) << name;
+      EXPECT_EQ(dst->frameRate, src->frameRate) << name;
+      EXPECT_EQ(dst->loop, src->loop) << name;
+      ASSERT_EQ(dst->objects.size(), src->objects.size()) << name;
+      for (size_t j = 0; j < src->objects.size(); j++) {
+        EXPECT_EQ(dst->objects[j]->target, src->objects[j]->target) << name;
+        ASSERT_EQ(dst->objects[j]->channels.size(), src->objects[j]->channels.size()) << name;
+        for (size_t k = 0; k < src->objects[j]->channels.size(); k++) {
+          auto* srcChannel = src->objects[j]->channels[k];
+          auto* dstChannel = dst->objects[j]->channels[k];
+          EXPECT_EQ(dstChannel->name, srcChannel->name) << name;
+          EXPECT_EQ(dstChannel->valueType(), srcChannel->valueType()) << name;
+        }
+      }
+    }
+    // Animation targets resolve through findNode (RetainedIdTable restored the ids).
+    for (auto* node : decoded->animations) {
+      for (auto* object : static_cast<Animation*>(node)->objects) {
+        auto target = object->target;
+        if (!target.empty() && target[0] == '@') {
+          target = target.substr(1);
+        }
+        if (!target.empty()) {
+          EXPECT_TRUE(decoded->findNode(target) != nullptr) << name << " target " << target;
+        }
+      }
+    }
+    // Pixel equivalence at several playback times through the runtime animation path.
+    for (auto& timeText : std::vector<std::string>{"0", "0.25", "0.5", "0.9"}) {
+      auto sceneA = PAGScene::Make(source);
+      auto sceneB = PAGScene::Make(decoded);
+      ASSERT_TRUE(sceneA != nullptr) << name;
+      ASSERT_TRUE(sceneB != nullptr) << name;
+      auto timeUs = static_cast<int64_t>(llround(std::stod(timeText) * 1e6));
+      for (auto& id : sceneA->getAnimationIds()) {
+        auto animation = sceneA->getAnimation(id);
+        animation->setCurrentTime(timeUs);
+        animation->apply(1.0f);
+      }
+      for (auto& id : sceneB->getAnimationIds()) {
+        auto animation = sceneB->getAnimation(id);
+        animation->setCurrentTime(timeUs);
+        animation->apply(1.0f);
+      }
+      int width = static_cast<int>(source->width);
+      int height = static_cast<int>(source->height);
+      auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+      auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+      ASSERT_TRUE(surfaceA != nullptr) << name;
+      ASSERT_TRUE(surfaceB != nullptr) << name;
+      ASSERT_TRUE(sceneA->draw(surfaceA)) << name;
+      ASSERT_TRUE(sceneB->draw(surfaceB)) << name;
+      std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+      std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+      ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4)) << name;
+      ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4)) << name;
+      EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0)
+          << name << " t=" << timeText;
+    }
+  }
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {

@@ -26,9 +26,13 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -62,11 +66,13 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/Timeline.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
@@ -140,6 +146,10 @@ struct EncodeState {
   int subDocNodeCount = 0;
   // Spec §5.1 node indices in emission order, backing NodeRef fields (Layer.mask).
   std::unordered_map<Node*, uint32_t> nodeIndices;
+  // Bare ids referenced by AnimationObject targets (spec §9.0): any node carrying one of
+  // these ids keeps it in the RetainedIdTable, whatever its type (Fill/Path/RangeSelector
+  // targets are not Layers). Root documents and sub-documents fill this independently.
+  std::unordered_set<std::string> animationTargetIds;
   // Shared-composition placement (spec §5.3): compositions referenced by two or more layers go
   // into the ResourceBlock in first-reference order; single-use compositions are inlined as a
   // CompositionBlock right after the referencing layer's LayerAttributes.
@@ -185,6 +195,57 @@ void CollectStringsFromColorSource(ColorSource* source, EncodeState* state) {
     for (auto& key : keys) {
       state->intern(key);
       state->intern(pattern->customData[key]);
+    }
+  }
+}
+
+// Collects the bare ids referenced by AnimationObject targets (spec §9.0). Targets may carry
+// a leading '@' (the runtime strips it at resolution), so both forms map to the bare id.
+void CollectAnimationTargetIds(const std::vector<Node*>& animations,
+                               std::unordered_set<std::string>* ids) {
+  for (auto* animationNode : animations) {
+    if (animationNode == nullptr || animationNode->nodeType() != NodeType::Animation) {
+      continue;
+    }
+    for (auto* object : static_cast<Animation*>(animationNode)->objects) {
+      auto target = object->target;
+      if (!target.empty() && target[0] == '@') {
+        target = target.substr(1);
+      }
+      if (!target.empty()) {
+        ids->insert(target);
+      }
+    }
+  }
+}
+
+// Interns every string an AnimationBlock emits (spec §9.7): the animation id (kept by the
+// RetainedIdTable), object targets and channel names. Must run before the StringTable is
+// written because the tag writers intern during body emission.
+void CollectStringsFromAnimation(Node* node, EncodeState* state) {
+  if (node == nullptr || node->nodeType() != NodeType::Animation) {
+    return;
+  }
+  auto* animation = static_cast<Animation*>(node);
+  if (!animation->id.empty()) {
+    state->intern(animation->id);
+  }
+  for (auto* object : animation->objects) {
+    if (!object->target.empty()) {
+      state->intern(object->target);
+    }
+    for (auto* channel : object->channels) {
+      if (!channel->name.empty()) {
+        state->intern(channel->name);
+      }
+      // String keyframe values intern during body emission (after the StringTable is written),
+      // so every string value must be collected here as well.
+      if (channel->valueType() == ChannelValueType::String) {
+        auto* typed = static_cast<TypedChannel<std::string>*>(channel);
+        for (const auto& keyframe : typed->keyframes) {
+          state->intern(keyframe.value);
+        }
+      }
     }
   }
 }
@@ -1405,6 +1466,249 @@ void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, Enc
   WriteTag(stream, TagCode::TextModifierBlock, &content);
 }
 
+// ---------------------------------------------------------------------------
+// Animation encoding (spec §9.7). Channel keyframes use the columnar layout of §8: count,
+// 2-bit interpolations, frame times, per-type value list, then the packed bezier tail.
+// ---------------------------------------------------------------------------
+
+// Appends one keyframe value to the tag (columnar lists that need a single call are
+// specialized below). Float/String/Color/Matrix are written per frame.
+template <typename T>
+void WriteSingleKeyValue(pag::EncodeStream* tag, const T& value, EncodeState* state);
+
+template <>
+void WriteSingleKeyValue<float>(pag::EncodeStream* tag, const float& value, EncodeState*) {
+  tag->writeFloat(value);
+}
+
+template <>
+void WriteSingleKeyValue<std::string>(pag::EncodeStream* tag, const std::string& value,
+                                      EncodeState* state) {
+  tag->writeEncodedUint32(state->intern(value));
+}
+
+template <>
+void WriteSingleKeyValue<Color>(pag::EncodeStream* tag, const Color& value, EncodeState*) {
+  WritePAGColor(tag, value);
+}
+
+template <>
+void WriteSingleKeyValue<Matrix>(pag::EncodeStream* tag, const Matrix& value, EncodeState*) {
+  WritePAGMatrix(tag, value);
+}
+
+// Writes the §8 keyframe column block of a typed channel: count, interpolation bits, frame
+// times, value list, bezier tail. ImageRef/Path/PAGImage channels have no phase-2 encoding yet
+// and are rejected by the caller before this runs.
+template <typename T>
+void WriteChannelKeyframes(pag::EncodeStream* tag, const TypedChannel<T>* channel,
+                           EncodeState* state) {
+  const auto& keyframes = channel->keyframes;
+  auto count = static_cast<uint32_t>(keyframes.size());
+  tag->writeEncodedUint32(count);
+  for (const auto& keyframe : keyframes) {
+    tag->writeUBits(static_cast<uint32_t>(keyframe.interpolation), 2);
+  }
+  tag->alignWithBytes();
+  for (const auto& keyframe : keyframes) {
+    // Frame numbers are non-negative by spec; a negative time is clamped and reported by the
+    // timing validation that already runs on the animated clone.
+    tag->writeEncodedUint32(static_cast<uint32_t>(std::max<int64_t>(0, keyframe.time)));
+  }
+  for (const auto& keyframe : keyframes) {
+    WriteSingleKeyValue(tag, keyframe.value, state);
+  }
+  std::vector<float> bezierList = {};
+  for (const auto& keyframe : keyframes) {
+    if (keyframe.interpolation != KeyframeInterpolationType::Bezier) {
+      continue;
+    }
+    bezierList.push_back(keyframe.bezierOut.x);
+    bezierList.push_back(keyframe.bezierOut.y);
+    bezierList.push_back(keyframe.bezierIn.x);
+    bezierList.push_back(keyframe.bezierIn.y);
+  }
+  tag->writeFloatList(bezierList.empty() ? nullptr : bezierList.data(),
+                      static_cast<uint32_t>(bezierList.size()), 0.005f);
+}
+
+// Int values are a single Int32List column (spec §8.1) and Bool values are a bit column.
+template <>
+void WriteChannelKeyframes<int>(pag::EncodeStream* tag, const TypedChannel<int>* channel,
+                                EncodeState*) {
+  const auto& keyframes = channel->keyframes;
+  auto count = static_cast<uint32_t>(keyframes.size());
+  tag->writeEncodedUint32(count);
+  for (const auto& keyframe : keyframes) {
+    tag->writeUBits(static_cast<uint32_t>(keyframe.interpolation), 2);
+  }
+  tag->alignWithBytes();
+  for (const auto& keyframe : keyframes) {
+    tag->writeEncodedUint32(static_cast<uint32_t>(std::max<int64_t>(0, keyframe.time)));
+  }
+  std::vector<int32_t> values = {};
+  values.reserve(keyframes.size());
+  for (const auto& keyframe : keyframes) {
+    values.push_back(keyframe.value);
+  }
+  if (!values.empty()) {
+    tag->writeInt32List(values.data(), static_cast<uint32_t>(values.size()));
+  } else {
+    tag->writeUBits(0, 5);
+  }
+  std::vector<float> bezierList = {};
+  for (const auto& keyframe : keyframes) {
+    if (keyframe.interpolation != KeyframeInterpolationType::Bezier) {
+      continue;
+    }
+    bezierList.push_back(keyframe.bezierOut.x);
+    bezierList.push_back(keyframe.bezierOut.y);
+    bezierList.push_back(keyframe.bezierIn.x);
+    bezierList.push_back(keyframe.bezierIn.y);
+  }
+  tag->writeFloatList(bezierList.empty() ? nullptr : bezierList.data(),
+                      static_cast<uint32_t>(bezierList.size()), 0.005f);
+}
+
+template <>
+void WriteChannelKeyframes<bool>(pag::EncodeStream* tag, const TypedChannel<bool>* channel,
+                                 EncodeState*) {
+  const auto& keyframes = channel->keyframes;
+  auto count = static_cast<uint32_t>(keyframes.size());
+  tag->writeEncodedUint32(count);
+  for (const auto& keyframe : keyframes) {
+    tag->writeUBits(static_cast<uint32_t>(keyframe.interpolation), 2);
+  }
+  tag->alignWithBytes();
+  for (const auto& keyframe : keyframes) {
+    tag->writeEncodedUint32(static_cast<uint32_t>(std::max<int64_t>(0, keyframe.time)));
+  }
+  for (const auto& keyframe : keyframes) {
+    tag->writeUBits(keyframe.value ? 1 : 0, 1);
+  }
+  tag->alignWithBytes();
+  std::vector<float> bezierList = {};
+  for (const auto& keyframe : keyframes) {
+    if (keyframe.interpolation != KeyframeInterpolationType::Bezier) {
+      continue;
+    }
+    bezierList.push_back(keyframe.bezierOut.x);
+    bezierList.push_back(keyframe.bezierOut.y);
+    bezierList.push_back(keyframe.bezierIn.x);
+    bezierList.push_back(keyframe.bezierIn.y);
+  }
+  tag->writeFloatList(bezierList.empty() ? nullptr : bezierList.data(),
+                      static_cast<uint32_t>(bezierList.size()), 0.005f);
+}
+
+// Channel tag (spec §9.7 #482): name exist bit + StringRef, valueType u8, then the fixed
+// keyframe column block. ImageRef/Path/PAGImage channels warn and are skipped (phase-2 scope).
+void WriteChannelTag(pag::EncodeStream* stream, Channel* channel, EncodeState* state) {
+  auto valueType = channel->valueType();
+  if (valueType == ChannelValueType::ImageRef || valueType == ChannelValueType::Path ||
+      valueType == ChannelValueType::PAGImage) {
+    state->warn(PAGExportWarning::UnsupportedColorSource,
+                "channel value type has no binary encoding yet");
+    return;
+  }
+  pag::EncodeStream tag(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasName = !channel->name.empty();
+    writer.writeFlag(hasName);
+    writer.writeFlag(true);  // valueType is always written (u8 in the value area)
+    auto* v = writer.valueStream();
+    if (hasName) {
+      v->writeEncodedUint32(state->intern(channel->name));
+    }
+    v->writeUint8(static_cast<uint8_t>(valueType));
+    auto block = writer.release();
+    tag.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  switch (valueType) {
+    case ChannelValueType::Float:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<float>*>(channel), state);
+      break;
+    case ChannelValueType::Bool:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<bool>*>(channel), state);
+      break;
+    case ChannelValueType::Int:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<int>*>(channel), state);
+      break;
+    case ChannelValueType::String:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<std::string>*>(channel), state);
+      break;
+    case ChannelValueType::Color:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<Color>*>(channel), state);
+      break;
+    case ChannelValueType::Matrix:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<Matrix>*>(channel), state);
+      break;
+    default:
+      break;
+  }
+  WriteTag(stream, TagCode::Channel, &tag);
+}
+
+// AnimationObjectBlock (spec §9.7 #481): AnimationObjectAttributes (492, target StringRef)
+// followed by Channel tags, End-terminated.
+void WriteAnimationObjectBlock(pag::EncodeStream* stream, AnimationObject* object,
+                               EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasTarget = !object->target.empty();
+    writer.writeFlag(hasTarget);
+    auto* v = writer.valueStream();
+    if (hasTarget) {
+      v->writeEncodedUint32(state->intern(object->target));
+    }
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::AnimationObjectAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* channel : object->channels) {
+    WriteChannelTag(&content, channel, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::AnimationObjectBlock, &content);
+}
+
+// AnimationBlock (spec §9.7 #480): AnimationAttributes (489: duration varuint, frameRate f32,
+// loop u8) followed by AnimationObjectBlocks, End-terminated.
+void WriteAnimationBlock(pag::EncodeStream* stream, Animation* animation, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasDuration = animation->duration != 0;
+    auto hasFrameRate = animation->frameRate != 60.0f;
+    auto hasLoop = animation->loop != LoopMode::Once;
+    writer.writeFlag(hasDuration);
+    writer.writeFlag(hasFrameRate);
+    writer.writeFlag(hasLoop);
+    auto* v = writer.valueStream();
+    if (hasDuration) {
+      v->writeEncodedUint32(static_cast<uint32_t>(std::max<int64_t>(0, animation->duration)));
+    }
+    if (hasFrameRate) {
+      v->writeFloat(animation->frameRate);
+    }
+    if (hasLoop) {
+      v->writeUint8(static_cast<uint8_t>(animation->loop));
+    }
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::AnimationAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* object : animation->objects) {
+    WriteAnimationObjectBlock(&content, object, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::AnimationBlock, &content);
+}
+
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
 
 // CompositionBlock (spec §9.1 #297): CompositionAttributes (298: width/height) followed by
@@ -1428,6 +1732,11 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
   }
   for (auto* compLayer : composition->layers) {
     WriteLayerTag(&content, compLayer, state);
+  }
+  for (auto* animationNode : composition->animations) {
+    if (animationNode->nodeType() == NodeType::Animation) {
+      WriteAnimationBlock(&content, static_cast<Animation*>(animationNode), state);
+    }
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::CompositionBlock, &content);
@@ -2251,6 +2560,8 @@ void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* in
   }
 }
 
+void AssignAnimationNodeIndices(Node* node, EncodeState* state, uint32_t* index);
+
 void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
   state->nodeIndices[layer] = (*index)++;
   if (layer->composition != nullptr &&
@@ -2261,6 +2572,9 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
     state->nodeIndices[composition] = (*index)++;
     for (auto* compLayer : composition->layers) {
       AssignLayerNodeIndices(compLayer, state, index);
+    }
+    for (auto* animationNode : composition->animations) {
+      AssignAnimationNodeIndices(animationNode, state, index);
     }
   }
   for (auto* element : layer->contents) {
@@ -2276,6 +2590,21 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
   }
   for (auto* child : layer->children) {
     AssignLayerNodeIndices(child, state, index);
+  }
+}
+
+// Numbers an animation subtree (spec §5.1): the Animation node, then each AnimationObject with
+// its channels, matching the decoder's makeNode order inside AnimationBlock.
+void AssignAnimationNodeIndices(Node* node, EncodeState* state, uint32_t* index) {
+  if (node == nullptr || node->nodeType() != NodeType::Animation) {
+    return;
+  }
+  state->nodeIndices[node] = (*index)++;
+  for (auto* object : static_cast<Animation*>(node)->objects) {
+    state->nodeIndices[object] = (*index)++;
+    for (auto* channel : object->channels) {
+      state->nodeIndices[channel] = (*index)++;
+    }
   }
 }
 
@@ -2421,11 +2750,20 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   auto imageResult = ImageProcessor::Process(doc.get());
   result.warnings.insert(result.warnings.end(), imageResult.warnings.begin(),
                          imageResult.warnings.end());
-  if (!doc->animations.empty() || !doc->dataBinds.empty() || doc->viewModel != nullptr) {
+  if (!doc->dataBinds.empty() || doc->viewModel != nullptr) {
     PAGExportIssue issue = {};
     issue.code = PAGExportWarning::AnimatedContentSkipped;
-    issue.message = "animated content skipped in phase 1";
+    issue.message = "viewmodel and data binds have no binary encoding yet";
     result.warnings.push_back(issue);
+  }
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::StateMachine) {
+      PAGExportIssue issue = {};
+      issue.code = PAGExportWarning::AnimatedContentSkipped;
+      issue.message = "state machines have no binary encoding yet";
+      result.warnings.push_back(issue);
+      break;
+    }
   }
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
@@ -2540,12 +2878,46 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       for (auto* compLayer : composition->layers) {
         CollectStringsFromLayer(compLayer, state.get());
       }
+      for (auto* animationNode : composition->animations) {
+        CollectStringsFromAnimation(animationNode, state.get());
+      }
+    }
+  }
+  for (auto* animationNode : doc->animations) {
+    CollectStringsFromAnimation(animationNode, state.get());
+  }
+  CollectAnimationTargetIds(doc->animations, &state->animationTargetIds);
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* composition = static_cast<Composition*>(node.get());
+      CollectAnimationTargetIds(composition->animations, &state->animationTargetIds);
+    }
+  }
+  // RetainedIdTable (spec §9.0) restores the ids the runtime resolves by string lookup: Layer
+  // ids feed PAGLayer::id() and animation targets, Animation ids feed timeline lookups. The ids
+  // must be interned before the StringTable is written.
+  for (auto& node : doc->nodes) {
+    if (!node->id.empty() && node->nodeType() == NodeType::Layer) {
+      state->intern(node->id);
+    } else if (!node->id.empty() && state->animationTargetIds.count(node->id) > 0) {
+      state->intern(node->id);
     }
   }
   for (auto& sub : state->subDocuments) {
     state->intern(sub.name);
     for (auto* layer : sub.document->layers) {
       CollectStringsFromLayer(layer, state.get());
+    }
+    for (auto* animationNode : sub.document->animations) {
+      CollectStringsFromAnimation(animationNode, state.get());
+    }
+    std::unordered_set<std::string> subTargetIds = {};
+    CollectAnimationTargetIds(sub.document->animations, &subTargetIds);
+    for (auto& node : sub.document->nodes) {
+      if (!node->id.empty() &&
+          (node->nodeType() == NodeType::Layer || subTargetIds.count(node->id) > 0)) {
+        state->intern(node->id);
+      }
     }
   }
   // Node indices (spec §5.1) back the NodeRef fields (Layer.mask): shared resources first,
@@ -2568,9 +2940,15 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       for (auto* compLayer : composition->layers) {
         AssignLayerNodeIndices(compLayer, state.get(), &nextIndex);
       }
+      for (auto* animationNode : composition->animations) {
+        AssignAnimationNodeIndices(animationNode, state.get(), &nextIndex);
+      }
     }
     for (auto* layer : doc->layers) {
       AssignLayerNodeIndices(layer, state.get(), &nextIndex);
+    }
+    for (auto* animationNode : doc->animations) {
+      AssignAnimationNodeIndices(animationNode, state.get(), &nextIndex);
     }
   }
   pag::EncodeStream body(&state->streamContext);
@@ -2612,12 +2990,42 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                             static_cast<uint32_t>(block->length()));
     }
     {
+      // RetainedIdTable (spec §9.0): nodes that keep their id after stripping because the
+      // runtime resolves them by string lookup. Layer ids feed PAGLayer::id(); Animation ids
+      // feed timeline lookups; every node referenced by an AnimationObject target keeps its id
+      // too (Fill/Path/RangeSelector targets are not Layers). Entries are
+      // {nodeIndex, idStringRef} in ascending nodeIndex order.
+      std::vector<std::pair<uint32_t, uint32_t>> idEntries = {};
+      for (auto& node : doc->nodes) {
+        if (node->id.empty()) {
+          continue;
+        }
+        auto type = node->nodeType();
+        if (type != NodeType::Layer && type != NodeType::Animation &&
+            state->animationTargetIds.count(node->id) == 0) {
+          continue;
+        }
+        auto it = state->nodeIndices.find(node.get());
+        if (it != state->nodeIndices.end()) {
+          idEntries.push_back({it->second + 1, state->intern(node->id)});
+        }
+      }
+      std::sort(idEntries.begin(), idEntries.end());
       pag::EncodeStream idContent(&state->streamContext);
-      idContent.writeEncodedUint32(0);
+      idContent.writeEncodedUint32(static_cast<uint32_t>(idEntries.size()));
+      for (auto& entry : idEntries) {
+        idContent.writeEncodedUint32(entry.first);
+        idContent.writeEncodedUint32(entry.second);
+      }
       WriteTag(&docContent, TagCode::RetainedIdTable, &idContent);
     }
     for (auto* layer : doc->layers) {
       WriteLayerTag(&docContent, layer, state.get());
+    }
+    for (auto* animationNode : doc->animations) {
+      if (animationNode->nodeType() == NodeType::Animation) {
+        WriteAnimationBlock(&docContent, static_cast<Animation*>(animationNode), state.get());
+      }
     }
     WritePAGTagHeader(&docContent, TagCode::End, 0);
     WriteTag(&body, TagCode::DocumentBlock, &docContent);
@@ -2643,25 +3051,59 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         subContent.writeBytes(const_cast<uint8_t*>(block->data()),
                               static_cast<uint32_t>(block->length()));
       }
-      {
-        pag::EncodeStream idContent(&state->streamContext);
-        idContent.writeEncodedUint32(0);
-        WriteTag(&subContent, TagCode::RetainedIdTable, &idContent);
-      }
       // Each sub-document carries its own §5.2 node numbering space: the decoder rebuilds the
       // index table from the sub-document's own read order, so its layers (and their mask
       // NodeRefs) must be numbered from zero here, isolated from the root document's indices.
+      // The RetainedIdTable is written before the layers but needs those indices, so numbering
+      // runs first inside the same swapped-namespace scope.
       {
         auto rootIndices = std::move(state->nodeIndices);
+        auto rootTargets = std::move(state->animationTargetIds);
         state->nodeIndices = {};
+        state->animationTargetIds = {};
+        CollectAnimationTargetIds(sub.document->animations, &state->animationTargetIds);
         uint32_t subIndex = 0;
         for (auto* layer : sub.document->layers) {
           AssignLayerNodeIndices(layer, state.get(), &subIndex);
         }
+        for (auto* animationNode : sub.document->animations) {
+          AssignAnimationNodeIndices(animationNode, state.get(), &subIndex);
+        }
+        {
+          std::vector<std::pair<uint32_t, uint32_t>> idEntries = {};
+          for (auto& node : sub.document->nodes) {
+            if (node->id.empty()) {
+              continue;
+            }
+            auto type = node->nodeType();
+            if (type != NodeType::Layer && type != NodeType::Animation &&
+                state->animationTargetIds.count(node->id) == 0) {
+              continue;
+            }
+            auto it = state->nodeIndices.find(node.get());
+            if (it != state->nodeIndices.end()) {
+              idEntries.push_back({it->second + 1, state->intern(node->id)});
+            }
+          }
+          std::sort(idEntries.begin(), idEntries.end());
+          pag::EncodeStream idContent(&state->streamContext);
+          idContent.writeEncodedUint32(static_cast<uint32_t>(idEntries.size()));
+          for (auto& entry : idEntries) {
+            idContent.writeEncodedUint32(entry.first);
+            idContent.writeEncodedUint32(entry.second);
+          }
+          WriteTag(&subContent, TagCode::RetainedIdTable, &idContent);
+        }
         for (auto* layer : sub.document->layers) {
           WriteLayerTag(&subContent, layer, state.get());
         }
+        for (auto* animationNode : sub.document->animations) {
+          if (animationNode->nodeType() == NodeType::Animation) {
+            WriteAnimationBlock(&subContent, static_cast<Animation*>(animationNode), state.get());
+          }
+        }
         state->nodeIndices = std::move(rootIndices);
+        state->animationTargetIds = std::move(rootTargets);
       }
       WritePAGTagHeader(&subContent, TagCode::End, 0);
       WriteTag(&tableContent, TagCode::SubDocument, &subContent);

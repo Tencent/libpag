@@ -23,9 +23,12 @@
 #include <vector>
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -77,6 +80,11 @@ namespace {
 
 struct DecodeContext {
   std::vector<std::string> strings;
+  // RetainedIdTable entries (spec §9.0) of the root document: nodeIndex is 1-based into the
+  // emission-order node table, which is only complete after the whole body is read, so ids are
+  // restored in a final backfill pass. Sub-documents restore their own tables inline (their
+  // node list is complete when the sub-document block ends).
+  std::vector<std::pair<uint32_t, std::string>> pendingRetainedIds = {};
   // Zero-copy backing buffer for all decoded image slices: the adopted whole-file data. Slices
   // keep this parent alive (spec §5.1), so no image bytes are ever copied.
   std::shared_ptr<Data> fileData = nullptr;
@@ -137,6 +145,246 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
 void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
                            std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
                            std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget);
+
+// ---------------------------------------------------------------------------
+// Animation decoding (spec §9.7). Channel keyframes mirror the §8 columnar layout: count,
+// 2-bit interpolations, frame times, per-type value list, packed bezier tail.
+// ---------------------------------------------------------------------------
+
+// Reads one keyframe value; columnar lists with a single stream call are specialized below.
+template <typename T>
+void ReadSingleKeyValue(pag::DecodeStream* tag, T* value, DecodeContext* context);
+
+template <>
+void ReadSingleKeyValue<float>(pag::DecodeStream* tag, float* value, DecodeContext*) {
+  *value = tag->readFloat();
+}
+
+template <>
+void ReadSingleKeyValue<std::string>(pag::DecodeStream* tag, std::string* value,
+                                     DecodeContext* context) {
+  *value = context->getString(tag->readEncodedUint32());
+}
+
+template <>
+void ReadSingleKeyValue<Color>(pag::DecodeStream* tag, Color* value, DecodeContext*) {
+  *value = ReadPAGColor(tag);
+}
+
+template <>
+void ReadSingleKeyValue<Matrix>(pag::DecodeStream* tag, Matrix* value, DecodeContext*) {
+  *value = ReadPAGMatrix(tag);
+}
+
+// Reads the bezier tail shared by every value type: 4 floats per Bezier keyframe in time order.
+template <typename T>
+static void ReadBezierTail(pag::DecodeStream* tag, std::vector<Keyframe<T>>* keyframes) {
+  auto bezierCount = static_cast<uint32_t>(
+      std::count_if(keyframes->begin(), keyframes->end(), [](const Keyframe<T>& keyframe) {
+        return keyframe.interpolation == KeyframeInterpolationType::Bezier;
+      }));
+  if (bezierCount == 0) {
+    return;
+  }
+  std::vector<float> bezierList(bezierCount * 4, 0.0f);
+  tag->readFloatList(bezierList.data(), bezierCount * 4, 0.005f);
+  tag->alignWithBytes();
+  uint32_t cursor = 0;
+  for (auto& keyframe : *keyframes) {
+    if (keyframe.interpolation != KeyframeInterpolationType::Bezier) {
+      continue;
+    }
+    keyframe.bezierOut.x = bezierList[cursor++];
+    keyframe.bezierOut.y = bezierList[cursor++];
+    keyframe.bezierIn.x = bezierList[cursor++];
+    keyframe.bezierIn.y = bezierList[cursor++];
+  }
+}
+
+// Reads the §8 keyframe column block into a typed channel.
+template <typename T>
+void ReadChannelKeyframes(pag::DecodeStream* tag, TypedChannel<T>* channel,
+                          DecodeContext* context) {
+  auto count = tag->readEncodedUint32();
+  if (count > 65536) {
+    PAGThrowError(tag->context, "channel keyframe count exceeds the spec limit");
+    return;
+  }
+  std::vector<Keyframe<T>> keyframes(count);
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].interpolation = static_cast<KeyframeInterpolationType>(tag->readUBits(2));
+  }
+  tag->alignWithBytes();
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].time = static_cast<Frame>(tag->readEncodedUint32());
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    ReadSingleKeyValue(tag, &keyframes[i].value, context);
+  }
+  ReadBezierTail(tag, &keyframes);
+  channel->keyframes = std::move(keyframes);
+}
+
+// Int values arrive as one Int32List column (spec §8.1).
+template <>
+void ReadChannelKeyframes<int>(pag::DecodeStream* tag, TypedChannel<int>* channel, DecodeContext*) {
+  auto count = tag->readEncodedUint32();
+  if (count > 65536) {
+    PAGThrowError(tag->context, "channel keyframe count exceeds the spec limit");
+    return;
+  }
+  std::vector<Keyframe<int>> keyframes(count);
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].interpolation = static_cast<KeyframeInterpolationType>(tag->readUBits(2));
+  }
+  tag->alignWithBytes();
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].time = static_cast<Frame>(tag->readEncodedUint32());
+  }
+  if (count > 0) {
+    std::vector<int32_t> values(count, 0);
+    tag->readInt32List(values.data(), count);
+    for (uint32_t i = 0; i < count; i++) {
+      keyframes[i].value = values[i];
+    }
+  }
+  ReadBezierTail(tag, &keyframes);
+  channel->keyframes = std::move(keyframes);
+}
+
+// Bool values arrive as a bit column.
+template <>
+void ReadChannelKeyframes<bool>(pag::DecodeStream* tag, TypedChannel<bool>* channel,
+                                DecodeContext*) {
+  auto count = tag->readEncodedUint32();
+  if (count > 65536) {
+    PAGThrowError(tag->context, "channel keyframe count exceeds the spec limit");
+    return;
+  }
+  std::vector<Keyframe<bool>> keyframes(count);
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].interpolation = static_cast<KeyframeInterpolationType>(tag->readUBits(2));
+  }
+  tag->alignWithBytes();
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].time = static_cast<Frame>(tag->readEncodedUint32());
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    keyframes[i].value = tag->readUBits(1) != 0;
+  }
+  tag->alignWithBytes();
+  ReadBezierTail(tag, &keyframes);
+  channel->keyframes = std::move(keyframes);
+}
+
+// Channel tag (spec §9.7 #482): name exist bit + StringRef, valueType u8, keyframe block.
+Channel* ReadChannelTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  PAGAttributeBlockReader reader(tagStream, 2);
+  bool hasName = reader.flag(0);
+  bool hasValueType = reader.flag(1);
+  tagStream->alignWithBytes();
+  std::string name = {};
+  if (hasName) {
+    name = context->getString(tagStream->readEncodedUint32());
+  }
+  auto valueType = hasValueType ? static_cast<ChannelValueType>(tagStream->readUint8())
+                                : ChannelValueType::Float;
+  Channel* channel = nullptr;
+  switch (valueType) {
+    case ChannelValueType::Float:
+      channel = context->document->makeNode<TypedChannel<float>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<float>*>(channel), context);
+      break;
+    case ChannelValueType::Bool:
+      channel = context->document->makeNode<TypedChannel<bool>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<bool>*>(channel), context);
+      break;
+    case ChannelValueType::Int:
+      channel = context->document->makeNode<TypedChannel<int>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<int>*>(channel), context);
+      break;
+    case ChannelValueType::String:
+      channel = context->document->makeNode<TypedChannel<std::string>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<std::string>*>(channel), context);
+      break;
+    case ChannelValueType::Color:
+      channel = context->document->makeNode<TypedChannel<Color>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<Color>*>(channel), context);
+      break;
+    case ChannelValueType::Matrix:
+      channel = context->document->makeNode<TypedChannel<Matrix>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<Matrix>*>(channel), context);
+      break;
+    default:
+      // ImageRef/Path/PAGImage channels have no phase-2 encoding; a file carrying them cannot
+      // have been produced by this encoder, so the channel is skipped with an error.
+      PAGThrowError(tagStream->context, "channel value type has no binary encoding yet");
+      return nullptr;
+  }
+  return channel;
+}
+
+// AnimationObjectBlock (spec §9.7 #481).
+AnimationObject* ReadAnimationObjectBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* object = context->document->makeNode<AnimationObject>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::AnimationObjectAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 1);
+      bool hasTarget = reader.flag(0);
+      tagBytes.alignWithBytes();
+      if (hasTarget) {
+        object->target = context->getString(tagBytes.readEncodedUint32());
+      }
+    } else if (header.code == TagCode::Channel) {
+      auto* channel = ReadChannelTag(&tagBytes, context);
+      if (channel != nullptr) {
+        object->channels.push_back(channel);
+      }
+    }
+  }
+  return object;
+}
+
+// AnimationBlock (spec §9.7 #480).
+Animation* ReadAnimationBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* animation = context->document->makeNode<Animation>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::AnimationAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 3);
+      bool hasDuration = reader.flag(0);
+      bool hasFrameRate = reader.flag(1);
+      bool hasLoop = reader.flag(2);
+      tagBytes.alignWithBytes();
+      if (hasDuration) {
+        animation->duration = static_cast<Frame>(tagBytes.readEncodedUint32());
+      }
+      if (hasFrameRate) {
+        animation->frameRate = tagBytes.readFloat();
+      }
+      if (hasLoop) {
+        animation->loop = static_cast<LoopMode>(tagBytes.readUint8());
+      }
+    } else if (header.code == TagCode::AnimationObjectBlock) {
+      auto* object = ReadAnimationObjectBlock(&tagBytes, context);
+      if (object != nullptr) {
+        animation->objects.push_back(object);
+      }
+    }
+  }
+  return animation;
+}
 
 // Unknown resource tags are skipped (§4.2).
 void ReadResourceBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
@@ -522,6 +770,11 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
       ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
                             &context->pendingMaskRefs);
       composition->layers.push_back(layer);
+    } else if (header.code == TagCode::AnimationBlock) {
+      auto* animation = ReadAnimationBlock(&tagBytes, context);
+      if (animation != nullptr) {
+        composition->animations.push_back(animation);
+      }
     }
   }
   return composition;
@@ -1383,16 +1636,27 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
       if (hasWidth) doc->width = tagBytes.readFloat();
       if (hasHeight) doc->height = tagBytes.readFloat();
     } else if (header.code == TagCode::RetainedIdTable) {
+      // The table sits before the layers it indexes, so entries are recorded here and restored
+      // once the emission-order node list is complete (final backfill in LoadFromPAG).
       auto count = tagBytes.readEncodedUint32();
+      if (count > context->document->nodes.size() + 1048576) {
+        PAGThrowError(tagBytes.context, "retained id table count exceeds the spec limit");
+      }
       for (uint32_t i = 0; i < count; i++) {
-        tagBytes.readEncodedUint32();
-        tagBytes.readEncodedUint32();
+        auto nodeIndex = tagBytes.readEncodedUint32();
+        auto idRef = tagBytes.readEncodedUint32();
+        context->pendingRetainedIds.push_back({nodeIndex, context->getString(idRef)});
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
                             &context->pendingMaskRefs);
       doc->layers.push_back(layer);
+    } else if (header.code == TagCode::AnimationBlock) {
+      auto* animation = ReadAnimationBlock(&tagBytes, context);
+      if (animation != nullptr) {
+        doc->animations.push_back(animation);
+      }
     }
   }
 }
@@ -1473,6 +1737,7 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
   entry.document = PAGXDocument::Make(0, 0);
   std::vector<std::pair<Layer*, uint32_t>> pendingRefs = {};
   std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
+  std::vector<std::pair<uint32_t, std::string>> retainedIds = {};
   auto savedDocument = context->document;
   context->document = entry.document.get();
   while (true) {
@@ -1489,16 +1754,25 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
     } else if (header.code == TagCode::RetainedIdTable) {
       auto count = tagBytes.readEncodedUint32();
       for (uint32_t i = 0; i < count; i++) {
-        tagBytes.readEncodedUint32();
-        tagBytes.readEncodedUint32();
+        auto nodeIndex = tagBytes.readEncodedUint32();
+        auto idRef = tagBytes.readEncodedUint32();
+        retainedIds.push_back({nodeIndex, context->getString(idRef)});
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs, &pendingMaskRefs);
       entry.document->layers.push_back(layer);
+    } else if (header.code == TagCode::AnimationBlock) {
+      auto* animation = ReadAnimationBlock(&tagBytes, context);
+      if (animation != nullptr) {
+        entry.document->animations.push_back(animation);
+      }
     }
   }
   context->document = savedDocument;
+  // The sub-document's node list is complete at this point, so its retained ids restore inline
+  // (the root document defers because its table is read before later blocks create nodes).
+  PAGImporter::RestoreRetainedIds(entry.document.get(), retainedIds);
   // Backfill the sub-document's own mask refs against its node table (its own §5.1 namespace).
   for (auto& pending : pendingMaskRefs) {
     if (pending.second == 0 || pending.second > entry.document->nodes.size()) {
@@ -1538,6 +1812,21 @@ void ReadSubDocumentTable(pag::DecodeStream* tagStream, DecodeContext* context) 
 }
 
 }  // namespace
+
+void PAGImporter::RestoreRetainedIds(
+    PAGXDocument* document, const std::vector<std::pair<uint32_t, std::string>>& retainedIds) {
+  for (auto& retained : retainedIds) {
+    if (retained.first == 0 || retained.first > document->nodes.size()) {
+      continue;
+    }
+    auto* node = document->nodes[retained.first - 1].get();
+    if (node->id.empty()) {
+      node->id = retained.second;
+      document->registerNode(node, retained.second);
+    }
+  }
+}
+
 static PAGFormat DetectPAGFormatBytes(const uint8_t* bytes, size_t length) {
   PAGFileHeader header = {};
   if (header.parse(bytes, length)) {
@@ -1709,6 +1998,9 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
       pending.first->mask = static_cast<Layer*>(node);
     }
   }
+  // Restore the retained ids once the emission-order node list is complete (spec §9.0): these
+  // feed the runtime's string lookups (PAGLayer::id(), animation targets, timeline ids).
+  PAGImporter::RestoreRetainedIds(doc.get(), context.pendingRetainedIds);
 
   if (bodyStream.context->hasException()) {
     // Failed decodes return nullptr (interface draft §2): handing a partially decoded document

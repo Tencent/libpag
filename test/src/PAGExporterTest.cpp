@@ -71,18 +71,18 @@ PAGX_TEST(PAGExporterTest, ExportMultipleSamples) {
 }
 
 PAGX_TEST(PAGExporterTest, AnimatedContentWarning) {
+  // Phase 2 encodes animations (spec §9.7), so an animated sample no longer produces the
+  // AnimatedContentSkipped warning; the warning now only covers viewmodel/data binds and
+  // state machines, which still have no binary encoding.
   auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(
       "resources/pagx_to_pag/static_animated/mixed_static_animated.pagx"));
   ASSERT_TRUE(doc != nullptr);
   auto result = PAGExporter::ExportToPAG(doc, "/tmp/test_anim.pag");
   EXPECT_TRUE(result.success);
-  bool found = false;
   for (auto& w : result.warnings) {
-    if (w.code == PAGExportWarning::AnimatedContentSkipped) {
-      found = true;
-    }
+    EXPECT_NE(w.code, PAGExportWarning::AnimatedContentSkipped)
+        << "animations are encoded in phase 2";
   }
-  EXPECT_TRUE(found);
 }
 
 }  // namespace pagx
