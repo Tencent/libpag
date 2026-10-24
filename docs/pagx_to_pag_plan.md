@@ -102,3 +102,24 @@
 Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→ ViewModel/DataBind（§9.1/§9.8）→
 扁平化中的关键帧变换回调实装 → 图片缩放含关键帧 → 嵌入文本修改回退（TextHolder）→
 默认时间线统一（PAGViewer/pagx render 对齐 getDefaultTimeline）→ T2 动效行为等价用例。
+
+## 二期完成记录（2026-10-24）
+
+| 任务 | Commit |
+|---|---|
+| P2-1 动画核心编解码（AnimationBlock 480/489、AnimationObjectBlock 481/492、Channel 482 六种值类型列式关键帧）+ P2-2 RetainedIdTable（Layer/Animation/StateMachine/ViewModel/DataConverter id + 动画目标 id，解码注册 findNode） | 2095488ee |
+| P2-3 Layer 时间线挂载（AnimationTimeline 366：playing/signed evaluationOffset；StateMachineTimeline 367） | 664f889c3 |
+| P2-4 状态机编解码（StateMachineBlock 483、Input 484、StateRegion 485+490、State 486、Transition 487+491、Condition 488） | af897a716 |
+| P2-5 ViewModel/DataBind（263 扩展 hasViewModel NodeRef、ViewModelBlock 299、Property 300 含内联 defaultImage、DataConverter 301、DataBind 544；Stripper 保留 VM/DC id） | 31bad4cfc |
+| P2-6a 扁平化关键帧回调（PointKeyframeScaler：point{i}.x/y 关键帧随烘焙缩放同步变换） | 807662f56 |
+| P2-6b 图片缩放含关键帧（AnimationScaleLookup：matrix/scale 通道的精确谱范数上界并入最大显示缩放） | fd5d7fcc7 |
+| P2-6c TextHolder 嵌入文本回退（flush 改注册字体重排，修改不再被静默忽略） | 9306e1029 |
+| P2-6d 默认时间线统一（C23：pagx render 与 PAGViewer 走 getDefaultTimeline，StateMachine 从初始状态帧步进推进） | f0bcfd598 |
+| P2-7 动效等价验收（test/verify_animation_equivalence.sh） | 本次提交 |
+
+- **验收记录**：27/27 动效样本（animation 13 + state_machine 4 + viewmodel 5 + static_animated 5）
+  × 3 个时间点（0/0.5/1.0s）XML 与 v4 渲染 **全部 bit-exact**；PAGFullTest 2717 tests，
+  2716 通过 / 0 失败 / 1 skip（性能基线加载）；PAGViewer 独立构建（Qt 6.9）编译通过。
+- 调试中修复的实现缺陷：动画字符串值/StringRef 预收集时序、RetainedIdTable 的
+  registerNode 注册、point 通道名前缀长度、图片 maxScale 的 imgW=0 未布局退化、
+  嵌入字形子集无字符映射的 TextHolder 静默忽略。
