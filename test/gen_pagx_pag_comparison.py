@@ -128,7 +128,9 @@ body {
 }
 .topbar-inner { max-width: 1680px; margin: 0 auto; padding: 14px 28px 10px; }
 .topbar .title h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
-.topbar .title h1 .count { color: #64748b; font-weight: 500; }
+.topbar .title h1 .count {
+  color: #64748b; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums;
+}
 .topbar .title .sub { font-size: 12px; color: #64748b; margin-top: 3px; }
 .topbar .title code {
   background: rgba(15, 23, 42, 0.06); padding: 1px 5px; border-radius: 3px;
@@ -397,6 +399,16 @@ function render() {
 document.getElementById('showDiff').onchange = render;
 document.getElementById('diffOnly').onchange = render;
 document.getElementById('sort').onchange = render;
+var totalPass = 0, totalFail = 0, totalOther = 0;
+DATA.forEach(function (section) {
+  section.samples.forEach(function (s) {
+    if (s.status !== 'compared') totalOther++;
+    else if (s.diff.pass) totalPass++;
+    else totalFail++;
+  });
+});
+document.getElementById('title-count').textContent =
+    '（一致 ' + totalPass + ' / 差异 ' + totalFail + ' / 其他 ' + totalOther + '）';
 render();
 </script>
 </body>
