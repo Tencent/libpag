@@ -123,3 +123,84 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 - 调试中修复的实现缺陷：动画字符串值/StringRef 预收集时序、RetainedIdTable 的
   registerNode 注册、point 通道名前缀长度、图片 maxScale 的 imgW=0 未布局退化、
   嵌入字形子集无字符映射的 TextHolder 静默忽略。
+
+## 三期任务清单（旧 PAG 迁移，C28/C34；按 §13.4 先 P3-0 详细设计再编码）
+
+依赖主线：P3-0 设计 → P3-1 规范扩展编解码 → P3-2 时间锁定 → P3-4/5 导入器 → 各能力块 → P3-13/15 验收。
+文本（P3-3）、样式（P3-6）、特效（P3-7）可与技术主线并行。
+
+### P3-0 详细设计（全部后续任务的前置）
+- §7.4 能力清单逐项展开为详细设计（接口 + 核心伪代码），重点：时间锁定语义边界
+  （子时间越界/负值/timeScale≤0 与旧 PAG 预合成对齐）、视频解码栈与 PAGScene 帧调度
+  对接、3D 逐帧矩阵采样精度、运动模糊"前一帧变换"的获取路径。
+- 旧接口对照表（§8.5 按类逐方法：已有对应 / 需新增 / 形式）。
+
+### P3-1 规范扩展编解码
+- LayerTransform（354）：startTime/timeScale 存在位 + 值（字段已定稿，三期才写）。
+- Layer 变换属性（§6.2）：anchor/rotation/scale/skew/skewAxis（语义同 Group，x/y 为位置；
+  优先级 matrix3D > matrix > 属性），XML 导入导出 + 节点字段 + 二进制 + 编号扩展。
+- Path 值类型（§6.1）：ChannelValueType path=8 的变体与列式编码；命令序列相同逐点插值
+  （对齐旧 PathData::interpolate），不同按 Hold + verify 告警。
+- 反相遮罩（§6.4）：MaskType 新增 alphaInverted/luminanceInverted/contourInverted 编码映射。
+
+### P3-2 时间锁定挂载运行时（§6.3，C26）
+- PAGComposition 锁定模式：advance 不推进锁定实例；apply 按父时钟计算
+  子时间 =（父时钟 − startTime）× timeScale 并定位；setCurrentTime 后下次 apply 级联。
+- 默认时间线非 Animation 时锁定退回自行推进 + verify 告警。
+
+### P3-3 文本属性通道扩展（§6.5）
+- Fill/Stroke visible 通道；Text.tracking（1/1000em，与 letterSpacing 并存）；
+  TextHolder 排版参数（textAlign/textAnchor/lineHeight/boxText 位置宽高/writingMode）
+  运行时可写；baselineShift/firstBaseLine 通道；文本背景（backgroundColor/Alpha）。
+
+### P3-4 旧 PAG 导入器骨架（src/pagx/pag/importer/）
+- pag::File → PAGXDocument 基础映射：合成/图层树、Transform2D（含运动路径与自动朝向
+  逐帧采样）、纯色/图片/文本/形状图层、图层属性（入出点 → visible Hold 关键帧、
+  混合模式 Add → plusLighter）、字体表 → Font 节点。
+- 无关键帧时生成同时长同帧率根 Animation（成为默认时间线，§7.3）。
+
+### P3-5 旧动画与时间迁移
+- 关键帧（含贝塞尔、空间插值）→ 通道；文本动画器/范围选择器 → TextModifier；
+  倍速与起始时间 → 时间锁定；图层重映射（图片填充规则那份）。
+
+### P3-6 图层样式扩展 + tgfx
+- 描边、渐变叠加、外发光三个新样式；投影扩展（spread、blendMode）。
+
+### P3-7 特效滤镜 8 项 + tgfx
+- 动态拼贴、色阶、边角定位、鼓起、辉光、置换图、径向模糊、马赛克；
+  全部参数动画通道（含颜色矩阵动画）。旧实现 src/rendering/filters/ 作移植参考。
+
+### P3-8 遮罩路径列表 + 路径动画
+- 与旧遮罩语义一致的路径列表（模式/反相/羽化/不透明度/扩展）；
+  §6.1 路径动画在此消费。
+
+### P3-9 3D、相机、运动模糊
+- Transform3D/相机 → matrix3D 关键帧逐帧计算（投影与景深对齐旧运行时）；
+  运动模糊属性 + tgfx 实现（当前帧与前一帧变换，无跨帧状态）。
+
+### P3-10 视频与位图序列（§6.6，C28）
+- ImageTable 媒体类型扩展（视频流/位图序列帧，多分辨率全保留）；XML 外部文件引用
+  （.mp4 旁置）；复用旧解码栈（硬解/软解/预读/静态段跳过）；PAGScene 帧调度对接。
+
+### P3-11 时间伸缩与音频
+- TimeStretchMode（缩放/重复/反向重复）+ setDuration 文档级接口；
+  AudioBytes 原样携带 + 起始时间读取接口。
+
+### P3-12 可编辑内容与导出补全
+- 旧 editableText/editableImage → ViewModel（§7.2 映射）；PAGXExporter 保留
+  无对象 Animation（时长语义）。
+
+### P3-13 迁移 CLI 与报告
+- pagx import/export 支持 .pag 输入（内存直转，不落 XML 文本）；
+  保真度报告（特性清单/等级/Unsupported 明细/体积/ViewModel 属性对照）；--strict。
+
+### P3-14 旧接口对照实现（§8.5）
+- 按 P3-0 对照表补齐需新增的 C++ 接口（Marker 除外，C35）。
+
+### P3-15 迁移等价验收（C34：整数帧渲染一致，不接受近似）
+- 仓库 166 个可解码旧样本逐整数帧新旧渲染对比；业务素材复核；
+  可编辑内容用旧 replaceText/replaceImage 与新 ViewModel 赋值同等操作后对比。
+
+## 四期预告（平台接入，最后一期）
+平台接口设计（§8.2 一次覆盖一至三期全部能力）→ Android/iOS/macOS/OHOS/Web/C API 接入
+（播放统一、对象模型分离、ViewModel、字体注册、三期新增接口）→ 发版前全量回归（C33）。
