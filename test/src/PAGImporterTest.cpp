@@ -31,6 +31,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -60,10 +61,12 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/Timeline.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -1680,6 +1683,102 @@ PAGX_TEST(PAGImporterTest, SharedReferenceMaskNodeRefRoundTrip) {
   EXPECT_FALSE(sampleMaskedLayer->mask->visible);
   ASSERT_FALSE(sampleMaskedLayer->mask->contents.empty());
   EXPECT_EQ(sampleMaskedLayer->mask->contents[0]->nodeType(), NodeType::Ellipse);
+}
+
+PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
+  // Layer timelines (spec §9.6): AnimationTimeline carries animationId / playing /
+  // evaluationOffset (signed varint, negative skips ahead); StateMachineTimeline carries only
+  // stateMachineId. Both mount between filters and children and are owned by the layer, so they
+  // take no NodeRef indices.
+  auto source = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/layer_timeline_mount.pagx"));
+  ASSERT_TRUE(source != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(source, "/tmp/timeline_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/timeline_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(source->layers.size(), decoded->layers.size());
+  int animationTimelines = 0;
+  for (size_t i = 0; i < source->layers.size(); i++) {
+    ASSERT_EQ(decoded->layers[i]->timelines.size(), source->layers[i]->timelines.size());
+    for (size_t j = 0; j < source->layers[i]->timelines.size(); j++) {
+      auto* src = source->layers[i]->timelines[j].get();
+      auto* dst = decoded->layers[i]->timelines[j].get();
+      ASSERT_EQ(dst->timelineType(), src->timelineType());
+      if (src->timelineType() == TimelineType::Animation) {
+        auto* srcAnim = static_cast<AnimationTimeline*>(src);
+        auto* dstAnim = static_cast<AnimationTimeline*>(dst);
+        EXPECT_EQ(dstAnim->animationId, srcAnim->animationId);
+        EXPECT_EQ(dstAnim->playing, srcAnim->playing);
+        EXPECT_EQ(dstAnim->evaluationOffset, srcAnim->evaluationOffset);
+        animationTimelines++;
+      }
+    }
+  }
+  EXPECT_GT(animationTimelines, 0);
+  // Render equivalence through the runtime animation path at several playback times.
+  for (auto& timeText : std::vector<std::string>{"0", "0.25", "0.5"}) {
+    auto sceneA = PAGScene::Make(source);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr);
+    ASSERT_TRUE(sceneB != nullptr);
+    auto timeUs = static_cast<int64_t>(llround(std::stod(timeText) * 1e6));
+    for (auto& id : sceneA->getAnimationIds()) {
+      auto animation = sceneA->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    for (auto& id : sceneB->getAnimationIds()) {
+      auto animation = sceneB->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    int width = static_cast<int>(source->width);
+    int height = static_cast<int>(source->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(sceneA->draw(surfaceA));
+    ASSERT_TRUE(sceneB->draw(surfaceB));
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << " t=" << timeText;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, TimelineNegativeOffsetAndStateMachineRoundTrip) {
+  // Hand-built document exercising the signed evaluationOffset varint (negative skips ahead)
+  // and a StateMachineTimeline mount (structural round trip only: state machines themselves
+  // encode in P2-4, so the referenced id is allowed to dangle for now).
+  auto doc = PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<Layer>();
+  doc->layers.push_back(layer);
+  auto animationDriver = std::make_unique<AnimationTimeline>();
+  animationDriver->animationId = "spin";
+  animationDriver->playing = false;
+  animationDriver->evaluationOffset = -25;
+  layer->timelines.push_back(std::move(animationDriver));
+  auto stateMachineDriver = std::make_unique<StateMachineTimeline>();
+  stateMachineDriver->stateMachineId = "machine";
+  layer->timelines.push_back(std::move(stateMachineDriver));
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/timeline_flags.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/timeline_flags.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  ASSERT_EQ(decoded->layers[0]->timelines.size(), 2u);
+  auto* first = decoded->layers[0]->timelines[0].get();
+  ASSERT_EQ(first->timelineType(), TimelineType::Animation);
+  auto* decodedAnimation = static_cast<AnimationTimeline*>(first);
+  EXPECT_EQ(decodedAnimation->animationId, "spin");
+  EXPECT_FALSE(decodedAnimation->playing);
+  EXPECT_EQ(decodedAnimation->evaluationOffset, -25);
+  auto* second = decoded->layers[0]->timelines[1].get();
+  ASSERT_EQ(second->timelineType(), TimelineType::StateMachine);
+  EXPECT_EQ(static_cast<StateMachineTimeline*>(second)->stateMachineId, "machine");
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "timeline-mount", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, AnimationRoundTrip) {

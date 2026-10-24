@@ -294,6 +294,19 @@ void CollectStringsFromLayer(Layer* layer, EncodeState* state) {
   if (!layer->id.empty()) {
     state->intern(layer->id);
   }
+  for (const auto& timeline : layer->timelines) {
+    if (timeline->timelineType() == TimelineType::Animation) {
+      auto* animationTimeline = static_cast<AnimationTimeline*>(timeline.get());
+      if (!animationTimeline->animationId.empty()) {
+        state->intern(animationTimeline->animationId);
+      }
+    } else if (timeline->timelineType() == TimelineType::StateMachine) {
+      auto* stateMachineTimeline = static_cast<StateMachineTimeline*>(timeline.get());
+      if (!stateMachineTimeline->stateMachineId.empty()) {
+        state->intern(stateMachineTimeline->stateMachineId);
+      }
+    }
+  }
   for (auto* element : layer->contents) {
     CollectStringsFromElement(element, state);
   }
@@ -2164,6 +2177,50 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
   }
   for (auto* filter : layer->filters) {
     WriteLayerFilterTag(&content, filter, state);
+  }
+  // Layer timelines (spec §9.6) sit between filters and children, matching the XML emission
+  // order. Timelines are owned by the layer (unique_ptr), not pooled nodes, so they take no
+  // NodeRef indices; they reference their targets by string id.
+  for (const auto& timeline : layer->timelines) {
+    if (timeline->timelineType() == TimelineType::Animation) {
+      auto* animationTimeline = static_cast<AnimationTimeline*>(timeline.get());
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasAnimationId = !animationTimeline->animationId.empty();
+      auto notPlaying = !animationTimeline->playing;
+      auto hasEvaluationOffset = animationTimeline->evaluationOffset != 0;
+      writer.writeFlag(hasAnimationId);
+      writer.writeFlag(notPlaying);
+      writer.writeFlag(hasEvaluationOffset);
+      auto* v = writer.valueStream();
+      if (hasAnimationId) {
+        v->writeEncodedUint32(state->intern(animationTimeline->animationId));
+      }
+      if (notPlaying) {
+        v->writeBoolean(animationTimeline->playing);
+      }
+      if (hasEvaluationOffset) {
+        v->writeEncodedInt64(animationTimeline->evaluationOffset);
+      }
+      auto block = writer.release();
+      WritePAGTagHeader(&content, TagCode::AnimationTimeline,
+                        static_cast<uint32_t>(block->length()));
+      content.writeBytes(const_cast<uint8_t*>(block->data()),
+                         static_cast<uint32_t>(block->length()));
+    } else if (timeline->timelineType() == TimelineType::StateMachine) {
+      auto* stateMachineTimeline = static_cast<StateMachineTimeline*>(timeline.get());
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      auto hasStateMachineId = !stateMachineTimeline->stateMachineId.empty();
+      writer.writeFlag(hasStateMachineId);
+      auto* v = writer.valueStream();
+      if (hasStateMachineId) {
+        v->writeEncodedUint32(state->intern(stateMachineTimeline->stateMachineId));
+      }
+      auto block = writer.release();
+      WritePAGTagHeader(&content, TagCode::StateMachineTimeline,
+                        static_cast<uint32_t>(block->length()));
+      content.writeBytes(const_cast<uint8_t*>(block->data()),
+                         static_cast<uint32_t>(block->length()));
+    }
   }
   for (auto* child : layer->children) {
     WriteLayerTag(&content, child, state);

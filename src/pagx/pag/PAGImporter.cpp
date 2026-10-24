@@ -25,6 +25,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -61,6 +62,7 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -1616,6 +1618,34 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       if (filter != nullptr) {
         layer->filters.push_back(filter);
       }
+    } else if (header.code == TagCode::AnimationTimeline) {
+      // Layer timelines (spec §9.6) sit between filters and children. They are owned by the
+      // layer, not pooled nodes, so they create no doc->nodes entries and take no indices.
+      PAGAttributeBlockReader reader(&tagBytes, 3);
+      bool hasAnimationId = reader.flag(0);
+      bool notPlaying = reader.flag(1);
+      bool hasEvaluationOffset = reader.flag(2);
+      tagBytes.alignWithBytes();
+      auto driver = std::make_unique<AnimationTimeline>();
+      if (hasAnimationId) {
+        driver->animationId = context->getString(tagBytes.readEncodedUint32());
+      }
+      if (notPlaying) {
+        driver->playing = tagBytes.readBoolean();
+      }
+      if (hasEvaluationOffset) {
+        driver->evaluationOffset = tagBytes.readEncodedInt64();
+      }
+      layer->timelines.push_back(std::move(driver));
+    } else if (header.code == TagCode::StateMachineTimeline) {
+      PAGAttributeBlockReader reader(&tagBytes, 1);
+      bool hasStateMachineId = reader.flag(0);
+      tagBytes.alignWithBytes();
+      auto driver = std::make_unique<StateMachineTimeline>();
+      if (hasStateMachineId) {
+        driver->stateMachineId = context->getString(tagBytes.readEncodedUint32());
+      }
+      layer->timelines.push_back(std::move(driver));
     } else {
       auto* element = ReadElementTag(&tagBytes, header.code, context);
       if (element != nullptr) layer->contents.push_back(element);
