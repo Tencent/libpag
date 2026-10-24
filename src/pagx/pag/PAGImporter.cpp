@@ -34,6 +34,8 @@
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -75,6 +77,8 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
 #include "pagx/pag/PAGFileHeader.h"
@@ -93,6 +97,18 @@ struct DecodeContext {
   // restored in a final backfill pass. Sub-documents restore their own tables inline (their
   // node list is complete when the sub-document block ends).
   std::vector<std::pair<uint32_t, std::string>> pendingRetainedIds = {};
+  // DocumentAttributes viewModel NodeRefs (spec §6.4): the referenced ViewModel nodes are
+  // created later in the ViewModel section, so the pointers backfill after the body is read.
+  std::vector<std::pair<PAGXDocument*, uint32_t>> pendingDocumentViewModelRefs = {};
+  std::vector<std::pair<Composition*, uint32_t>> pendingCompositionViewModelRefs = {};
+  // ViewModelProperty dataConverter / viewModelRef NodeRefs (spec §9.1 #300), tagged with the
+  // owning document because the root document's ViewModel section is read before the
+  // SubDocumentTable, so entries from both scopes interleave in this list. Each scope resolves
+  // its own entries when its node list is complete.
+  std::vector<std::tuple<ViewModelProperty*, uint32_t, PAGXDocument*>>
+      pendingViewModelPropertyConverterRefs = {};
+  std::vector<std::tuple<ViewModelProperty*, uint32_t, PAGXDocument*>>
+      pendingViewModelPropertyModelRefs = {};
   // Zero-copy backing buffer for all decoded image slices: the adopted whole-file data. Slices
   // keep this parent alive (spec §5.1), so no image bytes are ever copied.
   std::shared_ptr<Data> fileData = nullptr;
@@ -360,6 +376,160 @@ AnimationObject* ReadAnimationObjectBlock(pag::DecodeStream* tagStream, DecodeCo
     }
   }
   return object;
+}
+
+// ---------------------------------------------------------------------------
+// ViewModel / DataBind decoding (spec §9.1 #299/300/301, §9.8 #544).
+// ---------------------------------------------------------------------------
+
+// DataConverter (301).
+DataConverter* ReadDataConverterTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* converter = context->document->makeNode<DataConverter>();
+  PAGAttributeBlockReader reader(tagStream, 2);
+  bool hasConverterType = reader.flag(0);
+  bool hasParams = reader.flag(1);
+  tagStream->alignWithBytes();
+  if (hasConverterType) {
+    converter->converterType = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasParams) {
+    auto count = tagStream->readEncodedUint32();
+    if (count > 65536) {
+      PAGThrowError(tagStream->context, "data converter param count exceeds the spec limit");
+      return converter;
+    }
+    for (uint32_t i = 0; i < count; i++) {
+      auto key = context->getString(tagStream->readEncodedUint32());
+      auto value = context->getString(tagStream->readEncodedUint32());
+      converter->params[key] = value;
+    }
+  }
+  return converter;
+}
+
+// ViewModelProperty (300). The inline defaultImage sub-tag (ResourceRef 0) follows the value
+// area.
+ViewModelProperty* ReadViewModelPropertyTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* property = context->document->makeNode<ViewModelProperty>();
+  PAGAttributeBlockReader reader(tagStream, 12);
+  bool hasName = reader.flag(0);
+  bool hasDataConverter = reader.flag(1);
+  bool hasViewModelRef = reader.flag(2);
+  bool hasMinValue = reader.flag(3);
+  bool hasMaxValue = reader.flag(4);
+  bool hasDefaultString = reader.flag(5);
+  property->defaultBoolean = reader.flag(6);
+  bool hasDefaultColor = reader.flag(7);
+  bool hasDefaultImage = reader.flag(8);
+  bool hasEnumOptions = reader.flag(9);
+  bool hasDataKeys = reader.flag(10);
+  tagStream->alignWithBytes();
+  if (hasName) {
+    property->name = context->getString(tagStream->readEncodedUint32());
+  }
+  property->propertyType = static_cast<ViewModelPropertyType>(tagStream->readUint8());
+  if (hasDataConverter) {
+    auto ref = tagStream->readEncodedUint32();
+    context->pendingViewModelPropertyConverterRefs.push_back({property, ref, context->document});
+  }
+  if (hasViewModelRef) {
+    auto ref = tagStream->readEncodedUint32();
+    context->pendingViewModelPropertyModelRefs.push_back({property, ref, context->document});
+  }
+  property->defaultNumber = tagStream->readFloat();
+  if (hasMinValue) {
+    property->minValue = tagStream->readFloat();
+  }
+  if (hasMaxValue) {
+    property->maxValue = tagStream->readFloat();
+  }
+  if (hasDefaultString) {
+    property->defaultString = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasDefaultColor) {
+    property->defaultColor = ReadPAGColor(tagStream);
+  }
+  uint32_t imageRef = 0;
+  if (hasDefaultImage) {
+    imageRef = tagStream->readEncodedUint32();
+  }
+  if (hasEnumOptions) {
+    auto count = tagStream->readEncodedUint32();
+    if (count > 1024) {
+      PAGThrowError(tagStream->context, "enum option count exceeds the spec limit");
+      return property;
+    }
+    property->enumOptions.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+      property->enumOptions[i] = context->getString(tagStream->readEncodedUint32());
+    }
+  }
+  property->defaultEnum = static_cast<int>(tagStream->readEncodedUint32());
+  if (hasDataKeys) {
+    auto keyCount = tagStream->readEncodedUint32();
+    std::vector<std::string> keys = {};
+    keys.resize(keyCount);
+    for (uint32_t i = 0; i < keyCount; i++) {
+      keys[i] = context->getString(tagStream->readEncodedUint32());
+    }
+    auto valueCount = tagStream->readEncodedUint32();
+    for (uint32_t i = 0; i < valueCount && i < keyCount; i++) {
+      auto value = context->getString(tagStream->readEncodedUint32());
+      property->customData[keys[i]] = value;
+    }
+    for (uint32_t i = valueCount; i < keyCount; i++) {
+      tagStream->readEncodedUint32();
+    }
+  }
+  if (hasDefaultImage && imageRef == 0) {
+    auto imageHeader = ReadPAGTagHeader(tagStream);
+    auto imageBytes = tagStream->readBytes(imageHeader.length);
+    if (imageHeader.code == TagCode::Image) {
+      property->defaultImage = ReadImageTag(&imageBytes, context);
+    }
+  }
+  return property;
+}
+
+// ViewModelBlock (299).
+ViewModel* ReadViewModelBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* viewModel = context->document->makeNode<ViewModel>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::ViewModelProperty) {
+      auto* property = ReadViewModelPropertyTag(&tagBytes, context);
+      if (property != nullptr) {
+        viewModel->properties.push_back(property);
+      }
+    }
+  }
+  return viewModel;
+}
+
+// DataBind (544).
+DataBind* ReadDataBindTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* bind = context->document->makeNode<DataBind>();
+  PAGAttributeBlockReader reader(tagStream, 4);
+  bool hasSource = reader.flag(0);
+  bool hasTarget = reader.flag(1);
+  bool hasChannel = reader.flag(2);
+  bool hasDirection = reader.flag(3);
+  tagStream->alignWithBytes();
+  if (hasSource) {
+    bind->source = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasTarget) {
+    bind->target = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasChannel) {
+    bind->channel = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasDirection) {
+    bind->direction = static_cast<DataBindDirection>(tagStream->readUint8());
+  }
+  return bind;
 }
 
 // ---------------------------------------------------------------------------
@@ -944,12 +1114,17 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::DocumentAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 4);
+      PAGAttributeBlockReader reader(&tagBytes, 5);
       bool hasWidth = reader.flag(0);
       bool hasHeight = reader.flag(1);
+      bool hasViewModel = reader.flag(4);
       tagBytes.alignWithBytes();
       if (hasWidth) composition->width = tagBytes.readFloat();
       if (hasHeight) composition->height = tagBytes.readFloat();
+      if (hasViewModel) {
+        context->pendingCompositionViewModelRefs.push_back(
+            {composition, tagBytes.readEncodedUint32()});
+      }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
@@ -964,6 +1139,11 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
       auto* stateMachine = ReadStateMachineBlock(&tagBytes, context);
       if (stateMachine != nullptr) {
         composition->animations.push_back(stateMachine);
+      }
+    } else if (header.code == TagCode::DataBind) {
+      auto* bind = ReadDataBindTag(&tagBytes, context);
+      if (bind != nullptr) {
+        composition->dataBinds.push_back(bind);
       }
     }
   }
@@ -1847,12 +2027,16 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::DocumentAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 4);
+      PAGAttributeBlockReader reader(&tagBytes, 5);
       bool hasWidth = reader.flag(0);
       bool hasHeight = reader.flag(1);
+      bool hasViewModel = reader.flag(4);
       tagBytes.alignWithBytes();
       if (hasWidth) doc->width = tagBytes.readFloat();
       if (hasHeight) doc->height = tagBytes.readFloat();
+      if (hasViewModel) {
+        context->pendingDocumentViewModelRefs.push_back({doc, tagBytes.readEncodedUint32()});
+      }
     } else if (header.code == TagCode::RetainedIdTable) {
       // The table sits before the layers it indexes, so entries are recorded here and restored
       // once the emission-order node list is complete (final backfill in LoadFromPAG).
@@ -1879,6 +2063,15 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
       auto* stateMachine = ReadStateMachineBlock(&tagBytes, context);
       if (stateMachine != nullptr) {
         doc->animations.push_back(stateMachine);
+      }
+    } else if (header.code == TagCode::DataConverter) {
+      ReadDataConverterTag(&tagBytes, context);
+    } else if (header.code == TagCode::ViewModelBlock) {
+      ReadViewModelBlock(&tagBytes, context);
+    } else if (header.code == TagCode::DataBind) {
+      auto* bind = ReadDataBindTag(&tagBytes, context);
+      if (bind != nullptr) {
+        doc->dataBinds.push_back(bind);
       }
     }
   }
@@ -1950,6 +2143,38 @@ std::shared_ptr<PAGXDocument> MakeSubDocumentInstance(uint32_t index,
 
 // SubDocument content (spec §6.5): varuint diagnosticName, DocumentAttributes(263),
 // [RetainedIdTable(264)], the sub-document's layers, End. Decoded once into a template.
+// Resolves the ViewModelProperty dataConverter/viewModelRef NodeRefs that belong to the given
+// sub-document against its own node table, then drops them from the shared pending lists (the
+// root document's entries are resolved separately once its whole body is read).
+static void RestoreSubDocumentPropertyRefs(PAGXDocument* document, DecodeContext* context) {
+  for (auto& pending : context->pendingViewModelPropertyConverterRefs) {
+    if (std::get<2>(pending) != document) {
+      continue;
+    }
+    auto ref = std::get<1>(pending);
+    if (ref == 0 || ref > document->nodes.size()) {
+      continue;
+    }
+    auto* node = document->nodes[ref - 1].get();
+    if (node->nodeType() == NodeType::DataConverter) {
+      std::get<0>(pending)->dataConverter = static_cast<DataConverter*>(node);
+    }
+  }
+  for (auto& pending : context->pendingViewModelPropertyModelRefs) {
+    if (std::get<2>(pending) != document) {
+      continue;
+    }
+    auto ref = std::get<1>(pending);
+    if (ref == 0 || ref > document->nodes.size()) {
+      continue;
+    }
+    auto* node = document->nodes[ref - 1].get();
+    if (node->nodeType() == NodeType::ViewModel) {
+      std::get<0>(pending)->viewModelRef = static_cast<ViewModel*>(node);
+    }
+  }
+}
+
 void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
   if (context->subDocuments.size() >= 256) {
     PAGThrowError(tagStream->context, "sub document table count exceeds the spec limit");
@@ -1961,6 +2186,7 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
   std::vector<std::pair<Layer*, uint32_t>> pendingRefs = {};
   std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
   std::vector<std::pair<uint32_t, std::string>> retainedIds = {};
+  std::vector<std::pair<PAGXDocument*, uint32_t>> subViewModelRefs = {};
   auto savedDocument = context->document;
   context->document = entry.document.get();
   while (true) {
@@ -1968,12 +2194,16 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::DocumentAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 4);
+      PAGAttributeBlockReader reader(&tagBytes, 5);
       bool hasWidth = reader.flag(0);
       bool hasHeight = reader.flag(1);
+      bool hasViewModel = reader.flag(4);
       tagBytes.alignWithBytes();
       if (hasWidth) entry.document->width = tagBytes.readFloat();
       if (hasHeight) entry.document->height = tagBytes.readFloat();
+      if (hasViewModel) {
+        subViewModelRefs.push_back({entry.document.get(), tagBytes.readEncodedUint32()});
+      }
     } else if (header.code == TagCode::RetainedIdTable) {
       auto count = tagBytes.readEncodedUint32();
       for (uint32_t i = 0; i < count; i++) {
@@ -1995,9 +2225,30 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
       if (stateMachine != nullptr) {
         entry.document->animations.push_back(stateMachine);
       }
+    } else if (header.code == TagCode::DataConverter) {
+      ReadDataConverterTag(&tagBytes, context);
+    } else if (header.code == TagCode::ViewModelBlock) {
+      ReadViewModelBlock(&tagBytes, context);
+    } else if (header.code == TagCode::DataBind) {
+      auto* bind = ReadDataBindTag(&tagBytes, context);
+      if (bind != nullptr) {
+        entry.document->dataBinds.push_back(bind);
+      }
     }
   }
   context->document = savedDocument;
+  // The sub-document's node list is complete at this point, so its viewModel pointer restores
+  // inline (the root document defers because its attributes are read before later blocks).
+  for (auto& pending : subViewModelRefs) {
+    if (pending.second == 0 || pending.second > entry.document->nodes.size()) {
+      continue;
+    }
+    auto* node = entry.document->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::ViewModel) {
+      pending.first->viewModel = static_cast<ViewModel*>(node);
+    }
+  }
+  RestoreSubDocumentPropertyRefs(entry.document.get(), context);
   // The sub-document's node list is complete at this point, so its retained ids restore inline
   // (the root document defers because its table is read before later blocks create nodes).
   PAGImporter::RestoreRetainedIds(entry.document.get(), retainedIds);
@@ -2229,6 +2480,52 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
   // Restore the retained ids once the emission-order node list is complete (spec §9.0): these
   // feed the runtime's string lookups (PAGLayer::id(), animation targets, timeline ids).
   PAGImporter::RestoreRetainedIds(doc.get(), context.pendingRetainedIds);
+  // DocumentAttributes viewModel pointers and property refs resolve against the completed
+  // root node table (spec §6.4, §9.1).
+  for (auto& pending : context.pendingDocumentViewModelRefs) {
+    if (pending.second == 0 || pending.second > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::ViewModel) {
+      pending.first->viewModel = static_cast<ViewModel*>(node);
+    }
+  }
+  for (auto& pending : context.pendingCompositionViewModelRefs) {
+    if (pending.second == 0 || pending.second > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::ViewModel) {
+      pending.first->viewModel = static_cast<ViewModel*>(node);
+    }
+  }
+  for (auto& pending : context.pendingViewModelPropertyConverterRefs) {
+    if (std::get<2>(pending) != doc.get()) {
+      continue;
+    }
+    auto ref = std::get<1>(pending);
+    if (ref == 0 || ref > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[ref - 1].get();
+    if (node->nodeType() == NodeType::DataConverter) {
+      std::get<0>(pending)->dataConverter = static_cast<DataConverter*>(node);
+    }
+  }
+  for (auto& pending : context.pendingViewModelPropertyModelRefs) {
+    if (std::get<2>(pending) != doc.get()) {
+      continue;
+    }
+    auto ref = std::get<1>(pending);
+    if (ref == 0 || ref > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[ref - 1].get();
+    if (node->nodeType() == NodeType::ViewModel) {
+      std::get<0>(pending)->viewModelRef = static_cast<ViewModel*>(node);
+    }
+  }
 
   if (bodyStream.context->hasException()) {
     // Failed decodes return nullptr (interface draft §2): handing a partially decoded document

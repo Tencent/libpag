@@ -85,10 +85,12 @@ PAGX_TEST(PAGStripTest, CollectRetainedIds) {
   EXPECT_EQ(ids.count("anim1"), 1u);
   // DataBind targets survive.
   EXPECT_EQ(ids.count("visible"), 1u);
-  // Non-Layer node ids do NOT survive (rect, fill, vm, photo).
+  // ViewModel ids survive (phase 2: the XML round trip and the RetainedIdTable reference
+  // them via viewModel="@..." and viewModelRef="@...").
+  EXPECT_EQ(ids.count("vm"), 1u);
+  // Other non-Layer node ids do NOT survive (rect, fill, photo).
   EXPECT_EQ(ids.count("rect"), 0u);
   EXPECT_EQ(ids.count("fill"), 0u);
-  EXPECT_EQ(ids.count("vm"), 0u);
   EXPECT_EQ(ids.count("photo"), 0u);
 }
 

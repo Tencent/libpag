@@ -39,6 +39,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -73,6 +75,8 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/Timeline.h"
 #include "pagx/nodes/TransitionCondition.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -1768,6 +1772,110 @@ PAGX_TEST(PAGImporterTest, StateMachineRoundTrip) {
     }
     int byteCount = 0;
     EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "state-machine", &byteCount)) << name;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, ViewModelDataBindRoundTrip) {
+  // ViewModel / DataBind round trip (spec §9.1/§9.8): the document's root viewModel pointer
+  // (DocumentAttributes NodeRef), property subtrees with all seven property types, DataConverter
+  // and nested viewModelRef NodeRefs, and declaration-ordered DataBinds must all survive. The
+  // render comparison exercises the runtime's ViewModel application (bind defaults drive the
+  // same channels from both documents).
+  const std::vector<std::string> samples = {
+      "bind_directions", "data_converter",        "nested_viewmodel",
+      "property_types",  "composition_viewmodel",
+  };
+  for (auto& name : samples) {
+    auto source = PAGXImporter::FromFile(
+        pag::ProjectPath::Absolute("resources/pagx_to_pag/viewmodel/" + name + ".pagx"));
+    ASSERT_TRUE(source != nullptr) << name;
+    auto exportResult = PAGExporter::ExportToPAG(source, "/tmp/vm_rt.pag");
+    ASSERT_TRUE(exportResult.success) << name;
+    for (auto& warning : exportResult.warnings) {
+      EXPECT_NE(warning.code, PAGExportWarning::AnimatedContentSkipped)
+          << name << ": viewmodels are encoded in phase 2";
+    }
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/vm_rt.pag");
+    ASSERT_TRUE(decoded != nullptr) << name;
+    // Root viewModel pointer survived (composition samples attach it to the composition).
+    bool hasRootModel = decoded->viewModel != nullptr;
+    for (auto& node : decoded->nodes) {
+      if (node->nodeType() == NodeType::Composition &&
+          static_cast<Composition*>(node.get())->viewModel != nullptr) {
+        hasRootModel = true;
+      }
+    }
+    EXPECT_TRUE(hasRootModel) << name;
+    EXPECT_EQ(decoded->dataBinds.size(), source->dataBinds.size()) << name;
+    for (size_t i = 0; i < source->dataBinds.size(); i++) {
+      EXPECT_EQ(decoded->dataBinds[i]->source, source->dataBinds[i]->source) << name;
+      EXPECT_EQ(decoded->dataBinds[i]->target, source->dataBinds[i]->target) << name;
+      EXPECT_EQ(decoded->dataBinds[i]->channel, source->dataBinds[i]->channel) << name;
+      EXPECT_EQ(decoded->dataBinds[i]->direction, source->dataBinds[i]->direction) << name;
+    }
+    // Property trees: compare every ViewModel node with its counterpart by id.
+    for (auto& node : decoded->nodes) {
+      if (node->nodeType() != NodeType::ViewModel) {
+        continue;
+      }
+      auto* dst = static_cast<ViewModel*>(node.get());
+      ASSERT_FALSE(dst->id.empty()) << name;
+      auto* src = source->findNode<ViewModel>(dst->id);
+      ASSERT_TRUE(src != nullptr) << name << " viewmodel " << dst->id;
+      ASSERT_EQ(dst->properties.size(), src->properties.size()) << name;
+      for (size_t i = 0; i < src->properties.size(); i++) {
+        EXPECT_EQ(dst->properties[i]->name, src->properties[i]->name) << name;
+        EXPECT_EQ(dst->properties[i]->propertyType, src->properties[i]->propertyType) << name;
+        EXPECT_EQ(dst->properties[i]->defaultNumber, src->properties[i]->defaultNumber) << name;
+        EXPECT_EQ(dst->properties[i]->minValue.has_value(),
+                  src->properties[i]->minValue.has_value())
+            << name;
+        EXPECT_EQ(dst->properties[i]->maxValue.has_value(),
+                  src->properties[i]->maxValue.has_value())
+            << name;
+        EXPECT_EQ(dst->properties[i]->defaultString, src->properties[i]->defaultString) << name;
+        EXPECT_EQ(dst->properties[i]->defaultBoolean, src->properties[i]->defaultBoolean) << name;
+        EXPECT_EQ(dst->properties[i]->enumOptions.size(), src->properties[i]->enumOptions.size())
+            << name;
+        EXPECT_EQ(dst->properties[i]->defaultEnum, src->properties[i]->defaultEnum) << name;
+        EXPECT_EQ(dst->properties[i]->dataConverter != nullptr,
+                  src->properties[i]->dataConverter != nullptr)
+            << name;
+        if (src->properties[i]->dataConverter != nullptr) {
+          EXPECT_EQ(dst->properties[i]->dataConverter->converterType,
+                    src->properties[i]->dataConverter->converterType)
+              << name;
+          EXPECT_EQ(dst->properties[i]->dataConverter->params.size(),
+                    src->properties[i]->dataConverter->params.size())
+              << name;
+        }
+        EXPECT_EQ(dst->properties[i]->viewModelRef != nullptr,
+                  src->properties[i]->viewModelRef != nullptr)
+            << name;
+        if (src->properties[i]->viewModelRef != nullptr) {
+          EXPECT_EQ(dst->properties[i]->viewModelRef->id, src->properties[i]->viewModelRef->id)
+              << name;
+        }
+      }
+    }
+    // Render equivalence through the runtime ViewModel application.
+    auto sceneA = PAGScene::Make(source);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr) << name;
+    ASSERT_TRUE(sceneB != nullptr) << name;
+    int width = static_cast<int>(source->width);
+    int height = static_cast<int>(source->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(sceneA->draw(surfaceA)) << name;
+    ASSERT_TRUE(sceneB->draw(surfaceB)) << name;
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4)) << name;
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4)) << name;
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << name;
+    int byteCount = 0;
+    EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "viewmodel", &byteCount)) << name;
   }
 }
 

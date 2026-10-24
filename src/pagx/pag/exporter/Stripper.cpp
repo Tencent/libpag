@@ -274,6 +274,15 @@ std::unordered_set<std::string> Stripper::CollectRetainedIds(const PAGXDocument*
   }
   CollectRetainedIdsFromAnimations(document->animations, &ids);
   CollectRetainedIdsFromDataBinds(document->dataBinds, &ids);
+  // ViewModel and DataConverter ids feed the XML round trip's @refs (viewModel="...",
+  // viewModelRef="...", dataConverter="...") and the binary RetainedIdTable; stripping them
+  // would break both the idempotent re-export and the string lookups after decode.
+  for (auto& node : document->nodes) {
+    auto type = node->nodeType();
+    if ((type == NodeType::ViewModel || type == NodeType::DataConverter) && !node->id.empty()) {
+      ids.insert(node->id);
+    }
+  }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* composition = static_cast<Composition*>(node.get());

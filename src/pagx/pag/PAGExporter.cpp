@@ -36,6 +36,8 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -80,6 +82,8 @@
 #include "pagx/nodes/Timeline.h"
 #include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
 #include "pagx/pag/PAGFileHeader.h"
@@ -297,6 +301,59 @@ void CollectStringsFromAnimation(Node* node, EncodeState* state) {
           }
         }
       }
+    }
+  }
+}
+
+// Interns every string the ViewModel/DataBind section emits (spec §9.1/§9.8) plus the ids the
+// RetainedIdTable restores (ViewModel/DataConverter ids feed the XML round trip's @refs;
+// DataBind targets are resolved by string at runtime). Must run before the StringTable is
+// written.
+void CollectStringsFromViewModels(PAGXDocument* document, EncodeState* state) {
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::DataConverter) {
+      auto* converter = static_cast<DataConverter*>(node.get());
+      if (!converter->id.empty()) {
+        state->intern(converter->id);
+      }
+      if (!converter->converterType.empty()) {
+        state->intern(converter->converterType);
+      }
+      for (auto& [key, value] : converter->params) {
+        state->intern(key);
+        state->intern(value);
+      }
+    } else if (node->nodeType() == NodeType::ViewModel) {
+      auto* viewModel = static_cast<ViewModel*>(node.get());
+      if (!viewModel->id.empty()) {
+        state->intern(viewModel->id);
+      }
+      for (auto* property : viewModel->properties) {
+        if (!property->name.empty()) {
+          state->intern(property->name);
+        }
+        if (!property->defaultString.empty()) {
+          state->intern(property->defaultString);
+        }
+        for (auto& option : property->enumOptions) {
+          state->intern(option);
+        }
+        for (auto& [key, value] : property->customData) {
+          state->intern(key);
+          state->intern(value);
+        }
+      }
+    }
+  }
+  for (auto* bind : document->dataBinds) {
+    if (!bind->source.empty()) {
+      state->intern(bind->source);
+    }
+    if (!bind->target.empty()) {
+      state->intern(bind->target);
+    }
+    if (!bind->channel.empty()) {
+      state->intern(bind->channel);
     }
   }
 }
@@ -1961,10 +2018,210 @@ void WriteStateMachineBlock(pag::EncodeStream* stream, StateMachine* stateMachin
   WriteTag(stream, TagCode::StateMachineBlock, &content);
 }
 
+// ---------------------------------------------------------------------------
+// ViewModel / DataBind encoding (spec §9.1 #299/300/301, §9.8 #544).
+// ---------------------------------------------------------------------------
+
+// DataConverter (301): converterType StringRef, params map (count + key/value pairs, key
+// ascending = std::map iteration order for deterministic bytes).
+void WriteDataConverterTag(pag::EncodeStream* stream, DataConverter* converter,
+                           EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasConverterType = !converter->converterType.empty();
+  auto hasParams = !converter->params.empty();
+  writer.writeFlag(hasConverterType);
+  writer.writeFlag(hasParams);
+  auto* v = writer.valueStream();
+  if (hasConverterType) {
+    v->writeEncodedUint32(state->intern(converter->converterType));
+  }
+  if (hasParams) {
+    v->writeEncodedUint32(static_cast<uint32_t>(converter->params.size()));
+    for (auto& [key, value] : converter->params) {
+      v->writeEncodedUint32(state->intern(key));
+      v->writeEncodedUint32(state->intern(value));
+    }
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::DataConverter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// ViewModelProperty (300): name, propertyType u8 (fixed), dataConverter/viewModelRef NodeRefs,
+// defaultNumber f32 (fixed), min/max, defaultString, defaultBoolean, defaultColor, defaultImage
+// (ResourceRef, 0 = inline Image sub-tag at the value-area end), enumOptions, defaultEnum,
+// data keys/values. The inline Image sub-tag creates a node right after the property, so the
+// index walk must number it there.
+void WriteViewModelPropertyTag(pag::EncodeStream* stream, ViewModelProperty* property,
+                               EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasName = !property->name.empty();
+    auto hasDataConverter = property->dataConverter != nullptr;
+    auto hasViewModelRef = property->viewModelRef != nullptr;
+    auto hasMinValue = property->minValue.has_value();
+    auto hasMaxValue = property->maxValue.has_value();
+    auto hasDefaultString = !property->defaultString.empty();
+    auto defaultBoolean = property->defaultBoolean;
+    auto hasDefaultColor = property->defaultColor != Color{};
+    auto hasDefaultImage = property->defaultImage != nullptr;
+    auto hasEnumOptions = !property->enumOptions.empty();
+    auto hasDataKeys = !property->customData.empty();
+    auto hasDataValues = !property->customData.empty();
+    writer.writeFlag(hasName);
+    writer.writeFlag(hasDataConverter);
+    writer.writeFlag(hasViewModelRef);
+    writer.writeFlag(hasMinValue);
+    writer.writeFlag(hasMaxValue);
+    writer.writeFlag(hasDefaultString);
+    writer.writeFlag(defaultBoolean);
+    writer.writeFlag(hasDefaultColor);
+    writer.writeFlag(hasDefaultImage);
+    writer.writeFlag(hasEnumOptions);
+    writer.writeFlag(hasDataKeys);
+    writer.writeFlag(hasDataValues);
+    auto* v = writer.valueStream();
+    if (hasName) {
+      v->writeEncodedUint32(state->intern(property->name));
+    }
+    v->writeUint8(static_cast<uint8_t>(property->propertyType));
+    if (hasDataConverter) {
+      auto it = state->nodeIndices.find(property->dataConverter);
+      v->writeEncodedUint32(it != state->nodeIndices.end() ? it->second + 1 : 0);
+    }
+    if (hasViewModelRef) {
+      auto it = state->nodeIndices.find(property->viewModelRef);
+      v->writeEncodedUint32(it != state->nodeIndices.end() ? it->second + 1 : 0);
+    }
+    v->writeFloat(property->defaultNumber);
+    if (hasMinValue) {
+      v->writeFloat(property->minValue.value());
+    }
+    if (hasMaxValue) {
+      v->writeFloat(property->maxValue.value());
+    }
+    if (hasDefaultString) {
+      v->writeEncodedUint32(state->intern(property->defaultString));
+    }
+    if (hasDefaultColor) {
+      WritePAGColor(v, property->defaultColor);
+    }
+    uint32_t imageRef = 0;
+    if (hasDefaultImage) {
+      auto entryIt = state->imageIndices.find(property->defaultImage);
+      if (entryIt != state->imageIndices.end()) {
+        auto slotIt = state->entryResourceSlots.find(entryIt->second);
+        if (slotIt != state->entryResourceSlots.end()) {
+          imageRef = slotIt->second + 1;
+        }
+      }
+      // imageRef 0 stays = the image is written inline at the value-area end below.
+      v->writeEncodedUint32(imageRef);
+    }
+    if (hasEnumOptions) {
+      v->writeEncodedUint32(static_cast<uint32_t>(property->enumOptions.size()));
+      for (auto& option : property->enumOptions) {
+        v->writeEncodedUint32(state->intern(option));
+      }
+    }
+    v->writeEncodedUint32(static_cast<uint32_t>(property->defaultEnum));
+    if (hasDataKeys) {
+      std::vector<std::string> keys = {};
+      keys.reserve(property->customData.size());
+      for (auto& [key, value] : property->customData) {
+        keys.push_back(key);
+      }
+      std::sort(keys.begin(), keys.end());
+      v->writeEncodedUint32(static_cast<uint32_t>(keys.size()));
+      for (auto& key : keys) {
+        v->writeEncodedUint32(state->intern(key));
+      }
+      v->writeEncodedUint32(static_cast<uint32_t>(keys.size()));
+      for (auto& key : keys) {
+        v->writeEncodedUint32(state->intern(property->customData[key]));
+      }
+    }
+    auto block = writer.release();
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  if (property->defaultImage != nullptr) {
+    auto entryIt = state->imageIndices.find(property->defaultImage);
+    bool shared = entryIt != state->imageIndices.end() &&
+                  state->entryResourceSlots.count(entryIt->second) > 0;
+    if (!shared) {
+      WriteImageTag(&content, property->defaultImage, state);
+    }
+  }
+  WriteTag(stream, TagCode::ViewModelProperty, &content);
+}
+
+// ViewModelBlock (299): properties, End-terminated.
+void WriteViewModelBlock(pag::EncodeStream* stream, ViewModel* viewModel, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  for (auto* property : viewModel->properties) {
+    WriteViewModelPropertyTag(&content, property, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::ViewModelBlock, &content);
+}
+
+void WriteDataBindTag(pag::EncodeStream* stream, DataBind* bind, EncodeState* state);
+
+// Writes the ViewModel/DataBind section (spec §6.4): DataConverters, then every ViewModel
+// node of the scope, then DataBinds in declaration order. The scope's root viewModel pointer
+// is carried by the DocumentAttributes NodeRef, not by ordering, so composition-scoped
+// machines can reference document-level ViewModels.
+void WriteViewModelSection(pag::EncodeStream* stream, PAGXDocument* document, EncodeState* state) {
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::DataConverter) {
+      WriteDataConverterTag(stream, static_cast<DataConverter*>(node.get()), state);
+    }
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::ViewModel) {
+      WriteViewModelBlock(stream, static_cast<ViewModel*>(node.get()), state);
+    }
+  }
+  for (auto* bind : document->dataBinds) {
+    WriteDataBindTag(stream, bind, state);
+  }
+}
+
+// DataBind (544): source, target, channel StringRefs, direction u8.
+void WriteDataBindTag(pag::EncodeStream* stream, DataBind* bind, EncodeState* state) {
+
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasSource = !bind->source.empty();
+  auto hasTarget = !bind->target.empty();
+  auto hasChannel = !bind->channel.empty();
+  auto hasDirection = bind->direction != DataBindDirection::ToTarget;
+  writer.writeFlag(hasSource);
+  writer.writeFlag(hasTarget);
+  writer.writeFlag(hasChannel);
+  writer.writeFlag(hasDirection);
+  auto* v = writer.valueStream();
+  if (hasSource) {
+    v->writeEncodedUint32(state->intern(bind->source));
+  }
+  if (hasTarget) {
+    v->writeEncodedUint32(state->intern(bind->target));
+  }
+  if (hasChannel) {
+    v->writeEncodedUint32(state->intern(bind->channel));
+  }
+  if (hasDirection) {
+    v->writeUint8(static_cast<uint8_t>(bind->direction));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::DataBind, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
 
-// CompositionBlock (spec §9.1 #297): CompositionAttributes (298: width/height) followed by
-// the composition's layer tags, End-terminated.
+// CompositionBlock (spec §9.1 #297): DocumentAttributes (263: width/height, viewModel NodeRef)
+// followed by the composition's layer tags, animation and data-bind sections, End-terminated.
 void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
                            EncodeState* state) {
   pag::EncodeStream content(&state->streamContext);
@@ -1972,11 +2229,17 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
     PAGAttributeBlockWriter writer(&state->streamContext);
     writer.writeFlag(true);   // width
     writer.writeFlag(true);   // height
-    writer.writeFlag(false);  // phase-2 fields
-    writer.writeFlag(false);
+    writer.writeFlag(false);  // dataKeys, phase 2
+    writer.writeFlag(false);  // dataValues, phase 2
+    auto hasViewModel = composition->viewModel != nullptr;
+    writer.writeFlag(hasViewModel);
     auto* v = writer.valueStream();
     v->writeFloat(composition->width);
     v->writeFloat(composition->height);
+    if (hasViewModel) {
+      auto it = state->nodeIndices.find(composition->viewModel);
+      v->writeEncodedUint32(it != state->nodeIndices.end() ? it->second + 1 : 0);
+    }
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::DocumentAttributes,
                       static_cast<uint32_t>(block->length()));
@@ -1991,6 +2254,9 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
     } else if (animationNode->nodeType() == NodeType::StateMachine) {
       WriteStateMachineBlock(&content, static_cast<StateMachine*>(animationNode), state);
     }
+  }
+  for (auto* bind : composition->dataBinds) {
+    WriteDataBindTag(&content, bind, state);
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::CompositionBlock, &content);
@@ -2859,6 +3125,8 @@ void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* in
 }
 
 void AssignAnimationNodeIndices(Node* node, EncodeState* state, uint32_t* index);
+void AssignDataBindNodeIndices(Composition* composition, EncodeState* state, uint32_t* index);
+void AssignViewModelNodeIndices(PAGXDocument* document, EncodeState* state, uint32_t* index);
 
 void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
   state->nodeIndices[layer] = (*index)++;
@@ -2874,6 +3142,7 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
     for (auto* animationNode : composition->animations) {
       AssignAnimationNodeIndices(animationNode, state, index);
     }
+    AssignDataBindNodeIndices(composition, state, index);
   }
   for (auto* element : layer->contents) {
     AssignElementNodeIndices(element, state, index);
@@ -2924,6 +3193,45 @@ void AssignAnimationNodeIndices(Node* node, EncodeState* state, uint32_t* index)
         }
       }
     }
+  }
+}
+
+// Numbers a composition's DataBind nodes after its animation subtree, matching the
+// CompositionBlock emission order.
+void AssignDataBindNodeIndices(Composition* composition, EncodeState* state, uint32_t* index) {
+  for (auto* bind : composition->dataBinds) {
+    state->nodeIndices[bind] = (*index)++;
+  }
+}
+
+// Numbers the ViewModel/DataBind section (spec §5.1): DataConverters, then ViewModels with
+// their property subtrees (an inline defaultImage creates its node right after the property),
+// then DataBinds — matching the WriteViewModelSection emission order.
+void AssignViewModelNodeIndices(PAGXDocument* document, EncodeState* state, uint32_t* index) {
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::DataConverter) {
+      state->nodeIndices[node.get()] = (*index)++;
+    }
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::ViewModel) {
+      continue;
+    }
+    state->nodeIndices[node.get()] = (*index)++;
+    for (auto* property : static_cast<ViewModel*>(node.get())->properties) {
+      state->nodeIndices[property] = (*index)++;
+      if (property->defaultImage != nullptr) {
+        auto entryIt = state->imageIndices.find(property->defaultImage);
+        bool shared = entryIt != state->imageIndices.end() &&
+                      state->entryResourceSlots.count(entryIt->second) > 0;
+        if (!shared) {
+          state->nodeIndices[property->defaultImage] = (*index)++;
+        }
+      }
+    }
+  }
+  for (auto* bind : document->dataBinds) {
+    state->nodeIndices[bind] = (*index)++;
   }
 }
 
@@ -3069,12 +3377,6 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   auto imageResult = ImageProcessor::Process(doc.get());
   result.warnings.insert(result.warnings.end(), imageResult.warnings.begin(),
                          imageResult.warnings.end());
-  if (!doc->dataBinds.empty() || doc->viewModel != nullptr) {
-    PAGExportIssue issue = {};
-    issue.code = PAGExportWarning::AnimatedContentSkipped;
-    issue.message = "viewmodel and data binds have no binary encoding yet";
-    result.warnings.push_back(issue);
-  }
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
   // Shared-image placement (spec §5.3): count references per ImageTable entry; entries
@@ -3092,9 +3394,29 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         }
       }
     }
+    // ViewModel image properties feed the same ImageTable pipeline as pattern images (spec
+    // §9.1 #300 defaultImage ResourceRef).
+    for (auto& node : doc->nodes) {
+      if (node->nodeType() == NodeType::ViewModel) {
+        for (auto* property : static_cast<ViewModel*>(node.get())->properties) {
+          if (property->defaultImage != nullptr) {
+            imageRefs.push_back(property->defaultImage);
+          }
+        }
+      }
+    }
     for (auto& sub : state->subDocuments) {
       for (auto* layer : sub.document->layers) {
         CollectImageReferencesFromLayer(layer, &imageRefs);
+      }
+      for (auto& node : sub.document->nodes) {
+        if (node->nodeType() == NodeType::ViewModel) {
+          for (auto* property : static_cast<ViewModel*>(node.get())->properties) {
+            if (property->defaultImage != nullptr) {
+              imageRefs.push_back(property->defaultImage);
+            }
+          }
+        }
       }
     }
     std::vector<Image*> entryFirstNode = {};
@@ -3196,7 +3518,17 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   for (auto* animationNode : doc->animations) {
     CollectStringsFromAnimation(animationNode, state.get());
   }
+  CollectStringsFromViewModels(doc.get(), state.get());
   CollectAnimationTargetIds(doc->animations, &state->animationTargetIds);
+  for (auto* bind : doc->dataBinds) {
+    auto target = bind->target;
+    if (!target.empty() && target[0] == '@') {
+      target = target.substr(1);
+    }
+    if (!target.empty()) {
+      state->animationTargetIds.insert(target);
+    }
+  }
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* composition = static_cast<Composition*>(node.get());
@@ -3221,6 +3553,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* animationNode : sub.document->animations) {
       CollectStringsFromAnimation(animationNode, state.get());
     }
+    CollectStringsFromViewModels(sub.document.get(), state.get());
     std::unordered_set<std::string> subTargetIds = {};
     CollectAnimationTargetIds(sub.document->animations, &subTargetIds);
     for (auto& node : sub.document->nodes) {
@@ -3253,6 +3586,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       for (auto* animationNode : composition->animations) {
         AssignAnimationNodeIndices(animationNode, state.get(), &nextIndex);
       }
+      AssignDataBindNodeIndices(composition, state.get(), &nextIndex);
     }
     for (auto* layer : doc->layers) {
       AssignLayerNodeIndices(layer, state.get(), &nextIndex);
@@ -3260,6 +3594,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* animationNode : doc->animations) {
       AssignAnimationNodeIndices(animationNode, state.get(), &nextIndex);
     }
+    AssignViewModelNodeIndices(doc.get(), state.get(), &nextIndex);
   }
   pag::EncodeStream body(&state->streamContext);
   WritePAGTagHeader(&body, TagCode::FileAttributes, 0);
@@ -3290,9 +3625,15 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       writer.writeFlag(true);
       writer.writeFlag(false);
       writer.writeFlag(false);
+      auto hasViewModel = doc->viewModel != nullptr;
+      writer.writeFlag(hasViewModel);
       auto* v = writer.valueStream();
       v->writeFloat(doc->width);
       v->writeFloat(doc->height);
+      if (hasViewModel) {
+        auto it = state->nodeIndices.find(doc->viewModel);
+        v->writeEncodedUint32(it != state->nodeIndices.end() ? it->second + 1 : 0);
+      }
       auto block = writer.release();
       WritePAGTagHeader(&docContent, TagCode::DocumentAttributes,
                         static_cast<uint32_t>(block->length()));
@@ -3312,7 +3653,8 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         }
         auto type = node->nodeType();
         if (type != NodeType::Layer && type != NodeType::Animation &&
-            type != NodeType::StateMachine && state->animationTargetIds.count(node->id) == 0) {
+            type != NodeType::StateMachine && type != NodeType::ViewModel &&
+            type != NodeType::DataConverter && state->animationTargetIds.count(node->id) == 0) {
           continue;
         }
         auto it = state->nodeIndices.find(node.get());
@@ -3339,6 +3681,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         WriteStateMachineBlock(&docContent, static_cast<StateMachine*>(animationNode), state.get());
       }
     }
+    WriteViewModelSection(&docContent, doc.get(), state.get());
     WritePAGTagHeader(&docContent, TagCode::End, 0);
     WriteTag(&body, TagCode::DocumentBlock, &docContent);
   }
@@ -3354,9 +3697,15 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         writer.writeFlag(true);   // height
         writer.writeFlag(false);  // dataKeys, phase 2
         writer.writeFlag(false);  // dataValues, phase 2
+        auto hasViewModel = sub.document->viewModel != nullptr;
+        writer.writeFlag(hasViewModel);
         auto* v = writer.valueStream();
         v->writeFloat(sub.document->width);
         v->writeFloat(sub.document->height);
+        if (hasViewModel) {
+          auto it = state->nodeIndices.find(sub.document->viewModel);
+          v->writeEncodedUint32(it != state->nodeIndices.end() ? it->second + 1 : 0);
+        }
         auto block = writer.release();
         WritePAGTagHeader(&subContent, TagCode::DocumentAttributes,
                           static_cast<uint32_t>(block->length()));
@@ -3381,6 +3730,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         for (auto* animationNode : sub.document->animations) {
           AssignAnimationNodeIndices(animationNode, state.get(), &subIndex);
         }
+        AssignViewModelNodeIndices(sub.document.get(), state.get(), &subIndex);
         {
           std::vector<std::pair<uint32_t, uint32_t>> idEntries = {};
           for (auto& node : sub.document->nodes) {
@@ -3389,7 +3739,8 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
             }
             auto type = node->nodeType();
             if (type != NodeType::Layer && type != NodeType::Animation &&
-                type != NodeType::StateMachine && state->animationTargetIds.count(node->id) == 0) {
+                type != NodeType::StateMachine && type != NodeType::ViewModel &&
+                type != NodeType::DataConverter && state->animationTargetIds.count(node->id) == 0) {
               continue;
             }
             auto it = state->nodeIndices.find(node.get());
@@ -3417,6 +3768,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                                    state.get());
           }
         }
+        WriteViewModelSection(&subContent, sub.document.get(), state.get());
         state->nodeIndices = std::move(rootIndices);
         state->animationTargetIds = std::move(rootTargets);
       }
