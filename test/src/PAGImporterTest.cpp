@@ -58,6 +58,7 @@
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -1772,6 +1773,69 @@ PAGX_TEST(PAGImporterTest, StateMachineRoundTrip) {
     }
     int byteCount = 0;
     EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "state-machine", &byteCount)) << name;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, BakedScaleKeyframeRoundTrip) {
+  // The flattener's geometry-scaled hook (design doc §12.2): when a uniform layout scale is
+  // baked into a Path's data, the per-point animation keyframes must carry the same scale —
+  // the runtime treats point{i}.x/y values as inputs in the PathData's unscaled space and
+  // multiplies by renderScale on rebuild, which is 1 after the bake. The sample declares a
+  // 200x200 box over 100x100 data (renderScale=2), so every point keyframe doubles.
+  auto source = PAGXImporter::FromFile(pag::ProjectPath::Absolute(
+      "resources/pagx_to_pag/animation/baked_scale_point_channels.pagx"));
+  ASSERT_TRUE(source != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(source, "/tmp/baked_scale_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/baked_scale_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->animations.size(), 1u);
+  auto* animation = static_cast<Animation*>(decoded->animations[0]);
+  ASSERT_EQ(animation->objects.size(), 1u);
+  int checkedChannels = 0;
+  for (auto* channel : animation->objects[0]->channels) {
+    ASSERT_EQ(channel->valueType(), ChannelValueType::Float);
+    auto* typed = static_cast<TypedChannel<float>*>(channel);
+    if (channel->name == "point0.x") {
+      ASSERT_EQ(typed->keyframes.size(), 2u);
+      EXPECT_EQ(typed->keyframes[0].value, 20.0f);
+      EXPECT_EQ(typed->keyframes[1].value, 80.0f);
+      checkedChannels++;
+    } else if (channel->name == "point2.x") {
+      ASSERT_EQ(typed->keyframes.size(), 2u);
+      EXPECT_EQ(typed->keyframes[0].value, 180.0f);
+      EXPECT_EQ(typed->keyframes[1].value, 120.0f);
+      checkedChannels++;
+    }
+  }
+  EXPECT_EQ(checkedChannels, 2);
+  // Render equivalence at several playback times through the runtime animation path.
+  for (auto& timeText : std::vector<std::string>{"0", "0.25", "0.5", "0.75", "1"}) {
+    auto sceneA = PAGScene::Make(source);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr);
+    ASSERT_TRUE(sceneB != nullptr);
+    auto timeUs = static_cast<int64_t>(llround(std::stod(timeText) * 1e6));
+    for (auto& id : sceneA->getAnimationIds()) {
+      auto anim = sceneA->getAnimation(id);
+      anim->setCurrentTime(timeUs);
+      anim->apply(1.0f);
+    }
+    for (auto& id : sceneB->getAnimationIds()) {
+      auto anim = sceneB->getAnimation(id);
+      anim->setCurrentTime(timeUs);
+      anim->apply(1.0f);
+    }
+    int width = static_cast<int>(source->width);
+    int height = static_cast<int>(source->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(sceneA->draw(surfaceA));
+    ASSERT_TRUE(sceneB->draw(surfaceB));
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << " t=" << timeText;
   }
 }
 

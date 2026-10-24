@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Baked-scale keyframe callback (design doc 12.2): the Path declares a 200x200 box over
+     100x100 data (renderScale=2), so the flattener bakes the scale into the PathData and the
+     point{i}.x/y keyframes must carry it too — the runtime treats point channel values as
+     inputs in the PathData's unscaled space and multiplies by renderScale on rebuild. -->
+<pagx width="400" height="300">
+  <Resources>
+    <PathData id="square" data="M 0,0 L 100,0 L 100,100 L 0,100 Z"/>
+  </Resources>
+  <Layer left="40" top="40" width="200" height="200">
+    <Path id="morph" data="@square" width="200" height="200"/>
+    <Fill color="#08B5FF"/>
+  </Layer>
+  <Animations>
+    <Animation id="morphAnim" duration="60" frameRate="60">
+      <Object target="morph">
+        <Channel name="point0.x" type="float">
+          <Key time="0" value="10" interpolation="linear"/>
+          <Key time="60" value="40" interpolation="linear"/>
+        </Channel>
+        <Channel name="point2.x" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="60" value="60" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

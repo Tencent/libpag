@@ -3235,6 +3235,74 @@ void AssignViewModelNodeIndices(PAGXDocument* document, EncodeState* state, uint
   }
 }
 
+// Scales every per-point animation keyframe attached to the given node by the uniform scale
+// the flattener baked into its path data (design doc §12.2). The runtime treats point{i}.x/y
+// channel values as inputs in the PathData's unscaled space and multiplies by renderScale on
+// rebuild, so once the scale is baked into the data the keyframe values must carry it instead.
+// Radius channels (Polystar) are exempt: their runtime writers address the final value
+// directly, so baked and animated values never mix scales.
+struct PointKeyframeScaler {
+  PAGXDocument* document = nullptr;
+
+  void operator()(Node* node, float scale) const {
+    if (document == nullptr || node == nullptr || node->id.empty()) {
+      return;
+    }
+    ScalePointChannels(document->animations, node->id, scale);
+    for (auto& anyNode : document->nodes) {
+      if (anyNode->nodeType() == NodeType::Composition) {
+        ScalePointChannels(static_cast<Composition*>(anyNode.get())->animations, node->id, scale);
+      }
+    }
+  }
+
+  static void ScalePointChannels(const std::vector<Node*>& animations, const std::string& id,
+                                 float scale) {
+    for (auto* animationNode : animations) {
+      if (animationNode == nullptr || animationNode->nodeType() != NodeType::Animation) {
+        continue;
+      }
+      for (auto* object : static_cast<Animation*>(animationNode)->objects) {
+        auto target = object->target;
+        if (!target.empty() && target[0] == '@') {
+          target = target.substr(1);
+        }
+        if (target != id) {
+          continue;
+        }
+        for (auto* channel : object->channels) {
+          if (channel->valueType() != ChannelValueType::Float) {
+            continue;
+          }
+          auto* typed = static_cast<TypedChannel<float>*>(channel);
+          if (!IsPointChannelName(typed->name)) {
+            continue;
+          }
+          for (auto& keyframe : typed->keyframes) {
+            keyframe.value *= scale;
+          }
+        }
+      }
+    }
+  }
+
+  // Matches the per-point channel names "point{i}.x" / "point{i}.y" the runtime binds for
+  // Path and TextPath geometry.
+  static bool IsPointChannelName(const std::string& name) {
+    if (name.size() < 8 || name.compare(0, 5, "point") != 0) {
+      return false;
+    }
+    size_t cursor = 5;
+    while (cursor < name.size() && name[cursor] >= '0' && name[cursor] <= '9') {
+      cursor++;
+    }
+    if (cursor == 5 || cursor + 2 != name.size() || name[cursor] != '.') {
+      return false;
+    }
+    return name[cursor + 1] == 'x' || name[cursor + 1] == 'y';
+  }
+};
+
 PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                                          const std::string& filePath,
                                          const PAGExportOptions& options) {
@@ -3360,9 +3428,17 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     return result;
   }
   doc->applyLayout(fontConfig.get());
-  LayoutFlattener::Flatten(doc.get());
+  {
+    FlattenOptions flattenOptions = {};
+    PointKeyframeScaler scaler = {doc.get()};
+    flattenOptions.geometryScaled = scaler;
+    LayoutFlattener::Flatten(doc.get(), flattenOptions);
+  }
   for (auto& sub : state->subDocuments) {
-    LayoutFlattener::Flatten(sub.document.get());
+    FlattenOptions flattenOptions = {};
+    PointKeyframeScaler scaler = {sub.document.get()};
+    flattenOptions.geometryScaled = scaler;
+    LayoutFlattener::Flatten(sub.document.get(), flattenOptions);
   }
   auto retainedIds = Stripper::CollectRetainedIds(doc.get());
   Stripper::StripMetadata(doc.get());
