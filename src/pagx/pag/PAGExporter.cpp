@@ -3303,6 +3303,101 @@ struct PointKeyframeScaler {
   }
 };
 
+// Returns the animation-driven scale multiplier upper bound for a transform node (design doc
+// §12.2): the largest keyframed transform over the node's static one. Layer matrix channels
+// carry absolute matrices (the runtime seeds from the static matrix and mixes towards the
+// keyframes), Group/TextBox scale channels overwrite the group scale, and an ImagePattern
+// matrix channel overwrites the pattern matrix — in every case the effective scale stays
+// below parent * max(static, largest keyframe), so max(1, keyframeMax / staticMax) is an
+// exact multiplier. Rotation and translation channels do not change singular values.
+struct AnimationScaleLookup {
+  PAGXDocument* document = nullptr;
+
+  float operator()(Node* node) const {
+    if (document == nullptr || node == nullptr || node->id.empty()) {
+      return 1.0f;
+    }
+    float keyframeMax = 0.0f;
+    CollectKeyframeMax(document->animations, node->id, &keyframeMax);
+    for (auto& anyNode : document->nodes) {
+      if (anyNode->nodeType() == NodeType::Composition) {
+        CollectKeyframeMax(static_cast<Composition*>(anyNode.get())->animations, node->id,
+                           &keyframeMax);
+      }
+    }
+    if (keyframeMax <= 0.0f) {
+      return 1.0f;
+    }
+    auto staticMax = StaticScaleOf(node);
+    if (staticMax >= keyframeMax) {
+      return 1.0f;
+    }
+    return staticMax > 0.0f ? keyframeMax / staticMax : keyframeMax;
+  }
+
+  static void CollectKeyframeMax(const std::vector<Node*>& animations, const std::string& id,
+                                 float* keyframeMax) {
+    for (auto* animationNode : animations) {
+      if (animationNode == nullptr || animationNode->nodeType() != NodeType::Animation) {
+        continue;
+      }
+      for (auto* object : static_cast<Animation*>(animationNode)->objects) {
+        auto target = object->target;
+        if (!target.empty() && target[0] == '@') {
+          target = target.substr(1);
+        }
+        if (target != id) {
+          continue;
+        }
+        for (auto* channel : object->channels) {
+          if (channel->name == "matrix") {
+            if (channel->valueType() == ChannelValueType::Matrix) {
+              auto* typed = static_cast<TypedChannel<Matrix>*>(channel);
+              for (const auto& keyframe : typed->keyframes) {
+                *keyframeMax = std::max(*keyframeMax, MatrixSingularScale(keyframe.value));
+              }
+            }
+          } else if (channel->name == "scale.x" || channel->name == "scale.y") {
+            if (channel->valueType() == ChannelValueType::Float) {
+              auto* typed = static_cast<TypedChannel<float>*>(channel);
+              for (const auto& keyframe : typed->keyframes) {
+                *keyframeMax = std::max(*keyframeMax, std::abs(keyframe.value));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  static float StaticScaleOf(Node* node) {
+    auto type = node->nodeType();
+    if (type == NodeType::Layer) {
+      return MatrixSingularScale(static_cast<Layer*>(node)->matrix);
+    }
+    if (type == NodeType::Group || type == NodeType::TextBox) {
+      auto* group = static_cast<Group*>(node);
+      return std::max(std::abs(group->scale.x), std::abs(group->scale.y));
+    }
+    if (type == NodeType::ImagePattern) {
+      return MatrixSingularScale(static_cast<ImagePattern*>(node)->matrix);
+    }
+    return 1.0f;
+  }
+
+  // Largest singular value of the affine [a b; c d] block (the spectral norm):
+  // sqrt((S + sqrt(S^2 - 4*det^2)) / 2) with S = a^2+b^2+c^2+d^2. Exact for every 2D matrix.
+  static float MatrixSingularScale(const Matrix& matrix) {
+    auto s = matrix.a * matrix.a + matrix.b * matrix.b + matrix.c * matrix.c + matrix.d * matrix.d;
+    auto det = matrix.a * matrix.d - matrix.b * matrix.c;
+    auto discriminant = s * s - 4.0f * det * det;
+    if (discriminant < 0.0f) {
+      discriminant = 0.0f;
+    }
+    return std::sqrt((s + std::sqrt(discriminant)) * 0.5f);
+  }
+};
+
 PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                                          const std::string& filePath,
                                          const PAGExportOptions& options) {
@@ -3450,7 +3545,10 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     Stripper::StripIds(sub.document.get(), subRetainedIds);
     Stripper::RemoveDeadNodes(sub.document.get(), subRetainedIds);
   }
-  auto imageResult = ImageProcessor::Process(doc.get());
+  ImageProcessor::Options imageOptions = {};
+  AnimationScaleLookup animationScaleLookup = {doc.get()};
+  imageOptions.animationScaleLookup = animationScaleLookup;
+  auto imageResult = ImageProcessor::Process(doc.get(), &imageOptions);
   result.warnings.insert(result.warnings.end(), imageResult.warnings.begin(),
                          imageResult.warnings.end());
   state->imageEntries = std::move(imageResult.entries);

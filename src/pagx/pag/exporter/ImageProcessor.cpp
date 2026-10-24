@@ -66,7 +66,11 @@ struct PatternReference {
 // Layer's matrix combines with the parent; a Group adds its position/rotation/scale.
 // The geometry bounds for the scaleMode fitting come from the enclosing container's
 // content bounds, which the flattened document provides in layoutBounds().
+// animMultiplier accumulates the keyframed-transform upper bounds along the chain (12.2):
+// each transform node contributes max(1, largest keyframe scale / static scale), an exact
+// upper bound because 2D singular values are invariant under rotation.
 void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geometryBounds,
+                       float animMultiplier, const ImageProcessor::Options& options,
                        std::vector<PatternReference>* references) {
   if (node == nullptr) {
     return;
@@ -76,13 +80,16 @@ void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geome
     auto* layer = static_cast<Layer*>(node);
     Matrix matrix = layer->matrix;
     auto combined = CombineMatrix(parentMatrix, matrix);
+    if (options.animationScaleLookup != nullptr) {
+      animMultiplier *= options.animationScaleLookup(layer);
+    }
     // Geometry bounds for the layer's contents.
     Rect bounds = layer->layoutBounds();
     for (auto* element : layer->contents) {
-      CollectReferences(element, combined, bounds, references);
+      CollectReferences(element, combined, bounds, animMultiplier, options, references);
     }
     for (auto* child : layer->children) {
-      CollectReferences(child, combined, bounds, references);
+      CollectReferences(child, combined, bounds, animMultiplier, options, references);
     }
     return;
   }
@@ -113,9 +120,12 @@ void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geome
       matrix.ty = group->position.y;
     }
     auto combined = CombineMatrix(parentMatrix, matrix);
+    if (options.animationScaleLookup != nullptr) {
+      animMultiplier *= options.animationScaleLookup(group);
+    }
     Rect bounds = group->layoutBounds();
     for (auto* element : group->elements) {
-      CollectReferences(element, combined, bounds, references);
+      CollectReferences(element, combined, bounds, animMultiplier, options, references);
     }
     return;
   }
@@ -135,6 +145,9 @@ void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geome
         // the pattern's own matrix and the scaleMode fitting.
         float parentScale = MatrixScale(parentMatrix);
         float patternScale = MatrixScale(pattern->matrix);
+        if (options.animationScaleLookup != nullptr) {
+          patternScale *= options.animationScaleLookup(pattern);
+        }
         // ScaleMode fitting: how much the image is stretched to fit the geometry. Only
         // compute this when we have valid geometry bounds and the image has dimensions.
         float fitScale = 1.0f;
@@ -161,7 +174,7 @@ void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geome
             }
           }
         }
-        ref.scale = parentScale * patternScale * fitScale;
+        ref.scale = parentScale * patternScale * fitScale * animMultiplier;
         references->push_back(ref);
       }
     }
@@ -169,18 +182,19 @@ void CollectReferences(Node* node, const Matrix& parentMatrix, const Rect& geome
   }
 }
 
-std::vector<PatternReference> CollectAllReferences(PAGXDocument* document) {
+std::vector<PatternReference> CollectAllReferences(PAGXDocument* document,
+                                                   const ImageProcessor::Options& options) {
   std::vector<PatternReference> references = {};
   Matrix identity = Matrix::Identity();
   Rect emptyBounds = {};
   for (auto* layer : document->layers) {
-    CollectReferences(layer, identity, emptyBounds, &references);
+    CollectReferences(layer, identity, emptyBounds, 1.0f, options, &references);
   }
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* composition = static_cast<Composition*>(node.get());
       for (auto* layer : composition->layers) {
-        CollectReferences(layer, identity, emptyBounds, &references);
+        CollectReferences(layer, identity, emptyBounds, 1.0f, options, &references);
       }
     }
   }
@@ -201,8 +215,9 @@ std::string ImageContentHash(const uint8_t* data, size_t size) {
 
 }  // namespace
 
-float ImageProcessor::ComputeMaxDisplayScale(PAGXDocument* document, const Image* image) {
-  auto references = CollectAllReferences(document);
+float ImageProcessor::ComputeMaxDisplayScale(PAGXDocument* document, const Image* image,
+                                             const Options* options) {
+  auto references = CollectAllReferences(document, options != nullptr ? *options : Options{});
   float maxScale = 0.0f;
   for (auto& ref : references) {
     if (ref.pattern->image == image) {
@@ -212,9 +227,10 @@ float ImageProcessor::ComputeMaxDisplayScale(PAGXDocument* document, const Image
   return maxScale;
 }
 
-ImageProcessor::Result ImageProcessor::Process(PAGXDocument* document) {
+ImageProcessor::Result ImageProcessor::Process(PAGXDocument* document, const Options* options) {
   Result result = {};
-  auto references = CollectAllReferences(document);
+  const Options& opts = options != nullptr ? *options : Options{};
+  auto references = CollectAllReferences(document, opts);
 
   // Group references by image.
   std::unordered_map<const Image*, std::vector<PatternReference*>> imageRefs = {};

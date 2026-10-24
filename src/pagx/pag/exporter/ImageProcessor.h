@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -47,11 +48,11 @@ struct ImageTableEntry {
 class ImageProcessor {
  public:
   struct Options {
-    // §12.2: the maximum display scale includes keyframes in phase 2; phase 1 counts only
-    // static transforms. The callback receives the node and the cumulative transform scale
-    // for each ImagePattern reference and returns the animation's max scale contribution.
-    // Null in phase 1 (no keyframes).
-    // (Reserved for phase 2; not yet a member to keep the struct minimal.)
+    // §12.2 phase 2: the maximum display scale must include keyframed transforms. The lookup
+    // receives a transform node (Layer, Group/TextBox, ImagePattern) and returns the
+    // animation-driven scale multiplier upper bound (>= 1) — the largest keyframe scale over
+    // the node's static one. Null treats every animation as 1 (phase 1 behavior).
+    std::function<float(Node* node)> animationScaleLookup = nullptr;
   };
 
   struct Result {
@@ -68,14 +69,15 @@ class ImageProcessor {
    * reference uses decal tiling, encodes as WebP q80, deduplicates identical content, and
    * handles missing images with a warning.
    */
-  static Result Process(PAGXDocument* document);
+  static Result Process(PAGXDocument* document, const Options* options = nullptr);
 
   /**
    * Computes the maximum display scale of an image: the largest singular value of the
    * cumulative ancestor transform at any ImagePattern that references the image, combined
    * with the pattern's own matrix and scaleMode fitting.
    */
-  static float ComputeMaxDisplayScale(PAGXDocument* document, const Image* image);
+  static float ComputeMaxDisplayScale(PAGXDocument* document, const Image* image,
+                                      const Options* options = nullptr);
 };
 
 }  // namespace pagx

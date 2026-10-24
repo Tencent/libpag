@@ -81,6 +81,7 @@
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
+#include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/types/ColorSpace.h"
 #include "utils/ProjectPath.h"
 
@@ -1773,6 +1774,74 @@ PAGX_TEST(PAGImporterTest, StateMachineRoundTrip) {
     }
     int byteCount = 0;
     EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "state-machine", &byteCount)) << name;
+  }
+}
+
+PAGX_TEST(PAGImporterTest, ImageScaleKeyframeLookup) {
+  // Keyframed image scale (design doc §12.2): the image shows at ~0.4x statically (38px box
+  // over a 96px image) but a matrix animation doubles the layer transform, so the true max
+  // display scale is ~0.8 and the image must not be downscaled. With the animation lookup the
+  // scaleFactor stays 1; without it (phase 1 behavior) the static-only computation downscales.
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/image_scale_keyframes.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  // The document clone the exporter builds is what the processor sees; build the same shape
+  // by exporting once and re-loading, then process the loaded tree directly.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/imgk_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/imgk_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  // The exported entries are not exposed, so drive ImageProcessor directly on the flattened
+  // decoded tree (the processor runs after flattening in the export pipeline, and the fit
+  // scale only resolves once the layout is solved — re-measure the decoded tree first) with
+  // a stub lookup that mirrors the exporter's functor for this document (the animation's
+  // largest matrix keyframe has a singular value of 2 over the identity static, so the
+  // multiplier is 2): with it the scale factor must stay 1 (no downscale); without it the
+  // static-only computation downscales.
+  decoded->applyLayout();
+  struct DoubledScaleLookup {
+    float operator()(Node*) const {
+      return 2.0f;
+    }
+  };
+  ImageProcessor::Options withLookup = {};
+  withLookup.animationScaleLookup = DoubledScaleLookup();
+  auto resultWith = ImageProcessor::Process(decoded.get(), &withLookup);
+  ASSERT_EQ(resultWith.entries.size(), 1u);
+  EXPECT_EQ(resultWith.entries[0].scaleFactor, 1.0f);
+
+  auto resultWithout = ImageProcessor::Process(decoded.get());
+  ASSERT_EQ(resultWithout.entries.size(), 1u);
+  EXPECT_LT(resultWithout.entries[0].scaleFactor, 1.0f);
+
+  // Render equivalence through the runtime animation path (t=1 applies the 2x matrix).
+  for (auto& timeText : std::vector<std::string>{"0", "1"}) {
+    auto sceneA = PAGScene::Make(doc);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr);
+    ASSERT_TRUE(sceneB != nullptr);
+    auto timeUs = static_cast<int64_t>(llround(std::stod(timeText) * 1e6));
+    for (auto& id : sceneA->getAnimationIds()) {
+      auto animation = sceneA->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    for (auto& id : sceneB->getAnimationIds()) {
+      auto animation = sceneB->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    int width = static_cast<int>(doc->width);
+    int height = static_cast<int>(doc->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(sceneA->draw(surfaceA));
+    ASSERT_TRUE(sceneB->draw(surfaceB));
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << " t=" << timeText;
   }
 }
 

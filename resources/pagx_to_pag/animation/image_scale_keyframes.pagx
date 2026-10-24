@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Keyframed image scale (design doc 12.2): the image shows at ~0.37x statically (24px box
+     over a 96px image), but a matrix animation doubles the layer transform, so the real max
+     display scale is ~0.8 — the image must NOT be downscaled below what the animation needs. -->
+<pagx width="200" height="200">
+  <Layer id="zoomBox" centerX="0" centerY="0" width="24" height="24">
+    <Rectangle width="24" height="24" roundness="4"/>
+    <Fill>
+      <ImagePattern image="@inline" scaleMode="letterBox"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="zoom" duration="60" frameRate="60">
+      <Object target="zoomBox">
+        <Channel name="matrix" type="matrix">
+          <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+          <Key time="60" value="2,0,0,2,0,0" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+  <Resources>
+    <Image id="inline" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACZ0lEQVR4nO1bUZHDIBCtg0qohEqohEqIhEqIhEjI1+mohEqIhEjYwmWZo7kUAgHeJsObeTP3VfZtFngs3OlUUQED/Zxumug4YFDie010HBAo4RdFYl7Q8RSHEt1ZCejQ8RSFEnxWHK0E6L/P6LiKQYltLPGGDTquYlBih4UEDOi4ikAJvS+IN7yj48sOJfLpSMATHV9WKIFXh3jDKzrObGDj40vAMY0Rb30+8YbH2xKVqDYgAS063uSYGR8fR3S8SfHF+Ph4HGP0xfj4eAxjRNOZP1S84f57BR7j4+M+jRFvefrLu2zvWt75t2RsjRzMjRc2vbV1/JWfgSt9LEdrvI5jaChFe42/nBHWWgPFLGJoDlb8Rk/jrSRaZ1f3ynU2+6BJCDtjUJx5kco4U3WQJGxzlDSd4Uus7qmpY07TW9hhEtKJt5Kgt8iXAHE+6hjzmKYdJCGf+FkSegFi5+yzi58lQlISMH1ENfBDgPgHRLyVhAYoXkbXiKYja8ltUo8l6xap8HTAlv0S6PO+PzflvSegba2vUMprlRUU/0u03g/Qts5vLOV0jAnjB+QshIRxhXJukQnTNJVxc0Rh196pib8roDSXH7HEu0EKu/f/KGH6u2SJnUL4dwQUboDGpcA5kaHnCbwhCgy6d81bCm+2YB9S0LpXX8RVstq48LRYW1m4V2Xk7wXo6og+s/Pv+yoM1xPwlGvrKveAMc7kXmhxhoiWO8S6dJO//6fp/wuWpsUr9VghQdmBDCHzfMOY/7bN3GO6AjHzvPjBhKYDmFkfyp8MeV46t7UCMZhtE2+IKioqKioqKnaHN731UHSLB5IuAAAAAElFTkSuQmCC"/>
+  </Resources>
+</pagx>
