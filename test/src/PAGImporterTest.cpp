@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-#include <functional>
 #include "base/PAGTest.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGImporter.h"
@@ -34,18 +33,22 @@
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
+#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
@@ -1321,44 +1324,359 @@ PAGX_TEST(PAGImporterTest, TextModifierRoundTrip) {
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "text-modifier", &byteCount));
 }
 
-PAGX_TEST(PAGImporterTest, MultipleMaskNodeRefCount) {
+// Collects every layer that carries a mask, pre-order over the children tree.
+static void CollectMaskedLayers(const std::vector<Layer*>& layers, std::vector<Layer*>* out) {
+  for (auto* layer : layers) {
+    if (layer->mask != nullptr) {
+      out->push_back(layer);
+    }
+    CollectMaskedLayers(layer->children, out);
+  }
+}
+
+struct MaskAudit {
+  int maskedCount = 0;
+  int selfMasked = 0;
+  int ancestorMasked = 0;
+};
+
+// A decoded mask that points at the masked layer itself or at one of its ancestors is the
+// structural condition that sends tgfx Layer::computeBounds into infinite recursion, so the
+// audit counts those separately from well-formed sibling masks.
+static void AuditLayerMasks(const std::vector<Layer*>& layers, const std::vector<Layer*>& ancestry,
+                            MaskAudit* audit) {
+  for (auto* layer : layers) {
+    if (layer->mask != nullptr) {
+      audit->maskedCount++;
+      if (layer->mask == layer) {
+        audit->selfMasked++;
+      }
+      for (auto* ancestor : ancestry) {
+        if (layer->mask == ancestor) {
+          audit->ancestorMasked++;
+        }
+      }
+    }
+    auto extendedAncestry = ancestry;
+    extendedAncestry.push_back(layer);
+    AuditLayerMasks(layer->children, extendedAncestry, audit);
+  }
+}
+
+PAGX_TEST(PAGImporterTest, ClipAndMaskSampleMaskIdentity) {
+  // Regression for the clip_and_mask SIGSEGV: NodeRef indices that ignored style, gradient
+  // stop and selector nodes shifted decoded masks onto ancestor layers, and tgfx
+  // computeBounds recursed forever walking down children and jumping back up the mask edge.
   auto doc = PAGXImporter::FromFile(
       pag::ProjectPath::Absolute("resources/pagx_to_html/clip_and_mask.pagx"));
   ASSERT_TRUE(doc != nullptr);
-  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/cam_debug.pag").success);
-  auto decoded = PAGImporter::LoadFromPAG("/tmp/cam_debug.pag");
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/cam_identity.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/cam_identity.pag");
   ASSERT_TRUE(decoded != nullptr);
 
-  // Find layers with masks in the source
-  int sourceMaskCount = 0;
-  for (auto* layer : doc->layers) {
-    std::function<void(Layer*)> walk = [&](Layer* l) {
-      if (l->mask != nullptr) sourceMaskCount++;
-      for (auto* child : l->children) walk(child);
-    };
-    walk(layer);
-  }
+  MaskAudit audit = {};
+  AuditLayerMasks(decoded->layers, {}, &audit);
+  EXPECT_EQ(audit.maskedCount, 3);
+  EXPECT_EQ(audit.selfMasked, 0);
+  EXPECT_EQ(audit.ancestorMasked, 0);
 
-  int decodedMaskCount = 0;
-  int decodedNullMask = 0;
-  int decodedWrongType = 0;
-  for (auto* layer : decoded->layers) {
-    std::function<void(Layer*)> walk = [&](Layer* l) {
-      if (l->mask != nullptr) {
-        decodedMaskCount++;
-        if (l->mask->nodeType() != NodeType::Layer) decodedWrongType++;
-      } else {
-        // Check if the source had a mask here
-        decodedNullMask++;
-      }
-      for (auto* child : l->children) walk(child);
-    };
-    walk(layer);
+  // Every mask target is the column's hidden shape layer: alpha and luminance columns use an
+  // Ellipse, the contour column a five-point Polystar, while each masked layer draws a Rectangle.
+  // The invisible shape content pins the NodeRef to the exact intended node instead of a
+  // type-only check that a shifted index could still satisfy.
+  std::vector<Layer*> maskedLayers = {};
+  CollectMaskedLayers(decoded->layers, &maskedLayers);
+  ASSERT_EQ(maskedLayers.size(), 3u);
+  int alphaCount = 0;
+  int luminanceCount = 0;
+  int contourCount = 0;
+  for (auto* masked : maskedLayers) {
+    ASSERT_TRUE(masked->mask != nullptr);
+    EXPECT_FALSE(masked->mask->visible);
+    ASSERT_FALSE(masked->mask->contents.empty());
+    auto maskShape = masked->mask->contents[0]->nodeType();
+    if (masked->maskType == MaskType::Alpha) {
+      alphaCount++;
+      EXPECT_EQ(maskShape, NodeType::Ellipse);
+    } else if (masked->maskType == MaskType::Luminance) {
+      luminanceCount++;
+      EXPECT_EQ(maskShape, NodeType::Ellipse);
+    } else if (masked->maskType == MaskType::Contour) {
+      contourCount++;
+      EXPECT_EQ(maskShape, NodeType::Polystar);
+    }
   }
-  std::cout << "sourceMaskCount=" << sourceMaskCount << " decodedMaskCount=" << decodedMaskCount
-            << " decodedNullMask=" << decodedNullMask << " decodedWrongType=" << decodedWrongType
-            << "\n";
-  SUCCEED();
+  EXPECT_EQ(alphaCount, 1);
+  EXPECT_EQ(luminanceCount, 1);
+  EXPECT_EQ(contourCount, 1);
+
+  // Pixel equivalence with the XML source (same machine, same font resolution).
+  auto sceneA = PAGScene::Make(doc);
+  auto sceneB = PAGScene::Make(decoded);
+  ASSERT_TRUE(sceneA != nullptr);
+  ASSERT_TRUE(sceneB != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+  auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+  ASSERT_TRUE(sceneA->draw(surfaceA));
+  ASSERT_TRUE(sceneB->draw(surfaceB));
+  std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+  std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+  EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0);
+}
+
+// Returns the layer whose children list contains the target, or null when the target is a
+// root layer or absent from the tree.
+static Layer* FindParentOf(const std::vector<Layer*>& layers, const Layer* target) {
+  for (auto* layer : layers) {
+    for (auto* child : layer->children) {
+      if (child == target) {
+        return layer;
+      }
+    }
+    auto* found = FindParentOf(layer->children, target);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+PAGX_TEST(PAGImporterTest, MaskNodeRefIndexShiftSources) {
+  // The node index walk must count every node the decoder creates in emission order: layer
+  // styles and filters (between contents and children), gradient stops, and TextModifier
+  // selectors. This document stacks all of them before the mask pair so any missed category
+  // shifts the mask NodeRef onto the wrong node.
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* root = doc->makeNode<Layer>();
+  doc->layers.push_back(root);
+
+  auto* shadow = doc->makeNode<DropShadowStyle>();
+  shadow->offsetX = 2.0f;
+  shadow->offsetY = 3.0f;
+  shadow->blurX = 4.0f;
+  shadow->blurY = 4.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 0.25f, ColorSpace::SRGB};
+  root->styles.push_back(shadow);
+
+  auto* gradientHolder = doc->makeNode<Layer>();
+  root->children.push_back(gradientHolder);
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size = {100.0f, 100.0f};
+  gradientHolder->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* gradient = doc->makeNode<LinearGradient>();
+  gradient->startPoint = {0.0f, 0.0f};
+  gradient->endPoint = {1.0f, 1.0f};
+  for (int i = 0; i < 3; i++) {
+    auto* stop = doc->makeNode<ColorStop>();
+    stop->offset = 0.5f * static_cast<float>(i);
+    stop->color = {0.5f * static_cast<float>(i), 0.2f, 0.8f, 1.0f, ColorSpace::SRGB};
+    gradient->colorStops.push_back(stop);
+  }
+  fill->color = gradient;
+  gradientHolder->contents.push_back(fill);
+  auto* group = doc->makeNode<Group>();
+  auto* text = doc->makeNode<Text>();
+  text->text = "AB";
+  text->fontSize = 20.0f;
+  group->elements.push_back(text);
+  auto* modifier = doc->makeNode<TextModifier>();
+  modifier->rotation = 10.0f;
+  for (int i = 0; i < 2; i++) {
+    auto* selector = doc->makeNode<RangeSelector>();
+    selector->start = 0.1f * static_cast<float>(i);
+    selector->end = 0.9f;
+    modifier->selectors.push_back(selector);
+  }
+  group->elements.push_back(modifier);
+  gradientHolder->contents.push_back(group);
+
+  auto* holder = doc->makeNode<Layer>();
+  root->children.push_back(holder);
+  auto* maskLayer = doc->makeNode<Layer>();
+  maskLayer->name = "theMask";
+  maskLayer->visible = false;
+  auto* ellipse = doc->makeNode<Ellipse>();
+  ellipse->position = {50.0f, 50.0f};
+  ellipse->size = {80.0f, 80.0f};
+  maskLayer->contents.push_back(ellipse);
+  auto* maskFill = doc->makeNode<Fill>();
+  auto* white = doc->makeNode<SolidColor>();
+  white->color = {1.0f, 1.0f, 1.0f, 1.0f, ColorSpace::SRGB};
+  maskFill->color = white;
+  maskLayer->contents.push_back(maskFill);
+  holder->children.push_back(maskLayer);
+  auto* maskedLayer = doc->makeNode<Layer>();
+  maskedLayer->mask = maskLayer;
+  maskedLayer->maskType = MaskType::Alpha;
+  auto* maskedRect = doc->makeNode<Rectangle>();
+  maskedRect->position = {50.0f, 50.0f};
+  maskedRect->size = {80.0f, 80.0f};
+  maskedLayer->contents.push_back(maskedRect);
+  auto* maskedFill = doc->makeNode<Fill>();
+  auto* cyan = doc->makeNode<SolidColor>();
+  cyan->color = {0.2f, 0.7f, 0.9f, 1.0f, ColorSpace::SRGB};
+  maskedFill->color = cyan;
+  maskedLayer->contents.push_back(maskedFill);
+  holder->children.push_back(maskedLayer);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/mask_shift.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/mask_shift.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  std::vector<Layer*> maskedLayers = {};
+  CollectMaskedLayers(decoded->layers, &maskedLayers);
+  ASSERT_EQ(maskedLayers.size(), 1u);
+  auto* decodedMasked = maskedLayers[0];
+  ASSERT_TRUE(decodedMasked->mask != nullptr);
+  // The mask target is identified by its name, invisibility and Ellipse content; a shifted
+  // NodeRef would land on one of the ancestor or sibling layers instead.
+  EXPECT_EQ(decodedMasked->mask->name, "theMask");
+  EXPECT_FALSE(decodedMasked->mask->visible);
+  ASSERT_FALSE(decodedMasked->mask->contents.empty());
+  EXPECT_EQ(decodedMasked->mask->contents[0]->nodeType(), NodeType::Ellipse);
+  EXPECT_EQ(decodedMasked->maskType, MaskType::Alpha);
+  // The mask is the first child of the same parent, and no mask is self- or ancestor-referencing.
+  ASSERT_EQ(decodedMasked->children.size(), 0u);
+  auto* maskParent = FindParentOf(decoded->layers, decodedMasked->mask);
+  ASSERT_TRUE(maskParent != nullptr);
+  EXPECT_EQ(maskParent->children.size(), 2u);
+  EXPECT_EQ(maskParent->children[0], decodedMasked->mask);
+  EXPECT_EQ(maskParent->children[1], decodedMasked);
+  EXPECT_EQ(FindParentOf(decoded->layers, decodedMasked), maskParent);
+  MaskAudit audit = {};
+  AuditLayerMasks(decoded->layers, {}, &audit);
+  EXPECT_EQ(audit.maskedCount, 1);
+  EXPECT_EQ(audit.selfMasked, 0);
+  EXPECT_EQ(audit.ancestorMasked, 0);
+}
+
+PAGX_TEST(PAGImporterTest, SubDocumentMaskNamespaceRoundTrip) {
+  // Each sub-document has its own node numbering space (spec 5.2): a mask inside the external
+  // document must resolve against the instance's own emission order, never the root's.
+  const std::string dir = "resources/pagx_to_pag/sub_document/mask_in_child";
+  auto doc = PAGXImporter::FromFile(pag::ProjectPath::Absolute(dir + "/main.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGXExternalFiles::Load(doc.get(), pag::ProjectPath::Absolute(dir + "/")));
+  auto result = PAGExporter::ExportToPAG(doc, "/tmp/subdoc_mask.pag");
+  ASSERT_TRUE(result.success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/subdoc_mask.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  ASSERT_TRUE(decoded->layers[0]->externalDoc != nullptr);
+
+  std::vector<Layer*> maskedLayers = {};
+  CollectMaskedLayers(decoded->layers[0]->externalDoc->layers, &maskedLayers);
+  ASSERT_EQ(maskedLayers.size(), 1u);
+  auto* masked = maskedLayers[0];
+  ASSERT_TRUE(masked->mask != nullptr);
+  EXPECT_EQ(masked->mask->name, "childMask");
+  EXPECT_FALSE(masked->mask->visible);
+  ASSERT_FALSE(masked->mask->contents.empty());
+  EXPECT_EQ(masked->mask->contents[0]->nodeType(), NodeType::Ellipse);
+  EXPECT_EQ(masked->maskType, MaskType::Alpha);
+  MaskAudit audit = {};
+  AuditLayerMasks(decoded->layers[0]->externalDoc->layers, {}, &audit);
+  EXPECT_EQ(audit.maskedCount, 1);
+  EXPECT_EQ(audit.selfMasked, 0);
+  EXPECT_EQ(audit.ancestorMasked, 0);
+}
+
+PAGX_TEST(PAGImporterTest, SharedReferenceMaskNodeRefRoundTrip) {
+  // A color source or path data shared by several fillers (resource @id in XML) is written as
+  // one inline sub-tag per referencing tag, and the decoder creates a fresh node per tag, so
+  // the node index walk must count shared nodes once per reference. Counting them once per
+  // node shifted later mask NodeRefs onto non-Layer nodes and silently dropped the mask.
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.9f, 0.2f, 0.2f, 1.0f, ColorSpace::SRGB};
+  auto* gradient = doc->makeNode<LinearGradient>();
+  gradient->startPoint = {0.0f, 0.0f};
+  gradient->endPoint = {1.0f, 0.0f};
+  for (int i = 0; i < 2; i++) {
+    auto* stop = doc->makeNode<ColorStop>();
+    stop->offset = static_cast<float>(i);
+    stop->color = {0.1f, 0.5f * static_cast<float>(i), 0.9f, 1.0f, ColorSpace::SRGB};
+    gradient->colorStops.push_back(stop);
+  }
+  for (int i = 0; i < 2; i++) {
+    auto* filler = doc->makeNode<Layer>();
+    auto* rect = doc->makeNode<Rectangle>();
+    rect->size = {40.0f, 40.0f};
+    rect->position = {20.0f + 60.0f * i, 20.0f};
+    filler->contents.push_back(rect);
+    auto* fill = doc->makeNode<Fill>();
+    fill->color = i == 0 ? static_cast<ColorSource*>(solid) : static_cast<ColorSource*>(gradient);
+    filler->contents.push_back(fill);
+    auto* fillAgain = doc->makeNode<Fill>();
+    fillAgain->color = fill->color;
+    filler->contents.push_back(fillAgain);
+    doc->layers.push_back(filler);
+  }
+  auto* maskLayer = doc->makeNode<Layer>();
+  maskLayer->name = "theMask";
+  maskLayer->visible = false;
+  auto* ellipse = doc->makeNode<Ellipse>();
+  ellipse->position = {100.0f, 140.0f};
+  ellipse->size = {60.0f, 60.0f};
+  maskLayer->contents.push_back(ellipse);
+  auto* maskFill = doc->makeNode<Fill>();
+  maskFill->color = solid;
+  maskLayer->contents.push_back(maskFill);
+  doc->layers.push_back(maskLayer);
+  auto* maskedLayer = doc->makeNode<Layer>();
+  maskedLayer->mask = maskLayer;
+  maskedLayer->maskType = MaskType::Alpha;
+  auto* maskedRect = doc->makeNode<Rectangle>();
+  maskedRect->position = {100.0f, 140.0f};
+  maskedRect->size = {60.0f, 60.0f};
+  maskedLayer->contents.push_back(maskedRect);
+  auto* maskedFill = doc->makeNode<Fill>();
+  maskedFill->color = gradient;
+  maskedLayer->contents.push_back(maskedFill);
+  doc->layers.push_back(maskedLayer);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/shared_ref_mask.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/shared_ref_mask.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  std::vector<Layer*> maskedLayers = {};
+  CollectMaskedLayers(decoded->layers, &maskedLayers);
+  ASSERT_EQ(maskedLayers.size(), 1u);
+  auto* decodedMasked = maskedLayers[0];
+  ASSERT_TRUE(decodedMasked->mask != nullptr);
+  EXPECT_EQ(decodedMasked->mask->name, "theMask");
+  EXPECT_FALSE(decodedMasked->mask->visible);
+  ASSERT_FALSE(decodedMasked->mask->contents.empty());
+  EXPECT_EQ(decodedMasked->mask->contents[0]->nodeType(), NodeType::Ellipse);
+  MaskAudit audit = {};
+  AuditLayerMasks(decoded->layers, {}, &audit);
+  EXPECT_EQ(audit.maskedCount, 1);
+  EXPECT_EQ(audit.selfMasked, 0);
+  EXPECT_EQ(audit.ancestorMasked, 0);
+
+  // The sample with shared @cyan/@purple/@emerald color sources, a shared @starPath and a
+  // mask: its mask must survive the round trip as a Layer, not shift onto a ColorStop.
+  auto sample =
+      PAGXImporter::FromFile(pag::ProjectPath::Absolute("spec/samples/complete_example.pagx"));
+  ASSERT_TRUE(sample != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(sample, "/tmp/ce_shared_ref.pag").success);
+  auto decodedSample = PAGImporter::LoadFromPAG("/tmp/ce_shared_ref.pag");
+  ASSERT_TRUE(decodedSample != nullptr);
+  std::vector<Layer*> sampleMasked = {};
+  CollectMaskedLayers(decodedSample->layers, &sampleMasked);
+  ASSERT_EQ(sampleMasked.size(), 1u);
+  auto* sampleMaskedLayer = sampleMasked[0];
+  ASSERT_TRUE(sampleMaskedLayer->mask != nullptr);
+  EXPECT_EQ(sampleMaskedLayer->mask->nodeType(), NodeType::Layer);
+  EXPECT_FALSE(sampleMaskedLayer->mask->visible);
+  ASSERT_FALSE(sampleMaskedLayer->mask->contents.empty());
+  EXPECT_EQ(sampleMaskedLayer->mask->contents[0]->nodeType(), NodeType::Ellipse);
 }
 
 PAGX_TEST(PAGImporterTest, AllExportPathsIdempotency) {

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Child document with a mask pair, referenced by main.pagx. Exercises the sub-document's
+     own node numbering space (spec 5.2): the mask NodeRef must resolve against the
+     instance's nodes, not the root document's. -->
+<pagx width="120" height="120">
+  <Layer width="120" height="120">
+    <Layer id="childMask" name="childMask" visible="false">
+      <Ellipse position="60,60" size="100,100"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer mask="@childMask" maskType="alpha">
+      <Rectangle position="60,60" size="100,100"/>
+      <Fill color="#22D3EE"/>
+    </Layer>
+  </Layer>
+</pagx>

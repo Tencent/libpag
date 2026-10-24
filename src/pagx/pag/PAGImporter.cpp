@@ -1415,6 +1415,30 @@ std::shared_ptr<PAGXDocument> MakeSubDocumentInstance(uint32_t index,
     return nullptr;
   }
   auto& entry = context->subDocuments[index];
+  // The XML deep-copy hop links Layer -> mask by @id, but the decoded template carries no ids
+  // (the binary keeps node identity by index). Synthesize deterministic ids on id-less mask
+  // targets so the hop preserves the links; the ids stay in the template so later instances of
+  // the same entry (and re-export of this instance) synthesize the same bytes.
+  std::unordered_set<std::string> takenIds = {};
+  for (auto& node : entry.document->nodes) {
+    if (node->nodeType() == NodeType::Layer && !node->id.empty()) {
+      takenIds.insert(node->id);
+    }
+  }
+  int synthIndex = 0;
+  for (auto& node : entry.document->nodes) {
+    if (node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node.get());
+    if (layer->mask == nullptr || !layer->mask->id.empty()) {
+      continue;
+    }
+    do {
+      layer->mask->id = "pag-v4-mask-" + std::to_string(synthIndex++);
+    } while (takenIds.count(layer->mask->id) > 0);
+    takenIds.insert(layer->mask->id);
+  }
   auto instance = PAGXImporter::FromXML(PAGXExporter::ToXML(*entry.document));
   if (instance == nullptr) {
     return nullptr;

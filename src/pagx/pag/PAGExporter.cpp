@@ -1819,6 +1819,11 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
       auto maskIt = state->nodeIndices.find(layer->mask);
       if (maskIt != state->nodeIndices.end()) {
         maskRef = maskIt->second + 1;
+      } else if (layer->mask != nullptr) {
+        // The mask target lives outside this document's numbering space (cross-document
+        // reference or a node dropped by stripping); spec §5.2 forbids resolving it here.
+        state->warn(PAGExportWarning::UnresolvedMaskReference,
+                    "mask reference cannot be resolved in this document's node numbering space");
       }
       v->writeEncodedUint32(maskRef);
     }
@@ -1940,6 +1945,8 @@ std::string WarningCodeName(PAGExportWarning code) {
       return "UnsupportedColorSource";
     case PAGExportWarning::SubDocumentExpansionLimit:
       return "SubDocumentExpansionLimit";
+    case PAGExportWarning::UnresolvedMaskReference:
+      return "UnresolvedMaskReference";
   }
   return "Unknown";
 }
@@ -2124,58 +2131,85 @@ void CollectSubDocumentReferences(PAGXDocument* input, PAGXDocument* clone, Enco
   }
 }
 
+// True for the four gradient color sources; their stops are read from the tag tail and each
+// becomes a node at decode time.
+static bool IsGradientNodeType(NodeType type) {
+  return type == NodeType::LinearGradient || type == NodeType::RadialGradient ||
+         type == NodeType::ConicGradient || type == NodeType::DiamondGradient;
+}
+
+// Numbers the sub-nodes a Fill/Stroke color source creates at decode time: the color node
+// itself, then the gradient stops (created while reading the tag tail), or the ImagePattern's
+// image when it is written inline (a shared ResourceBlock entry resolves by reference and
+// creates no node in this document). Every referencing Fill/Stroke writes its own inline
+// sub-tag and the decoder creates a fresh node per tag, so a color source shared by several
+// fillers (resource @id) is counted once per reference, not once per node.
+void AssignColorSourceNodeIndices(ColorSource* color, EncodeState* state, uint32_t* index) {
+  if (color == nullptr) {
+    return;
+  }
+  state->nodeIndices[color] = (*index)++;
+  if (IsGradientNodeType(color->nodeType())) {
+    for (auto* stop : static_cast<Gradient*>(color)->colorStops) {
+      state->nodeIndices[stop] = (*index)++;
+    }
+  } else if (color->nodeType() == NodeType::ImagePattern) {
+    auto* image = static_cast<ImagePattern*>(color)->image;
+    if (image == nullptr) {
+      return;
+    }
+    auto entryIt = state->imageIndices.find(image);
+    if (entryIt != state->imageIndices.end() &&
+        state->entryResourceSlots.count(entryIt->second) > 0) {
+      return;
+    }
+    state->nodeIndices[image] = (*index)++;
+  }
+}
+
 // Assigns spec §5.1 node indices in emission order: shared resources first (images, then
 // fonts with their glyph subtrees), then the document tree in pre-order (layer, contents with
 // their inline subtrees, children recursively). Only nodes actually emitted get indices;
 // nodes dropped from the output get none, and referencing them is invalid.
 void AssignFontNodeIndices(Font* font, EncodeState* state, uint32_t* index) {
-  if (state->nodeIndices.count(font) > 0) {
-    return;
-  }
   state->nodeIndices[font] = (*index)++;
   for (auto* glyph : font->glyphs) {
-    if (state->nodeIndices.count(glyph) == 0) {
-      state->nodeIndices[glyph] = (*index)++;
-    }
-    if (glyph->image != nullptr && state->nodeIndices.count(glyph->image) == 0) {
+    state->nodeIndices[glyph] = (*index)++;
+    if (glyph->image != nullptr) {
       state->nodeIndices[glyph->image] = (*index)++;
     }
-    if (glyph->path != nullptr && state->nodeIndices.count(glyph->path) == 0) {
+    if (glyph->path != nullptr) {
       state->nodeIndices[glyph->path] = (*index)++;
     }
   }
 }
 
+// Every reference writes its own inline sub-tag and the decoder creates a fresh node per
+// tag, so shared nodes (resource @id) are counted once per reference, not once per node. The
+// only references that must NOT be counted here are ResourceBlock entries, resolved by slot
+// index at decode time; those are guarded by their resource-slot maps.
 void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* index) {
-  if (element == nullptr || state->nodeIndices.count(element) > 0) {
+  if (element == nullptr) {
     return;
   }
   state->nodeIndices[element] = (*index)++;
   switch (element->nodeType()) {
-    case NodeType::Fill: {
-      auto* color = static_cast<Fill*>(element)->color;
-      if (color != nullptr && state->nodeIndices.count(color) == 0) {
-        state->nodeIndices[color] = (*index)++;
-      }
+    case NodeType::Fill:
+      AssignColorSourceNodeIndices(static_cast<Fill*>(element)->color, state, index);
       break;
-    }
-    case NodeType::Stroke: {
-      auto* color = static_cast<Stroke*>(element)->color;
-      if (color != nullptr && state->nodeIndices.count(color) == 0) {
-        state->nodeIndices[color] = (*index)++;
-      }
+    case NodeType::Stroke:
+      AssignColorSourceNodeIndices(static_cast<Stroke*>(element)->color, state, index);
       break;
-    }
     case NodeType::Path: {
       auto* data = static_cast<Path*>(element)->data;
-      if (data != nullptr && state->nodeIndices.count(data) == 0) {
+      if (data != nullptr) {
         state->nodeIndices[data] = (*index)++;
       }
       break;
     }
     case NodeType::TextPath: {
       auto* data = static_cast<TextPath*>(element)->path;
-      if (data != nullptr && state->nodeIndices.count(data) == 0) {
+      if (data != nullptr) {
         state->nodeIndices[data] = (*index)++;
       }
       break;
@@ -2183,10 +2217,10 @@ void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* in
     case NodeType::Text: {
       auto* text = static_cast<Text*>(element);
       for (auto* run : text->glyphRuns) {
-        if (state->nodeIndices.count(run) == 0) {
-          state->nodeIndices[run] = (*index)++;
-        }
-        if (run->font != nullptr) {
+        state->nodeIndices[run] = (*index)++;
+        // A shared ResourceBlock font resolves by reference and creates no node in this
+        // document's numbering space; only the inline value-area font subtree does.
+        if (run->font != nullptr && state->fontResourceSlots.count(run->font) == 0) {
           AssignFontNodeIndices(run->font, state, index);
         }
       }
@@ -2202,29 +2236,43 @@ void AssignElementNodeIndices(Element* element, EncodeState* state, uint32_t* in
         AssignElementNodeIndices(child, state, index);
       }
       break;
+    case NodeType::TextModifier:
+      // Each RangeSelector sub-tag becomes one node right after the modifier, mirroring the
+      // TextModifierBlock emission order (non-RangeSelector selectors have no encoding).
+      for (auto* selector : static_cast<TextModifier*>(element)->selectors) {
+        if (selector->nodeType() != NodeType::RangeSelector) {
+          continue;
+        }
+        state->nodeIndices[selector] = (*index)++;
+      }
+      break;
     default:
       break;
   }
 }
 
 void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
-  if (state->nodeIndices.count(layer) > 0) {
-    return;
-  }
   state->nodeIndices[layer] = (*index)++;
   if (layer->composition != nullptr &&
       state->compositionResourceSlots.count(layer->composition) == 0) {
-    // Inline composition: its subtree is numbered at this reference position.
+    // Inline composition: every referencing layer writes its own copy, so the subtree is
+    // numbered at each reference position.
     auto* composition = layer->composition;
-    if (state->nodeIndices.count(composition) == 0) {
-      state->nodeIndices[composition] = (*index)++;
-      for (auto* compLayer : composition->layers) {
-        AssignLayerNodeIndices(compLayer, state, index);
-      }
+    state->nodeIndices[composition] = (*index)++;
+    for (auto* compLayer : composition->layers) {
+      AssignLayerNodeIndices(compLayer, state, index);
     }
   }
   for (auto* element : layer->contents) {
     AssignElementNodeIndices(element, state, index);
+  }
+  // Styles and filters are emitted between contents and children (spec §9.2), and the decoder
+  // creates one node per tag at those positions, so the index walk must count them here.
+  for (auto* style : layer->styles) {
+    state->nodeIndices[style] = (*index)++;
+  }
+  for (auto* filter : layer->filters) {
+    state->nodeIndices[filter] = (*index)++;
   }
   for (auto* child : layer->children) {
     AssignLayerNodeIndices(child, state, index);
@@ -2238,13 +2286,15 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   if (document == nullptr) {
     return result;
   }
-  // The internal XML round trip links GlyphRun -> Font and Layer -> Composition by resource
-  // id, but documents decoded from the v4 binary carry no ids (the binary keeps node identity
-  // by reference). Synthesize deterministic ids on id-less fonts and compositions so the XML
-  // hop preserves the linkages, and restore the original ids afterwards; StripIds clears them
-  // in the working copy anyway, so the written bytes do not depend on the synthesized names.
+  // The internal XML round trip links GlyphRun -> Font, Layer -> Composition and Layer -> mask
+  // by id, but documents decoded from the v4 binary carry no ids (the binary keeps node identity
+  // by reference), and hand-built documents often have none either. Synthesize deterministic ids
+  // on id-less fonts, compositions and mask targets so the XML hop preserves the linkages, and
+  // restore the original ids afterwards; StripIds clears them in the working copy anyway, so the
+  // written bytes do not depend on the synthesized names.
   std::vector<std::pair<Font*, std::string>> restoredFontIds = {};
   std::vector<std::pair<Composition*, std::string>> restoredCompositionIds = {};
+  std::vector<std::pair<Layer*, std::string>> restoredMaskIds = {};
   std::unordered_set<std::string> takenIds = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -2256,6 +2306,11 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       auto* composition = static_cast<Composition*>(node.get());
       if (!composition->id.empty()) {
         takenIds.insert(composition->id);
+      }
+    } else if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (!layer->id.empty()) {
+        takenIds.insert(layer->id);
       }
     }
   }
@@ -2283,11 +2338,31 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       takenIds.insert(composition->id);
     }
   }
+  // Mask targets are numbered after the resource pass so a synthesized resource id can never
+  // collide with a mask id: the mask prefix differs, but the ordering also keeps synthesis
+  // deterministic when both passes touch the same document.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node.get());
+    if (layer->mask == nullptr || !layer->mask->id.empty()) {
+      continue;
+    }
+    restoredMaskIds.push_back({layer->mask, layer->mask->id});
+    do {
+      layer->mask->id = "pag-v4-mask-" + std::to_string(synthIndex++);
+    } while (takenIds.count(layer->mask->id) > 0);
+    takenIds.insert(layer->mask->id);
+  }
   auto xml = PAGXExporter::ToXML(*document);
   for (auto& restore : restoredFontIds) {
     restore.first->id = restore.second;
   }
   for (auto& restore : restoredCompositionIds) {
+    restore.first->id = restore.second;
+  }
+  for (auto& restore : restoredMaskIds) {
     restore.first->id = restore.second;
   }
   auto doc = PAGXImporter::FromXML(xml);
@@ -2573,8 +2648,20 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         idContent.writeEncodedUint32(0);
         WriteTag(&subContent, TagCode::RetainedIdTable, &idContent);
       }
-      for (auto* layer : sub.document->layers) {
-        WriteLayerTag(&subContent, layer, state.get());
+      // Each sub-document carries its own §5.2 node numbering space: the decoder rebuilds the
+      // index table from the sub-document's own read order, so its layers (and their mask
+      // NodeRefs) must be numbered from zero here, isolated from the root document's indices.
+      {
+        auto rootIndices = std::move(state->nodeIndices);
+        state->nodeIndices = {};
+        uint32_t subIndex = 0;
+        for (auto* layer : sub.document->layers) {
+          AssignLayerNodeIndices(layer, state.get(), &subIndex);
+        }
+        for (auto* layer : sub.document->layers) {
+          WriteLayerTag(&subContent, layer, state.get());
+        }
+        state->nodeIndices = std::move(rootIndices);
       }
       WritePAGTagHeader(&subContent, TagCode::End, 0);
       WriteTag(&tableContent, TagCode::SubDocument, &subContent);
