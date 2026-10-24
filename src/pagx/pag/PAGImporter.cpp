@@ -62,12 +62,18 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
 #include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
@@ -354,6 +360,183 @@ AnimationObject* ReadAnimationObjectBlock(pag::DecodeStream* tagStream, DecodeCo
     }
   }
   return object;
+}
+
+// ---------------------------------------------------------------------------
+// State machine decoding (spec §9.7): StateMachineBlock 483, StateMachineInput 484,
+// StateRegionBlock 485 + 490, State 486, StateTransition 487 + 491, TransitionCondition 488.
+// ---------------------------------------------------------------------------
+
+// TransitionCondition (488).
+TransitionCondition* ReadTransitionConditionTag(pag::DecodeStream* tagStream,
+                                                DecodeContext* context) {
+  auto* condition = context->document->makeNode<TransitionCondition>();
+  PAGAttributeBlockReader reader(tagStream, 4);
+  bool hasInputName = reader.flag(0);
+  bool hasOp = reader.flag(1);
+  condition->valueBool = reader.flag(2);
+  bool hasValueNumber = reader.flag(3);
+  tagStream->alignWithBytes();
+  if (hasInputName) {
+    condition->inputName = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasOp) {
+    condition->op = static_cast<TransitionConditionOp>(tagStream->readUint8());
+  }
+  if (hasValueNumber) {
+    condition->valueNumber = tagStream->readFloat();
+  }
+  return condition;
+}
+
+// StateTransition (487): attributes 491 then TransitionCondition tags.
+StateTransition* ReadStateTransitionTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* transition = context->document->makeNode<StateTransition>();
+  bool hasAttributes = false;
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::StateTransitionAttributes) {
+      hasAttributes = true;
+      PAGAttributeBlockReader reader(&tagBytes, 9);
+      bool hasFrom = reader.flag(0);
+      bool hasTo = reader.flag(1);
+      bool hasDuration = reader.flag(2);
+      bool hasFrameRate = reader.flag(3);
+      bool hasInterpolation = reader.flag(4);
+      bool hasBezierOut = reader.flag(5);
+      bool hasBezierIn = reader.flag(6);
+      transition->enableEarlyExit = reader.flag(7);
+      transition->pauseOnExit = reader.flag(8);
+      tagBytes.alignWithBytes();
+      if (hasFrom) {
+        transition->from = context->getString(tagBytes.readEncodedUint32());
+      }
+      if (hasTo) {
+        transition->to = context->getString(tagBytes.readEncodedUint32());
+      }
+      if (hasDuration) {
+        transition->duration = static_cast<Frame>(tagBytes.readEncodedUint32());
+      }
+      if (hasFrameRate) {
+        transition->frameRate = tagBytes.readFloat();
+      }
+      if (hasInterpolation) {
+        transition->interpolation = static_cast<KeyframeInterpolationType>(tagBytes.readUint8());
+      }
+      if (hasBezierOut) {
+        transition->bezierOut.x = tagBytes.readFloat();
+        transition->bezierOut.y = tagBytes.readFloat();
+      }
+      if (hasBezierIn) {
+        transition->bezierIn.x = tagBytes.readFloat();
+        transition->bezierIn.y = tagBytes.readFloat();
+      }
+    } else if (header.code == TagCode::TransitionCondition) {
+      auto* condition = ReadTransitionConditionTag(&tagBytes, context);
+      if (condition != nullptr) {
+        transition->conditions.push_back(condition);
+      }
+    }
+  }
+  (void)hasAttributes;
+  return transition;
+}
+
+// State (486): stateType u8 picks the concrete subclass; only Animation ships today.
+State* ReadStateTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  PAGAttributeBlockReader reader(tagStream, 2);
+  bool hasName = reader.flag(0);
+  bool hasAnimationId = reader.flag(1);
+  tagStream->alignWithBytes();
+  auto stateType = static_cast<StateType>(tagStream->readUint8());
+  if (stateType != StateType::Animation) {
+    PAGThrowError(tagStream->context, "state type has no binary encoding yet");
+    return nullptr;
+  }
+  auto* stateNode = context->document->makeNode<AnimationState>();
+  if (hasName) {
+    stateNode->name = context->getString(tagStream->readEncodedUint32());
+  }
+  if (hasAnimationId) {
+    static_cast<AnimationState*>(stateNode)->animationId =
+        context->getString(tagStream->readEncodedUint32());
+  }
+  return stateNode;
+}
+
+// StateRegionBlock (485): attributes 490 then States and StateTransitions.
+StateRegion* ReadStateRegionBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* region = context->document->makeNode<StateRegion>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::StateRegionAttributes) {
+      PAGAttributeBlockReader reader(&tagBytes, 2);
+      bool hasName = reader.flag(0);
+      bool hasInitialState = reader.flag(1);
+      tagBytes.alignWithBytes();
+      if (hasName) {
+        region->name = context->getString(tagBytes.readEncodedUint32());
+      }
+      if (hasInitialState) {
+        region->initialState = context->getString(tagBytes.readEncodedUint32());
+      }
+    } else if (header.code == TagCode::State) {
+      auto* stateNode = ReadStateTag(&tagBytes, context);
+      if (stateNode != nullptr) {
+        region->states.push_back(stateNode);
+      }
+    } else if (header.code == TagCode::StateTransition) {
+      auto* transition = ReadStateTransitionTag(&tagBytes, context);
+      if (transition != nullptr) {
+        region->transitions.push_back(transition);
+      }
+    }
+  }
+  return region;
+}
+
+// StateMachineInput (484).
+StateMachineInput* ReadStateMachineInputTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* input = context->document->makeNode<StateMachineInput>();
+  PAGAttributeBlockReader reader(tagStream, 3);
+  bool hasName = reader.flag(0);
+  input->defaultBool = reader.flag(1);
+  bool hasDefaultNumber = reader.flag(2);
+  tagStream->alignWithBytes();
+  if (hasName) {
+    input->name = context->getString(tagStream->readEncodedUint32());
+  }
+  input->type = static_cast<StateMachineInputType>(tagStream->readUint8());
+  if (hasDefaultNumber) {
+    input->defaultNumber = tagStream->readFloat();
+  }
+  return input;
+}
+
+// StateMachineBlock (483): inputs then regions, End-terminated.
+StateMachine* ReadStateMachineBlock(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* stateMachine = context->document->makeNode<StateMachine>();
+  while (true) {
+    auto header = ReadPAGTagHeader(tagStream);
+    if (header.code == TagCode::End) break;
+    auto tagBytes = tagStream->readBytes(header.length);
+    if (header.code == TagCode::StateMachineInput) {
+      auto* input = ReadStateMachineInputTag(&tagBytes, context);
+      if (input != nullptr) {
+        stateMachine->inputs.push_back(input);
+      }
+    } else if (header.code == TagCode::StateRegionBlock) {
+      auto* region = ReadStateRegionBlock(&tagBytes, context);
+      if (region != nullptr) {
+        stateMachine->regions.push_back(region);
+      }
+    }
+  }
+  return stateMachine;
 }
 
 // AnimationBlock (spec §9.7 #480).
@@ -776,6 +959,11 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
       auto* animation = ReadAnimationBlock(&tagBytes, context);
       if (animation != nullptr) {
         composition->animations.push_back(animation);
+      }
+    } else if (header.code == TagCode::StateMachineBlock) {
+      auto* stateMachine = ReadStateMachineBlock(&tagBytes, context);
+      if (stateMachine != nullptr) {
+        composition->animations.push_back(stateMachine);
       }
     }
   }
@@ -1687,6 +1875,11 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
       if (animation != nullptr) {
         doc->animations.push_back(animation);
       }
+    } else if (header.code == TagCode::StateMachineBlock) {
+      auto* stateMachine = ReadStateMachineBlock(&tagBytes, context);
+      if (stateMachine != nullptr) {
+        doc->animations.push_back(stateMachine);
+      }
     }
   }
 }
@@ -1796,6 +1989,11 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
       auto* animation = ReadAnimationBlock(&tagBytes, context);
       if (animation != nullptr) {
         entry.document->animations.push_back(animation);
+      }
+    } else if (header.code == TagCode::StateMachineBlock) {
+      auto* stateMachine = ReadStateMachineBlock(&tagBytes, context);
+      if (stateMachine != nullptr) {
+        entry.document->animations.push_back(stateMachine);
       }
     }
   }

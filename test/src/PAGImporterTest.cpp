@@ -61,12 +61,18 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
 #include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/Timeline.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
@@ -1683,6 +1689,86 @@ PAGX_TEST(PAGImporterTest, SharedReferenceMaskNodeRefRoundTrip) {
   EXPECT_FALSE(sampleMaskedLayer->mask->visible);
   ASSERT_FALSE(sampleMaskedLayer->mask->contents.empty());
   EXPECT_EQ(sampleMaskedLayer->mask->contents[0]->nodeType(), NodeType::Ellipse);
+}
+
+PAGX_TEST(PAGImporterTest, StateMachineRoundTrip) {
+  // State machine round trip (spec §9.7): every sample must survive with its full graph —
+  // inputs (name/type/defaults), regions (name/initialState), states (name/animationId),
+  // transitions (from/to/duration/frameRate/interpolation/beziers/flags) and conditions
+  // (inputName/op/valueBool/valueNumber) — and the machine id must resolve through findNode.
+  // Rendering equivalence lands with P2-6's default-timeline unification.
+  const std::vector<std::string> samples = {
+      "any_state_and_empty",
+      "input_types_and_conditions",
+      "multi_region_parallel",
+      "transition_params",
+  };
+  for (auto& name : samples) {
+    auto source = PAGXImporter::FromFile(
+        pag::ProjectPath::Absolute("resources/pagx_to_pag/state_machine/" + name + ".pagx"));
+    ASSERT_TRUE(source != nullptr) << name;
+    auto result = PAGExporter::ExportToPAG(source, "/tmp/sm_diag.pag");
+    ASSERT_TRUE(result.success) << name;
+    auto decoded = PAGImporter::LoadFromPAG("/tmp/sm_diag.pag");
+    ASSERT_TRUE(decoded != nullptr) << name;
+    ASSERT_EQ(decoded->animations.size(), source->animations.size()) << name;
+    for (size_t i = 0; i < source->animations.size(); i++) {
+      auto* srcNode = source->animations[i];
+      auto* dstNode = decoded->animations[i];
+      ASSERT_EQ(dstNode->nodeType(), srcNode->nodeType()) << name;
+      EXPECT_EQ(dstNode->id, srcNode->id) << name;
+      if (srcNode->nodeType() != NodeType::StateMachine) {
+        continue;
+      }
+      auto* src = static_cast<StateMachine*>(srcNode);
+      auto* dst = static_cast<StateMachine*>(dstNode);
+      ASSERT_EQ(dst->inputs.size(), src->inputs.size()) << name;
+      for (size_t j = 0; j < src->inputs.size(); j++) {
+        EXPECT_EQ(dst->inputs[j]->name, src->inputs[j]->name) << name;
+        EXPECT_EQ(dst->inputs[j]->type, src->inputs[j]->type) << name;
+        EXPECT_EQ(dst->inputs[j]->defaultBool, src->inputs[j]->defaultBool) << name;
+        EXPECT_EQ(dst->inputs[j]->defaultNumber, src->inputs[j]->defaultNumber) << name;
+      }
+      ASSERT_EQ(dst->regions.size(), src->regions.size()) << name;
+      for (size_t j = 0; j < src->regions.size(); j++) {
+        auto* srcRegion = src->regions[j];
+        auto* dstRegion = dst->regions[j];
+        EXPECT_EQ(dstRegion->name, srcRegion->name) << name;
+        EXPECT_EQ(dstRegion->initialState, srcRegion->initialState) << name;
+        ASSERT_EQ(dstRegion->states.size(), srcRegion->states.size()) << name;
+        for (size_t k = 0; k < srcRegion->states.size(); k++) {
+          EXPECT_EQ(dstRegion->states[k]->name, srcRegion->states[k]->name) << name;
+          EXPECT_EQ(static_cast<AnimationState*>(dstRegion->states[k])->animationId,
+                    static_cast<AnimationState*>(srcRegion->states[k])->animationId)
+              << name;
+        }
+        ASSERT_EQ(dstRegion->transitions.size(), srcRegion->transitions.size()) << name;
+        for (size_t k = 0; k < srcRegion->transitions.size(); k++) {
+          auto* srcT = srcRegion->transitions[k];
+          auto* dstT = dstRegion->transitions[k];
+          EXPECT_EQ(dstT->from, srcT->from) << name;
+          EXPECT_EQ(dstT->to, srcT->to) << name;
+          EXPECT_EQ(dstT->duration, srcT->duration) << name;
+          EXPECT_EQ(dstT->frameRate, srcT->frameRate) << name;
+          EXPECT_EQ(dstT->interpolation, srcT->interpolation) << name;
+          EXPECT_EQ(dstT->bezierOut.x, srcT->bezierOut.x) << name;
+          EXPECT_EQ(dstT->bezierIn.y, srcT->bezierIn.y) << name;
+          EXPECT_EQ(dstT->enableEarlyExit, srcT->enableEarlyExit) << name;
+          EXPECT_EQ(dstT->pauseOnExit, srcT->pauseOnExit) << name;
+          ASSERT_EQ(dstT->conditions.size(), srcT->conditions.size()) << name;
+          for (size_t m = 0; m < srcT->conditions.size(); m++) {
+            EXPECT_EQ(dstT->conditions[m]->inputName, srcT->conditions[m]->inputName) << name;
+            EXPECT_EQ(dstT->conditions[m]->op, srcT->conditions[m]->op) << name;
+            EXPECT_EQ(dstT->conditions[m]->valueBool, srcT->conditions[m]->valueBool) << name;
+            EXPECT_EQ(dstT->conditions[m]->valueNumber, srcT->conditions[m]->valueNumber) << name;
+          }
+        }
+      }
+      EXPECT_TRUE(decoded->findNode(srcNode->id) != nullptr) << name;
+    }
+    int byteCount = 0;
+    EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "state-machine", &byteCount)) << name;
+  }
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {

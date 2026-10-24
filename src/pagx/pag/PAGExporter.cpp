@@ -66,13 +66,19 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
 #include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/Timeline.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGDataTypes.h"
@@ -219,31 +225,76 @@ void CollectAnimationTargetIds(const std::vector<Node*>& animations,
   }
 }
 
-// Interns every string an AnimationBlock emits (spec §9.7): the animation id (kept by the
-// RetainedIdTable), object targets and channel names. Must run before the StringTable is
-// written because the tag writers intern during body emission.
+// Interns every string an AnimationBlock or StateMachineBlock emits (spec §9.7): the node id
+// (kept by the RetainedIdTable), object targets, channel names and keyframe string values,
+// input/region/state/transition/condition strings. Must run before the StringTable is written
+// because the tag writers intern during body emission.
 void CollectStringsFromAnimation(Node* node, EncodeState* state) {
-  if (node == nullptr || node->nodeType() != NodeType::Animation) {
+  if (node == nullptr) {
     return;
   }
-  auto* animation = static_cast<Animation*>(node);
-  if (!animation->id.empty()) {
-    state->intern(animation->id);
-  }
-  for (auto* object : animation->objects) {
-    if (!object->target.empty()) {
-      state->intern(object->target);
+  if (node->nodeType() == NodeType::Animation) {
+    auto* animation = static_cast<Animation*>(node);
+    if (!animation->id.empty()) {
+      state->intern(animation->id);
     }
-    for (auto* channel : object->channels) {
-      if (!channel->name.empty()) {
-        state->intern(channel->name);
+    for (auto* object : animation->objects) {
+      if (!object->target.empty()) {
+        state->intern(object->target);
       }
-      // String keyframe values intern during body emission (after the StringTable is written),
-      // so every string value must be collected here as well.
-      if (channel->valueType() == ChannelValueType::String) {
-        auto* typed = static_cast<TypedChannel<std::string>*>(channel);
-        for (const auto& keyframe : typed->keyframes) {
-          state->intern(keyframe.value);
+      for (auto* channel : object->channels) {
+        if (!channel->name.empty()) {
+          state->intern(channel->name);
+        }
+        // String keyframe values intern during body emission (after the StringTable is
+        // written), so every string value must be collected here as well.
+        if (channel->valueType() == ChannelValueType::String) {
+          auto* typed = static_cast<TypedChannel<std::string>*>(channel);
+          for (const auto& keyframe : typed->keyframes) {
+            state->intern(keyframe.value);
+          }
+        }
+      }
+    }
+  } else if (node->nodeType() == NodeType::StateMachine) {
+    auto* stateMachine = static_cast<StateMachine*>(node);
+    if (!stateMachine->id.empty()) {
+      state->intern(stateMachine->id);
+    }
+    for (auto* input : stateMachine->inputs) {
+      if (!input->name.empty()) {
+        state->intern(input->name);
+      }
+    }
+    for (auto* region : stateMachine->regions) {
+      if (!region->name.empty()) {
+        state->intern(region->name);
+      }
+      if (!region->initialState.empty()) {
+        state->intern(region->initialState);
+      }
+      for (auto* stateNode : region->states) {
+        if (!stateNode->name.empty()) {
+          state->intern(stateNode->name);
+        }
+        if (stateNode->stateType() == StateType::Animation) {
+          auto& animationId = static_cast<AnimationState*>(stateNode)->animationId;
+          if (!animationId.empty()) {
+            state->intern(animationId);
+          }
+        }
+      }
+      for (auto* transition : region->transitions) {
+        if (!transition->from.empty()) {
+          state->intern(transition->from);
+        }
+        if (!transition->to.empty()) {
+          state->intern(transition->to);
+        }
+        for (auto* condition : transition->conditions) {
+          if (!condition->inputName.empty()) {
+            state->intern(condition->inputName);
+          }
         }
       }
     }
@@ -1722,6 +1773,194 @@ void WriteAnimationBlock(pag::EncodeStream* stream, Animation* animation, Encode
   WriteTag(stream, TagCode::AnimationBlock, &content);
 }
 
+// ---------------------------------------------------------------------------
+// State machine encoding (spec §9.7): StateMachineBlock 483 with StateMachineInput 484,
+// StateRegionBlock 485 + 490, State 486, StateTransition 487 + 491, TransitionCondition 488.
+// ---------------------------------------------------------------------------
+
+// TransitionCondition (488): inputName StringRef, op u8, valueBool BitFlag, valueNumber f32.
+void WriteTransitionConditionTag(pag::EncodeStream* stream, TransitionCondition* condition,
+                                 EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasInputName = !condition->inputName.empty();
+    auto hasOp = condition->op != TransitionConditionOp::Equal;
+    auto valueBool = condition->valueBool;
+    auto hasValueNumber = condition->valueNumber != 0.0f;
+    writer.writeFlag(hasInputName);
+    writer.writeFlag(hasOp);
+    writer.writeFlag(valueBool);
+    writer.writeFlag(hasValueNumber);
+    auto* v = writer.valueStream();
+    if (hasInputName) {
+      v->writeEncodedUint32(state->intern(condition->inputName));
+    }
+    if (hasOp) {
+      v->writeUint8(static_cast<uint8_t>(condition->op));
+    }
+    if (hasValueNumber) {
+      v->writeFloat(condition->valueNumber);
+    }
+    auto block = writer.release();
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  WriteTag(stream, TagCode::TransitionCondition, &content);
+}
+
+// StateTransition (487): attributes 491 followed by TransitionCondition tags, End-terminated.
+void WriteStateTransitionTag(pag::EncodeStream* stream, StateTransition* transition,
+                             EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasFrom = !transition->from.empty();
+    auto hasTo = !transition->to.empty();
+    auto hasDuration = transition->duration != 0;
+    auto hasFrameRate = transition->frameRate != 60.0f;
+    auto hasInterpolation = transition->interpolation != KeyframeInterpolationType::Linear;
+    auto hasBezierOut = transition->bezierOut.x != 0.0f || transition->bezierOut.y != 0.0f;
+    auto hasBezierIn = transition->bezierIn.x != 0.0f || transition->bezierIn.y != 0.0f;
+    auto enableEarlyExit = transition->enableEarlyExit;
+    auto pauseOnExit = transition->pauseOnExit;
+    writer.writeFlag(hasFrom);
+    writer.writeFlag(hasTo);
+    writer.writeFlag(hasDuration);
+    writer.writeFlag(hasFrameRate);
+    writer.writeFlag(hasInterpolation);
+    writer.writeFlag(hasBezierOut);
+    writer.writeFlag(hasBezierIn);
+    writer.writeFlag(enableEarlyExit);
+    writer.writeFlag(pauseOnExit);
+    auto* v = writer.valueStream();
+    if (hasFrom) {
+      v->writeEncodedUint32(state->intern(transition->from));
+    }
+    if (hasTo) {
+      v->writeEncodedUint32(state->intern(transition->to));
+    }
+    if (hasDuration) {
+      v->writeEncodedUint32(static_cast<uint32_t>(std::max<int64_t>(0, transition->duration)));
+    }
+    if (hasFrameRate) {
+      v->writeFloat(transition->frameRate);
+    }
+    if (hasInterpolation) {
+      v->writeUint8(static_cast<uint8_t>(transition->interpolation));
+    }
+    if (hasBezierOut) {
+      v->writeFloat(transition->bezierOut.x);
+      v->writeFloat(transition->bezierOut.y);
+    }
+    if (hasBezierIn) {
+      v->writeFloat(transition->bezierIn.x);
+      v->writeFloat(transition->bezierIn.y);
+    }
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::StateTransitionAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* condition : transition->conditions) {
+    WriteTransitionConditionTag(&content, condition, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::StateTransition, &content);
+}
+
+// State (486): stateType is a fixed u8 (only Animation ships today); name and animationId are
+// StringRefs with exist bits.
+void WriteStateTag(pag::EncodeStream* stream, State* stateNode, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasName = !stateNode->name.empty();
+  auto animationId = stateNode->stateType() == StateType::Animation
+                         ? static_cast<AnimationState*>(stateNode)->animationId
+                         : std::string();
+  auto hasAnimationId = !animationId.empty();
+  writer.writeFlag(hasName);
+  writer.writeFlag(hasAnimationId);
+  auto* v = writer.valueStream();
+  v->writeUint8(static_cast<uint8_t>(stateNode->stateType()));
+  if (hasName) {
+    v->writeEncodedUint32(state->intern(stateNode->name));
+  }
+  if (hasAnimationId) {
+    v->writeEncodedUint32(state->intern(animationId));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::State, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// StateRegionBlock (485): attributes 490 (name, initialState) then States and Transitions.
+void WriteStateRegionBlock(pag::EncodeStream* stream, StateRegion* region, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasName = !region->name.empty();
+    auto hasInitialState = !region->initialState.empty();
+    writer.writeFlag(hasName);
+    writer.writeFlag(hasInitialState);
+    auto* v = writer.valueStream();
+    if (hasName) {
+      v->writeEncodedUint32(state->intern(region->name));
+    }
+    if (hasInitialState) {
+      v->writeEncodedUint32(state->intern(region->initialState));
+    }
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::StateRegionAttributes,
+                      static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  for (auto* stateNode : region->states) {
+    WriteStateTag(&content, stateNode, state);
+  }
+  for (auto* transition : region->transitions) {
+    WriteStateTransitionTag(&content, transition, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::StateRegionBlock, &content);
+}
+
+// StateMachineInput (484): name StringRef, type u8 (fixed), defaultBool BitFlag,
+// defaultNumber f32.
+void WriteStateMachineInputTag(pag::EncodeStream* stream, StateMachineInput* input,
+                               EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasName = !input->name.empty();
+  auto defaultBool = input->defaultBool;
+  auto hasDefaultNumber = input->defaultNumber != 0.0f;
+  writer.writeFlag(hasName);
+  writer.writeFlag(defaultBool);
+  writer.writeFlag(hasDefaultNumber);
+  auto* v = writer.valueStream();
+  if (hasName) {
+    v->writeEncodedUint32(state->intern(input->name));
+  }
+  v->writeUint8(static_cast<uint8_t>(input->type));
+  if (hasDefaultNumber) {
+    v->writeFloat(input->defaultNumber);
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::StateMachineInput, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// StateMachineBlock (483): inputs then regions, End-terminated.
+void WriteStateMachineBlock(pag::EncodeStream* stream, StateMachine* stateMachine,
+                            EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  for (auto* input : stateMachine->inputs) {
+    WriteStateMachineInputTag(&content, input, state);
+  }
+  for (auto* region : stateMachine->regions) {
+    WriteStateRegionBlock(&content, region, state);
+  }
+  WritePAGTagHeader(&content, TagCode::End, 0);
+  WriteTag(stream, TagCode::StateMachineBlock, &content);
+}
+
 void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
 
 // CompositionBlock (spec §9.1 #297): CompositionAttributes (298: width/height) followed by
@@ -1749,6 +1988,8 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
   for (auto* animationNode : composition->animations) {
     if (animationNode->nodeType() == NodeType::Animation) {
       WriteAnimationBlock(&content, static_cast<Animation*>(animationNode), state);
+    } else if (animationNode->nodeType() == NodeType::StateMachine) {
+      WriteStateMachineBlock(&content, static_cast<StateMachine*>(animationNode), state);
     }
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
@@ -2650,17 +2891,38 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
   }
 }
 
-// Numbers an animation subtree (spec §5.1): the Animation node, then each AnimationObject with
-// its channels, matching the decoder's makeNode order inside AnimationBlock.
+// Numbers an animation or state machine subtree (spec §5.1), matching the decoder's makeNode
+// order inside the corresponding block: Animation -> objects -> channels; StateMachine ->
+// inputs -> regions -> states -> transitions -> conditions.
 void AssignAnimationNodeIndices(Node* node, EncodeState* state, uint32_t* index) {
-  if (node == nullptr || node->nodeType() != NodeType::Animation) {
+  if (node == nullptr) {
     return;
   }
-  state->nodeIndices[node] = (*index)++;
-  for (auto* object : static_cast<Animation*>(node)->objects) {
-    state->nodeIndices[object] = (*index)++;
-    for (auto* channel : object->channels) {
-      state->nodeIndices[channel] = (*index)++;
+  if (node->nodeType() == NodeType::Animation) {
+    state->nodeIndices[node] = (*index)++;
+    for (auto* object : static_cast<Animation*>(node)->objects) {
+      state->nodeIndices[object] = (*index)++;
+      for (auto* channel : object->channels) {
+        state->nodeIndices[channel] = (*index)++;
+      }
+    }
+  } else if (node->nodeType() == NodeType::StateMachine) {
+    auto* stateMachine = static_cast<StateMachine*>(node);
+    state->nodeIndices[node] = (*index)++;
+    for (auto* input : stateMachine->inputs) {
+      state->nodeIndices[input] = (*index)++;
+    }
+    for (auto* region : stateMachine->regions) {
+      state->nodeIndices[region] = (*index)++;
+      for (auto* stateNode : region->states) {
+        state->nodeIndices[stateNode] = (*index)++;
+      }
+      for (auto* transition : region->transitions) {
+        state->nodeIndices[transition] = (*index)++;
+        for (auto* condition : transition->conditions) {
+          state->nodeIndices[condition] = (*index)++;
+        }
+      }
     }
   }
 }
@@ -2812,15 +3074,6 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     issue.code = PAGExportWarning::AnimatedContentSkipped;
     issue.message = "viewmodel and data binds have no binary encoding yet";
     result.warnings.push_back(issue);
-  }
-  for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::StateMachine) {
-      PAGExportIssue issue = {};
-      issue.code = PAGExportWarning::AnimatedContentSkipped;
-      issue.message = "state machines have no binary encoding yet";
-      result.warnings.push_back(issue);
-      break;
-    }
   }
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
@@ -3059,7 +3312,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         }
         auto type = node->nodeType();
         if (type != NodeType::Layer && type != NodeType::Animation &&
-            state->animationTargetIds.count(node->id) == 0) {
+            type != NodeType::StateMachine && state->animationTargetIds.count(node->id) == 0) {
           continue;
         }
         auto it = state->nodeIndices.find(node.get());
@@ -3082,6 +3335,8 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     for (auto* animationNode : doc->animations) {
       if (animationNode->nodeType() == NodeType::Animation) {
         WriteAnimationBlock(&docContent, static_cast<Animation*>(animationNode), state.get());
+      } else if (animationNode->nodeType() == NodeType::StateMachine) {
+        WriteStateMachineBlock(&docContent, static_cast<StateMachine*>(animationNode), state.get());
       }
     }
     WritePAGTagHeader(&docContent, TagCode::End, 0);
@@ -3134,7 +3389,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
             }
             auto type = node->nodeType();
             if (type != NodeType::Layer && type != NodeType::Animation &&
-                state->animationTargetIds.count(node->id) == 0) {
+                type != NodeType::StateMachine && state->animationTargetIds.count(node->id) == 0) {
               continue;
             }
             auto it = state->nodeIndices.find(node.get());
@@ -3157,6 +3412,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
         for (auto* animationNode : sub.document->animations) {
           if (animationNode->nodeType() == NodeType::Animation) {
             WriteAnimationBlock(&subContent, static_cast<Animation*>(animationNode), state.get());
+          } else if (animationNode->nodeType() == NodeType::StateMachine) {
+            WriteStateMachineBlock(&subContent, static_cast<StateMachine*>(animationNode),
+                                   state.get());
           }
         }
         state->nodeIndices = std::move(rootIndices);
