@@ -1845,6 +1845,61 @@ PAGX_TEST(PAGImporterTest, ImageScaleKeyframeLookup) {
   }
 }
 
+PAGX_TEST(PAGImporterTest, EmbeddedTextFallbackRoundTrip) {
+  // TextHolder fallback (design doc §4.3, C17/C18): an embedded-glyph Text whose text channel
+  // is rewritten must relayout with the host-registered fonts — the embedded subset has no
+  // character map and cannot display new characters. The first frame keeps the embedded
+  // outlines; after the swap the registered font's shaping shows. The sample animates "AG" to
+  // "AB" (B is outside the embedded subset), so t=1 must differ from t=0 on both the XML source
+  // and the v4 round trip, and the two must stay pixel-identical at every time.
+  auto source = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/embedded_text_fallback.pagx"));
+  ASSERT_TRUE(source != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(source, "/tmp/embedded_fallback.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/embedded_fallback.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  std::vector<uint8_t> pixelsT0;
+  std::vector<uint8_t> pixelsT1;
+  for (auto& timeText : std::vector<std::string>{"0", "1"}) {
+    auto sceneA = PAGScene::Make(source);
+    auto sceneB = PAGScene::Make(decoded);
+    ASSERT_TRUE(sceneA != nullptr);
+    ASSERT_TRUE(sceneB != nullptr);
+    auto timeUs = static_cast<int64_t>(llround(std::stod(timeText) * 1e6));
+    for (auto& id : sceneA->getAnimationIds()) {
+      auto animation = sceneA->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    for (auto& id : sceneB->getAnimationIds()) {
+      auto animation = sceneB->getAnimation(id);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    }
+    int width = static_cast<int>(source->width);
+    int height = static_cast<int>(source->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(sceneA->draw(surfaceA));
+    ASSERT_TRUE(sceneB->draw(surfaceB));
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+    EXPECT_EQ(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0) << " t=" << timeText;
+    if (timeText == "0") {
+      pixelsT0 = pixelsA;
+    } else {
+      pixelsT1 = pixelsA;
+    }
+  }
+  // The rewrite must actually show: the fallback relayout produced different pixels.
+  ASSERT_EQ(pixelsT0.size(), pixelsT1.size());
+  EXPECT_NE(memcmp(pixelsT0.data(), pixelsT1.data(), pixelsT0.size()), 0)
+      << "text rewrite was silently ignored";
+}
+
 PAGX_TEST(PAGImporterTest, BakedScaleKeyframeRoundTrip) {
   // The flattener's geometry-scaled hook (design doc §12.2): when a uniform layout scale is
   // baked into a Path's data, the per-point animation keyframes must carry the same scale —

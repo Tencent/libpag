@@ -165,7 +165,12 @@ void TextHolder::flush(FontConfig* fontConfig) {
     elements.push_back({entry.node, entry.glyph});
   }
   LayoutContext context(fontConfig);
-  auto result = TextLayout::Layout(elements, params, &context);
+  // flush only runs after a text-like channel write, so the authored content no longer matches
+  // the embedded GlyphRuns (which are a subset without a character map). Relayout with the
+  // host-registered fonts instead: the first frame keeps the embedded outlines (LayerBuilder
+  // builds it before any write), and every rewrite shows the registered font's shaping
+  // (design doc §4.3, confirmed behavior C17/C18).
+  auto result = TextLayout::Layout(elements, params, &context, false);
   for (auto& entry : entries) {
     auto runs = result.extractLayoutRuns(entry.node);
     // Bake the container padding offset into the run positions the same way TextBox::updateLayout
