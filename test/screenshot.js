@@ -76,29 +76,62 @@ function isFatalBrowserError(err) {
 }
 
 async function launchBrowser() {
-  return puppeteer.launch({
-    headless: true,
-    protocolTimeout: PROTOCOL_TIMEOUT_MS,
-    // The flag set deliberately targets headless CI containers as well as local macOS:
-    //   --no-sandbox / --disable-setuid-sandbox — required when running as root in Docker,
-    //     and a no-op on a normal desktop user account.
-    //   --hide-scrollbars — avoids scrollbar gutters stealing viewport pixels.
-    //   --disable-dev-shm-usage — Docker defaults /dev/shm to 64 MB, which is not enough
-    //     for Chromium's shared memory; switching to /tmp prevents the "Target closed"
-    //     bursts that otherwise hit after a handful of pages. Harmless on macOS.
-    //   --disable-gpu — no GPU in headless CI; skipping the probe trims launch latency
-    //     and sidesteps driver-specific hangs.
-    //   --font-render-hinting=none — disables hinting-based glyph adjustments that vary
-    //     between CI machines for reproducible screenshots.
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--hide-scrollbars',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--font-render-hinting=none',
-    ],
-  });
+  // 'shell' selects chrome-headless-shell instead of the full Chrome for Testing build. The
+  // shell renders pixel-identical output (verified bit-exact on blend_modes_showcase), but the
+  // full multi-process build has a failure mode on macOS where its startup stalls forever after
+  // repeated SIGKILLs of its process tree: every child sits in a live event loop, the startup
+  // log stops right after the prefs write, and no flag combination recovers it. The
+  // single-process shell (SwiftShader, no system-service integrations) is immune to that state.
+  // PUPPETEER_EXECUTABLE_PATH still overrides the choice for local debugging.
+  try {
+    return await puppeteer.launch({
+      headless: 'shell',
+      protocolTimeout: PROTOCOL_TIMEOUT_MS,
+      // The flag set deliberately targets headless CI containers as well as local macOS:
+      //   --no-sandbox / --disable-setuid-sandbox — required when running as root in Docker,
+      //     and a no-op on a normal desktop user account.
+      //   --hide-scrollbars — avoids scrollbar gutters stealing viewport pixels.
+      //   --disable-dev-shm-usage — Docker defaults /dev/shm to 64 MB, which is not enough
+      //     for Chromium's shared memory; switching to /tmp prevents the "Target closed"
+      //     bursts that otherwise hit after a handful of pages. Harmless on macOS.
+      //   --disable-gpu — no GPU in headless CI; skipping the probe trims launch latency
+      //     and sidesteps driver-specific hangs.
+      //   --font-render-hinting=none — disables hinting-based glyph adjustments that vary
+      //     between CI machines for reproducible screenshots.
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--hide-scrollbars',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--font-render-hinting=none',
+      ],
+    });
+  } catch (err) {
+    // A fresh checkout has no chrome-headless-shell in the browser cache yet; install the
+    // revision puppeteer expects and retry once. Any other failure propagates.
+    const missing = /Could not find|ENOENT|Failed to launch/.test(String(err && err.message));
+    if (!missing) {
+      throw err;
+    }
+    console.log('chrome-headless-shell missing, installing...');
+    execSync('npx puppeteer browsers install chrome-headless-shell', {
+      cwd: __dirname,
+      stdio: 'inherit',
+    });
+    return puppeteer.launch({
+      headless: 'shell',
+      protocolTimeout: PROTOCOL_TIMEOUT_MS,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--hide-scrollbars',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--font-render-hinting=none',
+      ],
+    });
+  }
 }
 
 async function captureWithRetry(state, task, label) {
