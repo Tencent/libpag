@@ -86,10 +86,16 @@
 - 接入 317 仓库样本 + `resources/pagx_to_pag/`。
 - **验收**：对比页生成并通过人工抽查；静态样本 diff 阈值与 Baseline::Compare 一致。
 
-### T11 测试收尾与全量回归（依赖全部）
+### T11 测试收尾与全量回归（依赖全部）✅ 已完成（2026-10-24，7d6a52eaf/b5c00a8df：全节点类型编解码、mask 编号按引用计数修复、全量 2708/2709 通过）
 - T1/T3/T4/T5(健壮性)/T9(静态)/T10/T11 用例并入 `PAGFullTest`；一期动效样本不进对比（§12.3）。
 - `PAGFullTest` 全量通过 → 提交（分支 `feature/henryjpxie_pagx_to_pag`）。
 - 截图基准变更走 `/accept-baseline`（仅用户执行）。
+- **验收记录**：PAGFullTest 2709 tests，2708 通过 / 0 失败 / 1 skip（性能基线加载）；渲染等价 298/330
+  bit-exact（90.3%），32 个差异全部归类（27 个 u8 量化、4 个文本/边缘 AA 级、fillrule 路径 0.05
+  量化网格设计限制、modifier_trim_continuous 已知渐变插值微偏）；9 个二期语料按设计跳过。渲染期间发现
+  并修复 mask NodeRef 两类深层缺陷（styles/filters/stops/selectors 未计数导致索引偏移；共享资源节点
+  未按引用计数导致 complete_example 串色），screenshot.js 固化 chrome-headless-shell 免疫完整版
+  Chrome 在 macOS 上的启动挂死。
 
 ## 二期预告（一期完成后按 §13.4 出接口与伪代码再开工）
 
