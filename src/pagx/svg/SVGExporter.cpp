@@ -1745,6 +1745,15 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
       case MaskType::Contour:
         defId += "_c";
         break;
+      case MaskType::AlphaInverted:
+        defId += "_ai";
+        break;
+      case MaskType::LuminanceInverted:
+        defId += "_li";
+        break;
+      case MaskType::ContourInverted:
+        defId += "_ci";
+        break;
     }
   }
   SVGBuilder paintDefs(true, _indentSpaces);

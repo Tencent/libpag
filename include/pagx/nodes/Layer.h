@@ -91,6 +91,33 @@ class Layer : public Node, public LayoutNode {
   Matrix3D matrix3D = {};
 
   /**
+   * The anchor point for the decomposed transform. Semantics match Group::anchor; the composed
+   * order is translate(-anchor) * scale * skew * rotate * translate(position). Ignored when
+   * matrix3D or matrix is set (priority: matrix3D > matrix > decomposed fields, spec 6.2).
+   */
+  Point anchor = {};
+
+  /**
+   * The rotation angle in degrees for the decomposed transform. Default 0.
+   */
+  float rotation = 0.0f;
+
+  /**
+   * The scale factor as (scaleX, scaleY) for the decomposed transform. Default {1, 1}.
+   */
+  Point scale = {1.0f, 1.0f};
+
+  /**
+   * The skew angle in degrees for the decomposed transform. Default 0.
+   */
+  float skew = 0.0f;
+
+  /**
+   * The axis angle in degrees for the skew transformation. Default 0.
+   */
+  float skewAxis = 0.0f;
+
+  /**
    * Whether to preserve 3D transformations for child layers. The default value is false.
    */
   bool preserve3D = false;
@@ -169,6 +196,19 @@ class Layer : public Node, public LayoutNode {
    * The ViewModel binding context path used to resolve DataBind sources (e.g. "$vm.propertyName").
    */
   std::string vmContext = {};
+
+  /**
+   * Time-lock start time in seconds (spec 6.3): declaring startTime or timeScale puts the
+   * layer's composition instance into time-locked mode, where its timelines no longer
+   * advance on their own and are positioned from the parent clock as
+   * childTime = (parentClock - startTime) * timeScale. Default 0.
+   */
+  float startTime = 0.0f;
+
+  /**
+   * Time-lock scale factor (spec 6.3). Default 1.
+   */
+  float timeScale = 1.0f;
 
   /**
    * The vector elements contained in this layer (geometry, painters, modifiers, etc.).

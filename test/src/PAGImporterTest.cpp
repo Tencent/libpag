@@ -2067,6 +2067,114 @@ PAGX_TEST(PAGImporterTest, ViewModelDataBindRoundTrip) {
   }
 }
 
+PAGX_TEST(PAGImporterTest, LayerTransformRoundTrip) {
+  // LayerTransform (spec 9.2 #354) round trip: the decomposed transform fields
+  // (anchor/rotation/scale/skew/skewAxis) and the time-lock mount (startTime/timeScale,
+  // spec 6.3) survive the binary hop with exact values, and the XML round trip inside the
+  // exporter preserves them too (the runtime priority matrix3D > matrix > decomposed is
+  // applied by the renderer, not by the codec).
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->anchor = {12.0f, 34.0f};
+  layer->rotation = 45.0f;
+  layer->scale = {2.0f, 0.5f};
+  layer->skew = 15.0f;
+  layer->skewAxis = 30.0f;
+  layer->startTime = -0.25f;
+  layer->timeScale = 1.5f;
+  doc->layers.push_back(layer);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/layer_transform_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/layer_transform_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  auto* dst = decoded->layers[0];
+  EXPECT_EQ(dst->anchor.x, 12.0f);
+  EXPECT_EQ(dst->anchor.y, 34.0f);
+  EXPECT_EQ(dst->rotation, 45.0f);
+  EXPECT_EQ(dst->scale.x, 2.0f);
+  EXPECT_EQ(dst->scale.y, 0.5f);
+  EXPECT_EQ(dst->skew, 15.0f);
+  EXPECT_EQ(dst->skewAxis, 30.0f);
+  EXPECT_EQ(dst->startTime, -0.25f);
+  EXPECT_EQ(dst->timeScale, 1.5f);
+
+  // Defaults round trip to defaults (the tag is omitted entirely).
+  auto doc2 = PAGXDocument::Make(200, 200);
+  auto* layer2 = doc2->makeNode<Layer>();
+  doc2->layers.push_back(layer2);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc2, "/tmp/layer_transform_def.pag").success);
+  auto decoded2 = PAGImporter::LoadFromPAG("/tmp/layer_transform_def.pag");
+  ASSERT_TRUE(decoded2 != nullptr);
+  auto* dst2 = decoded2->layers[0];
+  EXPECT_EQ(dst2->anchor.x, 0.0f);
+  EXPECT_EQ(dst2->rotation, 0.0f);
+  EXPECT_EQ(dst2->scale.x, 1.0f);
+  EXPECT_EQ(dst2->skew, 0.0f);
+  EXPECT_EQ(dst2->skewAxis, 0.0f);
+  EXPECT_EQ(dst2->startTime, 0.0f);
+  EXPECT_EQ(dst2->timeScale, 1.0f);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "layer-transform", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, InvertedMaskTypeRoundTrip) {
+  // MaskType 3-5 (spec 9.10 reservation, 6.4 inverted masks) survive the XML and binary
+  // round trips at the format layer; the renderer-side inversion lands with P3-8's
+  // mask-path list, the first consumer.
+  auto doc = PAGXDocument::Make(200, 200);
+  const std::vector<MaskType> types = {
+      MaskType::AlphaInverted,
+      MaskType::LuminanceInverted,
+      MaskType::ContourInverted,
+  };
+  for (auto type : types) {
+    auto* maskLayer = doc->makeNode<Layer>();
+    maskLayer->visible = false;
+    maskLayer->name = "m";
+    auto* ellipse = doc->makeNode<Ellipse>();
+    ellipse->position = {50.0f, 50.0f};
+    ellipse->size = {60.0f, 60.0f};
+    maskLayer->contents.push_back(ellipse);
+    auto* fill = doc->makeNode<Fill>();
+    auto* white = doc->makeNode<SolidColor>();
+    white->color = {1.0f, 1.0f, 1.0f, 1.0f, ColorSpace::SRGB};
+    fill->color = white;
+    maskLayer->contents.push_back(fill);
+    doc->layers.push_back(maskLayer);
+
+    auto* masked = doc->makeNode<Layer>();
+    masked->mask = maskLayer;
+    masked->maskType = type;
+    auto* rect = doc->makeNode<Rectangle>();
+    rect->position = {50.0f, 50.0f};
+    rect->size = {80.0f, 80.0f};
+    masked->contents.push_back(rect);
+    auto* fill2 = doc->makeNode<Fill>();
+    auto* color = doc->makeNode<SolidColor>();
+    color->color = {0.9f, 0.2f, 0.2f, 1.0f, ColorSpace::SRGB};
+    fill2->color = color;
+    masked->contents.push_back(fill2);
+    doc->layers.push_back(masked);
+  }
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/mask_types_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/mask_types_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  int invertedCount = 0;
+  std::vector<Layer*> maskedLayers = {};
+  CollectMaskedLayers(decoded->layers, &maskedLayers);
+  ASSERT_EQ(maskedLayers.size(), 3u);
+  for (auto* masked : maskedLayers) {
+    ASSERT_TRUE(masked->mask != nullptr);
+    EXPECT_FALSE(masked->mask->visible);
+    EXPECT_EQ(static_cast<int>(masked->maskType) >= 3, true);
+    invertedCount++;
+  }
+  EXPECT_EQ(invertedCount, 3);
+}
+
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
   // Layer timelines (spec §9.6): AnimationTimeline carries animationId / playing /
   // evaluationOffset (signed varint, negative skips ahead); StateMachineTimeline carries only

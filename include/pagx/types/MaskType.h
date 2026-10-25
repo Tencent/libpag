@@ -35,7 +35,19 @@ enum class MaskType {
   /**
    * Use the contour (outline) of the mask for masking.
    */
-  Contour
+  Contour,
+  /**
+   * Alpha mask with inverted coverage (spec 6.4): visible where the mask is transparent.
+   */
+  AlphaInverted,
+  /**
+   * Luminance mask with inverted brightness (spec 6.4).
+   */
+  LuminanceInverted,
+  /**
+   * Contour mask with reversed winding (spec 6.4).
+   */
+  ContourInverted
 };
 
 }  // namespace pagx

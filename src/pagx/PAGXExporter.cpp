@@ -1756,6 +1756,21 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->matrix3D.isIdentity()) {
     xml.addAttribute("matrix3D", FloatListToString(node->matrix3D.values, 16));
   }
+  // Decomposed transform (spec 6.2): only written when set; ignored at render time when
+  // matrix3D or matrix is present.
+  if (node->anchor != Default<Layer>().anchor) {
+    xml.addAttribute("anchor", PointToString(node->anchor));
+  }
+  xml.addAttribute("rotation", node->rotation, Default<Layer>().rotation);
+  if (node->scale != Default<Layer>().scale) {
+    xml.addAttribute("scale", PointToString(node->scale));
+  }
+  xml.addAttribute("skew", node->skew, Default<Layer>().skew);
+  xml.addAttribute("skewAxis", node->skewAxis, Default<Layer>().skewAxis);
+  // Time-lock mount (spec 6.3): any non-default value puts the composition instance in
+  // time-locked mode.
+  xml.addAttribute("startTime", node->startTime, Default<Layer>().startTime);
+  xml.addAttribute("timeScale", node->timeScale, Default<Layer>().timeScale);
   xml.addAttribute("preserve3D", node->preserve3D, Default<Layer>().preserve3D);
   xml.addAttribute("antiAlias", node->antiAlias, Default<Layer>().antiAlias);
   xml.addAttribute("groupOpacity", node->groupOpacity, Default<Layer>().groupOpacity);

@@ -513,6 +513,19 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     }
   }
   layer->preserve3D = GetBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);
+  auto anchorStr = GetAttribute(node, "anchor");
+  if (!anchorStr.empty()) {
+    layer->anchor = ParsePoint(anchorStr);
+  }
+  layer->rotation = GetFloatAttribute(node, "rotation", Default<Layer>().rotation, doc);
+  auto scaleStr = GetAttribute(node, "scale");
+  if (!scaleStr.empty()) {
+    layer->scale = ParsePoint(scaleStr);
+  }
+  layer->skew = GetFloatAttribute(node, "skew", Default<Layer>().skew, doc);
+  layer->skewAxis = GetFloatAttribute(node, "skewAxis", Default<Layer>().skewAxis, doc);
+  layer->startTime = GetFloatAttribute(node, "startTime", Default<Layer>().startTime, doc);
+  layer->timeScale = GetFloatAttribute(node, "timeScale", Default<Layer>().timeScale, doc);
   layer->antiAlias = GetBoolAttribute(node, "antiAlias", Default<Layer>().antiAlias, doc);
   layer->groupOpacity = GetBoolAttribute(node, "groupOpacity", Default<Layer>().groupOpacity, doc);
   layer->passThroughBackground =

@@ -2672,6 +2672,58 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
     WritePAGTagHeader(&content, TagCode::LayerAttributes, static_cast<uint32_t>(block->length()));
     content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   }
+  // LayerTransform (spec 9.2 #354): decomposed transform fields plus the time-lock mount.
+  // Written when any field is non-default; the decoder applies the priority
+  // matrix3D > matrix > decomposed fields at render time.
+  {
+    auto hasAnchor = layer->anchor.x != 0.0f || layer->anchor.y != 0.0f;
+    auto hasRotation = layer->rotation != 0.0f;
+    auto hasScale = layer->scale.x != 1.0f || layer->scale.y != 1.0f;
+    auto hasSkew = layer->skew != 0.0f;
+    auto hasSkewAxis = layer->skewAxis != 0.0f;
+    auto hasStartTime = layer->startTime != 0.0f;
+    auto hasTimeScale = layer->timeScale != 1.0f;
+    if (hasAnchor || hasRotation || hasScale || hasSkew || hasSkewAxis || hasStartTime ||
+        hasTimeScale) {
+      PAGAttributeBlockWriter writer(&state->streamContext);
+      writer.writeFlag(hasAnchor);
+      writer.writeFlag(hasRotation);
+      writer.writeFlag(hasScale);
+      writer.writeFlag(hasSkew);
+      writer.writeFlag(hasSkewAxis);
+      writer.writeFlag(hasStartTime);
+      writer.writeFlag(hasTimeScale);
+      auto* v = writer.valueStream();
+      if (hasAnchor) {
+        v->writeFloat(layer->anchor.x);
+        v->writeFloat(layer->anchor.y);
+      }
+      if (hasRotation) {
+        v->writeFloat(layer->rotation);
+      }
+      if (hasScale) {
+        v->writeFloat(layer->scale.x);
+        v->writeFloat(layer->scale.y);
+      }
+      if (hasSkew) {
+        v->writeFloat(layer->skew);
+      }
+      if (hasSkewAxis) {
+        v->writeFloat(layer->skewAxis);
+      }
+      if (hasStartTime) {
+        v->writeFloat(layer->startTime);
+      }
+      if (hasTimeScale) {
+        v->writeFloat(layer->timeScale);
+      }
+      auto transformBlock = writer.release();
+      WritePAGTagHeader(&content, TagCode::LayerTransform,
+                        static_cast<uint32_t>(transformBlock->length()));
+      content.writeBytes(const_cast<uint8_t*>(transformBlock->data()),
+                         static_cast<uint32_t>(transformBlock->length()));
+    }
+  }
   if (layer->composition != nullptr && state->compositionResourceSlots.find(layer->composition) ==
                                            state->compositionResourceSlots.end()) {
     WriteCompositionBlock(&content, layer->composition, state);

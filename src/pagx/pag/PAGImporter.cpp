@@ -1969,6 +1969,39 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       auto* child = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, child, context, subDocRefs, pendingMaskRefsTarget);
       layer->children.push_back(child);
+    } else if (header.code == TagCode::LayerTransform) {
+      PAGAttributeBlockReader reader(&tagBytes, 7);
+      bool hasAnchor = reader.flag(0);
+      bool hasRotation = reader.flag(1);
+      bool hasScale = reader.flag(2);
+      bool hasSkew = reader.flag(3);
+      bool hasSkewAxis = reader.flag(4);
+      bool hasStartTime = reader.flag(5);
+      bool hasTimeScale = reader.flag(6);
+      tagBytes.alignWithBytes();
+      if (hasAnchor) {
+        layer->anchor.x = tagBytes.readFloat();
+        layer->anchor.y = tagBytes.readFloat();
+      }
+      if (hasRotation) {
+        layer->rotation = tagBytes.readFloat();
+      }
+      if (hasScale) {
+        layer->scale.x = tagBytes.readFloat();
+        layer->scale.y = tagBytes.readFloat();
+      }
+      if (hasSkew) {
+        layer->skew = tagBytes.readFloat();
+      }
+      if (hasSkewAxis) {
+        layer->skewAxis = tagBytes.readFloat();
+      }
+      if (hasStartTime) {
+        layer->startTime = tagBytes.readFloat();
+      }
+      if (hasTimeScale) {
+        layer->timeScale = tagBytes.readFloat();
+      }
     } else if (header.code == TagCode::CompositionBlock) {
       layer->composition = ReadCompositionBlock(&tagBytes, context);
     } else if (header.code == TagCode::DropShadowStyle ||
