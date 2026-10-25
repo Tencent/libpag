@@ -597,7 +597,7 @@ class LayerBuilderContext {
     auto* layerTarget = static_cast<LayerRuntimeTarget*>(_result.binding.getTarget(node));
     if (layerTarget != nullptr) {
       auto layerPos = node->renderPosition();
-      layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+      layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(BuildLayerEffectiveMatrix(node)));
     }
     if (node->mask != nullptr) {
       _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
@@ -946,7 +946,7 @@ class LayerBuilderContext {
       // against the static baseline. applyLayerAttributes has already composed them into the layer.
       if (layerTarget != nullptr) {
         auto layerPos = node->renderPosition();
-        layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+        layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(BuildLayerEffectiveMatrix(node)));
       }
 
       // Queue mask to be applied in second pass.
@@ -2503,8 +2503,10 @@ class LayerBuilderContext {
       layer->setBlendMode(ToTGFX(node->blendMode));
     }
 
-    // Apply transformation: combine x/y translation with matrix
-    auto matrix = ToTGFX(node->matrix);
+    // Apply transformation: combine x/y translation with matrix. The decomposed fields
+    // (anchor/rotation/scale/skew/skewAxis, spec 6.2) only contribute when both matrix3D and
+    // matrix are identity — the priority matrix3D > matrix > decomposed fields.
+    auto matrix = ToTGFX(BuildLayerEffectiveMatrix(node));
     auto layerPos = node->renderPosition();
     if (layerPos.x != 0 || layerPos.y != 0) {
       matrix = tgfx::Matrix::MakeTrans(layerPos.x, layerPos.y) * matrix;

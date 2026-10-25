@@ -115,6 +115,51 @@ Matrix BuildLayerMatrix(const Layer* layer) {
   return m;
 }
 
+Matrix BuildLayerEffectiveMatrix(const Layer* layer) {
+  // Priority matrix3D > matrix > decomposed fields (spec 6.2). The result excludes the
+  // render-position translation on purpose: the renderer combines it separately so the x/y
+  // channels keep their own identity.
+  if (!layer->matrix3D.isIdentity()) {
+    const float* v = layer->matrix3D.values;
+    Matrix m = {};
+    m.a = v[0];
+    m.b = v[1];
+    m.c = v[4];
+    m.d = v[5];
+    return m;
+  }
+  if (!layer->matrix.isIdentity()) {
+    return layer->matrix;
+  }
+  bool hasAnchor = !FloatNearlyZero(layer->anchor.x) || !FloatNearlyZero(layer->anchor.y);
+  bool hasRotation = !FloatNearlyZero(layer->rotation);
+  bool hasScale =
+      !FloatNearlyZero(layer->scale.x - 1.0f) || !FloatNearlyZero(layer->scale.y - 1.0f);
+  bool hasSkew = !FloatNearlyZero(layer->skew);
+  if (!hasAnchor && !hasRotation && !hasScale && !hasSkew) {
+    return {};
+  }
+  // Same composition order as BuildGroupMatrix minus the position translation.
+  Matrix m = {};
+  if (hasAnchor) {
+    m = Matrix::Translate(-layer->anchor.x, -layer->anchor.y);
+  }
+  if (hasScale) {
+    m = Matrix::Scale(layer->scale.x, layer->scale.y) * m;
+  }
+  if (hasSkew) {
+    m = Matrix::Rotate(layer->skewAxis) * m;
+    Matrix shear = {};
+    shear.c = std::tan(DegreesToRadians(-layer->skew));
+    m = shear * m;
+    m = Matrix::Rotate(-layer->skewAxis) * m;
+  }
+  if (hasRotation) {
+    m = Matrix::Rotate(layer->rotation) * m;
+  }
+  return m;
+}
+
 Matrix BuildGroupMatrix(const Group* group) {
   // The authored `position` attribute is a layout input only; the actual
   // rendered translation comes from renderPosition() after constraints,

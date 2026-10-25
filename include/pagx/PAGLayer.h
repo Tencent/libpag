@@ -109,6 +109,14 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   virtual void apply(float mix = 1.0f);
 
   /**
+   * Propagates the effective parent clock (seconds) to time-locked descendant compositions
+   * (spec 6.3). Plain layers pass the clock through to children; PAGComposition overrides
+   * this to consume the clock when time-locked. Called by the scene after advance/seek so
+   * locked instances are positioned from the parent clock instead of their own timelines.
+   */
+  virtual void propagateTimeLock(double parentClockSeconds);
+
+  /**
    * Returns the source Layer node associated with this runtime layer, or nullptr for the root
    * composition.
    */

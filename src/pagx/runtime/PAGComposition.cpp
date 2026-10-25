@@ -42,6 +42,13 @@ namespace pagx {
 PAGComposition::PAGComposition(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
                                const std::shared_ptr<PAGScene>& scene)
     : PAGLayer(node, std::move(runtimeLayer), scene), binding(std::make_unique<RuntimeBinding>()) {
+  // Time-lock mount (spec 6.3): declaring startTime or timeScale puts the instance in locked
+  // mode; advance() then skips its timelines and the scene positions them from the parent clock.
+  if (node != nullptr && (node->startTime != 0.0f || node->timeScale != 1.0f)) {
+    timeLocked = true;
+    timeLockStartValue = node->startTime;
+    timeLockScaleValue = node->timeScale;
+  }
 }
 
 PAGComposition::~PAGComposition() = default;
@@ -67,9 +74,13 @@ bool PAGComposition::isTimelinePlaying(const std::string& id) const {
 }
 
 void PAGComposition::advance(int64_t deltaMicroseconds) {
-  for (auto& timeline : timelines) {
-    if (isTimelinePlaying(timeline->getId())) {
-      timeline->advance(deltaMicroseconds);
+  // Time-locked instances (spec 6.3) do not advance their own timelines: their position is
+  // derived from the parent clock during the scene's post-advance time-lock pass.
+  if (!timeLocked) {
+    for (auto& timeline : timelines) {
+      if (isTimelinePlaying(timeline->getId())) {
+        timeline->advance(deltaMicroseconds);
+      }
     }
   }
   PAGLayer::advance(deltaMicroseconds);
@@ -80,6 +91,29 @@ void PAGComposition::apply(float mix) {
     timeline->apply(mix);
   }
   PAGLayer::apply(mix);
+}
+
+void PAGComposition::propagateTimeLock(double parentClockSeconds) {
+  // Time-lock propagation (spec 6.3): a locked instance derives its child time from the
+  // parent clock and positions every animation timeline it owns (state-machine timelines keep
+  // advancing on their own; positioning them from a scalar clock is not defined). Non-locked
+  // compositions pass the effective clock through untouched, so a locked descendant always
+  // hangs off the nearest locked ancestor's child time (or the document default timeline).
+  double effectiveClock = parentClockSeconds;
+  if (timeLocked) {
+    effectiveClock = (parentClockSeconds - static_cast<double>(timeLockStartValue)) *
+                     static_cast<double>(timeLockScaleValue);
+    for (auto& timeline : timelines) {
+      auto animation = std::dynamic_pointer_cast<PAGAnimation>(timeline);
+      if (animation != nullptr) {
+        animation->setCurrentTime(static_cast<int64_t>(llround(effectiveClock * 1e6)));
+      }
+    }
+  }
+  for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
+    child->propagateTimeLock(effectiveClock);
+  }
 }
 
 std::shared_ptr<PAGComposition> PAGComposition::MakeChild(
@@ -170,6 +204,36 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
       binding->setTarget(sm, std::make_unique<StateMachineInputTarget>(smTimeline, sm));
       timelines.push_back(std::move(smTimeline));
+    }
+  }
+  // Composition-scoped animations (spec 5.4) auto-play inside the instance: they join the
+  // timeline list alongside the mounted ones so advance()/apply() (or the time-lock pass)
+  // drives both. A Timelines-mounted driver for the same Animation node wins — skip the
+  // scoped copy to avoid double-driving one animation.
+  auto* sourceComposition = node != nullptr ? node->composition : nullptr;
+  if (sourceComposition != nullptr) {
+    for (auto* animationNode : sourceComposition->animations) {
+      if (animationNode == nullptr || animationNode->nodeType() != NodeType::Animation) {
+        continue;
+      }
+      auto* animation = static_cast<Animation*>(animationNode);
+      bool alreadyMounted = false;
+      for (const auto& driver : node->timelines) {
+        if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
+          continue;
+        }
+        if (document != nullptr &&
+            document->findNode<Animation>(
+                static_cast<const AnimationTimeline*>(driver.get())->animationId) == animation) {
+          alreadyMounted = true;
+          break;
+        }
+      }
+      if (alreadyMounted) {
+        continue;
+      }
+      timelines.push_back(std::shared_ptr<PAGAnimation>(
+          new PAGAnimation(animation, binding.get(), document, scene)));
     }
   }
 }

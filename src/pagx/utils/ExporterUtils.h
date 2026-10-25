@@ -76,6 +76,14 @@ std::string EscapeCssFontFamily(const std::string& family);
 
 Matrix BuildLayerMatrix(const Layer* layer);
 
+/**
+ * Returns the layer's effective 2D transform excluding translation: matrix3D projected to 2D
+ * when set, else matrix, else the decomposed fields (anchor/rotation/scale/skew/skewAxis,
+ * spec 6.2) composed as translate(-anchor) * scale * skew * rotate. The render position stays
+ * separate so x/y channels keep working.
+ */
+Matrix BuildLayerEffectiveMatrix(const Layer* layer);
+
 Matrix BuildGroupMatrix(const Group* group);
 
 FillRule DetectMaskFillRule(const Layer* maskLayer);

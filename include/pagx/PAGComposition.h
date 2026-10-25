@@ -55,6 +55,7 @@ class PAGComposition : public PAGLayer {
 
   void advance(int64_t deltaMicroseconds) override;
   void apply(float mix = 1.0f) override;
+  void propagateTimeLock(double parentClockSeconds) override;
 
   /**
    * Returns the ViewModel instance for this composition, or nullptr if the composition has no
@@ -78,6 +79,26 @@ class PAGComposition : public PAGLayer {
    * Returns true if the named timeline is advancing (not paused).
    */
   bool isTimelinePlaying(const std::string& id) const;
+
+  /**
+   * Returns true when the owning layer declared a time-lock mount (spec 6.3): startTime or
+   * timeScale non-default. A locked instance's timelines no longer advance on their own; they
+   * are positioned from the parent clock as childTime = (parentClock - startTime) * timeScale.
+   */
+  bool isTimeLocked() const {
+    return timeLocked;
+  }
+
+  /**
+   * Returns the time-lock parameters (spec 6.3). Only meaningful when isTimeLocked() is true.
+   */
+  float timeLockStartTime() const {
+    return timeLockStartValue;
+  }
+
+  float timeLockScale() const {
+    return timeLockScaleValue;
+  }
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
@@ -185,6 +206,12 @@ class PAGComposition : public PAGLayer {
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+  // Time-lock mount state (spec 6.3), initialized from the owner layer's LayerTransform:
+  // when locked, advance() skips this instance's timelines and the scene positions them from
+  // the parent clock instead.
+  bool timeLocked = false;
+  float timeLockStartValue = 0.0f;
+  float timeLockScaleValue = 1.0f;
   // Timeline ids that are paused. advance() skips these, but apply() still runs so the current
   // frame keeps contributing to the output. Mirrors Rive's NestedSimpleAnimation.isPlaying, which
   // gates time advancement but not application.

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Time-locked composition mount (spec 6.3): the child composition declares its own
+     animation (fade, composition scope, auto-playing). The host layer locks the instance
+     with startTime 0.25s and timeScale 2, so at parent time t the child evaluates its
+     internal animation at (t - 0.25) * 2 instead of advancing on its own. -->
+<pagx width="400" height="300">
+  <Resources>
+    <Composition id="child" width="120" height="120">
+      <Layer id="childBox" centerX="0" centerY="0" width="80" height="80">
+        <Rectangle width="80" height="80" roundness="8"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Animations>
+        <Animation id="fade" duration="100" frameRate="60">
+        <Object target="childBox">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="50" value="0.2" interpolation="linear"/>
+            <Key time="100" value="1" interpolation="linear"/>
+          </Channel>
+        </Object>
+        </Animation>
+      </Animations>
+    </Composition>
+  </Resources>
+
+  <Layer id="host" centerX="0" centerY="0" width="120" height="120"
+         composition="@child" startTime="0.25" timeScale="2"/>
+
+  <Animations>
+    <Animation id="clock" duration="100" frameRate="60">
+      <Object target="host">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1"/>
+          <Key time="100" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

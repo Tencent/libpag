@@ -103,6 +103,13 @@ void PAGLayer::advance(int64_t deltaMicroseconds) {
   }
 }
 
+void PAGLayer::propagateTimeLock(double parentClockSeconds) {
+  for (auto& child : children) {
+    DEBUG_ASSERT(child != nullptr);
+    child->propagateTimeLock(parentClockSeconds);
+  }
+}
+
 void PAGLayer::apply(float mix) {
   for (auto& child : children) {
     DEBUG_ASSERT(child != nullptr);

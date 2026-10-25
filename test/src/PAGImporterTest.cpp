@@ -2175,6 +2175,58 @@ PAGX_TEST(PAGImporterTest, InvertedMaskTypeRoundTrip) {
   EXPECT_EQ(invertedCount, 3);
 }
 
+PAGX_TEST(PAGImporterTest, TimeLockedCompositionRuntime) {
+  // Time-locked composition mount (spec 6.3): the child composition's internal animation is
+  // positioned from the parent clock as childTime = (parentClock - startTime) * timeScale,
+  // instead of advancing on its own. The sample locks with startTime 0.25s / timeScale 2. The
+  // root-scope animation (the parent clock carrier) is driven by the host per spec 8.1.1; the
+  // scene's advanceAndApply then propagates its time into the locked instance.
+  auto doc = PAGXImporter::FromFile(
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/time_locked_composition.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/tl_rt.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/tl_rt.pag");
+  ASSERT_TRUE(decoded != nullptr);
+
+  for (auto& sceneDoc : {std::shared_ptr<PAGXDocument>(doc), decoded}) {
+    auto scene = PAGScene::Make(sceneDoc);
+    ASSERT_TRUE(scene != nullptr);
+    auto clock = scene->getAnimation("clock");
+    ASSERT_TRUE(clock != nullptr);
+
+    // Render at parent t=0.25s: childTime = 0 -> the child box is fully opaque.
+    for (int step = 0; step < 15; step++) {
+      clock->advanceAndApply(16667);
+      scene->advanceAndApply(16667);
+    }
+    int width = static_cast<int>(sceneDoc->width);
+    int height = static_cast<int>(sceneDoc->height);
+    auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(surfaceA != nullptr);
+    ASSERT_TRUE(scene->draw(surfaceA));
+    std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+
+    // Advance to parent t=0.5s: childTime = (0.5 - 0.25) * 2 = 0.5s, where the child
+    // animation's alpha dips to its minimum (~0.2 at frame 30/50).
+    for (int step = 0; step < 15; step++) {
+      clock->advanceAndApply(16667);
+      scene->advanceAndApply(16667);
+    }
+    auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+    ASSERT_TRUE(surfaceB != nullptr);
+    ASSERT_TRUE(scene->draw(surfaceB));
+    std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+    ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+
+    // The lock must actually move the child: the two parent times produce different pixels.
+    EXPECT_NE(memcmp(pixelsA.data(), pixelsB.data(), pixelsA.size()), 0)
+        << "locked child did not follow the parent clock";
+    // Parent clock sanity: 30 steps of 16.667ms = ~0.5s.
+    EXPECT_NEAR(clock->currentTime(), 500000, 30000);
+  }
+}
+
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
   // Layer timelines (spec §9.6): AnimationTimeline carries animationId / playing /
   // evaluationOffset (signed varint, negative skips ahead); StateMachineTimeline carries only

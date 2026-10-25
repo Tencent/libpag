@@ -564,6 +564,14 @@ PAGDisplayOptions* PAGScene::getDisplayOptions() const {
 void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
   if (_rootComposition != nullptr) {
     _rootComposition->advance(deltaMicroseconds);
+    // Time-lock pass (spec 6.3): locked composition instances derive their position from the
+    // default timeline's current time (the parent clock), not from their own advancement.
+    auto defaultTimeline = getDefaultTimeline();
+    auto animation = std::dynamic_pointer_cast<PAGAnimation>(defaultTimeline);
+    if (animation != nullptr) {
+      _rootComposition->propagateTimeLock(static_cast<double>(animation->currentTime()) /
+                                          1000000.0);
+    }
     _rootComposition->apply();
   }
 }
