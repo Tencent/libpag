@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstring>
 #include "base/PAGTest.h"
+#include "pagx/LegacyPAGImporter.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGImporter.h"
 #include "pagx/PAGScene.h"
@@ -2225,6 +2226,46 @@ PAGX_TEST(PAGImporterTest, TimeLockedCompositionRuntime) {
     // Parent clock sanity: 30 steps of 16.667ms = ~0.5s.
     EXPECT_NEAR(clock->currentTime(), 500000, 30000);
   }
+}
+
+PAGX_TEST(PAGImporterTest, LegacyImporterSkeletonSmoke) {
+  // P3-4 skeleton smoke: a legacy static vector file converts into a PAGXDocument, renders
+  // through the new pipeline, and the converted document exports to the v4 binary. Pixel
+  // equivalence against the legacy renderer lands with P3-15 (per-frame comparison); the
+  // skeleton assertion is that conversion, rendering, and re-export all succeed without
+  // crashing on basic shape/solid/precompose content.
+  const std::string path =
+      pag::ProjectPath::Absolute("resources/pagx_to_pag/animation/time_locked_composition.pagx");
+  (void)path;
+  // Pick a legacy gradient sample (static vector shapes).
+  const std::string legacyPath = pag::ProjectPath::Absolute("resources/gradient/grad_6.pag");
+  auto file = pag::File::Load(legacyPath);
+  if (file == nullptr) {
+    // The sample set may move; the skeleton smoke silently passes when it is absent.
+    GTEST_SKIP() << "legacy sample missing: " << legacyPath;
+  }
+  std::vector<PAGExportIssue> issues = {};
+  auto doc = LegacyPAGImporter::Convert(file, &issues);
+  ASSERT_TRUE(doc != nullptr);
+  // The root animation fallback exists and carries the legacy duration.
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_GT(static_cast<Animation*>(doc->animations[0])->duration, 0);
+
+  // Render the converted document.
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  ASSERT_GT(width, 0);
+  ASSERT_GT(height, 0);
+  auto surface = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+
+  // The converted document re-exports to the v4 binary.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/legacy_skeleton.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/legacy_skeleton.pag");
+  EXPECT_TRUE(decoded != nullptr);
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
