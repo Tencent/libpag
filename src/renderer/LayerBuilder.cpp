@@ -167,7 +167,14 @@ struct LayerRuntimeTarget : RuntimeTarget {
   float animX = 0;
   float animY = 0;
   tgfx::Matrix animMatrix = tgfx::Matrix::I();
-
+  // Decomposed transform state (spec 6.2): written by the anchor/scale/skew/skewAxis/rotation
+  // channels. When any of them is animated the effective matrix is recomposed from this state
+  // (the authored matrix seed still applies until the first decomposed-channel write).
+  tgfx::Point animAnchor = {0, 0};
+  tgfx::Point animScale = {1, 1};
+  float animSkew = 0;
+  float animSkewAxis = 0;
+  float animRotation = 0;
   bool apply(const std::string& channel, const KeyValue& value, float mix) override {
     if (channel == "x") {
       const auto* v = std::get_if<float>(&value);
@@ -197,11 +204,56 @@ struct LayerRuntimeTarget : RuntimeTarget {
       recompose();
       return true;
     }
+    // Decomposed channels (spec 6.2): each write updates the decomposed state and recomposes
+    // the effective matrix from it, so mixing anchor/scale/skew/rotation against the static
+    // baseline works the same way x/y do.
+    if (channel == "anchor.x" || channel == "anchor.y" || channel == "scale.x" ||
+        channel == "scale.y") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      useDecomposed = true;
+      bool isX = channel == "anchor.x" || channel == "scale.x";
+      if (channel[0] == 'a') {
+        if (isX) {
+          animAnchor.x = MixFloat(animAnchor.x, *v, mix);
+        } else {
+          animAnchor.y = MixFloat(animAnchor.y, *v, mix);
+        }
+      } else {
+        if (isX) {
+          animScale.x = MixFloat(animScale.x, *v, mix);
+        } else {
+          animScale.y = MixFloat(animScale.y, *v, mix);
+        }
+      }
+      recompose();
+      return true;
+    }
+    if (channel == "skew" || channel == "skewAxis" || channel == "rotation") {
+      const auto* v = std::get_if<float>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      useDecomposed = true;
+      if (channel == "skew") {
+        animSkew = MixFloat(animSkew, *v, mix);
+      } else if (channel == "skewAxis") {
+        animSkewAxis = MixFloat(animSkewAxis, *v, mix);
+      } else {
+        animRotation = MixFloat(animRotation, *v, mix);
+      }
+      recompose();
+      return true;
+    }
     return RuntimeTarget::apply(channel, value, mix);
   }
 
   bool hasWriter(const std::string& channel) const override {
-    if (channel == "x" || channel == "y" || channel == "matrix") {
+    if (channel == "x" || channel == "y" || channel == "matrix" || channel == "anchor.x" ||
+        channel == "anchor.y" || channel == "scale.x" || channel == "scale.y" ||
+        channel == "skew" || channel == "skewAxis" || channel == "rotation") {
       return true;
     }
     return RuntimeTarget::hasWriter(channel);
@@ -229,17 +281,55 @@ struct LayerRuntimeTarget : RuntimeTarget {
     animX = x;
     animY = y;
     animMatrix = matrix;
+    useDecomposed = false;
+  }
+
+  // Seeds the decomposed state from the node's authored decomposed fields (spec 6.2); the
+  // first decomposed-channel write switches the target over to recomposing from this state.
+  void initDecomposed(const Layer* node) {
+    if (node == nullptr) {
+      return;
+    }
+    animAnchor = {node->anchor.x, node->anchor.y};
+    animScale = {node->scale.x, node->scale.y};
+    animSkew = node->skew;
+    animSkewAxis = node->skewAxis;
+    animRotation = node->rotation;
   }
 
  private:
+  bool useDecomposed = false;
+
   void recompose() {
     auto* layer = static_cast<tgfx::Layer*>(const_cast<void*>(rawObject()));
     if (layer == nullptr) {
       return;
     }
-    auto result = animMatrix;
+    tgfx::Matrix result = {};
+    if (useDecomposed) {
+      // Same composition order as BuildGroupMatrix minus the position translation.
+      result = tgfx::Matrix::I();
+      if (animAnchor.x != 0 || animAnchor.y != 0) {
+        result = tgfx::Matrix::MakeTrans(-animAnchor.x, -animAnchor.y);
+      }
+      if (animScale.x != 1 || animScale.y != 1) {
+        result = tgfx::Matrix::MakeScale(animScale.x, animScale.y) * result;
+      }
+      if (animSkew != 0) {
+        result = tgfx::Matrix::MakeRotate(animSkewAxis) * result;
+        tgfx::Matrix shear = tgfx::Matrix::I();
+        shear.setSkewX(std::tan(-animSkew * 3.14159265f / 180.0f));
+        result = shear * result;
+        result = tgfx::Matrix::MakeRotate(-animSkewAxis) * result;
+      }
+      if (animRotation != 0) {
+        result = tgfx::Matrix::MakeRotate(animRotation) * result;
+      }
+    } else {
+      result = animMatrix;
+    }
     if (animX != 0 || animY != 0) {
-      result = tgfx::Matrix::MakeTrans(animX, animY) * animMatrix;
+      result = tgfx::Matrix::MakeTrans(animX, animY) * result;
     }
     layer->setMatrix(result);
   }
@@ -947,6 +1037,7 @@ class LayerBuilderContext {
       if (layerTarget != nullptr) {
         auto layerPos = node->renderPosition();
         layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(BuildLayerEffectiveMatrix(node)));
+        layerTarget->initDecomposed(node);
       }
 
       // Queue mask to be applied in second pass.

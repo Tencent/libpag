@@ -37,7 +37,23 @@
 #include "pagx/types/ColorSpace.h"
 
 namespace pagx {
+// Keyframe migration (P3-5): implemented in KeyframeConverter.cpp.
+void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
+                                 PAGXDocument* document, AnimationObject* object);
+void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
+                            AnimationObject* object);
+
 namespace {
+
+// Deterministic target id for a converted layer: legacy layers have no string ids, so the
+// importer assigns pag-legacy-N and the RetainedIdTable restores it after the binary hop.
+std::string LegacyLayerTargetId(pag::Layer* legacyLayer) {
+  return "pag-legacy-" + std::to_string(legacyLayer->uniqueID);
+}
+
+std::string LegacyCompositionAnimationId(pag::VectorComposition* legacy) {
+  return "pag-legacy-anim-" + std::to_string(legacy->uniqueID);
+}
 
 // Conversion state shared across the tree walk.
 struct ConvertState {
@@ -46,6 +62,9 @@ struct ConvertState {
   // Every legacy composition gets exactly one converted Composition node; layers reference it
   // through this map so shared compositions convert once.
   std::unordered_map<const pag::Composition*, Composition*> compositionNodes = {};
+  // Per-composition animation nodes for migrated keyframes (P3-5).
+  std::unordered_map<const pag::VectorComposition*, Animation*> compositionAnimations = {};
+  int layerIdCounter = 0;
   // Set when any converted channel carries keyframes (P3-5 extends this); until then it stays
   // false and the root animation fallback is unconditional for files with duration.
   bool hasKeyframes = false;
@@ -221,6 +240,37 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
   }
 }
 
+// Collects the animated channels of one legacy layer into a new AnimationObject under the
+// given animation. Returns the object, or nullptr when the layer has no animation at all.
+AnimationObject* MigrateLayerAnimation(ConvertState* state, pag::Layer* legacyLayer,
+                                       Animation* animation, float frameRate) {
+  auto* object = state->document->makeNode<AnimationObject>();
+  object->target = LegacyLayerTargetId(legacyLayer);
+  MigrateTransform2DAnimation(legacyLayer->transform, frameRate, state->document, object);
+  MigrateLayerVisibility(legacyLayer, state->document, object);
+  if (object->channels.empty()) {
+    return nullptr;
+  }
+  animation->objects.push_back(object);
+  return object;
+}
+
+// Creates the per-composition animation holding every layer's migrated channels; the
+// composition scope auto-plays it (spec 5.4) and time-locked parents position it (6.3).
+Animation* EnsureCompositionAnimation(ConvertState* state, pag::VectorComposition* legacy) {
+  auto it = state->compositionAnimations.find(legacy);
+  if (it != state->compositionAnimations.end()) {
+    return it->second;
+  }
+  auto* animation = state->document->makeNode<Animation>();
+  animation->id = LegacyCompositionAnimationId(legacy);
+  animation->frameRate = legacy->frameRate;
+  animation->duration = legacy->duration;
+  animation->loop = LoopMode::Once;
+  state->compositionAnimations[legacy] = animation;
+  return animation;
+}
+
 // Forward declaration for the precompose conversion.
 Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFrameRate);
 Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* legacy,
@@ -240,13 +290,19 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
-  // The nested layers live in the document's node pool; the composition keeps raw pointers.
-  auto* containerLayer = state->document->makeNode<Layer>();
-  containerLayer->composition = composition;
+  // Composition-scoped animations (spec 5.4) auto-play in the instance; the migrated
+  // keyframe animation is attached here (or stays absent for fully static compositions).
+  auto animIt = state->compositionAnimations.find(legacy);
+  if (animIt != state->compositionAnimations.end()) {
+    composition->animations.push_back(animIt->second);
+  }
   for (auto* legacyLayer : legacy->layers) {
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
     if (child != nullptr) {
-      containerLayer->children.push_back(child);
+      composition->layers.push_back(child);
+      // P3-5: migrate this layer's animated channels into the composition animation.
+      auto* animation = EnsureCompositionAnimation(state, legacy);
+      MigrateLayerAnimation(state, legacyLayer, animation, legacy->frameRate);
     }
   }
   // The wrapper layer is stored on the composition through the caller's layer conversion;
@@ -290,7 +346,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
   switch (legacyLayer->type()) {
     case pag::LayerType::PreCompose: {
       auto* legacy = static_cast<pag::PreComposeLayer*>(legacyLayer);
-      auto* layer = state->document->makeNode<Layer>();
+      auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
@@ -321,7 +377,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
     }
     case pag::LayerType::Solid: {
       auto* legacy = static_cast<pag::SolidLayer*>(legacyLayer);
-      auto* layer = state->document->makeNode<Layer>();
+      auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
@@ -339,7 +395,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
     }
     case pag::LayerType::Shape: {
       auto* legacy = static_cast<pag::ShapeLayer*>(legacyLayer);
-      auto* layer = state->document->makeNode<Layer>();
+      auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
@@ -404,6 +460,10 @@ std::shared_ptr<PAGXDocument> LegacyPAGImporter::Convert(const std::shared_ptr<p
   topLayer->composition = composition;
   document->layers.push_back(topLayer);
 
+  // The root fallback animation always exists (design doc 7.3): legacy files have a single
+  // time axis, so the document gets a same-length same-framerate root Animation placed first,
+  // becoming the default timeline. Migrated composition-scoped animations auto-play on top of
+  // it, and time-locked children read this timeline as the parent clock.
   EnsureRootAnimation(&state, file.get());
   return document;
 }
