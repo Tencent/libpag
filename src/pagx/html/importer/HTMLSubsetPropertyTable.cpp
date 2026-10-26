@@ -47,10 +47,6 @@ bool ParseLengthComponent(const std::string& trimmed, float& outNumber, std::str
   return true;
 }
 
-std::string FormatNumber(float v) {
-  return FormatRoundedNumber(v);
-}
-
 std::string DropProperty(const std::string& propertyName, const std::string& value,
                          const std::string& reason, HTMLTransformContext& diagnostics) {
   diagnostics.warn("subset:unsupported-property",
@@ -295,18 +291,45 @@ std::string TransformObjectFit(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string lc = ToLower(Trim(value));
   if (lc.empty()) return std::string();
-  if (lc == "fill" || lc == "contain" || lc == "cover") return lc;
-  if (lc == "none") {
-    diags.warn("subset:unsupported-property",
-               "html: 'object-fit: none' is not supported; downgraded to 'contain'");
-    return "contain";
-  }
-  if (lc == "scale-down") {
-    diags.warn("subset:unsupported-property",
-               "html: 'object-fit: scale-down' is not supported; downgraded to 'contain'");
-    return "contain";
-  }
+  if (lc == "fill" || lc == "contain" || lc == "cover" || lc == "none" || lc == "scale-down")
+    return lc;
   return DropProperty("object-fit", value, "is not a recognised keyword", diags);
+}
+
+// Normalize dimension tokens, including those inside calc(), without resolving percentages
+// against the canvas. Their reference is the eventual content-box minus the concrete object.
+std::string TransformObjectPosition(const std::string& value, const PropertyContext& ctx,
+                                    HTMLTransformContext& diags) {
+  std::string source = ToLower(Trim(value));
+  std::string result;
+  for (size_t at = 0; at < source.size();) {
+    if (!std::isdigit(static_cast<unsigned char>(source[at])) && source[at] != '.' &&
+        source[at] != '+' && source[at] != '-') {
+      result += source[at++];
+      continue;
+    }
+    char* end = nullptr;
+    std::strtof(source.c_str() + at, &end);
+    if (end == source.c_str() + at ||
+        (at > 0 && std::isalpha(static_cast<unsigned char>(source[at - 1])))) {
+      result += source[at++];
+      continue;
+    }
+    size_t unitStart = static_cast<size_t>(end - source.c_str());
+    size_t unitEnd = unitStart;
+    while (unitEnd < source.size() && std::isalpha(static_cast<unsigned char>(source[unitEnd])))
+      ++unitEnd;
+    if (unitEnd == unitStart) {
+      result += source.substr(at, unitStart - at);
+      at = unitStart;
+      continue;
+    }
+    auto length = ResolveLength(source.substr(at, unitEnd - at), ctx, diags);
+    if (length.empty()) return {};
+    result += length;
+    at = unitEnd;
+  }
+  return result;
 }
 
 std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTransformContext&) {
@@ -406,11 +429,11 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // keyword) and consumed in HTMLStyleCascade::parseBoxVisuals.
     {"background-blend-mode", PropAction::Keep, nullptr, nullptr},
     // `background-size` / `background-repeat` / `background-position` are kept verbatim and
-    // consumed only when paired with a `url(...)` background, where they drive the recovered
-    // ImagePattern's scaleMode / tile modes / matrix.
+    // consumed by the shared background layout for images and gradients.
     {"background-size", PropAction::Keep, nullptr, nullptr},
     {"background-repeat", PropAction::Keep, nullptr, nullptr},
     {"background-position", PropAction::Keep, nullptr, nullptr},
+    {"background-origin", PropAction::Keep, nullptr, nullptr},
     // Alpha / luminance masks. `mask-image` carries a `url(data:image/svg+xml,...)` whose SVG the
     // importer turns back into a PAGX mask layer; `mask-mode` selects Alpha vs Luminance and
     // `mask-size` / `mask-position` drive the mask layer's scale / offset. Kept verbatim and
@@ -435,14 +458,17 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
     {"opacity", PropAction::Transform, &TransformOpacity, nullptr},
     {"mix-blend-mode", PropAction::Keep, nullptr, nullptr},
+    {"isolation", PropAction::Keep, nullptr, nullptr},
     {"overflow", PropAction::Keep, nullptr, nullptr},
     {"object-fit", PropAction::Transform, &TransformObjectFit, nullptr},
+    {"object-position", PropAction::Transform, &TransformObjectPosition, nullptr},
     // Text
     {"color", PropAction::Keep, nullptr, nullptr},
     {"font-family", PropAction::Keep, nullptr, nullptr},
     {"font-size", PropAction::Transform, &ResolveLength, nullptr},
     {"font-weight", PropAction::Keep, nullptr, nullptr},
     {"font-style", PropAction::Keep, nullptr, nullptr},
+    {"font-stretch", PropAction::Keep, nullptr, nullptr},
     {"letter-spacing", PropAction::Transform, &ResolveLength, nullptr},
     {"line-height", PropAction::Transform, &PassThrough, nullptr},  // px / unitless both accepted
     {"text-align", PropAction::Keep, nullptr, nullptr},
@@ -513,7 +539,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"word-break", PropAction::Drop, nullptr, "is not in the subset"},
     {"overflow-wrap", PropAction::Drop, nullptr, "is not in the subset"},
     {"font-variant", PropAction::Drop, nullptr, "is not in the subset"},
-    {"font-stretch", PropAction::Drop, nullptr, "is not in the subset"},
     {"font", PropAction::Drop, nullptr, "use the longhand properties instead"},
     {"grid-template-columns", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
     {"grid-template-rows", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
@@ -566,6 +591,12 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
   // `auto`, `none`, `inherit`, `initial`, `unset`, `revert`: drop silently (they're benign no-ops
   // when the subset uses explicit values everywhere).
   std::string lc = ToLower(trimmed);
+  // On SVG, auto overrides a width/height presentation attribute and participates in intrinsic
+  // aspect-ratio sizing. Dropping it would incorrectly restore the attribute's value.
+  if (ctx.ownerTag == "svg" && (ctx.propertyName == "width" || ctx.propertyName == "height") &&
+      lc == "auto") {
+    return lc;
+  }
   if (lc == "auto" || lc == "none" || lc == "inherit" || lc == "initial" || lc == "unset" ||
       lc == "revert") {
     return std::string();

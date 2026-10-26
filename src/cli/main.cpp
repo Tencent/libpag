@@ -22,9 +22,8 @@
 #include "cli/CommandBounds.h"
 #include "cli/NodeTool.h"
 #ifdef _WIN32
-#include <windows.h>
-
 #include <shellapi.h>
+#include <windows.h>
 #endif
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"

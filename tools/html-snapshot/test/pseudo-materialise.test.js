@@ -95,6 +95,10 @@ function makeHostWithAfter({ animated }) {
     bottom: '0px',
     width: '450px',
     height: '2px',
+    'z-index': 'auto',
+    opacity: '1',
+    transform: 'none',
+    'animation-name': 'none',
     'background-image':
       'linear-gradient(90deg, rgb(95, 255, 240), rgb(40, 224, 208) 55%, rgba(40, 224, 208, 0))',
   };
@@ -123,6 +127,7 @@ function makeHostWithAfter({ animated }) {
 
 function runOn(host) {
   global.document = {
+    head: new FakeElement('head'),
     querySelectorAll: () => [host],
     createElement: (tag) => new FakeElement(tag),
   };
@@ -155,11 +160,13 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     // and the transient 0% phase (opacity: 0 / scaleX(0)) is NOT baked in —
     // those would drop or zero-size the box in the walker.
     expect(state.cancelled).toBe(true);
+    expect(style).toContain('opacity: 1');
+    expect(style).toContain('transform: none');
     expect(style).not.toContain('opacity: 0');
     expect(style).not.toContain('matrix(0, 0, 0');
   });
 
-  test('a non-animated decorative pseudo still materialises without animation props', async () => {
+  test('a non-animated pseudo pins default styles against the host stylesheet', async () => {
     const { host, state } = makeHostWithAfter({ animated: false });
     await runOn(host);
 
@@ -167,10 +174,40 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     const style = host.children[0].getAttribute('style');
     expect(style).toContain('width: 450px');
     expect(style).toContain('height: 2px');
-    expect(style).not.toContain('animation-name');
+    // Defaults are pinned inline: the stand-in still lives under the author's stylesheet,
+    // so an omitted z-index / opacity / transform / animation-name would be replaced by a
+    // structural rule such as '.host > *' and paint differently from the pseudo it replaces.
+    expect(style).toContain('animation-name: none');
+    expect(style).toContain('z-index: auto');
+    expect(style).toContain('opacity: 1');
+    expect(style).toContain('transform: none');
     // No animation to cancel.
     expect(state.cancelled).toBe(false);
   });
+});
+
+test('copies live styles for all hosts before any stand-in is inserted', async () => {
+  // Both of the second host's pseudo values flip once the first host owns a stand-in, so a
+  // single-pass materialiser would bake the polluted values. Collecting every host's
+  // computed style first is what keeps the source values.
+  const { host: first } = makeHostWithAfter({ animated: false });
+  const second = new FakeElement('div');
+  second.__cs = {
+    '::before': makeCs({
+      content: '""', position: 'absolute', height: '10px',
+      width: () => first.children.length ? '90px' : '20px',
+      'z-index': () => first.children.length ? '9' : 'auto',
+    }),
+    '::after': makeCs({ content: 'none' }),
+  };
+  global.document = {
+    head: new FakeElement('head'),
+    querySelectorAll: () => [first, second],
+    createElement: (tag) => new FakeElement(tag),
+  };
+  await materializeDecorativePseudoElements();
+  expect(second.children[0].getAttribute('style')).toContain('width: 20px');
+  expect(second.children[0].getAttribute('style')).toContain('z-index: auto');
 });
 
 describe('materializeDecorativePseudoElements — masked decorative pseudo', () => {
@@ -361,7 +398,7 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     expect(div.textContent).toBe('本机');
   });
 
-  test('an in-flow text pseudo keeps the text-leaf path', async () => {
+  test('an in-flow text pseudo gets a measurable stand-in', async () => {
     const host = new FakeElement('div');
     host.__cs = {
       '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
@@ -369,11 +406,14 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     };
     await runOn(host);
 
-    expect(host.children).toHaveLength(0);
-    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+    // An auto-sized inline text pseudo resolves width/height to 'auto', so the glyphs are
+    // the only thing giving it a box. The stand-in has to carry them to stay measurable.
+    expect(host.children).toHaveLength(1);
+    expect(host.children[0].textContent).toBe('→');
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(true);
   });
 
-  test('a host mixing a box pseudo with in-flow text is left to the text-leaf path', async () => {
+  test('a host mixing a box pseudo with in-flow text preserves both', async () => {
     const host = new FakeElement('div');
     host.__cs = {
       '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
@@ -386,10 +426,11 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     };
     await runOn(host);
 
-    // Appending a stand-in suppresses `renderPseudoTextLeaf` for the whole host, so materialising
-    // the box pseudo would silently drop the in-flow glyphs — the host keeps the text path.
-    expect(host.children).toHaveLength(0);
-    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+    // A stand-in suppresses the text-leaf path for the whole host, so both pseudos ride their
+    // own stand-in instead of one vetoing the other.
+    expect(host.children).toHaveLength(2);
+    expect(host.children[0].textContent).toBe('→');
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(true);
   });
 
   test('a host with an already inlined icon-font glyph is not materialised again', async () => {

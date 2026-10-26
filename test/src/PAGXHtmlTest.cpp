@@ -2463,6 +2463,23 @@ CLI_TEST(PAGXHtmlTest, Woff2RoundTripPreservesText) {
   EXPECT_TRUE(text->fauxItalic);
 }
 
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripPreservesFractionalInlinePositions) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer><Text text=\"AB\" fontFamily=\"CustomFont\" fontSize=\"16\" "
+      "inlinePositions=\"-0.03125,30.123456\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\" positions=\"0,0;30,0\"/>"
+      "</Text><Fill color=\"#000000\"/></Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_NE(html.find("data-pagx-inline-positions=\""), std::string::npos);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "AB");
+  EXPECT_EQ(texts[0]->inlinePositions, (std::vector<float>{-.03125f, 30.123456f}));
+}
+
 CLI_TEST(PAGXHtmlTest, Woff2RoundTripPerGlyphPositioning) {
   // Known-value assertions (hand-computed, not derived from the generated HTML):
   // an unconstrained Text has renderPosition() == position, so the exported container div

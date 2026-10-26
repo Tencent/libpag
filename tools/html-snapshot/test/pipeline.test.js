@@ -71,6 +71,18 @@ function readArgv(argvPath) {
 }
 
 describe('spawnCapture', () => {
+  test('returns diagnostics when spawn throws synchronously, even if stderr cannot be written', async () => {
+    const stderrPath = path.join(dir, 'spawn.stderr');
+    // NUL is rejected synchronously by child_process before any child exists.
+    const result = await spawnCapture('bad\0command', [], { stderrPath });
+    expect(result).toMatchObject({ code: null, stdout: '' });
+    expect(result.stderr).toMatch(/null bytes/);
+    expect(fs.readFileSync(stderrPath, 'utf8')).toBe(result.stderr);
+    const unwritable = await spawnCapture('bad\0command', [], { stderrPath: path.join(dir, 'missing', 'stderr') });
+    expect(unwritable.code).toBeNull();
+    expect(unwritable.stderr).toBe(result.stderr);
+    expect((await spawnCapture('bad\0command', [])).code).toBeNull();
+  });
   test('captures stdout, stderr, and a zero exit code', async () => {
     const cmd = makeArgvCapturingScript({
       stdout: 'hello',

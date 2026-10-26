@@ -147,13 +147,13 @@ void ExportItem(const ImportRequest& options, const ImportPlan& plan, const Impo
       auto found = published.find(source.u8string());
       if (found == published.end()) {
         auto target = fs::u8path(item.fonts) /
-                      ("font-" + std::to_string(++fontIndex) + "-" +
-                       source.filename().u8string());
+                      ("font-" + std::to_string(++fontIndex) + "-" + source.filename().u8string());
         stageBytes(target, ReadBytes(source));
         savedFonts.push_back(Relative(target.u8string(), plan));
-        found = published.emplace(source.u8string(),
-                                  target.lexically_relative(parent).generic_u8string())
-                    .first;
+        found =
+            published
+                .emplace(source.u8string(), target.lexically_relative(parent).generic_u8string())
+                .first;
       }
       font->file = found->second;
     }
@@ -298,6 +298,23 @@ int RunImport(int argc, char* argv[]) {
     if (!BuildImportPlan(options, checkpoints, &plan, &error)) {
       std::cerr << "pagx import: " << error << "\n";
       return 2;
+    }
+    if (!reportedInput.empty()) {
+      const auto archivePath = fs::u8path(reportedInput);
+      std::vector<std::string> outputFiles = {plan.manifest};
+      for (const auto& item : plan.items) {
+        outputFiles.push_back(item.output);
+        outputFiles.push_back(item.png);
+        outputFiles.push_back(item.snapshot);
+      }
+      for (const auto& output : outputFiles) {
+        if (output.empty()) continue;
+        std::error_code pathError;
+        if (fs::equivalent(archivePath, fs::u8path(output), pathError) && !pathError) {
+          std::cerr << "pagx import: output would replace an input: " << output << "\n";
+          return 2;
+        }
+      }
     }
     std::map<std::string, std::string> sourceIDs;
     request["inputs"] = JSON::array();

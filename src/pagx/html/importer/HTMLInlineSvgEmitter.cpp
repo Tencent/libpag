@@ -180,6 +180,8 @@ void ResolveCurrentColorRecursive(const std::shared_ptr<DOMNode>& node,
                                   const std::string& inheritedColor, int depth, bool isRoot) {
   if (!node || depth >= MAX_HTML_RECURSION_DEPTH) return;
   if (node->type != DOMNodeType::Element) return;
+  // Referenced definitions obtain their colour in the SVG instance's own cascade.
+  if (node->name == "symbol" || node->name == "defs") return;
 
   std::string here = inheritedColor;
   if (!isRoot) {
@@ -375,33 +377,6 @@ Color AverageStops(const std::vector<ColorStop*>& stops) {
   return c;
 }
 
-// Resolves a single CSS `<length-percentage>` token against `axis` (percentages are box-relative;
-// bare numbers / `px` are absolute). Other units are treated as px, which is all the exporter
-// writes for a conic centre.
-float ResolveConicAxis(const std::string& token, float axis) {
-  float fraction = NAN;
-  if (ParseCssPercentage(token, fraction)) return fraction * axis;
-  return std::strtof(token.c_str(), nullptr);
-}
-
-// Parses the `at <cx> <cy>` centre from a `conic-gradient(...)` value into box-local pixels,
-// defaulting to the box centre (CSS default `at 50% 50%`) when absent.
-void ParseConicCenter(const std::string& value, float boxW, float boxH, float& cx, float& cy) {
-  cx = boxW * 0.5f;
-  cy = boxH * 0.5f;
-  std::string args = ExtractParenArgs(value);
-  if (args.empty()) return;
-  auto parts = SplitTopLevelCommas(args);
-  if (parts.empty()) return;
-  auto tokens = SplitTopLevelWhitespace(parts[0]);
-  for (size_t i = 0; i + 2 < tokens.size() + 1 && i < tokens.size(); ++i) {
-    if (ToLower(tokens[i]) != "at") continue;
-    if (i + 1 < tokens.size()) cx = ResolveConicAxis(tokens[i + 1], boxW);
-    if (i + 2 < tokens.size()) cy = ResolveConicAxis(tokens[i + 2], boxH);
-    break;
-  }
-}
-
 // Sets (or overwrites, case-insensitively) attribute `name` on `node` to `value`.
 void SetAttribute(const std::shared_ptr<DOMNode>& node, const char* name,
                   const std::string& value) {
@@ -434,6 +409,24 @@ Color SampleConicOverBox(const std::vector<ColorStop*>& stops, float cssStartDeg
 }
 
 }  // namespace
+
+void HTMLInlineSvgEmitter::inheritTextStyle(const std::shared_ptr<DOMNode>& svgRoot,
+                                            const HTMLInheritedStyle& style) {
+  // Write only absent attributes. Authored SVG attributes and inline CSS retain their precedence.
+  const std::pair<const char*, std::string> values[] = {
+      {"font-family", style.fontFamily},
+      {"font-size", style.fontSize},
+      {"font-weight", style.fontWeight},
+      {"font-style", style.fontStyle},
+      {"letter-spacing", style.letterSpacing},
+      {"color", formatColorForAttribute(style.resolvedTextColor)},
+  };
+  for (const auto& value : values) {
+    if (!value.second.empty() && svgRoot->findAttribute(value.first) == nullptr) {
+      SetAttribute(svgRoot, value.first, value.second);
+    }
+  }
+}
 
 void HTMLInlineSvgEmitter::stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot) {
   if (!svgRoot || svgRoot->type != DOMNodeType::Element) return;
@@ -590,12 +583,11 @@ std::shared_ptr<DOMNode> HTMLInlineSvgEmitter::buildForeignObjectReplacement(
   std::string lowered = ToLower(paint);
   Color color = {0, 0, 0, 1, ColorSpace::SRGB};
   if (lowered.compare(0, 15, "conic-gradient(") == 0) {
-    auto* grad = valueParser.parseConicGradient(paint);
+    auto* grad = valueParser.parseConicGradient(paint, false, boxW, boxH);
     if (!grad || grad->colorStops.empty()) return nullptr;
-    float cx = NAN;
-    float cy = NAN;
-    ParseConicCenter(paint, boxW, boxH, cx, cy);
-    color = SampleConicOverBox(grad->colorStops, grad->startAngle + 90.0f, cx, cy, boxW, boxH);
+    float cssAngle = std::atan2(grad->matrix.b, grad->matrix.a) * 180.0f / kInlineSvgPi + 90;
+    color =
+        SampleConicOverBox(grad->colorStops, cssAngle, grad->center.x, grad->center.y, boxW, boxH);
   } else if (lowered.compare(0, 16, "linear-gradient(") == 0) {
     auto* grad = valueParser.parseLinearGradient(paint, boxW, boxH);
     if (!grad || grad->colorStops.empty()) return nullptr;

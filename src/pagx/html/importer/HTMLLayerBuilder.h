@@ -18,8 +18,11 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/types/BlendMode.h"
@@ -32,10 +35,19 @@ class ColorSource;
 class Element;
 class Fill;
 class HTMLDiagnosticSink;
+class HTMLIdAllocator;
 class HTMLInlineSvgEmitter;
 class HTMLValueParser;
 class Layer;
 class PAGXDocument;
+
+struct HTMLBackgroundImage {
+  ColorSource* color = nullptr;
+  float intrinsicWidth = NAN;
+  float intrinsicHeight = NAN;
+  // SVG stays vector. The factory creates a fresh import host for each visible tile.
+  std::function<Layer*(float, float)> vectorTile;
+};
 
 /**
  * Applies typed `HTMLBoxAttributes` onto PAGX `Layer` instances and synthesises the geometry /
@@ -44,15 +56,17 @@ class PAGXDocument;
  * The builder is layer-side: its public surface treats elements as opaque DOM nodes (used only
  * for `data-*` attribute forwarding in `applyLayerAttributes`) and never decides which element
  * becomes which kind of layer — that classification stays in `HTMLParserContext`. Borrows the
- * importer's diagnostic sink and value parser; the document handle is bound via `bindDocument`
- * after `PAGXDocument::Make` runs.
+ * importer's diagnostic sink, value parser and ID allocator; the document handle is bound via
+ * `bindDocument` after `PAGXDocument::Make` runs.
  */
 class HTMLLayerBuilder {
  public:
   HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
-                   HTMLInlineSvgEmitter& svgEmitter);
+                   HTMLInlineSvgEmitter& svgEmitter, HTMLIdAllocator& idAllocator);
 
   void bindDocument(PAGXDocument* document);
+  void setBackgroundImageResolver(std::function<HTMLBackgroundImage(const std::string&)> resolver);
+  static bool usesBackgroundLayout(const HTMLBoxAttributes& box);
 
   // Geometry / fills ------------------------------------------------------------------
   /** Writes width/height (px or %) and absolute-positioning anchors onto `layer`. Also
@@ -67,6 +81,8 @@ class HTMLLayerBuilder {
   /** Builds the background geometry node (Rectangle when corner radii are uniform, Path when
    *  the author requested per-corner radii on a sized box). */
   Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
+
+  Layer* makeBackgroundClip(const HTMLBoxAttributes& box, const HTMLBackgroundRect& rect);
 
   /** Emits the standard background visual chain (geometry + fill + stroke + shadows +
    *  backdrop filter). When `foregroundFill` is supplied, it is painted after the CSS background
@@ -126,9 +142,13 @@ class HTMLLayerBuilder {
    *  container" double-layer pattern, including the border inset of the content box. */
   Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
 
-  /** Hoists `DropShadowStyle` entries off `inner` onto a fresh outer wrapper Layer when
-   *  `inner` would also clip its bounds. See the original docs in `HTMLParserContext` for
-   *  the full rationale. Returns `inner` unchanged when no split is needed. */
+  // Keep CSS absolute children relative to the padding box, independently of the
+  // content inset used by PAGX flow layout. Each child keeps its paint-order slot.
+  void appendCSSChild(Layer* host, Layer* child, const HTMLBoxAttributes& box);
+
+  /** Places geometric outer box shadows behind `inner`, outside its overflow clip.
+   *  Also hoists legacy DropShadowStyle entries when clipping requires a wrapper.
+   *  Returns `inner` unchanged when no split is needed. */
   Layer* maybeSplitBoxShadowFromClip(Layer* inner);
 
   /** Materialises CSS `margin` on `inner` through positioning / padding (PAGX has no
@@ -140,6 +160,7 @@ class HTMLLayerBuilder {
                               bool decorationColorDiffers, float bottom, float centerY);
 
  private:
+  bool applyBackgroundLayers(Layer* layer, const HTMLBoxAttributes& box);
   void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                            bool& emitted);
   void emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttributes& box, ColorSource* color,
@@ -151,8 +172,11 @@ class HTMLLayerBuilder {
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
+  HTMLIdAllocator& _idAllocator;
   HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
+  std::unordered_map<Layer*, std::vector<Layer*>> _outerBoxShadows;
+  std::function<HTMLBackgroundImage(const std::string&)> _backgroundImageResolver;
 };
 
 }  // namespace pagx

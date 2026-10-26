@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 
-if [[ `uname` == 'Darwin' ]]; then
-  if [ ! $(which gcovr) ]; then
-    if [ ! $(which brew) ]; then
+if [[ $(uname) == 'Darwin' ]]; then
+  if ! command -v gcovr >/dev/null 2>&1; then
+    if ! command -v brew >/dev/null 2>&1; then
       echo "Homebrew not found. Trying to install..."
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
@@ -19,7 +19,6 @@ gcov_options=()
 if [[ $(uname) == 'Darwin' && -z ${GCOV:-} ]]; then
   gcov_options=(--gcov-executable 'xcrun llvm-cov gcov')
 fi
-# Optional gcovr arguments include a build directory, so independent coverage runs
-# do not accidentally merge stale counters from every build in the checkout.
-gcovr -r . -f='src/' -f='include/' "${gcov_options[@]}" --xml-pretty \
+# Select an instrumented build directory or add reports through gcovr arguments.
+exec gcovr -r . -f='src/' -f='include/' "${gcov_options[@]}" --xml-pretty \
   --merge-mode-functions=merge-use-line-min -o ./result/coverage.xml "$@"

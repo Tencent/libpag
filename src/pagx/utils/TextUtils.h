@@ -36,6 +36,11 @@ namespace pagx {
 class Image;
 class PathData;
 
+// Strictly parses and validates one finite inline position per Unicode scalar of a single line.
+// On failure, leaves positions empty.
+bool ParseTextInlinePositions(const std::string& text, const std::string& value,
+                              std::vector<float>* positions);
+
 struct GlyphPath {
   Matrix transform;
   const PathData* pathData = nullptr;

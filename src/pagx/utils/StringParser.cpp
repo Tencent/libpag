@@ -240,6 +240,10 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder, RepeaterOrder::BelowOriginal,
 DEFINE_ENUM_CONVERSION(LayoutMode, LayoutMode::None, {LayoutMode::None, "none"},
                        {LayoutMode::Horizontal, "horizontal"}, {LayoutMode::Vertical, "vertical"})
 
+DEFINE_ENUM_CONVERSION(LayoutRounding, LayoutRounding::Inherit,
+                       {LayoutRounding::Inherit, "inherit"}, {LayoutRounding::Pixel, "pixel"},
+                       {LayoutRounding::None, "none"})
+
 DEFINE_ENUM_CONVERSION(Alignment, Alignment::Stretch, {Alignment::Start, "start"},
                        {Alignment::Center, "center"}, {Alignment::End, "end"},
                        {Alignment::Stretch, "stretch"})
@@ -656,28 +660,31 @@ std::string FloatToString(float value) {
   }
   char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g", value);
+  // Keep common values compact, but never discard bits from authored geometry. Nine significant
+  // digits suffice to round-trip any float; the default six do not (e.g. 3372.84375).
+  if (strtof(buf, nullptr) != value) {
+    snprintf(buf, sizeof(buf), "%.9g", value);
+  }
   std::string s(buf);
-  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
-  // in fixed form so the result always matches the schema's decimal patterns. We deliberately
-  // do NOT snap small magnitudes to zero here: even sub-pixel residuals (e.g. sin/cos of an
-  // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
-  // and changing them would alter rendered output for baseline-sensitive callers.
-  if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    // Use 9 fractional digits: this matches FLT_DECIMAL_DIG, the minimum precision that
-    // guarantees every distinct float value serializes to a distinct decimal string and
-    // round-trips back to the same bit pattern. Fewer digits would collapse near-denormal
-    // values (e.g. 1e-30f) onto 0 after the scientific-notation branch is rewritten. Trailing
-    // zeros are stripped below so typical values stay short.
-    snprintf(buf, sizeof(buf), "%.9f", value);
-    s = buf;
-    auto dot = s.find('.');
-    if (dot != std::string::npos) {
-      auto last = s.find_last_not_of('0');
-      if (last == dot) {
-        last--;  // strip trailing dot
-      }
-      s = s.substr(0, last + 1);
+  auto exponentAt = s.find_first_of("eE");
+  if (exponentAt != std::string::npos) {
+    // PAGX's decimal grammar excludes exponents. Move the decimal point in the digit string,
+    // rather than formatting with a fixed number of fractional digits (which erases tiny values).
+    int exponent = std::stoi(s.substr(exponentAt + 1));
+    bool negative = s.front() == '-';
+    std::string digits = s.substr(negative ? 1 : 0, exponentAt - (negative ? 1 : 0));
+    auto dot = digits.find('.');
+    int decimal = static_cast<int>(dot == std::string::npos ? digits.size() : dot) + exponent;
+    if (dot != std::string::npos) digits.erase(dot, 1);
+    if (decimal <= 0) {
+      s = "0." + std::string(static_cast<size_t>(-decimal), '0') + digits;
+    } else if (decimal >= static_cast<int>(digits.size())) {
+      s = digits + std::string(static_cast<size_t>(decimal) - digits.size(), '0');
+    } else {
+      s = digits;
+      s.insert(static_cast<size_t>(decimal), ".");
     }
+    if (negative) s.insert(s.begin(), '-');
   }
   return s;
 }

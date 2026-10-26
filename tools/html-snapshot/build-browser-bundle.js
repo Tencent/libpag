@@ -22,6 +22,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { installTextLayout } = require('./dist/lib/text-layout');
+const { installControlPaints } = require('./dist/lib/control-capture');
 
 const {
   inlineExternalImages,
@@ -52,6 +54,8 @@ const { collectCurrentState } = require('./dist/lib/current-state');
 // comes from HELPERS_SRC, not from a Node-side require), so it is not in
 // this list.
 const BROWSER_EXPORTS = [
+  { name: 'installTextLayout',      fn: installTextLayout },
+  { name: 'installControlPaints',   fn: installControlPaints },
   { name: 'collectCurrentState',    fn: collectCurrentState },
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
@@ -76,6 +80,9 @@ const banner = `/*!
  *
  * Public API (operates on the live document):
  *   takeSnapshot()                          -> { html, width, height }
+ *   installTextLayout(data)                 -> void
+ *   installControlPaints(paints)            -> void
+ *   collectCurrentState()                   -> Promise<object>
  *   inlineExternalImages(cachedMap?)        -> Promise<void>
  *   inlineCanvases()                        -> Promise<void>
  *   dropCollapsedDetailsContent()           -> { details, nodes }
@@ -114,6 +121,8 @@ ${ICON_FONT_HELPERS_SRC}
 ${BROWSER_EXPORTS.map((e) => e.fn.toString()).join('\n\n')}
 
 return {
+  installTextLayout: installTextLayout,
+  installControlPaints: installControlPaints,
   collectCurrentState: collectCurrentState,
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,

@@ -675,6 +675,32 @@ static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
   }
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_CSSFontWidthAndWeight) {
+#ifdef __APPLE__
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="600" height="100"><g font-family="Helvetica Neue" font-weight="800"
+      font-stretch="75%"><text y="50">Narrow<tspan font-stretch="normal">Wide</tspan>
+      <tspan>Again</tspan></text></g></svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  ASSERT_EQ(texts.size(), 3u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->fontStyle, "Condensed Black");
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[1])->fontStyle, "Bold");
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[2])->fontStyle, "Condensed Black");
+#endif
+  auto missing = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="300" height="100"><g font-family="Missing CSS Fixture" font-stretch="87.5%">
+      <text y="50" font-weight="550.5" font-style="oblique">Unrounded</text></g></svg>)SVG");
+  ASSERT_NE(missing, nullptr);
+  std::vector<pagx::Element*> unresolved;
+  for (auto layer : missing->layers) CollectElementsByType(layer, pagx::NodeType::Text, unresolved);
+  ASSERT_EQ(unresolved.size(), 1u);
+  auto text = static_cast<pagx::Text*>(unresolved[0]);
+  EXPECT_EQ(text->fontStyle, "87.5% 550.5 Oblique");
+  EXPECT_TRUE(text->fauxItalic);
+}
+
 static pagx::Layer* FindFirstMaskedLayer(pagx::Layer* layer) {
   if (layer == nullptr) {
     return nullptr;
@@ -726,41 +752,51 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
   EXPECT_FALSE(textPath->path->isEmpty());
   EXPECT_FLOAT_EQ(textPath->firstMargin, 20.0f);
   EXPECT_TRUE(textPath->forceAlignment);
-  // Path length is 260 (straight line from x=10 to x=270). lastMargin = 260 - 20 - 220 = 20.
-  EXPECT_FLOAT_EQ(textPath->lastMargin, 20.0f);
+  // tgfx's available span is pathLength + lastMargin - firstMargin.
+  EXPECT_FLOAT_EQ(textPath->lastMargin, -20.0f);
+}
+
+// Imports a single <textPath> run whose anchor is authored on the <textPath> element and returns
+// the x position the importer gave the Text node, or NaN when the document did not convert.
+static float TextPathRunX(const std::string& anchor) {
+  std::string anchorAttribute = anchor.empty() ? std::string() : " text-anchor=\"" + anchor + "\"";
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<defs><path id=\"line\" d=\"M10 50L290 50\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\">"
+      "<textPath href=\"#line\" startOffset=\"50%\"" +
+      anchorAttribute + ">Curved Label</textPath></text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  if (doc == nullptr) return NAN;
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  if (texts.size() != 1u) return NAN;
+  return static_cast<pagx::Text*>(texts[0])->position.x;
 }
 
 /**
  * Test SVG import: text-anchor carried on the <textPath> element (which SVG inherits into the
- * referenced run) is mapped onto the Text node's TextAnchor, so the run is anchored on the path
- * the same way SVG anchors it. Without this the run starts at startOffset instead of centring.
+ * referenced run) governs how the run is anchored along the path, overriding the <text> element's
+ * own anchor. The importer bakes the anchor into the run's position, so a middle anchor sits half
+ * a run before the start anchor and an end anchor a whole run before it. Without this the run
+ * starts at startOffset instead of centring.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_TextPathAnchor) {
-  std::string svg =
-      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
-      "<defs><path id=\"arc\" d=\"M10 80A140 140 0 0 1 290 80\"/></defs>"
-      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\">"
-      "<textPath href=\"#arc\" startOffset=\"50%\" text-anchor=\"middle\">Curved Label</textPath>"
-      "</text></svg>";
-  auto doc = pagx::SVGImporter::ParseString(svg);
-  ASSERT_NE(doc, nullptr);
-  ASSERT_FALSE(doc->layers.empty());
-
-  std::vector<pagx::Element*> texts;
-  std::vector<pagx::Element*> textPaths;
-  for (auto layer : doc->layers) {
-    CollectElementsByType(layer, pagx::NodeType::Text, texts);
-    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
-  }
-
-  ASSERT_EQ(texts.size(), 1u);
-  ASSERT_EQ(textPaths.size(), 1u);
-  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->textAnchor, pagx::TextAnchor::Center);
+  float start = TextPathRunX("");
+  float middle = TextPathRunX("middle");
+  float end = TextPathRunX("end");
+  ASSERT_FALSE(std::isnan(start));
+  ASSERT_FALSE(std::isnan(middle));
+  ASSERT_FALSE(std::isnan(end));
+  EXPECT_LT(middle, start);
+  EXPECT_LT(end, middle);
+  EXPECT_NEAR(middle - start, (end - start) * .5f, 0.01f);
 }
 
 /**
- * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
- * modifier but still keeps the text content as a plain Text node, so the run is not lost.
+ * A textPath with an unresolved reference paints nothing and reports the missing path.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
   std::string svg =
@@ -779,9 +815,9 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
     CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
   }
 
-  ASSERT_EQ(texts.size(), 1u);
-  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "Orphan Text");
+  EXPECT_TRUE(texts.empty());
   EXPECT_TRUE(textPaths.empty());
+  EXPECT_FALSE(doc->errors.empty());
 }
 
 /**
@@ -872,6 +908,60 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MarkerCubicEndUserSpaceUnits) {
   ASSERT_FALSE(doc->layers.empty());
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_ArcMarkerUsesAuthoredVertices) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="100"><defs>
+      <marker id="m" markerWidth="4" markerHeight="4"><path d="M0 0H4V4H0Z"/></marker>
+    </defs><g marker-mid="url(#m)">
+      <path d="M10 50A40 40 0 1 1 90 50L150 50" fill="none" stroke="black"/>
+    </g></svg>)SVG");
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  // One source path and one marker at the arc-to-line join, regardless of arc subdivision.
+  EXPECT_EQ(paths.size(), 2u);
+  std::vector<size_t> commands;
+  auto path = pagx::PathDataFromSVGString("M10 50A40 40 0 1 1 90 50L150 50", &commands);
+  ASSERT_EQ(commands.size(), 3u);
+  EXPECT_GT(commands[1], 2u);
+  EXPECT_EQ(commands.back(), path.verbs().size());
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_VectorPatternSharesOnlyImmutableGeometry) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="100"><defs>
+      <pattern id="p" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path id="tile" d="M2 2H12V12H2Z" fill="red"/>
+      </pattern>
+    </defs><rect width="200" height="100" fill="url(#p)"/></svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  ASSERT_EQ(paths.size(), 50u);
+  auto data = static_cast<pagx::Path*>(paths.front())->data;
+  std::set<std::string> ids;
+  for (auto& node : doc->nodes) {
+    if (!node->id.empty()) EXPECT_TRUE(ids.insert(node->id).second) << node->id;
+    EXPECT_NE(node->nodeType(), pagx::NodeType::ImagePattern);
+  }
+  for (auto path : paths) EXPECT_EQ(static_cast<pagx::Path*>(path)->data, data);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_PatternCyclesAndExpansionAreBounded) {
+  for (const auto& definition : {"<pattern id=\"p\" href=\"#q\"/><pattern id=\"q\" href=\"#p\"/>",
+                                 "<pattern id=\"p\" width=\".00001\" height=\".00001\"><rect "
+                                 "width=\"1\" height=\"1\"/></pattern>",
+                                 "<pattern id=\"p\" width=\"1\" height=\"1\"><rect width=\"100\" "
+                                 "height=\"100\" fill=\"url(#p)\"/></pattern>"}) {
+    auto doc = pagx::SVGImporter::ParseString(
+        std::string("<svg width=\"100\" height=\"100\"><defs>") + definition +
+        "</defs><rect width=\"100\" height=\"100\" fill=\"url(#p)\"/></svg>");
+    ASSERT_NE(doc, nullptr);
+    EXPECT_FALSE(doc->errors.empty());
+    EXPECT_LT(doc->nodes.size(), 100u);
+  }
+}
+
 /**
  * Test SVG import: `stroke-dasharray` combined with `pathLength` normalises the dash values back
  * into user units using the real measured length. Exercising it across a polyline, line, circle,
@@ -923,6 +1013,57 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoLayerMatrix) {
   auto* layer = doc->layers[0];
   EXPECT_FLOAT_EQ(layer->matrix.a, 2.0f);
   EXPECT_FLOAT_EQ(layer->matrix.d, 2.0f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_RootViewportAspectRatioAndZeroSize) {
+  auto doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" height="100" viewBox="10 20 100 100" preserveAspectRatio="none">
+           <rect width="100" height="100"/></svg>)");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.a, 2);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.d, 1);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.tx, -20);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.ty, -20);
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMaxYMax slice">
+           <rect width="100" height="100"/></svg>)");
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.d, 2);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.ty, -100);
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="0" viewBox="0 0 100 100"><rect width="100" height="100"/></svg>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->layers.empty());
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" viewBox="0 0 100 50"><rect width="100" height="50"/></svg>)");
+  EXPECT_FLOAT_EQ(doc->width, 200);
+  EXPECT_FLOAT_EQ(doc->height, 100);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_NestedViewportResolvesPercentagesLocally) {
+  auto doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="300" height="200">
+           <svg x="30" y="20" width="120" height="60" viewBox="0 0 40 40"
+                preserveAspectRatio="none"><rect width="50%" height="100%"/></svg>
+         </svg>)");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* viewport = doc->layers.front()->children.front();
+  EXPECT_TRUE(viewport->clipToBounds);
+  EXPECT_FLOAT_EQ(viewport->width, 120);
+  EXPECT_FLOAT_EQ(viewport->height, 60);
+  EXPECT_FLOAT_EQ(viewport->matrix.tx, 30);
+  EXPECT_FLOAT_EQ(viewport->matrix.ty, 20);
+  auto* content = viewport->children.front();
+  EXPECT_FLOAT_EQ(content->matrix.a, 3);
+  EXPECT_FLOAT_EQ(content->matrix.d, 1.5);
+  std::vector<pagx::Element*> rectangles;
+  CollectElementsByType(content, pagx::NodeType::Rectangle, rectangles);
+  ASSERT_EQ(rectangles.size(), 1u);
+  auto* rectangle = static_cast<pagx::Rectangle*>(rectangles.front());
+  EXPECT_FLOAT_EQ(rectangle->size.width, 20);
+  EXPECT_FLOAT_EQ(rectangle->size.height, 40);
 }
 
 /**
@@ -982,6 +1123,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClipPathUseResolvesNestedDefinition) {
   auto* path = static_cast<pagx::Path*>(paths.front());
   ASSERT_NE(path->data, nullptr);
   EXPECT_FALSE(path->data->isEmpty());
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_MasksAreLocalIndependentInstances) {
+  auto doc = pagx::SVGImporter::ParseString(R"SVG(
+    <svg width="200" height="200"><defs>
+      <mask id="m" maskContentUnits="objectBoundingBox"><rect width=".5" height="1" fill="white"/></mask>
+    </defs>
+    <rect width="80" height="40" transform="translate(10 20)" mask="url(#m)"/>
+    <rect width="40" height="80" transform="translate(150 160) scale(-1)" mask="url(#m)"/>
+    </svg>)SVG");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 2u);
+  auto* first = FindFirstMaskedLayer(doc->layers[0]);
+  auto* second = FindFirstMaskedLayer(doc->layers[1]);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_NE(first->mask, second->mask);
+  EXPECT_NE(first->mask->id, second->mask->id);
+  EXPECT_FALSE(first->mask->includeInLayout);
+  EXPECT_TRUE(first->matrix.isIdentity());
+  EXPECT_TRUE(second->matrix.isIdentity());
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.tx, 10);
+  EXPECT_FLOAT_EQ(doc->layers[1]->matrix.d, -1);
+  auto* region = first->mask->children.front();
+  EXPECT_FLOAT_EQ(region->width, 96);
+  EXPECT_FLOAT_EQ(region->height, 48);
+  EXPECT_FLOAT_EQ(region->children.front()->matrix.a, 80);
+  EXPECT_FLOAT_EQ(second->mask->children.front()->children.front()->matrix.a, 40);
 }
 
 /**

@@ -277,7 +277,7 @@ export async function renderCapturedPage(
     await page.evaluate(inlineExternalImages, {});
     await page.evaluate(inlineCanvases);
     if (options.inlineIconFonts !== false) await inlineIconFontsOnPage(page, {});
-    await page.evaluate(materializeDecorativePseudoElements, { includeInlineText: true });
+    await page.evaluate(materializeDecorativePseudoElements);
     const snapshot = await page.evaluate((extent: string) => {
       const api = (window as unknown as { __pagxSnapshot: { takeSnapshot: (opts: object) =>
         { html: string; width: number; height: number } } }).__pagxSnapshot;

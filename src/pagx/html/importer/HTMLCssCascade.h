@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace pagx::html {
 
@@ -113,21 +114,22 @@ bool ParseFontFaceWeight(const std::string& value, CssFontWeightRange& out);
  *  value reports `normal`. Returns false for a value that is not a valid descriptor. */
 bool ParseFontFaceStyle(const std::string& value, bool& outItalic);
 
-/** The face a CSS weight/style request resolves to, with the weight and slant it actually delivers. */
+/** The face a CSS request resolves to, with the weight and slant it actually delivers. */
 struct CssFontFaceMatch {
   const CssFontFaceRule* rule = nullptr;
-  // The request clamped into `rule`'s range, keeping the precision the descriptor declares.
-  float weight = 400;
-  bool italic = false;
+  // The request projected onto `rule`: the weight clamped into its declared range (keeping the
+  // precision the descriptor declares) and the slant the rule actually provides.
+  CSSFontStyle style = {};
 };
 
-/** Resolves the `@font-face` face of `family` that a CSS weight/style request renders with, the way
- *  a browser's font matching does: the slant picks the candidate faces, then the CSS weight
- *  preference order picks one — `out.weight` is the request clamped into that face's range, so a
- *  family that only ships a 700 face answers a 400 request with 700. Returns false when no rule
- *  declares `family`. */
+/** Resolves the `@font-face` face of `family` that `request` renders with, the way a browser's
+ *  font matching does: width, then slant, then the CSS weight preference order. Each rule is
+ *  projected onto the request — its declared weight interval clamps the requested weight — so the
+ *  shared face matcher ranks declared faces exactly as it ranks registered ones, and
+ *  `out.style.weight` is the weight the face actually delivers: a family that only ships a 700
+ *  face answers a 400 request with 700. Returns false when no rule declares `family`. */
 bool SelectFontFace(const std::vector<CssFontFaceRule>& faces, const std::string& family,
-                    float requestWeight, bool requestItalic, CssFontFaceMatch& out);
+                    const CSSFontStyle& request, CssFontFaceMatch& out);
 
 /**
  * Tokenises CSS text into top-level `(selectors, declarations)` rules. Most `@`-rules (`@media`,

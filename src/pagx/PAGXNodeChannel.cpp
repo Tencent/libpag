@@ -409,6 +409,7 @@ static std::vector<ChannelDef> BuildLayerFields() {
       FIELD_BOOL(Layer, "clipToBounds", clipToBounds, Layout),
       FIELD_ENUM(Layer, "maskType", maskType, NoFlags, MaskType),
       FIELD_ENUM(Layer, "layout", layout, Layout, LayoutMode),
+      FIELD_ENUM(Layer, "layoutRounding", layoutRounding, Layout, LayoutRounding),
       FIELD_FLOAT(Layer, "gap", gap, Layout),
       FIELD_FLOAT(Layer, "flex", flex, Layout),
       FIELD_ENUM(Layer, "alignment", alignment, Layout, Alignment),

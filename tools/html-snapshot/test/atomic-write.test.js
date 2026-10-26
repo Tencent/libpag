@@ -11,10 +11,20 @@ beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'html-snapshot-atomic-test-'));
 });
 afterEach(() => {
+  jest.restoreAllMocks();
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('writeFileAtomic', () => {
+  test('preserves the rename error when cleanup also fails', async () => {
+    const error = new Error('rename denied');
+    jest.spyOn(fsp, 'rename').mockRejectedValue(error);
+    jest.spyOn(fsp, 'unlink').mockRejectedValue(new Error('cleanup denied'));
+    const target = path.join(dir, 'missing.bin');
+    await expect(writeFileAtomic(target, 'payload')).rejects.toBe(error);
+    expect(fs.existsSync(target)).toBe(false);
+    expect(fsp.unlink).toHaveBeenCalledWith(expect.stringContaining(`${target}.tmp-`));
+  });
   test('writes the bytes to the target path and leaves no temp behind', async () => {
     const target = path.join(dir, 'out.bin');
     await writeFileAtomic(target, Buffer.from('payload'));

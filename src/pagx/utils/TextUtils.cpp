@@ -17,16 +17,51 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/TextUtils.h"
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
+#include "tgfx/core/UTF.h"
 
 namespace pagx {
+
+bool ParseTextInlinePositions(const std::string& text, const std::string& value,
+                              std::vector<float>* positions) {
+  positions->clear();
+  int count = tgfx::UTF::CountUTF8(text.data(), text.size());
+  if (count <= 0 || text.find_first_of("\r\n\t") != std::string::npos) {
+    return false;
+  }
+  const char* p = value.c_str();
+  std::vector<float> parsed;
+  while (*p) {
+    while (std::isspace(static_cast<unsigned char>(*p))) p++;
+    if (!*p) break;
+    char* end = nullptr;
+    float number = std::strtof(p, &end);
+    if (end == p || !std::isfinite(number) || parsed.size() >= static_cast<size_t>(count)) {
+      return false;
+    }
+    parsed.push_back(number);
+    p = end;
+    if (*p && *p != ',' && !std::isspace(static_cast<unsigned char>(*p))) return false;
+    while (std::isspace(static_cast<unsigned char>(*p))) p++;
+    if (*p == ',') {
+      p++;
+      while (std::isspace(static_cast<unsigned char>(*p))) p++;
+      if (!*p || *p == ',') return false;
+    }
+  }
+  if (parsed.size() != static_cast<size_t>(count)) return false;
+  *positions = std::move(parsed);
+  return true;
+}
 
 const TextBox* FindModifierTextBox(const std::vector<Element*>& elements) {
   for (auto* e : elements) {
@@ -564,6 +599,7 @@ TextGlyphParams MakeGlyphParams(const Text* text) {
   params.fontStyle = text->fontStyle;
   params.fontSize = text->fontSize;
   params.letterSpacing = text->letterSpacing;
+  params.inlinePositions = text->inlinePositions;
   params.fauxBold = text->fauxBold;
   params.fauxItalic = text->fauxItalic;
   return params;

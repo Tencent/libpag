@@ -612,6 +612,7 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `layout` | LayoutMode | none | Container layout mode for child layer arrangement |
+| `layoutRounding` | LayoutRounding | inherit | Rounding policy for this container's contents and child layout; inherited by descendant containers |
 | `gap` | float | 0 | Spacing between adjacent child Layers |
 | `flex` | float | 0 | Flex weight for main-axis sizing. When a child has no explicit main-axis size: `flex=0` (default) uses content-measured size; `flex>0` takes a proportional share of remaining space by weight. Ignored when explicit `width`/`height` is set on the main axis |
 | `padding` | float or "t,r,b,l" | 0 | Insets the layout content area and the constraint reference frame for all contents (VectorElements and child Layers). Supports single value (uniform), two values (vertical,horizontal), four values (top,right,bottom,left), consistent with CSS shorthand |
@@ -626,6 +627,19 @@ All three child Layers have no `width` set and `flex="1"`, equally sharing avail
 | `none` | No container layout; child layers use constraint attributes (`left`/`top`) (default) |
 | `horizontal` | Main axis horizontal, cross axis vertical |
 | `vertical` | Main axis vertical, cross axis horizontal |
+
+**LayoutRounding**:
+
+| Value | Description |
+|-------|-------------|
+| `inherit` | Use the enclosing container's policy; document and Composition roots default to `pixel` |
+| `pixel` | Round layout-generated positions to the nearest integer, ceil constraint/percentage allocations, and distribute Flex space in integer pixels |
+| `none` | Preserve fractional positions and allocations in constraint and Flex layout |
+
+This policy applies to VectorElements (including nested Groups) and child Layers inside the
+container. A Layer's own position and allocation follow its parent's policy; its `layoutRounding`
+controls layout inside that Layer. Explicit dimensions and content-measured sizes retain their
+values in both modes. HTML import sets the body Layer to `none` to preserve CSS pixel geometry.
 
 **Alignment (Cross-Axis)**:
 
@@ -870,11 +884,13 @@ Child Layer constraint attributes override the child Layer's `x`/`y`. Activation
 
 ### 4.4 Animation Compatibility
 
-All layout-related attributes (`width`, `height`, `layout`, `gap`, `padding`, `alignment`, `arrangement`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`) do not exist at runtime. The layout engine computes once before the first render, writing results into each element's absolute coordinates (`position`, `size`), after which layout attributes are discarded.
+All layout-related attributes (`width`, `height`, `layout`, `layoutRounding`, `gap`, `padding`, `alignment`, `arrangement`, and constraint attributes `left`, `right`, `top`, `bottom`, `centerX`, `centerY`) do not exist at runtime. The layout engine computes once before the first render, writing results into each element's absolute coordinates (`position`, `size`), after which layout attributes are discarded.
 
 Consequently, animations cannot modify layout attributes. Instead, animations apply visual changes on top of the pre-computed layout results. For example, `transform` and `alpha` can be keyframed and are applied on top of layout results without triggering relayout.
 
-After layout computation completes, the engine rounds all Layer positions (`x`, `y`) to the nearest integer pixel and ceils content-measured sizes to the next integer pixel, preventing blur from sub-pixel rendering and content clipping at constraint boundaries.
+Layout-generated positions and allocations follow the container's `layoutRounding` policy (§4.2).
+The default `pixel` policy preserves existing integer alignment; `none` retains fractional geometry
+without accumulating rounding at nested container boundaries.
 
 ---
 
@@ -1470,12 +1486,20 @@ Text is a geometry element that contributes glyphs (rather than a path) to the g
 | `fontStyle` | string | "" | Font variant (Regular, Bold, Italic, Bold Italic, etc.). Empty string means the font's default variant |
 | `fontSize` | float | 12 | Font size |
 | `letterSpacing` | float | 0 | Letter spacing |
+| `inlinePositions` | float[] | [] | Optional physical inline positions in pixels, one per Unicode scalar, relative to the start of this Text run. X for horizontal text, Y for vertical text. |
 | `fauxBold` | bool | false | Faux bold (algorithmically bolded) |
 | `fauxItalic` | bool | false | Faux italic (algorithmically slanted) |
 | `baseline` | TextBaseline | lineBox | Baseline mode for vertical positioning. `lineBox`: position.y is the linebox top (based on font metrics line height); `alphabetic`: position.y is the alphabetic baseline |
 | `textAnchor` | TextAnchor | start | Text anchor alignment relative to the origin (see below). Ignored when a TextBox controls the layout |
 
 Child elements: `CDATA` text, `GlyphRun`*
+
+`inlinePositions` preserves externally laid-out single-line text without splitting it into individual
+characters before shaping. Each shaping cluster uses the minimum position of its source characters;
+the glyphs within that cluster retain their shaping offsets. Explicit positions disable automatic
+wrapping and justification in the containing text layout. A list with a non-finite value, invalid
+UTF-8, a mismatched character count, or text containing newlines or tabs is inactive. Positions scale
+with the text. Pre-shaped `GlyphRun` children take precedence.
 
 **Text Content**: Typically use the `text` attribute to specify text content. When text contains XML special characters (`<`, `>`, `&`, etc.) or needs to preserve multi-line formatting, use a CDATA child node instead of the `text` attribute. Text does not allow direct plain text child nodes; CDATA wrapping is required.
 

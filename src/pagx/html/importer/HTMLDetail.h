@@ -301,10 +301,9 @@ inline void CopyProperty(const std::unordered_map<std::string, std::string>& pro
 
 // ----- Numeric formatting (single source of truth for two pipelines) ------------------------
 
-// Rounds `v` to 0.001 and emits the shortest exact text. Integers are emitted without a
-// decimal point; finite non-integers use "%g"-style precision-6 output. Used by both the
-// subset transformer and pass code that writes `style="…"`.
-std::string FormatRoundedNumber(float v);
+// Preserves finite floats through decimal serialization. Shared by the subset transformer
+// and passes that rewrite CSS lengths after arithmetic.
+std::string FormatNumber(float v);
 
 // `<n>px` and `<n>%` shorthand emitters.
 std::string EmitPx(float px);

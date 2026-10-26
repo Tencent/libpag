@@ -1125,6 +1125,31 @@ CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {
   EXPECT_TRUE(output.find("includeInLayout=\"false\" has no effect") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Verify_SiblingMaskIsExcludedFromIneffectiveLayoutWarning) {
+  auto path = TempDir() + "/verify_sibling_mask.pagx";
+  std::ofstream(path) << R"(<pagx width="100" height="100">
+    <Layer id="wrapper">
+      <Layer id="mask" visible="false" includeInLayout="false">
+        <Ellipse position="30,30" size="40,40"/><Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer id="owner" mask="@mask" maskType="alpha">
+        <Rectangle position="50,50" size="100,100"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  for (const auto* id : {"", "mask", "wrapper"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+    EXPECT_EQ(output.str().find("includeInLayout=\"false\" has no effect"), std::string::npos);
+  }
+}
+
 CLI_TEST(PAGXCliTest, Verify_FlexNoParentLayout) {
   auto inputPath = TestResourcePath("verify_flex_no_parent_layout.pagx");
   std::streambuf* old = std::cerr.rdbuf();
@@ -1283,7 +1308,8 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_ValidateSimple) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_Basic.svg");
   auto outputPath = TempDir() + "/ImportSVG_Basic.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   auto output = ReadFile(outputPath);
@@ -1294,7 +1320,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
   auto svgPath = ExportToSVG("render_gradient.pagx", "ImportSVG_Gradient.svg");
   auto outputPath = TempDir() + "/ImportSVG_Gradient.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1303,7 +1330,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
   auto svgPath = ExportToSVG("render_text.pagx", "ImportSVG_Text.svg");
   auto outputPath = TempDir() + "/ImportSVG_Text.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1312,14 +1340,16 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
   auto svgPath = ExportToSVG("verify_simple.pagx", "ImportSVG_RoundTrip.svg");
   auto outputPath = TempDir() + "/ImportSVG_RoundTrip.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
   auto svgPath = ExportToSVG("render_scale.pagx", "ImportSVG_Scale.svg");
   auto outputPath = TempDir() + "/ImportSVG_Scale.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1328,8 +1358,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
 CLI_TEST(PAGXCliTest, Import_ForceFormat) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_ForceFormat.xml", {"--format", "svg"});
   auto outputPath = TempDir() + "/ImportSVG_ForceFormat.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--format", "svg", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input",
+                                            svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1345,21 +1375,22 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutput) {
 
 CLI_TEST(PAGXCliTest, Import_MissingFile) {
   auto outputPath = TempDir() + "/ImportSVG_Missing.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", "nonexistent.svg", "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "nonexistent.svg",
+                                            "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_InvalidSvg) {
   auto inputPath = TestResourcePath("verify_not_xml.pagx");
   auto outputPath = TempDir() + "/ImportSVG_Invalid.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--format", "svg", "--input", inputPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input",
+                                            inputPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_UnknownOption) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--unknown", "--input", "test.svg"});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--unknown", "--input", "test.svg"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1369,7 +1400,8 @@ CLI_TEST(PAGXCliTest, Import_MissingInput) {
 }
 
 CLI_TEST(PAGXCliTest, Import_UnsupportedFormat) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "xyz", "--input", "test.xyz"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--format", "xyz", "--input", "test.xyz"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1533,7 +1565,8 @@ CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
 
 // RunImport with a URL input but no --output is rejected during option parsing.
 CLI_TEST(PAGXCliTest, Import_UrlRequiresOutput) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "https://example.com/demo"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", "https://example.com/demo"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1542,8 +1575,8 @@ CLI_TEST(PAGXCliTest, Import_UrlRequiresOutput) {
 CLI_TEST(PAGXCliTest, Import_NoResolve) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoResolve.svg");
   auto outputPath = TempDir() + "/ImportNoResolve.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--no-resolve"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--no-resolve"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1552,8 +1585,8 @@ CLI_TEST(PAGXCliTest, Import_NoResolve) {
 CLI_TEST(PAGXCliTest, Import_Verbose) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportVerbose.svg");
   auto outputPath = TempDir() + "/ImportVerbose.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--verbose"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--verbose"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1562,8 +1595,8 @@ CLI_TEST(PAGXCliTest, Import_Verbose) {
 CLI_TEST(PAGXCliTest, Import_ImagesExternal) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesExternal.svg");
   auto outputPath = TempDir() + "/ImportImagesExternal.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath,
-                                            "--images", "external"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--images", "external"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1572,8 +1605,8 @@ CLI_TEST(PAGXCliTest, Import_ImagesExternal) {
 CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesEmbed.svg");
   auto outputPath = TempDir() + "/ImportImagesEmbed.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--images", "embed"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--images", "embed"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1628,7 +1661,7 @@ CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
   ASSERT_EQ(CallRun(pagx::cli::RunImport,
                     {"import", "--input", input, "--output", output, "--html-source", "snapshot",
                      "--fonts", "external", "--font-replacement", "Source", "600", "normal",
-                     "Target", "Bold"}),
+                     "Target", "Bold", "--overwrite"}),
             0);
   auto xml = ReadFile(output);
   EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
@@ -1655,9 +1688,8 @@ CLI_TEST(PAGXCliTest, Import_ZipExportReferencesFontFile) {
       zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
 
   auto outputPath = dir + "/out/export.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--input", zipPath, "--output", outputPath, "--html-source",
-                      "snapshot", "--fonts", "external"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", outputPath,
+                                            "--html-source", "snapshot", "--fonts", "external"});
   ASSERT_EQ(ret, 0);
   auto xml = ReadFile(outputPath);
   EXPECT_NE(xml.find(R"(file="export.fonts/font-1-font_f0.woff2")"), std::string::npos);
@@ -1685,9 +1717,8 @@ CLI_TEST(PAGXCliTest, Import_ZipExportBakesFontGlyphsWithFontsEmbed) {
       zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
 
   auto outputPath = dir + "/out/export.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--input", zipPath, "--output", outputPath, "--html-source",
-                      "snapshot", "--fonts", "embed"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", outputPath,
+                                            "--html-source", "snapshot", "--fonts", "embed"});
   ASSERT_EQ(ret, 0);
   auto xml = ReadFile(outputPath);
   EXPECT_EQ(xml.find("file=\""), std::string::npos);
@@ -1720,9 +1751,8 @@ CLI_TEST(PAGXCliTest, Import_BakesAliasedWebFontUnderCssFamily) {
            "font-size:20px;white-space:nowrap\">A</span></body></html>";
   }
   auto outputPath = dir + "/aliased.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--input", htmlPath, "--output", outputPath, "--html-source",
-                      "snapshot", "--fonts", "embed"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
+                                            "--html-source", "snapshot", "--fonts", "embed"});
   ASSERT_EQ(ret, 0);
   auto xml = ReadFile(outputPath);
   EXPECT_NE(xml.find("fontFamily=\"AliasedFace\""), std::string::npos);
@@ -1744,18 +1774,18 @@ CLI_TEST(PAGXCliTest, Import_BakesWithFallbackFont) {
                              "&#xE000;&#xE001;</span></body></html>";
   auto outputPath = dir + "/fallback.pagx";
   auto fontPath = ProjectPath::Absolute(PUA_WOFF2_FONT);
-  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
-                                           "--html-source", "snapshot", "--fonts", "embed",
-                                           "--fallback", fontPath}),
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", htmlPath, "--output", outputPath, "--html-source",
+                     "snapshot", "--fonts", "embed", "--fallback", fontPath}),
             0);
   auto xml = ReadFile(outputPath);
   EXPECT_NE(xml.find(R"(glyphs="1,2")"), std::string::npos);
   EXPECT_EQ(xml.find("file=\""), std::string::npos);
 
   StreamCapture errCapture(std::cerr);
-  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath,
-                                           "--html-source", "snapshot", "--fonts", "external",
-                                           "--fallback", fontPath}),
+  EXPECT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", htmlPath, "--output", outputPath, "--html-source",
+                     "snapshot", "--fonts", "external", "--fallback", fontPath}),
             2);
   EXPECT_NE(errCapture.str().find("--fallback require --fonts embed"), std::string::npos);
 }
@@ -1769,9 +1799,8 @@ CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
   ASSERT_TRUE(WriteZipArchive(zipPath, {{"site/index.html", WebFontIndexHTML()},
                                         {"site/assets/fonts/font_f0.woff2",
                                          ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT))}}));
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--input", zipPath, "--html-source", "snapshot", "--fonts",
-                      "external"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--html-source",
+                                            "snapshot", "--fonts", "external"});
   ASSERT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(dir + "/page.pagx"));
   EXPECT_TRUE(std::filesystem::exists(dir + "/page.fonts/font-1-font_f0.woff2"));
@@ -1794,7 +1823,7 @@ CLI_TEST(PAGXCliTest, Import_InlineFontSurvivesExternalStorageAndEmbed) {
   }
   ASSERT_EQ(CallRun(pagx::cli::RunImport,
                     {"import", "--input", input, "--output", output, "--html-source", "snapshot",
-                     "--fonts", "external"}),
+                     "--fonts", "external", "--overwrite"}),
             0);
   auto doc = pagx::PAGXImporter::FromFile(output);
   ASSERT_NE(doc, nullptr);
@@ -1821,6 +1850,26 @@ CLI_TEST(PAGXCliTest, Import_InlineFontSurvivesExternalStorageAndEmbed) {
     texts++;
   }
   EXPECT_EQ(texts, 1);
+}
+
+CLI_TEST(PAGXCliTest, Import_ZipRejectsOverwritingSourceArchive) {
+  auto dir = TempDir() + "/ImportZipSourceProtection";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto zipPath = dir + "/source.zip";
+  ASSERT_TRUE(
+      WriteZipArchive(zipPath, {{"index.html", "<html><body><p>Archive input</p></body></html>"}}));
+  auto sourceBytes = ReadBinaryFile(zipPath);
+  ASSERT_FALSE(sourceBytes.empty());
+  StreamCapture errCapture(std::cerr);
+  auto ret = CallRun(pagx::cli::RunImport, {"import", zipPath, "--output", zipPath, "--html-source",
+                                            "snapshot", "--overwrite"});
+  EXPECT_EQ(ret, 2);
+  EXPECT_NE(errCapture.str().find("output would replace an input"), std::string::npos);
+  EXPECT_EQ(ReadBinaryFile(zipPath), sourceBytes);
+  EXPECT_FALSE(std::filesystem::exists(dir + "/source.pagx"));
+  EXPECT_FALSE(std::filesystem::exists(dir + "/source.fonts"));
+  EXPECT_FALSE(std::filesystem::exists(dir + "/manifest.json"));
 }
 
 // An archive entry that would extract outside the temporary directory aborts the import.
@@ -1901,7 +1950,8 @@ CLI_TEST(PAGXCliTest, Verify_FontFileIsNotUnreferenced) {
 
 // An invalid --images value is rejected during option parsing.
 CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "test.svg", "--images", "bogus"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", "test.svg", "--images", "bogus"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1909,8 +1959,8 @@ CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
 CLI_TEST(PAGXCliTest, Import_ImageBaseDir) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImageBaseDir.svg");
   auto outputPath = TempDir() + "/ImportImageBaseDir.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath,
-                                            "--image-base-dir", TempDir()});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--image-base-dir", TempDir()});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -2205,13 +2255,15 @@ CLI_TEST(PAGXCliTest, Export_MultipleInputsRejectedForSvg) {
 CLI_TEST(PAGXCliTest, Import_WriteFailure) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_WriteFail.svg");
   auto outputPath = "/nonexistent_dir_xyz/output.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoExt", {"--format", "svg"});
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input", svgPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--format", "svg", "--input", svgPath});
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
@@ -3953,9 +4005,10 @@ CLI_TEST(PAGXCliTest, Embed_HTMLGlyphsPreserveOriginalTextAcrossRepeatedEmbed) {
             "&#xE000;&#xE001;</span></body></html>";
   stream.close();
   auto input = TempDir() + "/original_text_imported.pagx";
-  ASSERT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", html, "--output", input,
-                                          "--html-source", "snapshot", "--fonts", "embed"}),
-            0);
+  ASSERT_EQ(
+      CallRun(pagx::cli::RunImport, {"import", "--input", html, "--output", input, "--html-source",
+                                     "snapshot", "--fonts", "embed", "--overwrite"}),
+      0);
   auto first = TempDir() + "/original_text_embedded1.pagx";
   auto second = TempDir() + "/original_text_embedded2.pagx";
   ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", input, "-o", first}), 0);

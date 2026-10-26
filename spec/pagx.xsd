@@ -359,6 +359,14 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="LayoutRoundingType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="inherit"/>
+      <xs:enumeration value="pixel"/>
+      <xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="AlignmentType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="start"/>
@@ -594,6 +602,7 @@
     <xs:attribute name="fontStyle" type="xs:string" default=""/>
     <xs:attribute name="fontSize" type="xs:decimal" default="12"/>
     <xs:attribute name="letterSpacing" type="xs:decimal" default="0"/>
+    <xs:attribute name="inlinePositions" type="FloatListType"/>
     <xs:attribute name="position" type="PointType" default="0,0"/>
     <xs:attribute name="baseline" type="TextBaselineType" default="lineBox"/>
     <xs:attribute name="fauxBold" type="BoolType" default="false"/>
@@ -967,6 +976,7 @@
     <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
+    <xs:attribute name="layoutRounding" type="LayoutRoundingType" default="inherit"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>
     <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>

@@ -53,6 +53,17 @@ describe('normalizeBackgroundImage', () => {
     expect(normalizeBackgroundImage(grad)).toBe(grad);
   });
 
+  test('normalizes all URL layers and preserves none and gradient indices', () => {
+    expect(normalizeBackgroundImage(
+      'none, url("file:///tmp/one.png"), linear-gradient(red, blue), url("file:///tmp/two.png")'
+    )).toBe("none, url('/tmp/one.png'), linear-gradient(red, blue), url('/tmp/two.png')");
+  });
+
+  test('does not split commas or parentheses inside quoted URL values', () => {
+    expect(normalizeBackgroundImage('url("file:///tmp/a,b(1).png"), url("data:image/png;base64,AAAA")'))
+      .toBe("url('/tmp/a,b(1).png'), url('data:image/png;base64,AAAA')");
+  });
+
   test('drops none / empty', () => {
     expect(normalizeBackgroundImage('none')).toBe('');
     expect(normalizeBackgroundImage('')).toBe('');

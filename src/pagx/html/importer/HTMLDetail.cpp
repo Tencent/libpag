@@ -25,6 +25,8 @@
 #include <sstream>
 #include <utility>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx::html {
 
@@ -196,8 +198,8 @@ std::string JoinStyleTokens(const std::vector<std::string>& tokens) {
 void ApplyBackgroundShorthand(const std::string& value,
                               std::unordered_map<std::string, std::string>& out) {
   static const char* kResetProperties[] = {
-      "background-color", "background-image",  "background-position",
-      "background-size",  "background-repeat", "background-clip",
+      "background-color",  "background-image", "background-position", "background-size",
+      "background-repeat", "background-clip",  "background-origin",
   };
   for (const char* property : kResetProperties) {
     out[property].clear();
@@ -205,11 +207,8 @@ void ApplyBackgroundShorthand(const std::string& value,
 
   auto layers = SplitTopLevelCommas(Trim(value));
   std::vector<std::string> imageLayers;
-  bool hasURLImage = false;
   std::string colorToken;
-  std::string positionValue;
-  std::string sizeValue;
-  std::string repeatValue;
+  std::vector<std::string> positions, sizes, repeats, origins, clips;
 
   for (size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex) {
     bool isLastLayer = layerIndex + 1 == layers.size();
@@ -217,6 +216,7 @@ void ApplyBackgroundShorthand(const std::string& value,
     std::vector<std::string> positionTokens;
     std::vector<std::string> sizeTokens;
     std::vector<std::string> repeatTokens;
+    std::vector<std::string> boxes;
     bool afterSlash = false;
     for (const auto& token : SplitBackgroundLayerTokens(layers[layerIndex])) {
       if (token == "/") {
@@ -227,51 +227,47 @@ void ApplyBackgroundShorthand(const std::string& value,
       if (IsBackgroundImageToken(lower)) {
         imageToken = token;
       } else if (lower == "none") {
-        // The reset above already represents `background-image:none`.
+        imageToken = "none";
       } else if (isLastLayer && colorToken.empty() && IsBackgroundColorToken(token)) {
         colorToken = token;
       } else if (IsBackgroundRepeatToken(lower)) {
         repeatTokens.push_back(lower);
       } else if (IsBackgroundBoxOrAttachmentToken(lower)) {
-        // These reset correctly above but have no PAGX visual analogue.
+        if (lower == "border-box" || lower == "padding-box" || lower == "content-box") {
+          boxes.push_back(lower);
+        }
       } else if (afterSlash) {
         sizeTokens.push_back(token);
       } else {
         positionTokens.push_back(token);
       }
     }
-    if (!imageToken.empty()) {
-      bool isURLImage = ToLower(imageToken).rfind("url(", 0) == 0;
-      imageLayers.push_back(std::move(imageToken));
-      hasURLImage |= isURLImage;
-      // PAGX can stack gradients, but its ImagePattern path consumes only one image layer. Keep
-      // the fitting values from the CSS-topmost image so they stay paired with the same layer if
-      // the shorthand has to be reduced to one image below.
-      if (imageLayers.size() == 1) {
-        positionValue = JoinStyleTokens(positionTokens);
-        sizeValue = JoinStyleTokens(sizeTokens);
-        repeatValue = JoinStyleTokens(repeatTokens);
-      }
-    }
+    imageLayers.push_back(imageToken.empty() ? "none" : imageToken);
+    positions.push_back(positionTokens.empty() ? "0% 0%" : JoinStyleTokens(positionTokens));
+    sizes.push_back(sizeTokens.empty() ? "auto" : JoinStyleTokens(sizeTokens));
+    repeats.push_back(repeatTokens.empty() ? "repeat" : JoinStyleTokens(repeatTokens));
+    origins.push_back(boxes.empty() ? "padding-box" : boxes[0]);
+    clips.push_back(boxes.empty() ? "border-box" : boxes.back());
   }
 
   if (!imageLayers.empty()) {
-    std::string joinedImages;
-    if (hasURLImage) {
-      // Mixed/url stacks cannot be represented by one PAGX ImagePattern. CSS paints the first
-      // listed image on top, so retain that layer and its position/size/repeat values rather than
-      // pairing a multi-layer image list with unrelated fitting data.
-      joinedImages = imageLayers.front();
-    } else {
-      for (const auto& image : imageLayers) {
-        if (!joinedImages.empty()) joinedImages += ", ";
-        joinedImages += image;
+    auto join = [](const std::vector<std::string>& values, const std::string& initial) {
+      if (std::all_of(values.begin(), values.end(),
+                      [&](const std::string& v) { return v == initial; }))
+        return std::string();
+      std::string result;
+      for (const auto& v : values) {
+        if (!result.empty()) result += ", ";
+        result += v;
       }
-    }
-    out["background-image"] = std::move(joinedImages);
-    out["background-position"] = std::move(positionValue);
-    out["background-size"] = std::move(sizeValue);
-    out["background-repeat"] = std::move(repeatValue);
+      return result;
+    };
+    out["background-image"] = join(imageLayers, "none");
+    out["background-position"] = join(positions, "0% 0%");
+    out["background-size"] = join(sizes, "auto");
+    out["background-repeat"] = join(repeats, "repeat");
+    out["background-origin"] = join(origins, "padding-box");
+    out["background-clip"] = join(clips, "border-box");
   }
   if (!colorToken.empty()) {
     out["background-color"] = std::move(colorToken);
@@ -292,82 +288,19 @@ void ParseStyleString(const std::string& styleStr,
   }
 }
 
-namespace {
-
-std::string StripSurroundingQuotes(const std::string& s) {
-  if (s.size() < 2) return s;
-  char first = s.front();
-  char last = s.back();
-  if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
-    return s.substr(1, s.size() - 2);
-  }
-  return s;
-}
-
-// Builds the classification of a generic keyword. A null `resolved` marks a keyword this
-// platform has no face for.
-FontFamilyToken MakeGenericFontToken(const char* resolved) {
-  FontFamilyToken token = {};
-  token.resolved = resolved != nullptr ? resolved : "";
-  token.isGeneric = true;
-  return token;
-}
-
-}  // namespace
-
 std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
-  std::vector<std::string> out;
-  if (Trim(raw).empty()) return out;
-  auto tokens = SplitTopLevelCommas(raw);
-  out.reserve(tokens.size());
-  for (auto& token : tokens) {
-    auto trimmed = Trim(token);
-    if (trimmed.empty()) continue;
-    auto stripped = Trim(StripSurroundingQuotes(trimmed));
-    if (!stripped.empty()) {
-      out.push_back(std::move(stripped));
-    }
-  }
-  return out;
+  return ParseCSSFontFamilyList(raw);
 }
 
 FontFamilyToken ClassifyFontFamilyToken(const std::string& name) {
   FontFamilyToken token = {};
-  std::string lower = ToLower(Trim(name));
-  if (lower.empty()) return token;
-
-#if defined(__APPLE__)
-  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("Times");
-  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
-      lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return MakeGenericFontToken("Helvetica");
-  }
-  if (lower == "monospace" || lower == "ui-monospace") return MakeGenericFontToken("Menlo");
-#elif defined(_WIN32)
-  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("Times New Roman");
-  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
-      lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return MakeGenericFontToken("Arial");
-  }
-  if (lower == "monospace" || lower == "ui-monospace") return MakeGenericFontToken("Consolas");
-#else
-  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("DejaVu Serif");
-  if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
-      lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return MakeGenericFontToken("DejaVu Sans");
-  }
-  if (lower == "monospace" || lower == "ui-monospace")
-    return MakeGenericFontToken("DejaVu Sans Mono");
-#endif
-
-  // Recognised generics with no concrete mapping on the current platform. Distinguished
-  // from "not a generic" so callers can warn and drop the token.
-  if (lower == "cursive" || lower == "fantasy" || lower == "ui-rounded" || lower == "emoji" ||
-      lower == "math" || lower == "fangsong") {
-    return MakeGenericFontToken(nullptr);
-  }
-
-  token.resolved = name;
+  std::string trimmed = Trim(name);
+  if (trimmed.empty()) return token;
+  // The generic keyword table lives with the CSS font style helpers, so the importer, the HTML
+  // writer and the SVG importer all agree on which tokens are generics and what this platform
+  // maps them to.
+  token.isGeneric = IsCSSGenericFontFamily(trimmed);
+  token.resolved = ResolveCSSGenericFontFamily(trimmed);
   return token;
 }
 
@@ -592,6 +525,7 @@ float ParseAngle(const std::string& raw) {
   std::string suffix = Trim(end);
   if (suffix.empty() || suffix == "deg") return v;
   if (suffix == "rad") return v * 180.0f / 3.14159265358979323846f;
+  if (suffix == "grad") return v * 0.9f;
   if (suffix == "turn") return v * 360.0f;
   return v;
 }
@@ -760,6 +694,14 @@ float ConvertCssLengthToPx(float num, const std::string& unit, float fontSizePx,
     recognized = true;
     return num * 4.0f / 3.0f;
   }
+  for (auto absolute : {std::make_pair("pc", 16.0f), std::make_pair("in", 96.0f),
+                        std::make_pair("cm", 96.0f / 2.54f), std::make_pair("mm", 96.0f / 25.4f),
+                        std::make_pair("q", 96.0f / 101.6f)}) {
+    if (unit == absolute.first) {
+      recognized = true;
+      return num * absolute.second;
+    }
+  }
   if (unit == "vw") {
     if (std::isfinite(canvasW) && canvasW > 0) {
       recognized = true;
@@ -813,27 +755,16 @@ std::string CollapseHTMLWhitespace(const std::string& raw, bool trimLeading, boo
   return normalized;
 }
 
-std::string FormatRoundedNumber(float v) {
-  if (std::isfinite(v)) {
-    float rounded = std::round(v * 1000.0f) / 1000.0f;
-    if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
-      std::ostringstream oss;
-      oss << static_cast<long long>(rounded);
-      return oss.str();
-    }
-  }
-  std::ostringstream oss;
-  oss.precision(6);
-  oss << v;
-  return oss.str();
+std::string FormatNumber(float v) {
+  return FloatToString(v);
 }
 
 std::string EmitPx(float px) {
-  return FormatRoundedNumber(px) + "px";
+  return FormatNumber(px) + "px";
 }
 
 std::string EmitPercent(float pct) {
-  return FormatRoundedNumber(pct) + "%";
+  return FormatNumber(pct) + "%";
 }
 
 std::string EmitPaddingShorthand(float top, float right, float bottom, float left) {

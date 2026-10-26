@@ -21,10 +21,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <string>
 #include <vector>
 #include "base/utils/Log.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
@@ -95,7 +95,7 @@ class XMLBuilder {
     _buf += ' ';
     _buf += name;
     _buf += "=\"";
-    _buf += formatFloat(value);
+    _buf += FloatToString(value);
     _buf += '"';
     return *this;
   }
@@ -170,7 +170,7 @@ class XMLBuilder {
       _buf += ' ';
       _buf += name;
       _buf += "=\"";
-      _buf += formatFloat(percentValue);
+      _buf += FloatToString(percentValue);
       _buf += "%\"";
     } else if (!std::isnan(absoluteValue)) {
       addRequiredAttribute(name, absoluteValue);
@@ -377,12 +377,6 @@ class XMLBuilder {
           break;
       }
     }
-  }
-
-  static std::string formatFloat(float value) {
-    char buf[32] = {};
-    snprintf(buf, sizeof(buf), "%g", value);
-    return buf;
   }
 };
 

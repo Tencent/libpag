@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLCssCascade.h"
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include "pagx/html/importer/HTMLDetail.h"
@@ -365,40 +366,6 @@ bool ParseObliqueAngle(const std::string& token, double& outDegrees) {
   return false;
 }
 
-// The CSS Fonts 4 §5.2 weight preference, expressed as a rank so candidate faces compare without
-// being sorted: group 0 is the face whose range contains the request, and the later groups follow
-// the order the specification searches for the request's band. Within a group the closest declared
-// weight wins, so the comparison is the CSS preference order rather than a nearest-weight search.
-struct FontWeightRank {
-  int group = 0;
-  float distance = 0;
-};
-
-FontWeightRank RankFontFaceWeight(const CssFontWeightRange& range, float request) {
-  FontWeightRank rank = {};
-  if (range.contains(request)) {
-    return rank;
-  }
-  if (range.minWeight > request) {
-    // A face heavier than the request: last for requests below 400, and past the 500 ceiling for a
-    // request in [400, 500].
-    rank.distance = range.minWeight - request;
-    if (request < 400) {
-      rank.group = 2;
-    } else if (request <= 500) {
-      rank.group = range.minWeight <= 500 ? 1 : 3;
-    } else {
-      rank.group = 1;
-    }
-    return rank;
-  }
-  // A face lighter than the request: first only for requests below 400. A request in [400, 500]
-  // climbs to 500 before it descends, so a lighter face comes after the heavier ones.
-  rank.distance = request - range.maxWeight;
-  rank.group = request < 400 ? 1 : 2;
-  return rank;
-}
-
 void ApplyFontFaceDescriptor(const std::string& declaration, CssFontFaceRule& rule) {
   // Descriptor names never contain a colon, so the first one ends the name.
   auto colon = declaration.find(':');
@@ -523,44 +490,37 @@ bool ParseFontFaceStyle(const std::string& value, bool& outItalic) {
 }
 
 bool SelectFontFace(const std::vector<CssFontFaceRule>& faces, const std::string& family,
-                    float requestWeight, bool requestItalic, CssFontFaceMatch& out) {
+                    const CSSFontStyle& request, CssFontFaceMatch& out) {
   out = CssFontFaceMatch();
-  CssFontWeightRange bestRange = {};
-  int bestStyleRank = 0;
-  FontWeightRank bestRank = {};
-  for (const auto& face : faces) {
-    // Rules are registered under the exact CSS family they declare, so the lookup uses the same
-    // spelling the authored font-family produced.
+  // Projecting each rule onto the request (weight clamped into its interval, slant from the
+  // descriptor) lets the shared matcher rank declared faces with the CSS preference order.
+  std::vector<CSSFontFace> candidates = {};
+  std::vector<size_t> ruleIndices = {};
+  for (size_t index = 0; index < faces.size(); index++) {
+    const auto& face = faces[index];
     if (face.family != family) {
       continue;
     }
     CssFontWeightRange range = {};
     ParseFontFaceWeight(face.weight, range);
     bool italic = false;
-    ParseFontFaceStyle(face.style, italic);
-    // A face of the requested slant wins; the other slant is the fallback, the way a browser
-    // synthesises the missing axis from the faces it has.
-    int styleRank = italic == requestItalic ? 0 : 1;
-    FontWeightRank rank = RankFontFaceWeight(range, requestWeight);
-    bool better = out.rule == nullptr || styleRank < bestStyleRank ||
-                  (styleRank == bestStyleRank &&
-                   (rank.group < bestRank.group ||
-                    (rank.group == bestRank.group && rank.distance < bestRank.distance)));
-    if (!better) {
-      continue;
-    }
-    out.rule = &face;
-    out.italic = italic;
-    bestRange = range;
-    bestStyleRank = styleRank;
-    bestRank = rank;
+    CSSFontFace candidate = {};
+    candidate.style.weight =
+        std::min(std::max(request.weight, static_cast<double>(range.minWeight)),
+                 static_cast<double>(range.maxWeight));
+    // ParseFontFaceStyle validates the descriptor; the typed parse keeps italic and oblique apart.
+    candidate.style.slant = ParseFontFaceStyle(face.style, italic)
+                                ? ParseCSSFontStyle(std::string(), face.style).slant
+                                : CSSFontSlant::Normal;
+    candidates.push_back(std::move(candidate));
+    ruleIndices.push_back(index);
   }
-  if (out.rule == nullptr) {
+  auto best = MatchCSSFontFace(candidates, request);
+  if (best < 0) {
     return false;
   }
-  out.weight = requestWeight < bestRange.minWeight   ? bestRange.minWeight
-               : requestWeight > bestRange.maxWeight ? bestRange.maxWeight
-                                                     : requestWeight;
+  out.rule = &faces[ruleIndices[static_cast<size_t>(best)]];
+  out.style = candidates[static_cast<size_t>(best)].style;
   return true;
 }
 
@@ -714,7 +674,7 @@ std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRul
     out += " {";
     for (const auto& stop : rule.stops) {
       out += ' ';
-      out += FormatRoundedNumber(stop.percent);
+      out += FormatNumber(stop.percent);
       out += "% { ";
       out += stop.declarations;
       // Ensure the declaration block is terminated so re-parsing stays robust.

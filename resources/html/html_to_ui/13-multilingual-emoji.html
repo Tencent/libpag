@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>13 · 多语种 / RTL / Emoji / 特殊符号</title>
+<meta name="description" content="15 种文字系统（中日韩/阿拉伯/希伯来 RTL/天城文/泰文/格鲁吉亚等）、ruby 注音、生僻字、Emoji ZWJ/肤色/旗帜、全角标点、制表符字符画">
+<!-- HTML→Ardot 测试集 | 13-multilingual-emoji.html | 15 种文字系统（中日韩/阿拉伯/希伯来 RTL/天城文/泰文/格鲁吉亚等）、ruby 注音、生僻字、Emoji ZWJ/肤色/旗帜、全角标点、制表符字符画 | 单文件自包含：字体/图片均已 base64 内联，无任何外部请求 -->
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans","Apple SD Gothic Neo","Geeza Pro","Kohinoor Devanagari","Thonburi",sans-serif;background:#fff;color:#111}
+.wrap{max-width:1320px;margin:0 auto;padding:48px 40px}
+h1{font-size:52px;letter-spacing:-1px}
+h1+p{color:#777;margin:8px 0 32px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.lang{border:1px solid #eee;border-radius:14px;padding:22px;min-height:190px}
+.lang .k{font-size:12px;color:#999;display:flex;justify-content:space-between;margin-bottom:10px}
+.lang .h{font-size:34px;font-weight:700;line-height:1.3}
+.lang p{font-size:16px;line-height:1.7;margin-top:8px;color:#333}
+ruby rt{font-size:.5em;color:#e4572e}
+h2{font-size:22px;margin:48px 0 16px}
+.emo{display:flex;flex-wrap:wrap;gap:14px;font-size:44px;line-height:1.2}
+.emo.s{font-size:22px}
+.sym{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.sym div{border:1px solid #eee;border-radius:10px;padding:14px;font-size:22px;text-align:center}
+.sym small{display:block;font-size:11px;color:#999;margin-top:4px}
+.mix{font-size:20px;line-height:2;border:1px solid #eee;border-radius:14px;padding:22px}
+.box{font-family:Menlo,monospace;white-space:pre;font-size:14px;line-height:1.3;background:#111;color:#8f8;padding:20px;border-radius:12px}
+
+</style>
+</head>
+<body>
+<div class="wrap"><h1>🌏 Multilingual &amp; Emoji</h1><p>多语种 / 双向文字 / 注音 / Emoji（含 ZWJ 组合与肤色）/ 特殊符号，全部使用系统字体回退。</p>
+<div class="grid"><div class="lang" lang="zh-Hans"><div class="k"><span>简体中文</span><span>zh-Hans</span></div><div class="h">你好，世界</div><p>设计让复杂的事情变得简单，让简单的事情变得美好。</p></div><div class="lang" lang="zh-Hant"><div class="k"><span>繁體中文</span><span>zh-Hant</span></div><div class="h">你好，世界</div><p>設計讓複雜的事情變得簡單，讓簡單的事情變得美好。</p></div><div class="lang" lang="ja"><div class="k"><span>日本語</span><span>ja</span></div><div class="h"><ruby>世界<rt>せかい</rt></ruby>、こんにちは</div><p>デザインは、複雑なものをシンプルにする。ひらがな・カタカナ・漢字の混在。</p></div><div class="lang" lang="ko"><div class="k"><span>한국어</span><span>ko</span></div><div class="h">안녕하세요, 세계</div><p>디자인은 복잡한 것을 단순하게 만듭니다. 한글 음절 조합 테스트.</p></div><div class="lang" lang="en"><div class="k"><span>English</span><span>en</span></div><div class="h">Hello, World</div><p>Design makes complex things simple, and simple things beautiful.</p></div><div class="lang" lang="ru"><div class="k"><span>Русский</span><span>ru</span></div><div class="h">Привет, мир</div><p>Дизайн делает сложное простым, а простое — красивым.</p></div><div class="lang" lang="el"><div class="k"><span>Ελληνικά</span><span>el</span></div><div class="h">Γειά σου, Κόσμε</div><p>Ο σχεδιασμός κάνει τα σύνθετα απλά και τα απλά όμορφα.</p></div><div class="lang" lang="ar" dir="rtl" style="text-align:right"><div class="k"><span>العربية · RTL</span><span>ar</span></div><div class="h">مرحبا بالعالم</div><p>التصميم يجعل الأشياء المعقدة بسيطة، والبسيطة جميلة.</p></div><div class="lang" lang="he" dir="rtl" style="text-align:right"><div class="k"><span>עברית · RTL</span><span>he</span></div><div class="h">שלום עולם</div><p>העיצוב הופך דברים מורכבים לפשוטים, ופשוטים ליפים.</p></div><div class="lang" lang="hi"><div class="k"><span>हिन्दी</span><span>hi</span></div><div class="h">नमस्ते दुनिया</div><p>डिज़ाइन जटिल चीज़ों को सरल और सरल चीज़ों को सुंदर बनाता है।</p></div><div class="lang" lang="th"><div class="k"><span>ไทย</span><span>th</span></div><div class="h">สวัสดีชาวโลก</div><p>การออกแบบทำให้สิ่งที่ซับซ้อนกลายเป็นเรื่องง่าย</p></div><div class="lang" lang="vi"><div class="k"><span>Tiếng Việt</span><span>vi</span></div><div class="h">Xin chào thế giới</div><p>Thiết kế làm cho những điều phức tạp trở nên đơn giản.</p></div><div class="lang" lang="de"><div class="k"><span>Deutsch / Français</span><span>de</span></div><div class="h">Größe · Straße · Æsthétique</div><p>Übergrößenträger, naïve façade, cœur, œuvre, déjà vu.</p></div><div class="lang" lang="zh"><div class="k"><span>拼音注音 · Ruby</span><span>zh</span></div><div class="h"><ruby>设<rt>shè</rt>计<rt>jì</rt>师<rt>shī</rt></ruby></div><p><ruby>饕<rt>tāo</rt>餮<rt>tiè</rt></ruby>、<ruby>耄<rt>mào</rt>耋<rt>dié</rt></ruby>、<ruby>龘<rt>dá</rt></ruby>：生僻字与注音。</p></div><div class="lang" lang="ka"><div class="k"><span>ქართული / Հայերեն</span><span>ka</span></div><div class="h">გამარჯობა · Բարեւ</div><p>Georgian 与 Armenian 字母，冷门文字系统。</p></div></div>
+<h2>Emoji · 基础（44px）</h2><div class="emo">😀 😂 🥹 😍 🤔 🫠 😎 🥳 😭 🤯 👍 🙏 👏 💪 🔥 ✨ 🎉 ❤️ 💜 🌈 ☀️ 🌙 ⭐ 🍜 🍵 🥟 🎨 🚀 🏔️ 🌊</div>
+<h2>Emoji · ZWJ 组合 / 肤色 / 旗帜 / 键帽（22px）</h2><div class="emo s">👨‍👩‍👧‍👦 👩‍💻 🧑‍🎨 👨‍🚀 🏳️‍🌈 🐻‍❄️ ❤️‍🔥 🧑‍🤝‍🧑 👋🏻 👋🏼 👋🏽 👋🏾 👋🏿 🇨🇳 🇯🇵 🇫🇷 🇧🇷 🇰🇷 🇬🇧 🇩🇪 #️⃣ 1️⃣ ©️ ™️</div>
+<h2>中英混排 + Emoji 行内 + 双向文字</h2><div class="mix">今天用 <b>Ardot</b> 测试了 15 个 HTML 文件 🎉，其中 3 个出现字体回退问题 😅。价格 ¥1,299.00 / US$179.99；电话 +86 755-8888-6666。阿拉伯语插入：<span dir="rtl">مرحبا 2026</span>，希伯来语：<span dir="rtl">שלום</span>，然后继续中文。Emoji 放在词中间：设计🎨师、程序💻员、产品📦经理。</div>
+<h2>特殊符号</h2><div class="sym"><div>∑∫√∞<small>数学</small></div><div>≈≠≤≥<small>比较</small></div><div>←↑→↓↔<small>箭头</small></div><div>①②③④<small>带圈数字</small></div><div>ⅠⅡⅢⅣ<small>罗马数字</small></div><div>½¾⅓⅛<small>分数</small></div><div>℃℉°<small>温度</small></div><div>¥$€£₹<small>货币</small></div><div>★☆♠♣<small>符号</small></div><div>「」『』《》<small>中文引号</small></div><div>，。！？；：<small>全角标点</small></div><div>┌─┬┐<small>制表符</small></div></div>
+<h2>等宽字符画（制表符 + Emoji 宽度对齐）</h2><div class="box">┌──────────┬──────────┐
+│  项目    │  状态    │
+├──────────┼──────────┤
+│  字体    │  ✅ 通过 │
+│  图片    │  ⚠️ 警告 │
+│  图层    │  ❌ 失败 │
+└──────────┴──────────┘</div>
+</div>
+</body>
+</html>

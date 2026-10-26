@@ -161,6 +161,21 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // Resource pixels and CSS natural size are different for density-selected sources. Read
+  // selected resources without srcset once, using the browser's decoded-resource cache.
+  const pixelSizes = new Map();
+  await Promise.all(imgs.map(async img => {
+    if (!(img.getAttribute('srcset') || '').trim() && img.parentElement?.tagName !== 'PICTURE') return;
+    const selected = img.currentSrc;
+    if (!selected || !img.naturalWidth) return;
+    if (!pixelSizes.has(selected)) pixelSizes.set(selected, (async () => {
+      const probe = new Image();
+      probe.src = selected;
+      try { await probe.decode(); return probe.naturalWidth; } catch (_) { return 0; }
+    })());
+    const width = await pixelSizes.get(selected);
+    if (width > 0) img.setAttribute('data-snapshot-image-pixel-width', String(width));
+  }));
   // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
   // data URI the page authored) and only needs normalising.
   const pending = [];
@@ -176,7 +191,10 @@ async function inlineExternalImages(cachedMap) {
     // skipped outright.
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
-    if (!rawSrc && !rawSrcset) continue;
+    // A <picture> may select its source from a <source srcset> only, leaving
+    // both attributes on the <img> empty while `currentSrc` is real.
+    const pictureSource = img.parentElement?.tagName === 'PICTURE' && img.currentSrc;
+    if (!rawSrc && !rawSrcset && !pictureSource) continue;
     // Skip images an earlier pass already inlined (a `data:` URI or local path
     // stamped on `data-snapshot-src`). This function may run more than once on
     // a JS-driven page — components can mount fresh <img>s after the first pass

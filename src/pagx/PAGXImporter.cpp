@@ -85,6 +85,7 @@
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -482,6 +483,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
+  layer->layoutRounding = GET_ENUM(node, "layoutRounding", "inherit", doc, LayoutRounding);
   layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
   layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
   layer->padding = GetPaddingAttribute(node, doc);
@@ -975,6 +977,13 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->fontSize = GetFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
   text->letterSpacing =
       GetFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
+  if (auto positions = node->findAttribute("inlinePositions")) {
+    if (!ParseTextInlinePositions(text->text, *positions, &text->inlinePositions)) {
+      ReportError(doc, node,
+                  "Invalid inlinePositions: expected one finite position per Unicode "
+                  "scalar of a single line without tabs.");
+    }
+  }
   text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);

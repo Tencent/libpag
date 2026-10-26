@@ -35,6 +35,8 @@ import {
   makeFontCaptureListener,
   resolveFontFamilies,
   saveDownloadedFonts,
+  collectWebFontFaces,
+  decodeDataFont,
   type FontFaceSource,
   type SavedFont,
 } from './font-download';
@@ -52,6 +54,8 @@ import {
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
 import { applyCanvasViewport } from './canvas-viewport';
 import { responseBytes } from './browser-engine';
+import { capturePseudoContents, captureTextLayout, installTextLayout } from './text-layout';
+import { captureControlPaints, installControlPaints } from './control-capture';
 import type {
   BrowserResponse,
   CookieParam,
@@ -343,6 +347,8 @@ export interface RunSnapshotResult {
   html: string;
   width: number;
   height: number;
+  /** Painting features that require a model beyond the supported static 2D subset. */
+  warnings?: string[];
   fonts: SavedFont[];
   images: SavedImage[];
 }
@@ -425,10 +431,15 @@ export async function runSnapshot(
   const captureFont: CaptureResponseListener | null = downloadFonts
     ? makeFontCaptureListener(engine, fontBytesByUrl, log)
     : null;
+  const fontCaptures = new Set<Promise<void>>();
   const onResponse: (resp: BrowserResponse) => void = captureFont
     ? (resp: BrowserResponse) => {
         void captureImage(resp);
-        void captureFont(resp);
+        const capture = captureFont(resp).catch((err: unknown) => {
+          if (log) log(`font capture skipped: ${errMessage(err)}`);
+        });
+        fontCaptures.add(capture);
+        void capture.finally(() => fontCaptures.delete(capture));
       }
     : (resp: BrowserResponse) => { void captureImage(resp); };
   const page = await openAndSettlePage(engineHandle, targetUrl, {
@@ -671,7 +682,13 @@ export async function runSnapshot(
     // the entire pass (e.g. a missing helper triggering `ReferenceError`
     // inside `page.evaluate`) does not get buried among importer warnings.
     try {
-      await page.evaluate(materializeDecorativePseudoElements);
+      let contents;
+      try {
+        contents = await capturePseudoContents(page, engine);
+      } catch (err) {
+        if (log) log(`generated text capture unavailable; using CSS strings: ${errMessage(err)}`);
+      }
+      await page.evaluate(materializeDecorativePseudoElements, contents);
     } catch (err) {
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
@@ -825,21 +842,13 @@ export async function runSnapshot(
       if (log) log(`table row background hoist skipped: ${errMessage(err)}`);
     }
 
-    // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
-    // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
-    // ships the ~70-byte entry expression now.
-    const snapshot = await page.evaluate(snapshotExpr) as {
-      html: string; width: number; height: number;
-    };
-
     // Write the web fonts to disk: the ones the browser fetched (captured off
     // the `response` event during load + settle, only when `downloadFonts`
     // asked for them) plus the ones inlined as `data:` URLs (collected from
     // the page's `@font-face` rules here — a `data:` URI issues no request, so
     // the response listener can never see one, and without this pass the font
-    // would neither be saved nor registered). Deferring the collection to this
-    // point costs nothing and lets the CSS-family pass below see every font
-    // the page loaded.
+    // would neither be saved nor registered). Runs before the snapshot so the
+    // walker can rewrite family names to the saved files' own families.
     //
     // The inline half runs whenever a directory is set: those faces live only
     // inside the document, so saving them here is the only way a caller that
@@ -857,6 +866,7 @@ export async function runSnapshot(
     // caller forwards the pairs to `pagx embed` / `pagx render` as
     // `--font-alias`. This is best-effort: a failure degrades to "no fonts on
     // disk" and the rest of the snapshot still returns.
+    await Promise.all(fontCaptures);
     let fonts: SavedFont[] = [];
     if (fontDir) {
       let cssFacesByKey: Map<string, FontFaceSource[]> | undefined;
@@ -890,6 +900,50 @@ export async function runSnapshot(
     }
     // Network fonts keep travelling through the font manifest: their files are named there so
     // `pagx embed` / `pagx render` can register them under the authored CSS family.
+    if (fonts.length > 0) {
+      // The walker resolves an authored family to the saved file's internal
+      // family, picking the face whose weight/style/stretch is closest to the
+      // text's computed request. Without this, `pagx render` has to be handed
+      // the same aliases through the manifest.
+      const aliases = fonts.flatMap((font) => (font.cssFaces || []).map((face) => ({
+        from: face.family, to: font.family, weight: face.weight, style: face.style,
+      })));
+      try {
+        await page.evaluate((value: unknown) => {
+          (window as unknown as Record<string, unknown>).__pagxFontAliases = value;
+        }, aliases);
+      } catch (err) {
+        if (log) log(`font alias install skipped: ${errMessage(err)}`);
+      }
+    }
+
+    // Native form-control surfaces and protocol text boundaries are captured
+    // last, so their childNode paths address the tree the walker will measure.
+    try {
+      await page.evaluate(installControlPaints, await captureControlPaints(page, engine));
+    } catch (err) {
+      if (log) log(`native control paint capture unavailable: ${errMessage(err)}`);
+    }
+
+    // Read text boundaries after viewport settlement. Geometry is still measured
+    // by the in-page walker, in its temporarily untransformed coordinate system.
+    try {
+      const textLayout = await captureTextLayout(page, engine);
+      await page.evaluate(installTextLayout, textLayout);
+    } catch (err) {
+      if (log) log(`text layout capture unavailable; using DOM ranges: ${errMessage(err)}`);
+    }
+
+    // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
+    // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
+    // ships the ~70-byte entry expression now.
+    const snapshot = await page.evaluate(snapshotExpr) as {
+      html: string; width: number; height: number; warnings?: string[];
+    };
+    for (const warning of snapshot.warnings || []) {
+      if (log) log(warning);
+    }
+
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
