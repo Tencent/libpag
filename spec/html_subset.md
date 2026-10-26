@@ -566,8 +566,11 @@ timeline emit a channel.
   `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
   and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
 - `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
-  are clamped to 0. For looping animations the delay applies to the first iteration only (it is
-  excluded from `Animation.duration` so the gap is not replayed each cycle).
+  are clamped to 0. `Animation.duration` always ends at `delay + duration`, so delayed keyframes
+  are never truncated. For looping animations the delay is replayed as a pause on every pass
+  (CSS applies it to the first iteration only). Looping animations with the same cycle length and
+  loop mode share one `Animation` whose duration is the latest `delay + duration` among them, so a
+  staggered group keeps its offsets aligned on every pass.
 - `animation-fill-mode`: `none` (default) shows the element's non-animated baseline before the
   delay elapses and after a `once` animation ends; `forwards` holds the final keyframe past the
   end; `backwards` shows the first keyframe during the delay; `both` combines the two. Implemented

@@ -332,6 +332,23 @@ inline pagx::AnimationObject* FindObjectByTarget(pagx::Animation* anim,
   return nullptr;
 }
 
+// Returns the channel named `name` on the AnimationObject targeting `targetId` when its keyframes
+// carry `valueType`, or nullptr.
+template <typename T>
+inline pagx::TypedChannel<T>* FindTypedChannelOnTarget(pagx::Animation* anim,
+                                                       const std::string& targetId,
+                                                       const std::string& name,
+                                                       pagx::ChannelValueType valueType) {
+  auto* obj = FindObjectByTarget(anim, targetId);
+  if (!obj) return nullptr;
+  for (auto* ch : obj->channels) {
+    if (ch && ch->name == name && ch->valueType() == valueType) {
+      return static_cast<pagx::TypedChannel<T>*>(ch);
+    }
+  }
+  return nullptr;
+}
+
 // HTMLSubsetTransformer helpers -----------------------------------------------------------
 
 inline std::shared_ptr<pagx::DOMNode> ParseHtml(const std::string& html) {
@@ -7439,6 +7456,245 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationDelayShiftsKeyframeTimes) {
   EXPECT_EQ(ch->keyframes.front().time, 0);
   EXPECT_EQ(ch->keyframes[1].time, 30);
   EXPECT_EQ(ch->keyframes.back().time, 90);
+}
+
+// Returns the top-level Animation that owns an AnimationObject targeting `targetId`, or nullptr.
+static pagx::Animation* FindAnimationOwningTarget(pagx::PAGXDocument* doc,
+                                                  const std::string& targetId) {
+  for (auto* node : doc->animations) {
+    if (node == nullptr || node->nodeType() != pagx::NodeType::Animation) continue;
+    auto* anim = static_cast<pagx::Animation*>(node);
+    if (FindObjectByTarget(anim, targetId) != nullptr) return anim;
+  }
+  return nullptr;
+}
+
+// Counts the top-level Animation nodes (state machines excluded).
+static size_t CountTopLevelAnimations(pagx::PAGXDocument* doc) {
+  size_t count = 0;
+  for (auto* node : doc->animations) {
+    if (node != nullptr && node->nodeType() == pagx::NodeType::Animation) count++;
+  }
+  return count;
+}
+
+// An infinite animation keeps its keyframes shifted by `animation-delay`, so its Animation must
+// end at `delay + duration`; otherwise the runtime wraps before the delayed keyframes finish and
+// the tail of every delayed element is cut off. Staggered siblings sharing the same cycle length
+// stay on one Animation whose duration is the latest end among them: each element pauses for
+// its own delay at the head and for `maxDelay - delay` at the tail, keeping the stagger aligned
+// on every pass. Mirrors the audio-wave equalizer: 1.1s = 66 frames, delays step by 9 frames.
+PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteDelayExtendsSharedDurationToLatestEnd) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes audioBar { from { transform: scaleY(0.15); } to { transform: scaleY(1); } }
+    </style></head>
+    <body style="width:300px;height:300px">
+      <div id="bar1" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0s infinite alternate both"></div>
+      <div id="bar2" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.15s infinite alternate both"></div>
+      <div id="bar3" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.3s infinite alternate both"></div>
+      <div id="bar4" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.45s infinite alternate both"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::PingPong);
+  EXPECT_EQ(anim->duration, 93);
+  ASSERT_EQ(anim->objects.size(), 4u);
+
+  const char* ids[] = {"bar1", "bar2", "bar3", "bar4"};
+  for (int i = 0; i < 4; i++) {
+    auto* ch = FindTypedChannelOnTarget<pagx::Matrix>(anim, ids[i], "matrix",
+                                                      pagx::ChannelValueType::Matrix);
+    ASSERT_NE(ch, nullptr) << ids[i];
+    ASSERT_EQ(ch->keyframes.size(), 2u) << ids[i];
+    EXPECT_EQ(ch->keyframes.front().time, 9 * i) << ids[i];
+    EXPECT_EQ(ch->keyframes.back().time, 66 + 9 * i) << ids[i];
+    EXPECT_LE(ch->keyframes.back().time, anim->duration) << ids[i];
+  }
+}
+
+// The Animation duration is the end point of the playback window, which always starts at frame 0.
+// When no element starts at frame 0 (the earliest keyframe sits at frame 9), the duration still
+// ends at the latest `delay + duration` (93), not at the span between the earliest and the latest
+// keyframes (84).
+PAG_TEST(PAGXHTMLImporterTest,
+         AnimationInfiniteDelayDurationEndsAtLatestKeyEvenWhenNoneStartAtZero) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes audioBar { from { transform: scaleY(0.15); } to { transform: scaleY(1); } }
+    </style></head>
+    <body style="width:300px;height:300px">
+      <div id="bar2" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.15s infinite alternate both"></div>
+      <div id="bar3" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.3s infinite alternate both"></div>
+      <div id="bar4" style="width:14px;height:90px;background-color:#000;transform-origin:50% 100%;
+                            animation:audioBar 1.1s ease-in-out 0.45s infinite alternate both"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::PingPong);
+  EXPECT_EQ(anim->duration, 93);
+  ASSERT_EQ(anim->objects.size(), 3u);
+
+  auto* first = FindTypedChannelOnTarget<pagx::Matrix>(anim, "bar2", "matrix",
+                                                       pagx::ChannelValueType::Matrix);
+  ASSERT_NE(first, nullptr);
+  ASSERT_EQ(first->keyframes.size(), 2u);
+  EXPECT_EQ(first->keyframes.front().time, 9);
+  EXPECT_EQ(first->keyframes.back().time, 75);
+  auto* last = FindTypedChannelOnTarget<pagx::Matrix>(anim, "bar4", "matrix",
+                                                      pagx::ChannelValueType::Matrix);
+  ASSERT_NE(last, nullptr);
+  ASSERT_EQ(last->keyframes.size(), 2u);
+  EXPECT_EQ(last->keyframes.front().time, 27);
+  EXPECT_EQ(last->keyframes.back().time, 93);
+}
+
+// Infinite animations are grouped by cycle length (the CSS animation-duration) and loop mode, not by
+// their end point. Each group gets its own Animation ending at the latest `delay + duration` among
+// its members, and the delay stays a plain keyframe offset. Elements whose end point happens to
+// match another group still keep their own Animation:
+//   a, b: 1s Loop, delays 0 / 0.5s     -> shared, ends at 90
+//   c, d: 2s Loop, delays 0 / 0.25s    -> shared, ends at 135
+//   e:    1.5s Loop, no delay          -> alone, ends at 90 (cycle differs from a/b)
+//   f:    1s PingPong, delay 0.25s     -> alone, ends at 75 (loop mode differs from a/b)
+//   g:    1s Once forwards, delay 0.5s -> alone, ends at 90 (Once keeps its existing rule)
+PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteDelayGroupsByCycleAndLoopMode) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="a" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear infinite"></div>
+      <div id="b" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.5s infinite"></div>
+      <div id="c" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 2s linear infinite"></div>
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 2s linear 0.25s infinite"></div>
+      <div id="e" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1.5s linear infinite"></div>
+      <div id="f" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.25s infinite alternate"></div>
+      <div id="g" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.5s forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountTopLevelAnimations(doc.get()), 5u);
+  ASSERT_EQ(doc->animations.front()->nodeType(), pagx::NodeType::StateMachine);
+
+  auto* oneSecond = FindAnimationOwningTarget(doc.get(), "a");
+  ASSERT_NE(oneSecond, nullptr);
+  EXPECT_EQ(FindAnimationOwningTarget(doc.get(), "b"), oneSecond);
+  EXPECT_EQ(oneSecond->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(oneSecond->duration, 90);
+  auto* a = FindTypedChannelOnTarget<float>(oneSecond, "a", "alpha", pagx::ChannelValueType::Float);
+  ASSERT_NE(a, nullptr);
+  ASSERT_EQ(a->keyframes.size(), 2u);
+  EXPECT_EQ(a->keyframes.front().time, 0);
+  EXPECT_EQ(a->keyframes.back().time, 60);
+  auto* b = FindTypedChannelOnTarget<float>(oneSecond, "b", "alpha", pagx::ChannelValueType::Float);
+  ASSERT_NE(b, nullptr);
+  // fill-mode none: a baseline hold at frame 0 covers the delay, then the two authored stops.
+  ASSERT_EQ(b->keyframes.size(), 3u);
+  EXPECT_EQ(b->keyframes.front().time, 0);
+  EXPECT_EQ(b->keyframes[1].time, 30);
+  EXPECT_EQ(b->keyframes.back().time, 90);
+
+  auto* twoSeconds = FindAnimationOwningTarget(doc.get(), "c");
+  ASSERT_NE(twoSeconds, nullptr);
+  EXPECT_EQ(FindAnimationOwningTarget(doc.get(), "d"), twoSeconds);
+  EXPECT_EQ(twoSeconds->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(twoSeconds->duration, 135);
+
+  auto* oneAndHalf = FindAnimationOwningTarget(doc.get(), "e");
+  ASSERT_NE(oneAndHalf, nullptr);
+  EXPECT_NE(oneAndHalf, oneSecond);
+  EXPECT_EQ(oneAndHalf->objects.size(), 1u);
+  EXPECT_EQ(oneAndHalf->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(oneAndHalf->duration, 90);
+
+  auto* pingPong = FindAnimationOwningTarget(doc.get(), "f");
+  ASSERT_NE(pingPong, nullptr);
+  EXPECT_EQ(pingPong->objects.size(), 1u);
+  EXPECT_EQ(pingPong->loop, pagx::LoopMode::PingPong);
+  EXPECT_EQ(pingPong->duration, 75);
+
+  auto* once = FindAnimationOwningTarget(doc.get(), "g");
+  ASSERT_NE(once, nullptr);
+  EXPECT_NE(once, oneSecond);
+  EXPECT_NE(once, oneAndHalf);
+  EXPECT_EQ(once->objects.size(), 1u);
+  EXPECT_EQ(once->loop, pagx::LoopMode::Once);
+  EXPECT_EQ(once->duration, 90);
+}
+
+// Inline-SVG shape animations go through a separate builder path and must follow the same rule:
+// staggered infinite shapes with the same cycle share one Animation ending at the latest
+// `delay + duration`.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgInfiniteDelayExtendsSharedDuration) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin {
+        0%   { transform: matrix(1, 0, 0, 1, 0, 0); }
+        100% { transform: matrix(0, 1, -1, 0, 0, 0); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="200" height="80" viewBox="0 0 200 80">
+        <circle cx="40" cy="40" r="30" fill="none" stroke="#8B5CF6"
+                style="transform-origin:40px 40px;animation:spin 1s linear infinite"/>
+        <circle cx="120" cy="40" r="30" fill="none" stroke="#8B5CF6"
+                style="transform-origin:120px 40px;animation:spin 1s linear 0.5s infinite"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 90);
+
+  std::vector<pagx::Frame> lastKeyTimes;
+  for (auto* obj : anim->objects) {
+    ASSERT_NE(obj, nullptr);
+    for (auto* ch : obj->channels) {
+      if (ch == nullptr || ch->name != "rotation" ||
+          ch->valueType() != pagx::ChannelValueType::Float) {
+        continue;
+      }
+      auto* rotation = static_cast<pagx::TypedChannel<float>*>(ch);
+      ASSERT_FALSE(rotation->keyframes.empty());
+      lastKeyTimes.push_back(rotation->keyframes.back().time);
+    }
+  }
+  std::sort(lastKeyTimes.begin(), lastKeyTimes.end());
+  ASSERT_EQ(lastKeyTimes.size(), 2u);
+  EXPECT_EQ(lastKeyTimes[0], 60);
+  EXPECT_EQ(lastKeyTimes[1], 90);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {

@@ -253,10 +253,12 @@ class HTMLParserContext {
   // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
   // The runtime plays every top-level animation, so this is only a structural verbosity — but a
   // single timeline is easier to read, edit, and drive. Merge animations that share the same
-  // `duration` / `frameRate` / `loop` into one `Animation` (their objects concatenated). Grouping
-  // by that triple keeps it general: animations with different lengths or loop behaviour (some
-  // `once`, some infinite) stay in separate `Animation` nodes so they are never forced onto a
-  // mismatched shared timeline. Runs after both animation build passes.
+  // timing into one `Animation` (their objects concatenated): Once animations by `duration` /
+  // `frameRate` / `loop`; infinite animations by CSS cycle length / `frameRate` / `loop`, with the
+  // merged duration extended to the latest `delay + cycle` so delayed members are not truncated.
+  // Animations with different lengths or loop behaviour (some `once`, some infinite) stay in
+  // separate `Animation` nodes so they are never forced onto a mismatched shared timeline. Runs
+  // after both animation build passes.
   void coalesceAnimations();
 
   // Wraps multiple independent top-level animations in one parallel StateMachine so hosts that

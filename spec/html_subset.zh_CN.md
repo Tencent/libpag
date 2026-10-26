@@ -513,8 +513,10 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   `alternate` 无法表达，被降级为 `once` 并告警 `subset:animation-finite-count`）；`reverse` /
   `alternate-reverse` 会同时反转关键帧顺序与缓动（`ease-in` 变 `ease-out`，step 的 jump 互换）；
   `normal` 保持原序。
-- `animation-delay`：正延迟把每个关键帧时间前移；负延迟告警并钳制为 0。对于循环动画，延迟只作用于
-  第一次迭代（不计入 `Animation.duration`，因此不会每个周期重放该间隙）。
+- `animation-delay`：正延迟把每个关键帧时间前移；负延迟告警并钳制为 0。`Animation.duration` 始终
+  结束于 `delay + duration`，因此带延迟的关键帧不会被截断。对于循环动画，延迟在每个周期都会作为停顿
+  重放（CSS 只作用于第一次迭代）。循环周期与循环模式相同的循环动画共用一个 `Animation`，其时长取组内
+  最晚的 `delay + duration`，使错峰排列在每个周期都保持对齐。
 - `animation-fill-mode`：`none`（默认）在延迟结束前以及 `once` 动画结束后显示元素的非动画基线值；
   `forwards` 在结束后保持最后一个关键帧；`backwards` 在延迟期间显示第一个关键帧；`both` 两者兼有。
   通过在边界注入基线 `hold` 关键帧实现（`Loop` / `PingPong` 没有"结束之后"的区域，因此那里只有前导

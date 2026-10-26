@@ -382,17 +382,25 @@ void HTMLParserContext::coalesceAnimations() {
   if (!_document || _document->animations.size() < 2) {
     return;
   }
-  // First animation of each (duration, frameRate, loop) group becomes the group leader and keeps
-  // its id; later animations in the same group have their objects appended to the leader and are
-  // dropped from the list. Leaders are scanned linearly because a page has only a handful of
-  // distinct timings even when it animates hundreds of elements. Order is preserved so the
-  // resulting `<Animations>` block still follows document order.
+  // First animation of each group becomes the group leader and keeps its id; later animations in
+  // the same group have their objects appended to the leader and are dropped from the list.
+  // Leaders are scanned linearly because a page has only a handful of distinct timings even when
+  // it animates hundreds of elements. Order is preserved so the resulting `<Animations>` block
+  // still follows document order.
+  //
+  // Once animations group by (duration, frameRate, loop). Infinite (Loop / PingPong) animations
+  // group by (cycle, frameRate, loop) instead: their duration is `delay + cycle`, so staggered
+  // siblings with different delays share one timeline whose duration is the latest end among them.
+  // Each member then pauses for its own delay at the head and up to the shared end at the tail,
+  // which keeps the stagger aligned on every pass.
   std::vector<Node*> coalesced;
   coalesced.reserve(_document->animations.size());
-  // Parallel list of the Animation* leaders held in `coalesced`, used to match subsequent
-  // animations by timing. Non-animation timelines (e.g. state machines) are passed through
-  // untouched and never participate in coalescing.
+  // Parallel lists of the Animation* leaders held in `coalesced` and their grouping length (cycle
+  // for infinite animations, duration for Once), used to match subsequent animations by timing.
+  // Non-animation timelines (e.g. state machines) are passed through untouched and never
+  // participate in coalescing.
   std::vector<Animation*> leaders;
+  std::vector<Frame> leaderLengths;
   for (auto* node : _document->animations) {
     if (node == nullptr) {
       continue;
@@ -402,9 +410,17 @@ void HTMLParserContext::coalesceAnimations() {
       continue;
     }
     auto* anim = static_cast<Animation*>(node);
+    Frame length = anim->duration;
+    if (anim->loop != LoopMode::Once) {
+      Frame cycle = _animationBuilder->loopCycleFrames(anim);
+      if (cycle > 0) {
+        length = cycle;
+      }
+    }
     Animation* group = nullptr;
-    for (auto* leader : leaders) {
-      if (leader->duration == anim->duration && leader->loop == anim->loop &&
+    for (size_t index = 0; index < leaders.size(); index++) {
+      auto* leader = leaders[index];
+      if (leaderLengths[index] == length && leader->loop == anim->loop &&
           std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
         group = leader;
         break;
@@ -413,8 +429,10 @@ void HTMLParserContext::coalesceAnimations() {
     if (group == nullptr) {
       coalesced.push_back(anim);
       leaders.push_back(anim);
+      leaderLengths.push_back(length);
       continue;
     }
+    group->duration = std::max(group->duration, anim->duration);
     for (auto* obj : anim->objects) {
       group->objects.push_back(obj);
     }

@@ -993,6 +993,31 @@ void HTMLAnimationBuilder::setKeyframes(
   _keyframes = keyframes;
 }
 
+Frame HTMLAnimationBuilder::loopCycleFrames(const Animation* animation) const {
+  auto it = _loopCycleFrames.find(animation);
+  return it != _loopCycleFrames.end() ? it->second : 0;
+}
+
+void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loopMode,
+                                              long long durationFrames, long long delayFrames,
+                                              bool needsTrailingBaseline) {
+  animation->frameRate = kFrameRate;
+  animation->loop = loopMode;
+  // Keyframes are shifted by delayFrames, so the playback window (which always starts at frame 0)
+  // must end at `delay + duration` for every loop mode; a shorter window wraps before the delayed
+  // keyframes finish. For Loop / PingPong the delay is therefore replayed as a pause on every pass
+  // instead of only before the first iteration as in CSS: the PAGX timeline has no first-iteration
+  // offset, and a plain keyframe offset stays readable and editable for animators. Once extends by
+  // one more frame when fill-mode requires a trailing baseline sample, because LoopMode::Once
+  // clamps currentTime to `animation->duration` once playback ends.
+  bool loopOnce = (loopMode == LoopMode::Once);
+  animation->duration =
+      static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
+  if (!loopOnce) {
+    _loopCycleFrames[animation] = static_cast<Frame>(durationFrames);
+  }
+}
+
 bool HTMLAnimationBuilder::buildForElement(
     const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
@@ -1464,19 +1489,7 @@ bool HTMLAnimationBuilder::buildForElement(
       loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
 
   auto* animation = _document->makeNode<Animation>(layer->id + "_anim");
-  animation->frameRate = kFrameRate;
-  // Loop/PingPong: CSS animation-delay only delays the first iteration, so the looped duration
-  // must not include delayFrames (the runtime would otherwise re-play the delay gap each cycle).
-  // Once: include delayFrames to keep the baseline visible during the gap, and extend by one
-  // frame when fill-mode requires a trailing baseline sample (LoopMode::Once clamps currentTime
-  // to `animation->duration` once playback ends, so the trailing hold needs to live within it).
-  if (loopOnce) {
-    animation->duration =
-        static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
-  } else {
-    animation->duration = static_cast<Frame>(durationFrames);
-  }
-  animation->loop = loopMode;
+  setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline);
   if (!spec.iterationInfinite && spec.iterationCount != 1.0f) {
     std::ostringstream count;
     count << spec.iterationCount;
@@ -2116,14 +2129,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
                              : (!fillTargetId.empty() ? fillTargetId : shapeTargetId);
     std::string animId = idBase + "_" + spec.name + "_anim";
     auto* animation = _document->makeNode<Animation>(animId);
-    animation->frameRate = kFrameRate;
-    if (loopOnce) {
-      animation->duration =
-          static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
-    } else {
-      animation->duration = static_cast<Frame>(durationFrames);
-    }
-    animation->loop = loopMode;
+    setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline);
 
     // Layer-space channels (opacity / translate) target the shape's own `Layer`.
     if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty() || !matrixKeys.empty()) {
