@@ -17,14 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/cocoa/private/PAGViewSurface.h"
+#include <TargetConditionals.h>
 #include "platform/cocoa/private/metal/MetalLayerHelper.h"
+
+#if TARGET_OS_IPHONE
+#import "platform/ios/PAGSurface+Metal.h"
+#import "platform/ios/PAGView.h"
+#else
 #import "platform/mac/PAGSurface+Metal.h"
 #import "platform/mac/PAGView.h"
+#endif
 
 namespace pag::cocoa {
 
 static void UpdateDrawableSize(PAGView* view) {
+#if TARGET_OS_IPHONE
+  CGFloat scale = view.contentScaleFactor;
+#else
   CGFloat scale = view.window.backingScaleFactor > 0 ? view.window.backingScaleFactor : 1;
+#endif
   UpdateMetalLayerDrawableSize((CAMetalLayer*)view.layer, view.bounds.size, scale);
 }
 
@@ -32,10 +43,15 @@ Class PAGViewSurface::LayerClass() {
   return [CAMetalLayer class];
 }
 
+#if TARGET_OS_IPHONE
+void PAGViewSurface::Configure(id) {
+}
+#else
 void PAGViewSurface::Configure(id view) {
   PAGView* pagView = view;
   pagView.wantsLayer = YES;
 }
+#endif
 
 void PAGViewSurface::ObserveSurfacePrepared(id, SEL) {
 }
@@ -54,9 +70,24 @@ void PAGViewSurface::UpdateSize(id view, ::PAGSurface* surface) {
 }
 
 void PAGViewSurface::UpdateWindowSize(id view, ::PAGSurface* surface) {
+#if TARGET_OS_IPHONE
+  PAGView* pagView = view;
+  if (pagView.window == nil || surface == nil) {
+    return;
+  }
+  auto size = pagView.bounds.size;
+  auto scale = pagView.contentScaleFactor;
+  auto drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+  auto layer = (CAMetalLayer*)pagView.layer;
+  // Reattaching at the same size must not discard rendering caches.
+  if (!CGSizeEqualToSize(layer.drawableSize, drawableSize)) {
+    UpdateSize(view, surface);
+  }
+#else
   if (surface != nil) {
     UpdateSize(view, surface);
   }
+#endif
 }
 
 std::unique_lock<std::mutex> PAGViewSurface::Lock(std::mutex& mutex) {

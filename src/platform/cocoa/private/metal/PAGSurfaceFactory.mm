@@ -17,12 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include <TargetConditionals.h>
 #include "platform/cocoa/private/metal/MetalLayerDrawable.h"
+
+#if TARGET_OS_IPHONE
+#include "rendering/drawables/HardwareBufferDrawable.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
+#endif
 
 namespace pag::cocoa {
 
 std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
   return PAGSurface::MakeFrom(MetalLayerDrawable::FromLayer(host));
 }
+
+#if TARGET_OS_IPHONE
+std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(CVPixelBufferRef pixelBuffer, id device) {
+  std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
+  if (device != nil) {
+    metalDevice = tgfx::MetalDevice::MakeFrom(device);
+  }
+  return PAGSurface::MakeFrom(HardwareBufferDrawable::MakeFrom(pixelBuffer, metalDevice));
+}
+#endif
 
 }  // namespace pag::cocoa
