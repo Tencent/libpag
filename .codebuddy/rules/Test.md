@@ -35,6 +35,22 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 - **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline_{Backend}` target（包括 `UpdateBaseline_OpenGL`、`UpdateBaseline_Metal`）、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
 - 接受截图基准变更的**唯一方式**是用户主动执行 `/accept-baseline` 斜杠命令
 
+### Metal 截图基线过渡状态
+
+**Metal 截图基准未接受，7 例会失败。** 以下截图 key 尚未纳入 `test/baseline/version.json`：
+
+- `PAGBlendMetalTest/CopyDstTexture`
+- `PAGBlendMetalTest/TextureBottomLeft`
+- `PAGBlendMetalTest/BothBottomLeft`
+- `PAGSurfaceMetalTest/Mask`
+- `PAGSurfaceMetalTest/BottomLeftScissor`
+- `PAGXRuntimeTest/MetalPAGSurfaceFromBackendTexture`
+- `PAGXRuntimeTest/MetalPAGSurfaceFromBackendRenderTarget`
+
+正常运行到这些截图比较时，缺少基线 key 会使 `Baseline::Compare()` 返回失败，`PAGFullTest_Metal` 因此返回非零；这 7 例不是完整 Metal 测试中所有潜在失败的清单。现有 Metal CI 只做编译，不运行截图测试，CI 通过不代表这些基线已建立。
+
+当前保留测试及比较逻辑，不自动跳过缺失基线。后续独立 PR 将通过 `/accept-baseline` 流程审核并接受这 7 个截图基线，再运行 `PAGFullTest_Metal` 核验并移除本过渡说明。
+
 ## HTML 测试集（浏览器保真度评测）
 
 `resources/html/` 收录 HTML 测试语料（`cases/`、`corpus/cli`、`corpus/websites`、
