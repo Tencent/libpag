@@ -3510,6 +3510,62 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerMatrixAndRotationScale) {
   EXPECT_NE(matTag.find("transform-origin:0 0"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationKeepsStaticTransform) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/layer/05_x_with_static_rotation.pagx"),
+                     opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tag = FindTagContaining(html, "id=\"tiltBox\"");
+  ASSERT_FALSE(tag.empty());
+  auto rotatePos = tag.find("transform:rotate(");
+  ASSERT_NE(rotatePos, std::string::npos);
+  auto rotateEnd = tag.find(')', rotatePos);
+  ASSERT_NE(rotateEnd, std::string::npos);
+  auto staticTransform = tag.substr(rotatePos + 10, rotateEnd - rotatePos - 9);
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) " + staticTransform + "; }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(120px, 0px) " + staticTransform + "; }"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationWithMatrixChannel) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="mixLayer" width="50" height="50" matrix="0,1,-1,0,0,0">
+      <Rectangle width="50" height="50"/>
+      <Fill color="#FF8800"/>
+    </Layer>
+    <Animations>
+      <Animation id="mixAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="mixLayer">
+          <Channel name="x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+            <Key time="60" value="2,0,0,2,0,0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) matrix(1,0,0,1,0,0); }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(40px, 0px) matrix(2,0,0,2,0,0); }"),
+            std::string::npos);
+  EXPECT_EQ(html.find("matrix(0,1,-1,0,0,0); }"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="rectLayer" width="80" height="80">
