@@ -93,6 +93,7 @@
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -1807,6 +1808,17 @@ std::string ParseTypedValue<std::string>(const std::string& value, PAGXDocument*
 }
 
 template <>
+Matrix3D ParseTypedValue<Matrix3D>(const std::string& value, PAGXDocument* doc,
+                                   const DOMNode* node) {
+  auto values = ParseFloatList(value);
+  if (values.size() != 16) {
+    ReportError(doc, node, "Invalid matrix3D keyframe value '" + value + "'. Expected 16 floats.");
+    return Matrix3D();
+  }
+  return Matrix3DFromString(value);
+}
+
+template <>
 PathData* ParseTypedValue<PathData*>(const std::string& value, PAGXDocument* doc,
                                      const DOMNode* node) {
   if (value.empty() || value[0] != '@') {
@@ -1956,6 +1968,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "path") {
     auto ch = makeNodeFromXML<TypedChannel<PathData*>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "matrix3D") {
+    auto ch = makeNodeFromXML<TypedChannel<Matrix3D>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {

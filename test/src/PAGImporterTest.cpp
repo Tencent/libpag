@@ -97,6 +97,7 @@
 #include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/types/ColorSpace.h"
 #include "renderer/LayerBuilder.h"
+#include "tgfx/layers/Layer.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "utils/ProjectPath.h"
 
@@ -2880,6 +2881,95 @@ PAGX_TEST(PAGImporterTest, MaskPathExtensionsRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "mask-path-ext", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, Matrix3DChannelRoundTrip) {
+  // P3-9 matrix3D keyframe support: the 4x4 matrix value type round trips through the binary
+  // and XML, interpolates element-wise, registers on the Layer channel table and drives the
+  // tgfx layer's 3D matrix at runtime. The Transform3D/Camera sampling migration lands once
+  // its composition formula is confirmed (the legacy runtime has no 3D evaluation to align
+  // with; rendering goes through PAGX setMatrix3D).
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>("p39Layer");
+  doc->layers.push_back(layer);
+
+  Matrix3D start = {};
+  start.values[12] = 20.0f;
+  start.values[14] = -50.0f;
+  Matrix3D end = {};
+  end.values[12] = 60.0f;
+  end.values[14] = -150.0f;
+  end.values[5] = 2.0f;
+
+  auto* animation = doc->makeNode<Animation>();
+  animation->id = "matrix3DAnim";
+  animation->duration = 10;
+  animation->frameRate = 10;
+  auto* object = doc->makeNode<AnimationObject>();
+  object->target = "p39Layer";
+  auto* channel = doc->makeNode<TypedChannel<Matrix3D>>();
+  channel->name = "matrix3D";
+  Keyframe<Matrix3D> startKey = {};
+  startKey.time = 0;
+  startKey.value = start;
+  startKey.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(startKey);
+  Keyframe<Matrix3D> endKey = {};
+  endKey.time = 5;
+  endKey.value = end;
+  endKey.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(endKey);
+  object->channels.push_back(channel);
+  animation->objects.push_back(object);
+  doc->animations.push_back(animation);
+
+  // Element-wise interpolation at 60%: tx 20+0.6*(60-20)=44, tz -50-60=-110, scaleY 1.6.
+  auto mid = channel->evaluateAt(static_cast<Frame>(3));
+  auto* midMatrix = std::get_if<Matrix3D>(&mid);
+  ASSERT_TRUE(midMatrix != nullptr);
+  EXPECT_NEAR(midMatrix->values[12], 44.0f, 0.001f);
+  EXPECT_NEAR(midMatrix->values[14], -110.0f, 0.001f);
+  EXPECT_NEAR(midMatrix->values[5], 1.6f, 0.001f);
+  EXPECT_EQ(midMatrix->values[0], 1.0f);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/matrix3d_channel.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/matrix3d_channel.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  auto* dstAnimation = static_cast<Animation*>(decoded->findNode("matrix3DAnim"));
+  ASSERT_TRUE(dstAnimation != nullptr);
+  ASSERT_EQ(dstAnimation->objects.size(), 1u);
+  auto* dstChannel = dstAnimation->objects[0]->channels[0];
+  ASSERT_EQ(dstChannel->valueType(), ChannelValueType::Matrix3D);
+  auto* dstTyped = static_cast<TypedChannel<Matrix3D>*>(dstChannel);
+  ASSERT_EQ(dstTyped->keyframes.size(), 2u);
+  EXPECT_NEAR(dstTyped->keyframes[1].value.values[12], 60.0f, 0.001f);
+  EXPECT_NEAR(dstTyped->keyframes[1].value.values[14], -150.0f, 0.001f);
+  EXPECT_NEAR(dstTyped->keyframes[1].value.values[5], 2.0f, 0.001f);
+  EXPECT_NEAR(dstTyped->keyframes[0].value.values[12], 20.0f, 0.001f);
+
+  // Channel-table reflection.
+  auto names = ListChannels(NodeType::Layer);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "matrix3D") != names.end());
+
+  // Runtime write: apply drives the bound tgfx layer's 3D matrix.
+  auto runtimeScene = PAGScene::Make(doc);
+  ASSERT_TRUE(runtimeScene != nullptr);
+  auto matrix3DAnim = runtimeScene->getAnimation("matrix3DAnim");
+  ASSERT_TRUE(matrix3DAnim != nullptr);
+  matrix3DAnim->setCurrentTime(900000);
+  matrix3DAnim->apply(1.0f);
+  auto* binding = runtimeScene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  auto matrix3D = tgfxLayer->matrix3D();
+  EXPECT_NEAR(matrix3D.getRowColumn(0, 3), 60.0f, 0.001f);
+  EXPECT_NEAR(matrix3D.getRowColumn(2, 3), -150.0f, 0.001f);
+  EXPECT_NEAR(matrix3D.getRowColumn(1, 1), 2.0f, 0.001f);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "matrix3d-channel", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {

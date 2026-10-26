@@ -70,6 +70,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -231,6 +232,26 @@ static bool AccessArrayElement(Node* node, KeyValue* getOut, const KeyValue* set
     return false;
   }
   (self->*Field)[Index] = *value;
+  return true;
+}
+
+// Matrix3D access: addresses Layer.matrix3D (spec 6.2). The reset pass restores identity.
+template <typename T, auto Field>
+static bool AccessMatrix3D(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Matrix3D();
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<Matrix3D>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
   return true;
 }
 
@@ -429,6 +450,8 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessArrayElement<T, &T::member, idx> }
 #define FIELD_PATH_DATA(T, name, member, cls) \
   { name, cls, &AccessPathData<T, &T::member> }
+#define FIELD_MATRIX3D(T, name, member, cls) \
+  { name, cls, &AccessMatrix3D<T, &T::member> }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -452,6 +475,7 @@ static void AppendLayoutNodeFields(std::vector<ChannelDef>& table) {
 static std::vector<ChannelDef> BuildLayerFields() {
   std::vector<ChannelDef> table = {
       FIELD_STRING(Layer, "name", name, NoFlags),
+      FIELD_MATRIX3D(Layer, "matrix3D", matrix3D, Anim),
       FIELD_BOOL(Layer, "visible", visible, Anim),
       FIELD_FLOAT(Layer, "alpha", alpha, Anim),
       FIELD_ENUM(Layer, "blendMode", blendMode, Anim, BlendMode),

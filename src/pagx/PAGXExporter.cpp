@@ -85,6 +85,7 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
@@ -272,6 +273,11 @@ std::string KeyframeValueToString<PathData*>(PathData* const& value) {
 }
 
 template <>
+std::string KeyframeValueToString<Matrix3D>(const Matrix3D& value) {
+  return Matrix3DToString(value);
+}
+
+template <>
 std::string KeyframeValueToString<Color>(const Color& value) {
   return ColorToHexString(value, value.alpha < 1.0f);
 }
@@ -336,6 +342,9 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       break;
     case ChannelValueType::Path:
       WriteTypedChannel(xml, static_cast<const TypedChannel<PathData*>*>(channel), "path");
+      break;
+    case ChannelValueType::Matrix3D:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix3D>*>(channel), "matrix3D");
       break;
   }
 }

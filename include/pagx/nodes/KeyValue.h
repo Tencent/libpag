@@ -24,6 +24,7 @@
 #include <variant>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 
 namespace pagx {
 
@@ -36,7 +37,7 @@ class PathData;
  * ChannelValueType value.
  */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix,
-                               std::shared_ptr<PAGImage>, PathData*>;
+                               std::shared_ptr<PAGImage>, PathData*, Matrix3D>;
 
 /**
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
@@ -56,6 +57,8 @@ enum class ChannelValueType : uint8_t {
   // implementation; the binary format already reserves value 8 (spec/pag_binary_spec.md
   // §9.10).
   Path = 8,
+  // 4x4 column-major matrix for the Layer.matrix3D channel (PAGX spec 6.2).
+  Matrix3D = 9,
 };
 
 }  // namespace pagx

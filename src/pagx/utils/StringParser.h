@@ -42,6 +42,7 @@
 #include "pagx/types/LayerPlacement.h"
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/MipmapMode.h"
 #include "pagx/types/NoiseMode.h"
 #include "pagx/types/Padding.h"
@@ -255,6 +256,12 @@ std::string ColorToHexString(const Color& color, bool withAlpha = false);
 //==============================================================================
 std::string MatrixToString(const Matrix& matrix);
 Matrix MatrixFromString(const std::string& str);
+
+//==============================================================================
+// Matrix3D
+//==============================================================================
+std::string Matrix3DToString(const Matrix3D& matrix);
+Matrix3D Matrix3DFromString(const std::string& str);
 
 //==============================================================================
 // String parsing utilities

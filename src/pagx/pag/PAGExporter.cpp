@@ -103,6 +103,7 @@
 #include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/pag/exporter/LayoutFlattener.h"
 #include "pagx/pag/exporter/Stripper.h"
+#include "pagx/types/Matrix3D.h"
 
 namespace pagx {
 namespace {
@@ -1626,6 +1627,11 @@ void WriteSingleKeyValue<Color>(pag::EncodeStream* tag, const Color& value, Enco
 }
 
 template <>
+void WriteSingleKeyValue<Matrix3D>(pag::EncodeStream* tag, const Matrix3D& value, EncodeState*) {
+  WritePAGMatrix3D(tag, value);
+}
+
+template <>
 void WriteSingleKeyValue<PathData*>(pag::EncodeStream* tag, PathData* const& value, EncodeState*) {
   // Spec 6.1 columnar layout: one complete path (spec 7) per keyframe.
   WritePAGPath(tag, value, 0);
@@ -1784,6 +1790,9 @@ void WriteChannelTag(pag::EncodeStream* stream, Channel* channel, EncodeState* s
       break;
     case ChannelValueType::Path:
       WriteChannelKeyframes(&tag, static_cast<TypedChannel<PathData*>*>(channel), state);
+      break;
+    case ChannelValueType::Matrix3D:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<Matrix3D>*>(channel), state);
       break;
     default:
       break;

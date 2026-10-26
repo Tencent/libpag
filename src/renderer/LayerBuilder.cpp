@@ -204,6 +204,29 @@ struct LayerRuntimeTarget : RuntimeTarget {
       recompose();
       return true;
     }
+    if (channel == "matrix3D") {
+      const auto* v = std::get_if<Matrix3D>(&value);
+      if (v == nullptr) {
+        return false;
+      }
+      // 3D matrices mix element-wise (the sampled-per-frame migration keeps gaps dense, spec
+      // 6.2); matrix3D bypasses the recomposed 2D pipeline and writes the tgfx layer directly.
+      auto* layer = static_cast<tgfx::Layer*>(const_cast<void*>(rawObject()));
+      if (layer == nullptr) {
+        return false;
+      }
+      auto current = layer->matrix3D();
+      auto target = ToTGFX3D(*v);
+      for (int r = 0; r < 4; r++) {
+        for (int c = 0; c < 4; c++) {
+          auto a = current.getRowColumn(r, c);
+          auto b = target.getRowColumn(r, c);
+          target.setRowColumn(r, c, MixFloat(a, b, mix));
+        }
+      }
+      layer->setMatrix3D(target);
+      return true;
+    }
     // Decomposed channels (spec 6.2): each write updates the decomposed state and recomposes
     // the effective matrix from it, so mixing anchor/scale/skew/rotation against the static
     // baseline works the same way x/y do.
@@ -251,9 +274,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
   }
 
   bool hasWriter(const std::string& channel) const override {
-    if (channel == "x" || channel == "y" || channel == "matrix" || channel == "anchor.x" ||
-        channel == "anchor.y" || channel == "scale.x" || channel == "scale.y" ||
-        channel == "skew" || channel == "skewAxis" || channel == "rotation") {
+    if (channel == "x" || channel == "y" || channel == "matrix" || channel == "matrix3D" ||
+        channel == "anchor.x" || channel == "anchor.y" || channel == "scale.x" ||
+        channel == "scale.y" || channel == "skew" || channel == "skewAxis" ||
+        channel == "rotation") {
       return true;
     }
     return RuntimeTarget::hasWriter(channel);

@@ -340,6 +340,26 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
 // Matrix encoding/decoding
 //==============================================================================
 
+std::string Matrix3DToString(const Matrix3D& matrix) {
+  std::string result = {};
+  for (int i = 0; i < 16; i++) {
+    if (i > 0) {
+      result += ",";
+    }
+    result += FloatToString(matrix.values[i]);
+  }
+  return result;
+}
+
+Matrix3D Matrix3DFromString(const std::string& str) {
+  Matrix3D m = {};
+  auto values = ParseFloatList(str);
+  for (size_t i = 0; i < 16 && i < values.size(); i++) {
+    m.values[i] = values[i];
+  }
+  return m;
+}
+
 std::string MatrixToString(const Matrix& matrix) {
   return FloatToString(matrix.a) + "," + FloatToString(matrix.b) + "," + FloatToString(matrix.c) +
          "," + FloatToString(matrix.d) + "," + FloatToString(matrix.tx) + "," +

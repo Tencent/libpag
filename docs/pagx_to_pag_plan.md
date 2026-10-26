@@ -214,6 +214,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-6 图层样式扩展（StrokeLayerStyle 576/GradientOverlayStyle 577/OuterGlowStyle 578 + DropShadow spread；二进制与 XML 双向编解码，tgfx 着色器随后） | 2fdb48057 |
 | P3-7 特效滤镜 8 项（MotionTile 579/Levels 580/CornerPin 581/Bulge 582/Glow 583/DisplacementMap 584/RadialBlur 585/Mosaic 586；二进制与 XML 双向编解码 + DisplacementMap 图层引用（NodeRef + @id 双链路）+ 全参数动画通道注册 + ColorMatrixFilter 补齐 binding 与 matrix[0..19] 通道；tgfx 着色器随后） | 091810d2a |
 | P3-8 遮罩路径列表 + 路径动画（MaskPath 587：mode/inverted/feather/opacity/expansion + 内联 PathData；Layer.maskPaths 列表；§6.1 Path 值类型全链路——variant 第 9 备选、verb 相同逐点插值/不同 Hold、列式每帧完整 PathData、XML @id 引用 + id 合成、Path.data/MaskPath.path 通道；tgfx MaskContext 合成随后） | db0fe1b4c |
+| P3-9a matrix3D 关键帧支持（ChannelValueType::Matrix3D=9 第 10 备选；逐元素插值；二进制每帧 16 float 列式 + XML "matrix3D" 类型；Layer.matrix3D 通道注册 + LayerRuntimeTarget 运行时写 tgfx setMatrix3D。**Transform3D/相机采样迁移暂缓**：旧运行时无 3D 求值实现可对齐（CameraLayer.cpp 仅 verify/bounds、transform3D 图层旧渲染直接跳过），公式确认后落地；渲染走 PAGX setMatrix3D） | 本次提交 |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip

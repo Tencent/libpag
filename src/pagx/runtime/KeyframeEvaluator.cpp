@@ -49,6 +49,8 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
       // PathData channels are not wired into the runtime writers yet (PAGX spec §6.1
       // extension); nothing to interpolate until that lands.
       return a;
+    case ChannelValueType::Matrix3D:
+      return LerpKeyframeValue<Matrix3D>(std::get<Matrix3D>(a), std::get<Matrix3D>(b), t);
   }
   return a;
 }

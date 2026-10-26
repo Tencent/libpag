@@ -28,6 +28,7 @@
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 
 namespace pagx {
@@ -68,6 +69,18 @@ template <>
 inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /*b*/,
                                             double /*t*/) {
   return a;
+}
+
+template <>
+inline Matrix3D LerpKeyframeValue<Matrix3D>(const Matrix3D& a, const Matrix3D& b, double t) {
+  // Element-wise lerp. Like the 2D Matrix specialization this cannot recover full rotations;
+  // the migration samples Transform3D per frame (design doc 3.2), so interpolation only fills
+  // the gaps between dense samples and the distortion stays bounded.
+  Matrix3D result = {};
+  for (int i = 0; i < 16; i++) {
+    result.values[i] = a.values[i] + (b.values[i] - a.values[i]) * static_cast<float>(t);
+  }
+  return result;
 }
 
 template <>

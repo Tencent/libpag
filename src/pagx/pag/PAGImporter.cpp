@@ -96,6 +96,7 @@
 #include "pagx/pag/PAGTagHeader.h"
 #include "pagx/pag/TagCode.h"
 #include "pagx/pag/exporter/ImageProcessor.h"
+#include "pagx/types/Matrix3D.h"
 
 namespace pagx {
 namespace {
@@ -208,6 +209,11 @@ void ReadSingleKeyValue<std::string>(pag::DecodeStream* tag, std::string* value,
 template <>
 void ReadSingleKeyValue<Color>(pag::DecodeStream* tag, Color* value, DecodeContext*) {
   *value = ReadPAGColor(tag);
+}
+
+template <>
+void ReadSingleKeyValue<Matrix3D>(pag::DecodeStream* tag, Matrix3D* value, DecodeContext*) {
+  *value = ReadPAGMatrix3D(tag);
 }
 
 template <>
@@ -377,6 +383,11 @@ Channel* ReadChannelTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       channel = context->document->makeNode<TypedChannel<PathData*>>();
       channel->name = name;
       ReadChannelKeyframes(tagStream, static_cast<TypedChannel<PathData*>*>(channel), context);
+      break;
+    case ChannelValueType::Matrix3D:
+      channel = context->document->makeNode<TypedChannel<Matrix3D>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<Matrix3D>*>(channel), context);
       break;
     default:
       // ImageRef/PAGImage channels have no binary encoding yet; a file carrying them cannot
