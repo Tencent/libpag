@@ -3,7 +3,9 @@ import { AlphaType, ColorType } from './types';
 import {
   isWebGPUBackend,
   resolveTextureHandle,
+  trackWebGPUTextureHandle,
   unregisterWebGPUTexture,
+  untrackWebGPUTextureHandle,
   WebGPUTextureLike,
 } from './core/backend-context';
 import { GPU_TEXTURE_USAGE_COPY_SRC } from './constant';
@@ -89,7 +91,9 @@ export class PAGSurface {
       if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
       throw new Error(`Make PAGSurface from texture ${textureID} fail!`);
     }
-    return new PAGSurface(wasmIns, webGPUHandle);
+    const surface = new PAGSurface(wasmIns, webGPUHandle);
+    if (webGPUHandle > 0) trackWebGPUTextureHandle(surface, webGPUHandle);
+    return surface;
   }
   /**
    * Make a PAGSurface from frameBuffer. WebGL backend only; on the WebGPU backend a texture view
@@ -223,6 +227,7 @@ export class PAGSurface {
     this.wasmIns.delete();
     if (this.webGPUTextureHandle > 0) {
       unregisterWebGPUTexture(this.webGPUTextureHandle);
+      untrackWebGPUTextureHandle(this);
       this.webGPUTextureHandle = 0;
     }
     this.isDestroyed = true;

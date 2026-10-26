@@ -62,6 +62,32 @@ export const unregisterWebGPUTexture = (handle: number): void => {
   }
 };
 
+// Releases the WebGPU texture registration of wrappers that were garbage-collected without
+// calling destroy(), e.g. when a new wrapper from PAGPlayer.getSurface() replaced the original
+// one. The registry entry holds a strong reference to the host GPUTexture, so leaking it leaks
+// the texture itself. The callback timing is up to the GC; destroy() remains the primary
+// release path.
+const textureHandleRegistry =
+  typeof FinalizationRegistry === 'undefined'
+    ? null
+    : new FinalizationRegistry<number>((handle) => unregisterWebGPUTexture(handle));
+
+/**
+ * WebGPU backend only. Registers the wrapper so its texture handle gets released if the wrapper
+ * is garbage-collected without calling destroy(). Pair with untrackWebGPUTextureHandle() when
+ * the handle is released explicitly.
+ */
+export const trackWebGPUTextureHandle = (wrapper: object, handle: number): void => {
+  textureHandleRegistry?.register(wrapper, handle, wrapper);
+};
+
+/**
+ * WebGPU backend only. Cancels the GC-time release registered by trackWebGPUTextureHandle().
+ */
+export const untrackWebGPUTextureHandle = (wrapper: object): void => {
+  textureHandleRegistry?.unregister(wrapper);
+};
+
 export interface ResolvedTextureHandle {
   // Value to pass to the wasm _FromTexture entry.
   textureID: number;

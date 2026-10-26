@@ -2,7 +2,13 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
-import { resolveTextureHandle, unregisterWebGPUTexture, WebGPUTextureLike } from './core/backend-context';
+import {
+  resolveTextureHandle,
+  trackWebGPUTextureHandle,
+  unregisterWebGPUTexture,
+  untrackWebGPUTextureHandle,
+  WebGPUTextureLike,
+} from './core/backend-context';
 
 @destroyVerify
 export class PAGImage {
@@ -65,7 +71,9 @@ export class PAGImage {
       if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
       throw new Error('Make PAGImage from texture fail!');
     }
-    return new PAGImage(wasmIns, webGPUHandle);
+    const image = new PAGImage(wasmIns, webGPUHandle);
+    if (webGPUHandle > 0) trackWebGPUTextureHandle(image, webGPUHandle);
+    return image;
   }
 
   public wasmIns;
@@ -124,6 +132,7 @@ export class PAGImage {
     this.wasmIns.delete();
     if (this.webGPUTextureHandle > 0) {
       unregisterWebGPUTexture(this.webGPUTextureHandle);
+      untrackWebGPUTextureHandle(this);
       this.webGPUTextureHandle = 0;
     }
     this.isDestroyed = true;
