@@ -1340,6 +1340,86 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutput) {
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));
 }
 
+//==============================================================================
+// Import — legacy .pag migration (spec 3.13)
+//==============================================================================
+
+static std::string LegacySamplePath(const std::string& name) {
+  return ProjectPath::Absolute("resources/apitest/" + name);
+}
+
+// A legacy .pag migrates to the v4 binary (the default .pag output path, design decision 5)
+// and loads back through the v4 importer.
+CLI_TEST(PAGXCliTest, Import_LegacyPagToV4) {
+  auto inputPath = LegacySamplePath("video_sequence_with_mp4header.pag");
+  auto outputPath = TempDir() + "/legacy_v4.pag";
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 100000u);
+  // The v4 output decodes back with the sequence entry intact.
+  auto decoded = pagx::PAGImporter::LoadFromPAG(outputPath);
+  ASSERT_TRUE(decoded != nullptr);
+  bool hasSequence = false;
+  for (auto& node : decoded->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (image->isSequence) {
+        hasSequence = true;
+        break;
+      }
+    }
+  }
+  EXPECT_TRUE(hasSequence);
+}
+
+// The fidelity report (spec 3.13) carries the migration level, the feature inventory, the
+// issue table and the ViewModel property mapping.
+CLI_TEST(PAGXCliTest, Import_LegacyPagReport) {
+  auto inputPath = LegacySamplePath("editableTextLayer.pag");
+  auto outputPath = TempDir() + "/legacy_edit.v4.pag";
+  auto reportPath = TempDir() + "/legacy_edit_report.md";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath,
+                                            "--report", reportPath});
+  ASSERT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(reportPath));
+  auto report = ReadFile(reportPath);
+  EXPECT_TRUE(report.find("# Legacy PAG Migration Report") != std::string::npos);
+  EXPECT_TRUE(report.find("## Legacy feature inventory") != std::string::npos);
+  EXPECT_TRUE(report.find("| Editable texts | 2 |") != std::string::npos);
+  EXPECT_TRUE(report.find("## ViewModel property mapping (spec 7.2)") != std::string::npos);
+  EXPECT_TRUE(report.find("| text0 | string |") != std::string::npos);
+}
+
+// --strict fails (exit code 2) when the migration produced any issue, even though the
+// output file was written.
+CLI_TEST(PAGXCliTest, Import_LegacyPagStrict) {
+  auto inputPath = LegacySamplePath("video_sequence_with_mp4header.pag");
+  auto outputPath = TempDir() + "/legacy_strict.v4.pag";
+  // A clean migration passes strict.
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", inputPath, "--output", outputPath, "--strict"});
+  EXPECT_EQ(ret, 0);
+  // A sample with issues (grad_6 reports an unsupported shape element) fails strict with 2.
+  auto issuePath = ProjectPath::Absolute("resources/gradient/grad_6.pag");
+  auto ret2 = CallRun(pagx::cli::RunImport,
+                      {"import", "--input", issuePath, "--output", outputPath, "--strict"});
+  EXPECT_EQ(ret2, 2);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// An explicit .pagx output keeps the XML path for a legacy input.
+CLI_TEST(PAGXCliTest, Import_LegacyPagToPagx) {
+  auto inputPath = LegacySamplePath("video_sequence_with_mp4header.pag");
+  auto outputPath = TempDir() + "/legacy_xml.pagx";
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_TRUE(xml.find("<pagx") != std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Import_MissingFile) {
   auto outputPath = TempDir() + "/ImportSVG_Missing.pagx";
   auto ret = CallRun(pagx::cli::RunImport,

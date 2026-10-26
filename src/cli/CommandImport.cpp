@@ -33,7 +33,11 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
+#include "cli/MigrationReport.h"
+#include "pag/file.h"
 #include "pagx/HTMLImporter.h"
+#include "pagx/LegacyPAGImporter.h"
+#include "pagx/PAGExporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
@@ -436,6 +440,16 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
   if (effectiveFormat == "svg") {
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
+  } else if (effectiveFormat == "pag") {
+    // Legacy PAG migration (spec 3.13): the file converts in memory — no intermediate XML text —
+    // and the loaded file stays alive for the fidelity report.
+    result.legacyFile = pag::File::Load(filePath);
+    if (result.legacyFile == nullptr) {
+      result.error = "failed to load legacy PAG '" + filePath + "'";
+      return result;
+    }
+    result.document = LegacyPAGImporter::Convert(result.legacyFile, &result.migrationIssues);
+    result.isLegacyMigration = result.document != nullptr;
   } else if (effectiveFormat == "html") {
     auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
     if (snapshotEnabled) {
@@ -512,6 +526,12 @@ struct ImportOptions {
   // Directory used to resolve relative image `source` paths to real files. Defaults to the input
   // file's directory. Only meaningful for local (non-URL) inputs.
   std::string imageBaseDir = {};
+  // Legacy (.pag) migration only: write the fidelity report to this Markdown file (a summary
+  // line always goes to stderr).
+  std::string reportFile = {};
+  // Legacy (.pag) migration only: exit with a non-zero code when the migration produced any
+  // issue (partial migration), even though the output file was written.
+  bool strict = false;
 };
 
 static void PrintUsage() {
@@ -523,7 +543,11 @@ static void PrintUsage() {
       << "Options:\n"
       << "  --input <file|url>             Input file or URL to import (required)\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
-      << "  --format <format>              Force input format (svg, html)\n"
+      << "  --format <format>              Force input format (svg, html, pag)\n"
+      << "  --report <file>                Legacy .pag only: write a Markdown fidelity report\n"
+      << "                                 (feature inventory, issues, size, ViewModel mapping)\n"
+      << "  --strict                       Legacy .pag only: exit with code 2 when the migration\n"
+      << "                                 produced any issue (partial migration)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
       << "                                 <svg>) instead of expanding them into native nodes\n"
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
@@ -543,6 +567,7 @@ static void PrintUsage() {
       << "\n"
       << "Examples:\n"
       << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
+      << "  pagx import --input legacy.pag --report report.md # migrate to legacy.v4.pag + report\n"
       << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
       << "  pagx import --input page.html --no-resolve        # keep import directives\n"
@@ -575,6 +600,10 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->imageBaseDir = argv[++i];
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
+    } else if (arg == "--report" && i + 1 < argc) {
+      options->reportFile = argv[++i];
+    } else if (arg == "--strict") {
+      options->strict = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
                arg == "--svg-preserve-unknown") {
       // Handled by ParseFormatOptions below.
@@ -601,7 +630,12 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       std::cerr << "pagx import: error: --output is required when --input is a URL\n";
       return 1;
     }
-    options->outputFile = ReplaceExtension(options->inputFile, "pagx");
+    // Legacy .pag inputs default to a v4 binary .pag output (spec 3.13, design decision 5:
+    // the migration is .pag -> .pag); everything else defaults to a .pagx XML. An explicit
+    // --output keeps whatever extension the caller chose (the writer dispatches on it).
+    auto effectiveDefault = NormalizeFormat(options->format, GetFileExtension(options->inputFile));
+    options->outputFile = effectiveDefault == "pag" ? ReplaceExtension(options->inputFile, "v4.pag")
+                                                    : ReplaceExtension(options->inputFile, "pagx");
   }
 
   ParseFormatOptions(argc, argv, &options->formatOptions);
@@ -672,9 +706,60 @@ int RunImport(int argc, char* argv[]) {
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
   }
 
-  auto xml = PAGXExporter::ToXML(*result.document);
-  if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {
-    return 1;
+  // Legacy migrations default to the v4 binary (.pag output extension, spec 3.13); an explicit
+  // .pagx output keeps the XML path. Everything else stays XML.
+  bool outputV4 = result.isLegacyMigration && GetFileExtension(options.outputFile) != "pagx";
+  if (outputV4) {
+    auto exportResult = PAGExporter::ExportToPAG(result.document, options.outputFile);
+    if (!exportResult.success) {
+      std::cerr << "pagx import: error: v4 export failed";
+      if (!exportResult.warnings.empty()) {
+        std::cerr << ": " << exportResult.warnings.back().message;
+      }
+      std::cerr << "\n";
+      return 1;
+    }
+    if (options.verbose) {
+      for (auto& issue : exportResult.warnings) {
+        std::cerr << "pagx import: warning: v4 export: " << issue.message << "\n";
+      }
+    }
+  } else {
+    auto xml = PAGXExporter::ToXML(*result.document);
+    if (!WriteStringToFile(xml, options.outputFile, "pagx import")) {
+      return 1;
+    }
+  }
+
+  if (result.isLegacyMigration) {
+    uint64_t outputBytes = 0;
+    uint64_t inputBytes = 0;
+    try {
+      outputBytes = static_cast<uint64_t>(std::filesystem::file_size(options.outputFile));
+      inputBytes = static_cast<uint64_t>(std::filesystem::file_size(options.inputFile));
+    } catch (const std::filesystem::filesystem_error&) {
+      // Size comparison degrades to 0 when a path is not stat-able (e.g. piped input).
+    }
+    MigrationReportInput reportInput = {};
+    reportInput.legacyFile = result.legacyFile.get();
+    reportInput.document = result.document.get();
+    reportInput.issues = &result.migrationIssues;
+    reportInput.inputPath = options.inputFile;
+    reportInput.inputBytes = inputBytes;
+    reportInput.outputPath = options.outputFile;
+    reportInput.outputBytes = outputBytes;
+    PrintMigrationSummary(reportInput);
+    if (!options.reportFile.empty()) {
+      auto report = BuildMigrationReport(reportInput);
+      if (!WriteStringToFile(report, options.reportFile, "pagx import")) {
+        return 1;
+      }
+    }
+    if (options.strict && !result.migrationIssues.empty()) {
+      std::cerr << "pagx import: --strict: migration produced " << result.migrationIssues.size()
+                << " issue(s); failing\n";
+      return 2;
+    }
   }
 
   return 0;

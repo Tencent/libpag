@@ -19,9 +19,15 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/PAGExporter.h"
+
+namespace pag {
+class File;
+}  // namespace pag
 
 namespace pagx {
 class PAGXDocument;
@@ -33,6 +39,11 @@ struct ImportResult {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::string error = {};
   std::vector<std::string> warnings = {};
+  // Legacy (.pag) migration only: the importer's per-issue records and the loaded file, kept
+  // alive for the fidelity report (feature inventory, size comparison).
+  bool isLegacyMigration = false;
+  std::vector<PAGExportIssue> migrationIssues = {};
+  std::shared_ptr<pag::File> legacyFile = nullptr;
 };
 
 struct ImportFormatOptions {

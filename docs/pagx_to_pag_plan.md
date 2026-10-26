@@ -221,6 +221,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-10c-fix 视频帧 RGBAAA 修复（SequencePlayer::frameAt 对视频帧做 makeRGBAAA(w,h,alphaStart) 双区重采样对齐 SequenceInfo::MakeSequenceImage；解码器回退平台默认工厂列表（硬解优先+软解兜底）对齐旧管线；VideoSequenceFrameSchedulingTest 新旧双管线对照回归） | 75b29ca33 |
 | P3-11 时间伸缩与音频（TimeStretchMode + PAGScene::setTimeStretchMode/setDuration：Repeat/Inverted→运行时 Loop/PingPong 覆盖、None→Once、Scale→rate 注入；Composition.audioData/startTime：ImageTable mediaType=4 + CompositionAudio 588 + XML data URI + 迁移帧转秒） | eff85bca7 |
 | P3-12 可编辑映射（TextLayer→TextBox+Text 运行时排版、ImageLayer→Rect+Fill+ImagePattern 静态迁移补齐；editableTexts/editableImages→ViewModel text<i>/image<i> + DataBind 按目标 composition 挂载（scope 规则）+ VM 挂文档级；**修复既有 bug**：StringTable 预收集漏 Composition::dataBinds 致 v4 往返 bind 字段全空；PAGXExporter 保留无对象 Animation；运行时编辑渲染写回链（value→flush→TextHolder reshape→像素）为尾项待收） | 75daa214e |
+| P3-13 迁移 CLI 与报告（pagx import 接受 .pag 输入走 LegacyPAGImporter 内存直转，默认输出 v4 .pag（决策 5）、显式 .pagx 扩展走 XML；--report Markdown 保真度报告：迁移等级/特性清单/issue 明细/体积对比/ViewModel 属性对照；--strict 有 issue 退出码 2；新 src/cli/MigrationReport） | 本次提交 |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip
