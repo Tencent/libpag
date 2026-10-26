@@ -38,11 +38,6 @@ class __attribute__((visibility("hidden"))) PAGViewSurface {
   static Class LayerClass();
 
   /**
-   * Configures the view before creating its player and animation state.
-   */
-  static void Configure(id view);
-
-  /**
    * Registers the view's callback for backend-specific surface-prepared notifications.
    */
   static void ObserveSurfacePrepared(id view, SEL callback);

@@ -27,9 +27,6 @@ Class PAGViewSurface::LayerClass() {
   return [CAEAGLLayer class];
 }
 
-void PAGViewSurface::Configure(id) {
-}
-
 void PAGViewSurface::ObserveSurfacePrepared(id view, SEL callback) {
   // EAGLDrawable defers CAEAGLLayer surface creation to the main queue to avoid issue #1870.
   [[NSNotificationCenter defaultCenter] addObserver:view

@@ -27,9 +27,6 @@ Class PAGViewSurface::LayerClass() {
   return Nil;
 }
 
-void PAGViewSurface::Configure(id) {
-}
-
 void PAGViewSurface::ObserveSurfacePrepared(id view, SEL callback) {
   [[NSNotificationCenter defaultCenter] addObserver:view
                                            selector:callback

@@ -43,16 +43,6 @@ Class PAGViewSurface::LayerClass() {
   return [CAMetalLayer class];
 }
 
-#if TARGET_OS_IPHONE
-void PAGViewSurface::Configure(id) {
-}
-#else
-void PAGViewSurface::Configure(id view) {
-  PAGView* pagView = view;
-  pagView.wantsLayer = YES;
-}
-#endif
-
 void PAGViewSurface::ObserveSurfacePrepared(id, SEL) {
 }
 

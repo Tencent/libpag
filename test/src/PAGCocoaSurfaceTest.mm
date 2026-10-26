@@ -135,6 +135,8 @@ PAG_TEST(PAGCocoaSurfaceTest, ViewSurfaceSurvivesResize) {
     auto view = [[PAGView alloc] initWithFrame:CGRectMake(0, 0, 16, 16)];
 #if TARGET_OS_IPHONE
     [view setSync:YES];
+#else
+    EXPECT_EQ(view.wantsLayer, pag::Devices::SupportsBackend(tgfx::Backend::Metal));
 #endif
     [view initPAGSurface];
     PAGSurface* surface = [view valueForKey:@"pagSurface"];

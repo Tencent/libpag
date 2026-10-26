@@ -52,7 +52,9 @@
 }
 
 - (void)initPAG {
-  pag::cocoa::PAGViewSurface::Configure(self);
+#if defined(TGFX_USE_METAL)
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
