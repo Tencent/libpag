@@ -1219,6 +1219,7 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     writer.writeFlag(!text->fontStyle.empty());
     writer.writeFlag(text->fontSize != 12.0f);
     writer.writeFlag(text->letterSpacing != 0.0f);
+    writer.writeFlag(text->tracking != 0.0f);
     writer.writeFlag(text->fauxBold);
     writer.writeFlag(text->fauxItalic);
     writer.writeFlag(text->textAnchor != TextAnchor::Start);
@@ -1233,6 +1234,7 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     if (!text->fontStyle.empty()) v->writeEncodedUint32(state->intern(text->fontStyle));
     if (text->fontSize != 12.0f) v->writeFloat(text->fontSize);
     if (text->letterSpacing != 0.0f) v->writeFloat(text->letterSpacing);
+    if (text->tracking != 0.0f) v->writeFloat(text->tracking);
     if (text->textAnchor != TextAnchor::Start) {
       v->writeUint8(static_cast<uint8_t>(text->textAnchor));
     }

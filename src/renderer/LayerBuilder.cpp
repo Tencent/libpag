@@ -485,6 +485,37 @@ struct TextRuntimeTarget : RuntimeTarget {
   }
 };
 
+// Runtime target for a TextBox node: forwards the container-level layout channels to the shared
+// TextHolder, which mutates its TextLayoutParams and re-lays-out on the next flush.
+struct TextBoxRuntimeTarget : RuntimeTarget {
+  std::shared_ptr<TextHolder> holder = nullptr;
+
+  explicit TextBoxRuntimeTarget(std::shared_ptr<TextHolder> textHolder)
+      : holder(std::move(textHolder)) {
+  }
+
+  static bool IsContainerChannel(const std::string& channel) {
+    return channel == "textAlign" || channel == "writingMode" || channel == "lineHeight" ||
+           channel == "width" || channel == "boxWidth" || channel == "height" ||
+           channel == "boxHeight" || channel == "wordWrap" || channel == "overflow";
+  }
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (holder != nullptr && IsContainerChannel(channel)) {
+      holder->applyContainer(channel, value, mix);
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    if (holder != nullptr && IsContainerChannel(channel)) {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+};
+
 // Context threaded through convertGroup/convertVectorElement/convertText while converting a
 // TextBox's children. Carries the shared TextHolder all child Texts attach to (they share one
 // line-breaking layout), plus each child's inverse matrix and the box padding so a reshape
@@ -1688,10 +1719,12 @@ class LayerBuilderContext {
         _result.binding.setAccessor(node, "color", WritePainterColor<tgfx::FillStyle>,
                                     ReadPainterColor<tgfx::FillStyle>);
       }
-      _result.binding.setAccessor(
-          node, "alpha",
-          WriteMixedFloat<tgfx::FillStyle, &tgfx::FillStyle::alpha, &tgfx::FillStyle::setAlpha>,
-          ReadScalar<tgfx::FillStyle, &tgfx::FillStyle::alpha>);
+      _result.binding.setAccessor(node, "alpha",
+                                  WritePainterAlphaTracked<tgfx::FillStyle, &tgfx::FillStyle::alpha,
+                                                           &tgfx::FillStyle::setAlpha>,
+                                  ReadScalar<tgfx::FillStyle, &tgfx::FillStyle::alpha>);
+      _result.binding.setAccessor(node, "visible", WritePainterVisible<tgfx::FillStyle>,
+                                  ReadPainterVisible<tgfx::FillStyle>);
     }
     return fill;
   }
@@ -1749,8 +1782,11 @@ class LayerBuilderContext {
                                 ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::strokeWidth>);
     _result.binding.setAccessor(
         node, "alpha",
-        WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha, &tgfx::StrokeStyle::setAlpha>,
+        WritePainterAlphaTracked<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha,
+                                 &tgfx::StrokeStyle::setAlpha>,
         ReadScalar<tgfx::StrokeStyle, &tgfx::StrokeStyle::alpha>);
+    _result.binding.setAccessor(node, "visible", WritePainterVisible<tgfx::StrokeStyle>,
+                                ReadPainterVisible<tgfx::StrokeStyle>);
     _result.binding.setAccessor(node, "miterLimit",
                                 WriteMixedFloat<tgfx::StrokeStyle, &tgfx::StrokeStyle::miterLimit,
                                                 &tgfx::StrokeStyle::setMiterLimit>,
@@ -1804,6 +1840,58 @@ class LayerBuilderContext {
       return;
     }
     WriteSolidColor(solid, value, mix);
+  }
+
+  // Painter "visible" channel (spec 6.5 applyFill/applyStroke): false blanks the painter by
+  // zeroing its alpha, true restores the authored node alpha. Alpha and visible are separate
+  // channels — writing visible never rewrites the authored alpha source of truth.
+  template <typename PainterType>
+  static void WritePainterVisible(void* object, const KeyValue& value, float) {
+    const auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* painter = static_cast<PainterType*>(object);
+    if (*v) {
+      auto base = painterVisibleBaseAlpha(painter, painter->alpha(), false);
+      painter->setAlpha(base);
+    } else {
+      painterVisibleBaseAlpha(painter, painter->alpha(), false);
+      painter->setAlpha(0.0f);
+    }
+  }
+
+  // The authored alpha is remembered in a side map keyed by the painter pointer because
+  // LayerProperty carries no user storage; the alpha writer keeps it current so a later
+  // visible=true restores the latest animated alpha, not a stale snapshot.
+  static float painterVisibleBaseAlpha(void* painter, float currentAlpha, bool update) {
+    auto& map = painterBaseAlphas();
+    if (update || map.find(painter) == map.end()) {
+      map[painter] = currentAlpha;
+    }
+    return map[painter];
+  }
+
+  static std::unordered_map<void*, float>& painterBaseAlphas() {
+    static std::unordered_map<void*, float> map;
+    return map;
+  }
+
+  template <typename PainterType>
+  static bool ReadPainterVisible(const void* object, KeyValue* out) {
+    auto* painter = const_cast<PainterType*>(static_cast<const PainterType*>(object));
+    *out = KeyValue{painter->alpha() > 0.0f};
+    return true;
+  }
+
+  // Wraps the painter alpha writer so the visible-channel side map tracks the newest alpha.
+  template <typename PainterType, float (PainterType::*Getter)() const,
+            void (PainterType::*Setter)(float)>
+  static void WritePainterAlphaTracked(void* object, const KeyValue& value, float mix) {
+    auto* painter = static_cast<PainterType*>(object);
+    auto mixed = MixFloat((painter->*Getter)(), *std::get_if<float>(&value), mix);
+    painterVisibleBaseAlpha(painter, mixed, true);
+    (painter->*Setter)(mixed);
   }
 
   template <typename PainterType>
@@ -3492,6 +3580,9 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
     auto group = convertGroup(node);
     _textBoxContext = previous;
     _result.binding.registerTextHolder(context.holder);
+    // Container-level layout channels (spec 6.5) route through a runtime target on the TextBox
+    // node so justification / leading / box geometry can be animated or ViewModel-bound.
+    _result.binding.setTarget(node, std::make_unique<TextBoxRuntimeTarget>(context.holder));
     return group;
   }
 

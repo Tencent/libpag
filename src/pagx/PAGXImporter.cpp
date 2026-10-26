@@ -988,6 +988,7 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->fontSize = GetFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
   text->letterSpacing =
       GetFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
+  text->tracking = GetFloatAttribute(node, "tracking", Default<Text>().tracking, doc);
   text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);

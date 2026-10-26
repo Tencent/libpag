@@ -74,6 +74,12 @@ class Text : public Element, public LayoutNode {
   float letterSpacing = 0.0f;
 
   /**
+   * Tracking in 1/1000 em (spec 6.5): independent of letterSpacing, effective spacing =
+   * letterSpacing + tracking * fontSize / 1000. Unset when NaN (not authored). The default is 0.
+   */
+  float tracking = 0.0f;
+
+  /**
    * Whether to apply algorithmic bolding. The default value is false.
    */
   bool fauxBold = false;

@@ -1790,7 +1790,7 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::TextAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 13);
+      PAGAttributeBlockReader reader(&tagBytes, 14);
       bool hasPosX = reader.flag(0);
       bool hasPosY = reader.flag(1);
       bool hasWidth = reader.flag(2);
@@ -1800,10 +1800,11 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       bool hasStyle = reader.flag(6);
       bool hasSize = reader.flag(7);
       bool hasSpacing = reader.flag(8);
-      text->fauxBold = reader.flag(9);
-      text->fauxItalic = reader.flag(10);
-      bool hasAnchor = reader.flag(11);
-      bool hasBaseline = reader.flag(12);
+      bool hasTracking = reader.flag(9);
+      text->fauxBold = reader.flag(10);
+      text->fauxItalic = reader.flag(11);
+      bool hasAnchor = reader.flag(12);
+      bool hasBaseline = reader.flag(13);
       tagBytes.alignWithBytes();
       if (hasPosX) text->position.x = tagBytes.readFloat();
       if (hasPosY) text->position.y = tagBytes.readFloat();
@@ -1814,6 +1815,7 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       if (hasStyle) text->fontStyle = context->getString(tagBytes.readEncodedUint32());
       if (hasSize) text->fontSize = tagBytes.readFloat();
       if (hasSpacing) text->letterSpacing = tagBytes.readFloat();
+      if (hasTracking) text->tracking = tagBytes.readFloat();
       if (hasAnchor) text->textAnchor = static_cast<TextAnchor>(tagBytes.readUint8());
       if (hasBaseline) text->baseline = static_cast<TextBaseline>(tagBytes.readUint8());
     } else if (header.code == TagCode::GlyphRun) {

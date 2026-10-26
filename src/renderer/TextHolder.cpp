@@ -20,6 +20,9 @@
 #include <variant>
 #include "pagx/LayoutContext.h"
 #include "pagx/runtime/MixUtils.h"
+#include "pagx/types/Overflow.h"
+#include "pagx/types/TextAlign.h"
+#include "pagx/types/WritingMode.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/LayerBuilder.h"
 
@@ -89,6 +92,16 @@ void TextHolder::apply(Text* node, const std::string& channel, const KeyValue& v
       return;
     }
     glyph.letterSpacing = mixed;
+  } else if (channel == "tracking") {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto mixed = MixFloat(glyph.tracking, *v, mix);
+    if (mixed == glyph.tracking) {
+      return;
+    }
+    glyph.tracking = mixed;
   } else if (channel == "text") {
     const auto* v = std::get_if<std::string>(&value);
     if (v == nullptr || *v == glyph.text) {
@@ -144,6 +157,8 @@ bool TextHolder::read(Text* node, const std::string& channel, KeyValue* out) con
     *out = KeyValue{glyph.fontSize};
   } else if (channel == "letterSpacing") {
     *out = KeyValue{glyph.letterSpacing};
+  } else if (channel == "tracking") {
+    *out = KeyValue{glyph.tracking};
   } else if (channel == "fauxBold") {
     *out = KeyValue{glyph.fauxBold};
   } else if (channel == "fauxItalic") {
@@ -152,6 +167,55 @@ bool TextHolder::read(Text* node, const std::string& channel, KeyValue* out) con
     return false;
   }
   return true;
+}
+
+void TextHolder::applyContainer(const std::string& channel, const KeyValue& value, float mix) {
+  if (channel == "textAlign") {
+    const auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    params.textAlign = static_cast<TextAlign>(*v);
+  } else if (channel == "writingMode") {
+    const auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    params.writingMode = static_cast<WritingMode>(*v);
+  } else if (channel == "lineHeight") {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || *v == params.lineHeight) {
+      return;
+    }
+    params.lineHeight = MixFloat(params.lineHeight, *v, mix);
+  } else if (channel == "width" || channel == "boxWidth") {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || *v == params.boxWidth) {
+      return;
+    }
+    params.boxWidth = MixFloat(params.boxWidth, *v, mix);
+  } else if (channel == "height" || channel == "boxHeight") {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || *v == params.boxHeight) {
+      return;
+    }
+    params.boxHeight = MixFloat(params.boxHeight, *v, mix);
+  } else if (channel == "wordWrap") {
+    const auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    params.wordWrap = *v;
+  } else if (channel == "overflow") {
+    const auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    params.overflow = static_cast<Overflow>(*v);
+  } else {
+    return;
+  }
+  dirty = true;
 }
 
 void TextHolder::flush(FontConfig* fontConfig) {

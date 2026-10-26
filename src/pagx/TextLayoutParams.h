@@ -39,6 +39,10 @@ struct TextGlyphParams {
   std::string fontStyle;
   float fontSize = 12.0f;
   float letterSpacing = 0.0f;
+  // Tracking in 1/1000 em (spec 6.5): independent of letterSpacing, effective spacing =
+  // letterSpacing + tracking * fontSize / 1000. Ensures tracking and fontSize animate precisely
+  // together (the legacy AE semantics) instead of pre-baking tracking into letterSpacing.
+  float tracking = 0.0f;
   bool fauxBold = false;
   bool fauxItalic = false;
 };

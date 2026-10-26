@@ -70,6 +70,12 @@ class TextHolder {
   // the holder dirty. mix follows the existing writer convention: discrete channels ignore it.
   void apply(Text* node, const std::string& channel, const KeyValue& value, float mix);
 
+  // Container-level layout channels (spec 6.5 justification/leading/boxText): mutate the
+  // holder's snapshotted TextLayoutParams and mark dirty, so the next flush re-lays-out the
+  // whole source with the new box geometry. Discrete channels (textAlign, writingMode, ...)
+  // overwrite; continuous ones (lineHeight, boxWidth, boxHeight) mix from the current value.
+  void applyContainer(const std::string& channel, const KeyValue& value, float mix);
+
   // target -> ViewModel. Reads the entry's current effective attribute for the channel.
   bool read(Text* node, const std::string& channel, KeyValue* out) const;
 

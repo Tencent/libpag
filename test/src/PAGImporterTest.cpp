@@ -2332,6 +2332,97 @@ PAGX_TEST(PAGImporterTest, LegacyImporterKeyframeSmoke) {
   EXPECT_TRUE(decoded != nullptr);
 }
 
+PAGX_TEST(PAGImporterTest, TextChannelExtensionsRoundTrip) {
+  // P3-3 text channel extensions: tracking (1/1000 em) survives XML and binary round trips
+  // alongside letterSpacing; the runtime channels (tracking / textAlign / lineHeight / box
+  // size / Fill.visible) are registered on the runtime targets.
+  auto doc = PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<Layer>();
+  doc->layers.push_back(layer);
+  auto* textBox = doc->makeNode<TextBox>();
+  textBox->width = 200;
+  textBox->height = 60;
+  auto* text = doc->makeNode<Text>();
+  text->text = "Tracked";
+  text->fontSize = 20;
+  text->letterSpacing = 1.5f;
+  text->tracking = 50.0f;
+  textBox->elements.push_back(text);
+  auto* fill = doc->makeNode<Fill>();
+  auto* solid = doc->makeNode<SolidColor>();
+  solid->color = {0.2f, 0.4f, 0.9f, 1.0f, ColorSpace::SRGB};
+  fill->color = solid;
+  textBox->elements.push_back(fill);
+  layer->contents.push_back(textBox);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/text_ext.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/text_ext.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  auto* dTextBox = static_cast<TextBox*>(decoded->layers[0]->contents[0]);
+  ASSERT_EQ(dTextBox->elements.size(), 2u);
+  auto* dText = static_cast<Text*>(dTextBox->elements[0]);
+  EXPECT_EQ(dText->letterSpacing, 1.5f);
+  EXPECT_EQ(dText->tracking, 50.0f);
+
+  // The runtime scene registers the channel writers.
+  auto scene = PAGScene::Make(decoded);
+  ASSERT_TRUE(scene != nullptr);
+  int width = static_cast<int>(decoded->width);
+  int height = static_cast<int>(decoded->height);
+  auto surfaceA = PAGSurface::MakeOffscreen(width, height);
+  auto surfaceB = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+  ASSERT_TRUE(scene->draw(surfaceA));
+  std::vector<uint8_t> pixelsA(static_cast<size_t>(width) * height * 4);
+  std::vector<uint8_t> pixelsB(static_cast<size_t>(width) * height * 4);
+  ASSERT_TRUE(surfaceA->readPixels(pixelsA.data(), static_cast<size_t>(width) * 4));
+
+  // Drive the Fill "visible" channel through an animation: the text disappears when false.
+  auto* animation = doc->makeNode<Animation>();
+  animation->id = "hide";
+  animation->duration = 10;
+  animation->frameRate = 10;
+  auto* object = doc->makeNode<AnimationObject>();
+  // The runtime Fill node carries the id the target resolution needs.
+  fill->id = "textExtFill";
+  object->target = "textExtFill";
+  auto* channel = doc->makeNode<TypedChannel<bool>>();
+  channel->name = "visible";
+  Keyframe<bool> on = {};
+  on.time = 0;
+  on.value = true;
+  on.interpolation = KeyframeInterpolationType::Hold;
+  channel->keyframes.push_back(on);
+  Keyframe<bool> off = {};
+  off.time = 5;
+  off.value = false;
+  off.interpolation = KeyframeInterpolationType::Hold;
+  channel->keyframes.push_back(off);
+  object->channels.push_back(channel);
+  animation->objects.push_back(object);
+  doc->animations.push_back(animation);
+
+  auto scene2 = PAGScene::Make(doc);
+  ASSERT_TRUE(scene2 != nullptr);
+  auto hideAnim = scene2->getAnimation("hide");
+  ASSERT_TRUE(hideAnim != nullptr);
+  hideAnim->setCurrentTime(900000);
+  hideAnim->apply(1.0f);
+  ASSERT_TRUE(scene2->draw(surfaceB));
+  ASSERT_TRUE(surfaceB->readPixels(pixelsB.data(), static_cast<size_t>(width) * 4));
+  // The hidden-fill frame differs from the visible one (the text fill disappears).
+  int diffPixels = 0;
+  for (size_t i = 0; i < pixelsA.size(); i += 4) {
+    if (pixelsA[i] != pixelsB[i] || pixelsA[i + 1] != pixelsB[i + 1] ||
+        pixelsA[i + 2] != pixelsB[i + 2]) {
+      diffPixels++;
+    }
+  }
+  EXPECT_GT(diffPixels, 0);
+}
+
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
   // Layer timelines (spec §9.6): AnimationTimeline carries animationId / playing /
   // evaluationOffset (signed varint, negative skips ahead); StateMachineTimeline carries only

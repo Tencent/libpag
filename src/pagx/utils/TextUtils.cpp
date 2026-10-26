@@ -564,6 +564,7 @@ TextGlyphParams MakeGlyphParams(const Text* text) {
   params.fontStyle = text->fontStyle;
   params.fontSize = text->fontSize;
   params.letterSpacing = text->letterSpacing;
+  params.tracking = text->tracking;
   params.fauxBold = text->fauxBold;
   params.fauxItalic = text->fauxItalic;
   return params;

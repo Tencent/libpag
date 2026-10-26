@@ -419,7 +419,8 @@ class TextLayoutContext {
     metricsFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     float currentX = 0;
     const std::string& content = glyph.text;
-    float effectiveLetterSpacing = glyph.letterSpacing * textScale;
+    float effectiveLetterSpacing =
+        (glyph.letterSpacing + glyph.tracking * glyph.fontSize / 1000.0f) * textScale;
     bool hasLetterSpacing = !FloatNearlyEqual(effectiveLetterSpacing, 0.0f);
 
     // Collect newline and tab positions, then shape non-special segments.
