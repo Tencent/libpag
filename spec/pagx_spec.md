@@ -1026,18 +1026,24 @@ Draws a drop shadow **below** the layer. Computes shadow shape based on opaque l
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
+| `spread` | float | 0 | Signed layer-local length. Positive expands the shadow shape outward, negative contracts it |
 | `color` | Color | #000000 | Shadow color |
 | `showBehindLayer` | bool | true | Whether shadow shows behind layer |
 
 **Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the offset content
-3. Fill the shadow region with `color`
-4. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
+1. Get opaque layer content. When `spread` is non-zero, spread the content contour by `spread` (positive outward, negative inward) to form the shadow shape; when it is 0, use the layer content raster unchanged
+2. Offset the shadow shape by `(offsetX, offsetY)`
+3. Apply Gaussian blur `(blurX, blurY)` to the offset shape
+4. Fill the shadow region with `color`
+5. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
 
 **showBehindLayer**:
 - `true`: Shadow displays completely, including portion occluded by layer content
 - `false`: Portion of shadow occluded by layer content is cut out (using layer contour as erase mask)
+
+**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. Spread applies to the shadow geometry before offsetting, blurring and clipping, so a positive value can extend the shadow beyond the layer bounds. The default `spread="0"` keeps the plain raster path, so documents that omit the attribute render unchanged.
+
+**Approximation**: Rectangles, rounded rectangles and ellipses use the renderer's basic-shape spread rules; their behavior depends on the renderer version. Irregular closed paths use their bounding rect, and content without a single contour (text, multiple distinct geometries, groups containing only child layers) uses the content image bounds. Stroke outlines follow the renderer's stroke-spread rules. Exact morphological spreading of arbitrary paths is not guaranteed; a negative spread large enough to consume the geometry removes the shadow.
 
 #### 5.3.2 BackgroundBlurStyle
 
@@ -1064,13 +1070,30 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
+| `spread` | float | 0 | Signed layer-local length. Positive thickens the inner shadow band inward, negative thins it |
 | `color` | Color | #000000 | Shadow color |
 
 **Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the inverse of the offset content (exterior region)
-3. Fill the shadow region with `color`
-4. Intersect with opaque layer content, keeping only shadow inside content
+1. Get opaque layer content as the region the shadow is clipped to
+2. Derive the occluder from the content contour, contracted by `spread` when it is positive and expanded when it is negative; when it is 0, use the layer content raster unchanged
+3. Offset the occluder by `(offsetX, offsetY)`
+4. Apply Gaussian blur `(blurX, blurY)` to the occluder
+5. Fill the region inside the content but outside the blurred occluder with `color`
+
+**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. The value is passed through unchanged: the renderer derives the occluder direction internally, so documents never negate it. The default `spread="0"` keeps the plain raster path. A positive spread large enough to collapse the occluder makes the shadow cover the entire content area. Shape approximation and stroke handling follow §5.3.1.
+
+**Example**:
+
+```xml
+<Layer id="panel" left="60" top="40" width="120" height="80">
+  <Rectangle width="120" height="80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle id="drop" offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+  <InnerShadowStyle id="inner" offsetY="8" blurX="4" blurY="4" spread="-6" color="#282828"/>
+</Layer>
+```
+
+**Compatibility**: `spread` defaults to 0, so documents written before this attribute keep their appearance. A reader that predates it may ignore `spread` or reject such documents, and will not show the spread effect. In the C++ API the field is a new member of the two public style classes, so code built against an older header must be rebuilt.
 
 #### 5.3.4 NoiseStyle
 
@@ -3152,8 +3175,11 @@ Group and TextBox share the following transform channels for applying animated t
 |---------|------------|-------------|
 | `offsetX`, `offsetY` | float | Shadow offset (DropShadow, InnerShadow) |
 | `blurX`, `blurY` | float | Blur radius |
+| `spread` | float | Signed shadow spread (DropShadowStyle, InnerShadowStyle only) |
 | `color` | color | Shadow / overlay color |
 | `showBehindLayer` | boolean | Show behind layer (DropShadowStyle) |
+
+The `spread` channel exists only on `DropShadowStyle` and `InnerShadowStyle`. It is not part of `LayerStyle` in general and is not available on `DropShadowFilter` or `InnerShadowFilter` (§D.9).
 
 **GlassStyle** (all animatable float channels):
 

@@ -1277,6 +1277,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
                        Default<DropShadowStyle>().excludeChildEffects);
       WriteShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
+      xml.addAttribute("spread", style->spread, Default<DropShadowStyle>().spread);
       xml.addAttribute("showBehindLayer", style->showBehindLayer,
                        Default<DropShadowStyle>().showBehindLayer);
       WriteCustomData(xml, node);
@@ -1294,6 +1295,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
                        Default<InnerShadowStyle>().excludeChildEffects);
       WriteShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
+      xml.addAttribute("spread", style->spread, Default<InnerShadowStyle>().spread);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

@@ -1026,18 +1026,24 @@ Layer 的子元素按类型自动归类为五个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
+| `spread` | float | 0 | 带符号的图层局部长度。正值向外扩张阴影形状，负值向内收缩 |
 | `color` | Color | #000000 | 阴影颜色 |
 | `showBehindLayer` | bool | true | 图层后面是否显示阴影 |
 
 **渲染步骤**：
-1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
-2. 对偏移后的内容应用高斯模糊 `(blurX, blurY)`
-3. 使用 `color` 的颜色填充阴影区域
-4. 如果 `showBehindLayer="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
+1. 获取不透明图层内容。`spread` 非零时按 `spread` 扩张（正值）或收缩（负值）内容轮廓，得到阴影形状；为零时直接使用图层内容栅格
+2. 将阴影形状偏移 `(offsetX, offsetY)`
+3. 对偏移后的形状应用高斯模糊 `(blurX, blurY)`
+4. 使用 `color` 的颜色填充阴影区域
+5. 如果 `showBehindLayer="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
 
 **showBehindLayer**：
 - `true`：阴影完整显示，包括被图层内容遮挡的部分
 - `false`：阴影被图层内容遮挡的部分会被挖空（使用图层轮廓作为擦除遮罩）
+
+**spread**：单位为图层局部坐标长度，与 `offsetX`、`offsetY` 一致，并随图层内容一同缩放。扩散作用于阴影几何，发生在偏移、模糊和裁剪之前，因此正值可以把阴影扩展到图层边界之外。默认值 `spread="0"` 沿用原栅格路径，省略该属性的文档渲染结果不变。
+
+**近似边界**：矩形、圆角矩形和椭圆使用渲染器对应的基本形状扩散规则，具体表现以所依赖的渲染器版本为准。不规则闭合路径使用其包围盒，没有单一轮廓的内容（文本、多个独立几何、仅含子图层的组）使用内容图像包围盒。描边轮廓遵循渲染器既有的描边扩散规则。不保证任意路径的精确形态学扩散；负值大到足以消耗掉几何时阴影消失。
 
 #### 5.3.2 背景模糊（BackgroundBlurStyle）
 
@@ -1064,13 +1070,30 @@ Layer 的子元素按类型自动归类为五个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
+| `spread` | float | 0 | 带符号的图层局部长度。正值使内阴影向内加厚，负值使其变薄 |
 | `color` | Color | #000000 | 阴影颜色 |
 
 **渲染步骤**：
-1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
-2. 对偏移后内容的反向（内容外部区域）应用高斯模糊 `(blurX, blurY)`
-3. 使用 `color` 的颜色填充阴影区域
-4. 与不透明图层内容求交集，仅保留内容内部的阴影
+1. 获取不透明图层内容，作为阴影的裁剪区域
+2. 由内容轮廓推导遮挡形状：`spread` 为正时收缩，为负时扩张；为零时直接使用图层内容栅格
+3. 将遮挡形状偏移 `(offsetX, offsetY)`
+4. 对遮挡形状应用高斯模糊 `(blurX, blurY)`
+5. 使用 `color` 的颜色填充内容内部、模糊后遮挡形状之外的区域
+
+**spread**：单位为图层局部坐标长度，与 `offsetX`、`offsetY` 一致，并随图层内容一同缩放。数值原样传递，遮挡形状的方向由渲染器内部推导，文档中不需要取反。默认值 `spread="0"` 沿用原栅格路径。正值大到使遮挡形状完全收缩时，阴影覆盖整个内容区域。形状近似与描边处理同 §5.3.1。
+
+**示例**：
+
+```xml
+<Layer id="panel" left="60" top="40" width="120" height="80">
+  <Rectangle width="120" height="80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle id="drop" offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+  <InnerShadowStyle id="inner" offsetY="8" blurX="4" blurY="4" spread="-6" color="#282828"/>
+</Layer>
+```
+
+**兼容性**：`spread` 默认值为 0，因此早于该属性的文档外观保持不变。不支持该属性的旧版读取器可能忽略 `spread` 或拒绝该文档，不会呈现扩散效果。C++ API 中该字段是两个公开样式类的新增成员，按旧头文件编译的代码需要重新编译。
 
 #### 5.3.4 噪声样式（NoiseStyle）
 
@@ -3144,8 +3167,11 @@ Group 和 TextBox 共享以下变换通道，可对内部元素整体施加动�
 |------|--------|------|
 | `offsetX`, `offsetY` | float | 阴影偏移（DropShadow, InnerShadow） |
 | `blurX`, `blurY` | float | 模糊半径 |
+| `spread` | float | 带符号的阴影扩散（仅 DropShadowStyle、InnerShadowStyle） |
 | `color` | color | 阴影/覆盖颜色 |
 | `showBehindLayer` | boolean | 是否显示在图层后方（DropShadowStyle） |
+
+`spread` 通道只存在于 `DropShadowStyle` 和 `InnerShadowStyle`，不属于通用的 `LayerStyle`，`DropShadowFilter` 与 `InnerShadowFilter` 也不提供（§D.9）。
 
 **GlassStyle**（全部为可动画 float 通道）：
 
