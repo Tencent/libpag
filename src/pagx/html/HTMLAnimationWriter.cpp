@@ -839,26 +839,38 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
 
 void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                              std::string& decls, bool& needsZeroOrigin) {
-  if (chSet.matrixCh != nullptr) {
-    Matrix m = EvalMatrixChannel(chSet.matrixCh, t, Matrix::Identity());
-    AppendCssDecl(decls, "transform", FormatMatrixCss(m));
-    needsZeroOrigin = true;
-    return;
-  }
-  if (chSet.xCh != nullptr || chSet.yCh != nullptr) {
-    float baseX = 0.0f;
-    float baseY = 0.0f;
+  if (chSet.matrixCh != nullptr || chSet.xCh != nullptr || chSet.yCh != nullptr) {
+    const Layer* hostLayer = nullptr;
     if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer) {
-      auto renderPos = static_cast<const Layer*>(bundle.primaryHost)->renderPosition();
-      baseX = renderPos.x;
-      baseY = renderPos.y;
+      hostLayer = static_cast<const Layer*>(bundle.primaryHost);
     }
-    float xVal = EvalFloatChannel(chSet.xCh, t, baseX);
-    float yVal = EvalFloatChannel(chSet.yCh, t, baseY);
-    float dx = xVal - baseX;
-    float dy = yVal - baseY;
-    AppendCssDecl(decls, "transform",
-                  "translate(" + CssFloatToString(dx) + "px, " + CssFloatToString(dy) + "px)");
+    // The runtime composes the layer transform as Translate(x, y) * matrix (see
+    // LayerRuntimeTarget::recompose). A keyframe `transform` replaces the element's inline transform
+    // instead of stacking on it, so every frame re-emits the full chain: the animated translation
+    // relative to the static left/top first, then the matrix part, which is the animated matrix
+    // channel when present and otherwise the layer's static transform as written inline.
+    std::string tf = {};
+    if (chSet.xCh != nullptr || chSet.yCh != nullptr) {
+      Point basePos = hostLayer != nullptr ? hostLayer->renderPosition() : Point{0.0f, 0.0f};
+      float dx = EvalFloatChannel(chSet.xCh, t, basePos.x) - basePos.x;
+      float dy = EvalFloatChannel(chSet.yCh, t, basePos.y) - basePos.y;
+      tf = "translate(" + CssFloatToString(dx) + "px, " + CssFloatToString(dy) + "px)";
+    }
+    std::string matrixPart = {};
+    if (chSet.matrixCh != nullptr) {
+      Matrix staticMatrix = hostLayer != nullptr ? hostLayer->matrix : Matrix::Identity();
+      matrixPart = FormatMatrixCss(EvalMatrixChannel(chSet.matrixCh, t, staticMatrix));
+    } else if (hostLayer != nullptr) {
+      matrixPart = LayerTransformCSS(hostLayer);
+    }
+    if (!matrixPart.empty()) {
+      if (!tf.empty()) {
+        tf += ' ';
+      }
+      tf += matrixPart;
+      needsZeroOrigin = true;
+    }
+    AppendCssDecl(decls, "transform", tf);
     return;
   }
   if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
