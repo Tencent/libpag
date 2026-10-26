@@ -3580,11 +3580,31 @@ CLI_TEST(PAGXHtmlTest, AnimationFillInRepeaterAnimatesEveryCopy) {
   for (const char* id : copyIds) {
     auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
     ASSERT_FALSE(tag.empty()) << id;
-    EXPECT_NE(tag.find("animation:pagx_repeatedFill_0"), std::string::npos) << id;
+    EXPECT_NE(tag.find("animation:pagx_repeatedFill_0 "), std::string::npos) << id;
   }
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), static_cast<size_t>(1));
 }
 
-CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextGetsUniqueIds) {
+static std::string AnimationNameOfTag(const std::string& tag) {
+  auto pos = tag.find("animation:");
+  if (pos == std::string::npos) {
+    return "";
+  }
+  pos += 10;
+  auto end = tag.find(' ', pos);
+  return end == std::string::npos ? "" : tag.substr(pos, end - pos);
+}
+
+static std::string KeyframesRuleNamed(const std::string& html, const std::string& name) {
+  auto start = html.find("@keyframes " + name + " {\n");
+  if (start == std::string::npos) {
+    return "";
+  }
+  auto end = html.find("\n}", start);
+  return end == std::string::npos ? "" : html.substr(start, end - start + 2);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextUsesPerTagKeyframes) {
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
   auto html =
@@ -3593,13 +3613,28 @@ CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextGetsUniqueIds) {
                      opts);
   ASSERT_FALSE(html.empty());
 
-  auto first = FindTagContaining(html, "id=\"sharedPainter\"");
-  auto second = FindTagContaining(html, "id=\"sharedPainter__1\"");
-  ASSERT_FALSE(first.empty());
-  ASSERT_FALSE(second.empty());
+  auto rectTag = FindTagContaining(html, "id=\"sharedPainter\"");
+  auto textTag = FindTagContaining(html, "id=\"sharedPainter__1\"");
+  ASSERT_FALSE(rectTag.empty());
+  ASSERT_FALSE(textTag.empty());
   EXPECT_EQ(CountOccurrences(html, "id=\"sharedPainter\""), static_cast<size_t>(1));
-  EXPECT_NE(first.find("animation:pagx_sharedPainter_0"), std::string::npos);
-  EXPECT_NE(second.find("animation:pagx_sharedPainter_0"), std::string::npos);
+  EXPECT_EQ(rectTag.rfind("<div", 0), static_cast<size_t>(0));
+  EXPECT_EQ(textTag.rfind("<span", 0), static_cast<size_t>(0));
+
+  // A box paints the Fill as its background, while text paints it as the glyph color, so the two
+  // tags need different keyframes even though they share one animated Fill.
+  auto rectName = AnimationNameOfTag(rectTag);
+  auto textName = AnimationNameOfTag(textTag);
+  ASSERT_FALSE(rectName.empty());
+  ASSERT_FALSE(textName.empty());
+  EXPECT_NE(rectName, textName);
+  auto rectRule = KeyframesRuleNamed(html, rectName);
+  auto textRule = KeyframesRuleNamed(html, textName);
+  EXPECT_NE(rectRule.find("0% { background-color: #2563EB; }"), std::string::npos) << rectRule;
+  EXPECT_NE(rectRule.find("100% { background-color: #F97316; }"), std::string::npos) << rectRule;
+  EXPECT_NE(textRule.find("0% { color: #2563EB; }"), std::string::npos) << textRule;
+  EXPECT_NE(textRule.find("100% { color: #F97316; }"), std::string::npos) << textRule;
+  EXPECT_EQ(textRule.find("background-color"), std::string::npos) << textRule;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
