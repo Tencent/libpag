@@ -729,7 +729,7 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   out.fontRequest = ParseCSSFontStyle(out.fontWeight, out.fontStyle, out.fontStretch);
   out.fontStyleName = FontStyleRequestName(out.fontRequest);
   out.fauxBold = fontSynthesis.fauxBold;
-  out.fauxItalic = fontSynthesis.fauxItalic;
+  out.fauxItalic = out.fontRequest.slant != CSSFontSlant::Normal;
   // A caller-supplied replacement is authoritative: its target family/style is what the document
   // must carry, so the platform face lookup is skipped for the element it matched. An <svg> root
   // keeps the lookup so its own font stack still resolves against the platform.

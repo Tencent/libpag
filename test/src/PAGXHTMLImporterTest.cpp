@@ -8047,6 +8047,32 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceSingleRegularFaceKeepsHeavierRequest) {
   EXPECT_EQ(black->fontStyle, "Black");
 }
 
+PAG_TEST(PAGXHTMLImporterTest, FontFaceKeepsAuthoredObliqueAngle) {
+  auto html = "<html><head><style>" + WebFontFaceRule("OnlyRegular", "400") +
+              "</style></head><body style='width:200px;height:100px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:OnlyRegular;"
+              "font-size:20px;font-style:oblique 14deg'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:OnlyRegular;"
+              "font-size:20px;font-style:oblique'>B</span>"
+              "<span style='position:absolute;left:0px;top:40px;font-family:OnlyRegular;"
+              "font-size:20px;font-style:normal'>C</span>"
+              "<div style='font-family:OnlyRegular;font-style:oblique -10deg'>"
+              "<span style='position:absolute;left:0px;top:60px;font-size:20px'>D</span>"
+              "</div></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  for (const auto* content : {"A", "B", "D"}) {
+    auto* text = FindTextByContent(doc.get(), content);
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->fontStyle, "Oblique");
+    EXPECT_TRUE(text->fauxItalic);
+  }
+  auto* regular = FindTextByContent(doc.get(), "C");
+  ASSERT_NE(regular, nullptr);
+  EXPECT_EQ(regular->fontStyle, "Regular");
+  EXPECT_FALSE(regular->fauxItalic);
+}
+
 // A family whose only face is declared `700 italic` paints upright 400 text with that face, so
 // both axes of the declared face reach the exported name — aligning the weight while dropping the
 // declared slant would name a face that is neither the requested one nor the declared one.

@@ -23,6 +23,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import { prepareSnapshotFontReplacements } from './snapshot-fonts';
 import type { FontReplacement } from './snapshot-fonts';
@@ -86,9 +87,8 @@ function spawnPagxImport(
     ];
     // `--html-source snapshot` marks the payload as an already-rendered subset, so the
     // importer skips its own browser pass. Images are embedded because the HTTP response
-    // must survive removal of its temporary output directory; fonts stay external — the mode is
-    // named explicitly instead of leaning on the importer's default — because baking glyphs
-    // requires resolution, which `--no-resolve` forbids, and a subset carries its faces inline.
+    // must survive removal of its temporary output directory. Fonts remain external during
+    // import to avoid glyph baking; their file bytes are inlined before returning the response.
     for (const replacement of fontReplacements) {
       args.push('--font-replacement', replacement.families, String(replacement.weight),
         replacement.style, replacement.targetFamily, replacement.targetStyle);
@@ -146,6 +146,40 @@ export function filterKnownWarnings(stderr: string | null | undefined): string {
     .trim();
 }
 
+function readPagxWithInlineFonts(pagxPath: string): string {
+  const xml = fs.readFileSync(pagxPath, 'utf8');
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const fonts = Array.from(doc.getElementsByTagName('Font'));
+  const root = fs.realpathSync(path.dirname(pagxPath));
+  const embedded = new Map<string, string>();
+  let changed = false;
+  for (const font of fonts) {
+    const file = font.getAttribute('file');
+    if (!file) continue;
+    const lowerFile = file.toLowerCase();
+    if (lowerFile.startsWith('data:') || lowerFile.startsWith('https://') ||
+        lowerFile.startsWith('http://')) continue;
+    try {
+      const resolved = fs.realpathSync(path.resolve(root, file));
+      // Only publish files produced inside this import's output directory, including symlinks.
+      if (!resolved.startsWith(root + path.sep)) {
+        throw new PagxImportError('font resource is outside the import output directory');
+      }
+      let uri = embedded.get(resolved);
+      if (uri === undefined) {
+        uri = 'data:application/octet-stream;base64,' + fs.readFileSync(resolved).toString('base64');
+        embedded.set(resolved, uri);
+      }
+      font.setAttribute('file', uri);
+      changed = true;
+    } catch (error) {
+      if (error instanceof PagxImportError) throw error;
+      throw new PagxImportError('cannot embed font resource: ' + file);
+    }
+  }
+  return changed ? new XMLSerializer().serializeToString(doc) : xml;
+}
+
 export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
@@ -154,7 +188,7 @@ export interface RunPagxImportOptions {
 }
 
 // Convenience wrapper: drop the snapshot HTML into a per-call temp dir,
-// run pagx import, read the resulting PAGX, and clean up. Returns the
+// run pagx import, inline its local font files, and clean up. Returns the
 // PAGX as a UTF-8 string. The temp dir is removed in `finally` so even
 // a failed import never leaks bytes onto $TMPDIR.
 //
@@ -198,7 +232,7 @@ export async function runPagxImport(
       const { replaced, unmatched, missingRequests } = prepared.mapping;
       log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
     }
-    return fs.readFileSync(pagxPath, 'utf8');
+    return readPagxWithInlineFonts(pagxPath);
   } finally {
     try {
       fs.rmSync(dir, { recursive: true, force: true });

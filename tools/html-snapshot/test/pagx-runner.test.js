@@ -156,3 +156,87 @@ describe('runPagxImport — spawn behaviour', () => {
     }
   });
 });
+
+describe('runPagxImport — font resource lifetime', () => {
+  let dir;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pagx-font-response-'));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  function wrapperFor(xml, fonts = {}, symlink = false) {
+    const wrapper = path.join(dir, 'pagx');
+    fs.writeFileSync(wrapper, [
+      '#!' + process.execPath,
+      "const fs = require('fs'); const path = require('path');",
+      "const out = process.argv[process.argv.indexOf('--output') + 1];",
+      "const root = path.dirname(out);",
+      'fs.writeFileSync(' + JSON.stringify(path.join(dir, 'output-path')) + ', out);',
+      'const fonts = ' + JSON.stringify(fonts) + ';',
+      'for (const [name, base64] of Object.entries(fonts)) {',
+      '  const target = path.join(root, name);',
+      '  fs.mkdirSync(path.dirname(target), { recursive: true });',
+      "  fs.writeFileSync(target, Buffer.from(base64, 'base64'));",
+      '}',
+      symlink ? 'fs.symlinkSync(' + JSON.stringify(path.join(dir, 'secret.otf')) + ', path.join(root, "link.otf"));' : '',
+      'fs.writeFileSync(out, ' + JSON.stringify(xml) + ');',
+    ].join('\n'));
+    fs.chmodSync(wrapper, 0o755);
+    return wrapper;
+  }
+
+  function expectOutputRemoved() {
+    const out = fs.readFileSync(path.join(dir, 'output-path'), 'utf8');
+    expect(fs.existsSync(path.dirname(out))).toBe(false);
+  }
+
+  test('embeds exact font bytes and keeps aliases and unresolved imports after cleanup', async () => {
+    const bytes = Buffer.from([0, 1, 2, 127, 128, 255]);
+    const xml = '<pagx><Resources><Font id="first" fontFamily="A &amp; B" file="output.fonts/a.otf"/>' +
+      '<Font id="second" fontFamily="Alias" file="output.fonts/a.otf"/></Resources>' +
+      '<Layer import="remaining.svg"/><Text fontFamily="Alias" fontStyle="Bold"/></pagx>';
+    const result = await runPagxImport({pagxBin: wrapperFor(xml, {'output.fonts/a.otf': bytes.toString('base64')}), html: '<div/>'});
+    const {DOMParser} = require('@xmldom/xmldom');
+    const doc = new DOMParser().parseFromString(result, 'text/xml');
+    const fonts = Array.from(doc.getElementsByTagName('Font'));
+    expect(fonts).toHaveLength(2);
+    for (const font of fonts) {
+      const uri = font.getAttribute('file');
+      expect(uri).toMatch(/^data:.*;base64,/);
+      expect(Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64')).toEqual(bytes);
+    }
+    expect(fonts[0].getAttribute('fontFamily')).toBe('A & B');
+    expect(fonts[1].getAttribute('fontFamily')).toBe('Alias');
+    expect(doc.getElementsByTagName('Layer')[0].getAttribute('import')).toBe('remaining.svg');
+    expect(doc.getElementsByTagName('Text')[0].getAttribute('fontStyle')).toBe('Bold');
+    expectOutputRemoved();
+  });
+
+  test('leaves inline fonts and remote font references unchanged', async () => {
+    const xml = '<pagx><Font file="data:font/woff2;base64,AAEC"/>' +
+      '<Font file="https://fonts.example/font.woff2"/><Font id="glyphs"/></pagx>';
+    expect(await runPagxImport({pagxBin: wrapperFor(xml), html: '<div/>'})).toBe(xml);
+    expectOutputRemoved();
+  });
+
+  test('rejects missing local fonts instead of returning broken references', async () => {
+    await expect(runPagxImport({pagxBin: wrapperFor('<pagx><Font file="missing.otf"/></pagx>'), html: '<div/>'}))
+      .rejects.toBeInstanceOf(PagxImportError);
+    expectOutputRemoved();
+  });
+
+  test('rejects font paths outside the output directory', async () => {
+    const secret = path.join(dir, 'secret.otf');
+    fs.writeFileSync(secret, 'must not be returned');
+    await expect(runPagxImport({pagxBin: wrapperFor('<pagx><Font file="' + secret + '"/></pagx>'), html: '<div/>'}))
+      .rejects.toBeInstanceOf(PagxImportError);
+    expectOutputRemoved();
+  });
+
+  test('rejects symlink font paths escaping the output directory', async () => {
+    fs.writeFileSync(path.join(dir, 'secret.otf'), 'must not be returned');
+    await expect(runPagxImport({pagxBin: wrapperFor('<pagx><Font file="link.otf"/></pagx>', {}, true), html: '<div/>'}))
+      .rejects.toBeInstanceOf(PagxImportError);
+    expectOutputRemoved();
+  });
+});
