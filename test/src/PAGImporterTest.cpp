@@ -2379,6 +2379,84 @@ PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
             0);
 }
 
+PAGX_TEST(PAGImporterTest, LegacyAccessorEquivalentsTest) {
+  // P3-14: the §8.5 legacy C++ accessors — layer visible/alpha/matrix/matrix3D reads and
+  // runtime writes, the composition time-lock rewrite, duration(), and the audio track readers.
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>("accessLayer");
+  layer->width = 100;
+  layer->height = 100;
+  layer->alpha = 0.5f;
+  layer->x = 30.0f;
+  doc->layers.push_back(layer);
+  auto* compNode = doc->makeNode<Composition>("audioComp");
+  compNode->width = 200;
+  compNode->height = 200;
+  const char* kAudioBytes = "fake-aac";
+  compNode->audioData = Data::MakeWithCopy(kAudioBytes, strlen(kAudioBytes));
+  compNode->audioStartTime = 0.25f;
+  auto* holder = doc->makeNode<Layer>("holder");
+  holder->composition = compNode;
+  holder->startTime = 0.5f;
+  holder->timeScale = 2.0f;
+  doc->layers.push_back(holder);
+  auto* animation = doc->makeNode<Animation>("accessAnim");
+  animation->duration = 30;
+  animation->frameRate = 30;
+  doc->animations.push_back(animation);
+
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto root = scene->rootComposition();
+  ASSERT_TRUE(root != nullptr);
+  ASSERT_EQ(root->getChildren().size(), 2u);
+  auto& first = root->getChildren()[0];
+  auto& compLayer = root->getChildren()[1];
+
+  // Layer accessors reflect the authored state.
+  EXPECT_EQ(first->name(), "");
+  EXPECT_TRUE(first->visible());
+  EXPECT_NEAR(first->alpha(), 0.5f, 0.01f);
+  EXPECT_NEAR(first->matrix().tx, 30.0f, 0.01f);
+
+  // Runtime writes change the rendered state without touching the document node.
+  first->setVisible(false);
+  EXPECT_FALSE(first->visible());
+  EXPECT_TRUE(layer->visible);
+  first->setVisible(true);
+  first->setAlpha(0.2f);
+  EXPECT_NEAR(first->alpha(), 0.2f, 0.01f);
+  EXPECT_NEAR(layer->alpha, 0.5f, 0.01f);
+  Matrix offset = Matrix::Identity();
+  offset.tx = 77.0f;
+  first->setMatrix(offset);
+  EXPECT_NEAR(first->matrix().tx, 77.0f, 0.01f);
+  Matrix3D tilt = {};
+  tilt.values[14] = -0.5f;
+  first->setMatrix3D(tilt);
+  EXPECT_NEAR(first->matrix3D().values[14], -0.5f, 0.001f);
+
+  // The composition layer exposes the time-lock rewrite, the duration and the audio readers.
+  auto* runtimeComp = static_cast<PAGComposition*>(compLayer.get());
+  EXPECT_TRUE(runtimeComp->isTimeLocked());
+  EXPECT_NEAR(runtimeComp->timeLockStartTime(), 0.5f, 0.001f);
+  EXPECT_NEAR(runtimeComp->timeLockScale(), 2.0f, 0.001f);
+  runtimeComp->setTimeLock(1.0f, 0.5f);
+  EXPECT_NEAR(runtimeComp->timeLockStartTime(), 1.0f, 0.001f);
+  EXPECT_NEAR(runtimeComp->timeLockScale(), 0.5f, 0.001f);
+  runtimeComp->setTimeLock(0.0f, 1.0f);
+  EXPECT_FALSE(runtimeComp->isTimeLocked());
+
+  // The document-level animation drives the scene duration (legacy PAGFile::duration());
+  // asking for the default timeline first instantiates it.
+  ASSERT_TRUE(scene->getDefaultTimeline() != nullptr);
+  EXPECT_EQ(scene->duration(), 1000000);
+  ASSERT_TRUE(runtimeComp->audioData() != nullptr);
+  EXPECT_EQ(runtimeComp->audioData()->size(), strlen(kAudioBytes));
+  EXPECT_EQ(runtimeComp->audioData()->bytes()[0], 'f');
+  EXPECT_NEAR(runtimeComp->audioStartTime(), 0.25f, 0.001f);
+}
+
 PAGX_TEST(PAGImporterTest, EditableViewModelMappingTest) {
   // P3-12: legacy editable texts and images map onto ViewModel properties (spec 7.2) bound to
   // the migrated nodes — text<i> drives the Text node's text channel, image<i> drives the

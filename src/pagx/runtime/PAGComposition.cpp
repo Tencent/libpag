@@ -61,6 +61,41 @@ std::shared_ptr<PAGViewModel> PAGComposition::viewModel() const {
   return compositionViewModel;
 }
 
+void PAGComposition::setTimeLock(float startTime, float timeScale) {
+  timeLockStartValue = startTime;
+  timeLockScaleValue = timeScale;
+  timeLocked = startTime != 0.0f || (timeScale > 0.0f && timeScale != 1.0f);
+}
+
+int64_t PAGComposition::duration() const {
+  int64_t total = 0;
+  for (const auto& timeline : timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    // Only PAGAnimation exposes a duration; state-machine timelines ride animations and never
+    // exceed them.
+    if (timeline->type() != TimelineType::Animation) {
+      continue;
+    }
+    auto timelineDuration = static_cast<PAGAnimation*>(timeline.get())->duration();
+    if (timelineDuration > total) {
+      total = timelineDuration;
+    }
+  }
+  return total;
+}
+
+std::shared_ptr<Data> PAGComposition::audioData() const {
+  const auto* source = node != nullptr ? node->composition : nullptr;
+  return source != nullptr ? source->audioData : nullptr;
+}
+
+float PAGComposition::audioStartTime() const {
+  const auto* source = node != nullptr ? node->composition : nullptr;
+  return source != nullptr ? source->audioStartTime : 0.0f;
+}
+
 void PAGComposition::playTimeline(const std::string& id) {
   pausedTimelineIds.erase(id);
 }

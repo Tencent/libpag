@@ -96,6 +96,68 @@ Rect PAGLayer::getBounds() const {
   return FromTGFX(bounds);
 }
 
+bool PAGLayer::visible() const {
+  return runtimeLayer != nullptr ? runtimeLayer->visible() : true;
+}
+
+void PAGLayer::setVisible(bool value) {
+  if (runtimeLayer != nullptr) {
+    runtimeLayer->setVisible(value);
+  }
+}
+
+float PAGLayer::alpha() const {
+  return runtimeLayer != nullptr ? runtimeLayer->alpha() : 1.0f;
+}
+
+void PAGLayer::setAlpha(float value) {
+  if (runtimeLayer != nullptr) {
+    runtimeLayer->setAlpha(value);
+  }
+}
+
+Matrix PAGLayer::matrix() const {
+  if (runtimeLayer == nullptr) {
+    return Matrix::Identity();
+  }
+  auto m = runtimeLayer->matrix();
+  return {m.getScaleX(), m.getSkewY(),      m.getSkewX(),
+          m.getScaleY(), m.getTranslateX(), m.getTranslateY()};
+}
+
+void PAGLayer::setMatrix(const Matrix& value) {
+  if (runtimeLayer != nullptr) {
+    runtimeLayer->setMatrix(ToTGFX(value));
+  }
+}
+
+Matrix3D PAGLayer::matrix3D() const {
+  if (runtimeLayer == nullptr) {
+    return {};
+  }
+  auto m = runtimeLayer->matrix3D();
+  Matrix3D result = {};
+  for (int r = 0; r < 4; r++) {
+    for (int c = 0; c < 4; c++) {
+      result.setRowColumn(r, c, m.getRowColumn(r, c));
+    }
+  }
+  return result;
+}
+
+void PAGLayer::setMatrix3D(const Matrix3D& value) {
+  if (runtimeLayer == nullptr) {
+    return;
+  }
+  tgfx::Matrix3D m = {};
+  for (int r = 0; r < 4; r++) {
+    for (int c = 0; c < 4; c++) {
+      m.setRowColumn(r, c, value.getRowColumn(r, c));
+    }
+  }
+  runtimeLayer->setMatrix3D(m);
+}
+
 void PAGLayer::advance(int64_t deltaMicroseconds) {
   for (auto& child : children) {
     DEBUG_ASSERT(child != nullptr);

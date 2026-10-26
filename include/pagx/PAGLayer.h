@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/Rect.h"
 
 namespace tgfx {
@@ -94,6 +95,54 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
    * @param pixelHitTest whether to test against the actual shape (true) or the bounding box (false).
    */
   bool hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest = false);
+
+  /**
+   * Returns the layer's runtime visibility (the rendered state, including any animation applied
+   * so far). Equivalent of the legacy PAGLayer::visible().
+   */
+  bool visible() const;
+
+  /**
+   * Sets the layer's runtime visibility without touching the document node. Equivalent of the
+   * legacy PAGLayer::setVisible().
+   */
+  void setVisible(bool value);
+
+  /**
+   * Returns the layer's runtime alpha (the rendered state, including any animation applied so
+   * far). Equivalent of the legacy PAGLayer::alpha().
+   */
+  float alpha() const;
+
+  /**
+   * Sets the layer's runtime alpha without touching the document node. Equivalent of the legacy
+   * PAGLayer::setAlpha().
+   */
+  void setAlpha(float value);
+
+  /**
+   * Returns the layer's runtime 2D matrix (local transform, including any animation applied so
+   * far). Equivalent of the legacy PAGLayer::matrix().
+   */
+  Matrix matrix() const;
+
+  /**
+   * Sets the layer's runtime 2D matrix without touching the document node. Equivalent of the
+   * legacy PAGLayer::setMatrix().
+   */
+  void setMatrix(const Matrix& value);
+
+  /**
+   * Returns the layer's runtime 3D matrix, or the identity when the layer has none. Equivalent
+   * of the legacy PAGLayer::matrix3D().
+   */
+  Matrix3D matrix3D() const;
+
+  /**
+   * Sets the layer's runtime 3D matrix without touching the document node. Equivalent of the
+   * legacy PAGLayer::setMatrix3D().
+   */
+  void setMatrix3D(const Matrix3D& value);
 
   /**
    * Advances the animations owned by this layer and its descendants by the given amount of time.

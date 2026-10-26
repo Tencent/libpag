@@ -589,6 +589,21 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
   return rootViewModel;
 }
 
+int64_t PAGScene::duration() const {
+  int64_t total = 0;
+  for (const auto& entry : instantiatedTimelines) {
+    auto& timeline = entry.second;
+    if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
+      continue;
+    }
+    auto timelineDuration = static_cast<PAGAnimation*>(timeline.get())->duration();
+    if (timelineDuration > total) {
+      total = timelineDuration;
+    }
+  }
+  return total;
+}
+
 TimeStretchMode PAGScene::timeStretchMode() const {
   return _stretchMode;
 }

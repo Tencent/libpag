@@ -105,6 +105,13 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
   /**
+   * Returns the total playback duration of the scene in microseconds: the longest of its
+   * instantiated timelines (the document-level default timeline first, then every composition
+   * instance's timelines). Equivalent of the legacy PAGFile::duration().
+   */
+  int64_t duration() const;
+
+  /**
    * Returns the current time-stretch mode (spec 3.4, document-level runtime state, not
    * serialized). The default is Repeat.
    */

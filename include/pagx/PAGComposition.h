@@ -25,6 +25,7 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/PAGLayer.h"
+#include "pagx/types/Data.h"
 
 namespace pagx {
 
@@ -99,6 +100,32 @@ class PAGComposition : public PAGLayer {
   float timeLockScale() const {
     return timeLockScaleValue;
   }
+
+  /**
+   * Rewrites the time-lock parameters at runtime (spec 6.3, equivalent of the legacy
+   * startTime/timeStretch setters): childTime = (parentClock - startTime) * timeScale. Passing
+   * a non-positive scale with a zero start time clears the lock so the composition advances on
+   * its own again. The next propagateTimeLock pass (each scene advance/draw) picks the new
+   * values up.
+   */
+  void setTimeLock(float startTime, float timeScale);
+
+  /**
+   * Returns the composition's total playback duration in microseconds (the longest of its
+   * timelines; zero when it has none). Equivalent of the legacy PAGLayer::duration().
+   */
+  int64_t duration() const;
+
+  /**
+   * Returns the audio track of this composition's source node (an AAC stream in an MP4
+   * container), or null when it has none. Equivalent of the legacy audio reader entry point.
+   */
+  std::shared_ptr<Data> audioData() const;
+
+  /**
+   * Returns when the first frame of the audio plays on the composition's timeline, in seconds.
+   */
+  float audioStartTime() const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
