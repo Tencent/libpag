@@ -1625,15 +1625,9 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   }
 
   out.openTag("div");
-  auto animIdIt = _ctx->animatedElementIds.end();
-  if (fill) {
-    animIdIt = _ctx->animatedElementIds.find(fill);
-  }
-  if (animIdIt == _ctx->animatedElementIds.end() && geo.element) {
-    animIdIt = _ctx->animatedElementIds.find(geo.element);
-  }
-  if (animIdIt != _ctx->animatedElementIds.end()) {
-    out.addAttr("id", animIdIt->second);
+  auto animId = _ctx->claimAnimatedDomId({fill, geo.element});
+  if (!animId.empty()) {
+    out.addAttr("id", animId);
   }
   out.addAttr("style", style);
   out.closeTagSelfClosing();
@@ -2073,40 +2067,12 @@ void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& ge
     }
   }
 
-  std::string svgAnimId;
-  if (!_ctx->animatedElementIds.empty()) {
-    if (stroke) {
-      auto it = _ctx->animatedElementIds.find(stroke);
-      if (it != _ctx->animatedElementIds.end()) {
-        svgAnimId = it->second;
-      }
-    }
-    if (svgAnimId.empty() && fill) {
-      auto it = _ctx->animatedElementIds.find(fill);
-      if (it != _ctx->animatedElementIds.end()) {
-        svgAnimId = it->second;
-      }
-    }
-  }
-
-  size_t emittedSvgAnimCount = 0;
   for (size_t geoIdx = 0; geoIdx < geos.size(); geoIdx++) {
     auto& g = geos[geoIdx];
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
-    std::string geoAnimId;
-    if (!svgAnimId.empty()) {
-      geoAnimId = (emittedSvgAnimCount == 0)
-                      ? svgAnimId
-                      : (svgAnimId + "__" + std::to_string(emittedSvgAnimCount));
-      emittedSvgAnimCount++;
-    } else if (g.element && !_ctx->animatedElementIds.empty()) {
-      auto it = _ctx->animatedElementIds.find(g.element);
-      if (it != _ctx->animatedElementIds.end()) {
-        geoAnimId = it->second;
-      }
-    }
+    std::string geoAnimId = _ctx->claimAnimatedDomId({stroke, fill, g.element});
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
       if (!geoAnimId.empty()) {
