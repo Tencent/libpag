@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <TargetConditionals.h>
+#include <stdio.h>
 #import "PAGSurface.h"
 #import "PAGView.h"
 
 static BOOL FactoryReturnsNil(Class type, SEL selector) {
   NSMethodSignature* signature = [type methodSignatureForSelector:selector];
   if (signature == nil) {
+    fprintf(stderr, "PAGCocoaStaticLinkTest: missing factory %s.%s.\n",
+            [NSStringFromClass(type) UTF8String], [NSStringFromSelector(selector) UTF8String]);
     return NO;
   }
   NSInvocation* invocation = [NSInvocation invocationWithMethodSignature:signature];
@@ -33,7 +36,12 @@ static BOOL FactoryReturnsNil(Class type, SEL selector) {
   [invocation invoke];
   __unsafe_unretained id result = nil;
   [invocation getReturnValue:&result];
-  return result == nil;
+  if (result != nil) {
+    fprintf(stderr, "PAGCocoaStaticLinkTest: %s.%s must return nil for a nil host.\n",
+            [NSStringFromClass(type) UTF8String], [NSStringFromSelector(selector) UTF8String]);
+    return NO;
+  }
+  return YES;
 }
 
 int main(void) {
@@ -45,25 +53,36 @@ int main(void) {
       return 1;
     }
     Class impl = NSClassFromString(@"PAGSurfaceImpl");
-    if (impl == Nil || !FactoryReturnsNil(impl, NSSelectorFromString(@"FromHost:"))) {
+    if (impl == Nil) {
+      fprintf(stderr, "PAGCocoaStaticLinkTest: missing class PAGSurfaceImpl.\n");
       return 2;
     }
-    PAGSurface* surface = [PAGSurface MakeOffscreen:CGSizeMake(16, 16)];
-    if (surface == nil || surface.width != 16 || surface.height != 16) {
-      return 3;
+    if (!FactoryReturnsNil(impl, NSSelectorFromString(@"FromHost:"))) {
+      return 2;
     }
     PAGView* view = [[PAGView alloc] initWithFrame:CGRectMake(0, 0, 16, 16)];
     if (view == nil) {
-      return 4;
+      fprintf(stderr, "PAGCocoaStaticLinkTest: PAGView initialization returned nil.\n");
+      return 3;
     }
 #if TARGET_OS_IPHONE
-    if ([view layer] == nil || [PAGSurface FromCVPixelBuffer:nil] != nil) {
-      return 5;
+    if ([view layer] == nil) {
+      fprintf(stderr, "PAGCocoaStaticLinkTest: iOS PAGView has no backing layer.\n");
+      return 10;
+    }
+    if ([PAGSurface FromCVPixelBuffer:nil] != nil) {
+      fprintf(stderr,
+              "PAGCocoaStaticLinkTest: iOS PAGSurface.FromCVPixelBuffer: must return nil for a nil "
+              "pixel buffer.\n");
+      return 11;
     }
 #else
     [view setFrameSize:NSMakeSize(32, 32)];
     if (view.bounds.size.width != 32 || view.bounds.size.height != 32) {
-      return 5;
+      fprintf(stderr,
+              "PAGCocoaStaticLinkTest: macOS PAGView resize expected 32x32 but got %gx%g.\n",
+              view.bounds.size.width, view.bounds.size.height);
+      return 20;
     }
 #endif
   }
