@@ -22,6 +22,24 @@ const READBACK_STATUS_READY = 0;
 const READBACK_STATUS_PENDING = 1;
 const READBACK_STATUS_FAILED = 2;
 
+// Yields one turn of the event loop between readback polls. MessageChannel is not affected by
+// the 4ms clamping browsers apply to nested setTimeout(0) chains; setTimeout remains the
+// fallback for environments without MessageChannel.
+const nextTick = (): Promise<void> => {
+  if (typeof MessageChannel === 'undefined') {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      channel.port2.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
+};
+
 @destroyVerify
 export class PAGSurface {
   /**
@@ -93,6 +111,7 @@ export class PAGSurface {
 
   private webGPUTextureHandle = 0;
   private isCanvasBacked = false;
+  private readbackPending = false;
 
   public constructor(wasmIns: any, webGPUTextureHandle = 0) {
     this.wasmIns = wasmIns;
@@ -151,17 +170,27 @@ export class PAGSurface {
   /**
    * Asynchronously reads pixels from current PAGSurface with specified color type and alpha type.
    * On WebGL the returned promise resolves within the current frame; on WebGPU it resolves once
-   * the GPU readback mapping completes. Returns null on failure or when the readback does not
-   * complete within 30 seconds.
+   * the GPU readback mapping completes. Returns null on failure, when the readback does not
+   * complete within timeoutMs, or when the surface is destroyed while waiting.
    *
    * Canvas-backed surfaces (created by fromCanvas(), including the surfaces used by PAGView on
    * the WebGPU backend) cannot be read back after the frame is presented, so this method always
    * returns null for them; call PAGView.makeSnapshot() instead, or render to an offscreen
-   * PAGSurface and read from it. Do not call readPixelsAsync() again on the same surface before
-   * the previous call settles; each concurrent session holds its own GPU readback buffer.
+   * PAGSurface and read from it. Only one readback may run per surface at a time; a concurrent
+   * call returns null immediately.
    */
-  public async readPixelsAsync(colorType: ColorType, alphaType: AlphaType): Promise<Uint8Array | null> {
+  public async readPixelsAsync(
+    colorType: ColorType,
+    alphaType: AlphaType,
+    timeoutMs: number = READBACK_TIMEOUT_MS,
+  ): Promise<Uint8Array | null> {
     if (colorType === ColorType.Unknown) return null;
+    if (this.readbackPending) {
+      console.warn(
+        'PAGSurface.readPixelsAsync() was called while a previous readback on the same surface is still pending. Wait for it to settle before calling again.',
+      );
+      return null;
+    }
     const session = this.wasmIns._readPixelsAsync();
     if (!session) {
       if (this.isCanvasBacked && !readbackUnsupportedWarned) {
@@ -172,18 +201,20 @@ export class PAGSurface {
       }
       return null;
     }
+    this.readbackPending = true;
     try {
-      const deadline = Date.now() + READBACK_TIMEOUT_MS;
+      const deadline = Date.now() + timeoutMs;
       let status = session._status();
       while (status === READBACK_STATUS_PENDING) {
-        if (Date.now() > deadline) return null;
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (this.isDestroyed || Date.now() > deadline) return null;
+        await nextTick();
         status = session._status();
       }
       if (status === READBACK_STATUS_FAILED) return null;
       const rowBytes = session._width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
       return session._readPixels(colorType, alphaType, rowBytes) as Uint8Array | null;
     } finally {
+      this.readbackPending = false;
       session.delete();
     }
   }
