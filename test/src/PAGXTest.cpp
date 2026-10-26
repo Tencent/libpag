@@ -6315,6 +6315,152 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
 }
 
 /**
+ * Test case: an edit a timeline cannot target does not replay that timeline. Replaying every
+ * timeline on every edit costs a full frame per keystroke on a large document, so the replay is
+ * filtered to the compositions whose binding covers a dirty node — a timeline resolves its targets
+ * against its own binding and drops everything outside it, so a composition covering none of the
+ * dirty nodes has no channel the refresh could have reset. targetsDirty is the observable: the
+ * refresh marks it stale and apply() clears it.
+ */
+PAGX_TEST(PAGXTest, EditOutsideTimelineTargetsSkipsTimelineApply) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  // One composition carrying an animation that drives its own layer...
+  auto animComp = doc->makeNode<pagx::Composition>("animComp");
+  auto* animated = doc->makeNode<pagx::Layer>("animated");
+  animated->width = 50;
+  animated->height = 50;
+  animComp->layers.push_back(animated);
+
+  auto animation = doc->makeNode<pagx::Animation>("drive");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "animated";
+  animation->objects.push_back(object);
+  auto alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaChannel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(alphaChannel);
+  animComp->animations.push_back(animation);
+
+  // ...and one composition with no animation at all.
+  auto plainComp = doc->makeNode<pagx::Composition>("plainComp");
+  auto* plain = doc->makeNode<pagx::Layer>("plain");
+  plain->width = 50;
+  plain->height = 50;
+  plainComp->layers.push_back(plain);
+
+  auto* animHost = doc->makeNode<pagx::Layer>("animHost");
+  animHost->composition = animComp;
+  auto* plainHost = doc->makeNode<pagx::Layer>("plainHost");
+  plainHost->composition = plainComp;
+  doc->layers.push_back(animHost);
+  doc->layers.push_back(plainHost);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  ASSERT_EQ(scene->rootComposition()->children.size(), 2u);
+  auto* animRuntime =
+      static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  ASSERT_FALSE(animRuntime->timelines.empty());
+  ASSERT_EQ(animRuntime->timelines[0]->type(), pagx::TimelineType::Animation);
+  auto* driven = static_cast<pagx::PAGAnimation*>(animRuntime->timelines[0].get());
+
+  // Editing the unrelated composition must leave the timeline alone.
+  doc->notifyChange({plain}, false);
+  EXPECT_TRUE(driven->targetsDirty) << "an edit the timeline cannot target must not replay it";
+
+  // Editing the layer the animation drives must still replay it — restoring the channels the
+  // refresh reset to their node defaults is the whole reason the replay exists.
+  doc->notifyChange({animated}, false);
+  EXPECT_FALSE(driven->targetsDirty) << "an edit the timeline targets must still be replayed";
+}
+
+/**
+ * Test case: inside one composition an animation is replayed only when the edit touches one of its
+ * resolved targets. Two animations in the same composition drive different layers, so the
+ * composition-wide test would replay both; narrowing by resolved targets is what lets editing one
+ * layer skip the animation that does not drive it.
+ */
+PAGX_TEST(PAGXTest, EditSkipsAnimationsThatDoNotTargetIt) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  auto* layerA = doc->makeNode<pagx::Layer>("layerA");
+  layerA->width = 50;
+  layerA->height = 50;
+  auto* layerB = doc->makeNode<pagx::Layer>("layerB");
+  layerB->width = 50;
+  layerB->height = 50;
+  comp->layers.push_back(layerA);
+  comp->layers.push_back(layerB);
+
+  auto animationA = doc->makeNode<pagx::Animation>("driveA");
+  animationA->duration = 60;
+  animationA->frameRate = 60;
+  auto objectA = doc->makeNode<pagx::AnimationObject>();
+  objectA->target = "layerA";
+  animationA->objects.push_back(objectA);
+  auto chanA = doc->makeNode<pagx::TypedChannel<float>>();
+  chanA->name = "alpha";
+  chanA->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chanA->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objectA->channels.push_back(chanA);
+  comp->animations.push_back(animationA);
+
+  auto animationB = doc->makeNode<pagx::Animation>("driveB");
+  animationB->duration = 60;
+  animationB->frameRate = 60;
+  auto objectB = doc->makeNode<pagx::AnimationObject>();
+  objectB->target = "layerB";
+  animationB->objects.push_back(objectB);
+  auto chanB = doc->makeNode<pagx::TypedChannel<float>>();
+  chanB->name = "alpha";
+  chanB->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  chanB->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  objectB->channels.push_back(chanB);
+  comp->animations.push_back(animationB);
+
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->composition = comp;
+  doc->layers.push_back(host);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* runtime = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  // Resolve the target lists first. An animation that has not resolved yet has no targets to narrow
+  // by and is replayed conservatively — that is the one-time cost of the first frame.
+  scene->advanceAndApply(0);
+
+  pagx::PAGAnimation* driveA = nullptr;
+  pagx::PAGAnimation* driveB = nullptr;
+  for (auto& timeline : runtime->timelines) {
+    if (timeline == nullptr || timeline->type() != pagx::TimelineType::Animation) {
+      continue;
+    }
+    auto* anim = static_cast<pagx::PAGAnimation*>(timeline.get());
+    if (anim->animation == nullptr) {
+      continue;
+    }
+    if (anim->animation->id == "driveA") {
+      driveA = anim;
+    } else if (anim->animation->id == "driveB") {
+      driveB = anim;
+    }
+  }
+  ASSERT_TRUE(driveA != nullptr);
+  ASSERT_TRUE(driveB != nullptr);
+
+  doc->notifyChange({layerA}, false);
+  EXPECT_FALSE(driveA->targetsDirty) << "the animation driving the edited layer must be replayed";
+  EXPECT_TRUE(driveB->targetsDirty) << "an animation that does not target it must not be replayed";
+}
+
+/**
  * Test case: Keyframe interpolation modes (None / Linear / Bezier / Hold)
  * and bezierIn / bezierOut attributes round-trip.
  */

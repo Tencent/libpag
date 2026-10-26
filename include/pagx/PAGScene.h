@@ -251,6 +251,26 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   static void ReapplyCompositionTreeDataBinds(PAGComposition* comp, const Node* targetNode,
                                               RuntimeBinding* scopeBinding);
 
+  // Returns true when the binding holds at least one of the dirty nodes. A timeline resolves its
+  // targets against the binding it lives in and drops everything outside it (see
+  // PAGAnimation::resolveTargets), so a composition whose binding covers none of them has no channel
+  // an incremental refresh could have reset, and re-applying its timelines would be pure work.
+  static bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
+                                      const std::unordered_set<const Node*>& dirtySet);
+  // Narrows an already-covering composition further: an animation only needs re-applying when one of
+  // its resolved targets is dirty, so an edit to a sibling the animation does not drive is skipped.
+  // A state machine does not expose its resolved targets (its inner animations live in regions) and
+  // an animation that has not resolved yet has no target list to narrow by, so both keep the
+  // composition-wide answer instead of risking a replay that is needed.
+  static bool TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
+                                          const std::unordered_set<const Node*>& dirtySet);
+  // Re-applies only the timelines of compositions whose binding covers a dirty node, in the order
+  // PAGComposition::apply() uses (own timelines first, then descendants). Descendants are tested
+  // independently: a parent whose binding covers nothing must not stop a dirty child from being
+  // re-applied.
+  static void ApplyTimelinesForDirtyNodes(PAGComposition* comp,
+                                          const std::unordered_set<const Node*>& dirtySet);
+
   RuntimeBinding* mutableBinding();
 
   tgfx::DisplayList* getDisplayListForOptions() const;

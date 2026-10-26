@@ -913,19 +913,79 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // playback resumes. Re-apply the timelines at their current position here (apply without
     // advancing) so the rebuilt targets are re-resolved (targetsDirty was set above) and written
     // back immediately. resetTimelines() above already covers the timelineDirty case.
-    _rootComposition->apply();
+    // Only the timelines that can write to a refreshed layer need re-applying, so the replay is
+    // filtered instead of walking the whole tree: an edit to a non-animated property (text, color,
+    // name) otherwise re-resolves and rewrites every animation channel in the document, which is a
+    // full frame of work per keystroke on a large document. Compositions whose binding covers none of
+    // the dirty nodes drop out first, then each surviving animation is narrowed by its resolved
+    // targets, so a sibling layer that animation does not drive is skipped as well.
+    std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
+    ApplyTimelinesForDirtyNodes(_rootComposition.get(), dirtySet);
     // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
-    // inside the root composition subtree, so _rootComposition->apply() above does not reach them.
-    // Re-apply them at their current position so an animated property on a top-level timeline
-    // (e.g. slidingBar's x, or a state machine's active-state channels) is written back
-    // immediately while paused; otherwise it would snap back to its static layout value until the
-    // next tick, which only fires while playing.
-    for (auto& entry : instantiatedTimelines) {
-      if (entry.second != nullptr) {
-        entry.second->apply();
+    // inside the root composition subtree, so the walk above does not reach them. Re-apply them at
+    // their current position so an animated property on a top-level timeline (e.g. slidingBar's x,
+    // or a state machine's active-state channels) is written back immediately while paused;
+    // otherwise it would snap back to its static layout value until the next tick, which only fires
+    // while playing. They resolve against the root binding, so the same coverage test applies.
+    if (BindingCoversDirtyNodes(_rootComposition->binding.get(), dirtySet)) {
+      for (auto& entry : instantiatedTimelines) {
+        if (entry.second != nullptr && TimelineCanTargetDirtyNodes(entry.second.get(), dirtySet)) {
+          entry.second->apply();
+        }
       }
     }
   }
+}
+
+bool PAGScene::BindingCoversDirtyNodes(const RuntimeBinding* binding,
+                                       const std::unordered_set<const Node*>& dirtySet) {
+  if (binding == nullptr) {
+    return false;
+  }
+  for (const auto* node : dirtySet) {
+    if (node != nullptr && binding->contains(node)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void PAGScene::ApplyTimelinesForDirtyNodes(PAGComposition* comp,
+                                           const std::unordered_set<const Node*>& dirtySet) {
+  if (comp == nullptr) {
+    return;
+  }
+  // Own timelines before descendants, matching PAGComposition::apply(), which applies its own
+  // timelines and then recurses through PAGLayer::apply().
+  if (BindingCoversDirtyNodes(comp->binding.get(), dirtySet)) {
+    for (auto& timeline : comp->timelines) {
+      if (timeline != nullptr && TimelineCanTargetDirtyNodes(timeline.get(), dirtySet)) {
+        timeline->apply();
+      }
+    }
+  }
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(comp, childComps);
+  for (auto* childComp : childComps) {
+    ApplyTimelinesForDirtyNodes(childComp, dirtySet);
+  }
+}
+
+bool PAGScene::TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
+                                           const std::unordered_set<const Node*>& dirtySet) {
+  if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
+    return true;
+  }
+  const auto& resolved = static_cast<const PAGAnimation*>(timeline)->resolvedTargets;
+  if (resolved.empty()) {
+    return true;
+  }
+  for (const auto& entry : resolved) {
+    if (entry.first != nullptr && dirtySet.find(entry.first) != dirtySet.end()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 RuntimeBinding* PAGScene::mutableBinding() {
