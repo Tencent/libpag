@@ -981,7 +981,19 @@ bool PAGScene::TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
     return true;
   }
   for (const auto& entry : resolved) {
-    if (entry.first != nullptr && dirtySet.find(entry.first) != dirtySet.end()) {
+    auto* target = entry.first;
+    if (target == nullptr) {
+      continue;
+    }
+    // notifyChange collapses an edit on a content node (Fill, Stroke, Rectangle, ...) to the Layer
+    // that owns it, so the dirty set only ever holds Layers while a target can be any node. A Layer
+    // refresh rebuilds that layer's whole content subtree and resets every channel in it, so an
+    // animation driving something other than a Layer cannot be proven unaffected from the dirty set
+    // alone; replay it rather than risk leaving a reset channel unrestored.
+    if (target->nodeType() != NodeType::Layer) {
+      return true;
+    }
+    if (dirtySet.find(target) != dirtySet.end()) {
       return true;
     }
   }

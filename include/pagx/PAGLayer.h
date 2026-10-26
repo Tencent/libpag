@@ -142,6 +142,10 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   std::vector<std::shared_ptr<PAGLayer>> children = {};
   // Parent in the runtime tree. weak_ptr because the parent owns its children via shared_ptr; a
   // strong ref here would create a cycle (parent → child → parent) that prevents destruction.
+  // Written on every build and rebuild but not read in this PR: the accessor that walks the chain
+  // (PAGLayer::getParent(), used by the source editor's ancestor-chain hit testing) arrives in a
+  // follow-up PR together with its callers, which this PR dropped as unexercised. Kept and kept
+  // wired so that PR re-adds only the accessor and not the chain maintenance.
   std::weak_ptr<PAGLayer> parent = {};
 
   /**

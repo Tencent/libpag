@@ -6474,6 +6474,69 @@ PAGX_TEST(PAGXTest, EditSkipsAnimationsThatDoNotTargetIt) {
 }
 
 /**
+ * Test case: an animation driving a content node is replayed when the Layer owning it is edited.
+ * notifyChange collapses a content-node edit to the owning Layer, so the dirty set never holds the
+ * Fill itself, while a Layer refresh rebuilds the whole content subtree and resets every channel in
+ * it. Filtering that animation out would leave the rebuilt color at its static default while paused.
+ */
+PAGX_TEST(PAGXTest, EditReplaysAnimationDrivingAContentNode) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("comp");
+  auto* layer = doc->makeNode<pagx::Layer>("host");
+  layer->width = 100;
+  layer->height = 100;
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto fill = doc->makeNode<pagx::Fill>("tintedFill");
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  comp->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("tint");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "tintedFill";
+  animation->objects.push_back(object);
+  auto colorChannel = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  colorChannel->name = "color";
+  pagx::Color from{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::Color to{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  colorChannel->keyframes.push_back({0, from, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorChannel->keyframes.push_back({60, to, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(colorChannel);
+  comp->animations.push_back(animation);
+
+  auto* host = doc->makeNode<pagx::Layer>("compHost");
+  host->composition = comp;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "tint";
+  host->timelines.push_back(std::move(driver));
+  doc->layers.push_back(host);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* runtime = static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get());
+  // Resolve the target list first so the filter has something to narrow by.
+  scene->advanceAndApply(0);
+  ASSERT_FALSE(runtime->timelines.empty());
+  auto* tinted = static_cast<pagx::PAGAnimation*>(runtime->timelines[0].get());
+  // The target is the Fill, not a Layer — the case the dirty set cannot represent.
+  ASSERT_FALSE(tinted->resolvedTargets.empty());
+  EXPECT_NE(tinted->resolvedTargets[0].first->nodeType(), pagx::NodeType::Layer);
+
+  doc->notifyChange({layer}, false);
+  EXPECT_FALSE(tinted->targetsDirty)
+      << "editing the owning Layer must replay an animation driving one of its content nodes";
+}
+
+/**
  * Test case: Keyframe interpolation modes (None / Linear / Bezier / Hold)
  * and bezierIn / bezierOut attributes round-trip.
  */

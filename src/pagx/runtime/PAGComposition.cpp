@@ -235,6 +235,9 @@ void PAGComposition::buildChildren(const std::vector<Layer*>& layers,
   BuildChildren(binding.get(), layers, children, scene, visited, shared_from_this());
 }
 
+// parentForChildren exists only to wire PAGLayer::parent, which nothing in this PR reads — see the
+// field for why it is kept. Keeping the parameter means the follow-up accessor lands without
+// re-plumbing every caller.
 void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
                                    std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                                    const std::shared_ptr<PAGScene>& scene,
@@ -417,7 +420,8 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
   children = std::move(newChildren);
   // Re-parent every direct child so the parent chain matches the rebuilt tree. Existing children
   // may carry a stale parent pointer (e.g. a plain-layer container whose parent was replaced
-  // during a prior sync), and freshly built children have no parent set yet.
+  // during a prior sync), and freshly built children have no parent set yet. The only thing written
+  // here is PAGLayer::parent, which nothing in this PR reads but a follow-up accessor will.
   for (auto& child : children) {
     if (child != nullptr) {
       child->parent = shared_from_this();
@@ -486,6 +490,7 @@ void PAGComposition::refreshPlainContainerChildren(
       }
       container->children = std::move(newChildren);
       // Re-parent the container's direct children so the parent chain matches the rebuilt subtree.
+      // As above, this writes only PAGLayer::parent, kept for the follow-up accessor.
       for (auto& child : container->children) {
         if (child != nullptr) {
           child->parent = container->shared_from_this();

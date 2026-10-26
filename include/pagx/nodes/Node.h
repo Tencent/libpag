@@ -306,6 +306,10 @@ class Node {
    * PAGXDocument::removeNodes all renumber every remaining node. Callers MUST NOT cache this
    * value across any operation that may mutate the node list; re-resolve the node from a runtime
    * layer the host hit-tested (PAGLayer::getNode()) and use the freshly returned index instead.
+   *
+   * Not read in this PR: getNodeSourceMap(), which exposed these indexes to the editor for selection
+   * and source-range mapping, arrives in a follow-up PR. The value is still maintained by every
+   * structural edit (makeNode, adoptNodes, removeNodes) so that PR can rely on it.
    */
   int index = -1;
 
