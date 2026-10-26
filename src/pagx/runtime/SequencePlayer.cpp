@@ -26,7 +26,6 @@
 #include "rendering/sequences/SequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
-#include "rendering/video/VideoDecoderFactory.h"
 
 namespace pagx {
 
@@ -78,16 +77,18 @@ std::shared_ptr<SequencePlayer> BuildVideoPlayer(
   // a null file reference is safe here.
   auto demuxer = std::make_unique<pag::VideoSequenceDemuxer>(nullptr, sequence);
   auto player = std::shared_ptr<SequencePlayer>(new SequencePlayer());
-  // Soft decode only (design decision 2): frame-comparison gates run on the software path;
-  // hardware decoders are platform-dependent and excluded from the scheduling path.
-  std::vector<const pag::VideoDecoderFactory*> factories = {};
-  factories.push_back(pag::VideoDecoderFactory::SoftwareAVCDecoderFactory());
-  player->reader = std::make_shared<pag::VideoReader>(std::move(demuxer), std::move(factories));
+  // The default platform factory list (hardware first, SoftAVCDecoder fallback) — exactly the
+  // decoder configuration the legacy runtime uses. The strict soft-decode comparison gate of
+  // P3-15 forces this list down to software when it runs.
+  player->reader = std::make_shared<pag::VideoReader>(std::move(demuxer));
   player->holder = holder;
   player->_frameRate = container.frameRate;
   player->_frameCount = static_cast<uint32_t>(container.frames.size());
   player->_width = static_cast<int>(container.width);
   player->_height = static_cast<int>(container.height);
+  player->_isVideo = true;
+  player->_alphaStartX = container.alphaStartX;
+  player->_alphaStartY = container.alphaStartY;
   return player;
 }
 
@@ -160,7 +161,13 @@ std::shared_ptr<tgfx::Image> SequencePlayer::frameAt(double compositionTime) {
   auto targetFrame =
       static_cast<pag::Frame>(std::min<int64_t>(rawFrame, static_cast<int64_t>(_frameCount) - 1));
   auto generator = std::make_shared<pag::SequenceFrameGenerator>(reader, targetFrame, nullptr);
-  return tgfx::Image::MakeFrom(generator);
+  auto image = tgfx::Image::MakeFrom(std::move(generator));
+  if (image != nullptr && _isVideo) {
+    // Video frames carry a dual-region buffer (RGB + alpha areas, legacy RGBAAA layout);
+    // resample into the display size exactly like SequenceInfo::MakeSequenceImage does.
+    image = image->makeRGBAAA(_width, _height, _alphaStartX, _alphaStartY);
+  }
+  return image;
 }
 
 float SequencePlayer::frameRate() const {

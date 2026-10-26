@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include "base/PAGTest.h"
+#include "pag/pag.h"
 #include "pagx/LegacyPAGImporter.h"
 #include "pagx/PAGExporter.h"
 #include "pagx/PAGImporter.h"
@@ -2373,6 +2374,75 @@ PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
   EXPECT_EQ(memcmp(decodedImage->data->bytes(), sequenceImages.back()->data->bytes(),
                    sequenceImages.back()->data->size()),
             0);
+}
+
+PAGX_TEST(PAGImporterTest, VideoSequenceFrameSchedulingTest) {
+  // P3-10c follow-up: video frame scheduling on both pipelines with the same sample. The
+  // legacy pipeline renders through PAGPlayer; the new pipeline renders the migrated document
+  // through SequencePlayer (RGBAAA resampling of the dual-region decoded frame). Both must
+  // produce real content and advance frames between the two playback times.
+  const std::string legacyPath =
+      pag::ProjectPath::Absolute("resources/apitest/video_sequence_without_mp4header.pag");
+  auto pagFile = pag::PAGFile::Load(legacyPath);
+  if (pagFile == nullptr) {
+    GTEST_SKIP() << "legacy sample missing";
+  }
+  int width = pagFile->width();
+  int height = pagFile->height();
+  auto pagSurface = pag::PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<pag::PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(pag::Matrix::I());
+  pagPlayer->setProgress(0.0f);
+  pagPlayer->flush();
+  std::vector<uint8_t> a(static_cast<size_t>(width) * height * 4, 0);
+  std::vector<uint8_t> b(static_cast<size_t>(width) * height * 4, 0);
+  ASSERT_TRUE(pagSurface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
+                                     a.data(), static_cast<size_t>(width) * 4));
+  pagPlayer->setProgress(458334.0f / static_cast<float>(pagFile->duration()));
+  pagPlayer->flush();
+  ASSERT_TRUE(pagSurface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
+                                     b.data(), static_cast<size_t>(width) * 4));
+  int content = 0;
+  int diff = 0;
+  for (size_t i = 0; i < a.size(); i += 4) {
+    if (a[i] | a[i + 1] | a[i + 2]) content++;
+    if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2]) diff++;
+  }
+  EXPECT_GT(content, 0);
+  EXPECT_GT(diff, 0);
+
+  // The same sample through the new pipeline: migrate, render two times.
+  auto rawFile = pag::File::Load(legacyPath);
+  ASSERT_TRUE(rawFile != nullptr);
+  std::vector<PAGExportIssue> issues = {};
+  auto doc = LegacyPAGImporter::Convert(rawFile, &issues);
+  ASSERT_TRUE(doc != nullptr);
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto newSurface = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(newSurface != nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  auto animation = std::dynamic_pointer_cast<PAGAnimation>(timeline);
+  ASSERT_TRUE(animation != nullptr);
+  std::vector<uint8_t> c(static_cast<size_t>(width) * height * 4, 0);
+  std::vector<uint8_t> d(static_cast<size_t>(width) * height * 4, 0);
+  animation->setCurrentTime(0);
+  ASSERT_TRUE(scene->draw(newSurface));
+  ASSERT_TRUE(newSurface->readPixels(c.data(), static_cast<size_t>(width) * 4));
+  animation->setCurrentTime(458334);
+  ASSERT_TRUE(scene->draw(newSurface));
+  ASSERT_TRUE(newSurface->readPixels(d.data(), static_cast<size_t>(width) * 4));
+  int contentC = 0;
+  int diffCD = 0;
+  for (size_t i = 0; i < c.size(); i += 4) {
+    if (c[i] | c[i + 1] | c[i + 2]) contentC++;
+    if (c[i] != d[i] || c[i + 1] != d[i + 1] || c[i + 2] != d[i + 2]) diffCD++;
+  }
+  EXPECT_GT(contentC, 0);
+  EXPECT_GT(diffCD, 0);
 }
 
 PAGX_TEST(PAGImporterTest, SequenceFrameSchedulingTest) {

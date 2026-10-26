@@ -75,6 +75,11 @@ class SequencePlayer {
   uint32_t _frameCount = 0;
   int _width = 0;
   int _height = 0;
+  // Video frames decode into a dual-region buffer (RGB area + alpha area, spec of the legacy
+  // RGBAAA layout); makeRGBAAA resamples it into the display size. Bitmap frames are plain RGBA.
+  bool _isVideo = false;
+  int32_t _alphaStartX = 0;
+  int32_t _alphaStartY = 0;
 
   friend std::shared_ptr<SequencePlayer> BuildVideoPlayer(
       const VideoSequenceContainer& container, const std::shared_ptr<LegacySequenceHolder>& holder);
