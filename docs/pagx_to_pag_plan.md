@@ -115,7 +115,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P2-6b 图片缩放含关键帧（AnimationScaleLookup：matrix/scale 通道的精确谱范数上界并入最大显示缩放） | fd5d7fcc7 |
 | P2-6c TextHolder 嵌入文本回退（flush 改注册字体重排，修改不再被静默忽略） | 9306e1029 |
 | P2-6d 默认时间线统一（C23：pagx render 与 PAGViewer 走 getDefaultTimeline，StateMachine 从初始状态帧步进推进） | f0bcfd598 |
-| P2-7 动效等价验收（test/verify_animation_equivalence.sh） | 2fdb48057 |
+| P2-7 动效等价验收（test/verify_animation_equivalence.sh） | 54456700c |
 
 - **验收记录**：27/27 动效样本（animation 13 + state_machine 4 + viewmodel 5 + static_animated 5）
   × 3 个时间点（0/0.5/1.0s）XML 与 v4 渲染 **全部 bit-exact**；PAGFullTest 2717 tests，
