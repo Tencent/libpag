@@ -15040,8 +15040,7 @@ static std::shared_ptr<tgfx::VectorLayer> MakeReferenceShadowLayer(
 
 static std::shared_ptr<tgfx::Surface> RenderReferenceShadowScene(
     tgfx::Context* context, int surfaceWidth, int surfaceHeight, float contentWidth,
-    float contentHeight, float zoomScale,
-    const std::vector<std::shared_ptr<tgfx::Layer>>& layers) {
+    float contentHeight, float zoomScale, const std::vector<std::shared_ptr<tgfx::Layer>>& layers) {
   auto surface = tgfx::Surface::Make(context, surfaceWidth, surfaceHeight);
   if (surface == nullptr) {
     return nullptr;
@@ -15105,23 +15104,6 @@ static int CountPixelDifferences(const std::vector<uint8_t>& first,
   return count;
 }
 
-static int CountVisiblePixels(const std::vector<uint8_t>& pixels, int left, int top, int width,
-                              int height, int imageWidth) {
-  if (pixels.empty()) {
-    return 0;
-  }
-  int count = 0;
-  for (int row = top; row < top + height; row++) {
-    for (int column = left; column < left + width; column++) {
-      const size_t offset = (static_cast<size_t>(row) * imageWidth + column) * 4;
-      if (pixels[offset + 3] > 0) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
 static int CountOccurrences(const std::string& text, const std::string& token) {
   int count = 0;
   size_t position = text.find(token);
@@ -15133,7 +15115,7 @@ static int CountOccurrences(const std::string& text, const std::string& token) {
 }
 
 static std::shared_ptr<pagx::PAGXDocument> MakeShadowSpreadStyleDocument(float dropSpread,
-                                                                        float innerSpread) {
+                                                                         float innerSpread) {
   auto doc = pagx::PAGXDocument::Make(160, 160);
   auto layer = doc->makeNode<pagx::Layer>("layer");
   auto rect = doc->makeNode<pagx::Rectangle>();
@@ -15185,142 +15167,6 @@ static std::shared_ptr<tgfx::VectorLayer> MakeShadowSpreadStyleReferenceLayer(fl
   inner.spread = innerSpread;
   inner.color = {0.0f, 0.0f, 0.0f, 0.5f};
   return MakeReferenceShadowLayer(shape, {drop, inner});
-}
-
-// Actual editor parameters for the three stacked inner shadows: light, upper dark, lower dark.
-static constexpr float kThreeShadowSpread = -19.587f;
-static constexpr float kThreeShadowOffset = 19.587f;
-static constexpr float kThreeShadowLightBlur = 7.34513f;
-static constexpr float kThreeShadowDarkBlur = 2.44838f;
-static constexpr float kThreeShadowPanelWidth = 23.5044f;
-static constexpr float kThreeShadowPanelHeight = 102.832f;
-static constexpr float kThreeShadowPanelRoundness = 489.676f;
-static constexpr float kThreeShadowLight = 230.0f / 255.0f;
-static constexpr float kThreeShadowDark = 40.0f / 255.0f;
-
-static std::shared_ptr<pagx::PAGXDocument> MakeThreeInnerShadowDocument(bool withGlass,
-                                                                       bool zeroSpread) {
-  auto doc = pagx::PAGXDocument::Make(120, 160);
-
-  auto background = doc->makeNode<pagx::Layer>("background");
-  auto backgroundRect = doc->makeNode<pagx::Rectangle>();
-  backgroundRect->position = {60, 80};
-  backgroundRect->size = {120, 160};
-  auto backgroundFill = doc->makeNode<pagx::Fill>();
-  auto backgroundColor = doc->makeNode<pagx::SolidColor>();
-  backgroundColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
-  backgroundFill->color = backgroundColor;
-  background->contents = {backgroundRect, backgroundFill};
-  doc->layers.push_back(background);
-
-  auto panel = doc->makeNode<pagx::Layer>("panel");
-  auto panelRect = doc->makeNode<pagx::Rectangle>();
-  panelRect->position = {60, 80};
-  panelRect->size = {kThreeShadowPanelWidth, kThreeShadowPanelHeight};
-  panelRect->roundness = kThreeShadowPanelRoundness;
-  auto panelFill = doc->makeNode<pagx::Fill>();
-  auto panelColor = doc->makeNode<pagx::SolidColor>();
-  panelColor->color = {0.0f, 0.0f, 0.0f, 0.004f};
-  panelFill->color = panelColor;
-  panel->contents = {panelRect, panelFill};
-
-  const float spread = zeroSpread ? 0.0f : kThreeShadowSpread;
-  auto light = doc->makeNode<pagx::InnerShadowStyle>("lightShadow");
-  light->offsetY = kThreeShadowOffset;
-  light->blurX = kThreeShadowLightBlur;
-  light->blurY = kThreeShadowLightBlur;
-  light->spread = spread;
-  light->color = {kThreeShadowLight, kThreeShadowLight, kThreeShadowLight, 1.0f};
-  light->excludeChildEffects = true;
-  panel->styles.push_back(light);
-
-  auto upperDark = doc->makeNode<pagx::InnerShadowStyle>("upperDarkShadow");
-  upperDark->offsetY = -kThreeShadowOffset;
-  upperDark->blurX = kThreeShadowDarkBlur;
-  upperDark->blurY = kThreeShadowDarkBlur;
-  upperDark->spread = spread;
-  upperDark->color = {kThreeShadowDark, kThreeShadowDark, kThreeShadowDark, 1.0f};
-  upperDark->excludeChildEffects = true;
-  panel->styles.push_back(upperDark);
-
-  auto lowerDark = doc->makeNode<pagx::InnerShadowStyle>("lowerDarkShadow");
-  lowerDark->offsetY = kThreeShadowOffset;
-  lowerDark->blurX = kThreeShadowDarkBlur;
-  lowerDark->blurY = kThreeShadowDarkBlur;
-  lowerDark->spread = spread;
-  lowerDark->color = {kThreeShadowDark, kThreeShadowDark, kThreeShadowDark, 1.0f};
-  lowerDark->excludeChildEffects = true;
-  panel->styles.push_back(lowerDark);
-
-  if (withGlass) {
-    auto glass = doc->makeNode<pagx::GlassStyle>("glass");
-    glass->refraction = 70;
-    glass->depth = 30;
-    glass->frost = 6;
-    glass->dispersion = 20;
-    glass->splay = 20;
-    glass->lightAngle = 0;
-    glass->lightIntensity = 25;
-    glass->excludeChildEffects = true;
-    panel->styles.push_back(glass);
-  }
-
-  doc->layers.push_back(panel);
-  return doc;
-}
-
-static std::vector<std::shared_ptr<tgfx::Layer>> MakeThreeInnerShadowReferenceLayers(
-    bool withGlass, bool zeroSpread) {
-  std::vector<std::shared_ptr<tgfx::Layer>> layers = {};
-
-  ShadowSpreadReferenceShape background;
-  background.centerX = 60;
-  background.centerY = 80;
-  background.width = 120;
-  background.height = 160;
-  background.fill = tgfx::Color::White();
-  layers.push_back(MakeReferenceShadowLayer(background, {}));
-
-  ShadowSpreadReferenceShape panel;
-  panel.centerX = 60;
-  panel.centerY = 80;
-  panel.width = kThreeShadowPanelWidth;
-  panel.height = kThreeShadowPanelHeight;
-  panel.roundness = kThreeShadowPanelRoundness;
-  panel.fill = {0.0f, 0.0f, 0.0f, 0.004f};
-
-  const float spread = zeroSpread ? 0.0f : kThreeShadowSpread;
-  ShadowSpreadReferenceStyle light;
-  light.inner = true;
-  light.offsetY = kThreeShadowOffset;
-  light.blurX = kThreeShadowLightBlur;
-  light.blurY = kThreeShadowLightBlur;
-  light.spread = spread;
-  light.color = {kThreeShadowLight, kThreeShadowLight, kThreeShadowLight, 1.0f};
-  light.excludeChildEffects = true;
-
-  ShadowSpreadReferenceStyle upperDark;
-  upperDark.inner = true;
-  upperDark.offsetY = -kThreeShadowOffset;
-  upperDark.blurX = kThreeShadowDarkBlur;
-  upperDark.blurY = kThreeShadowDarkBlur;
-  upperDark.spread = spread;
-  upperDark.color = {kThreeShadowDark, kThreeShadowDark, kThreeShadowDark, 1.0f};
-  upperDark.excludeChildEffects = true;
-
-  ShadowSpreadReferenceStyle lowerDark = upperDark;
-  lowerDark.offsetY = kThreeShadowOffset;
-
-  auto panelLayer = MakeReferenceShadowLayer(panel, {light, upperDark, lowerDark});
-  if (withGlass) {
-    auto styles = panelLayer->layerStyles();
-    auto glass = tgfx::GlassStyle::Make(70, 30, 6, 20, 20, 0, 25);
-    glass->setExcludeChildEffects(true);
-    styles.push_back(glass);
-    panelLayer->setLayerStyles(styles);
-  }
-  layers.push_back(panelLayer);
-  return layers;
 }
 
 }  // namespace
@@ -15490,7 +15336,7 @@ PAGX_TEST(PAGXTest, ShadowSpreadNodeChannels) {
   const auto& dropTable = pagx::ChannelsFor(pagx::NodeType::DropShadowStyle);
   bool sawDropSpread = false;
   for (const auto& channel : dropTable) {
-    if (channel.channel != "spread") {
+    if (std::string(channel.channel) != "spread") {
       continue;
     }
     sawDropSpread = true;
@@ -15572,8 +15418,8 @@ PAGX_TEST(PAGXTest, ShadowSpreadSceneBuild) {
   EXPECT_FLOAT_EQ(reloadedTgfxDrop->spread(), 8.0f);
   EXPECT_FLOAT_EQ(reloadedTgfxInner->spread(), -6.0f);
 
-  auto resource = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/apitest/shadow_spread.pagx"));
+  auto resource =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/apitest/shadow_spread.pagx"));
   ASSERT_TRUE(resource != nullptr);
   ASSERT_TRUE(resource->errors.empty());
   auto* resourceDrop = resource->findNode<pagx::DropShadowStyle>("drop");
