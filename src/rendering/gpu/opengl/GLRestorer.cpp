@@ -18,8 +18,6 @@
 
 #include "GLRestorer.h"
 
-#if defined(TGFX_USE_OPENGL) && !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE
@@ -35,6 +33,10 @@
 #endif
 
 namespace pag {
+
+std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
+  return std::make_unique<GLRestorer>();
+}
 
 static void ClearGLError() {
   while (glGetError() != GL_NO_ERROR) {
@@ -102,5 +104,3 @@ void GLRestorer::restore() {
 }
 
 }  // namespace pag
-
-#endif  // TGFX_USE_OPENGL && !PAG_BUILD_FOR_WEB && !_WIN32

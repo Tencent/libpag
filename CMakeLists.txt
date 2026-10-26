@@ -104,29 +104,9 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
 
-# Non-GL backends (Metal / Vulkan / D3D12 / WebGPU) are mutually exclusive with each other and
-# with OpenGL. If any non-GL backend is enabled, disable OpenGL and all GL-only variants
-# (QT / SwiftShader / ANGLE). This mirrors the mutual-exclusion contract enforced in
-# third_party/tgfx/CMakeLists.txt, and must run BEFORE the existing QT / SwiftShader mutual-
-# exclusion block so the "if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE) set(PAG_USE_OPENGL ON)"
-# fixup further down does not accidentally re-enable GL.
-#
-# The non-GL backends must not be combined: libpag passes each PAG_USE_* to tgfx unchanged, but
-# tgfx resolves them with its own priority chain (Vulkan > D3D12 > Metal > WebGPU) and silently
-# disables the losers. A combination would leave libpag compiling backend glue (Devices_*.cpp)
-# for a backend tgfx never built, failing at link time with undefined symbols.
-set(PAG_NON_GL_BACKENDS_COUNT 0)
-foreach (backend PAG_USE_METAL PAG_USE_VULKAN PAG_USE_D3D12 PAG_USE_WEBGPU)
-    if (${backend})
-        math(EXPR PAG_NON_GL_BACKENDS_COUNT "${PAG_NON_GL_BACKENDS_COUNT} + 1")
-    endif ()
-endforeach ()
-if (PAG_NON_GL_BACKENDS_COUNT GREATER 1)
-    message(FATAL_ERROR
-            "Only one non-OpenGL backend may be enabled at a time "
-            "(PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
-endif ()
-
+# Normalize GPU backend options before validating the resolved selection below. Non-GL backends
+# override OpenGL and its Qt / SwiftShader / ANGLE variants, so disable them before the GL variant
+# fixup can re-enable OpenGL.
 if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
     foreach (gl_variant PAG_USE_OPENGL PAG_USE_QT PAG_USE_SWIFTSHADER PAG_USE_ANGLE)
         if (${gl_variant})
@@ -148,13 +128,6 @@ endif ()
 # The Metal backend supports the iOS simulator on arm64 only.
 if (PAG_USE_METAL AND IOS)
     set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
-endif ()
-
-if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
-        AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
-    message(FATAL_ERROR
-            "At least one GPU backend must be enabled "
-            "(PAG_USE_OPENGL / PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
 endif ()
 
 if (PAG_USE_QT)
@@ -190,25 +163,37 @@ if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
 endif ()
 
-# Expose the selected tgfx backend to libpag sources. The Devices_* implementation files dispatch
-# on this macro to pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables
-# passed to tgfx further down. libpag defines its own copy instead of relying on tgfx's PRIVATE
-# compile definitions, so tgfx can change its visibility policy without breaking libpag.
-if (PAG_USE_OPENGL)
-    list(APPEND PAG_DEFINES TGFX_USE_OPENGL)
+# Require one resolved backend so source selection, compile definitions and tgfx options agree
+# without depending on tgfx's backend priority rules.
+set(PAG_GPU_BACKENDS OPENGL METAL VULKAN D3D12 WEBGPU)
+set(PAG_ENABLED_GPU_BACKENDS "")
+foreach (backend IN LISTS PAG_GPU_BACKENDS)
+    if (PAG_USE_${backend})
+        list(APPEND PAG_ENABLED_GPU_BACKENDS ${backend})
+    endif ()
+endforeach ()
+list(LENGTH PAG_ENABLED_GPU_BACKENDS PAG_GPU_BACKENDS_COUNT)
+if (NOT PAG_GPU_BACKENDS_COUNT EQUAL 1)
+    message(FATAL_ERROR
+            "Exactly one GPU backend must be enabled "
+            "(PAG_USE_OPENGL / PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
 endif ()
-if (PAG_USE_METAL)
-    list(APPEND PAG_DEFINES TGFX_USE_METAL)
+list(GET PAG_ENABLED_GPU_BACKENDS 0 PAG_GPU_BACKEND)
+
+# tgfx backend availability does not imply that libpag has implemented its device and platform glue.
+set(PAG_IMPLEMENTED_GPU_BACKENDS OPENGL METAL)
+if (NOT PAG_GPU_BACKEND IN_LIST PAG_IMPLEMENTED_GPU_BACKENDS)
+    message(FATAL_ERROR "The libpag ${PAG_GPU_BACKEND} backend is not yet implemented.")
 endif ()
-if (PAG_USE_VULKAN)
-    list(APPEND PAG_DEFINES TGFX_USE_VULKAN)
+string(TOLOWER "${PAG_GPU_BACKEND}" PAG_GPU_BACKEND_DIRECTORY)
+set(PAG_GPU_BACKEND_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/gpu/${PAG_GPU_BACKEND_DIRECTORY}")
+if (NOT IS_DIRECTORY "${PAG_GPU_BACKEND_PATH}")
+    message(FATAL_ERROR "Missing libpag ${PAG_GPU_BACKEND} backend directory: ${PAG_GPU_BACKEND_PATH}")
 endif ()
-if (PAG_USE_D3D12)
-    list(APPEND PAG_DEFINES TGFX_USE_D3D12)
-endif ()
-if (PAG_USE_WEBGPU)
-    list(APPEND PAG_DEFINES TGFX_USE_WEBGPU)
-endif ()
+
+# Apple integration and backend-specific tests still need this macro. Core device implementations
+# are selected below by directory, independently of tgfx's private compile definitions.
+list(APPEND PAG_DEFINES TGFX_USE_${PAG_GPU_BACKEND})
 
 if (PAG_USE_FFAVC)
     set(PAG_USE_LIBAVC OFF)
@@ -291,14 +276,24 @@ file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*)
-# Devices_Metal.mm is an Objective-C++ file; it only has content under TGFX_USE_METAL. On non-Apple
-# platforms the GCC toolchain lacks the Objective-C++ frontend (`cc1objplus`) and would fail even
-# compiling an empty .mm. Drop it from the source list outside of Apple.
-if (NOT APPLE)
-    list(FILTER SRC_FILES EXCLUDE REGEX "src/rendering/gpu/Devices_Metal\\.mm$")
-    list(FILTER SRC_FILES EXCLUDE REGEX "src/base/utils/TGFXCast_Metal\\.mm$")
+# Keep backend implementations out of the shared source list, including Objective-C++ sources on
+# non-Apple platforms. Only the selected backend directories are added back.
+list(FILTER SRC_FILES EXCLUDE REGEX
+        "/(rendering/gpu|base/utils/cast)/(opengl|metal|vulkan|d3d12|webgpu)/")
+file(GLOB_RECURSE PAG_GPU_BACKEND_FILES CONFIGURE_DEPENDS "${PAG_GPU_BACKEND_PATH}/*.*")
+file(GLOB_RECURSE PAG_CAST_BACKEND_FILES CONFIGURE_DEPENDS
+        "src/base/utils/cast/${PAG_GPU_BACKEND_DIRECTORY}/*.*")
+
+# GL state preservation is platform-specific. Web and Windows keep the same null factory as Metal.
+if (PAG_USE_OPENGL AND NOT WEB AND NOT WIN32)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/rendering/gpu/ExternalStateGuard\\.cpp$")
+else ()
+    list(FILTER PAG_GPU_BACKEND_FILES EXCLUDE REGEX "/GLRestorer\\.(h|cpp)$")
 endif ()
-list(APPEND PAG_FILES ${SRC_FILES})
+if (PAG_USE_METAL)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/base/utils/cast/MetalTexture\\.cpp$")
+endif ()
+list(APPEND PAG_FILES ${SRC_FILES} ${PAG_GPU_BACKEND_FILES} ${PAG_CAST_BACKEND_FILES})
 
 if (PAG_BUILD_PAGX)
     # pagx core + utils + xml (always included with PAGX)
@@ -528,10 +523,10 @@ function(find_include_dirs out)
 endfunction()
 
 # Apple drawable implementations and surface category headers are selected per GPU backend.
-# Surface category implementations share a translation unit with their class so ordinary static
-# linking retains them without -ObjC. Both public categories declare the same ObjC selector
-# (FromLayer:), and framework consumers have no TGFX_USE_* build macros, so only the selected
-# backend's category header is exported.
+# Public surface categories share a translation unit with their class so ordinary static linking
+# retains them without -ObjC. Private factories use direct C++ calls to the selected backend.
+# On iOS both public categories declare FromLayer:, and framework consumers have no TGFX_USE_*
+# build macros, so only the selected backend's category header is exported.
 if (APPLE)
     if (PAG_USE_METAL)
         set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
@@ -1212,5 +1207,23 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
+        # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros
+        # and cannot pull backend objects through direct references to private implementation symbols.
+        add_executable(PAGCocoaStaticLinkTest test/cocoa/StaticLinkTest.m)
+        add_dependencies(PAGCocoaStaticLinkTest pag)
+        target_include_directories(PAGCocoaStaticLinkTest PRIVATE ${PAG_INCLUDES} include)
+        target_compile_options(PAGCocoaStaticLinkTest PRIVATE -fobjc-arc)
+        target_link_options(PAGCocoaStaticLinkTest PRIVATE -dead_strip)
+        target_link_libraries(PAGCocoaStaticLinkTest "$<TARGET_FILE:pag>" ${PAG_SHARED_LIBS})
+        set_target_properties(PAGCocoaStaticLinkTest PROPERTIES LINKER_LANGUAGE CXX)
+        add_custom_target(PAGCocoaStaticLinkCheck
+                COMMAND "$<TARGET_FILE:PAGCocoaStaticLinkTest>"
+                DEPENDS PAGCocoaStaticLinkTest
+                COMMENT "Running Cocoa static link regression"
+                VERBATIM)
+        add_dependencies(PAGFullTest PAGCocoaStaticLinkCheck)
+    endif ()
 
 endif ()
