@@ -397,7 +397,11 @@ bool PAGBindInit() {
   // requires the class to be bound before it appears in another class's method signature.
   class_<PAGSurfaceReadback>("_PAGSurfaceReadback")
       .smart_ptr<std::shared_ptr<PAGSurfaceReadback>>("_PAGSurfaceReadback")
-      .function("_isReady", &PAGSurfaceReadback::isReady)
+      .function("_status", optional_override([](PAGSurfaceReadback& session) {
+                  // The int value must stay in sync with the declaration order of the pag
+                  // ReadbackStatus enum: 0 = Ready, 1 = Pending, 2 = Failed.
+                  return static_cast<int>(session.status());
+                }))
       .function("_width", &PAGSurfaceReadback::width)
       .function("_height", &PAGSurfaceReadback::height)
       .function("_readPixels", optional_override([](PAGSurfaceReadback& session, int colorType,

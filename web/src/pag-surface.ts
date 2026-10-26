@@ -16,6 +16,12 @@ const READBACK_TIMEOUT_MS = 30000;
 // Throttles the unsupported-surface warning of readPixelsAsync() to a single console entry.
 let readbackUnsupportedWarned = false;
 
+// Values must stay in sync with the declaration order of the pag::ReadbackStatus enum in
+// include/pag/pag.h.
+const READBACK_STATUS_READY = 0;
+const READBACK_STATUS_PENDING = 1;
+const READBACK_STATUS_FAILED = 2;
+
 @destroyVerify
 export class PAGSurface {
   /**
@@ -168,10 +174,13 @@ export class PAGSurface {
     }
     try {
       const deadline = Date.now() + READBACK_TIMEOUT_MS;
-      while (!session._isReady()) {
+      let status = session._status();
+      while (status === READBACK_STATUS_PENDING) {
         if (Date.now() > deadline) return null;
         await new Promise((resolve) => setTimeout(resolve, 0));
+        status = session._status();
       }
+      if (status === READBACK_STATUS_FAILED) return null;
       const rowBytes = session._width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
       return session._readPixels(colorType, alphaType, rowBytes) as Uint8Array | null;
     } finally {

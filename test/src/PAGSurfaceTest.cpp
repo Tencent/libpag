@@ -386,4 +386,30 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsOutlivesSurface) {
                                    static_cast<size_t>(width * 4)));
 }
 
+/**
+ * 用例描述: 回读会话的 status() 状态机，创建后为 Ready 或 Pending，轮询后必须到达 Ready，
+ * 任何时刻都不得出现 Failed
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadbackStatus) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = pagSurface->asyncReadPixels();
+  ASSERT_TRUE(readback != nullptr);
+  auto status = readback->status();
+  EXPECT_TRUE(status == ReadbackStatus::Ready || status == ReadbackStatus::Pending);
+  for (int i = 0; i < 5000 && readback->status() == ReadbackStatus::Pending; i++) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(readback->status(), ReadbackStatus::Ready);
+  EXPECT_TRUE(readback->isReady());
+}
+
 }  // namespace pag

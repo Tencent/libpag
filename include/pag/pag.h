@@ -1183,6 +1183,24 @@ class PAGPlayer;
 class PAGSurface;
 
 /**
+ * Describes the current state of an asynchronous pixel readback session.
+ */
+enum class ReadbackStatus {
+  /**
+   * The pixels are ready and can be read by PAGSurfaceReadback::readPixels().
+   */
+  Ready,
+  /**
+   * The pixels have not arrived yet and may still become Ready on a later poll.
+   */
+  Pending,
+  /**
+   * The readback has failed permanently; the pixels will never arrive.
+   */
+  Failed,
+};
+
+/**
  * An asynchronous pixel readback session created by PAGSurface::asyncReadPixels(). The pixel data
  * may not be available immediately after creation, because it can involve asynchronous GPU
  * processing: on WebGPU the data arrives through an asynchronous GPU buffer mapping, and even on
@@ -1207,8 +1225,16 @@ class PAG_API PAGSurfaceReadback {
 
   /**
    * Returns true if the pixel data is ready to be read by readPixels(). This method never blocks.
+   * Equivalent to status() == ReadbackStatus::Ready.
    */
   bool isReady();
+
+  /**
+   * Returns the current state of the readback session. Unlike isReady(), this method
+   * distinguishes a permanent failure (ReadbackStatus::Failed) from a not-yet-ready state, so
+   * callers can stop polling immediately instead of waiting forever. This method never blocks.
+   */
+  ReadbackStatus status();
 
   /**
    * Copies the readback pixels to dstPixels with the specified color type, alpha type and row

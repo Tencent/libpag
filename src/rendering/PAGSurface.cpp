@@ -32,6 +32,18 @@
 
 namespace pag {
 
+static ReadbackStatus ToPAGReadbackStatus(tgfx::ReadbackStatus status) {
+  switch (status) {
+    case tgfx::ReadbackStatus::Ready:
+      return ReadbackStatus::Ready;
+    case tgfx::ReadbackStatus::Pending:
+      return ReadbackStatus::Pending;
+    case tgfx::ReadbackStatus::Failed:
+      return ReadbackStatus::Failed;
+  }
+  return ReadbackStatus::Failed;
+}
+
 PAGSurfaceReadback::PAGSurfaceReadback(std::shared_ptr<PAGSurface> pagSurface,
                                        std::shared_ptr<tgfx::SurfaceReadback> readback, bool flipY)
     : pagSurface(std::move(pagSurface)), readback(std::move(readback)), flipY(flipY) {
@@ -48,14 +60,18 @@ int PAGSurfaceReadback::height() const {
 }
 
 bool PAGSurfaceReadback::isReady() {
+  return status() == ReadbackStatus::Ready;
+}
+
+ReadbackStatus PAGSurfaceReadback::status() {
   LockGuard autoLock(pagSurface->rootLocker);
   auto context = pagSurface->lockContext();
   if (context == nullptr) {
-    return false;
+    return ReadbackStatus::Failed;
   }
-  auto ready = readback->isReady(context);
+  auto result = ToPAGReadbackStatus(readback->status(context));
   pagSurface->unlockContext();
-  return ready;
+  return result;
 }
 
 bool PAGSurfaceReadback::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
