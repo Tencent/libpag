@@ -56,7 +56,7 @@ export class PAGView extends NativePAGView {
     pagView.renderCanvas.retain();
     pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
     pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, canvas, canvas.width, canvas.height);
+    pagView.pagSurface = this.makeGLSurface(pagView.pagGlContext, canvas.width, canvas.height);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     pagView.setProgress(0);
@@ -80,9 +80,8 @@ export class PAGView extends NativePAGView {
       throw new Error('Canvas element is not found!');
     }
     if (!this.pagGlContext) return;
-    const pagSurface = PAGView.makePAGSurface(
+    const pagSurface = PAGView.makeGLSurface(
       this.pagGlContext,
-      this.canvasElement!,
       this.canvasElement!.width,
       this.canvasElement!.height,
     );

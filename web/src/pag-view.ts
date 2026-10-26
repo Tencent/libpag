@@ -118,23 +118,39 @@ export class PAGView {
     height: number,
     useCanvas2D = false,
   ): PAGSurface {
-    if (isWebGPUBackend()) {
-      // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
-      // Width and height are read from the canvas by the C++ side.
-      if (useCanvas2D) {
-        // In canvas2D mode PAG renders into the shared global canvas and flush() composites it
-        // onto the target canvas with drawImage. Size the global canvas exactly, because the
-        // surface wraps the whole canvas and its content is top-left origin.
-        const globalCanvas = PAGModule.globalCanvas.canvas;
-        if (!globalCanvas) throw new Error('Global canvas is not initialized!');
-        PAGModule.globalCanvas.setCanvasSize(width, height);
-        return PAGSurface.fromCanvas(globalCanvas);
-      }
-      if (isOffscreenCanvas(canvasElement)) {
-        return PAGSurface.fromCanvas(canvasElement);
-      }
-      return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement as HTMLCanvasElement));
+    return isWebGPUBackend()
+      ? this.makeWebGPUSurface(canvasElement, width, height, useCanvas2D)
+      : this.makeGLSurface(pagGlContext, width, height);
+  }
+
+  protected static makeWebGPUSurface(
+    canvasElement: HTMLCanvasElement | OffscreenCanvas,
+    width: number,
+    height: number,
+    useCanvas2D = false,
+  ): PAGSurface {
+    // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
+    // Width and height are read from the canvas by the C++ side.
+    if (useCanvas2D) {
+      // In canvas2D mode PAG renders into the shared global canvas and flush() composites it
+      // onto the target canvas with drawImage. Size the global canvas exactly, because the
+      // surface wraps the whole canvas and its content is top-left origin.
+      const globalCanvas = PAGModule.globalCanvas.canvas;
+      if (!globalCanvas) throw new Error('Global canvas is not initialized!');
+      PAGModule.globalCanvas.setCanvasSize(width, height);
+      return PAGSurface.fromCanvas(globalCanvas);
     }
+    if (isOffscreenCanvas(canvasElement)) {
+      return PAGSurface.fromCanvas(canvasElement);
+    }
+    return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement as HTMLCanvasElement));
+  }
+
+  protected static makeGLSurface(
+    pagGlContext: BackendContext | null,
+    width: number,
+    height: number,
+  ): PAGSurface {
     if (!pagGlContext || !pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
     const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);
     pagGlContext.clearCurrent();
@@ -455,8 +471,7 @@ export class PAGView {
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
     if (isWebGPUBackend()) {
-      const webgpuSurface = PAGView.makePAGSurface(
-        null,
+      const webgpuSurface = PAGView.makeWebGPUSurface(
         this.canvasElement,
         this.rawWidth,
         this.rawHeight,
@@ -468,7 +483,7 @@ export class PAGView {
       return;
     }
     if (!this.pagGlContext) return;
-    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement, this.rawWidth, this.rawHeight);
+    const pagSurface = PAGView.makeGLSurface(this.pagGlContext, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
