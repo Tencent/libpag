@@ -10,13 +10,21 @@ const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includ
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const arch = process.env.ARCH;
 const backend = process.env.BACKEND;
-const demoName = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'index-webgpu-mt' : 'index-webgpu') : (arch === 'wasm-mt' ? 'index' : 'index-st');
+const libPath = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'lib-webgpu-mt' : 'lib-webgpu') : (arch === 'wasm-mt' ? 'lib-mt' : 'lib');
 const demoOutDir = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : arch;
 
 require("./update.pag.import");
+require("./gen.demo.html");
 
 const plugins = [
-  esbuild({ tsconfig: "tsconfig.json", minify: false }),
+  esbuild({
+    tsconfig: "tsconfig.json",
+    minify: false,
+    define: {
+      __PAG_DEMO_LIB_DIR__: JSON.stringify(libPath),
+      __PAG_DEMO_BACKEND__: JSON.stringify(backend === 'webgpu' ? 'webgpu' : 'gl'),
+    },
+  }),
   json(),
   resolve({ extensions: ['.ts', '.js'] }),
   commonJs(),
@@ -37,7 +45,7 @@ const plugins = [
 
 export default [
   {
-    input: `demo/${demoName}.ts`,
+    input: 'demo/index.ts',
     output: { banner, file: `demo/${demoOutDir}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   }
