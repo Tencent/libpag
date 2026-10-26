@@ -212,7 +212,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-5 旧关键帧与动画迁移（range→point 关键帧、空间插值逐帧采样、入出点→visible Hold 通道） | c8963d75b |
 | P3-3 文本属性通道扩展（tracking 1/1000em、TextHolder 容器通道、painter visible alpha 门控） | 89f3d007d |
 | P3-6 图层样式扩展（StrokeLayerStyle 576/GradientOverlayStyle 577/OuterGlowStyle 578 + DropShadow spread；二进制与 XML 双向编解码，tgfx 着色器随后） | 2fdb48057 |
-| P3-7 特效滤镜 8 项（MotionTile 579/Levels 580/CornerPin 581/Bulge 582/Glow 583/DisplacementMap 584/RadialBlur 585/Mosaic 586；二进制与 XML 双向编解码 + DisplacementMap 图层引用（NodeRef + @id 双链路）+ 全参数动画通道注册 + ColorMatrixFilter 补齐 binding 与 matrix[0..19] 通道；tgfx 着色器随后） | 本次提交 |
+| P3-7 特效滤镜 8 项（MotionTile 579/Levels 580/CornerPin 581/Bulge 582/Glow 583/DisplacementMap 584/RadialBlur 585/Mosaic 586；二进制与 XML 双向编解码 + DisplacementMap 图层引用（NodeRef + @id 双链路）+ 全参数动画通道注册 + ColorMatrixFilter 补齐 binding 与 matrix[0..19] 通道；tgfx 着色器随后） | 091810d2a |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip
