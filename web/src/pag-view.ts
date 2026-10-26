@@ -74,9 +74,11 @@ export class PAGView {
 
     try {
       if (pagView.pagViewOptions.useCanvas2D) {
-        PAGModule.globalCanvas.retain();
-        pagView.globalCanvasRetained = true;
+        // WebGPU renders into a per-view offscreen canvas created by ensureCanvas2DSource(), so
+        // the shared GlobalCanvas is only needed on WebGL.
         if (!isWebGPUBackend()) {
+          PAGModule.globalCanvas.retain();
+          pagView.globalCanvasRetained = true;
           pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
         }
       } else {
@@ -88,13 +90,12 @@ export class PAGView {
       }
       pagView.resetSize(pagView.pagViewOptions.useScale);
       pagView.frameRate = file.frameRate();
-      pagView.pagSurface = this.makePAGSurface(
-        pagView.pagGlContext,
-        canvasElement,
-        pagView.rawWidth,
-        pagView.rawHeight,
-        pagView.pagViewOptions.useCanvas2D,
-      );
+      pagView.pagSurface = isWebGPUBackend()
+        ? PAGView.makeWebGPUSurface(
+            canvasElement,
+            pagView.pagViewOptions.useCanvas2D ? pagView.ensureCanvas2DSource() : null,
+          )
+        : PAGView.makeGLSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
       pagView.player.setSurface(pagView.pagSurface);
       pagView.player.setComposition(file);
       pagView.setProgress(0);
@@ -111,34 +112,14 @@ export class PAGView {
     return pagView;
   }
 
-  protected static makePAGSurface(
-    pagGlContext: BackendContext | null,
-    canvasElement: HTMLCanvasElement | OffscreenCanvas,
-    width: number,
-    height: number,
-    useCanvas2D = false,
-  ): PAGSurface {
-    return isWebGPUBackend()
-      ? this.makeWebGPUSurface(canvasElement, width, height, useCanvas2D)
-      : this.makeGLSurface(pagGlContext, width, height);
-  }
-
   protected static makeWebGPUSurface(
     canvasElement: HTMLCanvasElement | OffscreenCanvas,
-    width: number,
-    height: number,
-    useCanvas2D = false,
+    canvas2DSource: HTMLCanvasElement | OffscreenCanvas | null = null,
   ): PAGSurface {
-    // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
-    // Width and height are read from the canvas by the C++ side.
-    if (useCanvas2D) {
-      // In canvas2D mode PAG renders into the shared global canvas and flush() composites it
-      // onto the target canvas with drawImage. Size the global canvas exactly, because the
-      // surface wraps the whole canvas and its content is top-left origin.
-      const globalCanvas = PAGModule.globalCanvas.canvas;
-      if (!globalCanvas) throw new Error('Global canvas is not initialized!');
-      PAGModule.globalCanvas.setCanvasSize(width, height);
-      return PAGSurface.fromCanvas(globalCanvas);
+    // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow; the size
+    // is read from the canvas by the C++ side, so the canvas must be sized before wrapping.
+    if (canvas2DSource) {
+      return PAGSurface.fromCanvas(canvas2DSource);
     }
     if (isOffscreenCanvas(canvasElement)) {
       return PAGSurface.fromCanvas(canvasElement);
@@ -191,6 +172,7 @@ export class PAGView {
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private globalCanvasRetained = false;
+  private canvas2DSource: HTMLCanvasElement | OffscreenCanvas | null = null;
   private canvasContextUnavailableWarned = false;
   private rawWidth = 0;
   private rawHeight = 0;
@@ -379,7 +361,8 @@ export class PAGView {
   public async flush() {
     const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
-      if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
+      const sourceCanvas = isWebGPUBackend() ? this.canvas2DSource : PAGModule.globalCanvas.canvas;
+      if (this.pagViewOptions.useCanvas2D && res && sourceCanvas) {
         if (!this.canvasContext) {
           // getContext('2d') returns null when the canvas already holds another context type;
           // compositing is impossible then, so skip this frame instead of crashing.
@@ -400,9 +383,9 @@ export class PAGView {
         // On WebGL the render target is the default framebuffer (bottom-left origin) of a
         // possibly larger global canvas, so the content sits at the bottom; on WebGPU the
         // surface wraps the whole exactly-sized canvas with top-left origin.
-        const srcY = isWebGPUBackend() ? 0 : PAGModule.globalCanvas.canvas.height - this.rawHeight;
+        const srcY = isWebGPUBackend() ? 0 : sourceCanvas.height - this.rawHeight;
         this.canvasContext.drawImage(
-          PAGModule.globalCanvas.canvas,
+          sourceCanvas,
           0,
           srcY,
           this.rawWidth,
@@ -473,9 +456,7 @@ export class PAGView {
     if (isWebGPUBackend()) {
       const webgpuSurface = PAGView.makeWebGPUSurface(
         this.canvasElement,
-        this.rawWidth,
-        this.rawHeight,
-        this.pagViewOptions.useCanvas2D,
+        this.pagViewOptions.useCanvas2D ? this.ensureCanvas2DSource() : null,
       );
       this.player.setSurface(webgpuSurface);
       this.pagSurface?.destroy();
@@ -521,6 +502,7 @@ export class PAGView {
     this.pagGlContext?.destroy();
     this.pagGlContext = null;
     this.canvasContext = null;
+    this.canvas2DSource = null;
     this.canvasElement = null;
     this.isDestroyed = true;
   }
@@ -629,6 +611,26 @@ export class PAGView {
       if (VideoReader.isSought) return true;
     }
     return false;
+  }
+
+  // In canvas2D mode on WebGPU, PAG renders into a per-view offscreen canvas and flush()
+  // composites it onto the target canvas with drawImage. Each view owns its canvas so that
+  // multiple views never resize a shared canvas under each other.
+  private ensureCanvas2DSource(): HTMLCanvasElement | OffscreenCanvas {
+    if (this.canvas2DSource) {
+      this.canvas2DSource.width = this.rawWidth;
+      this.canvas2DSource.height = this.rawHeight;
+      return this.canvas2DSource;
+    }
+    try {
+      this.canvas2DSource = new OffscreenCanvas(this.rawWidth, this.rawHeight);
+    } catch (error) {
+      const canvas = document.createElement('canvas');
+      canvas.width = this.rawWidth;
+      canvas.height = this.rawHeight;
+      this.canvas2DSource = canvas;
+    }
+    return this.canvas2DSource;
   }
 
   private updateFPS() {
