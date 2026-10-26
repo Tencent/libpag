@@ -370,6 +370,24 @@ void CollectStringsFromViewModels(PAGXDocument* document, EncodeState* state) {
       state->intern(bind->channel);
     }
   }
+  // Composition-scoped DataBinds (spec 6.4) inline into their composition blocks; their
+  // strings must join the table too.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Composition) {
+      continue;
+    }
+    for (auto* bind : static_cast<Composition*>(node.get())->dataBinds) {
+      if (!bind->source.empty()) {
+        state->intern(bind->source);
+      }
+      if (!bind->target.empty()) {
+        state->intern(bind->target);
+      }
+      if (!bind->channel.empty()) {
+        state->intern(bind->channel);
+      }
+    }
+  }
 }
 
 void CollectStringsFromElement(Element* element, EncodeState* state) {
@@ -2222,7 +2240,6 @@ void WriteViewModelSection(pag::EncodeStream* stream, PAGXDocument* document, En
 
 // DataBind (544): source, target, channel StringRefs, direction u8.
 void WriteDataBindTag(pag::EncodeStream* stream, DataBind* bind, EncodeState* state) {
-
   PAGAttributeBlockWriter writer(&state->streamContext);
   auto hasSource = !bind->source.empty();
   auto hasTarget = !bind->target.empty();

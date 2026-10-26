@@ -24,6 +24,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
@@ -36,6 +37,10 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/SequenceCodec.h"
 #include "pagx/types/ColorSpace.h"
 
@@ -71,6 +76,25 @@ struct ConvertState {
   // Set when any converted channel carries keyframes (P3-5 extends this); until then it stays
   // false and the root animation fallback is unconditional for files with duration.
   bool hasKeyframes = false;
+  // Editable mapping (spec 7.2): converted text/image nodes keyed by their legacy layers, so
+  // the editable index lists resolve onto the migrated nodes after the tree walk. Each entry
+  // records the composition the layer lives in — DataBinds must attach to that composition so
+  // the runtime scope check finds the target in the same binding.
+  struct ConvertedTextEntry {
+    pag::TextLayer* legacy = nullptr;
+    Text* node = nullptr;
+    Composition* composition = nullptr;
+  };
+  struct ConvertedImageEntry {
+    pag::ImageLayer* legacy = nullptr;
+    ImagePattern* node = nullptr;
+    Composition* composition = nullptr;
+  };
+  std::vector<ConvertedTextEntry> convertedTexts = {};
+  std::vector<ConvertedImageEntry> convertedImages = {};
+  Composition* currentComposition = nullptr;
+  int textIdCounter = 0;
+  int imageIdCounter = 0;
 
   void warn(PAGExportWarning code, const std::string& message) {
     if (issues == nullptr) {
@@ -421,6 +445,9 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
+  // The composition being filled is the editable-attachment scope for its layers (spec 7.2).
+  auto* previousComposition = state->currentComposition;
+  state->currentComposition = composition;
   // Audio (spec 3.4): the AAC stream is carried as-is; the start time converts from legacy
   // frames to seconds on the composition's frame rate.
   if (legacy->audioBytes != nullptr) {
@@ -448,6 +475,7 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   // The wrapper layer is stored on the composition through the caller's layer conversion;
   // the composition itself only holds the width/height for now, layers attach via Layer.
   (void)parentFrameRate;
+  state->currentComposition = previousComposition;
   return composition;
 }
 
@@ -558,10 +586,100 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       }
       return layer;
     }
+    case pag::LayerType::Text: {
+      // Text layers migrate as a TextBox with a runtime-shaped Text element (spec 7.2): the
+      // document's text string and font properties carry over; glyph-exact migration lands with
+      // the legacy glyph exporter. The text channel of the Text node is the editable target.
+      auto* legacyText = static_cast<pag::TextLayer*>(legacyLayer);
+      auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
+      layer->name = legacyLayer->name;
+      layer->visible = legacyLayer->isActive;
+      ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
+      auto textDocument = legacyText->getTextDocument();
+      if (textDocument != nullptr) {
+        auto* textBox = state->document->makeNode<TextBox>();
+        textBox->position.x = textDocument->boxTextPos.x;
+        textBox->position.y = textDocument->boxTextPos.y;
+        if (textDocument->boxText) {
+          textBox->width = textDocument->boxTextSize.x;
+          textBox->height = textDocument->boxTextSize.y;
+        }
+        auto* text = state->document->makeNode<Text>("pag-editable-text-" +
+                                                     std::to_string(state->textIdCounter++));
+        text->text = textDocument->text;
+        text->fontFamily = textDocument->fontFamily;
+        text->fontStyle = textDocument->fontStyle;
+        text->fontSize = textDocument->fontSize;
+        text->fauxBold = textDocument->fauxBold;
+        text->fauxItalic = textDocument->fauxItalic;
+        textBox->elements.push_back(text);
+        if (textDocument->applyFill) {
+          auto* fill = state->document->makeNode<Fill>();
+          auto* solid = state->document->makeNode<SolidColor>();
+          solid->color = ConvertColor(textDocument->fillColor);
+          fill->color = solid;
+          textBox->elements.push_back(fill);
+        }
+        layer->contents.push_back(textBox);
+        state->convertedTexts.push_back({legacyText, text, state->currentComposition});
+      }
+      if (legacyLayer->masks.empty() == false) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
+      }
+      return layer;
+    }
+    case pag::LayerType::Image: {
+      auto* legacyImage = static_cast<pag::ImageLayer*>(legacyLayer);
+      auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
+      layer->name = legacyLayer->name;
+      layer->visible = legacyLayer->isActive;
+      ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
+      if (legacyImage->imageBytes != nullptr && legacyImage->imageBytes->fileBytes != nullptr) {
+        auto bounds = legacyImage->getBounds();
+        auto* rect = state->document->makeNode<Rectangle>();
+        rect->size.width = bounds.right - bounds.left;
+        rect->size.height = bounds.bottom - bounds.top;
+        rect->position.x = (bounds.right + bounds.left) / 2;
+        rect->position.y = (bounds.bottom + bounds.top) / 2;
+        layer->contents.push_back(rect);
+        auto* fill = state->document->makeNode<Fill>();
+        auto* pattern = state->document->makeNode<ImagePattern>(
+            "pag-editable-image-" + std::to_string(state->imageIdCounter++));
+        auto* image = state->document->makeNode<Image>();
+        image->data = Data::MakeWithCopy(legacyImage->imageBytes->fileBytes->data(),
+                                         legacyImage->imageBytes->fileBytes->length());
+        pattern->image = image;
+        pattern->scaleMode = ScaleMode::Stretch;
+        fill->color = pattern;
+        layer->contents.push_back(fill);
+        state->convertedImages.push_back({legacyImage, pattern, state->currentComposition});
+      }
+      return layer;
+    }
     default:
       state->warn(PAGExportWarning::UnsupportedColorSource,
                   "unsupported legacy layer type: " + legacyLayer->name);
       return nullptr;
+  }
+}
+
+// Collects the file's text layers in File::updateEditables order (main composition first,
+// recursing into pre-composes, de-duplicated), so the editableTexts indices resolve onto the
+// same layers the legacy accessor used.
+void CollectLegacyTextLayers(pag::Composition* composition,
+                             std::vector<pag::TextLayer*>* outLayers) {
+  if (composition == nullptr || composition->type() != pag::CompositionType::Vector) {
+    return;
+  }
+  for (auto* layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+    if (layer->type() == pag::LayerType::Text) {
+      auto* textLayer = static_cast<pag::TextLayer*>(layer);
+      if (std::find(outLayers->begin(), outLayers->end(), textLayer) == outLayers->end()) {
+        outLayers->push_back(textLayer);
+      }
+    } else if (layer->type() == pag::LayerType::PreCompose) {
+      CollectLegacyTextLayers(static_cast<pag::PreComposeLayer*>(layer)->composition, outLayers);
+    }
   }
 }
 
@@ -579,6 +697,8 @@ void EnsureRootAnimation(ConvertState* state, pag::File* file) {
 }
 
 }  // namespace
+
+void BuildEditableViewModel(ConvertState* state, pag::File* file, Composition* composition);
 
 std::shared_ptr<PAGXDocument> LegacyPAGImporter::Convert(const std::shared_ptr<pag::File>& file,
                                                          std::vector<PAGExportIssue>* issues) {
@@ -615,7 +735,111 @@ std::shared_ptr<PAGXDocument> LegacyPAGImporter::Convert(const std::shared_ptr<p
   // becoming the default timeline. Migrated composition-scoped animations auto-play on top of
   // it, and time-locked children read this timeline as the parent clock.
   EnsureRootAnimation(&state, file.get());
+
+  // Editable mapping (spec 7.2): the legacy editable index lists resolve onto the converted
+  // nodes; each entry becomes a ViewModel property (text<i> / image<i>) bound to the migrated
+  // node's channel. A null list means every layer of that type is editable.
+  BuildEditableViewModel(&state, file.get(), composition);
   return document;
+}
+
+// Builds the editable ViewModel (spec 7.2). The legacy editableImages indices address groups
+// of image layers sharing one resource, so every converted pattern of a group binds to the
+// same image<i> property. The schema attaches at the document level (every nested data context
+// reaches $vm.* through its parent chain), while each DataBind attaches to the composition
+// owning its target so the runtime scope check resolves inside the same binding.
+void BuildEditableViewModel(ConvertState* state, pag::File* file, Composition* composition) {
+  if (composition == nullptr) {
+    return;
+  }
+  auto* viewModel = state->document->makeNode<ViewModel>("pag-editable-vm");
+  std::unordered_map<Composition*, std::vector<DataBind*>> bindsByComposition = {};
+
+  // Text: the editable set is the index list, or every converted text when the list is null.
+  std::vector<ConvertState::ConvertedTextEntry> editableTexts = {};
+  if (file->editableTexts != nullptr) {
+    std::vector<pag::TextLayer*> legacyTextLayers = {};
+    CollectLegacyTextLayers(file->getRootLayer()->composition, &legacyTextLayers);
+    for (auto index : *file->editableTexts) {
+      if (index < 0 || index >= static_cast<int>(legacyTextLayers.size())) {
+        continue;
+      }
+      for (auto& entry : state->convertedTexts) {
+        if (entry.legacy == legacyTextLayers[index]) {
+          editableTexts.push_back(entry);
+          break;
+        }
+      }
+    }
+  } else {
+    editableTexts = state->convertedTexts;
+  }
+  for (size_t i = 0; i < editableTexts.size(); i++) {
+    auto* property = state->document->makeNode<ViewModelProperty>();
+    property->name = "text" + std::to_string(i);
+    property->propertyType = ViewModelPropertyType::String;
+    property->defaultString = editableTexts[i].node->text;
+    viewModel->properties.push_back(property);
+    auto* bind = state->document->makeNode<DataBind>();
+    bind->source = "$vm.text" + std::to_string(i);
+    bind->target = "@" + editableTexts[i].node->id;
+    bind->channel = "text";
+    bindsByComposition[editableTexts[i].composition].push_back(bind);
+  }
+
+  // Images: editableImages indices address resource groups; every converted pattern sharing
+  // the group's resource binds to the same property.
+  std::vector<std::vector<ConvertState::ConvertedImageEntry>> editableImages = {};
+  if (file->editableImages != nullptr) {
+    for (auto index : *file->editableImages) {
+      if (index < 0 || index >= file->numImages()) {
+        continue;
+      }
+      std::vector<ConvertState::ConvertedImageEntry> entries = {};
+      for (auto* legacyImage : file->getImageAt(index)) {
+        for (auto& entry : state->convertedImages) {
+          if (entry.legacy == legacyImage) {
+            entries.push_back(entry);
+            break;
+          }
+        }
+      }
+      if (!entries.empty()) {
+        editableImages.push_back(std::move(entries));
+      }
+    }
+  } else {
+    for (auto& entry : state->convertedImages) {
+      editableImages.push_back({entry});
+    }
+  }
+  for (size_t i = 0; i < editableImages.size(); i++) {
+    auto* property = state->document->makeNode<ViewModelProperty>();
+    property->name = "image" + std::to_string(i);
+    property->propertyType = ViewModelPropertyType::Image;
+    property->defaultImage = editableImages[i][0].node->image;
+    viewModel->properties.push_back(property);
+    for (auto& entry : editableImages[i]) {
+      auto* bind = state->document->makeNode<DataBind>();
+      bind->source = "$vm.image" + std::to_string(i);
+      bind->target = "@" + entry.node->id;
+      bind->channel = "image";
+      bindsByComposition[entry.composition].push_back(bind);
+    }
+  }
+
+  if (viewModel->properties.empty()) {
+    return;
+  }
+  state->document->viewModel = viewModel;
+  for (auto& pair : bindsByComposition) {
+    if (pair.first == nullptr) {
+      continue;
+    }
+    for (auto* bind : pair.second) {
+      pair.first->dataBinds.push_back(bind);
+    }
+  }
 }
 
 }  // namespace pagx

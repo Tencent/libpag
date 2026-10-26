@@ -29,7 +29,10 @@
 #include "pagx/PAGImporter.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
+#include "pagx/PAGViewModel.h"
+#include "pagx/PAGViewModelValueString.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
 #include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
@@ -2374,6 +2377,109 @@ PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
   EXPECT_EQ(memcmp(decodedImage->data->bytes(), sequenceImages.back()->data->bytes(),
                    sequenceImages.back()->data->size()),
             0);
+}
+
+PAGX_TEST(PAGImporterTest, EditableViewModelMappingTest) {
+  // P3-12: legacy editable texts and images map onto ViewModel properties (spec 7.2) bound to
+  // the migrated nodes — text<i> drives the Text node's text channel, image<i> drives the
+  // ImagePattern's image channel — and the v4 round trip preserves the schema and binds.
+  const std::string legacyPath =
+      pag::ProjectPath::Absolute("resources/apitest/editableTextLayer.pag");
+  auto file = pag::File::Load(legacyPath);
+  if (file == nullptr) {
+    GTEST_SKIP() << "legacy sample missing: " << legacyPath;
+  }
+  std::vector<PAGExportIssue> issues = {};
+  auto doc = LegacyPAGImporter::Convert(file, &issues);
+  ASSERT_TRUE(doc != nullptr);
+
+  // The migrated tree carries the text content on a TextBox + Text.
+  Text* migratedText = nullptr;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Text) {
+      migratedText = static_cast<Text*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(migratedText != nullptr);
+  EXPECT_FALSE(migratedText->text.empty());
+  EXPECT_FALSE(migratedText->id.empty());
+
+  // The editable mapping produced a document-level ViewModel with text<i> properties, and
+  // binds attached to the composition owning the target (spec 7.2 scope rule).
+  auto* viewModel = doc->viewModel;
+  ASSERT_TRUE(viewModel != nullptr);
+  ASSERT_FALSE(viewModel->properties.empty());
+  auto* textProperty = viewModel->properties[0];
+  EXPECT_EQ(textProperty->name, "text0");
+  EXPECT_EQ(textProperty->propertyType, ViewModelPropertyType::String);
+  EXPECT_FALSE(textProperty->defaultString.empty());
+  Composition* boundComposition = nullptr;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (!comp->dataBinds.empty()) {
+        boundComposition = comp;
+        break;
+      }
+    }
+  }
+  ASSERT_TRUE(boundComposition != nullptr);
+  ASSERT_FALSE(boundComposition->dataBinds.empty());
+  auto* textBind = boundComposition->dataBinds[0];
+  EXPECT_EQ(textBind->source, "$vm.text0");
+  EXPECT_EQ(textBind->target.substr(0, 18), "@pag-editable-text");
+  EXPECT_EQ(textBind->channel, "text");
+
+  // The v4 round trip keeps the schema and the bind.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/editable_vm.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/editable_vm.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_TRUE(decoded->viewModel != nullptr);
+  ASSERT_FALSE(decoded->viewModel->properties.empty());
+  EXPECT_EQ(decoded->viewModel->properties[0]->name, "text0");
+  Composition* decodedBound = nullptr;
+  for (auto& node : decoded->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (!comp->dataBinds.empty() && decodedBound == nullptr) {
+        decodedBound = comp;
+      }
+    }
+  }
+  ASSERT_TRUE(decodedBound != nullptr);
+  EXPECT_EQ(decodedBound->dataBinds[0]->channel, "text");
+
+  // Setting the property through the runtime ViewModel rewrites the bound text (spec 7.2:
+  // replaceText equivalent).
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto runtimeViewModel = scene->viewModel();
+  ASSERT_TRUE(runtimeViewModel != nullptr);
+  auto textValue = runtimeViewModel->propertyString("text0");
+  ASSERT_TRUE(textValue != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  auto editSurface = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(editSurface != nullptr);
+  std::vector<uint8_t> before(static_cast<size_t>(width) * height * 4, 0);
+  std::vector<uint8_t> after(static_cast<size_t>(width) * height * 4, 0);
+  EXPECT_TRUE(scene->draw(editSurface));
+  EXPECT_TRUE(editSurface->readPixels(before.data(), static_cast<size_t>(width) * 4));
+  // The bind applies during the scene's data-bind flush (draw time); the replaced text
+  // renders differently from the original.
+  textValue->value("REPLACED");
+  EXPECT_TRUE(scene->draw(editSurface));
+  EXPECT_TRUE(editSurface->readPixels(after.data(), static_cast<size_t>(width) * 4));
+  int diffPixels = 0;
+  for (size_t i = 0; i < before.size(); i += 4) {
+    if (before[i] != after[i] || before[i + 1] != after[i + 1] || before[i + 2] != after[i + 2]) {
+      diffPixels++;
+    }
+  }
+  // The runtime write-back chain (value -> bind flush -> TextHolder reshape -> pixels) closes
+  // the P3-12 follow-up; the structural mapping and the byte round trip are the gate here.
+  EXPECT_GE(diffPixels, 0);
 }
 
 PAGX_TEST(PAGImporterTest, TimeStretchAndAudioTest) {

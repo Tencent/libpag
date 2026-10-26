@@ -2210,6 +2210,15 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   auto isExportableTimelineNode = [](const Node* node) {
     if (node == nullptr) return false;
     if (node->nodeType() == NodeType::StateMachine) return true;
+    // Object-less Animations still carry the duration semantics of the default timeline
+    // (spec 3.4 / P3-12), so a live entry of doc->animations is exportable.
+    return node->nodeType() == NodeType::Animation;
+  };
+  // Orphan Animations (present in doc->nodes but cleared from doc->animations, e.g. an HTML
+  // coalescing leftover) stay dropped: resurrecting them would duplicate their timeline.
+  auto isExportableOrphanNode = [](const Node* node) {
+    if (node == nullptr) return false;
+    if (node->nodeType() == NodeType::StateMachine) return true;
     return node->nodeType() == NodeType::Animation &&
            !static_cast<const Animation*>(node)->objects.empty();
   };
@@ -2222,7 +2231,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   }
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (isExportableTimelineNode(node.get()) && written.find(node.get()) == written.end()) {
+      if (isExportableOrphanNode(node.get()) && written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
       }
@@ -2236,21 +2245,17 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        auto* animation = static_cast<const Animation*>(node);
-        if (!animation->objects.empty()) WriteAnimation(xml, animation);
+        WriteAnimation(xml, static_cast<const Animation*>(node));
       } else if (node->nodeType() == NodeType::StateMachine) {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node));
       }
     }
     for (const auto& node : doc.nodes) {
-      if (node == nullptr ||
-          (node->nodeType() != NodeType::Animation && node->nodeType() != NodeType::StateMachine) ||
-          written.find(node.get()) != written.end()) {
+      if (!isExportableOrphanNode(node.get()) || written.find(node.get()) != written.end()) {
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        auto* animation = static_cast<const Animation*>(node.get());
-        if (!animation->objects.empty()) WriteAnimation(xml, animation);
+        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
       } else {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }
