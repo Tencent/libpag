@@ -450,9 +450,9 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
 }
 
 // Injects `animation` declaration (and optional extra style properties such as
-// `transform-origin:0 0`) into a single opening tag with `id="domId"` in `bodyHtml`.
-bool WeaveStyleIntoSingleElementById(std::string& bodyHtml, const std::string& domId,
-                                     const std::string& animDecl, bool needsZeroTransformOrigin) {
+// `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`.
+bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
+                               const std::string& animDecl, bool needsZeroTransformOrigin) {
   size_t tagStart = 0;
   size_t tagEnd = 0;
   std::string tagName;
@@ -494,22 +494,6 @@ bool WeaveStyleIntoSingleElementById(std::string& bodyHtml, const std::string& d
   tagStr.insert(insertPos, newStyle);
   bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
   return true;
-}
-
-// Weaves `animation` declaration into `id="domId"` and any multi-geometry sibling replicas
-// (`id="domId__1"`, `id="domId__2"`, ...) emitted by `renderSVG` when a single animated Fill/Stroke
-// paints multiple geometries.
-void WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
-                               const std::string& animDecl, bool needsZeroTransformOrigin) {
-  if (!WeaveStyleIntoSingleElementById(bodyHtml, domId, animDecl, needsZeroTransformOrigin)) {
-    return;
-  }
-  for (size_t replicaIdx = 1;; ++replicaIdx) {
-    std::string replicaId = domId + "__" + std::to_string(replicaIdx);
-    if (!WeaveStyleIntoSingleElementById(bodyHtml, replicaId, animDecl, needsZeroTransformOrigin)) {
-      break;
-    }
-  }
 }
 
 // ============================================================================
@@ -1149,10 +1133,10 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
   return bundles;
 }
 
-std::string EmitBundleKeyframesRule(const std::string& kfName, const DomTargetBundle& bundle,
-                                    const BundleChannelSet& chSet, const BundleTimingInfo& timing,
-                                    const std::string& tagName, bool& outNeedsZeroOrigin) {
-  std::string rules = "@keyframes " + kfName + " {\n";
+std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
+                                    const BundleTimingInfo& timing, const std::string& tagName,
+                                    bool& outNeedsZeroOrigin) {
+  std::string stops = {};
   // PAGX holds the first/last key value outside the key range, whereas CSS synthesizes missing
   // 0%/100% stops from the element's static style. Always emit both boundary stops so the browser
   // holds the key values instead of interpolating from the static style.
@@ -1163,10 +1147,32 @@ std::string EmitBundleKeyframesRule(const std::string& kfName, const DomTargetBu
     std::string decls =
         EvaluateKeyframeCssDecls(bundle, chSet, timing, tagName, t, outNeedsZeroOrigin);
     Frame relTime = (t >= timing.bundleShiftFrames) ? (t - timing.bundleShiftFrames) : 0;
-    rules += "  " + FormatPercent(relTime, timing.effectiveDuration) + " { " + decls + "; }\n";
+    stops += "  " + FormatPercent(relTime, timing.effectiveDuration) + " { " + decls + "; }\n";
   }
-  rules += "}\n";
-  return rules;
+  return stops;
+}
+
+struct BundleElement {
+  std::string id = {};
+  std::string tagName = {};
+};
+
+// Lists every tag rendering the bundle's target: the base id plus the "<base>__N" copies that
+// HTMLWriterContext::claimAnimatedDomId hands out when one node renders into several tags.
+std::vector<BundleElement> FindBundleElements(const std::string& bodyHtml,
+                                              const std::string& domId) {
+  std::vector<BundleElement> elements = {};
+  for (size_t copyIndex = 0;; ++copyIndex) {
+    BundleElement element = {};
+    element.id = copyIndex == 0 ? domId : domId + "__" + std::to_string(copyIndex);
+    size_t tagStart = 0;
+    size_t tagEnd = 0;
+    if (!FindElementOpeningTagById(bodyHtml, element.id, tagStart, tagEnd, element.tagName)) {
+      break;
+    }
+    elements.push_back(std::move(element));
+  }
+  return elements;
 }
 
 }  // namespace
@@ -1284,9 +1290,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   std::string keyframesCss;
   int animCounter = 0;
 
-  std::vector<std::string> domIdOrder = {};
-  std::unordered_map<std::string, std::vector<std::string>> domIdAnimDecls = {};
-  std::unordered_map<std::string, bool> domIdNeedsZeroOrigin = {};
+  std::vector<std::string> elementIdOrder = {};
+  std::unordered_map<std::string, std::vector<std::string>> elementAnimDecls = {};
+  std::unordered_map<std::string, bool> elementNeedsZeroOrigin = {};
 
   for (auto* animNode : _doc.animations) {
     if (animNode == nullptr || animNode->nodeType() != NodeType::Animation) {
@@ -1305,48 +1311,61 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
     }
 
-    // Step 1: Group AnimationObjects by their resolved DOM element id.
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
 
     for (const auto& bundle : bundles) {
-      size_t tagStart = 0;
-      size_t tagEnd = 0;
-      std::string tagName;
-      if (!FindElementOpeningTagById(bodyHtml, bundle.domId, tagStart, tagEnd, tagName)) {
+      auto elements = FindBundleElements(bodyHtml, bundle.domId);
+      if (elements.empty()) {
         continue;
       }
-
-      // Step 2: Classify channels via kChannelBindingTable and collect keyTimes / easings.
       BundleChannelSet chSet = CollectBundleChannels(_doc, bundle, _solidToPainter);
       if (chSet.keyTimes.empty()) {
         continue;
       }
-
-      // Step 3: Compute timing (bundleShiftFrames, effectiveDuration, uniformEasing).
       BundleTimingInfo timing = ComputeBundleTiming(anim, evalOffsetFrames, chSet);
-      std::string kfName = MakeSafeKeyframesName(bundle.domId, animCounter++);
 
-      // Step 4: Evaluate channels at each keyframe timestamp and emit @keyframes block.
+      // One animated node can render into tags of different kinds (a Fill painting both a box and
+      // a text span), and paint channels map to a different CSS property per kind. Keyframes are
+      // therefore generated per tag name, and kinds that produce identical stops share one rule.
       bool needsZeroOrigin = false;
-      keyframesCss +=
-          EmitBundleKeyframesRule(kfName, bundle, chSet, timing, tagName, needsZeroOrigin);
-
-      // Step 5: Build the CSS `animation:` shorthand for this target element.
-      std::string shorthand = BuildAnimationShorthand(anim, kfName, timing, evalOffsetFrames);
-      if (domIdAnimDecls.find(bundle.domId) == domIdAnimDecls.end()) {
-        domIdOrder.push_back(bundle.domId);
+      std::unordered_map<std::string, std::string> keyframesNameByTag = {};
+      std::vector<std::pair<std::string, std::string>> emittedRules = {};
+      for (const auto& element : elements) {
+        auto nameIt = keyframesNameByTag.find(element.tagName);
+        if (nameIt == keyframesNameByTag.end()) {
+          std::string stops =
+              EmitBundleKeyframeStops(bundle, chSet, timing, element.tagName, needsZeroOrigin);
+          std::string kfName = {};
+          for (const auto& rule : emittedRules) {
+            if (rule.first == stops) {
+              kfName = rule.second;
+              break;
+            }
+          }
+          if (kfName.empty()) {
+            kfName = MakeSafeKeyframesName(bundle.domId, animCounter++);
+            keyframesCss += "@keyframes " + kfName + " {\n" + stops + "}\n";
+            emittedRules.emplace_back(stops, kfName);
+          }
+          nameIt = keyframesNameByTag.emplace(element.tagName, kfName).first;
+        }
+        if (elementAnimDecls.find(element.id) == elementAnimDecls.end()) {
+          elementIdOrder.push_back(element.id);
+        }
+        elementAnimDecls[element.id].push_back(
+            BuildAnimationShorthand(anim, nameIt->second, timing, evalOffsetFrames));
       }
-      domIdAnimDecls[bundle.domId].push_back(shorthand);
       if (needsZeroOrigin) {
-        domIdNeedsZeroOrigin[bundle.domId] = true;
+        for (const auto& element : elements) {
+          elementNeedsZeroOrigin[element.id] = true;
+        }
       }
     }
   }
 
-  // Step 6: Weave accumulated `animation:` declarations into the DOM elements in `bodyHtml`.
-  for (const auto& domId : domIdOrder) {
-    const auto& decls = domIdAnimDecls[domId];
+  for (const auto& elementId : elementIdOrder) {
+    const auto& decls = elementAnimDecls[elementId];
     std::string combined;
     for (size_t i = 0; i < decls.size(); ++i) {
       if (i > 0) {
@@ -1354,7 +1373,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       combined += decls[i];
     }
-    WeaveStyleIntoElementById(bodyHtml, domId, combined, domIdNeedsZeroOrigin[domId]);
+    WeaveStyleIntoElementById(bodyHtml, elementId, combined, elementNeedsZeroOrigin[elementId]);
   }
 
   return keyframesCss;
