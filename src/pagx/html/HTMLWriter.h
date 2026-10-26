@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -284,6 +285,35 @@ class HTMLWriterContext {
   // should be emitted on its corresponding HTML/SVG tag so the post-weaving pass can attach
   // `animation` declarations. Empty when no animations are exported.
   std::unordered_map<const Node*, std::string> animatedElementIds = {};
+
+  // Number of tags already emitted for each animated base id.
+  std::unordered_map<std::string, size_t> animatedDomIdUseCount = {};
+
+  /**
+   * Returns the DOM id for the next tag rendering an animated node, or an empty string when none
+   * of the candidates is animated. The candidates are checked in order and the first one found in
+   * animatedElementIds supplies the base id. One node can render into several tags (Repeater
+   * copies, per-geometry SVG shapes, a Fill shared by shapes and text, every Text under one
+   * TextBox), so the first tag gets the base id and later tags get "<base>__1", "<base>__2", and
+   * so on, which keeps ids unique and lets the weaving pass reach every copy.
+   */
+  std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
+    if (animatedElementIds.empty()) {
+      return {};
+    }
+    for (auto* node : candidates) {
+      if (node == nullptr) {
+        continue;
+      }
+      auto it = animatedElementIds.find(node);
+      if (it == animatedElementIds.end()) {
+        continue;
+      }
+      size_t index = animatedDomIdUseCount[it->second]++;
+      return index == 0 ? it->second : it->second + "__" + std::to_string(index);
+    }
+    return {};
+  }
 
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
