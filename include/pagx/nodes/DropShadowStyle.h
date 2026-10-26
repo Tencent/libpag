@@ -49,6 +49,12 @@ class DropShadowStyle : public LayerStyle {
   float blurY = 0.0f;
 
   /**
+   * The shadow spread distance in layer-local coordinates. Positive values expand the shadow
+   * outward, and negative values shrink it inward. The default value is 0.
+   */
+  float spread = 0.0f;
+
+  /**
    * The color of the shadow.
    */
   Color color = {};

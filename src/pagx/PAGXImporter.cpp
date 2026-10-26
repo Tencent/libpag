@@ -2405,6 +2405,7 @@ static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* 
       node, "excludeChildEffects", Default<DropShadowStyle>().excludeChildEffects, doc);
   ParseShadowAttributes<DropShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
                                          style->blurY, style->color);
+  style->spread = GetFloatAttribute(node, "spread", Default<DropShadowStyle>().spread, doc);
   style->showBehindLayer =
       GetBoolAttribute(node, "showBehindLayer", Default<DropShadowStyle>().showBehindLayer, doc);
   return style;
@@ -2420,6 +2421,7 @@ static InnerShadowStyle* ParseInnerShadowStyle(const DOMNode* node, PAGXDocument
       node, "excludeChildEffects", Default<InnerShadowStyle>().excludeChildEffects, doc);
   ParseShadowAttributes<InnerShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
                                           style->blurY, style->color);
+  style->spread = GetFloatAttribute(node, "spread", Default<InnerShadowStyle>().spread, doc);
   return style;
 }
 
