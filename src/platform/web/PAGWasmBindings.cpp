@@ -139,7 +139,7 @@ emscripten::val PAGLayerToJsObject(std::shared_ptr<PAGLayer> pagLayer) {
   return layerObject;
 }
 
-bool PAGBindInit() {
+static void BindPAGLayer() {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
       .function("_uniqueID", optional_override([](PAGLayer& pagLayer) {
@@ -201,7 +201,9 @@ bool PAGBindInit() {
       .function("_excludedFromTimeline", &PAGLayer::excludedFromTimeline)
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
       .function("_isPAGFile", &PAGLayer::isPAGFile);
+}
 
+static void BindPAGSolidLayer() {
   class_<PAGSolidLayer, base<PAGLayer>>("_PAGSolidLayer")
       .smart_ptr<std::shared_ptr<PAGSolidLayer>>("_PAGSolidLayer")
       .class_function("_Make", optional_override([](int duration, int width, int height,
@@ -211,7 +213,9 @@ bool PAGBindInit() {
                       }))
       .function("_solidColor", &PAGSolidLayer::solidColor)
       .function("_setSolidColor", &PAGSolidLayer::setSolidColor);
+}
 
+static void BindPAGImageLayer() {
   class_<PAGImageLayer, base<PAGLayer>>("_PAGImageLayer")
       .smart_ptr<std::shared_ptr<PAGImageLayer>>("_PAGImageLayer")
       .class_function("_Make", optional_override([](int width, int height, int duration) {
@@ -250,7 +254,9 @@ bool PAGBindInit() {
                   }
                   return val(typed_memory_view(result->length(), result->data()));
                 }));
+}
 
+static void BindPAGTextLayer() {
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
       .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")
       .class_function("_Make", optional_override([](int duration, std::string text, float fontSize,
@@ -274,7 +280,9 @@ bool PAGBindInit() {
       .function("_text", &PAGTextLayer::text)
       .function("_setText", &PAGTextLayer::setText)
       .function("_reset", &PAGTextLayer::reset);
+}
 
+static void BindPAGComposition() {
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .class_function("_Make", PAGComposition::Make)
@@ -344,7 +352,9 @@ bool PAGBindInit() {
                   }
                   return jsArray;
                 }));
+}
 
+static void BindPAGFile() {
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_MaxSupportedTagLevel", PAGFile::MaxSupportedTagLevel)
@@ -392,9 +402,9 @@ bool PAGBindInit() {
                   return pagFile.setDuration(static_cast<int64_t>(duration));
                 }))
       .function("_copyOriginal", &PAGFile::copyOriginal);
+}
 
-  // Registered before _PAGSurface because _PAGSurface._readPixelsAsync returns this type; embind
-  // requires the class to be bound before it appears in another class's method signature.
+static void BindPAGSurfaceReadback() {
   class_<PAGSurfaceReadback>("_PAGSurfaceReadback")
       .smart_ptr<std::shared_ptr<PAGSurfaceReadback>>("_PAGSurfaceReadback")
       .function("_status", optional_override([](PAGSurfaceReadback& session) {
@@ -418,7 +428,9 @@ bool PAGBindInit() {
                   }
                   return val::null();
                 }));
+}
 
+static void BindPAGSurface() {
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")
       .class_function("_FromCanvas", optional_override([](const std::string& canvasID) {
@@ -465,7 +477,9 @@ bool PAGBindInit() {
                   return val::null();
                 }))
       .function("_readPixelsAsync", &PAGSurface::asyncReadPixels);
+}
 
+static void BindPAGImage() {
   class_<PAGImage>("_PAGImage")
       .smart_ptr<std::shared_ptr<PAGImage>>("_PAGImage")
       .class_function("_FromBytes",
@@ -510,7 +524,9 @@ bool PAGBindInit() {
                 }))
       .function("_matrix", &PAGImage::matrix)
       .function("_setMatrix", &PAGImage::setMatrix);
+}
 
+static void BindPAGPlayer() {
   class_<PAGPlayer>("_PAGPlayer")
       .smart_ptr_constructor("_PAGPlayer", &std::make_shared<PAGPlayer>)
       .function("_setProgress", &PAGPlayer::setProgress)
@@ -574,7 +590,9 @@ bool PAGBindInit() {
                   return static_cast<int>(pagPlayer.graphicsMemory());
                 }))
       .function("_prepare", &PAGPlayer::prepare);
+}
 
+static void BindPAGFont() {
   class_<PAGFont>("_PAGFont")
       .smart_ptr<std::shared_ptr<PAGFont>>("_PAGFont")
       .class_function("_create",
@@ -584,7 +602,9 @@ bool PAGBindInit() {
       .class_function("_SetFallbackFontNames", PAGFont::SetFallbackFontNames)
       .property("fontFamily", &PAGFont::fontFamily)
       .property("fontStyle", &PAGFont::fontStyle);
+}
 
+static void BindMatrix() {
   class_<Matrix>("_Matrix")
       .class_function("_MakeAll", Matrix::MakeAll)
       .class_function("_MakeScale", optional_override([](float sx, float sy) {
@@ -644,7 +664,9 @@ bool PAGBindInit() {
                   return matrix.postSkew(kx, ky, px, py);
                 }))
       .function("_postConcat", &Matrix::postConcat);
+}
 
+static void BindVideoInfoManager() {
   class_<VideoInfoManager>("_videoInfoManager")
       .smart_ptr<std::shared_ptr<VideoInfoManager>>("_videoInfoManager")
       .class_function("_Make",
@@ -664,6 +686,9 @@ bool PAGBindInit() {
       .function("_getTargetFrameByID", &VideoInfoManager::getTargetFrameByID)
       .function("_getPlaybackRateByID", &VideoInfoManager::getPlaybackRateByID)
       .function("_hasTimeRangeOverlap", &VideoInfoManager::hasTimeRangeOverlap);
+}
+
+static void BindTextDocument() {
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)
@@ -699,7 +724,9 @@ bool PAGBindInit() {
                 optional_override([](TextDocument& textDocument, uint8_t val) {
                   textDocument.direction = static_cast<TextDirection>(val);
                 }));
+}
 
+static void BindValueTypes() {
   value_object<Rect>("Rect")
       .field("left", &Rect::left)
       .field("top", &Rect::top)
@@ -725,7 +752,9 @@ bool PAGBindInit() {
              optional_override(
                  [](Marker& marker, int value) { marker.duration = static_cast<int64_t>(value); }))
       .field("comment", &Marker::comment);
+}
 
+static void BindGlobals() {
   function("_registerSoftwareDecoderFactory", optional_override([](val factory) {
              static std::unique_ptr<SoftwareDecoderFactory> softwareDecoderFactory = nullptr;
              auto webFactory = WebSoftwareDecoderFactory::Make(factory);
@@ -738,8 +767,10 @@ bool PAGBindInit() {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");
+}
 
 #ifdef PAG_BUILD_PAGX
+static void BindPAGXSurface() {
   class_<pagx::PAGSurface>("_PAGXSurface")
       .smart_ptr<std::shared_ptr<pagx::PAGSurface>>("_PAGXSurface")
       .class_function(
@@ -749,8 +780,31 @@ bool PAGBindInit() {
       .class_function("_MakeOffscreen", &pagx::PAGSurface::MakeOffscreen)
       .function("_width", &pagx::PAGSurface::width)
       .function("_height", &pagx::PAGSurface::height);
+}
 #endif
 
+bool PAGBindInit() {
+  BindPAGLayer();
+  BindPAGSolidLayer();
+  BindPAGImageLayer();
+  BindPAGTextLayer();
+  BindPAGComposition();
+  BindPAGFile();
+  // BindPAGSurfaceReadback must run before BindPAGSurface because _PAGSurface._readPixelsAsync
+  // returns the readback type.
+  BindPAGSurfaceReadback();
+  BindPAGSurface();
+  BindPAGImage();
+  BindPAGPlayer();
+  BindPAGFont();
+  BindMatrix();
+  BindVideoInfoManager();
+  BindTextDocument();
+  BindValueTypes();
+  BindGlobals();
+#ifdef PAG_BUILD_PAGX
+  BindPAGXSurface();
+#endif
   return true;
 }
 }  // namespace pag
