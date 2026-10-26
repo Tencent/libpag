@@ -3,6 +3,7 @@ import { PAGBind } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
+import { isModuleWebGPUBackend } from './core/backend-context';
 
 export interface ModuleOption {
   /**
@@ -58,7 +59,7 @@ const PAGInit = (moduleOption: ModuleOption = {}): Promise<types.PAG> =>
       throw new Error('PAGInit fail! Please check .wasm file path valid.');
     })
     .then(async (module: types.PAG) => {
-      if (typeof module._IsWebGPUBackend === 'function' && module._IsWebGPUBackend()) {
+      if (isModuleWebGPUBackend(module) === true) {
         // The GPUDevice must be preinitialized on the JS side before any rendering call,
         // because tgfx picks it up synchronously via emscripten_webgpu_get_device().
         await initWebGPUDevice(module, moduleOption.webGPUDevice);
