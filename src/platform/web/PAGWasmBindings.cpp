@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !defined(TGFX_USE_WEBGPU)
 #include <GLES3/gl31.h>
+#endif
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include "VideoInfoManager.h"
@@ -37,15 +39,13 @@ using namespace emscripten;
 
 namespace pag {
 
-// Reports whether this wasm build uses the WebGPU backend. The JS side branches on it to skip
-// WebGL context creation and to bootstrap the GPUDevice before any rendering call.
-static bool IsWebGPUBackend() {
+// The backend is fixed at build time. The JS side branches on it to skip WebGL context
+// creation and to bootstrap the GPUDevice before any rendering call.
 #if defined(TGFX_USE_WEBGPU)
-  return true;
+constexpr bool IS_WEBGPU_BACKEND = true;
 #else
-  return false;
+constexpr bool IS_WEBGPU_BACKEND = false;
 #endif
-}
 
 // Copies pixel data out of the wasm heap into a fresh JS-owned Uint8Array, so the result stays
 // valid after the temporary buffer is freed.
@@ -448,6 +448,7 @@ static void BindPAGSurface() {
             auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
             return PAGSurface::MakeFrom(backendTexture, origin);
           }))
+#if !defined(TGFX_USE_WEBGPU)
       .class_function("_FromRenderTarget",
                       optional_override([](int frameBufferID, int width, int height, bool flipY) {
                         GLFrameBufferInfo glFrameBufferInfo = {};
@@ -457,6 +458,7 @@ static void BindPAGSurface() {
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
                         return PAGSurface::MakeFrom(glRenderTarget, origin);
                       }))
+#endif
       .function("_width", &PAGSurface::width)
       .function("_height", &PAGSurface::height)
       .function("_updateSize", &PAGSurface::updateSize)
@@ -763,7 +765,7 @@ static void BindGlobals() {
            }));
 
   function("_SDKVersion", &PAG::SDKVersion);
-  function("_IsWebGPUBackend", &IsWebGPUBackend);
+  function("_IsWebGPUBackend", optional_override([]() { return IS_WEBGPU_BACKEND; }));
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");

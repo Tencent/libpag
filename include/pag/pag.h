@@ -1259,6 +1259,10 @@ class PAG_API PAGSurfaceReadback {
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
  * including readPixels(), asyncReadPixels(), clearAll(), freeCache(), updateSize(), and
  * getHardwareBuffer().
+ *
+ * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
+ * by std::shared_ptr: asyncReadPixels() captures shared_from_this() to keep the surface alive
+ * while the GPU readback is in flight.
  */
 class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
  public:

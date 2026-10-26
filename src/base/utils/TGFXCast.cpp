@@ -50,6 +50,25 @@ static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Luminosity, tgfx::BlendMode::Luminosity},
     {BlendMode::Add, tgfx::BlendMode::PlusLighter}};
 
+static tgfx::WebGPUTextureInfo ToTGFX(const WgpuTextureInfo& info) {
+  tgfx::WebGPUTextureInfo result = {};
+  result.texture = info.texture;
+  result.textureView = info.textureView;
+  result.format = info.format;
+  return result;
+}
+
+// tgfx::WebGPUTextureInfo uses const void* handles while pag::WgpuTextureInfo predates that and
+// uses void*. The pointers are opaque to libpag and never written through, so the const_cast is
+// safe.
+static WgpuTextureInfo ToPAG(const tgfx::WebGPUTextureInfo& info) {
+  WgpuTextureInfo result = {};
+  result.texture = const_cast<void*>(info.texture);
+  result.textureView = const_cast<void*>(info.textureView);
+  result.format = info.format;
+  return result;
+}
+
 tgfx::BlendMode ToTGFX(BlendMode blendMode) {
   for (const auto& pair : BlendModeMap) {
     if (pair.first == blendMode) {
@@ -195,11 +214,7 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       if (!texture.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
         return {};
       }
-      tgfx::WebGPUTextureInfo sampler = {};
-      sampler.texture = wgpuInfo.texture;
-      sampler.textureView = wgpuInfo.textureView;
-      sampler.format = wgpuInfo.format;
-      return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
+      return tgfx::BackendTexture{ToTGFX(wgpuInfo), texture.width(), texture.height()};
     }
     case Backend::VULKAN:
     case Backend::MOCK:
@@ -238,13 +253,7 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       if (!texture.getWebGPUTextureInfo(&wgpuInfo)) {
         return {};
       }
-      WgpuTextureInfo sampler = {};
-      // Same const-to-mutable handle conversion as the Metal branch above: the pointers are
-      // opaque to libpag and never written through.
-      sampler.texture = const_cast<void*>(wgpuInfo.texture);
-      sampler.textureView = const_cast<void*>(wgpuInfo.textureView);
-      sampler.format = wgpuInfo.format;
-      return {sampler, texture.width(), texture.height()};
+      return {ToPAG(wgpuInfo), texture.width(), texture.height()};
     }
     default:
       return {};
@@ -278,11 +287,8 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       if (!renderTarget.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
         return {};
       }
-      tgfx::WebGPUTextureInfo sampler = {};
-      sampler.texture = wgpuInfo.texture;
-      sampler.textureView = wgpuInfo.textureView;
-      sampler.format = wgpuInfo.format;
-      return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
+      return tgfx::BackendRenderTarget(ToTGFX(wgpuInfo), renderTarget.width(),
+                                       renderTarget.height());
     }
     case Backend::VULKAN:
     case Backend::MOCK:

@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <thread>
+#include "base/utils/Log.h"
 #include "rendering/drawables/TextureDrawable.h"
 #include "utils/TestUtils.h"
 
@@ -274,14 +275,21 @@ namespace pag {
 
 // GL readback readiness is fence-based: it only flips after the GPU drains previously queued
 // work, so tests must poll instead of assuming immediate readiness.
-static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readback) {
-  for (int i = 0; i < 5000; i++) {
-    if (readback->isReady()) {
-      return true;
+static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readback,
+                              int timeoutMs = 5000) {
+  auto start = std::chrono::steady_clock::now();
+  auto deadline = start + std::chrono::milliseconds(timeoutMs);
+  while (!readback->isReady()) {
+    if (std::chrono::steady_clock::now() >= deadline) {
+      auto elapsed =
+          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
+              .count();
+      LOGE("WaitReadbackReady() timed out after %lld ms.", static_cast<long long>(elapsed));
+      return false;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  return false;
+  return true;
 }
 
 /**
