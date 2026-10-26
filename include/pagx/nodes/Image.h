@@ -59,6 +59,18 @@ class Image : public Node {
   float offsetX = 0.0f;
   float offsetY = 0.0f;
 
+  /**
+   * Sequence decode metadata (spec 6.6.1): set by the migration importer and the v4 decoder
+   * from the ImageTable sequence entry header. Sequence images bypass the export-time
+   * scaling/cropping/re-encoding pipeline (frames are stored as-is in the container) and XML
+   * output keeps the structure only (design decision 5: video travels the binary path).
+   */
+  bool isSequence = false;
+  // 2 = video sequence, 3 = bitmap sequence (spec 6.6.1); 0 when not a sequence.
+  uint8_t sequenceMediaType = 0;
+  float sequenceFrameRate = 0.0f;
+  uint32_t sequenceFrameCount = 0;
+
   NodeType nodeType() const override {
     return NodeType::Image;
   }

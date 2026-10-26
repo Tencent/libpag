@@ -94,6 +94,7 @@
 #include "pagx/pag/PAGFileHeader.h"
 #include "pagx/pag/PAGPathIO.h"
 #include "pagx/pag/PAGTagHeader.h"
+#include "pagx/pag/SequenceCodec.h"
 #include "pagx/pag/TagCode.h"
 #include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/types/Matrix3D.h"
@@ -825,10 +826,10 @@ void ReadImageTable(pag::DecodeStream* tagStream, size_t contentFileOffset,
       PAGThrowError(tagStream->context, "image data extends past the image table");
       return;
     }
-    if (entry.mediaType <= 1 && byteLength > 0) {
+    if (entry.mediaType <= 3 && byteLength > 0) {
       entry.data = Data::MakeSlice(context->fileData, dataOffset, byteLength);
     }
-    // Unknown mediaType (>1, phase 3): the bytes are consumed but the entry stays empty and
+    // Unknown mediaType (>3): the bytes are consumed but the entry stays empty and
     // referencing images render as empty (§6.6).
     tagStream->readBytes(byteLength);
     entry.logicalWidth = tagStream->readUint32();
@@ -2808,6 +2809,35 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     pending.first->scaleFactor = entry.scaleFactor;
     pending.first->offsetX = entry.offsetX;
     pending.first->offsetY = entry.offsetY;
+    // Sequence entries (spec 6.6.1): decode the container header so the Image carries the
+    // scheduling metadata; the frame data itself is consumed lazily by the sequence player.
+    if (entry.mediaType == 2 && entry.data != nullptr) {
+      VideoSequenceContainer container = {};
+      if (SequenceCodec::DecodeVideoSequence(entry.data, &container)) {
+        pending.first->isSequence = true;
+        pending.first->sequenceMediaType = 2;
+        pending.first->sequenceFrameRate = container.frameRate;
+        pending.first->sequenceFrameCount = static_cast<uint32_t>(container.frames.size());
+        pending.first->logicalWidth = container.width;
+        pending.first->logicalHeight = container.height;
+        pending.first->scaleFactor = 1.0f;
+        pending.first->offsetX = 0.0f;
+        pending.first->offsetY = 0.0f;
+      }
+    } else if (entry.mediaType == 3 && entry.data != nullptr) {
+      BitmapSequenceContainer container = {};
+      if (SequenceCodec::DecodeBitmapSequence(entry.data, &container)) {
+        pending.first->isSequence = true;
+        pending.first->sequenceMediaType = 3;
+        pending.first->sequenceFrameRate = container.frameRate;
+        pending.first->sequenceFrameCount = static_cast<uint32_t>(container.frames.size());
+        pending.first->logicalWidth = container.width;
+        pending.first->logicalHeight = container.height;
+        pending.first->scaleFactor = 1.0f;
+        pending.first->offsetX = 0.0f;
+        pending.first->offsetY = 0.0f;
+      }
+    }
   }
 
   // Attach sub-document instances: every referencing root layer decodes an independent copy

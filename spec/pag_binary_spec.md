@@ -310,6 +310,43 @@ varuint count
 - Image 节点（Tag 288）通过 ImageRef 指向条目；渲染时按逻辑尺寸适配、以 1/scaleFactor 缩放并平移。
 - 媒体类型与各期实现范围：一期只产生 0/1；解码器遇到未知 mediaType 跳过该条目并告警，引用它的
   Image 按空图处理。
+- 三期序列条目（mediaType 2/3，§6.6.1）：帧数据原样存储不重编码，条目元数据中
+  `scaleFactor = 1`、`offset = 0`，`logicalWidth/logicalHeight` = 序列尺寸。
+
+#### 6.6.1 序列条目容器（三期）
+
+mediaType = 2（视频序列）时，条目 `data` 为序列容器：
+
+```
+float32 frameRate          序列帧率
+u32 width, height          序列尺寸（= 条目 logicalWidth/Height）
+varuint frameCount         帧数
+varuint headerCount        编码头（codec specific data）数
+重复 headerCount 次： varuint byteLength + byte[byteLength]
+s32 alphaStartX, alphaStartY   alpha 裁剪起点
+重复 frameCount 次：
+  u8 flags                 bit0 = isKeyframe
+  varuint frameIndex       presentation 帧序号
+  varuint byteLength + byte[byteLength]   帧数据原样（H.264 NAL）
+```
+
+mediaType = 3（位图序列）时，条目 `data` 为：
+
+```
+float32 frameRate
+u32 width, height
+varuint frameCount
+重复 frameCount 次：
+  u8 flags                 bit0 = isKeyframe
+  varuint bitmapCount      该帧位图块数
+  重复 bitmapCount 次： s32 x, y, w, h + varuint byteLength + byte[byteLength]
+```
+
+- 序列条目在导出管线中原样通过（不缩放/不裁边/不重编码）；引用它的 Image 节点携带
+  `isSequence / sequenceFrameRate / sequenceFrameCount` 解码元数据（Tag 288 读侧填充，
+  XML 仅保结构）。
+- 多分辨率序列 = 多条目全部保留；XML（.pagx）输出只保结构，序列数据不落旁置文件
+  （三期设计决策 5：视频只走二进制路径）。
 
 ## 7. 路径编码（PathData）
 

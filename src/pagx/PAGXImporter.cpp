@@ -1652,6 +1652,22 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
   } else {
     image->filePath = source;
   }
+  // Sequence structure attributes (spec 6.6.1, design decision 5: XML keeps the structure;
+  // the frame container rides the binary ImageTable / the base64 source on the internal hop).
+  auto sequence = GetAttribute(node, "sequence");
+  if (sequence == "video") {
+    image->isSequence = true;
+    image->sequenceMediaType = 2;
+  } else if (sequence == "bitmap") {
+    image->isSequence = true;
+    image->sequenceMediaType = 3;
+  }
+  if (image->isSequence) {
+    image->sequenceFrameRate =
+        GetFloatAttribute(node, "frameRate", Default<Image>().sequenceFrameRate, doc);
+    image->sequenceFrameCount = static_cast<uint32_t>(
+        GetInt64Attribute(node, "frames", Default<Image>().sequenceFrameCount, doc));
+  }
   return image;
 }
 

@@ -93,6 +93,7 @@
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/PAGAttributeIO.h"
 #include "pagx/pag/PAGTagHeader.h"
+#include "pagx/pag/SequenceCodec.h"
 #include "pagx/pag/TagCode.h"
 #include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/types/ColorSpace.h"
@@ -2970,6 +2971,152 @@ PAGX_TEST(PAGImporterTest, Matrix3DChannelRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "matrix3d-channel", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, SequenceEntryRoundTrip) {
+  // P3-10 sequence entries (spec 6.6.1): a video sequence container and a bitmap sequence
+  // container round trip through the binary ImageTable byte-identically, and the referencing
+  // Image nodes carry the scheduling metadata (mediaType / frameRate / frameCount / size).
+  // Frames are stored as-is (no re-encode); XML keeps the structure via the sequence
+  // attributes while the container rides the data URI on the internal hop.
+  auto doc = PAGXDocument::Make(320, 240);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 320;
+  layer->height = 240;
+  doc->layers.push_back(layer);
+
+  VideoSequenceContainer video = {};
+  video.frameRate = 30.0f;
+  video.width = 320;
+  video.height = 240;
+  video.alphaStartX = 4;
+  video.alphaStartY = 6;
+  video.headers.push_back(Data::MakeWithCopy("\x00\x00\x00\x01", 4));
+  video.headers.push_back(Data::MakeWithCopy("\x00\x00\x00\x01\x67", 5));
+  const char* kFramePayload = "frame-payload";
+  for (uint32_t i = 0; i < 3; i++) {
+    VideoSequenceFrame frame = {};
+    frame.isKeyframe = i == 0;
+    frame.frameIndex = i;
+    frame.data = Data::MakeWithCopy(kFramePayload, strlen(kFramePayload));
+    video.frames.push_back(frame);
+  }
+  auto videoData = SequenceCodec::EncodeVideoSequence(video);
+  ASSERT_TRUE(videoData != nullptr && !videoData->empty());
+
+  auto* videoImage = doc->makeNode<Image>("seqVideo");
+  videoImage->isSequence = true;
+  videoImage->sequenceMediaType = 2;
+  videoImage->data = videoData;
+  videoImage->logicalWidth = video.width;
+  videoImage->logicalHeight = video.height;
+  videoImage->sequenceFrameRate = video.frameRate;
+  videoImage->sequenceFrameCount = 3;
+
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 320;
+  rect->size.height = 240;
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* videoPattern = doc->makeNode<ImagePattern>();
+  videoPattern->image = videoImage;
+  fill->color = videoPattern;
+  layer->contents.push_back(fill);
+
+  BitmapSequenceContainer bitmap = {};
+  bitmap.frameRate = 12.0f;
+  bitmap.width = 100;
+  bitmap.height = 80;
+  const char* kBlockPayload = "bitmap-block-data";
+  for (uint32_t i = 0; i < 2; i++) {
+    BitmapSequenceFrame frame = {};
+    frame.isKeyframe = i == 0;
+    BitmapSequenceBlock block = {};
+    block.x = static_cast<int32_t>(i) * 2;
+    block.y = 3;
+    block.width = 40;
+    block.height = 30;
+    block.data = Data::MakeWithCopy(kBlockPayload, strlen(kBlockPayload));
+    frame.bitmaps.push_back(block);
+    bitmap.frames.push_back(frame);
+  }
+  auto bitmapData = SequenceCodec::EncodeBitmapSequence(bitmap);
+  ASSERT_TRUE(bitmapData != nullptr && !bitmapData->empty());
+
+  auto* bitmapImage = doc->makeNode<Image>("seqBitmap");
+  bitmapImage->isSequence = true;
+  bitmapImage->sequenceMediaType = 3;
+  bitmapImage->data = bitmapData;
+  bitmapImage->logicalWidth = bitmap.width;
+  bitmapImage->logicalHeight = bitmap.height;
+  bitmapImage->sequenceFrameRate = bitmap.frameRate;
+  bitmapImage->sequenceFrameCount = 2;
+
+  auto* rect2 = doc->makeNode<Rectangle>();
+  rect2->size.width = 100;
+  rect2->size.height = 80;
+  auto* fill2 = doc->makeNode<Fill>();
+  auto* bitmapPattern = doc->makeNode<ImagePattern>();
+  bitmapPattern->image = bitmapImage;
+  fill2->color = bitmapPattern;
+  auto* layer2 = doc->makeNode<Layer>("seqBitmapLayer");
+  layer2->contents.push_back(rect2);
+  layer2->contents.push_back(fill2);
+  doc->layers.push_back(layer2);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/sequence_entry.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/sequence_entry.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 2u);
+
+  auto* dVideoImage =
+      static_cast<ImagePattern*>(static_cast<Fill*>(decoded->layers[0]->contents[1])->color)->image;
+  ASSERT_TRUE(dVideoImage != nullptr);
+  EXPECT_TRUE(dVideoImage->isSequence);
+  EXPECT_EQ(dVideoImage->sequenceMediaType, 2);
+  EXPECT_EQ(dVideoImage->sequenceFrameRate, 30.0f);
+  EXPECT_EQ(dVideoImage->sequenceFrameCount, 3u);
+  EXPECT_EQ(dVideoImage->logicalWidth, 320u);
+  EXPECT_EQ(dVideoImage->logicalHeight, 240u);
+  ASSERT_TRUE(dVideoImage->data != nullptr);
+  VideoSequenceContainer dVideo = {};
+  ASSERT_TRUE(SequenceCodec::DecodeVideoSequence(dVideoImage->data, &dVideo));
+  EXPECT_EQ(dVideo.frameRate, 30.0f);
+  EXPECT_EQ(dVideo.width, 320u);
+  EXPECT_EQ(dVideo.height, 240u);
+  EXPECT_EQ(dVideo.alphaStartX, 4);
+  EXPECT_EQ(dVideo.alphaStartY, 6);
+  ASSERT_EQ(dVideo.headers.size(), 2u);
+  ASSERT_EQ(dVideo.headers[0]->size(), 4u);
+  ASSERT_EQ(dVideo.frames.size(), 3u);
+  EXPECT_TRUE(dVideo.frames[0].isKeyframe);
+  EXPECT_FALSE(dVideo.frames[1].isKeyframe);
+  EXPECT_EQ(dVideo.frames[2].frameIndex, 2u);
+  ASSERT_TRUE(dVideo.frames[1].data != nullptr);
+  EXPECT_EQ(dVideo.frames[1].data->size(), strlen(kFramePayload));
+  // The video container survives the round trip byte-identically.
+  EXPECT_EQ(dVideoImage->data->size(), videoData->size());
+  EXPECT_EQ(memcmp(dVideoImage->data->bytes(), videoData->bytes(), videoData->size()), 0);
+
+  auto* dBitmapImage =
+      static_cast<ImagePattern*>(static_cast<Fill*>(decoded->layers[1]->contents[1])->color)->image;
+  ASSERT_TRUE(dBitmapImage != nullptr);
+  EXPECT_TRUE(dBitmapImage->isSequence);
+  EXPECT_EQ(dBitmapImage->sequenceMediaType, 3);
+  EXPECT_EQ(dBitmapImage->sequenceFrameRate, 12.0f);
+  EXPECT_EQ(dBitmapImage->sequenceFrameCount, 2u);
+  BitmapSequenceContainer dBitmap = {};
+  ASSERT_TRUE(SequenceCodec::DecodeBitmapSequence(dBitmapImage->data, &dBitmap));
+  EXPECT_EQ(dBitmap.frames.size(), 2u);
+  ASSERT_EQ(dBitmap.frames[1].bitmaps.size(), 1u);
+  EXPECT_EQ(dBitmap.frames[1].bitmaps[0].x, 2);
+  EXPECT_EQ(dBitmap.frames[1].bitmaps[0].width, 40);
+  ASSERT_TRUE(dBitmap.frames[1].bitmaps[0].data != nullptr);
+  EXPECT_EQ(dBitmap.frames[1].bitmaps[0].data->size(), strlen(kBlockPayload));
+  EXPECT_EQ(memcmp(dBitmapImage->data->bytes(), bitmapData->bytes(), bitmapData->size()), 0);
+
+  int seqByteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "sequence-entry", &seqByteCount));
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {

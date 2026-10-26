@@ -25,10 +25,12 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/pag/SequenceCodec.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
@@ -243,6 +245,36 @@ ImageProcessor::Result ImageProcessor::Process(PAGXDocument* document, const Opt
 
   for (auto& [image, refs] : imageRefs) {
     if (image == nullptr || refs.empty()) {
+      continue;
+    }
+
+    // Sequence images (spec 6.6.1): frames are stored as-is in the container — no scaling,
+    // cropping or re-encoding; the entry mirrors the container header's dimensions.
+    if (image->isSequence && image->sequenceMediaType >= 2 && image->data != nullptr &&
+        !image->data->empty()) {
+      ImageTableEntry entry = {};
+      entry.mediaType = image->sequenceMediaType;
+      entry.data = image->data;
+      entry.scaleFactor = 1.0f;
+      uint32_t width = image->logicalWidth;
+      uint32_t height = image->logicalHeight;
+      if (image->sequenceMediaType == 2) {
+        VideoSequenceContainer container = {};
+        if (SequenceCodec::DecodeVideoSequence(image->data, &container)) {
+          width = container.width;
+          height = container.height;
+        }
+      } else {
+        BitmapSequenceContainer container = {};
+        if (SequenceCodec::DecodeBitmapSequence(image->data, &container)) {
+          width = container.width;
+          height = container.height;
+        }
+      }
+      entry.logicalWidth = width;
+      entry.logicalHeight = height;
+      result.imageIndices[image] = static_cast<uint32_t>(result.entries.size());
+      result.entries.push_back(entry);
       continue;
     }
 

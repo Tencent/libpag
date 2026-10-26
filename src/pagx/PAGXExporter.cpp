@@ -1760,6 +1760,13 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
+      if (image->isSequence) {
+        // Sequence structure attributes (spec 6.6.1): the frame container travels the binary
+        // ImageTable (design decision 5); the data-URI source below keeps the internal hop lossless.
+        xml.addAttribute("sequence", image->sequenceMediaType == 3 ? "bitmap" : "video");
+        xml.addAttribute("frameRate", image->sequenceFrameRate);
+        xml.addAttribute("frames", static_cast<int64_t>(image->sequenceFrameCount));
+      }
       if (!image->filePath.empty()) {
         xml.addAttribute("source", image->filePath);
       } else if (image->data) {
