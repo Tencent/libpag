@@ -1146,9 +1146,9 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     }
     out.openTag("div");
     {
-      auto animIdIt = _ctx->animatedElementIds.find(tb);
-      if (animIdIt != _ctx->animatedElementIds.end()) {
-        out.addAttr("id", animIdIt->second);
+      auto animId = _ctx->claimAnimatedDomId({tb});
+      if (!animId.empty()) {
+        out.addAttr("id", animId);
       }
     }
     out.addAttr("style", style);
@@ -1241,15 +1241,9 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       out.openTag("span");
       {
-        auto animIdIt = _ctx->animatedElementIds.end();
-        if (span.fill) {
-          animIdIt = _ctx->animatedElementIds.find(span.fill);
-        }
-        if (animIdIt == _ctx->animatedElementIds.end() && span.text) {
-          animIdIt = _ctx->animatedElementIds.find(span.text);
-        }
-        if (animIdIt != _ctx->animatedElementIds.end()) {
-          out.addAttr("id", animIdIt->second);
+        auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+        if (!animId.empty()) {
+          out.addAttr("id", animId);
         }
       }
       out.addAttr("style", spanStyle);
@@ -1341,9 +1335,9 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   }
   out.openTag("div");
   {
-    auto animIdIt = _ctx->animatedElementIds.find(tb);
-    if (animIdIt != _ctx->animatedElementIds.end()) {
-      out.addAttr("id", animIdIt->second);
+    auto animId = _ctx->claimAnimatedDomId({tb});
+    if (!animId.empty()) {
+      out.addAttr("id", animId);
     }
   }
   out.addAttr("style", style);
@@ -1386,15 +1380,9 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     }
     out.openTag("span");
     {
-      auto animIdIt = _ctx->animatedElementIds.end();
-      if (span.fill) {
-        animIdIt = _ctx->animatedElementIds.find(span.fill);
-      }
-      if (animIdIt == _ctx->animatedElementIds.end() && span.text) {
-        animIdIt = _ctx->animatedElementIds.find(span.text);
-      }
-      if (animIdIt != _ctx->animatedElementIds.end()) {
-        out.addAttr("id", animIdIt->second);
+      auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+      if (!animId.empty()) {
+        out.addAttr("id", animId);
       }
     }
     out.addAttr("style", spanStyle);

@@ -3566,6 +3566,42 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationWithMatrixChannel) {
   EXPECT_EQ(html.find("matrix(0,1,-1,0,0,0); }"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, AnimationFillInRepeaterAnimatesEveryCopy) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute(
+          "resources/pagx_to_html/animations/sharing/02_animated_fill_in_repeater.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(CountOccurrences(html, "id=\"repeatedFill\""), static_cast<size_t>(1));
+  const char* copyIds[] = {"repeatedFill", "repeatedFill__1", "repeatedFill__2", "repeatedFill__3"};
+  for (const char* id : copyIds) {
+    auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
+    ASSERT_FALSE(tag.empty()) << id;
+    EXPECT_NE(tag.find("animation:pagx_repeatedFill_0"), std::string::npos) << id;
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextGetsUniqueIds) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/sharing/03_fill_on_rect_and_text.pagx"),
+                     opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = FindTagContaining(html, "id=\"sharedPainter\"");
+  auto second = FindTagContaining(html, "id=\"sharedPainter__1\"");
+  ASSERT_FALSE(first.empty());
+  ASSERT_FALSE(second.empty());
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedPainter\""), static_cast<size_t>(1));
+  EXPECT_NE(first.find("animation:pagx_sharedPainter_0"), std::string::npos);
+  EXPECT_NE(second.find("animation:pagx_sharedPainter_0"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="rectLayer" width="80" height="80">

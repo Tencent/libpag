@@ -1270,6 +1270,7 @@ HTMLAnimationSession::~HTMLAnimationSession() {
     kv.first->groupOpacity = kv.second;
   }
   _ctx.animatedElementIds.clear();
+  _ctx.animatedDomIdUseCount.clear();
 }
 
 std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
