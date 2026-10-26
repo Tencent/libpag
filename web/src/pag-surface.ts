@@ -1,13 +1,12 @@
 import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
+import { isWebGPUBackend } from './core/backend-context';
 import {
-  isWebGPUBackend,
-  resolveTextureHandle,
-  trackWebGPUTextureHandle,
   unregisterWebGPUTexture,
   untrackWebGPUTextureHandle,
   WebGPUTextureLike,
-} from './core/backend-context';
+  wrapBackendTexture,
+} from './core/webgpu-texture';
 import { GPU_TEXTURE_USAGE_COPY_SRC } from './constant';
 import { destroyVerify } from './utils/decorators';
 
@@ -85,15 +84,12 @@ export class PAGSurface {
         'PAGSurface.fromTexture() requires the GPUTexture to be created with the COPY_SRC usage flag.',
       );
     }
-    const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGSurface.fromTexture()', texture);
-    const wasmIns = PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format);
-    if (!wasmIns) {
-      if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
-      throw new Error(`Make PAGSurface from texture ${textureID} fail!`);
-    }
-    const surface = new PAGSurface(wasmIns, webGPUHandle);
-    if (webGPUHandle > 0) trackWebGPUTextureHandle(surface, webGPUHandle);
-    return surface;
+    return wrapBackendTexture(
+      'PAGSurface.fromTexture()',
+      texture,
+      (textureID, format) => PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format),
+      (wasmIns, webGPUHandle) => new PAGSurface(wasmIns, webGPUHandle),
+    );
   }
   /**
    * Make a PAGSurface from frameBuffer. WebGL backend only; on the WebGPU backend a texture view

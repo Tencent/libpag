@@ -29,6 +29,16 @@ declare global {
   }
 }
 
+/**
+ * Minimal structure of a GPUDevice accepted by PAGInit for WebGPU rendering. lib.dom of
+ * TypeScript ~5.0 does not ship WebGPU declarations, so a structural type is used; a real
+ * GPUDevice satisfies it.
+ */
+export interface WebGPUDeviceLike {
+  createTexture: (descriptor: object) => object;
+  queue: object;
+}
+
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
     _Load: (buffer: Uint8Array) => any;
@@ -132,7 +142,7 @@ export interface PAG extends EmscriptenModule {
    * WebGPU build only. The GPUDevice preinitialized on the JS side during PAGInit, picked up by
    * tgfx via emscripten_webgpu_get_device().
    */
-  preinitializedWebGPUDevice?: object;
+  preinitializedWebGPUDevice?: WebGPUDeviceLike;
   /**
    * WebGPU build only. Emscripten's WebGPU runtime exported via EXPORTED_RUNTIME_METHODS,
    * providing the object managers that map wasm handle numbers to JS WebGPU objects.

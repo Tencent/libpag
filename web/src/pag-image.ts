@@ -3,12 +3,11 @@ import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
 import {
-  resolveTextureHandle,
-  trackWebGPUTextureHandle,
   unregisterWebGPUTexture,
   untrackWebGPUTextureHandle,
   WebGPUTextureLike,
-} from './core/backend-context';
+  wrapBackendTexture,
+} from './core/webgpu-texture';
 
 @destroyVerify
 export class PAGImage {
@@ -65,15 +64,12 @@ export class PAGImage {
    * PAGInit) and with the TEXTURE_BINDING usage flag.
    */
   public static fromTexture(texture: number | WebGPUTextureLike, width: number, height: number, flipY: boolean) {
-    const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGImage.fromTexture()', texture);
-    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format);
-    if (!wasmIns) {
-      if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
-      throw new Error('Make PAGImage from texture fail!');
-    }
-    const image = new PAGImage(wasmIns, webGPUHandle);
-    if (webGPUHandle > 0) trackWebGPUTextureHandle(image, webGPUHandle);
-    return image;
+    return wrapBackendTexture(
+      'PAGImage.fromTexture()',
+      texture,
+      (textureID, format) => PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format),
+      (wasmIns, webGPUHandle) => new PAGImage(wasmIns, webGPUHandle),
+    );
   }
 
   public wasmIns;

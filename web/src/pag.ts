@@ -16,12 +16,12 @@ export interface ModuleOption {
    * PAGImage.fromTexture, because WGPUTexture carries no device back-reference. If omitted,
    * libpag requests a device via navigator.gpu on its own.
    */
-  webGPUDevice?: object;
+  webGPUDevice?: types.WebGPUDeviceLike;
 }
 
 // Minimal WebGPU typings. lib.dom of TypeScript ~5.0 does not ship WebGPU declarations.
 interface WebGPUAdapterLike {
-  requestDevice: () => Promise<object>;
+  requestDevice: () => Promise<types.WebGPUDeviceLike>;
 }
 
 interface NavigatorWithGPU extends Navigator {
@@ -30,7 +30,7 @@ interface NavigatorWithGPU extends Navigator {
   };
 }
 
-const initWebGPUDevice = async (module: types.PAG, webGPUDevice?: object): Promise<void> => {
+const initWebGPUDevice = async (module: types.PAG, webGPUDevice?: types.WebGPUDeviceLike): Promise<void> => {
   if (webGPUDevice) {
     module.preinitializedWebGPUDevice = webGPUDevice;
     return;
