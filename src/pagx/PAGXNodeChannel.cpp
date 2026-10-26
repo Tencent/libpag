@@ -49,6 +49,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -233,6 +234,27 @@ static bool AccessArrayElement(Node* node, KeyValue* getOut, const KeyValue* set
   return true;
 }
 
+// PathData pointer access: addresses Path.data / MaskPath.path (spec 6.1 path channels). The
+// pointer references document-pooled nodes; the reset pass clears the linkage.
+template <typename T, auto Field>
+static bool AccessPathData(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = nullptr;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<PathData*>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
 // Point sub-component access: addresses position.x / position.y etc. XAxis selects x vs y.
 template <typename T, auto Field, bool XAxis>
 static bool AccessPointAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -405,6 +427,8 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
 #define FIELD_MATRIX_ELEM(T, name, member, idx, cls) \
   { name, cls, &AccessArrayElement<T, &T::member, idx> }
+#define FIELD_PATH_DATA(T, name, member, cls) \
+  { name, cls, &AccessPathData<T, &T::member> }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -498,6 +522,7 @@ static std::vector<ChannelDef> BuildPolystarFields() {
 
 static std::vector<ChannelDef> BuildPathFields() {
   std::vector<ChannelDef> table = {
+      FIELD_PATH_DATA(Path, "data", data, Anim),
       FIELD_POINT_X(Path, "position.x", position, Layout),
       FIELD_POINT_Y(Path, "position.y", position, Layout),
       FIELD_BOOL(Path, "reversed", reversed, NoFlags),
@@ -1000,6 +1025,18 @@ static std::vector<ChannelDef> BuildColorMatrixFilterFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildMaskPathFields() {
+  return {
+      FIELD_PATH_DATA(MaskPath, "path", path, Anim),
+      FIELD_ENUM(MaskPath, "maskMode", maskMode, NoFlags, MaskMode),
+      FIELD_BOOL(MaskPath, "inverted", inverted, Anim),
+      FIELD_POINT_X(MaskPath, "feather.x", feather, Anim),
+      FIELD_POINT_Y(MaskPath, "feather.y", feather, Anim),
+      FIELD_FLOAT(MaskPath, "opacity", opacity, Anim),
+      FIELD_FLOAT(MaskPath, "expansion", expansion, Anim),
+  };
+}
+
 const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
   static const std::vector<ChannelDef> empty = {};
   // Each table is built once on first use. Static locals keep the member-pointer-generated access
@@ -1175,6 +1212,10 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::ColorMatrixFilter: {
       static const std::vector<ChannelDef> table = BuildColorMatrixFilterFields();
+      return table;
+    }
+    case NodeType::MaskPath: {
+      static const std::vector<ChannelDef> table = BuildMaskPathFields();
       return table;
     }
     default:

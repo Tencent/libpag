@@ -23,6 +23,7 @@
 #include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Polystar.h"
@@ -219,6 +220,9 @@ std::string RadialBlurModeToString(RadialBlurMode mode);
 RadialBlurMode RadialBlurModeFromString(const std::string& str);
 bool IsValidRadialBlurModeString(const std::string& str);
 std::string RadialBlurAntialiasToString(RadialBlurAntialias antialias);
+std::string MaskModeToString(MaskMode mode);
+MaskMode MaskModeFromString(const std::string& str);
+bool IsValidMaskModeString(const std::string& str);
 RadialBlurAntialias RadialBlurAntialiasFromString(const std::string& str);
 bool IsValidRadialBlurAntialiasString(const std::string& str);
 

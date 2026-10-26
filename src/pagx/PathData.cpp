@@ -18,8 +18,72 @@
 
 #include "pagx/nodes/PathData.h"
 #include <cmath>
+#include <memory>
 
 namespace pagx {
+
+// Point-wise lerp helper for PathData::Interpolate (the project forbids lambdas).
+static Point MixPathPoint(const Point& a, const Point& b, float t) {
+  return Point{a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
+}
+
+PathData* PathData::Interpolate(const PathData* start, const PathData* end, float t) {
+  if (start == nullptr || end == nullptr) {
+    return const_cast<PathData*>(start);
+  }
+  const auto& verbsStart = start->verbs();
+  const auto& verbsEnd = end->verbs();
+  // Different command sequences cannot be paired point-by-point; spec 6.1 falls back to Hold.
+  if (verbsStart.size() != verbsEnd.size()) {
+    return const_cast<PathData*>(start);
+  }
+  for (size_t i = 0; i < verbsStart.size(); i++) {
+    if (verbsStart[i] != verbsEnd[i]) {
+      return const_cast<PathData*>(start);
+    }
+  }
+  static thread_local auto scratch = std::unique_ptr<PathData>(new PathData());
+  // The scratch is reused across calls, so reset its command lists before replaying.
+  *scratch = PathData();
+  const auto& pointsStart = start->points();
+  const auto& pointsEnd = end->points();
+  size_t pointIndex = 0;
+  for (auto verb : verbsStart) {
+    switch (verb) {
+      case PathVerb::Move: {
+        auto p = MixPathPoint(pointsStart[pointIndex], pointsEnd[pointIndex], t);
+        scratch->moveTo(p.x, p.y);
+        pointIndex++;
+        break;
+      }
+      case PathVerb::Line: {
+        auto p = MixPathPoint(pointsStart[pointIndex], pointsEnd[pointIndex], t);
+        scratch->lineTo(p.x, p.y);
+        pointIndex++;
+        break;
+      }
+      case PathVerb::Quad: {
+        auto c = MixPathPoint(pointsStart[pointIndex], pointsEnd[pointIndex], t);
+        auto p = MixPathPoint(pointsStart[pointIndex + 1], pointsEnd[pointIndex + 1], t);
+        scratch->quadTo(c.x, c.y, p.x, p.y);
+        pointIndex += 2;
+        break;
+      }
+      case PathVerb::Cubic: {
+        auto c1 = MixPathPoint(pointsStart[pointIndex], pointsEnd[pointIndex], t);
+        auto c2 = MixPathPoint(pointsStart[pointIndex + 1], pointsEnd[pointIndex + 1], t);
+        auto p = MixPathPoint(pointsStart[pointIndex + 2], pointsEnd[pointIndex + 2], t);
+        scratch->cubicTo(c1.x, c1.y, c2.x, c2.y, p.x, p.y);
+        pointIndex += 3;
+        break;
+      }
+      case PathVerb::Close:
+        scratch->close();
+        break;
+    }
+  }
+  return scratch.get();
+}
 
 int PathData::PointsPerVerb(PathVerb verb) {
   switch (verb) {

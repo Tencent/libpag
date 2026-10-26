@@ -28,6 +28,7 @@
 namespace pagx {
 
 class PAGImage;
+class PathData;
 
 /**
  * KeyValue is the value carried by a Channel's keyframes. Its std::variant alternatives are
@@ -35,7 +36,7 @@ class PAGImage;
  * ChannelValueType value.
  */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix,
-                               std::shared_ptr<PAGImage>>;
+                               std::shared_ptr<PAGImage>, PathData*>;
 
 /**
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of

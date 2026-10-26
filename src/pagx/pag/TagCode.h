@@ -118,6 +118,8 @@ enum class TagCode : uint16_t {
   DisplacementMapFilter = 584,
   RadialBlurFilter = 585,
   MosaicFilter = 586,
+  // Phase three migration mask paths (spec 7.6).
+  MaskPath = 587,
   // 544-575 data binding.
   DataBind = 544,
   // 576-767 is reserved for the phase-3 migration capabilities (design doc §12.2),

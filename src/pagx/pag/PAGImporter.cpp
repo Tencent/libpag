@@ -57,6 +57,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -210,6 +211,19 @@ void ReadSingleKeyValue<Color>(pag::DecodeStream* tag, Color* value, DecodeConte
 }
 
 template <>
+void ReadSingleKeyValue<PathData*>(pag::DecodeStream* tag, PathData** value,
+                                   DecodeContext* context) {
+  // Spec 6.1 columnar layout: one complete path (spec 7) per keyframe. The node joins the
+  // document pool so the decoded keyframe owns it for the document's lifetime.
+  auto* pathData = context->document->makeNode<PathData>();
+  if (!ReadPAGPath(tag, pathData)) {
+    PAGThrowError(tag->context, "channel path keyframe is malformed");
+    return;
+  }
+  *value = pathData;
+}
+
+template <>
 void ReadSingleKeyValue<Matrix>(pag::DecodeStream* tag, Matrix* value, DecodeContext*) {
   *value = ReadPAGMatrix(tag);
 }
@@ -359,8 +373,13 @@ Channel* ReadChannelTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       channel->name = name;
       ReadChannelKeyframes(tagStream, static_cast<TypedChannel<Matrix>*>(channel), context);
       break;
+    case ChannelValueType::Path:
+      channel = context->document->makeNode<TypedChannel<PathData*>>();
+      channel->name = name;
+      ReadChannelKeyframes(tagStream, static_cast<TypedChannel<PathData*>*>(channel), context);
+      break;
     default:
-      // ImageRef/Path/PAGImage channels have no phase-2 encoding; a file carrying them cannot
+      // ImageRef/PAGImage channels have no binary encoding yet; a file carrying them cannot
       // have been produced by this encoder, so the channel is skipped with an error.
       PAGThrowError(tagStream->context, "channel value type has no binary encoding yet");
       return nullptr;
@@ -2161,6 +2180,36 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
   }
 }
 
+// MaskPath tag (spec 7.6 #587): the inline PathData sub-tag sits at the value-area end.
+MaskPath* ReadMaskPathTag(pag::DecodeStream* tagStream, DecodeContext* context) {
+  auto* maskPath = context->document->makeNode<MaskPath>();
+  PAGAttributeBlockReader reader(tagStream, 7);
+  bool hasPath = reader.flag(0);
+  bool hasMode = reader.flag(1);
+  maskPath->inverted = reader.flag(2);
+  bool hasFeatherX = reader.flag(3);
+  bool hasFeatherY = reader.flag(4);
+  bool hasOpacity = reader.flag(5);
+  bool hasExpansion = reader.flag(6);
+  tagStream->alignWithBytes();
+  uint32_t pathRef = 0;
+  if (hasPath) pathRef = tagStream->readEncodedUint32();
+  if (hasMode) maskPath->maskMode = static_cast<MaskMode>(tagStream->readUint8());
+  if (hasFeatherX) maskPath->feather.x = tagStream->readFloat();
+  if (hasFeatherY) maskPath->feather.y = tagStream->readFloat();
+  if (hasOpacity) maskPath->opacity = tagStream->readFloat();
+  if (hasExpansion) maskPath->expansion = tagStream->readFloat();
+  if (hasPath && pathRef == 0) {
+    auto pathHeader = ReadPAGTagHeader(tagStream);
+    auto pathBytes = tagStream->readBytes(pathHeader.length);
+    auto* pathData = context->document->makeNode<PathData>();
+    if (ReadPAGPath(&pathBytes, pathData)) {
+      maskPath->path = pathData;
+    }
+  }
+  return maskPath;
+}
+
 void ReadLayerBlockContent(
     pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
     std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
@@ -2286,6 +2335,8 @@ void ReadLayerBlockContent(
       if (filter != nullptr) {
         layer->filters.push_back(filter);
       }
+    } else if (header.code == TagCode::MaskPath) {
+      layer->maskPaths.push_back(ReadMaskPathTag(&tagBytes, context));
     } else if (header.code == TagCode::AnimationTimeline) {
       // Layer timelines (spec §9.6) sit between filters and children. They are owned by the
       // layer, not pooled nodes, so they create no doc->nodes entries and take no indices.

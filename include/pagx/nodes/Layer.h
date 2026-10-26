@@ -43,6 +43,7 @@
 namespace pagx {
 
 class PAGXDocument;
+class MaskPath;
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
@@ -224,6 +225,12 @@ class Layer : public Node, public LayoutNode {
    * The filters applied to this layer (blur, color matrix, etc.).
    */
   std::vector<LayerFilter*> filters = {};
+
+  /**
+   * The mask path list (spec 7.6): path shapes combined into the layer mask, migrated from the
+   * legacy Layer::masks semantics. Distinct from the single-layer mask reference above.
+   */
+  std::vector<MaskPath*> maskPaths = {};
 
   /**
    * The child layers contained in this layer.

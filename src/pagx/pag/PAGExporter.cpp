@@ -61,6 +61,7 @@
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -1625,6 +1626,12 @@ void WriteSingleKeyValue<Color>(pag::EncodeStream* tag, const Color& value, Enco
 }
 
 template <>
+void WriteSingleKeyValue<PathData*>(pag::EncodeStream* tag, PathData* const& value, EncodeState*) {
+  // Spec 6.1 columnar layout: one complete path (spec 7) per keyframe.
+  WritePAGPath(tag, value, 0);
+}
+
+template <>
 void WriteSingleKeyValue<Matrix>(pag::EncodeStream* tag, const Matrix& value, EncodeState*) {
   WritePAGMatrix(tag, value);
 }
@@ -1737,8 +1744,7 @@ void WriteChannelKeyframes<bool>(pag::EncodeStream* tag, const TypedChannel<bool
 // keyframe column block. ImageRef/Path/PAGImage channels warn and are skipped (phase-2 scope).
 void WriteChannelTag(pag::EncodeStream* stream, Channel* channel, EncodeState* state) {
   auto valueType = channel->valueType();
-  if (valueType == ChannelValueType::ImageRef || valueType == ChannelValueType::Path ||
-      valueType == ChannelValueType::PAGImage) {
+  if (valueType == ChannelValueType::ImageRef || valueType == ChannelValueType::PAGImage) {
     state->warn(PAGExportWarning::UnsupportedColorSource,
                 "channel value type has no binary encoding yet");
     return;
@@ -1775,6 +1781,9 @@ void WriteChannelTag(pag::EncodeStream* stream, Channel* channel, EncodeState* s
       break;
     case ChannelValueType::Matrix:
       WriteChannelKeyframes(&tag, static_cast<TypedChannel<Matrix>*>(channel), state);
+      break;
+    case ChannelValueType::Path:
+      WriteChannelKeyframes(&tag, static_cast<TypedChannel<PathData*>*>(channel), state);
       break;
     default:
       break;
@@ -2609,6 +2618,42 @@ void WriteMosaicFilterTag(pag::EncodeStream* stream, MosaicFilter* filter, Encod
   stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
 }
 
+// MaskPath tag (spec 7.6 #587): a mask list entry; the path is always an inline PathData
+// sub-tag at the value-area end (the same layout as Path.data).
+void WriteMaskPathTag(pag::EncodeStream* stream, MaskPath* maskPath, EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasPath = maskPath->path != nullptr;
+    writer.writeFlag(hasPath);
+    writer.writeFlag(maskPath->maskMode != MaskMode::Add);
+    writer.writeFlag(maskPath->inverted);
+    writer.writeFlag(maskPath->feather.x != 0.0f);
+    writer.writeFlag(maskPath->feather.y != 0.0f);
+    writer.writeFlag(maskPath->opacity != 1.0f);
+    writer.writeFlag(maskPath->expansion != 0.0f);
+    auto* v = writer.valueStream();
+    if (hasPath) {
+      v->writeEncodedUint32(0);  // 0 = inline path data sub-tag at the value-area end
+    }
+    if (maskPath->maskMode != MaskMode::Add) {
+      v->writeUint8(static_cast<uint8_t>(maskPath->maskMode));
+    }
+    if (maskPath->feather.x != 0.0f) v->writeFloat(maskPath->feather.x);
+    if (maskPath->feather.y != 0.0f) v->writeFloat(maskPath->feather.y);
+    if (maskPath->opacity != 1.0f) v->writeFloat(maskPath->opacity);
+    if (maskPath->expansion != 0.0f) v->writeFloat(maskPath->expansion);
+    auto block = writer.release();
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  if (maskPath->path != nullptr) {
+    pag::EncodeStream pathTag(&state->streamContext);
+    WritePAGPath(&pathTag, maskPath->path, 0);
+    WriteTag(&content, TagCode::PathData, &pathTag);
+  }
+  WriteTag(stream, TagCode::MaskPath, &content);
+}
+
 // Dispatches a layer filter tag by node type.
 void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeState* state) {
   switch (filter->nodeType()) {
@@ -3096,6 +3141,10 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state) 
   for (auto* filter : layer->filters) {
     WriteLayerFilterTag(&content, filter, state);
   }
+  // The mask path list (spec 7.6) sits between filters and timelines, matching the XML order.
+  for (auto* maskPath : layer->maskPaths) {
+    WriteMaskPathTag(&content, maskPath, state);
+  }
   // Layer timelines (spec §9.6) sit between filters and children, matching the XML emission
   // order. Timelines are owned by the layer (unique_ptr), not pooled nodes, so they take no
   // NodeRef indices; they reference their targets by string id.
@@ -3574,6 +3623,14 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
   for (auto* filter : layer->filters) {
     state->nodeIndices[filter] = (*index)++;
   }
+  // Mask list entries follow the filters; each entry's inline PathData sub-tag creates its node
+  // right after the entry, so the walk numbers both.
+  for (auto* maskPath : layer->maskPaths) {
+    state->nodeIndices[maskPath] = (*index)++;
+    if (maskPath->path != nullptr) {
+      state->nodeIndices[maskPath->path] = (*index)++;
+    }
+  }
   for (auto* child : layer->children) {
     AssignLayerNodeIndices(child, state, index);
   }
@@ -3834,6 +3891,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   std::vector<std::pair<Composition*, std::string>> restoredCompositionIds = {};
   std::vector<std::pair<Layer*, std::string>> restoredMaskIds = {};
   std::vector<std::pair<Layer*, std::string>> restoredDisplacementMapIds = {};
+  std::vector<std::pair<PathData*, std::string>> restoredPathIds = {};
   std::unordered_set<std::string> takenIds = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -3910,6 +3968,37 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     } while (takenIds.count(mapLayer->id) > 0);
     takenIds.insert(mapLayer->id);
   }
+  // Mask list paths and path-channel keyframe values reference PathData nodes by id in XML;
+  // id-less ones get the same deterministic synthesis so the XML hop keeps the linkages.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::MaskPath) {
+      auto* pathNode = static_cast<MaskPath*>(node.get())->path;
+      if (pathNode == nullptr || !pathNode->id.empty()) {
+        continue;
+      }
+      restoredPathIds.push_back({pathNode, pathNode->id});
+      do {
+        pathNode->id = "pag-v4-path-" + std::to_string(synthIndex++);
+      } while (takenIds.count(pathNode->id) > 0);
+      takenIds.insert(pathNode->id);
+    } else if (node->nodeType() == NodeType::Channel) {
+      auto* channel = static_cast<Channel*>(node.get());
+      if (channel->valueType() != ChannelValueType::Path) {
+        continue;
+      }
+      auto* typed = static_cast<TypedChannel<PathData*>*>(channel);
+      for (auto& keyframe : typed->keyframes) {
+        if (keyframe.value == nullptr || !keyframe.value->id.empty()) {
+          continue;
+        }
+        restoredPathIds.push_back({keyframe.value, keyframe.value->id});
+        do {
+          keyframe.value->id = "pag-v4-path-" + std::to_string(synthIndex++);
+        } while (takenIds.count(keyframe.value->id) > 0);
+        takenIds.insert(keyframe.value->id);
+      }
+    }
+  }
   auto xml = PAGXExporter::ToXML(*document);
   for (auto& restore : restoredFontIds) {
     restore.first->id = restore.second;
@@ -3921,6 +4010,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     restore.first->id = restore.second;
   }
   for (auto& restore : restoredDisplacementMapIds) {
+    restore.first->id = restore.second;
+  }
+  for (auto& restore : restoredPathIds) {
     restore.first->id = restore.second;
   }
   auto doc = PAGXImporter::FromXML(xml);

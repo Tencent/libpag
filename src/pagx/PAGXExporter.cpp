@@ -53,6 +53,7 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -266,6 +267,11 @@ std::string KeyframeValueToString<ImageRef>(const ImageRef& value) {
 }
 
 template <>
+std::string KeyframeValueToString<PathData*>(PathData* const& value) {
+  return value != nullptr ? "@" + value->id : std::string();
+}
+
+template <>
 std::string KeyframeValueToString<Color>(const Color& value) {
   return ColorToHexString(value, value.alpha < 1.0f);
 }
@@ -329,8 +335,7 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       // are intentionally not written; there is no matching import path in ParseChannel.
       break;
     case ChannelValueType::Path:
-      // Path channels belong to the PAGX spec §6.1 extension; XML round-tripping lands with
-      // that extension's implementation.
+      WriteTypedChannel(xml, static_cast<const TypedChannel<PathData*>*>(channel), "path");
       break;
   }
 }
@@ -1442,6 +1447,25 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
 // LayerFilter writing
 //==============================================================================
 
+static void WriteMaskPath(XMLBuilder& xml, const MaskPath* node) {
+  xml.openElement("MaskPath");
+  xml.addAttribute("id", node->id);
+  if (node->path != nullptr) {
+    xml.addAttribute("path", "@" + node->path->id);
+  }
+  if (node->maskMode != Default<MaskPath>().maskMode) {
+    xml.addAttribute("maskMode", MaskModeToString(node->maskMode));
+  }
+  xml.addAttribute("inverted", node->inverted, Default<MaskPath>().inverted);
+  if (node->feather != Default<MaskPath>().feather) {
+    xml.addAttribute("feather", PointToString(node->feather));
+  }
+  xml.addAttribute("opacity", node->opacity, Default<MaskPath>().opacity);
+  xml.addAttribute("expansion", node->expansion, Default<MaskPath>().expansion);
+  WriteCustomData(xml, node);
+  xml.closeElementSelfClosing();
+}
+
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
   switch (node->nodeType()) {
     case NodeType::BlurFilter: {
@@ -2043,8 +2067,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   WriteCustomData(xml, node);
 
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
-                     !node->children.empty() || !node->timelines.empty() ||
-                     !node->importDirective.content.empty() ||
+                     !node->maskPaths.empty() || !node->children.empty() ||
+                     !node->timelines.empty() || !node->importDirective.content.empty() ||
                      !node->importDirective.resolvedFrom.empty();
   if (!hasChildren) {
     xml.closeElementSelfClosing();
@@ -2076,6 +2100,11 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   // Write LayerFilter (filters) directly without container node.
   for (const auto& filter : node->filters) {
     WriteLayerFilter(xml, filter);
+  }
+
+  // Write MaskPath (maskPaths) directly without container node.
+  for (const auto& maskPath : node->maskPaths) {
+    WriteMaskPath(xml, maskPath);
   }
 
   // Write Timelines container with one child per Timeline driver.

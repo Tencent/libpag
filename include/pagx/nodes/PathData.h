@@ -128,6 +128,15 @@ class PathData : public Node {
   static int PointsPerVerb(PathVerb verb);
 
   /**
+   * Interpolates between two paths point-by-point (spec 6.1). Requires identical verb
+   * sequences; when they differ (or either input is null) the result falls back to Hold
+   * semantics and returns the start path. The returned node is a thread-local scratch
+   * instance reused by the next call — consume the result synchronously (channel evaluation
+   * is read-then-apply, so no caller retains the pointer across evaluations).
+   */
+  static PathData* Interpolate(const PathData* start, const PathData* end, float t);
+
+  /**
    * Copies the path data (verbs and points) from another PathData, without affecting the Node
    * base class fields (id).
    */

@@ -221,6 +221,10 @@ enum class NodeType {
    * A mosaic filter (spec 7.5).
    */
   MosaicFilter,
+  /**
+   * A mask path entry in a layer's mask list (spec 7.6).
+   */
+  MaskPath,
 
   // Elements (geometry, painters, modifiers, containers)
   /**

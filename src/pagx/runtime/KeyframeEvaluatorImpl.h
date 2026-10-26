@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
@@ -67,6 +68,14 @@ template <>
 inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /*b*/,
                                             double /*t*/) {
   return a;
+}
+
+template <>
+inline PathData* LerpKeyframeValue<PathData*>(PathData* const& a, PathData* const& b, double t) {
+  // Spec 6.1: identical command sequences interpolate point-by-point (PathData::Interpolate
+  // reuses a thread-local scratch, valid until the next evaluation); different sequences fall
+  // back to Hold by returning the start value.
+  return PathData::Interpolate(a, b, static_cast<float>(t));
 }
 
 template <>

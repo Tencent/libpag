@@ -59,6 +59,7 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -163,6 +164,8 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc);
 static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static void ParseFilters(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static void ParseMaskPaths(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static MaskPath* ParseMaskPath(const DOMNode* node, PAGXDocument* doc);
 static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static Element* ParseElement(const DOMNode* node, PAGXDocument* doc);
 static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc);
@@ -616,6 +619,17 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       ParseFilters(current.get(), layer, doc);
       continue;
     }
+    if (current->name == "maskPaths") {
+      ParseMaskPaths(current.get(), layer, doc);
+      continue;
+    }
+    if (current->name == "MaskPath") {
+      auto maskPath = ParseMaskPath(current.get(), doc);
+      if (maskPath) {
+        layer->maskPaths.push_back(maskPath);
+      }
+      continue;
+    }
     // New format: direct child elements without container nodes.
     if (current->name == "Layer") {
       auto childLayer = ParseLayer(current.get(), doc);
@@ -712,6 +726,44 @@ static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                       "' is not allowed in 'styles'."
                       " Expected: DropShadowStyle, InnerShadowStyle,"
                       " BackgroundBlurStyle, NoiseStyle, GlassStyle.");
+    }
+  }
+}
+
+static MaskPath* ParseMaskPath(const DOMNode* node, PAGXDocument* doc) {
+  auto maskPath = makeNodeFromXML<MaskPath>(node, doc);
+  if (!maskPath) {
+    return nullptr;
+  }
+  auto pathAttr = GetAttribute(node, "path");
+  if (!pathAttr.empty() && pathAttr[0] == '@') {
+    maskPath->path = doc->findNode<PathData>(pathAttr.substr(1));
+    if (!maskPath->path) {
+      ReportError(doc, node, "Resource '" + pathAttr + "' not found for 'path' attribute.");
+    }
+  }
+  maskPath->maskMode = GET_ENUM(node, "maskMode", "add", doc, MaskMode);
+  maskPath->inverted = GetBoolAttribute(node, "inverted", Default<MaskPath>().inverted, doc);
+  maskPath->feather = GetPointAttribute(node, "feather", Default<MaskPath>().feather, doc);
+  maskPath->opacity = GetFloatAttribute(node, "opacity", Default<MaskPath>().opacity, doc);
+  maskPath->expansion = GetFloatAttribute(node, "expansion", Default<MaskPath>().expansion, doc);
+  return maskPath;
+}
+
+static void ParseMaskPaths(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
+  auto child = node->firstChild;
+  while (child) {
+    auto current = child;
+    child = child->nextSibling;
+    if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    auto maskPath = ParseMaskPath(current.get(), doc);
+    if (maskPath) {
+      layer->maskPaths.push_back(maskPath);
+    } else {
+      ReportError(doc, current.get(),
+                  "Element '" + current->name + "' is not allowed in 'maskPaths'.");
     }
   }
 }
@@ -1755,6 +1807,20 @@ std::string ParseTypedValue<std::string>(const std::string& value, PAGXDocument*
 }
 
 template <>
+PathData* ParseTypedValue<PathData*>(const std::string& value, PAGXDocument* doc,
+                                     const DOMNode* node) {
+  if (value.empty() || value[0] != '@') {
+    ReportError(doc, node, "Invalid path keyframe value '" + value + "'. Expected: @id.");
+    return nullptr;
+  }
+  auto* pathData = doc->findNode<PathData>(value.substr(1));
+  if (pathData == nullptr) {
+    ReportError(doc, node, "Resource '" + value + "' not found for path keyframe value.");
+  }
+  return pathData;
+}
+
+template <>
 ImageRef ParseTypedValue<ImageRef>(const std::string& value, PAGXDocument*, const DOMNode*) {
   ImageRef ref = {};
   ref.id = !value.empty() && value[0] == '@' ? value.substr(1) : value;
@@ -1886,6 +1952,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "matrix") {
     auto ch = makeNodeFromXML<TypedChannel<Matrix>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "path") {
+    auto ch = makeNodeFromXML<TypedChannel<PathData*>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {

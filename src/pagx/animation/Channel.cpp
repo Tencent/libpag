@@ -18,6 +18,7 @@
 
 #include "pagx/nodes/Channel.h"
 #include <string>
+#include "pagx/nodes/PathData.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 
 namespace pagx {
@@ -70,6 +71,11 @@ ChannelValueType TypedChannel<Matrix>::valueType() const {
   return ChannelValueType::Matrix;
 }
 
+template <>
+ChannelValueType TypedChannel<PathData*>::valueType() const {
+  return ChannelValueType::Path;
+}
+
 // Explicit instantiations for every keyframe-animatable alternative of KeyValue (PAGImage is
 // excluded — it is not interpolated).
 template class TypedChannel<float>;
@@ -79,5 +85,6 @@ template class TypedChannel<std::string>;
 template class TypedChannel<ImageRef>;
 template class TypedChannel<Color>;
 template class TypedChannel<Matrix>;
+template class TypedChannel<PathData*>;
 
 }  // namespace pagx

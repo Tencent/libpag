@@ -63,6 +63,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/Node.h"
@@ -2744,6 +2745,141 @@ PAGX_TEST(PAGImporterTest, FilterExtensionsRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "filter-ext", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, MaskPathExtensionsRoundTrip) {
+  // P3-8 mask path list + path animation: MaskPath entries round trip through the binary with
+  // full fields (mode/inverted/feather/opacity/expansion + inline PathData), and the Path value
+  // type channel (spec 6.1) round trips its keyframes and interpolates point-by-point when the
+  // command sequences match. The tgfx mask composition lands with its MaskContext pass
+  // (format-layer first, matching P3-6/P3-7).
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  doc->layers.push_back(layer);
+
+  auto* maskA = doc->makeNode<MaskPath>();
+  auto* pathA = doc->makeNode<PathData>();
+  pathA->moveTo(10.0f, 20.0f);
+  pathA->lineTo(100.0f, 20.0f);
+  pathA->quadTo(120.0f, 60.0f, 100.0f, 100.0f);
+  pathA->close();
+  maskA->path = pathA;
+  maskA->maskMode = MaskMode::Subtract;
+  maskA->inverted = true;
+  maskA->feather = {4.0f, 6.0f};
+  maskA->opacity = 0.7f;
+  maskA->expansion = 2.5f;
+  layer->maskPaths.push_back(maskA);
+
+  auto* maskB = doc->makeNode<MaskPath>();
+  auto* pathB = doc->makeNode<PathData>();
+  pathB->moveTo(0.0f, 0.0f);
+  pathB->lineTo(50.0f, 0.0f);
+  pathB->lineTo(50.0f, 50.0f);
+  pathB->close();
+  maskB->path = pathB;
+  maskB->maskMode = MaskMode::Intersect;
+  layer->maskPaths.push_back(maskB);
+
+  // A path channel animating maskA's path between two same-shape paths (verb sequence match).
+  maskA->id = "p38Mask";
+  auto* morphStart = pathA;
+  auto* morphEnd = doc->makeNode<PathData>();
+  morphEnd->moveTo(30.0f, 40.0f);
+  morphEnd->lineTo(150.0f, 40.0f);
+  morphEnd->quadTo(180.0f, 90.0f, 150.0f, 150.0f);
+  morphEnd->close();
+  auto* animation = doc->makeNode<Animation>();
+  animation->id = "maskMorph";
+  animation->duration = 10;
+  animation->frameRate = 10;
+  auto* object = doc->makeNode<AnimationObject>();
+  object->target = "p38Mask";
+  auto* channel = doc->makeNode<TypedChannel<PathData*>>();
+  channel->name = "path";
+  Keyframe<PathData*> start = {};
+  start.time = 0;
+  start.value = morphStart;
+  start.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(start);
+  Keyframe<PathData*> end = {};
+  end.time = 5;
+  end.value = morphEnd;
+  end.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(end);
+  object->channels.push_back(channel);
+  animation->objects.push_back(object);
+  doc->animations.push_back(animation);
+
+  // Evaluation: mid-segment interpolates point-by-point (verb sequences match); a verb
+  // mismatch falls back to Hold (the start value).
+  auto midValue = channel->evaluateAt(static_cast<Frame>(3));
+  auto* midPath = std::get_if<PathData*>(&midValue);
+  ASSERT_TRUE(midPath != nullptr && *midPath != nullptr);
+  EXPECT_EQ((*midPath)->countPoints(), 4u);
+  // First point: lerp((10,20),(30,40), 0.6) = (22,32).
+  EXPECT_NEAR((*midPath)->points()[0].x, 22.0f, 0.01f);
+  EXPECT_NEAR((*midPath)->points()[0].y, 32.0f, 0.01f);
+  auto* mismatchEnd = doc->makeNode<PathData>();
+  mismatchEnd->moveTo(0.0f, 0.0f);
+  mismatchEnd->lineTo(10.0f, 10.0f);
+  channel->keyframes.back().value = mismatchEnd;
+  auto holdValue = channel->evaluateAt(static_cast<Frame>(3));
+  auto* holdPath = std::get_if<PathData*>(&holdValue);
+  ASSERT_TRUE(holdPath != nullptr && *holdPath != nullptr);
+  EXPECT_EQ(*holdPath, morphStart);
+  channel->keyframes.back().value = morphEnd;
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/mask_path_ext.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/mask_path_ext.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  auto* dstLayer = decoded->layers[0];
+  ASSERT_EQ(dstLayer->maskPaths.size(), 2u);
+
+  auto* dMaskA = dstLayer->maskPaths[0];
+  ASSERT_TRUE(dMaskA->path != nullptr);
+  EXPECT_EQ(dMaskA->maskMode, MaskMode::Subtract);
+  EXPECT_TRUE(dMaskA->inverted);
+  EXPECT_EQ(dMaskA->feather.x, 4.0f);
+  EXPECT_EQ(dMaskA->feather.y, 6.0f);
+  EXPECT_EQ(dMaskA->opacity, 0.7f);
+  EXPECT_EQ(dMaskA->expansion, 2.5f);
+  EXPECT_EQ(dMaskA->path->countPoints(), 4u);
+  EXPECT_NEAR(dMaskA->path->points()[2].x, 120.0f, 0.01f);
+
+  auto* dMaskB = dstLayer->maskPaths[1];
+  ASSERT_TRUE(dMaskB->path != nullptr);
+  EXPECT_EQ(dMaskB->maskMode, MaskMode::Intersect);
+  EXPECT_FALSE(dMaskB->inverted);
+  EXPECT_EQ(dMaskB->opacity, 1.0f);
+
+  // The path channel round trips: two keyframes, the decoded end value restores its points.
+  auto* dstAnimation = static_cast<Animation*>(decoded->findNode("maskMorph"));
+  ASSERT_TRUE(dstAnimation != nullptr);
+  ASSERT_EQ(dstAnimation->objects.size(), 1u);
+  ASSERT_EQ(dstAnimation->objects[0]->channels.size(), 1u);
+  auto* dstChannel = dstAnimation->objects[0]->channels[0];
+  ASSERT_EQ(dstChannel->valueType(), ChannelValueType::Path);
+  auto* dstTyped = static_cast<TypedChannel<PathData*>*>(dstChannel);
+  ASSERT_EQ(dstTyped->keyframes.size(), 2u);
+  ASSERT_TRUE(dstTyped->keyframes[1].value != nullptr);
+  EXPECT_EQ(dstTyped->keyframes[1].value->countPoints(), 4u);
+  EXPECT_NEAR(dstTyped->keyframes[1].value->points()[0].x, 30.0f, 0.01f);
+
+  // Channel-table reflection: the mask entry and path channels are registered.
+  auto hasChannel = [](NodeType type, const std::string& name) {
+    auto names = ListChannels(type);
+    return std::find(names.begin(), names.end(), name) != names.end();
+  };
+  EXPECT_TRUE(hasChannel(NodeType::MaskPath, "path"));
+  EXPECT_TRUE(hasChannel(NodeType::MaskPath, "maskMode"));
+  EXPECT_TRUE(hasChannel(NodeType::MaskPath, "feather.x"));
+  EXPECT_TRUE(hasChannel(NodeType::MaskPath, "expansion"));
+  EXPECT_TRUE(hasChannel(NodeType::Path, "data"));
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "mask-path-ext", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {

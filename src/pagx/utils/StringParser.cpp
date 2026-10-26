@@ -275,6 +275,11 @@ DEFINE_ENUM_CONVERSION(RadialBlurMode, RadialBlurMode::Spin, {RadialBlurMode::Sp
 DEFINE_ENUM_CONVERSION(RadialBlurAntialias, RadialBlurAntialias::Low,
                        {RadialBlurAntialias::Low, "low"}, {RadialBlurAntialias::High, "high"})
 
+DEFINE_ENUM_CONVERSION(MaskMode, MaskMode::Add, {MaskMode::None, "none"}, {MaskMode::Add, "add"},
+                       {MaskMode::Subtract, "subtract"}, {MaskMode::Intersect, "intersect"},
+                       {MaskMode::Lighten, "lighten"}, {MaskMode::Darken, "darken"},
+                       {MaskMode::Difference, "difference"}, {MaskMode::Accum, "accum"})
+
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {
     case ColorSpace::SRGB:
