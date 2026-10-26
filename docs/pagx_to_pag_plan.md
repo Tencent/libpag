@@ -115,7 +115,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P2-6b 图片缩放含关键帧（AnimationScaleLookup：matrix/scale 通道的精确谱范数上界并入最大显示缩放） | fd5d7fcc7 |
 | P2-6c TextHolder 嵌入文本回退（flush 改注册字体重排，修改不再被静默忽略） | 9306e1029 |
 | P2-6d 默认时间线统一（C23：pagx render 与 PAGViewer 走 getDefaultTimeline，StateMachine 从初始状态帧步进推进） | f0bcfd598 |
-| P2-7 动效等价验收（test/verify_animation_equivalence.sh） | 本次提交 |
+| P2-7 动效等价验收（test/verify_animation_equivalence.sh） | 2fdb48057 |
 
 - **验收记录**：27/27 动效样本（animation 13 + state_machine 4 + viewmodel 5 + static_animated 5）
   × 3 个时间点（0/0.5/1.0s）XML 与 v4 渲染 **全部 bit-exact**；PAGFullTest 2717 tests，
@@ -211,7 +211,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-4 旧 PAG 导入器骨架（LegacyPAGImporter：合成/图层树/PreCompose 时间锁挂载/根 Animation 兜底） | 6b83541e8 |
 | P3-5 旧关键帧与动画迁移（range→point 关键帧、空间插值逐帧采样、入出点→visible Hold 通道） | c8963d75b |
 | P3-3 文本属性通道扩展（tracking 1/1000em、TextHolder 容器通道、painter visible alpha 门控） | 89f3d007d |
-| P3-6 图层样式扩展（StrokeLayerStyle 576/GradientOverlayStyle 577/OuterGlowStyle 578 + DropShadow spread；二进制与 XML 双向编解码，tgfx 着色器随后） | 本次提交 |
+| P3-6 图层样式扩展（StrokeLayerStyle 576/GradientOverlayStyle 577/OuterGlowStyle 578 + DropShadow spread；二进制与 XML 双向编解码，tgfx 着色器随后） | 2fdb48057 |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip
