@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - translateX</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 120px; background-color: #1E1B4B; position: relative; margin: 0;">
+    <div id="box"
+         style="position: absolute; left: 16px; top: 36px;
+                width: 48px; height: 48px; border-radius: 8px;
+                background-color: #A78BFA;"></div>
+    <script>
+      // translateX -> x 通道
+      anime({
+        targets: "#box",
+        translateX: 160,
+        duration: 2000,
+        easing: "linear",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

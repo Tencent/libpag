@@ -165,6 +165,25 @@ describe('parseArgs — URL inputs', () => {
 });
 
 describe('parseArgs — argument errors', () => {
+  test('parses a scenario and selected checkpoint', () => {
+    const opts=parseArgs(argv('/tmp/page.html','--scenario','states.json','--checkpoint','ready'));
+    expect(opts.scenario).toBe(path.resolve('states.json'));
+    expect(opts.checkpoint).toBe('ready');
+  });
+
+  test.each(['--capture-animations','--scroll-reveal','--viewport-width','--wait-ms','--selector'])(
+    'rejects scenario conflicts with %s', flag => {
+      const value=['--viewport-width','--wait-ms','--selector'].includes(flag) ? ['500'] : [];
+      const {exited,messages}=captureExit(()=>parseArgs(argv('/tmp/page.html','--scenario','states.json',flag,...value)));
+      expect(exited).toBe(true);
+      expect(messages[0]).toContain('cannot be combined with --scenario');
+    });
+
+  test('rejects a checkpoint without a scenario',()=>{
+    const {messages}=captureExit(()=>parseArgs(argv('/tmp/page.html','--checkpoint','ready')));
+    expect(messages[0]).toContain('--checkpoint requires --scenario');
+  });
+
   test('unknown option exits 2', () => {
     const { exited, code, messages } = captureExit(() =>
       parseArgs(argv('/tmp/page.html', '--bogus')));

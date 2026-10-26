@@ -229,6 +229,12 @@ struct FontAlias {
 bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command);
 
 /**
+ * Parses a `--font-alias` value (`<family>=<path>`) without printing anything, for callers that
+ * report the failure through their own error channel. Returns false when either half is missing.
+ */
+bool ParseFontAliasValue(const std::string& value, FontAlias* alias);
+
+/**
  * Loads font files and fallback typefaces into a FontConfig. Every face of a font file is
  * registered, so a collection such as PingFang.ttc contributes each of its (family, style) pairs.
  * A font alias registers its file the same way but under the given family name. Prints errors to

@@ -256,7 +256,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (tgfxSurface == nullptr) {
     return;
   }
-  pagSurface = pagx::MakeFrom(tgfxSurface);
+  pagSurface = pagx::MakeFrom(device, tgfxSurface);
   lastSurfaceWidth = canvasWidth;
   lastSurfaceHeight = canvasHeight;
   updateContentTransform();

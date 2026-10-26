@@ -327,10 +327,8 @@ async function processCase(entry, outDir, opts) {
       // so the timeline diff has something to compare. Snapshot capture is off
       // by default (static frame), so opt in explicitly here.
       captureAnimations: true,
-      // Image download writes the page's images into the shared cache and
-      // rewrites the subset HTML to reference them by absolute path. The path is
-      // baked into the .pagx by `pagx import`, so render reads the files
-      // directly — no per-case manifest / `--fallback` wiring needed.
+      // Snapshot images use a shared cache; import reads those bytes and the
+      // subsequent resolve step applies the requested PAGX image storage mode.
       downloadImages: opts.downloadImages,
       imageDir: opts.downloadImages ? opts.imageCacheDir : '',
       stderrPath: snapshotStderr,

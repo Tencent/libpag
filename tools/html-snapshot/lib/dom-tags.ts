@@ -20,7 +20,9 @@
 // leaves (see browser-snapshot.ts classify / renderTextInput). Dropping
 // the form outright would silently throw away every interactive child it
 // hosts — the email/captcha-style input groups common in landing pages
-// would render as a hole next to their button sibling.
+// would render as a hole next to their button sibling. The interactive
+// capture work keeps the same rule and additionally records the controls
+// themselves as interaction targets.
 //
 // Lower-case canonical form. Both consumers serialise this constant into
 // the browser-side payload and rebuild a Set from it: the main pipeline
@@ -36,6 +38,8 @@ export const DROP_TAG_NAMES: readonly string[] = [
   'template', 'slot', 'dialog',
   'map', 'area', 'source', 'track', 'param',
 ];
+// Forms are ordinary painted containers. Keep their boxes and descendants;
+// the snapshot rewrites them to divs and captures their controls separately.
 
 // Pre-serialised forms of `DROP_TAG_NAMES`. The browser-side payload of both
 // the snapshot pipeline and the icon-font pre-pass reconstructs the set from

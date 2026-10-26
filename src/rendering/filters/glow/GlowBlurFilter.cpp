@@ -72,7 +72,7 @@ std::string GlowBlurRuntimeFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> GlowBlurRuntimeFilter::uniformBlocks() const {
-  return {{"VertexUniforms", 0}};
+  return {{"VertexUniforms", 0, tgfx::ShaderVisibility::Vertex}};
 }
 
 void GlowBlurRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

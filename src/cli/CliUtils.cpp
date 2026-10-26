@@ -47,15 +47,22 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
   return document;
 }
 
-bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command) {
+bool ParseFontAliasValue(const std::string& value, FontAlias* alias) {
   auto equals = value.find('=');
   if (equals == std::string::npos || equals == 0 || equals + 1 >= value.size()) {
-    std::cerr << command << ": malformed --font-alias '" << value
-              << "' (expected <family>=<path>)\n";
     return false;
   }
   alias->family = value.substr(0, equals);
   alias->path = value.substr(equals + 1);
+  return true;
+}
+
+bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command) {
+  if (!ParseFontAliasValue(value, alias)) {
+    std::cerr << command << ": malformed --font-alias '" << value
+              << "' (expected <family>=<path>)\n";
+    return false;
+  }
   return true;
 }
 
@@ -99,7 +106,14 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
   // registration whose name table happened to produce the same key. The style half always comes
   // from each face, so the faces of an aliased collection stay distinguishable.
   for (const auto& alias : aliases) {
-    if (RegisterFontFileFaces(fontConfig, alias.path, true, alias.family) == 0) {
+    // An alias adds a name, it does not rename the face: the file stays reachable under the family
+    // its name table carries, so a document asking for that family still shapes with this face
+    // instead of whatever substitute the host resolves.
+    auto faces = RegisterFontFileFaces(fontConfig, alias.path, false);
+    if (faces > 0) {
+      faces = RegisterFontFileFaces(fontConfig, alias.path, true, alias.family);
+    }
+    if (faces == 0) {
       std::cerr << command << ": font alias '" << alias.family << "=" << alias.path
                 << "' not found\n";
       return false;

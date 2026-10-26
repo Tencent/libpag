@@ -1,59 +1,16 @@
-// Shared pipeline orchestration for the html → PAGX flow.
-//
-// Two entry points consume this module:
-//   - `tools/html-snapshot/html2pagx` — the user-facing single-file CLI
-//     (run snapshot.js → pagx import → resolve → optional font embed → render
-//     for one HTML document or URL).
-//   - `tools/html-snapshot/eval/run.js` — the corpus evaluator (same pipeline
-//     per case, plus baseline rendering, pixel/flex metrics, shared font/image
-//     caches, and concurrency).
-//
-// Before this module existed, both entry points reimplemented the same five
-// shell-outs side by side; eval/run.js even had `Mirrors html2pagx` comments
-// scattered through it. The duplication forced every behaviour change into
-// two places. This file consolidates those shell-outs so the shared pipeline
-// has exactly one implementation, and each entry point is left only with the
-// code that is genuinely its own (eval-specific reports + caches + pool;
-// html2pagx-specific argument parsing + preflight + progress prints).
+// Native command and snapshot helpers for evaluation tools and preview rendering.
+// The public import workflow is owned by the native CLI; this module does not orchestrate it.
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
 
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
-import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import type { CapturedFontRef } from './font-download';
-import { FontMappingError, FontMappingErrorCode } from './font-metadata';
-import { validateAvailableFonts, type AvailableFont } from './font-matcher';
-import { prepareSnapshotFontReplacements } from './snapshot-fonts';
-import type { FontMappingResult, FontReplacement } from './snapshot-fonts';
+import type { FontReplacement } from './snapshot-fonts';
+import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
 
-// Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
-// exits non-zero. Carries the step label, exit code, and stderr so the
-// html2pagx CLI can print a clean `html2pagx: <step> failed` message and
-// surface the underlying tool's diagnostics. Inherits `{ code, stderr }`
-// field initialisation from `ChildProcessError`; only the `step` label and
-// `name` are specific to this subclass.
-export interface PipelineStepErrorInit extends ChildProcessErrorInit {
-  step?: string;
-}
-
-export class PipelineStepError extends ChildProcessError {
-  step: string;
-
-  constructor(message: string, opts: PipelineStepErrorInit = {}) {
-    super(message, opts);
-    this.name = 'PipelineStepError';
-    this.step = opts.step || '';
-  }
-}
-
-// Default per-child timeout. eval/run.js used 180s for years; matching it here
-// keeps a stuck pagx invocation from hanging the parent forever without
-// changing the eval's observed behaviour. The orchestrator forwards this to
-// every step; callers that want a different ceiling pass `timeoutMs`.
 const DEFAULT_STEP_TIMEOUT_MS = 180000;
 
 export interface SpawnCaptureOptions {
@@ -78,6 +35,7 @@ export function spawnCapture(
   args: string[],
   opts: SpawnCaptureOptions = {},
 ): Promise<SpawnCaptureResult> {
+  throwIfCancelled();
   const stderrPath = opts.stderrPath || '';
   const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : DEFAULT_STEP_TIMEOUT_MS;
   return new Promise<SpawnCaptureResult>((resolve) => {
@@ -101,12 +59,22 @@ export function spawnCapture(
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
     child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
     let killedByTimeout = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      if (killTimer) return;
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => child.kill('SIGKILL'), 5000);
+      killTimer.unref();
+    };
+    const release = trackCliResource(stop);
     const timer = setTimeout(() => {
       killedByTimeout = true;
-      try { child.kill('SIGKILL'); } catch (_e) { /* ignore */ }
+      stop();
     }, timeoutMs);
     child.on('error', (err: Error) => { stderr += `\n${err.message || String(err)}`; });
     child.on('close', (code: number | null) => {
+      release();
+      if (killTimer) clearTimeout(killTimer);
       clearTimeout(timer);
       if (killedByTimeout) stderr += `\n[pipeline] killed by timeout (${timeoutMs}ms)`;
       if (stderrPath) {
@@ -120,6 +88,8 @@ export function spawnCapture(
 export interface BuildSnapshotArgsOptions {
   scriptDir: string;
   input: string;
+  scenario?: string;
+  checkpoint?: string;
   output: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
@@ -145,6 +115,8 @@ export interface BuildSnapshotArgsOptions {
 // has not learned about yet.
 function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
+  if (opts.scenario) args.push('--scenario', opts.scenario);
+  if (opts.checkpoint) args.push('--checkpoint', opts.checkpoint);
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
   if (opts.captureAnimations) args.push('--capture-animations', '--no-reduced-motion');
@@ -176,13 +148,8 @@ export interface ForkSnapshotCliOptions extends BuildSnapshotArgsOptions, SpawnC
   nodeBin?: string;
 }
 
-// Step 1 — fork `node snapshot.js` to render <input> into a flat absolute-
-// positioned subset HTML. Named `forkSnapshotCli` (rather than `runSnapshot`)
-// so it never collides with `lib/snapshot-runner.ts`'s `runSnapshot`, which
-// drives the snapshot pipeline in-process against an already-launched browser
-// — both names previously coexisted and `lib/batch.ts` had to import them
-// side-by-side, which made the difference between "fork a child" and "drive
-// in-process" invisible at the call site.
+// Fork `node snapshot.js` to render <input> into a flat absolute-positioned
+// subset HTML. The separate runSnapshot API uses an already-launched browser.
 export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}): Promise<SpawnCaptureResult> {
   if (!opts.input) throw new Error('forkSnapshotCli: input is required');
   if (!opts.output) throw new Error('forkSnapshotCli: output is required');
@@ -200,8 +167,9 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
   pagxBin?: string;
   subsetHtml?: string;
   pagxFile?: string;
-  // Font files the snapshot downloaded rather than carried inside the subset. Import bakes glyphs
-  // by default, so it needs them registered under the authored CSS families to shape with.
+  // Font files the snapshot downloaded rather than carried inside the subset. Supplying them asks
+  // the import to bake glyphs (`--fonts embed`), so they are registered under the authored CSS
+  // families it shapes with.
   fonts?: CapturedFontRef[];
   log?: (line: string) => void;
 }
@@ -215,24 +183,29 @@ export async function runPagxImportToFile(
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
-  // `--no-resolve`: `pagx import` resolves import directives by default now, but this pipeline
-  // has its own dedicated resolve step (runPagxResolve) that owns diagnostics, progress logging,
-  // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
+  // The subset is already rendered, so the prepared-input mode is selected explicitly.
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
-    '--no-resolve'];
+    '--html-source', 'snapshot', '--images', 'embed', '--overwrite'];
+  // `pagx import` defaults to external font storage; the mode is always named so the pipeline never
+  // depends on that default. Baking glyphs needs the fonts resolvable, so an embedding import must
+  // resolve itself; otherwise this pipeline owns resolution in its dedicated runPagxResolve step.
+  const embedFonts = fonts.length > 0;
+  if (embedFonts) args.push('--fonts', 'embed');
+  else args.push('--fonts', 'external', '--no-resolve');
   for (const replacement of fontReplacements) {
     args.push('--font-replacement', replacement.families, String(replacement.weight),
       replacement.style, replacement.targetFamily, replacement.targetStyle);
   }
-  // Import bakes the page's glyphs by default, so the fonts it cannot find on its own — the ones
-  // the snapshot downloaded rather than carried inside the subset — have to be named here.
+  // `--font-alias` / `--fallback` are only valid while embedding: they name the files the baked
+  // glyph runs shape with, which are the ones the snapshot downloaded rather than carried inside
+  // the subset.
   appendFontArgs(args, fonts);
   // Flex inference is always on inside the importer now. The subset is already rendered, so
-  // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
+  // explicitly select prepared HTML to avoid a second browser render.
   const result = await spawnCapture(pagxBin, args, {
     stderrPath,
     timeoutMs,
-    env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
+    env: process.env,
   });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
@@ -340,264 +313,6 @@ export function readFontManifest(opts: { manifestPath?: string } = {}): Captured
     out.push({ path, family });
   }
   return out;
-}
-
-function noopLog(_msg: string): void {}
-
-// Standard "did the step succeed?" check used by every fork-based step in
-// runHtmlToPagx.
-function assertStepOk(stepName: string, result: SpawnCaptureResult): void {
-  if (result.code !== 0) {
-    process.stderr.write(result.stderr);
-    throw new PipelineStepError(`${stepName} failed`, {
-      step: stepName,
-      code: result.code,
-      stderr: result.stderr,
-    });
-  }
-  if (result.stderr) process.stderr.write(result.stderr);
-}
-
-export type SnapshotImpl = (args: BuildSnapshotArgsOptions) => Promise<SpawnCaptureResult>;
-
-export interface RunHtmlToPagxOptions {
-  log?: (line: string) => void;
-  pagxBin?: string;
-  scriptDir?: string;
-  input?: string;
-  outputDir?: string;
-  outputName?: string;
-  scale?: number;
-  doResolve?: boolean;
-  doRender?: boolean;
-  keepSubsetHtml?: boolean;
-  embedFonts?: boolean;
-  downloadFonts?: boolean;
-  fontDir?: string;
-  downloadImages?: boolean;
-  imageDir?: string;
-  // How image resources are stored in the exported .pagx: 'external' (default; write image files
-  // next to the .pagx, keeping their relative path) or 'embed' (inline as base64 data URIs).
-  pagxImages?: 'external' | 'embed';
-  // Directory relative image paths resolve against. Defaults to the input document's directory.
-  pagxImageBaseDir?: string;
-  browserEngine?: string;
-  inlineIconFonts?: boolean;
-  captureAnimations?: boolean;
-  scrollReveal?: boolean;
-  cookies?: string[];
-  headers?: string[];
-  viewportWidth?: number;
-  viewportHeight?: number;
-  waitMs?: number;
-  selector?: string;
-  snapshotImpl?: SnapshotImpl;
-  snapshotExtraArgs?: string[];
-  /** Available frontend faces, matched before native layout. Unmatched fonts stay unchanged. */
-  availableFonts?: AvailableFont[];
-}
-
-export interface RunHtmlToPagxResult {
-  subsetHtml: string;
-  pagx: string;
-  png: string | null;
-  fonts: CapturedFontRef[];
-  fontMapping?: FontMappingResult;
-}
-
-// End-to-end orchestrator. Runs snapshot → import → optional resolve →
-// optional font embed → optional render. Throws `PipelineStepError` on the
-// first non-zero step so the html2pagx CLI can print a uniform
-// `html2pagx: <step> failed` message and exit 1.
-export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
-  const log = typeof opts.log === 'function' ? opts.log : noopLog;
-  const pagxBin = opts.pagxBin || defaultPagxBin();
-  const scriptDir = opts.scriptDir;
-  if (!scriptDir) throw new Error('runHtmlToPagx: scriptDir is required');
-  if (!opts.input) throw new Error('runHtmlToPagx: input is required');
-
-  const inputIsUrl = isHttpUrl(opts.input);
-  let outputDir = opts.outputDir || '';
-  let baseName = opts.outputName || '';
-
-  if (inputIsUrl) {
-    if (!baseName) {
-      throw new Error('runHtmlToPagx: outputName is required for URL input');
-    }
-    if (!outputDir) outputDir = process.cwd();
-  } else {
-    if (!fs.existsSync(opts.input)) {
-      throw new Error(`runHtmlToPagx: input not found: ${opts.input}`);
-    }
-    const inputAbs = path.resolve(opts.input);
-    if (!outputDir) outputDir = path.dirname(inputAbs);
-    if (!baseName) {
-      let stem = path.basename(inputAbs, path.extname(inputAbs));
-      if (stem.endsWith('.htm')) stem = stem.slice(0, -'.htm'.length);
-      baseName = stem;
-    }
-  }
-  fs.mkdirSync(outputDir, { recursive: true });
-  outputDir = path.resolve(outputDir);
-
-  // When the user opts out of keeping the subset HTML on disk, redirect it to
-  // a self-cleaning temp dir; pagx import still needs a file to read.
-  let subsetHtml: string;
-  let tempDir = '';
-  if (opts.keepSubsetHtml === false) {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'html2pagx-'));
-    subsetHtml = path.join(tempDir, `${baseName}.subset.html`);
-  } else {
-    subsetHtml = path.join(outputDir, `${baseName}.subset.html`);
-  }
-  const pagxFile = path.join(outputDir, `${baseName}.pagx`);
-  const pngFile = path.join(outputDir, `${baseName}.png`);
-
-  const doResolve = opts.doResolve !== false;
-  const doRender = opts.doRender !== false && doResolve;
-  const embedFonts = !!opts.embedFonts;
-  const downloadFonts = !!opts.downloadFonts || embedFonts;
-  const downloadImages = !!opts.downloadImages;
-  if (opts.availableFonts !== undefined) {
-    const errors = validateAvailableFonts(opts.availableFonts);
-    if (errors.length) throw new FontMappingError(FontMappingErrorCode.InvalidAvailableFonts, errors.join('; '));
-  }
-
-
-  // Font files always land next to the outputs: even without --download-fonts a page may inline
-  // its fonts as `data:` URLs (icon fonts most often) and the importer needs a real file on disk
-  // to reference. Network fonts stay opt-in, so the default costs nothing extra.
-  let fontDir = opts.fontDir || '';
-  if (!fontDir) {
-    fontDir = path.join(outputDir, `${baseName}.fonts`);
-  }
-  // The manifest is what carries each captured file's authored CSS family down to
-  // `pagx embed/render --font-alias`; it lives next to the outputs so a shared --font-dir still
-  // gets a per-page list.
-  const fontManifest = downloadFonts ? path.join(outputDir, `${baseName}.fonts.txt`) : '';
-  let imageDir = opts.imageDir || '';
-  if (downloadImages && !imageDir) {
-    imageDir = path.join(outputDir, `${baseName}.images`);
-  }
-
-  let totalSteps = 2;
-  if (doResolve) totalSteps = 3;
-  if (doRender) totalSteps = 4;
-
-  const snapshotImpl: SnapshotImpl = typeof opts.snapshotImpl === 'function'
-    ? opts.snapshotImpl
-    : (forkSnapshotCli as SnapshotImpl);
-
-  try {
-    log(`[1/${totalSteps}] snapshot  ${opts.input}`);
-    const snapshotResult = await snapshotImpl({
-      input: opts.input,
-      output: subsetHtml,
-      scriptDir,
-      browserEngine: opts.browserEngine,
-      inlineIconFonts: opts.inlineIconFonts,
-      captureAnimations: opts.captureAnimations,
-      scrollReveal: opts.scrollReveal,
-      cookies: opts.cookies,
-      headers: opts.headers,
-      viewportWidth: opts.viewportWidth,
-      viewportHeight: opts.viewportHeight,
-      waitMs: opts.waitMs,
-      selector: opts.selector,
-      downloadFonts,
-      fontDir,
-      fontManifest,
-      downloadImages,
-      imageDir,
-      extraArgs: opts.snapshotExtraArgs,
-    });
-    assertStepOk('snapshot', snapshotResult);
-
-    const snapshotHtml = fs.readFileSync(subsetHtml, 'utf8');
-    let fontMapping: FontMappingResult | undefined;
-    let fontReplacements: FontReplacement[] = [];
-    if (opts.availableFonts !== undefined) {
-      const mapped = prepareSnapshotFontReplacements(snapshotHtml, opts.availableFonts);
-      fontReplacements = mapped.replacements;
-      fontMapping = mapped.mapping;
-      log(`[font-map] ${fontMapping.replaced} replaced, ${fontMapping.unmatched} unmatched`);
-    }
-    const fontResult = fontMapping ? { fontMapping } : {};
-
-    let fonts: CapturedFontRef[] = [];
-    if (downloadFonts) {
-      fonts = readFontManifest({ manifestPath: fontManifest });
-      if (fonts.length === 0) {
-        log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
-      }
-    }
-
-    log(`[2/${totalSteps}] import    ${subsetHtml}`);
-    const importResult = await runPagxImportToFile({
-      pagxBin,
-      subsetHtml,
-      pagxFile,
-      fontReplacements,
-      fonts,
-      log: (line: string) => process.stderr.write(line + '\n'),
-    });
-    if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
-      throw new PipelineStepError('pagx import failed', {
-        step: 'pagx import',
-        code: importResult.code,
-        stderr: importResult.stderr,
-      });
-    }
-    if (!doResolve) {
-      log(`[done] wrote ${pagxFile} (skipped resolve+render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
-    }
-
-    log(`[3/${totalSteps}] resolve   ${pagxFile}`);
-    // Image resources (both <img> and inline-SVG <image>) exist only after resolve, so the image
-    // storage mode is applied here. Relative paths in the subset resolve against the original input
-    // document's directory (the subset may live in a different output dir).
-    const pagxImageBaseDir = opts.pagxImageBaseDir
-      || (inputIsUrl ? '' : path.dirname(path.resolve(opts.input)));
-    const resolveResult = await runPagxResolve({
-      pagxBin,
-      pagxFile,
-      imageStorage: opts.pagxImages || 'external',
-      imageBaseDir: pagxImageBaseDir,
-    });
-    assertStepOk('pagx resolve', resolveResult);
-
-    // Downloaded faces are only one source of glyphs: the importer also records system font names
-    // on every Text, and `pagx embed` resolves those through the host font manager. Running the
-    // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
-    // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
-    if (embedFonts) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} saved font file(s))`);
-      const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fonts });
-      assertStepOk('pagx embed', embedResult);
-    }
-    if (!doRender) {
-      log(`[done] wrote ${pagxFile} (skipped render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
-    }
-
-    log(`[4/${totalSteps}] render    ${pagxFile}  ->  ${pngFile} (scale=${opts.scale || 1})`);
-    const renderResult = await runPagxRender({
-      pagxBin,
-      pagxFile,
-      output: pngFile,
-      scale: opts.scale || 1,
-      fonts,
-    });
-    assertStepOk('pagx render', renderResult);
-
-    log(`[done] ${pngFile}`);
-    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts, ...fontResult };
-  } finally {
-    if (tempDir) {
-      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_e) { /* ignore */ }
-    }
-  }
 }
 
 export { defaultPagxBin, filterKnownWarnings, isHttpUrl };

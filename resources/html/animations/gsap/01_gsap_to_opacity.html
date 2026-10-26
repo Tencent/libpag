@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - to opacity</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A; position: relative; margin: 0;">
+    <div id="dot"
+         style="position: absolute; left: 88px; top: 56px;
+                width: 64px; height: 64px; border-radius: 32px;
+                background-color: #38BDF8;"></div>
+    <script>
+      // opacity -> alpha 通道
+      gsap.to("#dot", {
+        opacity: 0,
+        duration: 1.5,
+        ease: "none",
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

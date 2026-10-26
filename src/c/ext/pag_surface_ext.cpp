@@ -20,11 +20,11 @@
 #include "c/pag_types_priv.h"
 #include "pag/pag.h"
 #include "rendering/drawables/DoubleBufferedDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 pag_surface* pag_surface_make_offscreen_double_buffered(int width, int height, bool tryHardware,
                                                         void* sharedContext) {
-  auto device = tgfx::GLDevice::Make(sharedContext);
+  auto device = pag::Devices::MakeForSharedContext(sharedContext);
   if (device == nullptr) {
     return nullptr;
   }

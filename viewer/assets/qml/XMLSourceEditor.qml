@@ -6,10 +6,11 @@ import QtQuick.Controls
 // validation on Apply, an always-visible Discard/Apply/Save bar, and per-block syntax
 // highlighting provided by the C++ XmlDocumentHighlighter attached through the viewModel.
 //
-// Performance notes for large documents: content width/height are estimated from
-// lineCount * lineHeight and a pre-measured maxLineWidth instead of the document layout
-// (whose size queries force a full layout of every block), and modified state is tracked
-// with a dirty flag instead of comparing the full text on every change notification.
+// Performance notes for large documents: the content width comes from a pre-measured
+// maxLineWidth and the content height from the view model's per-block height table, both
+// instead of the document layout (whose size queries force a full layout of every block), and
+// modified state is tracked with a dirty flag instead of comparing the full text on every
+// change notification.
 Rectangle {
     id: root
 
@@ -54,6 +55,26 @@ Rectangle {
     // Chunked loading progress in the 0..1 range, fed by editorLoadProgress.
     property real loadProgress: 0
 
+    // Real content height measured from per-block layout heights by the view model. CJK lines
+    // render taller than ASCII lines under font fallback, so the former
+    // documentLineCount * lineHeight estimate fell short of the real height and the last lines
+    // could never be scrolled into view.
+    property real realContentHeight: 0
+
+    // Bumped whenever the C++ per-block height table is rebuilt (editorGeometryChanged). The
+    // gutter bindings reference it so they re-evaluate the geometry helpers on an in-viewport
+    // edit, which mutates the table without moving contentY (QML cannot track the C++ table).
+    property int geometryRevision: 0
+
+    // True when the view model provides the real editor geometry helpers.
+    readonly property bool hasEditorGeometry: viewModel
+                                              && typeof viewModel.editorLineAtY === "function"
+
+    // Total number of lines backing the gutter's "is this line real" test. The geometry table
+    // lags user edits by its debounce window, so this uses the live documentLineCount single
+    // binding (re-evaluated only on lineCountChanged, see its comment) instead.
+    readonly property int totalLines: root.documentLineCount
+
     // StackLayout zeroes the geometry of inactive tabs. Resizing the editor stack on every tab
     // switch forces the text backend to re-layout and rebuild render nodes, so the last
     // non-zero size is cached and used while the panel is hidden.
@@ -64,10 +85,23 @@ Rectangle {
     readonly property real layoutWidth: width > 0 ? width : (cachedWidth > 0 ? cachedWidth : 1)
     readonly property real layoutHeight: height > 0 ? height : (cachedHeight > 0 ? cachedHeight : 1)
 
-    // Single-line height in pixels; falls back to the Menlo 13px metric until the first
-    // cursor rectangle is available. Constant for the fixed-pitch NoWrap editor.
-    readonly property real lineHeight: textArea.cursorRectangle.height > 0
-                                           ? textArea.cursorRectangle.height : 17
+    // Real height of a plain ASCII line, pulled from the C++ height table (see editorLineHeight).
+    // Updated on load finish and on every geometry rebuild, 0 until the first table is built.
+    property real baseLineHeight: 0
+
+    // Single-line height in pixels. Prefers the layout height from the C++ table, which matches
+    // the editor's real line height; FontMetrics.height (the font line spacing) underestimates it
+    // and is only used as a fallback before the table exists or when no geometry helper is
+    // present. Not the caret rectangle, whose height follows the caret's line and would shrink
+    // visibleLineCount when the caret sits on a taller CJK line. Constant for the fixed-pitch
+    // NoWrap editor.
+    readonly property real lineHeight: root.baseLineHeight > 0 ? root.baseLineHeight
+        : (editorFontMetrics.height > 0 ? editorFontMetrics.height : 17)
+
+    FontMetrics {
+        id: editorFontMetrics
+        font: textArea.font
+    }
 
     // Cached line count. QQuickTextEdit::lineCount walks every document block on each read
     // (O(blockCount)), so it must never be referenced from per-line bindings: with the line
@@ -96,9 +130,18 @@ Rectangle {
         }
     }
 
+    // Forces QQuickTextEdit to drop its cached text nodes and rebuild the visible band; see the
+    // scroll-recovery comment on the Flickable for why every scroll frame calls this.
+    function refreshEditorNodes() {
+        if (viewModel && typeof viewModel.refreshEditorRendering === "function") {
+            viewModel.refreshEditorRendering(textArea);
+        }
+    }
+
     function loadXml(xml, keepScrollPosition) {
         baselineXml = xml;
         maxLineWidth = 0;
+        realContentHeight = 0;
         loadProgress = 0;
         savedScrollX = (keepScrollPosition === true) ? flick.contentX : 0;
         savedScrollY = (keepScrollPosition === true) ? flick.contentY : 0;
@@ -235,12 +278,24 @@ Rectangle {
 
         function onEditorLoadFinished(maxLineWidth) {
             root.maxLineWidth = maxLineWidth;
+            if (typeof viewModel.editorContentHeight === "function") {
+                root.realContentHeight = viewModel.editorContentHeight();
+                root.baseLineHeight = viewModel.editorLineHeight();
+            }
             // Clearing the document pulls the caret to position 0, which drags the viewport
             // to the top-left; restore the saved position after the content is complete.
             flick.contentX = root.savedScrollX;
             flick.contentY = root.savedScrollY;
             dirty = false;
             busy = false;
+        }
+
+        function onEditorGeometryChanged() {
+            if (typeof viewModel.editorContentHeight === "function") {
+                root.realContentHeight = viewModel.editorContentHeight();
+                root.baseLineHeight = viewModel.editorLineHeight();
+            }
+            root.geometryRevision++;
         }
     }
 
@@ -268,6 +323,11 @@ Rectangle {
         }
         connectedViewModel = viewModel;
         viewModel.attachHighlighter(textArea.textDocument);
+        // Install the wheel axis lock on the editor Flickable so a vertical trackpad swipe
+        // cannot accumulate horizontal drift (the C++ filter zeroes the noise axis at source).
+        if (typeof viewModel.lockWheelAxis === "function") {
+            viewModel.lockWheelAxis(flick);
+        }
         if (viewModel.documentXml !== "") {
             requestDocumentLoad();
         }
@@ -305,9 +365,28 @@ Rectangle {
 
             // One extra line above/below the viewport keeps numbers ahead of fast scrolls.
             readonly property int visibleLineCount: Math.ceil(height / root.lineHeight) + 2
-            readonly property int firstLine: Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1)
-            // cursorRectangle is in content coordinates, so it identifies the caret line.
-            readonly property int caretLine: Math.round(textArea.cursorRectangle.y / root.lineHeight)
+            // The first line at the top of the viewport, mapped through the real per-block
+            // height table: with fallback fonts some lines are taller, so the uniform
+            // line-height estimate desyncs the numbers from the text while scrolling. Falls
+            // back to the estimate when the view model has no geometry helpers. The leading
+            // `root.geometryRevision;` reference makes the binding re-evaluate when the C++
+            // block-height table changes without contentY moving (in-viewport edits), which QML
+            // cannot track through the editorLineAtY/editorLineTopY calls on its own.
+            readonly property int firstLine: {
+                root.geometryRevision;
+                return root.hasEditorGeometry
+                    ? Math.max(0, viewModel.editorLineAtY(flick.contentY) - 1)
+                    : Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1);
+            }
+            // cursorRectangle is in content coordinates, so it identifies the caret line; the
+            // geometryRevision reference keeps the active-line highlight correct after an edit
+            // above the caret reshapes the table (see firstLine).
+            readonly property int caretLine: {
+                root.geometryRevision;
+                return root.hasEditorGeometry
+                    ? viewModel.editorLineAtY(textArea.cursorRectangle.y)
+                    : Math.round(textArea.cursorRectangle.y / root.lineHeight);
+            }
 
             Repeater {
                 model: gutter.visibleLineCount
@@ -316,8 +395,16 @@ Rectangle {
                     x: 0
                     width: gutter.width - 10
                     height: root.lineHeight
-                    y: (gutter.firstLine + index) * root.lineHeight - flick.contentY
-                    text: gutter.firstLine + index < root.documentLineCount
+                    // Anchored to the line's real top from the height table (see firstLine for
+                    // the geometryRevision dependency), so numbers stay aligned with the text
+                    // even when line heights vary under CJK fallback fonts.
+                    y: {
+                        root.geometryRevision;
+                        return (root.hasEditorGeometry
+                            ? viewModel.editorLineTopY(gutter.firstLine + index)
+                            : (gutter.firstLine + index) * root.lineHeight) - flick.contentY;
+                    }
+                    text: gutter.firstLine + index < root.totalLines
                               ? String(gutter.firstLine + index + 1) : ""
                     color: (gutter.firstLine + index) === gutter.caretLine
                                ? root.gutterActiveTextColor : root.gutterTextColor
@@ -336,13 +423,33 @@ Rectangle {
             anchors.left: gutter.right
             anchors.right: parent.right
 
-            // Estimated from line metrics: reading the document's content size here would
-            // force a full layout pass over every block and freeze the UI on large files.
+            // Estimated from the real measured content size: reading the document's content
+            // size from a binding would force a full layout pass over every block and freeze
+            // the UI on large files, so the view model measures it once (refreshed debounced
+            // after edits) instead of the lineCount * lineHeight estimate, which fell short
+            // whenever fallback fonts made some lines taller.
             contentWidth: Math.max(width, root.maxLineWidth)
-            contentHeight: Math.max(height, root.documentLineCount * root.lineHeight)
+            contentHeight: Math.max(height, root.realContentHeight)
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalAndVerticalFlick
+
+            // Scroll recovery: QQuickTextEdit's ItemObservesViewport optimization wipes every
+            // cached text node on a viewport-triggered rebuild while keeping the accumulated
+            // rendered-region extent, and the rebuild trigger only checks the vertical extents.
+            // Forward vertical scrolling into fresh territory gets a native per-frame rebuild,
+            // but horizontal scrolling and back-scrolling (contentY decreasing) into already
+            // covered bands have no native path, so only those need a manual refresh. Plain
+            // forward vertical scrolling is left to the native rebuild to avoid a redundant
+            // full-document dirty pass every frame.
+            property real lastRefreshedContentY: 0
+            onContentYChanged: {
+                if (flick.contentY < flick.lastRefreshedContentY) {
+                    refreshEditorNodes();
+                }
+                flick.lastRefreshedContentY = flick.contentY;
+            }
+            onContentXChanged: refreshEditorNodes()
 
             // NOTE: the TextArea is a plain child of the Flickable's contentItem, NOT attached
             // via "TextArea.flickable". The attached property pipes the document's ideal width
@@ -380,7 +487,7 @@ Rectangle {
             TextArea {
                 id: textArea
                 width: Math.max(flick.width, root.maxLineWidth)
-                height: Math.max(flick.height, root.documentLineCount * root.lineHeight)
+                height: Math.max(flick.height, root.realContentHeight)
 
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.NoWrap
@@ -391,7 +498,16 @@ Rectangle {
                 selectedTextColor: "#FFFFFF"
                 font.family: "Menlo"
                 font.pixelSize: 13
+                // The Universal style binds topPadding/rightPadding/bottomPadding to
+                // "padding - N" (N = 7/4/5), so a bare "padding: 0" leaves topPadding at -7 and
+                // paints the text 7px above the gutter origin (clipping the first line and
+                // desyncing every line number). Pin all edges to 0 so the text's document
+                // origin matches the gutter's content coordinates.
                 padding: 0
+                topPadding: 0
+                leftPadding: 0
+                rightPadding: 0
+                bottomPadding: 0
                 leftInset: 0
                 rightInset: 0
                 topInset: 0

@@ -22,14 +22,14 @@
 #include "rendering/utils/BitmapBuffer.h"
 
 namespace tgfx {
-class GLDevice;
+class Device;
 }  // namespace tgfx
 
 namespace pag {
 class BitmapDrawable : public Drawable {
  public:
-  static std::shared_ptr<BitmapDrawable> Make(
-      int width, int height, std::shared_ptr<tgfx::GLDevice> sharedDevice = nullptr);
+  static std::shared_ptr<BitmapDrawable> Make(int width, int height,
+                                              std::shared_ptr<tgfx::Device> sharedDevice = nullptr);
 
   int width() const override {
     return _width;

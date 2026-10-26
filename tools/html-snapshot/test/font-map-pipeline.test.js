@@ -3,85 +3,89 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { runHtmlToPagx } = require('../dist/lib/pipeline');
+const { runPagxImport } = require('../dist/lib/pagx-runner');
+
 let dir;
-beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'font-map-pipeline-')); });
+beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'font-replacement-')); });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
 const availableFonts = [{ fontName: { family: 'SOURCE', style: 'SemiBold' } }];
-const html = `<html><body><span style="font-family:Source,sans-serif;font-weight:650">A</span></body></html>`;
-function setup(pageHtml = html) {
-  const input = path.join(dir, 'page.html'); fs.writeFileSync(input, '<html/>');
-  const calls = path.join(dir, 'calls.jsonl');
+const html = '<html><body><span style="font-family:Source,sans-serif;font-weight:650">A</span></body></html>';
+
+// A stand-in `pagx` that records its argv (NUL separated so empty values survive),
+// copies the HTML it was handed and writes a PAGX document to --output. The copy
+// proves the catalog is matched against the snapshot instead of rewriting it.
+function fakePagx() {
+  const argvPath = path.join(dir, 'argv.bin');
+  const copiedPath = path.join(dir, 'import-input.html');
   const bin = path.join(dir, 'fake-pagx');
-  fs.writeFileSync(bin, '#!/usr/bin/env node\n' + `
-const fs=require('fs'),args=process.argv.slice(2),command=args[0];
-fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(args)+'\\n');
-if(command==='import') {
-  const html=fs.readFileSync(args[args.indexOf('--input')+1],'utf8');
-  fs.writeFileSync(${JSON.stringify(path.join(dir, 'import-input.html'))},html);
-  if(args.includes('--font-request-metadata')) process.exit(2);
-  const out=args[args.indexOf('--output')+1];
-  if(fs.existsSync(out.replace(/\\.pagx$/,'.fonts.json'))) process.exit(3);
-  fs.writeFileSync(out,'<pagx><Layer><Text text="A" fontFamily="From native import"/></Layer></pagx>');
-} else if(command==='render') fs.writeFileSync(args[args.indexOf('--output')+1],'PNG');
-`, { mode: 0o755 });
-  return { input, pagxBin: bin, scriptDir: dir, outputDir: path.join(dir, 'out'),
-    snapshotImpl: async args => {
-      fs.writeFileSync(args.output, pageHtml);
-      if (args.fontManifest) fs.writeFileSync(args.fontManifest, '');
-      return { code: 0, stdout: '', stderr: '', durationMs: 0 };
-    } };
+  fs.writeFileSync(bin, [
+    '#!/bin/sh',
+    `printf '%s\\0' "$@" > ${JSON.stringify(argvPath)}`,
+    'out=""',
+    'input=""',
+    'while [ "$#" -gt 0 ]; do',
+    '  if [ "$1" = "--output" ]; then out="$2"; shift; fi',
+    '  if [ "$1" = "--input" ]; then input="$2"; shift; fi',
+    '  shift',
+    'done',
+    `cp "$input" ${JSON.stringify(copiedPath)}`,
+    'printf \'<pagx><Layer/></pagx>\' > "$out"',
+  ].join('\n'));
+  fs.chmodSync(bin, 0o755);
+  return { bin, argvPath, copiedPath };
 }
-test.each([{ doResolve: false }, { doRender: false }, { doRender: false, embedFonts: true }])(
-  'maps before native import independently of embedding: %j', async options => {
-    const result = await runHtmlToPagx({ ...setup(), ...options, availableFonts });
-    const input = fs.readFileSync(path.join(dir, 'import-input.html'), 'utf8');
-    expect(input).toBe(html);
-    const calls = fs.readFileSync(path.join(dir, 'calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-    const args = calls[0];
-    const offset = args.indexOf('--font-replacement');
-    expect(args.slice(offset + 1, offset + 6)).toEqual(['Source,sans-serif', '650', 'normal', 'SOURCE', 'SemiBold']);
-    expect(input).not.toContain('data-pagx-font-request');
-    expect(result.fontMapping).toEqual({ replaced: 1, unmatched: 0, missingRequests: 0 });
-    expect(result).not.toHaveProperty('fontMetadataPath');
-    expect(fs.existsSync(path.join(path.dirname(result.pagx), 'page.fonts.json'))).toBe(false);
-    expect(fs.readFileSync(result.pagx, 'utf8')).toContain('fontFamily="From native import"');
-  });
 
-test('without a catalog the snapshot is unchanged and no inventory is published', async () => {
-  const result = await runHtmlToPagx({ ...setup(), doResolve: false });
-  expect(fs.readFileSync(result.subsetHtml, 'utf8')).toBe(html);
-  expect(result.fontMapping).toBeUndefined();
-  expect(result).not.toHaveProperty('fontMetadataPath');
-  expect(fs.existsSync(path.join(path.dirname(result.pagx), 'page.fonts.json'))).toBe(false);
+function readArgv(argvPath) {
+  return fs.readFileSync(argvPath, 'utf8').split('\0').slice(0, -1);
+}
+
+function replacementArgs(argv) {
+  const offset = argv.indexOf('--font-replacement');
+  return offset < 0 ? [] : argv.slice(offset + 1, offset + 6);
+}
+
+test('replaces catalogued families before native import without rewriting the snapshot', async () => {
+  const fake = fakePagx();
+  const logs = [];
+  await runPagxImport({ pagxBin: fake.bin, html, availableFonts, log: (m) => logs.push(m) });
+  const argv = readArgv(fake.argvPath);
+  expect(replacementArgs(argv)).toEqual(['Source,sans-serif', '650', 'normal', 'SOURCE', 'SemiBold']);
+  expect(fs.readFileSync(fake.copiedPath, 'utf8')).toBe(html);
+  expect(fs.readFileSync(fake.copiedPath, 'utf8')).not.toContain('data-pagx-font-request');
+  expect(logs.some((line) => line === '[font-map] 1 replaced, 0 unmatched, 0 without source requests'))
+    .toBe(true);
 });
 
-test('does not publish font JSON when native import fails', async () => {
-  const options = setup();
-  fs.writeFileSync(options.pagxBin, '#!/usr/bin/env node\nprocess.exit(1);', { mode: 0o755 });
-  await expect(runHtmlToPagx(options)).rejects.toMatchObject({ step: 'pagx import' });
-  expect(fs.existsSync(path.join(options.outputDir, 'page.fonts.json'))).toBe(false);
+test('without a catalog no replacement is requested', async () => {
+  const fake = fakePagx();
+  const logs = [];
+  await runPagxImport({ pagxBin: fake.bin, html, log: (m) => logs.push(m) });
+  expect(replacementArgs(readArgv(fake.argvPath))).toEqual([]);
+  expect(fs.readFileSync(fake.copiedPath, 'utf8')).toBe(html);
+  expect(logs.some((line) => line.startsWith('[font-map]'))).toBe(false);
 });
 
-test('rejects malformed catalogs before snapshot or native conversion', async () => {
-  const options = setup();
-  const snapshot = jest.fn(options.snapshotImpl);
-  await expect(runHtmlToPagx({ ...options, snapshotImpl: snapshot, availableFonts: [{}] }))
+test('rejects a malformed catalog before spawning native conversion', async () => {
+  const fake = fakePagx();
+  await expect(runPagxImport({ pagxBin: fake.bin, html, availableFonts: [{}] }))
     .rejects.toThrow(/INVALID_AVAILABLE_FONTS/);
-  expect(snapshot).not.toHaveBeenCalled();
-  expect(fs.existsSync(path.join(dir, 'calls.jsonl'))).toBe(false);
+  expect(fs.existsSync(fake.argvPath)).toBe(false);
 });
 
 test('keys the replacement on the computed request and targets the cut the snapshot declared', async () => {
-  const options = setup('<html><head><style>@font-face{font-family:"Cinzel Decorative";' +
+  const fake = fakePagx();
+  const declared = '<html><head><style>@font-face{font-family:"Cinzel Decorative";' +
     'src:url("data:font/woff2;base64,AA");font-weight:700;font-style:normal}</style></head>' +
-    '<body><span style="font-family:\'Cinzel Decorative\'">A</span></body></html>');
-  await runHtmlToPagx({ ...options, doResolve: false, availableFonts: [
-    { fontName: { family: 'Cinzel Decorative', style: 'Regular' } },
-    { fontName: { family: 'Cinzel Decorative', style: 'Bold' } },
-  ] });
-  const args = fs.readFileSync(path.join(dir, 'calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)[0];
-  const offset = args.indexOf('--font-replacement');
-  expect(args.slice(offset + 1, offset + 6))
+    '<body><span style="font-family:\'Cinzel Decorative\'">A</span></body></html>';
+  await runPagxImport({
+    pagxBin: fake.bin,
+    html: declared,
+    availableFonts: [
+      { fontName: { family: 'Cinzel Decorative', style: 'Regular' } },
+      { fontName: { family: 'Cinzel Decorative', style: 'Bold' } },
+    ],
+  });
+  expect(replacementArgs(readArgv(fake.argvPath)))
     .toEqual(["'Cinzel Decorative'", '400', 'normal', 'Cinzel Decorative', 'Bold']);
 });

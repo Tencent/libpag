@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>longhand props + ms duration</title>
+    <style>
+      @keyframes fadeMove {
+        0%   { opacity: 0; transform: translateX(0px); }
+        100% { opacity: 1; transform: translateX(40px); }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 120px; background-color: #0C4A6E;">
+    <!--
+      §13.1: longhand 动画属性在归一化时折叠进 shorthand；
+      §13.3: animation-duration 接受 ms 单位（1200ms = 1.2s）。
+      对应 spec §13.4 的 opacity+translateX 双通道范例。
+    -->
+    <div id="card"
+         style="position: absolute; left: 40px; top: 40px; width: 44px; height: 44px;
+                animation-name: fadeMove;
+                animation-duration: 1200ms;
+                animation-timing-function: linear;
+                animation-iteration-count: infinite;
+                animation-direction: alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="5" width="18" height="14" rx="2" fill="#38BDF8"/>
+        <rect x="3" y="5" width="18" height="4" rx="2" fill="#0EA5E9"/>
+      </svg>
+    </div>
+  </body>
+</html>

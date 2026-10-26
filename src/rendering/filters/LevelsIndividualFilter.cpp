@@ -125,7 +125,7 @@ std::string LevelsIndividualFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> LevelsIndividualFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void LevelsIndividualFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

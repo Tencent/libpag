@@ -38,10 +38,10 @@
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx::cli {
@@ -453,14 +453,14 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
 
-  auto device = tgfx::GLDevice::Make();
+  auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
-    std::cerr << "pagx render: failed to create GL device\n";
+    std::cerr << "pagx render: failed to create the GPU device\n";
     return {};
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    std::cerr << "pagx render: failed to lock GL context\n";
+    std::cerr << "pagx render: failed to lock the GPU context\n";
     return {};
   }
 
@@ -516,12 +516,7 @@ tgfx::Bitmap RenderToBitmap(int argc, char* argv[]) {
   return RenderCore(options);
 }
 
-int RunRender(int argc, char* argv[]) {
-  RenderOptions options = {};
-  auto parseResult = ParseRenderOptions(argc, argv, &options);
-  if (parseResult != 0) {
-    return parseResult == -1 ? 0 : parseResult;
-  }
+static int RenderFile(const RenderOptions& options, bool report) {
   auto bitmap = RenderCore(options);
   if (bitmap.isEmpty()) {
     return 1;
@@ -537,9 +532,27 @@ int RunRender(int argc, char* argv[]) {
     std::cerr << "pagx render: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
-  std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"
-            << bitmap.height() << ")\n";
+  if (report)
+    std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"
+              << bitmap.height() << ")\n";
   return 0;
+}
+
+int RunRender(int argc, char* argv[]) {
+  RenderOptions options = {};
+  auto parseResult = ParseRenderOptions(argc, argv, &options);
+  if (parseResult != 0) return parseResult == -1 ? 0 : parseResult;
+  return RenderFile(options, true);
+}
+
+bool RenderPNG(const std::string& input, const std::string& output, float scale,
+               const std::vector<std::string>& fallbacks) {
+  RenderOptions options;
+  options.inputFile = input;
+  options.outputFile = output;
+  options.scale = scale;
+  options.fallbacks = fallbacks;
+  return RenderFile(options, false) == 0;
 }
 
 }  // namespace pagx::cli
