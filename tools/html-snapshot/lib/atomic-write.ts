@@ -17,6 +17,7 @@ const fsp = fs.promises;
 export async function writeFileAtomic(
   filePath: string,
   data: Buffer | Uint8Array | string,
+  options: { reuseExisting?: boolean } = {},
 ): Promise<void> {
   const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   await fsp.writeFile(tmp, data);
@@ -24,6 +25,6 @@ export async function writeFileAtomic(
     await fsp.rename(tmp, filePath);
   } catch (err) {
     await fsp.unlink(tmp).catch(() => {});
-    if (!fs.existsSync(filePath)) throw err;
+    if (options.reuseExisting === false || !fs.existsSync(filePath)) throw err;
   }
 }

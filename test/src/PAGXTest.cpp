@@ -325,6 +325,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 }
 
 PAGX_TEST(PAGXTest, FractionalCanvasAndMatrixRenderRoundTrip) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   pagx::FontConfig fontConfig;
   for (const auto& path : GetFallbackFontPaths()) {
     fontConfig.addFallbackFont(path, 0);

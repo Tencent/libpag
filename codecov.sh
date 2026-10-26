@@ -1,5 +1,6 @@
 #!/bin/bash
-cd "$(dirname "$0")" || exit 1
+set -e
+cd "$(dirname "$0")"
 
 if [[ $(uname) == 'Darwin' ]]; then
   if ! command -v gcovr >/dev/null 2>&1; then
@@ -12,8 +13,13 @@ if [[ $(uname) == 'Darwin' ]]; then
   fi
 fi
 
-mkdir -p result || exit 1
-# Optional gcovr arguments can select a single instrumented build directory and add reports:
-# ./codecov.sh build --json result/coverage.json --html-details result/coverage.html
-exec gcovr -r . -f='src/' -f='include/' --xml-pretty \
+mkdir -p result
+# Apple's clang produces gcov data that must be read by its matching llvm-cov.
+gcov_options=()
+if [[ $(uname) == 'Darwin' && -z ${GCOV:-} ]]; then
+  gcov_options=(--gcov-executable 'xcrun llvm-cov gcov')
+fi
+# Optional gcovr arguments include a build directory, so independent coverage runs
+# do not accidentally merge stale counters from every build in the checkout.
+exec gcovr -r . -f='src/' -f='include/' "${gcov_options[@]}" --xml-pretty \
   --merge-mode-functions=merge-use-line-min -o ./result/coverage.xml "$@"

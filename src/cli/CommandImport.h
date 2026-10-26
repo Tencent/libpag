@@ -45,6 +45,9 @@ struct ImportFormatOptions {
   // snapshot.js) so the importer can replay the motion. Off by default: the
   // snapshot emits a single static frame.
   bool captureAnimations = false;
+  // Replay an HTML interaction scenario and import one named static checkpoint.
+  std::string scenario = {};
+  std::string checkpoint = {};
 };
 
 /**

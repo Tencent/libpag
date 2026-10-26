@@ -1058,11 +1058,18 @@ if (PAG_BUILD_CLI)
     set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_include_directories(pagx-cli PRIVATE
             src/cli
+            ${TGFX_DIR}/third_party/json/include
             ${PAG_INCLUDES}
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
     target_compile_definitions(pagx-cli PRIVATE PAGX_CLI_VERSION="${PAGX_CLI_VERSION}")
     set(CLI_EXTRA_LIBS)
+    if (WIN32)
+        list(APPEND CLI_EXTRA_LIBS shell32)
+        if (MSVC)
+            target_sources(pagx-cli PRIVATE cli/pagx.manifest)
+        endif ()
+    endif ()
     if (LINUX)
         find_package(Fontconfig REQUIRED)
         list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)

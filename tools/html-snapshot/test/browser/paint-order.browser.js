@@ -29,11 +29,11 @@ describe('CSS painting survives the snapshot', () => {
     const png = path.join(dir, 'subset.png');
     fs.writeFileSync(input, html);
     for (const args of [
-      ['import', '--input', input, '--output', pagx, '--format', 'html'],
+      ['import', '--html-source', 'snapshot', '--input', input, '--output', pagx, '--format', 'html'],
       ['render', pagx, '--output', png, ...(nativeTime === undefined ? [] : ['--time', String(nativeTime)])],
     ]) {
       const result = spawnSync(binary, args, {
-        env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' }, encoding: 'utf8', timeout: 30000,
+        encoding: 'utf8', timeout: 30000,
       });
       assert.equal(result.status, 0, `${name}: ${result.stderr}; ${dir}`);
     }

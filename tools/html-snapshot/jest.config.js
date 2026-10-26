@@ -18,6 +18,10 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: ['<rootDir>/test/**/*.test.js'],
   transformIgnorePatterns: ['/node_modules/(?!(pixelmatch)/)'],
+  transform: {
+    '[/\\\\]node_modules[/\\\\]pixelmatch[/\\\\].*\\.js$': 'babel-jest',
+  },
+  coverageProvider: 'v8',
   collectCoverageFrom: [
     ...compiledSources('lib'),
     'bench/report-utils.js',

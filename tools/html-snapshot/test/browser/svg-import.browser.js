@@ -38,11 +38,12 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
       const png = path.join(dir, `${format}.png`);
       fs.writeFileSync(input, source);
       for (const args of [
-        ['import', '--input', input, '--output', output, '--format', format],
+        ['import', '--input', input, '--output', output, '--format', format,
+          ...(format === 'html' ? ['--html-source', 'snapshot'] : [])],
         ['render', output, '--output', png],
       ]) {
         const result = spawnSync(binary, args, {
-          env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' }, encoding: 'utf8', timeout: 30000,
+          encoding: 'utf8', timeout: 30000,
         });
         assert.equal(result.status, 0, `${name}/${format}: ${result.stderr}; ${dir}`);
       }
