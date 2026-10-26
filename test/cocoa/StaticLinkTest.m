@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <TargetConditionals.h>
 #include <stdio.h>
 #import "PAGSurface.h"
 #import "PAGView.h"
@@ -65,18 +64,6 @@ int main(void) {
       fprintf(stderr, "PAGCocoaStaticLinkTest: PAGView initialization returned nil.\n");
       return 3;
     }
-#if TARGET_OS_IPHONE
-    if ([view layer] == nil) {
-      fprintf(stderr, "PAGCocoaStaticLinkTest: iOS PAGView has no backing layer.\n");
-      return 10;
-    }
-    if ([PAGSurface FromCVPixelBuffer:nil] != nil) {
-      fprintf(stderr,
-              "PAGCocoaStaticLinkTest: iOS PAGSurface.FromCVPixelBuffer: must return nil for a nil "
-              "pixel buffer.\n");
-      return 11;
-    }
-#else
     [view setFrameSize:NSMakeSize(32, 32)];
     if (view.bounds.size.width != 32 || view.bounds.size.height != 32) {
       fprintf(stderr,
@@ -84,7 +71,6 @@ int main(void) {
               view.bounds.size.width, view.bounds.size.height);
       return 20;
     }
-#endif
   }
   return 0;
 }

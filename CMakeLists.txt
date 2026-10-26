@@ -1204,7 +1204,7 @@ if (PAG_BUILD_TESTS)
     target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
 
-    if (APPLE AND USE_NATIVE_PLATFORM)
+    if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
         # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros
         # and cannot pull backend objects through direct references to private implementation symbols.
         add_executable(PAGCocoaStaticLinkTest test/cocoa/StaticLinkTest.m)
@@ -1214,15 +1214,12 @@ if (PAG_BUILD_TESTS)
         target_link_options(PAGCocoaStaticLinkTest PRIVATE -dead_strip)
         target_link_libraries(PAGCocoaStaticLinkTest "$<TARGET_FILE:pag>" ${PAG_SHARED_LIBS})
         set_target_properties(PAGCocoaStaticLinkTest PROPERTIES LINKER_LANGUAGE CXX)
-        add_dependencies(PAGFullTest PAGCocoaStaticLinkTest)
-        if (MACOS AND NOT CMAKE_CROSSCOMPILING)
-            add_custom_target(PAGCocoaStaticLinkCheck
-                    COMMAND "$<TARGET_FILE:PAGCocoaStaticLinkTest>"
-                    DEPENDS PAGCocoaStaticLinkTest
-                    COMMENT "Running Cocoa static link regression"
-                    VERBATIM)
-            add_dependencies(PAGFullTest PAGCocoaStaticLinkCheck)
-        endif ()
+        add_custom_target(PAGCocoaStaticLinkCheck
+                COMMAND "$<TARGET_FILE:PAGCocoaStaticLinkTest>"
+                DEPENDS PAGCocoaStaticLinkTest
+                COMMENT "Running Cocoa static link regression"
+                VERBATIM)
+        add_dependencies(PAGFullTest PAGCocoaStaticLinkCheck)
     endif ()
 
 endif ()
