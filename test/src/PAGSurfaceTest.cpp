@@ -348,7 +348,9 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
 
   // 「未就绪时 readPixels 返回 false」无法在 GL 上确定性构造：isReady() 的探测与
   // readPixels 内部的就绪重查之间存在 fence 置位竞态，GPU 排空进度不受 CPU 控制。
-  // 该路径改由浏览器端 WebGPU 车道覆盖：mapAsync 的异步映射天然存在未就绪窗口。
+  // WebGPU 上 mapAsync 的异步映射天然存在未就绪窗口，但当前仓库没有浏览器端 WebGPU
+  // 测试车道（web/cypress 仅覆盖 GL 构建），该路径暂无自动化覆盖，待 WebGPU 车道
+  // 在独立 PR 落地后补充。
   ASSERT_TRUE(WaitReadbackReady(readback));
 
   std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
