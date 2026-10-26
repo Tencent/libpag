@@ -1,19 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-const arch = process.env.ARCH;
-const backend = process.env.BACKEND;
-const archTarget = (arch === 'wasm-mt' ? 'wasm-mt' : 'wasm');
-const target = (backend === 'webgpu' ? (archTarget === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : archTarget);
+const { wasmDir } = require('./targets').resolveTarget(process.env.ARCH, process.env.BACKEND);
 const filePath = path.resolve(__dirname, '../src/pag.ts');
-console.log("target:",target);
+console.log("target:", wasmDir);
 fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) {
         console.error('Error reading file:', err);
         return;
     }
 
-    let newImportPath = `./${target}/libpag`;
+    let newImportPath = `./${wasmDir}/libpag`;
     const updatedData = data.replace(/import createPAG from '.*';/, `import createPAG from '${newImportPath}';`);
     fs.writeFile(filePath, updatedData, 'utf8', (err) => {
         if (err) {

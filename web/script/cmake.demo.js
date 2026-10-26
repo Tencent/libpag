@@ -26,27 +26,36 @@ require("../../build_pag");
 const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
 
 const arch = getArgValue("-a");
+const { libDir, wasmDir } = require("./targets").resolveTarget(arch, process.env.BACKEND);
+
+const assertFileExists = (filePath) => {
+    if (!fs.existsSync(filePath)) {
+        console.error(`Expected build artifact is missing: ${filePath}`);
+        process.exit(1);
+    }
+};
+
+const copyWasmToLib = (srcWasmPath, libDir) => {
+    assertFileExists(srcWasmPath);
+    fs.mkdirSync(libDir, {recursive: true});
+    fs.copyFileSync(srcWasmPath, `${libDir}/libpag.wasm`);
+};
 
 if (isWebGPU) {
-    const webgpuArch = arch === "wasm-mt" ? "wasm-webgpu-mt" : "wasm-webgpu";
-    const libPath = arch === "wasm-mt" ? "../lib-webgpu-mt" : "../lib-webgpu";
-
-    fs.mkdirSync(`../src/${webgpuArch}`, {recursive: true});
-    fs.copyFileSync(`${tmpOutputDir}/${arch}/libpag.js`, `../src/${webgpuArch}/libpag.js`);
-    fs.copyFileSync(`${tmpOutputDir}/${arch}/libpag.wasm`, `../src/${webgpuArch}/libpag.wasm`);
-
-    if (!fs.existsSync(`${libPath}`)) {
-        fs.mkdirSync(`${libPath}`, {recursive: true});
+    // The staging directory must be cleaned up even when a copy fails, otherwise the next build
+    // picks up stale artifacts from src-webgpu-tmp.
+    try {
+        const stagedJs = `${tmpOutputDir}/${arch}/libpag.js`;
+        const stagedWasm = `${tmpOutputDir}/${arch}/libpag.wasm`;
+        assertFileExists(stagedJs);
+        assertFileExists(stagedWasm);
+        fs.mkdirSync(`../src/${wasmDir}`, {recursive: true});
+        fs.copyFileSync(stagedJs, `../src/${wasmDir}/libpag.js`);
+        fs.copyFileSync(stagedWasm, `../src/${wasmDir}/libpag.wasm`);
+        copyWasmToLib(`../src/${wasmDir}/libpag.wasm`, `../${libDir}`);
+    } finally {
+        fs.rmSync(tmpOutputDir, {recursive: true, force: true});
     }
-    fs.copyFileSync(`../src/${webgpuArch}/libpag.wasm`, `${libPath}/libpag.wasm`);
-
-    fs.rmSync(tmpOutputDir, {recursive: true, force: true});
 } else {
-    const libPath = (arch === "wasm-mt" ? "../lib-mt" : "../lib");
-
-    if (!fs.existsSync(`${libPath}`)) {
-        fs.mkdirSync(`${libPath}`, {recursive: true});
-    }
-
-    fs.copyFileSync(`../src/${arch}/libpag.wasm`, `${libPath}/libpag.wasm`);
+    copyWasmToLib(`../src/${wasmDir}/libpag.wasm`, `../${libDir}`);
 }

@@ -68,7 +68,7 @@ export class PAGImage {
       'PAGImage.fromTexture()',
       texture,
       (textureID, format) => PAGModule._PAGImage._FromTexture(textureID, width, height, flipY, format),
-      (wasmIns, webGPUHandle) => new PAGImage(wasmIns, webGPUHandle),
+      (wasmIns) => new PAGImage(wasmIns),
     );
   }
 
@@ -77,9 +77,16 @@ export class PAGImage {
 
   private webGPUTextureHandle = 0;
 
-  public constructor(wasmIns: any, webGPUTextureHandle = 0) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
-    this.webGPUTextureHandle = webGPUTextureHandle;
+  }
+
+  /**
+   * Attaches the WebGPU texture handle registered by fromTexture() so destroy() can release it.
+   * WebGPU backend only; called internally by the factory, do not invoke directly.
+   */
+  public attachWebGPUTextureHandle(handle: number): void {
+    this.webGPUTextureHandle = handle;
   }
   /**
    * Returns the width in pixels.

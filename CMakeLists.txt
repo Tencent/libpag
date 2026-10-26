@@ -929,13 +929,13 @@ if (WEB)
         if (PAG_USE_WEBGPU)
             # 'WebGPU' is exported so tgfx's JS glue can resolve GPUDevice/GPUTexture handles
             # (Module.WebGPU.mgrDevice/mgrTexture) for color-space configuration and video
-            # uploads. 'GL' stays exported because shared web platform code may still touch GL
-            # symbols.
+            # uploads. 'GL' is deliberately not exported: a WebGPU build compiles no GL code,
+            # so nothing reads Module.GL at runtime.
             # Tint (Dawn's shader compiler) runs deep recursion in DependencyAnalysis when
             # parsing SPIR-V, which overflows emscripten's default 64KB stack and traps as a
             # segfault. 1MB mirrors tgfx's own web builds (tgfx/web/demo/CMakeLists.txt).
             list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1 -sSTACK_SIZE=1MB
-                    -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'])
+                    -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU'])
             # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
             # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
             # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
@@ -943,6 +943,11 @@ if (WEB)
             # symbols.
             if (TARGET libtint)
                 list(APPEND PAG_STATIC_LIBS libtint)
+            else ()
+                message(FATAL_ERROR
+                        "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
+                        "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
+                        "the final link would fail on tint symbols.")
             endif ()
         else ()
             list(APPEND PAG_LINK_OPTIONS -sMAX_WEBGL_VERSION=2

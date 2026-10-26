@@ -17,6 +17,10 @@ const READBACK_TIMEOUT_MS = 30000;
 // Throttles the unsupported-surface warning of readPixelsAsync() to a single console entry.
 let readbackUnsupportedWarned = false;
 
+// Throttles the not-supported warning of readPixels() on the WebGPU backend; the backend is a
+// build-time constant, so without throttling a per-frame caller would spam the console.
+let readPixelsUnsupportedWarned = false;
+
 // Values must stay in sync with the declaration order of the pag::ReadbackStatus enum in
 // include/pag/pag.h.
 const READBACK_STATUS_READY = 0;
@@ -88,7 +92,7 @@ export class PAGSurface {
       'PAGSurface.fromTexture()',
       texture,
       (textureID, format) => PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format),
-      (wasmIns, webGPUHandle) => new PAGSurface(wasmIns, webGPUHandle),
+      (wasmIns) => new PAGSurface(wasmIns),
     );
   }
   /**
@@ -113,9 +117,16 @@ export class PAGSurface {
   private isCanvasBacked = false;
   private readbackPending = false;
 
-  public constructor(wasmIns: any, webGPUTextureHandle = 0) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
-    this.webGPUTextureHandle = webGPUTextureHandle;
+  }
+
+  /**
+   * Attaches the WebGPU texture handle registered by fromTexture() so destroy() can release it.
+   * WebGPU backend only; called internally by the factory, do not invoke directly.
+   */
+  public attachWebGPUTextureHandle(handle: number): void {
+    this.webGPUTextureHandle = handle;
   }
 
   private markCanvasBacked(): PAGSurface {
@@ -160,7 +171,10 @@ export class PAGSurface {
    */
   public readPixels(colorType: ColorType, alphaType: AlphaType): Uint8Array | null {
     if (isWebGPUBackend()) {
-      console.warn('PAGSurface.readPixels() is not supported on the WebGPU backend. Use readPixelsAsync() instead.');
+      if (!readPixelsUnsupportedWarned) {
+        readPixelsUnsupportedWarned = true;
+        console.warn('PAGSurface.readPixels() is not supported on the WebGPU backend. Use readPixelsAsync() instead.');
+      }
       return null;
     }
     if (colorType === ColorType.Unknown) return null;

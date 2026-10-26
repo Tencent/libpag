@@ -84,13 +84,11 @@ function replacePathInFiles(rootDir) {
     });
 }
 
-if(argv.a ==="wasm-mt" || argv.a ==="wasm" || argv.a ==="wasm-webgpu" || argv.a ==="wasm-webgpu-mt"){
+const target = require("./targets").resolveByWasmDir(argv.a);
+if(target){
     restoreFile(filePath);
-    if(argv.a ==="wasm-mt"){
-        replaceFileNameInFiles(path.resolve(__dirname, "../lib-mt/"));
-    }
-    if(argv.a ==="wasm-webgpu-mt"){
-        replaceFileNameInFiles(path.resolve(__dirname, "../lib-webgpu-mt/"));
+    if(target.arch ==="wasm-mt"){
+        replaceFileNameInFiles(path.resolve(__dirname, `../${target.libDir}/`));
     }
     const typesDir = path.resolve(__dirname, "../types/web/src");
     if(fs.existsSync(typesDir)){

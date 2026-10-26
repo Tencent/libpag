@@ -8,10 +8,7 @@ import { readFileSync } from 'node:fs';
 
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
-const arch = process.env.ARCH;
-const backend = process.env.BACKEND;
-const libPath = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'lib-webgpu-mt' : 'lib-webgpu') : (arch === 'wasm-mt' ? 'lib-mt' : 'lib');
-const demoOutDir = backend === 'webgpu' ? (arch === 'wasm-mt' ? 'wasm-webgpu-mt' : 'wasm-webgpu') : arch;
+const { backend, libDir, wasmDir } = require('./targets').resolveTarget(process.env.ARCH, process.env.BACKEND);
 
 require("./update.pag.import");
 require("./gen.demo.html");
@@ -21,8 +18,8 @@ const plugins = [
     tsconfig: "tsconfig.json",
     minify: false,
     define: {
-      __PAG_DEMO_LIB_DIR__: JSON.stringify(libPath),
-      __PAG_DEMO_BACKEND__: JSON.stringify(backend === 'webgpu' ? 'webgpu' : 'gl'),
+      __PAG_DEMO_LIB_DIR__: JSON.stringify(libDir),
+      __PAG_DEMO_BACKEND__: JSON.stringify(backend),
     },
   }),
   json(),
@@ -46,7 +43,7 @@ const plugins = [
 export default [
   {
     input: 'demo/index.ts',
-    output: { banner, file: `demo/${demoOutDir}/libpag.js`, format: 'esm', sourcemap: true },
+    output: { banner, file: `demo/${wasmDir}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   }
 ];

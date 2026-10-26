@@ -100,15 +100,25 @@ export const untrackWebGPUTextureHandle = (wrapper: object): void => {
 };
 
 /**
+ * Implemented by wrappers (PAGSurface, PAGImage) whose fromTexture() factory registers a host
+ * GPUTexture. The handle is attached by wrapBackendTexture() after construction instead of
+ * flowing through the public constructor, so external code cannot inject an arbitrary handle
+ * that destroy() would then release by mistake.
+ */
+export interface WebGPUTextureHolder {
+  attachWebGPUTextureHandle: (handle: number) => void;
+}
+
+/**
  * Shared implementation of the fromTexture() factories of PAGSurface and PAGImage: resolves the
  * host texture, wraps it into a wasm instance, rolls the registration back on failure, and
  * tracks the wrapper for GC-time release of the WebGPU texture handle.
  */
-export const wrapBackendTexture = <T extends object>(
+export const wrapBackendTexture = <T extends WebGPUTextureHolder>(
   apiName: string,
   texture: number | WebGPUTextureLike,
   makeWasmIns: (textureID: number, format: number) => any,
-  makeWrapper: (wasmIns: any, webGPUHandle: number) => T,
+  makeWrapper: (wasmIns: any) => T,
 ): T => {
   const { textureID, format, webGPUHandle } = resolveTextureHandle(apiName, texture);
   const wasmIns = makeWasmIns(textureID, format);
@@ -116,7 +126,10 @@ export const wrapBackendTexture = <T extends object>(
     if (webGPUHandle > 0) unregisterWebGPUTexture(webGPUHandle);
     throw new Error(`${apiName} failed to wrap the texture ${textureID}!`);
   }
-  const wrapper = makeWrapper(wasmIns, webGPUHandle);
-  if (webGPUHandle > 0) trackWebGPUTextureHandle(wrapper, webGPUHandle);
+  const wrapper = makeWrapper(wasmIns);
+  if (webGPUHandle > 0) {
+    wrapper.attachWebGPUTextureHandle(webGPUHandle);
+    trackWebGPUTextureHandle(wrapper, webGPUHandle);
+  }
   return wrapper;
 };
