@@ -28,11 +28,17 @@
 namespace pag::cocoa {
 
 std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  if (![host isKindOfClass:[CAMetalLayer class]]) {
+    return nullptr;
+  }
   return PAGSurface::MakeFrom(MetalLayerDrawable::FromLayer(host));
 }
 
 #if TARGET_OS_IPHONE
 std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(CVPixelBufferRef pixelBuffer, id device) {
+  if (device != nil && ![device conformsToProtocol:@protocol(MTLDevice)]) {
+    return nullptr;
+  }
   std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
   if (device != nil) {
     metalDevice = tgfx::MetalDevice::MakeFrom(device);

@@ -25,6 +25,9 @@
 namespace pag::cocoa {
 
 std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  if (![host isKindOfClass:[CAEAGLLayer class]]) {
+    return nullptr;
+  }
   return PAGSurface::MakeFrom(EAGLDrawable::FromLayer(host));
 }
 
@@ -36,6 +39,9 @@ std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(CVPixelBufferRef, id) {
 }
 #else
 std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(CVPixelBufferRef pixelBuffer, id device) {
+  if (device != nil && ![device isKindOfClass:[EAGLContext class]]) {
+    return nullptr;
+  }
   auto eaglDevice = tgfx::EAGLDevice::MakeFrom(device);
   return PAGSurface::MakeFrom(HardwareBufferDrawable::MakeFrom(pixelBuffer, eaglDevice));
 }

@@ -27,14 +27,16 @@ namespace pag::cocoa {
 
 /**
  * Creates a surface from the selected backend's native host: a layer on iOS and Metal, or an NSView
- * on macOS OpenGL. The caller keeps the host alive for the lifetime of the surface.
+ * on macOS OpenGL. The caller keeps the host alive for the lifetime of the surface. Returns nullptr
+ * if the host is nil or has an incompatible type for the selected backend.
  */
 __attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host);
 
 #if TARGET_OS_IPHONE
 /**
  * Creates an iOS pixel-buffer surface using an optional native device or context for the selected
- * backend. The caller retains ownership of the pixel buffer and native device.
+ * backend. The caller retains ownership of the pixel buffer and native device. A nil device uses
+ * the default device. Returns nullptr if a non-nil device has an incompatible type for the backend.
  */
 __attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(
     CVPixelBufferRef pixelBuffer, id device);

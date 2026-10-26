@@ -21,9 +21,11 @@
 #import <TargetConditionals.h>
 #include "base/PAGTest.h"
 #import "platform/cocoa/PAGPlayer.h"
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
 #include "platform/cocoa/private/PAGViewSurface.h"
 
 #if TARGET_OS_IPHONE
+#include "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/PAGView.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
 #else
@@ -34,6 +36,17 @@
 @interface PAGView (CocoaSurfaceTests)
 - (void)initPAGSurface;
 @end
+
+static void CheckInvalidHost(id host) {
+  SCOPED_TRACE([NSStringFromClass([host class]) UTF8String]);
+  EXPECT_EQ(pag::cocoa::MakeSurfaceFromHost(host), nullptr);
+  EXPECT_TRUE([PAGSurfaceImpl FromHost:host] == nil);
+#if TARGET_OS_IPHONE || defined(TGFX_USE_METAL)
+  EXPECT_TRUE([PAGSurface FromLayer:host] == nil);
+#else
+  EXPECT_TRUE([PAGSurface FromView:host] == nil);
+#endif
+}
 
 /**
  * Verifies that the selected backend's public and private factories are linked with their classes
@@ -77,6 +90,21 @@ PAG_TEST(PAGCocoaSurfaceTest, NullHostReturnsNil) {
 #else
     ASSERT_TRUE([PAGSurface respondsToSelector:@selector(FromView:)]);
     EXPECT_TRUE([PAGSurface FromView:nil] == nil);
+#endif
+  }
+}
+
+/**
+ * Verifies that invalid hosts are rejected before accessing backend-specific native properties.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, InvalidHostReturnsNil) {
+  @autoreleasepool {
+    CheckInvalidHost([[NSObject alloc] init]);
+    CheckInvalidHost([CALayer layer]);
+#if defined(TGFX_USE_METAL)
+    CheckInvalidHost([[PAGView alloc] initWithFrame:CGRectMake(0, 0, 16, 16)]);
+#else
+    CheckInvalidHost([CAMetalLayer layer]);
 #endif
   }
 }
@@ -142,6 +170,25 @@ PAG_TEST(PAGCocoaSurfaceTest, DefaultPixelBufferFactoryDispatches) {
     EXPECT_TRUE([PAGSurface FromCVPixelBuffer:nil] == nil);
     EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:nil] == nil);
     EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:nil device:nil] == nil);
+  }
+}
+
+/**
+ * Verifies that invalid native devices are rejected even when a valid pixel buffer is supplied.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, InvalidPixelBufferDeviceReturnsNil) {
+  @autoreleasepool {
+    auto pixelBuffer = pag::PixelBufferUtil::Make(16, 16);
+    ASSERT_TRUE(pixelBuffer != nil);
+    NSArray* invalidDevices = @[[[NSObject alloc] init], [CALayer layer]];
+    for (id device in invalidDevices) {
+      SCOPED_TRACE([NSStringFromClass([device class]) UTF8String]);
+      EXPECT_EQ(pag::cocoa::MakeSurfaceFromPixelBuffer(pixelBuffer, device), nullptr);
+      EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer device:device] == nil);
+#if defined(TGFX_USE_OPENGL)
+      EXPECT_TRUE([PAGSurface FromCVPixelBuffer:pixelBuffer context:device] == nil);
+#endif
+    }
   }
 }
 #endif

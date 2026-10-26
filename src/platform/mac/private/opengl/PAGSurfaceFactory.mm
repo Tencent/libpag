@@ -22,6 +22,9 @@
 namespace pag::cocoa {
 
 std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  if (![host isKindOfClass:[NSView class]]) {
+    return nullptr;
+  }
   return PAGSurface::MakeFrom(CGLDrawable::FromView(host));
 }
 
