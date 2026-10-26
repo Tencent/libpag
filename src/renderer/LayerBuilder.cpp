@@ -3322,6 +3322,54 @@ class LayerBuilderContext {
     filter->setColor(MixTGFXColor(filter->color(), target, mix));
   }
 
+  // The color matrix elements animate individually (matrix[0]..matrix[19]); each element gets
+  // its own accessor instance because the runtime writer signature carries no channel name.
+  template <size_t Index>
+  static void WriteColorMatrixElement(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<tgfx::ColorMatrixFilter*>(object);
+    auto matrix = filter->matrix();
+    matrix[Index] = MixFloat(matrix[Index], *v, mix);
+    filter->setMatrix(matrix);
+  }
+
+  template <size_t Index>
+  static bool ReadColorMatrixElement(const void* object, KeyValue* out) {
+    auto* filter = static_cast<const tgfx::ColorMatrixFilter*>(object);
+    *out = KeyValue{filter->matrix()[Index]};
+    return true;
+  }
+
+  void bindColorMatrixFilterChannels(const pagx::ColorMatrixFilter* node) {
+#define BIND_MATRIX_ELEMENT(i)                                                    \
+  _result.binding.setAccessor(node, "matrix[" #i "]", WriteColorMatrixElement<i>, \
+                              ReadColorMatrixElement<i>)
+    BIND_MATRIX_ELEMENT(0);
+    BIND_MATRIX_ELEMENT(1);
+    BIND_MATRIX_ELEMENT(2);
+    BIND_MATRIX_ELEMENT(3);
+    BIND_MATRIX_ELEMENT(4);
+    BIND_MATRIX_ELEMENT(5);
+    BIND_MATRIX_ELEMENT(6);
+    BIND_MATRIX_ELEMENT(7);
+    BIND_MATRIX_ELEMENT(8);
+    BIND_MATRIX_ELEMENT(9);
+    BIND_MATRIX_ELEMENT(10);
+    BIND_MATRIX_ELEMENT(11);
+    BIND_MATRIX_ELEMENT(12);
+    BIND_MATRIX_ELEMENT(13);
+    BIND_MATRIX_ELEMENT(14);
+    BIND_MATRIX_ELEMENT(15);
+    BIND_MATRIX_ELEMENT(16);
+    BIND_MATRIX_ELEMENT(17);
+    BIND_MATRIX_ELEMENT(18);
+    BIND_MATRIX_ELEMENT(19);
+#undef BIND_MATRIX_ELEMENT
+  }
+
   void bindBlendFilterChannels(const BlendFilter* node) {
     _result.binding.setAccessor(node, "color", WriteBlendFilterColor,
                                 ReadColorChannel<tgfx::BlendFilter, &tgfx::BlendFilter::color>);
@@ -3463,7 +3511,10 @@ class LayerBuilderContext {
       }
       case NodeType::ColorMatrixFilter: {
         auto filter = static_cast<const pagx::ColorMatrixFilter*>(node);
-        return tgfx::ColorMatrixFilter::Make(filter->matrix);
+        auto tgfxFilter = tgfx::ColorMatrixFilter::Make(filter->matrix);
+        _result.binding.set(filter, tgfxFilter);
+        bindColorMatrixFilterChannels(filter);
+        return tgfxFilter;
       }
       case NodeType::NoiseFilter: {
         auto filter = static_cast<const pagx::NoiseFilter*>(node);

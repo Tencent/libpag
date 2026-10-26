@@ -256,6 +256,25 @@ DEFINE_ENUM_CONVERSION(Arrangement, Arrangement::Start, {Arrangement::Start, "st
 DEFINE_ENUM_CONVERSION(NoiseMode, NoiseMode::Mono, {NoiseMode::Mono, "mono"},
                        {NoiseMode::Duo, "duo"}, {NoiseMode::Multi, "multi"})
 
+DEFINE_ENUM_CONVERSION(
+    DisplacementMapSource, DisplacementMapSource::Red, {DisplacementMapSource::Red, "red"},
+    {DisplacementMapSource::Green, "green"}, {DisplacementMapSource::Blue, "blue"},
+    {DisplacementMapSource::Alpha, "alpha"}, {DisplacementMapSource::Luminance, "luminance"},
+    {DisplacementMapSource::Hue, "hue"}, {DisplacementMapSource::Lightness, "lightness"},
+    {DisplacementMapSource::Saturation, "saturation"}, {DisplacementMapSource::Full, "full"},
+    {DisplacementMapSource::Half, "half"}, {DisplacementMapSource::Off, "off"})
+
+DEFINE_ENUM_CONVERSION(DisplacementMapBehavior, DisplacementMapBehavior::CenterMap,
+                       {DisplacementMapBehavior::CenterMap, "centerMap"},
+                       {DisplacementMapBehavior::StretchMapToFit, "stretchMapToFit"},
+                       {DisplacementMapBehavior::TileMap, "tileMap"})
+
+DEFINE_ENUM_CONVERSION(RadialBlurMode, RadialBlurMode::Spin, {RadialBlurMode::Spin, "spin"},
+                       {RadialBlurMode::Zoom, "zoom"})
+
+DEFINE_ENUM_CONVERSION(RadialBlurAntialias, RadialBlurAntialias::Low,
+                       {RadialBlurAntialias::Low, "low"}, {RadialBlurAntialias::High, "high"})
+
 std::string ColorSpaceToString(ColorSpace space) {
   switch (space) {
     case ColorSpace::SRGB:

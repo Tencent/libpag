@@ -29,20 +29,24 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -51,13 +55,17 @@
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -142,6 +150,9 @@ struct DecodeContext {
   // Layer mask NodeRefs: backfilled after the whole body decodes, when the node table
   // (creation order = emission order, spec §5.1) is complete.
   std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
+  // DisplacementMapFilter map-layer NodeRefs: backfilled with the mask refs, when the node
+  // table (creation order = emission order, spec 5.1) is complete.
+  std::vector<std::pair<DisplacementMapFilter*, uint32_t>> pendingDisplacementMapRefs = {};
   PAGXDocument* document = nullptr;
   uint16_t tagLevel = 0;
 
@@ -167,9 +178,11 @@ Font* ReadFontTag(pag::DecodeStream* tagStream, DecodeContext* context);
 
 Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* context);
 LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, DecodeContext* context);
-void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
-                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
-                           std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget);
+void ReadLayerBlockContent(
+    pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
+    std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
+    std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget,
+    std::vector<std::pair<DisplacementMapFilter*, uint32_t>>* pendingDisplacementMapRefsTarget);
 
 // ---------------------------------------------------------------------------
 // Animation decoding (spec §9.7). Channel keyframes mirror the §8 columnar layout: count,
@@ -1129,7 +1142,7 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
-                            &context->pendingMaskRefs);
+                            &context->pendingMaskRefs, &context->pendingDisplacementMapRefs);
       composition->layers.push_back(layer);
     } else if (header.code == TagCode::AnimationBlock) {
       auto* animation = ReadAnimationBlock(&tagBytes, context);
@@ -1338,8 +1351,9 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
   }
 }
 
-LayerFilter* ReadLayerFilterTag(pag::DecodeStream* tagStream, TagCode code,
-                                DecodeContext* context) {
+LayerFilter* ReadLayerFilterTag(
+    pag::DecodeStream* tagStream, TagCode code, DecodeContext* context,
+    std::vector<std::pair<DisplacementMapFilter*, uint32_t>>* pendingDisplacementMapRefs) {
   switch (code) {
     case TagCode::BlurFilter: {
       auto* filter = context->document->makeNode<BlurFilter>();
@@ -1433,6 +1447,169 @@ LayerFilter* ReadLayerFilterTag(pag::DecodeStream* tagStream, TagCode code,
       if (hasOpacity) {
         filter->opacity = static_cast<float>(tagStream->readUint8()) / 255.0f;
       }
+      return filter;
+    }
+    case TagCode::MotionTileFilter: {
+      auto* filter = context->document->makeNode<MotionTileFilter>();
+      PAGAttributeBlockReader reader(tagStream, 8);
+      bool hasTileCenter = reader.flag(0);
+      bool hasTileWidth = reader.flag(1);
+      bool hasTileHeight = reader.flag(2);
+      bool hasOutputWidth = reader.flag(3);
+      bool hasOutputHeight = reader.flag(4);
+      filter->mirrorEdges = reader.flag(5);
+      bool hasPhase = reader.flag(6);
+      filter->horizontalPhaseShift = reader.flag(7);
+      tagStream->alignWithBytes();
+      if (hasTileCenter) {
+        filter->tileCenter.x = tagStream->readFloat();
+        filter->tileCenter.y = tagStream->readFloat();
+      }
+      if (hasTileWidth) filter->tileWidth = tagStream->readFloat();
+      if (hasTileHeight) filter->tileHeight = tagStream->readFloat();
+      if (hasOutputWidth) filter->outputWidth = tagStream->readFloat();
+      if (hasOutputHeight) filter->outputHeight = tagStream->readFloat();
+      if (hasPhase) filter->phase = tagStream->readFloat();
+      return filter;
+    }
+    case TagCode::LevelsIndividualFilter: {
+      auto* filter = context->document->makeNode<LevelsIndividualFilter>();
+      PAGAttributeBlockReader reader(tagStream, 20);
+      bool has[20] = {};
+      for (int i = 0; i < 20; i++) {
+        has[i] = reader.flag(static_cast<size_t>(i));
+      }
+      tagStream->alignWithBytes();
+      float* values[20] = {
+          &filter->inputBlack,      &filter->inputWhite,       &filter->gamma,
+          &filter->outputBlack,     &filter->outputWhite,      &filter->redInputBlack,
+          &filter->redInputWhite,   &filter->redGamma,         &filter->redOutputBlack,
+          &filter->redOutputWhite,  &filter->greenInputBlack,  &filter->greenInputWhite,
+          &filter->greenGamma,      &filter->greenOutputBlack, &filter->greenOutputWhite,
+          &filter->blueInputBlack,  &filter->blueInputWhite,   &filter->blueGamma,
+          &filter->blueOutputBlack, &filter->blueOutputWhite};
+      for (int i = 0; i < 20; i++) {
+        if (has[i]) *values[i] = tagStream->readFloat();
+      }
+      return filter;
+    }
+    case TagCode::CornerPinFilter: {
+      auto* filter = context->document->makeNode<CornerPinFilter>();
+      PAGAttributeBlockReader reader(tagStream, 4);
+      bool hasUpperLeft = reader.flag(0);
+      bool hasUpperRight = reader.flag(1);
+      bool hasLowerLeft = reader.flag(2);
+      bool hasLowerRight = reader.flag(3);
+      tagStream->alignWithBytes();
+      if (hasUpperLeft) {
+        filter->upperLeft.x = tagStream->readFloat();
+        filter->upperLeft.y = tagStream->readFloat();
+      }
+      if (hasUpperRight) {
+        filter->upperRight.x = tagStream->readFloat();
+        filter->upperRight.y = tagStream->readFloat();
+      }
+      if (hasLowerLeft) {
+        filter->lowerLeft.x = tagStream->readFloat();
+        filter->lowerLeft.y = tagStream->readFloat();
+      }
+      if (hasLowerRight) {
+        filter->lowerRight.x = tagStream->readFloat();
+        filter->lowerRight.y = tagStream->readFloat();
+      }
+      return filter;
+    }
+    case TagCode::BulgeFilter: {
+      auto* filter = context->document->makeNode<BulgeFilter>();
+      PAGAttributeBlockReader reader(tagStream, 6);
+      bool hasHorizontalRadius = reader.flag(0);
+      bool hasVerticalRadius = reader.flag(1);
+      bool hasBulgeCenter = reader.flag(2);
+      bool hasBulgeHeight = reader.flag(3);
+      bool hasTaperRadius = reader.flag(4);
+      filter->pinning = reader.flag(5);
+      tagStream->alignWithBytes();
+      if (hasHorizontalRadius) filter->horizontalRadius = tagStream->readFloat();
+      if (hasVerticalRadius) filter->verticalRadius = tagStream->readFloat();
+      if (hasBulgeCenter) {
+        filter->bulgeCenter.x = tagStream->readFloat();
+        filter->bulgeCenter.y = tagStream->readFloat();
+      }
+      if (hasBulgeHeight) filter->bulgeHeight = tagStream->readFloat();
+      if (hasTaperRadius) filter->taperRadius = tagStream->readFloat();
+      return filter;
+    }
+    case TagCode::GlowFilter: {
+      auto* filter = context->document->makeNode<GlowFilter>();
+      PAGAttributeBlockReader reader(tagStream, 3);
+      bool hasGlowThreshold = reader.flag(0);
+      bool hasGlowRadius = reader.flag(1);
+      bool hasGlowIntensity = reader.flag(2);
+      tagStream->alignWithBytes();
+      if (hasGlowThreshold) filter->glowThreshold = tagStream->readFloat();
+      if (hasGlowRadius) filter->glowRadius = tagStream->readFloat();
+      if (hasGlowIntensity) filter->glowIntensity = tagStream->readFloat();
+      return filter;
+    }
+    case TagCode::DisplacementMapFilter: {
+      auto* filter = context->document->makeNode<DisplacementMapFilter>();
+      PAGAttributeBlockReader reader(tagStream, 8);
+      bool hasHorizontalSource = reader.flag(0);
+      bool hasMaxHorizontal = reader.flag(1);
+      bool hasVerticalSource = reader.flag(2);
+      bool hasMaxVertical = reader.flag(3);
+      bool hasBehavior = reader.flag(4);
+      filter->edgeBehavior = reader.flag(5);
+      filter->expandOutput = !reader.flag(6);
+      bool hasMapLayer = reader.flag(7);
+      tagStream->alignWithBytes();
+      if (hasHorizontalSource) {
+        filter->useForHorizontalDisplacement =
+            static_cast<DisplacementMapSource>(tagStream->readUint8());
+      }
+      if (hasMaxHorizontal) filter->maxHorizontalDisplacement = tagStream->readFloat();
+      if (hasVerticalSource) {
+        filter->useForVerticalDisplacement =
+            static_cast<DisplacementMapSource>(tagStream->readUint8());
+      }
+      if (hasMaxVertical) filter->maxVerticalDisplacement = tagStream->readFloat();
+      if (hasBehavior) {
+        filter->displacementMapBehavior =
+            static_cast<DisplacementMapBehavior>(tagStream->readUint8());
+      }
+      if (hasMapLayer) {
+        pendingDisplacementMapRefs->push_back({filter, tagStream->readEncodedUint32()});
+      }
+      return filter;
+    }
+    case TagCode::RadialBlurFilter: {
+      auto* filter = context->document->makeNode<RadialBlurFilter>();
+      PAGAttributeBlockReader reader(tagStream, 4);
+      bool hasAmount = reader.flag(0);
+      bool hasCenter = reader.flag(1);
+      bool hasMode = reader.flag(2);
+      bool hasAntialias = reader.flag(3);
+      tagStream->alignWithBytes();
+      if (hasAmount) filter->amount = tagStream->readFloat();
+      if (hasCenter) {
+        filter->center.x = tagStream->readFloat();
+        filter->center.y = tagStream->readFloat();
+      }
+      if (hasMode) filter->mode = static_cast<RadialBlurMode>(tagStream->readUint8());
+      if (hasAntialias) {
+        filter->antialias = static_cast<RadialBlurAntialias>(tagStream->readUint8());
+      }
+      return filter;
+    }
+    case TagCode::MosaicFilter: {
+      auto* filter = context->document->makeNode<MosaicFilter>();
+      PAGAttributeBlockReader reader(tagStream, 3);
+      bool hasHorizontalBlocks = reader.flag(0);
+      bool hasVerticalBlocks = reader.flag(1);
+      filter->sharpColors = reader.flag(2);
+      tagStream->alignWithBytes();
+      if (hasHorizontalBlocks) filter->horizontalBlocks = tagStream->readFloat();
+      if (hasVerticalBlocks) filter->verticalBlocks = tagStream->readFloat();
       return filter;
     }
     default:
@@ -1984,9 +2161,11 @@ Element* ReadElementTag(pag::DecodeStream* tagStream, TagCode code, DecodeContex
   }
 }
 
-void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
-                           std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
-                           std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget) {
+void ReadLayerBlockContent(
+    pag::DecodeStream* tagStream, Layer* layer, DecodeContext* context,
+    std::vector<std::pair<Layer*, uint32_t>>* subDocRefs,
+    std::vector<std::pair<Layer*, uint32_t>>* pendingMaskRefsTarget,
+    std::vector<std::pair<DisplacementMapFilter*, uint32_t>>* pendingDisplacementMapRefsTarget) {
   while (true) {
     auto header = ReadPAGTagHeader(tagStream);
     if (header.code == TagCode::End) break;
@@ -2045,7 +2224,8 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       if (hasVmContext) layer->vmContext = context->getString(tagBytes.readEncodedUint32());
     } else if (header.code == TagCode::LayerBlock) {
       auto* child = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, child, context, subDocRefs, pendingMaskRefsTarget);
+      ReadLayerBlockContent(&tagBytes, child, context, subDocRefs, pendingMaskRefsTarget,
+                            pendingDisplacementMapRefsTarget);
       layer->children.push_back(child);
     } else if (header.code == TagCode::LayerTransform) {
       PAGAttributeBlockReader reader(&tagBytes, 7);
@@ -2094,8 +2274,15 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
       }
     } else if (header.code == TagCode::BlurFilter || header.code == TagCode::DropShadowFilter ||
                header.code == TagCode::InnerShadowFilter || header.code == TagCode::BlendFilter ||
-               header.code == TagCode::ColorMatrixFilter || header.code == TagCode::NoiseFilter) {
-      auto* filter = ReadLayerFilterTag(&tagBytes, header.code, context);
+               header.code == TagCode::ColorMatrixFilter || header.code == TagCode::NoiseFilter ||
+               header.code == TagCode::MotionTileFilter ||
+               header.code == TagCode::LevelsIndividualFilter ||
+               header.code == TagCode::CornerPinFilter || header.code == TagCode::BulgeFilter ||
+               header.code == TagCode::GlowFilter ||
+               header.code == TagCode::DisplacementMapFilter ||
+               header.code == TagCode::RadialBlurFilter || header.code == TagCode::MosaicFilter) {
+      auto* filter =
+          ReadLayerFilterTag(&tagBytes, header.code, context, pendingDisplacementMapRefsTarget);
       if (filter != nullptr) {
         layer->filters.push_back(filter);
       }
@@ -2165,7 +2352,7 @@ void ReadDocumentBlock(pag::DecodeStream* tagStream, PAGXDocument* doc, DecodeCo
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
       ReadLayerBlockContent(&tagBytes, layer, context, &context->pendingSubDocRefs,
-                            &context->pendingMaskRefs);
+                            &context->pendingMaskRefs, &context->pendingDisplacementMapRefs);
       doc->layers.push_back(layer);
     } else if (header.code == TagCode::AnimationBlock) {
       auto* animation = ReadAnimationBlock(&tagBytes, context);
@@ -2298,6 +2485,7 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
   entry.document = PAGXDocument::Make(0, 0);
   std::vector<std::pair<Layer*, uint32_t>> pendingRefs = {};
   std::vector<std::pair<Layer*, uint32_t>> pendingMaskRefs = {};
+  std::vector<std::pair<DisplacementMapFilter*, uint32_t>> pendingDisplacementMapRefs = {};
   std::vector<std::pair<uint32_t, std::string>> retainedIds = {};
   std::vector<std::pair<PAGXDocument*, uint32_t>> subViewModelRefs = {};
   auto savedDocument = context->document;
@@ -2326,7 +2514,8 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
       }
     } else if (header.code == TagCode::LayerBlock) {
       auto* layer = context->document->makeNode<Layer>();
-      ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs, &pendingMaskRefs);
+      ReadLayerBlockContent(&tagBytes, layer, context, &pendingRefs, &pendingMaskRefs,
+                            &pendingDisplacementMapRefs);
       entry.document->layers.push_back(layer);
     } else if (header.code == TagCode::AnimationBlock) {
       auto* animation = ReadAnimationBlock(&tagBytes, context);
@@ -2373,6 +2562,16 @@ void ReadSubDocument(pag::DecodeStream* tagStream, DecodeContext* context) {
     auto* node = entry.document->nodes[pending.second - 1].get();
     if (node->nodeType() == NodeType::Layer) {
       pending.first->mask = static_cast<Layer*>(node);
+    }
+  }
+  // The displacement map refs resolve in the same sub-document namespace.
+  for (auto& pending : pendingDisplacementMapRefs) {
+    if (pending.second == 0 || pending.second > entry.document->nodes.size()) {
+      continue;
+    }
+    auto* node = entry.document->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::Layer) {
+      pending.first->displacementMapLayer = static_cast<Layer*>(node);
     }
   }
   // The pending refs record template layers; store their top-level indices.
@@ -2588,6 +2787,17 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     auto* node = doc->nodes[pending.second - 1].get();
     if (node->nodeType() == NodeType::Layer) {
       pending.first->mask = static_cast<Layer*>(node);
+    }
+  }
+
+  // Backfill displacement map layer NodeRefs the same way (creation order = emission order).
+  for (auto& pending : context.pendingDisplacementMapRefs) {
+    if (pending.second == 0 || pending.second > doc->nodes.size()) {
+      continue;
+    }
+    auto* node = doc->nodes[pending.second - 1].get();
+    if (node->nodeType() == NodeType::Layer) {
+      pending.first->displacementMapLayer = static_cast<Layer*>(node);
     }
   }
   // Restore the retained ids once the emission-order node list is complete (spec §9.0): these

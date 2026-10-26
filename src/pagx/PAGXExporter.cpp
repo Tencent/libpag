@@ -27,19 +27,23 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -47,12 +51,16 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -1501,6 +1509,169 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }
       WriteNoiseColorAttributes(xml, filter);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::MotionTileFilter: {
+      auto filter = static_cast<const MotionTileFilter*>(node);
+      xml.openElement("MotionTileFilter");
+      xml.addAttribute("id", filter->id);
+      if (filter->tileCenter != Default<MotionTileFilter>().tileCenter) {
+        xml.addAttribute("tileCenter", PointToString(filter->tileCenter));
+      }
+      xml.addAttribute("tileWidth", filter->tileWidth, Default<MotionTileFilter>().tileWidth);
+      xml.addAttribute("tileHeight", filter->tileHeight, Default<MotionTileFilter>().tileHeight);
+      xml.addAttribute("outputWidth", filter->outputWidth, Default<MotionTileFilter>().outputWidth);
+      xml.addAttribute("outputHeight", filter->outputHeight,
+                       Default<MotionTileFilter>().outputHeight);
+      xml.addAttribute("mirrorEdges", filter->mirrorEdges, Default<MotionTileFilter>().mirrorEdges);
+      xml.addAttribute("phase", filter->phase, Default<MotionTileFilter>().phase);
+      xml.addAttribute("horizontalPhaseShift", filter->horizontalPhaseShift,
+                       Default<MotionTileFilter>().horizontalPhaseShift);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::LevelsIndividualFilter: {
+      auto filter = static_cast<const LevelsIndividualFilter*>(node);
+      xml.openElement("LevelsIndividualFilter");
+      xml.addAttribute("id", filter->id);
+      auto defaults = Default<LevelsIndividualFilter>();
+      xml.addAttribute("inputBlack", filter->inputBlack, defaults.inputBlack);
+      xml.addAttribute("inputWhite", filter->inputWhite, defaults.inputWhite);
+      xml.addAttribute("gamma", filter->gamma, defaults.gamma);
+      xml.addAttribute("outputBlack", filter->outputBlack, defaults.outputBlack);
+      xml.addAttribute("outputWhite", filter->outputWhite, defaults.outputWhite);
+      xml.addAttribute("redInputBlack", filter->redInputBlack, defaults.redInputBlack);
+      xml.addAttribute("redInputWhite", filter->redInputWhite, defaults.redInputWhite);
+      xml.addAttribute("redGamma", filter->redGamma, defaults.redGamma);
+      xml.addAttribute("redOutputBlack", filter->redOutputBlack, defaults.redOutputBlack);
+      xml.addAttribute("redOutputWhite", filter->redOutputWhite, defaults.redOutputWhite);
+      xml.addAttribute("greenInputBlack", filter->greenInputBlack, defaults.greenInputBlack);
+      xml.addAttribute("greenInputWhite", filter->greenInputWhite, defaults.greenInputWhite);
+      xml.addAttribute("greenGamma", filter->greenGamma, defaults.greenGamma);
+      xml.addAttribute("greenOutputBlack", filter->greenOutputBlack, defaults.greenOutputBlack);
+      xml.addAttribute("greenOutputWhite", filter->greenOutputWhite, defaults.greenOutputWhite);
+      xml.addAttribute("blueInputBlack", filter->blueInputBlack, defaults.blueInputBlack);
+      xml.addAttribute("blueInputWhite", filter->blueInputWhite, defaults.blueInputWhite);
+      xml.addAttribute("blueGamma", filter->blueGamma, defaults.blueGamma);
+      xml.addAttribute("blueOutputBlack", filter->blueOutputBlack, defaults.blueOutputBlack);
+      xml.addAttribute("blueOutputWhite", filter->blueOutputWhite, defaults.blueOutputWhite);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::CornerPinFilter: {
+      auto filter = static_cast<const CornerPinFilter*>(node);
+      xml.openElement("CornerPinFilter");
+      xml.addAttribute("id", filter->id);
+      if (filter->upperLeft != Default<CornerPinFilter>().upperLeft) {
+        xml.addAttribute("upperLeft", PointToString(filter->upperLeft));
+      }
+      if (filter->upperRight != Default<CornerPinFilter>().upperRight) {
+        xml.addAttribute("upperRight", PointToString(filter->upperRight));
+      }
+      if (filter->lowerLeft != Default<CornerPinFilter>().lowerLeft) {
+        xml.addAttribute("lowerLeft", PointToString(filter->lowerLeft));
+      }
+      if (filter->lowerRight != Default<CornerPinFilter>().lowerRight) {
+        xml.addAttribute("lowerRight", PointToString(filter->lowerRight));
+      }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::BulgeFilter: {
+      auto filter = static_cast<const BulgeFilter*>(node);
+      xml.openElement("BulgeFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("horizontalRadius", filter->horizontalRadius,
+                       Default<BulgeFilter>().horizontalRadius);
+      xml.addAttribute("verticalRadius", filter->verticalRadius,
+                       Default<BulgeFilter>().verticalRadius);
+      if (filter->bulgeCenter != Default<BulgeFilter>().bulgeCenter) {
+        xml.addAttribute("bulgeCenter", PointToString(filter->bulgeCenter));
+      }
+      xml.addAttribute("bulgeHeight", filter->bulgeHeight, Default<BulgeFilter>().bulgeHeight);
+      xml.addAttribute("taperRadius", filter->taperRadius, Default<BulgeFilter>().taperRadius);
+      xml.addAttribute("pinning", filter->pinning, Default<BulgeFilter>().pinning);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::GlowFilter: {
+      auto filter = static_cast<const GlowFilter*>(node);
+      xml.openElement("GlowFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("glowThreshold", filter->glowThreshold, Default<GlowFilter>().glowThreshold);
+      xml.addAttribute("glowRadius", filter->glowRadius, Default<GlowFilter>().glowRadius);
+      xml.addAttribute("glowIntensity", filter->glowIntensity, Default<GlowFilter>().glowIntensity);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::DisplacementMapFilter: {
+      auto filter = static_cast<const DisplacementMapFilter*>(node);
+      xml.openElement("DisplacementMapFilter");
+      xml.addAttribute("id", filter->id);
+      if (filter->useForHorizontalDisplacement !=
+          Default<DisplacementMapFilter>().useForHorizontalDisplacement) {
+        xml.addAttribute("useForHorizontalDisplacement",
+                         DisplacementMapSourceToString(filter->useForHorizontalDisplacement));
+      }
+      xml.addAttribute("maxHorizontalDisplacement", filter->maxHorizontalDisplacement,
+                       Default<DisplacementMapFilter>().maxHorizontalDisplacement);
+      if (filter->useForVerticalDisplacement !=
+          Default<DisplacementMapFilter>().useForVerticalDisplacement) {
+        xml.addAttribute("useForVerticalDisplacement",
+                         DisplacementMapSourceToString(filter->useForVerticalDisplacement));
+      }
+      xml.addAttribute("maxVerticalDisplacement", filter->maxVerticalDisplacement,
+                       Default<DisplacementMapFilter>().maxVerticalDisplacement);
+      if (filter->displacementMapBehavior !=
+          Default<DisplacementMapFilter>().displacementMapBehavior) {
+        xml.addAttribute("displacementMapBehavior",
+                         DisplacementMapBehaviorToString(filter->displacementMapBehavior));
+      }
+      xml.addAttribute("edgeBehavior", filter->edgeBehavior,
+                       Default<DisplacementMapFilter>().edgeBehavior);
+      xml.addAttribute("expandOutput", filter->expandOutput,
+                       Default<DisplacementMapFilter>().expandOutput);
+      if (filter->displacementMapLayer != nullptr) {
+        xml.addAttribute("map", "@" + filter->displacementMapLayer->id);
+      }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::RadialBlurFilter: {
+      auto filter = static_cast<const RadialBlurFilter*>(node);
+      xml.openElement("RadialBlurFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("amount", filter->amount, Default<RadialBlurFilter>().amount);
+      if (filter->center != Default<RadialBlurFilter>().center) {
+        xml.addAttribute("center", PointToString(filter->center));
+      }
+      if (filter->mode != Default<RadialBlurFilter>().mode) {
+        xml.addAttribute("mode", RadialBlurModeToString(filter->mode));
+      }
+      if (filter->antialias != Default<RadialBlurFilter>().antialias) {
+        xml.addAttribute("antialias", RadialBlurAntialiasToString(filter->antialias));
+      }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::MosaicFilter: {
+      auto filter = static_cast<const MosaicFilter*>(node);
+      xml.openElement("MosaicFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("horizontalBlocks", filter->horizontalBlocks,
+                       Default<MosaicFilter>().horizontalBlocks);
+      xml.addAttribute("verticalBlocks", filter->verticalBlocks,
+                       Default<MosaicFilter>().verticalBlocks);
+      xml.addAttribute("sharpColors", filter->sharpColors, Default<MosaicFilter>().sharpColors);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

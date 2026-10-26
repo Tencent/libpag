@@ -109,6 +109,15 @@ enum class TagCode : uint16_t {
   StrokeLayerStyle = 576,
   GradientOverlayStyle = 577,
   OuterGlowStyle = 578,
+  // Phase three migration filters (spec 7.5), continuing the 576-767 reserved range.
+  MotionTileFilter = 579,
+  LevelsIndividualFilter = 580,
+  CornerPinFilter = 581,
+  BulgeFilter = 582,
+  GlowFilter = 583,
+  DisplacementMapFilter = 584,
+  RadialBlurFilter = 585,
+  MosaicFilter = 586,
   // 544-575 data binding.
   DataBind = 544,
   // 576-767 is reserved for the phase-3 migration capabilities (design doc §12.2),

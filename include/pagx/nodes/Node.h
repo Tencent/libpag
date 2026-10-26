@@ -189,6 +189,38 @@ enum class NodeType {
    * A noise filter.
    */
   NoiseFilter,
+  /**
+   * A motion tile filter (spec 7.5).
+   */
+  MotionTileFilter,
+  /**
+   * A levels filter with per-channel controls (spec 7.5).
+   */
+  LevelsIndividualFilter,
+  /**
+   * A corner pin filter (spec 7.5).
+   */
+  CornerPinFilter,
+  /**
+   * A bulge filter (spec 7.5).
+   */
+  BulgeFilter,
+  /**
+   * A glow filter (spec 7.5).
+   */
+  GlowFilter,
+  /**
+   * A displacement map filter (spec 7.5).
+   */
+  DisplacementMapFilter,
+  /**
+   * A radial blur filter (spec 7.5).
+   */
+  RadialBlurFilter,
+  /**
+   * A mosaic filter (spec 7.5).
+   */
+  MosaicFilter,
 
   // Elements (geometry, painters, modifiers, containers)
   /**

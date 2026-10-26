@@ -20,11 +20,13 @@
 
 #include <string>
 #include <vector>
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
@@ -203,6 +205,22 @@ bool IsValidArrangementString(const std::string& str);
 std::string NoiseModeToString(NoiseMode mode);
 NoiseMode NoiseModeFromString(const std::string& str);
 bool IsValidNoiseModeString(const std::string& str);
+
+//==============================================================================
+// DisplacementMapSource / DisplacementMapBehavior / RadialBlurMode / RadialBlurAntialias
+//==============================================================================
+std::string DisplacementMapSourceToString(DisplacementMapSource source);
+DisplacementMapSource DisplacementMapSourceFromString(const std::string& str);
+bool IsValidDisplacementMapSourceString(const std::string& str);
+std::string DisplacementMapBehaviorToString(DisplacementMapBehavior behavior);
+DisplacementMapBehavior DisplacementMapBehaviorFromString(const std::string& str);
+bool IsValidDisplacementMapBehaviorString(const std::string& str);
+std::string RadialBlurModeToString(RadialBlurMode mode);
+RadialBlurMode RadialBlurModeFromString(const std::string& str);
+bool IsValidRadialBlurModeString(const std::string& str);
+std::string RadialBlurAntialiasToString(RadialBlurAntialias antialias);
+RadialBlurAntialias RadialBlurAntialiasFromString(const std::string& str);
+bool IsValidRadialBlurAntialiasString(const std::string& str);
 
 //==============================================================================
 // Padding

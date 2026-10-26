@@ -26,14 +26,19 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -42,12 +47,16 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/LayoutNode.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -201,6 +210,26 @@ static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* 
     return false;
   }
   solid->color = *value;
+  return true;
+}
+
+// Fixed-array element access: addresses one slot of a std::array member (the color matrix).
+template <typename T, auto Field, size_t Index>
+static bool AccessArrayElement(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    (self->*Field)[Index] = (Default<T>().*Field)[Index];
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = (self->*Field)[Index];
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  (self->*Field)[Index] = *value;
   return true;
 }
 
@@ -374,6 +403,8 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessOptionalColor<T, &T::member> }
 #define FIELD_ENUM(T, name, member, cls, E) \
   { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
+#define FIELD_MATRIX_ELEM(T, name, member, idx, cls) \
+  { name, cls, &AccessArrayElement<T, &T::member, idx> }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -836,6 +867,139 @@ static std::vector<ChannelDef> BuildNoiseFilterFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildMotionTileFilterFields() {
+  return {
+      FIELD_POINT_X(MotionTileFilter, "tileCenter.x", tileCenter, Anim),
+      FIELD_POINT_Y(MotionTileFilter, "tileCenter.y", tileCenter, Anim),
+      FIELD_FLOAT(MotionTileFilter, "tileWidth", tileWidth, Anim),
+      FIELD_FLOAT(MotionTileFilter, "tileHeight", tileHeight, Anim),
+      FIELD_FLOAT(MotionTileFilter, "outputWidth", outputWidth, Anim),
+      FIELD_FLOAT(MotionTileFilter, "outputHeight", outputHeight, Anim),
+      FIELD_BOOL(MotionTileFilter, "mirrorEdges", mirrorEdges, Anim),
+      FIELD_FLOAT(MotionTileFilter, "phase", phase, Anim),
+      FIELD_BOOL(MotionTileFilter, "horizontalPhaseShift", horizontalPhaseShift, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildLevelsIndividualFilterFields() {
+  return {
+      FIELD_FLOAT(LevelsIndividualFilter, "inputBlack", inputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "inputWhite", inputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "gamma", gamma, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "outputBlack", outputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "outputWhite", outputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "redInputBlack", redInputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "redInputWhite", redInputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "redGamma", redGamma, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "redOutputBlack", redOutputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "redOutputWhite", redOutputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "greenInputBlack", greenInputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "greenInputWhite", greenInputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "greenGamma", greenGamma, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "greenOutputBlack", greenOutputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "greenOutputWhite", greenOutputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "blueInputBlack", blueInputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "blueInputWhite", blueInputWhite, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "blueGamma", blueGamma, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "blueOutputBlack", blueOutputBlack, Anim),
+      FIELD_FLOAT(LevelsIndividualFilter, "blueOutputWhite", blueOutputWhite, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildCornerPinFilterFields() {
+  return {
+      FIELD_POINT_X(CornerPinFilter, "upperLeft.x", upperLeft, Anim),
+      FIELD_POINT_Y(CornerPinFilter, "upperLeft.y", upperLeft, Anim),
+      FIELD_POINT_X(CornerPinFilter, "upperRight.x", upperRight, Anim),
+      FIELD_POINT_Y(CornerPinFilter, "upperRight.y", upperRight, Anim),
+      FIELD_POINT_X(CornerPinFilter, "lowerLeft.x", lowerLeft, Anim),
+      FIELD_POINT_Y(CornerPinFilter, "lowerLeft.y", lowerLeft, Anim),
+      FIELD_POINT_X(CornerPinFilter, "lowerRight.x", lowerRight, Anim),
+      FIELD_POINT_Y(CornerPinFilter, "lowerRight.y", lowerRight, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildBulgeFilterFields() {
+  return {
+      FIELD_FLOAT(BulgeFilter, "horizontalRadius", horizontalRadius, Anim),
+      FIELD_FLOAT(BulgeFilter, "verticalRadius", verticalRadius, Anim),
+      FIELD_POINT_X(BulgeFilter, "bulgeCenter.x", bulgeCenter, Anim),
+      FIELD_POINT_Y(BulgeFilter, "bulgeCenter.y", bulgeCenter, Anim),
+      FIELD_FLOAT(BulgeFilter, "bulgeHeight", bulgeHeight, Anim),
+      FIELD_FLOAT(BulgeFilter, "taperRadius", taperRadius, Anim),
+      FIELD_BOOL(BulgeFilter, "pinning", pinning, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildGlowFilterFields() {
+  return {
+      FIELD_FLOAT(GlowFilter, "glowThreshold", glowThreshold, Anim),
+      FIELD_FLOAT(GlowFilter, "glowRadius", glowRadius, Anim),
+      FIELD_FLOAT(GlowFilter, "glowIntensity", glowIntensity, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildDisplacementMapFilterFields() {
+  return {
+      FIELD_ENUM(DisplacementMapFilter, "useForHorizontalDisplacement",
+                 useForHorizontalDisplacement, NoFlags, DisplacementMapSource),
+      FIELD_FLOAT(DisplacementMapFilter, "maxHorizontalDisplacement", maxHorizontalDisplacement,
+                  Anim),
+      FIELD_ENUM(DisplacementMapFilter, "useForVerticalDisplacement", useForVerticalDisplacement,
+                 NoFlags, DisplacementMapSource),
+      FIELD_FLOAT(DisplacementMapFilter, "maxVerticalDisplacement", maxVerticalDisplacement, Anim),
+      FIELD_ENUM(DisplacementMapFilter, "displacementMapBehavior", displacementMapBehavior, NoFlags,
+                 DisplacementMapBehavior),
+      FIELD_BOOL(DisplacementMapFilter, "edgeBehavior", edgeBehavior, Anim),
+      FIELD_BOOL(DisplacementMapFilter, "expandOutput", expandOutput, Anim),
+  };
+}
+
+static std::vector<ChannelDef> BuildRadialBlurFilterFields() {
+  return {
+      FIELD_FLOAT(RadialBlurFilter, "amount", amount, Anim),
+      FIELD_POINT_X(RadialBlurFilter, "center.x", center, Anim),
+      FIELD_POINT_Y(RadialBlurFilter, "center.y", center, Anim),
+      FIELD_ENUM(RadialBlurFilter, "mode", mode, NoFlags, RadialBlurMode),
+      FIELD_ENUM(RadialBlurFilter, "antialias", antialias, NoFlags, RadialBlurAntialias),
+  };
+}
+
+static std::vector<ChannelDef> BuildMosaicFilterFields() {
+  return {
+      FIELD_FLOAT(MosaicFilter, "horizontalBlocks", horizontalBlocks, Anim),
+      FIELD_FLOAT(MosaicFilter, "verticalBlocks", verticalBlocks, Anim),
+      FIELD_BOOL(MosaicFilter, "sharpColors", sharpColors, Anim),
+  };
+}
+
+// The color matrix elements animate individually (matrix[0]..matrix[19]), matching the legacy
+// color-adjust effects that fold into a color matrix with animated parameters.
+static std::vector<ChannelDef> BuildColorMatrixFilterFields() {
+  return {
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[0]", matrix, 0, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[1]", matrix, 1, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[2]", matrix, 2, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[3]", matrix, 3, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[4]", matrix, 4, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[5]", matrix, 5, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[6]", matrix, 6, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[7]", matrix, 7, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[8]", matrix, 8, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[9]", matrix, 9, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[10]", matrix, 10, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[11]", matrix, 11, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[12]", matrix, 12, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[13]", matrix, 13, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[14]", matrix, 14, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[15]", matrix, 15, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[16]", matrix, 16, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[17]", matrix, 17, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[18]", matrix, 18, Anim),
+      FIELD_MATRIX_ELEM(ColorMatrixFilter, "matrix[19]", matrix, 19, Anim),
+  };
+}
+
 const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
   static const std::vector<ChannelDef> empty = {};
   // Each table is built once on first use. Static locals keep the member-pointer-generated access
@@ -975,6 +1139,42 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::NoiseFilter: {
       static const std::vector<ChannelDef> table = BuildNoiseFilterFields();
+      return table;
+    }
+    case NodeType::MotionTileFilter: {
+      static const std::vector<ChannelDef> table = BuildMotionTileFilterFields();
+      return table;
+    }
+    case NodeType::LevelsIndividualFilter: {
+      static const std::vector<ChannelDef> table = BuildLevelsIndividualFilterFields();
+      return table;
+    }
+    case NodeType::CornerPinFilter: {
+      static const std::vector<ChannelDef> table = BuildCornerPinFilterFields();
+      return table;
+    }
+    case NodeType::BulgeFilter: {
+      static const std::vector<ChannelDef> table = BuildBulgeFilterFields();
+      return table;
+    }
+    case NodeType::GlowFilter: {
+      static const std::vector<ChannelDef> table = BuildGlowFilterFields();
+      return table;
+    }
+    case NodeType::DisplacementMapFilter: {
+      static const std::vector<ChannelDef> table = BuildDisplacementMapFilterFields();
+      return table;
+    }
+    case NodeType::RadialBlurFilter: {
+      static const std::vector<ChannelDef> table = BuildRadialBlurFilterFields();
+      return table;
+    }
+    case NodeType::MosaicFilter: {
+      static const std::vector<ChannelDef> table = BuildMosaicFilterFields();
+      return table;
+    }
+    case NodeType::ColorMatrixFilter: {
+      static const std::vector<ChannelDef> table = BuildColorMatrixFilterFields();
       return table;
     }
     default:

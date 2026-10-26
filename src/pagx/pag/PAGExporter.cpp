@@ -32,19 +32,23 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -55,13 +59,17 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -2387,6 +2395,220 @@ void WriteNoiseFilterTag(pag::EncodeStream* stream, NoiseFilter* filter, EncodeS
   stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
 }
 
+// MotionTileFilter tag (spec 7.5 #579).
+void WriteMotionTileFilterTag(pag::EncodeStream* stream, MotionTileFilter* filter,
+                              EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasTileCenter = filter->tileCenter.x != 0.0f || filter->tileCenter.y != 0.0f;
+  writer.writeFlag(hasTileCenter);
+  writer.writeFlag(filter->tileWidth != 0.0f);
+  writer.writeFlag(filter->tileHeight != 0.0f);
+  writer.writeFlag(filter->outputWidth != 0.0f);
+  writer.writeFlag(filter->outputHeight != 0.0f);
+  writer.writeFlag(filter->mirrorEdges);
+  writer.writeFlag(filter->phase != 0.0f);
+  writer.writeFlag(filter->horizontalPhaseShift);
+  auto* v = writer.valueStream();
+  if (hasTileCenter) {
+    v->writeFloat(filter->tileCenter.x);
+    v->writeFloat(filter->tileCenter.y);
+  }
+  if (filter->tileWidth != 0.0f) v->writeFloat(filter->tileWidth);
+  if (filter->tileHeight != 0.0f) v->writeFloat(filter->tileHeight);
+  if (filter->outputWidth != 0.0f) v->writeFloat(filter->outputWidth);
+  if (filter->outputHeight != 0.0f) v->writeFloat(filter->outputHeight);
+  if (filter->phase != 0.0f) v->writeFloat(filter->phase);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::MotionTileFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// LevelsIndividualFilter tag (spec 7.5 #580): five level controls per channel, existence bits
+// in declaration order (global, red, green, blue).
+void WriteLevelsIndividualFilterTag(pag::EncodeStream* stream, LevelsIndividualFilter* filter,
+                                    EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  float values[20] = {filter->inputBlack,      filter->inputWhite,       filter->gamma,
+                      filter->outputBlack,     filter->outputWhite,      filter->redInputBlack,
+                      filter->redInputWhite,   filter->redGamma,         filter->redOutputBlack,
+                      filter->redOutputWhite,  filter->greenInputBlack,  filter->greenInputWhite,
+                      filter->greenGamma,      filter->greenOutputBlack, filter->greenOutputWhite,
+                      filter->blueInputBlack,  filter->blueInputWhite,   filter->blueGamma,
+                      filter->blueOutputBlack, filter->blueOutputWhite};
+  float defaults[20] = {0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
+  for (int i = 0; i < 20; i++) {
+    writer.writeFlag(values[i] != defaults[i % 5]);
+  }
+  auto* v = writer.valueStream();
+  for (int i = 0; i < 20; i++) {
+    if (values[i] != defaults[i % 5]) v->writeFloat(values[i]);
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::LevelsIndividualFilter,
+                    static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// CornerPinFilter tag (spec 7.5 #581).
+void WriteCornerPinFilterTag(pag::EncodeStream* stream, CornerPinFilter* filter,
+                             EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasUpperLeft = filter->upperLeft.x != 0.0f || filter->upperLeft.y != 0.0f;
+  auto hasUpperRight = filter->upperRight.x != 0.0f || filter->upperRight.y != 0.0f;
+  auto hasLowerLeft = filter->lowerLeft.x != 0.0f || filter->lowerLeft.y != 0.0f;
+  auto hasLowerRight = filter->lowerRight.x != 0.0f || filter->lowerRight.y != 0.0f;
+  writer.writeFlag(hasUpperLeft);
+  writer.writeFlag(hasUpperRight);
+  writer.writeFlag(hasLowerLeft);
+  writer.writeFlag(hasLowerRight);
+  auto* v = writer.valueStream();
+  if (hasUpperLeft) {
+    v->writeFloat(filter->upperLeft.x);
+    v->writeFloat(filter->upperLeft.y);
+  }
+  if (hasUpperRight) {
+    v->writeFloat(filter->upperRight.x);
+    v->writeFloat(filter->upperRight.y);
+  }
+  if (hasLowerLeft) {
+    v->writeFloat(filter->lowerLeft.x);
+    v->writeFloat(filter->lowerLeft.y);
+  }
+  if (hasLowerRight) {
+    v->writeFloat(filter->lowerRight.x);
+    v->writeFloat(filter->lowerRight.y);
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::CornerPinFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// BulgeFilter tag (spec 7.5 #582).
+void WriteBulgeFilterTag(pag::EncodeStream* stream, BulgeFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasBulgeCenter = filter->bulgeCenter.x != 0.0f || filter->bulgeCenter.y != 0.0f;
+  writer.writeFlag(filter->horizontalRadius != 0.0f);
+  writer.writeFlag(filter->verticalRadius != 0.0f);
+  writer.writeFlag(hasBulgeCenter);
+  writer.writeFlag(filter->bulgeHeight != 0.0f);
+  writer.writeFlag(filter->taperRadius != 0.0f);
+  writer.writeFlag(filter->pinning);
+  auto* v = writer.valueStream();
+  if (filter->horizontalRadius != 0.0f) v->writeFloat(filter->horizontalRadius);
+  if (filter->verticalRadius != 0.0f) v->writeFloat(filter->verticalRadius);
+  if (hasBulgeCenter) {
+    v->writeFloat(filter->bulgeCenter.x);
+    v->writeFloat(filter->bulgeCenter.y);
+  }
+  if (filter->bulgeHeight != 0.0f) v->writeFloat(filter->bulgeHeight);
+  if (filter->taperRadius != 0.0f) v->writeFloat(filter->taperRadius);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::BulgeFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// GlowFilter tag (spec 7.5 #583).
+void WriteGlowFilterTag(pag::EncodeStream* stream, GlowFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->glowThreshold != 0.0f);
+  writer.writeFlag(filter->glowRadius != 0.0f);
+  writer.writeFlag(filter->glowIntensity != 1.0f);
+  auto* v = writer.valueStream();
+  if (filter->glowThreshold != 0.0f) v->writeFloat(filter->glowThreshold);
+  if (filter->glowRadius != 0.0f) v->writeFloat(filter->glowRadius);
+  if (filter->glowIntensity != 1.0f) v->writeFloat(filter->glowIntensity);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::GlowFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// DisplacementMapFilter tag (spec 7.5 #584): the map layer is a NodeRef (spec 5.2), resolved
+// from the same emission-order numbering space as Layer::mask.
+void WriteDisplacementMapFilterTag(pag::EncodeStream* stream, DisplacementMapFilter* filter,
+                                   EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasMapLayer = filter->displacementMapLayer != nullptr;
+  writer.writeFlag(filter->useForHorizontalDisplacement != DisplacementMapSource::Red);
+  writer.writeFlag(filter->maxHorizontalDisplacement != 0.0f);
+  writer.writeFlag(filter->useForVerticalDisplacement != DisplacementMapSource::Red);
+  writer.writeFlag(filter->maxVerticalDisplacement != 0.0f);
+  writer.writeFlag(filter->displacementMapBehavior != DisplacementMapBehavior::CenterMap);
+  writer.writeFlag(filter->edgeBehavior);
+  writer.writeFlag(!filter->expandOutput);
+  writer.writeFlag(hasMapLayer);
+  auto* v = writer.valueStream();
+  if (filter->useForHorizontalDisplacement != DisplacementMapSource::Red) {
+    v->writeUint8(static_cast<uint8_t>(filter->useForHorizontalDisplacement));
+  }
+  if (filter->maxHorizontalDisplacement != 0.0f) {
+    v->writeFloat(filter->maxHorizontalDisplacement);
+  }
+  if (filter->useForVerticalDisplacement != DisplacementMapSource::Red) {
+    v->writeUint8(static_cast<uint8_t>(filter->useForVerticalDisplacement));
+  }
+  if (filter->maxVerticalDisplacement != 0.0f) v->writeFloat(filter->maxVerticalDisplacement);
+  if (filter->displacementMapBehavior != DisplacementMapBehavior::CenterMap) {
+    v->writeUint8(static_cast<uint8_t>(filter->displacementMapBehavior));
+  }
+  if (hasMapLayer) {
+    uint32_t mapRef = 0;
+    auto mapIt = state->nodeIndices.find(filter->displacementMapLayer);
+    if (mapIt != state->nodeIndices.end()) {
+      mapRef = mapIt->second + 1;
+    } else {
+      // The map layer lives outside this document's numbering space; spec 5.2 forbids
+      // resolving cross-document references here, so the filter degrades to no map.
+      state->warn(PAGExportWarning::UnresolvedDisplacementMapReference,
+                  "displacement map layer reference cannot be resolved in this document's node "
+                  "numbering space");
+    }
+    v->writeEncodedUint32(mapRef);
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::DisplacementMapFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// RadialBlurFilter tag (spec 7.5 #585).
+void WriteRadialBlurFilterTag(pag::EncodeStream* stream, RadialBlurFilter* filter,
+                              EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  auto hasCenter = filter->center.x != 0.0f || filter->center.y != 0.0f;
+  writer.writeFlag(filter->amount != 0.0f);
+  writer.writeFlag(hasCenter);
+  writer.writeFlag(filter->mode != RadialBlurMode::Spin);
+  writer.writeFlag(filter->antialias != RadialBlurAntialias::Low);
+  auto* v = writer.valueStream();
+  if (filter->amount != 0.0f) v->writeFloat(filter->amount);
+  if (hasCenter) {
+    v->writeFloat(filter->center.x);
+    v->writeFloat(filter->center.y);
+  }
+  if (filter->mode != RadialBlurMode::Spin) {
+    v->writeUint8(static_cast<uint8_t>(filter->mode));
+  }
+  if (filter->antialias != RadialBlurAntialias::Low) {
+    v->writeUint8(static_cast<uint8_t>(filter->antialias));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::RadialBlurFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// MosaicFilter tag (spec 7.5 #586).
+void WriteMosaicFilterTag(pag::EncodeStream* stream, MosaicFilter* filter, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->horizontalBlocks != 1.0f);
+  writer.writeFlag(filter->verticalBlocks != 1.0f);
+  writer.writeFlag(filter->sharpColors);
+  auto* v = writer.valueStream();
+  if (filter->horizontalBlocks != 1.0f) v->writeFloat(filter->horizontalBlocks);
+  if (filter->verticalBlocks != 1.0f) v->writeFloat(filter->verticalBlocks);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::MosaicFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
 // Dispatches a layer filter tag by node type.
 void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeState* state) {
   switch (filter->nodeType()) {
@@ -2415,6 +2637,30 @@ void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeS
       break;
     case NodeType::NoiseFilter:
       WriteNoiseFilterTag(stream, static_cast<NoiseFilter*>(filter), state);
+      break;
+    case NodeType::MotionTileFilter:
+      WriteMotionTileFilterTag(stream, static_cast<MotionTileFilter*>(filter), state);
+      break;
+    case NodeType::LevelsIndividualFilter:
+      WriteLevelsIndividualFilterTag(stream, static_cast<LevelsIndividualFilter*>(filter), state);
+      break;
+    case NodeType::CornerPinFilter:
+      WriteCornerPinFilterTag(stream, static_cast<CornerPinFilter*>(filter), state);
+      break;
+    case NodeType::BulgeFilter:
+      WriteBulgeFilterTag(stream, static_cast<BulgeFilter*>(filter), state);
+      break;
+    case NodeType::GlowFilter:
+      WriteGlowFilterTag(stream, static_cast<GlowFilter*>(filter), state);
+      break;
+    case NodeType::DisplacementMapFilter:
+      WriteDisplacementMapFilterTag(stream, static_cast<DisplacementMapFilter*>(filter), state);
+      break;
+    case NodeType::RadialBlurFilter:
+      WriteRadialBlurFilterTag(stream, static_cast<RadialBlurFilter*>(filter), state);
+      break;
+    case NodeType::MosaicFilter:
+      WriteMosaicFilterTag(stream, static_cast<MosaicFilter*>(filter), state);
       break;
     default:
       break;
@@ -2985,6 +3231,8 @@ std::string WarningCodeName(PAGExportWarning code) {
       return "SubDocumentExpansionLimit";
     case PAGExportWarning::UnresolvedMaskReference:
       return "UnresolvedMaskReference";
+    case PAGExportWarning::UnresolvedDisplacementMapReference:
+      return "UnresolvedDisplacementMapReference";
   }
   return "Unknown";
 }
@@ -3585,6 +3833,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   std::vector<std::pair<Font*, std::string>> restoredFontIds = {};
   std::vector<std::pair<Composition*, std::string>> restoredCompositionIds = {};
   std::vector<std::pair<Layer*, std::string>> restoredMaskIds = {};
+  std::vector<std::pair<Layer*, std::string>> restoredDisplacementMapIds = {};
   std::unordered_set<std::string> takenIds = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -3645,6 +3894,22 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     } while (takenIds.count(layer->mask->id) > 0);
     takenIds.insert(layer->mask->id);
   }
+  // Displacement map layer targets follow the same id synthesis so the XML hop keeps the
+  // filter-to-layer linkage.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::DisplacementMapFilter) {
+      continue;
+    }
+    auto* mapLayer = static_cast<DisplacementMapFilter*>(node.get())->displacementMapLayer;
+    if (mapLayer == nullptr || !mapLayer->id.empty()) {
+      continue;
+    }
+    restoredDisplacementMapIds.push_back({mapLayer, mapLayer->id});
+    do {
+      mapLayer->id = "pag-v4-dmap-" + std::to_string(synthIndex++);
+    } while (takenIds.count(mapLayer->id) > 0);
+    takenIds.insert(mapLayer->id);
+  }
   auto xml = PAGXExporter::ToXML(*document);
   for (auto& restore : restoredFontIds) {
     restore.first->id = restore.second;
@@ -3653,6 +3918,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     restore.first->id = restore.second;
   }
   for (auto& restore : restoredMaskIds) {
+    restore.first->id = restore.second;
+  }
+  for (auto& restore : restoredDisplacementMapIds) {
     restore.first->id = restore.second;
   }
   auto doc = PAGXImporter::FromXML(xml);

@@ -39,6 +39,7 @@ enum class PAGExportWarning {
   UnsupportedColorSource,
   SubDocumentExpansionLimit,
   UnresolvedMaskReference,
+  UnresolvedDisplacementMapReference,
 };
 
 struct PAGExportIssue {

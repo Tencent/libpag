@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -30,24 +31,29 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExternalFiles.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -55,12 +61,16 @@
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
@@ -85,6 +95,8 @@
 #include "pagx/pag/TagCode.h"
 #include "pagx/pag/exporter/ImageProcessor.h"
 #include "pagx/types/ColorSpace.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "utils/ProjectPath.h"
 
 namespace pagx {
@@ -2515,6 +2527,223 @@ PAGX_TEST(PAGImporterTest, LayerStyleExtensionsRoundTrip) {
 
   int byteCount = 0;
   EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "style-ext", &byteCount));
+}
+
+PAGX_TEST(PAGImporterTest, FilterExtensionsRoundTrip) {
+  // P3-7 filter extensions: the eight legacy-effect filters round trip through the binary with
+  // full fields, including the displacement map layer reference. The tgfx rendering for the new
+  // filters lands with their shader implementations (format-layer first, matching P3-6).
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  doc->layers.push_back(layer);
+  auto* mapLayer = doc->makeNode<Layer>();
+  doc->layers.push_back(mapLayer);
+
+  auto* tile = doc->makeNode<MotionTileFilter>();
+  tile->tileCenter = {40.0f, 30.0f};
+  tile->tileWidth = 100.0f;
+  tile->tileHeight = 80.0f;
+  tile->outputWidth = 200.0f;
+  tile->outputHeight = 150.0f;
+  tile->mirrorEdges = true;
+  tile->phase = 2.5f;
+  tile->horizontalPhaseShift = true;
+  layer->filters.push_back(tile);
+
+  auto* levels = doc->makeNode<LevelsIndividualFilter>();
+  levels->inputBlack = 0.05f;
+  levels->inputWhite = 0.9f;
+  levels->gamma = 1.4f;
+  levels->outputBlack = 0.02f;
+  levels->outputWhite = 0.95f;
+  levels->redGamma = 0.8f;
+  levels->greenInputWhite = 0.85f;
+  levels->blueOutputBlack = 0.1f;
+  layer->filters.push_back(levels);
+
+  auto* pin = doc->makeNode<CornerPinFilter>();
+  pin->upperLeft = {10.0f, 20.0f};
+  pin->upperRight = {190.0f, 15.0f};
+  pin->lowerLeft = {5.0f, 180.0f};
+  pin->lowerRight = {195.0f, 185.0f};
+  layer->filters.push_back(pin);
+
+  auto* bulge = doc->makeNode<BulgeFilter>();
+  bulge->horizontalRadius = 60.0f;
+  bulge->verticalRadius = 45.0f;
+  bulge->bulgeCenter = {100.0f, 90.0f};
+  bulge->bulgeHeight = 1.2f;
+  bulge->taperRadius = 30.0f;
+  bulge->pinning = true;
+  layer->filters.push_back(bulge);
+
+  auto* glow = doc->makeNode<GlowFilter>("p37Glow");
+  glow->glowThreshold = 0.4f;
+  glow->glowRadius = 25.0f;
+  glow->glowIntensity = 1.5f;
+  layer->filters.push_back(glow);
+
+  auto* displacement = doc->makeNode<DisplacementMapFilter>();
+  displacement->useForHorizontalDisplacement = DisplacementMapSource::Luminance;
+  displacement->maxHorizontalDisplacement = 12.0f;
+  displacement->useForVerticalDisplacement = DisplacementMapSource::Blue;
+  displacement->maxVerticalDisplacement = -8.0f;
+  displacement->displacementMapBehavior = DisplacementMapBehavior::StretchMapToFit;
+  displacement->edgeBehavior = true;
+  displacement->expandOutput = false;
+  displacement->displacementMapLayer = mapLayer;
+  layer->filters.push_back(displacement);
+
+  auto* radial = doc->makeNode<RadialBlurFilter>();
+  radial->amount = 7.0f;
+  radial->center = {100.0f, 100.0f};
+  radial->mode = RadialBlurMode::Zoom;
+  radial->antialias = RadialBlurAntialias::High;
+  layer->filters.push_back(radial);
+
+  auto* mosaic = doc->makeNode<MosaicFilter>();
+  mosaic->horizontalBlocks = 24.0f;
+  mosaic->verticalBlocks = 18.0f;
+  mosaic->sharpColors = true;
+  layer->filters.push_back(mosaic);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/filter_ext.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/filter_ext.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 2u);
+  auto* dstLayer = decoded->layers[0];
+  ASSERT_EQ(dstLayer->filters.size(), 8u);
+
+  auto* dTile = static_cast<MotionTileFilter*>(dstLayer->filters[0]);
+  EXPECT_EQ(dTile->tileCenter.x, 40.0f);
+  EXPECT_EQ(dTile->tileCenter.y, 30.0f);
+  EXPECT_EQ(dTile->tileWidth, 100.0f);
+  EXPECT_EQ(dTile->tileHeight, 80.0f);
+  EXPECT_EQ(dTile->outputWidth, 200.0f);
+  EXPECT_EQ(dTile->outputHeight, 150.0f);
+  EXPECT_TRUE(dTile->mirrorEdges);
+  EXPECT_EQ(dTile->phase, 2.5f);
+  EXPECT_TRUE(dTile->horizontalPhaseShift);
+
+  auto* dLevels = static_cast<LevelsIndividualFilter*>(dstLayer->filters[1]);
+  EXPECT_EQ(dLevels->inputBlack, 0.05f);
+  EXPECT_EQ(dLevels->inputWhite, 0.9f);
+  EXPECT_EQ(dLevels->gamma, 1.4f);
+  EXPECT_EQ(dLevels->outputBlack, 0.02f);
+  EXPECT_EQ(dLevels->outputWhite, 0.95f);
+  EXPECT_EQ(dLevels->redGamma, 0.8f);
+  EXPECT_EQ(dLevels->greenInputWhite, 0.85f);
+  EXPECT_EQ(dLevels->blueOutputBlack, 0.1f);
+  EXPECT_EQ(dLevels->redInputBlack, 0.0f);
+  EXPECT_EQ(dLevels->blueOutputWhite, 1.0f);
+
+  auto* dPin = static_cast<CornerPinFilter*>(dstLayer->filters[2]);
+  EXPECT_EQ(dPin->upperLeft.x, 10.0f);
+  EXPECT_EQ(dPin->upperLeft.y, 20.0f);
+  EXPECT_EQ(dPin->upperRight.x, 190.0f);
+  EXPECT_EQ(dPin->upperRight.y, 15.0f);
+  EXPECT_EQ(dPin->lowerLeft.x, 5.0f);
+  EXPECT_EQ(dPin->lowerLeft.y, 180.0f);
+  EXPECT_EQ(dPin->lowerRight.x, 195.0f);
+  EXPECT_EQ(dPin->lowerRight.y, 185.0f);
+
+  auto* dBulge = static_cast<BulgeFilter*>(dstLayer->filters[3]);
+  EXPECT_EQ(dBulge->horizontalRadius, 60.0f);
+  EXPECT_EQ(dBulge->verticalRadius, 45.0f);
+  EXPECT_EQ(dBulge->bulgeCenter.x, 100.0f);
+  EXPECT_EQ(dBulge->bulgeCenter.y, 90.0f);
+  EXPECT_EQ(dBulge->bulgeHeight, 1.2f);
+  EXPECT_EQ(dBulge->taperRadius, 30.0f);
+  EXPECT_TRUE(dBulge->pinning);
+
+  auto* dGlow = static_cast<GlowFilter*>(dstLayer->filters[4]);
+  EXPECT_EQ(dGlow->glowThreshold, 0.4f);
+  EXPECT_EQ(dGlow->glowRadius, 25.0f);
+  EXPECT_EQ(dGlow->glowIntensity, 1.5f);
+
+  auto* dDisplacement = static_cast<DisplacementMapFilter*>(dstLayer->filters[5]);
+  EXPECT_EQ(dDisplacement->useForHorizontalDisplacement, DisplacementMapSource::Luminance);
+  EXPECT_EQ(dDisplacement->maxHorizontalDisplacement, 12.0f);
+  EXPECT_EQ(dDisplacement->useForVerticalDisplacement, DisplacementMapSource::Blue);
+  EXPECT_EQ(dDisplacement->maxVerticalDisplacement, -8.0f);
+  EXPECT_EQ(dDisplacement->displacementMapBehavior, DisplacementMapBehavior::StretchMapToFit);
+  EXPECT_TRUE(dDisplacement->edgeBehavior);
+  EXPECT_FALSE(dDisplacement->expandOutput);
+  ASSERT_TRUE(dDisplacement->displacementMapLayer != nullptr);
+  EXPECT_EQ(dDisplacement->displacementMapLayer, decoded->layers[1]);
+
+  auto* dRadial = static_cast<RadialBlurFilter*>(dstLayer->filters[6]);
+  EXPECT_EQ(dRadial->amount, 7.0f);
+  EXPECT_EQ(dRadial->center.x, 100.0f);
+  EXPECT_EQ(dRadial->center.y, 100.0f);
+  EXPECT_EQ(dRadial->mode, RadialBlurMode::Zoom);
+  EXPECT_EQ(dRadial->antialias, RadialBlurAntialias::High);
+
+  auto* dMosaic = static_cast<MosaicFilter*>(dstLayer->filters[7]);
+  EXPECT_EQ(dMosaic->horizontalBlocks, 24.0f);
+  EXPECT_EQ(dMosaic->verticalBlocks, 18.0f);
+  EXPECT_TRUE(dMosaic->sharpColors);
+
+  // The P3-7 parameter channels register for every new filter (reflection-level check): the
+  // runtime apply path additionally requires the node to carry a tgfx binding, which the new
+  // filters gain with their shader implementations (format-layer first, matching P3-6).
+  auto hasChannel = [](NodeType type, const std::string& name) {
+    auto names = ListChannels(type);
+    return std::find(names.begin(), names.end(), name) != names.end();
+  };
+  EXPECT_TRUE(hasChannel(NodeType::MotionTileFilter, "tileCenter.x"));
+  EXPECT_TRUE(hasChannel(NodeType::MotionTileFilter, "phase"));
+  EXPECT_TRUE(hasChannel(NodeType::LevelsIndividualFilter, "redGamma"));
+  EXPECT_TRUE(hasChannel(NodeType::CornerPinFilter, "lowerRight.y"));
+  EXPECT_TRUE(hasChannel(NodeType::BulgeFilter, "bulgeHeight"));
+  EXPECT_TRUE(hasChannel(NodeType::GlowFilter, "glowRadius"));
+  EXPECT_TRUE(hasChannel(NodeType::GlowFilter, "glowIntensity"));
+  EXPECT_TRUE(hasChannel(NodeType::DisplacementMapFilter, "maxVerticalDisplacement"));
+  EXPECT_TRUE(hasChannel(NodeType::RadialBlurFilter, "amount"));
+  EXPECT_TRUE(hasChannel(NodeType::RadialBlurFilter, "center.y"));
+  EXPECT_TRUE(hasChannel(NodeType::MosaicFilter, "horizontalBlocks"));
+
+  // ColorMatrixFilter already has a tgfx binding, so its matrix[i] channels drive end to end:
+  // drive matrix[0] through an animation and check the write-back.
+  auto* colorMatrix = doc->makeNode<ColorMatrixFilter>("p37Matrix");
+  layer->filters.push_back(colorMatrix);
+  auto* animation = doc->makeNode<Animation>();
+  animation->id = "filterChannels";
+  animation->duration = 10;
+  animation->frameRate = 10;
+  auto* matrixObject = doc->makeNode<AnimationObject>();
+  matrixObject->target = "p37Matrix";
+  auto* matrixChannel = doc->makeNode<TypedChannel<float>>();
+  matrixChannel->name = "matrix[0]";
+  Keyframe<float> matrixStart = {};
+  matrixStart.time = 0;
+  matrixStart.value = 1.0f;
+  matrixStart.interpolation = KeyframeInterpolationType::Hold;
+  matrixChannel->keyframes.push_back(matrixStart);
+  Keyframe<float> matrixEnd = {};
+  matrixEnd.time = 5;
+  matrixEnd.value = 0.5f;
+  matrixEnd.interpolation = KeyframeInterpolationType::Hold;
+  matrixChannel->keyframes.push_back(matrixEnd);
+  matrixObject->channels.push_back(matrixChannel);
+  animation->objects.push_back(matrixObject);
+  doc->animations.push_back(animation);
+
+  auto runtimeScene = PAGScene::Make(doc);
+  ASSERT_TRUE(runtimeScene != nullptr);
+  auto filterAnim = runtimeScene->getAnimation("filterChannels");
+  ASSERT_TRUE(filterAnim != nullptr);
+  filterAnim->setCurrentTime(900000);
+  filterAnim->apply(1.0f);
+  // The runtime writer targets the bound tgfx object (the pagx node is the authoring copy).
+  auto* binding = runtimeScene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto tgfxMatrixFilter = binding->get<tgfx::ColorMatrixFilter>(colorMatrix);
+  ASSERT_TRUE(tgfxMatrixFilter != nullptr);
+  EXPECT_EQ(tgfxMatrixFilter->matrix()[0], 0.5f);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "filter-ext", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {

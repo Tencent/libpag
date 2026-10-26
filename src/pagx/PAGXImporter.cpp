@@ -33,19 +33,23 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -53,13 +57,17 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -206,6 +214,14 @@ static BlendFilter* ParseBlendFilter(const DOMNode* node, PAGXDocument* doc);
 static ColorMatrixFilter* ParseColorMatrixFilter(const DOMNode* node, PAGXDocument* doc);
 static NoiseStyle* ParseNoiseStyle(const DOMNode* node, PAGXDocument* doc);
 static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc);
+static MotionTileFilter* ParseMotionTileFilter(const DOMNode* node, PAGXDocument* doc);
+static LevelsIndividualFilter* ParseLevelsIndividualFilter(const DOMNode* node, PAGXDocument* doc);
+static CornerPinFilter* ParseCornerPinFilter(const DOMNode* node, PAGXDocument* doc);
+static BulgeFilter* ParseBulgeFilter(const DOMNode* node, PAGXDocument* doc);
+static GlowFilter* ParseGlowFilter(const DOMNode* node, PAGXDocument* doc);
+static DisplacementMapFilter* ParseDisplacementMapFilter(const DOMNode* node, PAGXDocument* doc);
+static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument* doc);
+static MosaicFilter* ParseMosaicFilter(const DOMNode* node, PAGXDocument* doc);
 
 // A `mask="@id"` reference whose target Layer was not yet registered when the owning Layer was
 // parsed. A mask layer is commonly authored as a (later-parsed) descendant of the masked layer —
@@ -218,6 +234,16 @@ struct PendingMaskRef {
   const DOMNode* node = nullptr;  // owning Layer's DOM node, for error reporting
 };
 static std::vector<PendingMaskRef> gPendingMaskRefs = {};
+
+// Displacement map layer references follow the same forward-reference pattern as masks: the map
+// layer often appears later in the tree, so unresolved ids are collected and fixed up after the
+// full parse (see ParseDocument's resolution pass).
+struct PendingDisplacementMapRef {
+  DisplacementMapFilter* owner = nullptr;
+  std::string mapId = {};
+  const DOMNode* node = nullptr;
+};
+static std::vector<PendingDisplacementMapRef> gPendingDisplacementMapRefs = {};
 
 //==============================================================================
 // Custom data parsing
@@ -867,6 +893,30 @@ static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "NoiseFilter") {
     return ParseNoiseFilter(node, doc);
+  }
+  if (node->name == "MotionTileFilter") {
+    return ParseMotionTileFilter(node, doc);
+  }
+  if (node->name == "LevelsIndividualFilter") {
+    return ParseLevelsIndividualFilter(node, doc);
+  }
+  if (node->name == "CornerPinFilter") {
+    return ParseCornerPinFilter(node, doc);
+  }
+  if (node->name == "BulgeFilter") {
+    return ParseBulgeFilter(node, doc);
+  }
+  if (node->name == "GlowFilter") {
+    return ParseGlowFilter(node, doc);
+  }
+  if (node->name == "DisplacementMapFilter") {
+    return ParseDisplacementMapFilter(node, doc);
+  }
+  if (node->name == "RadialBlurFilter") {
+    return ParseRadialBlurFilter(node, doc);
+  }
+  if (node->name == "MosaicFilter") {
+    return ParseMosaicFilter(node, doc);
   }
   return nullptr;
 }
@@ -2558,6 +2608,169 @@ static GlassStyle* ParseGlassStyle(const DOMNode* node, PAGXDocument* doc) {
 // Layer filter parsing
 //==============================================================================
 
+static MotionTileFilter* ParseMotionTileFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<MotionTileFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->tileCenter =
+      GetPointAttribute(node, "tileCenter", Default<MotionTileFilter>().tileCenter, doc);
+  filter->tileWidth =
+      GetFloatAttribute(node, "tileWidth", Default<MotionTileFilter>().tileWidth, doc);
+  filter->tileHeight =
+      GetFloatAttribute(node, "tileHeight", Default<MotionTileFilter>().tileHeight, doc);
+  filter->outputWidth =
+      GetFloatAttribute(node, "outputWidth", Default<MotionTileFilter>().outputWidth, doc);
+  filter->outputHeight =
+      GetFloatAttribute(node, "outputHeight", Default<MotionTileFilter>().outputHeight, doc);
+  filter->mirrorEdges =
+      GetBoolAttribute(node, "mirrorEdges", Default<MotionTileFilter>().mirrorEdges, doc);
+  filter->phase = GetFloatAttribute(node, "phase", Default<MotionTileFilter>().phase, doc);
+  filter->horizontalPhaseShift = GetBoolAttribute(
+      node, "horizontalPhaseShift", Default<MotionTileFilter>().horizontalPhaseShift, doc);
+  return filter;
+}
+
+static LevelsIndividualFilter* ParseLevelsIndividualFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<LevelsIndividualFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  auto defaults = Default<LevelsIndividualFilter>();
+  filter->inputBlack = GetFloatAttribute(node, "inputBlack", defaults.inputBlack, doc);
+  filter->inputWhite = GetFloatAttribute(node, "inputWhite", defaults.inputWhite, doc);
+  filter->gamma = GetFloatAttribute(node, "gamma", defaults.gamma, doc);
+  filter->outputBlack = GetFloatAttribute(node, "outputBlack", defaults.outputBlack, doc);
+  filter->outputWhite = GetFloatAttribute(node, "outputWhite", defaults.outputWhite, doc);
+  filter->redInputBlack = GetFloatAttribute(node, "redInputBlack", defaults.redInputBlack, doc);
+  filter->redInputWhite = GetFloatAttribute(node, "redInputWhite", defaults.redInputWhite, doc);
+  filter->redGamma = GetFloatAttribute(node, "redGamma", defaults.redGamma, doc);
+  filter->redOutputBlack = GetFloatAttribute(node, "redOutputBlack", defaults.redOutputBlack, doc);
+  filter->redOutputWhite = GetFloatAttribute(node, "redOutputWhite", defaults.redOutputWhite, doc);
+  filter->greenInputBlack =
+      GetFloatAttribute(node, "greenInputBlack", defaults.greenInputBlack, doc);
+  filter->greenInputWhite =
+      GetFloatAttribute(node, "greenInputWhite", defaults.greenInputWhite, doc);
+  filter->greenGamma = GetFloatAttribute(node, "greenGamma", defaults.greenGamma, doc);
+  filter->greenOutputBlack =
+      GetFloatAttribute(node, "greenOutputBlack", defaults.greenOutputBlack, doc);
+  filter->greenOutputWhite =
+      GetFloatAttribute(node, "greenOutputWhite", defaults.greenOutputWhite, doc);
+  filter->blueInputBlack = GetFloatAttribute(node, "blueInputBlack", defaults.blueInputBlack, doc);
+  filter->blueInputWhite = GetFloatAttribute(node, "blueInputWhite", defaults.blueInputWhite, doc);
+  filter->blueGamma = GetFloatAttribute(node, "blueGamma", defaults.blueGamma, doc);
+  filter->blueOutputBlack =
+      GetFloatAttribute(node, "blueOutputBlack", defaults.blueOutputBlack, doc);
+  filter->blueOutputWhite =
+      GetFloatAttribute(node, "blueOutputWhite", defaults.blueOutputWhite, doc);
+  return filter;
+}
+
+static CornerPinFilter* ParseCornerPinFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<CornerPinFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->upperLeft =
+      GetPointAttribute(node, "upperLeft", Default<CornerPinFilter>().upperLeft, doc);
+  filter->upperRight =
+      GetPointAttribute(node, "upperRight", Default<CornerPinFilter>().upperRight, doc);
+  filter->lowerLeft =
+      GetPointAttribute(node, "lowerLeft", Default<CornerPinFilter>().lowerLeft, doc);
+  filter->lowerRight =
+      GetPointAttribute(node, "lowerRight", Default<CornerPinFilter>().lowerRight, doc);
+  return filter;
+}
+
+static BulgeFilter* ParseBulgeFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<BulgeFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->horizontalRadius =
+      GetFloatAttribute(node, "horizontalRadius", Default<BulgeFilter>().horizontalRadius, doc);
+  filter->verticalRadius =
+      GetFloatAttribute(node, "verticalRadius", Default<BulgeFilter>().verticalRadius, doc);
+  filter->bulgeCenter =
+      GetPointAttribute(node, "bulgeCenter", Default<BulgeFilter>().bulgeCenter, doc);
+  filter->bulgeHeight =
+      GetFloatAttribute(node, "bulgeHeight", Default<BulgeFilter>().bulgeHeight, doc);
+  filter->taperRadius =
+      GetFloatAttribute(node, "taperRadius", Default<BulgeFilter>().taperRadius, doc);
+  filter->pinning = GetBoolAttribute(node, "pinning", Default<BulgeFilter>().pinning, doc);
+  return filter;
+}
+
+static GlowFilter* ParseGlowFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<GlowFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->glowThreshold =
+      GetFloatAttribute(node, "glowThreshold", Default<GlowFilter>().glowThreshold, doc);
+  filter->glowRadius = GetFloatAttribute(node, "glowRadius", Default<GlowFilter>().glowRadius, doc);
+  filter->glowIntensity =
+      GetFloatAttribute(node, "glowIntensity", Default<GlowFilter>().glowIntensity, doc);
+  return filter;
+}
+
+static DisplacementMapFilter* ParseDisplacementMapFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<DisplacementMapFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->useForHorizontalDisplacement =
+      GET_ENUM(node, "useForHorizontalDisplacement", "red", doc, DisplacementMapSource);
+  filter->maxHorizontalDisplacement =
+      GetFloatAttribute(node, "maxHorizontalDisplacement",
+                        Default<DisplacementMapFilter>().maxHorizontalDisplacement, doc);
+  filter->useForVerticalDisplacement =
+      GET_ENUM(node, "useForVerticalDisplacement", "red", doc, DisplacementMapSource);
+  filter->maxVerticalDisplacement =
+      GetFloatAttribute(node, "maxVerticalDisplacement",
+                        Default<DisplacementMapFilter>().maxVerticalDisplacement, doc);
+  filter->displacementMapBehavior =
+      GET_ENUM(node, "displacementMapBehavior", "centerMap", doc, DisplacementMapBehavior);
+  filter->edgeBehavior =
+      GetBoolAttribute(node, "edgeBehavior", Default<DisplacementMapFilter>().edgeBehavior, doc);
+  filter->expandOutput =
+      GetBoolAttribute(node, "expandOutput", Default<DisplacementMapFilter>().expandOutput, doc);
+  auto mapAttr = GetAttribute(node, "map");
+  if (!mapAttr.empty() && mapAttr[0] == '@') {
+    filter->displacementMapLayer = doc->findNode<Layer>(mapAttr.substr(1));
+    if (!filter->displacementMapLayer) {
+      gPendingDisplacementMapRefs.push_back({filter, mapAttr.substr(1), node});
+    }
+  }
+  return filter;
+}
+
+static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<RadialBlurFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->amount = GetFloatAttribute(node, "amount", Default<RadialBlurFilter>().amount, doc);
+  filter->center = GetPointAttribute(node, "center", Default<RadialBlurFilter>().center, doc);
+  filter->mode = GET_ENUM(node, "mode", "spin", doc, RadialBlurMode);
+  filter->antialias = GET_ENUM(node, "antialias", "low", doc, RadialBlurAntialias);
+  return filter;
+}
+
+static MosaicFilter* ParseMosaicFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<MosaicFilter>(node, doc);
+  if (!filter) {
+    return nullptr;
+  }
+  filter->horizontalBlocks =
+      GetFloatAttribute(node, "horizontalBlocks", Default<MosaicFilter>().horizontalBlocks, doc);
+  filter->verticalBlocks =
+      GetFloatAttribute(node, "verticalBlocks", Default<MosaicFilter>().verticalBlocks, doc);
+  filter->sharpColors =
+      GetBoolAttribute(node, "sharpColors", Default<MosaicFilter>().sharpColors, doc);
+  return filter;
+}
+
 static NoiseFilter* ParseNoiseFilter(const DOMNode* node, PAGXDocument* doc) {
   auto filter = makeNodeFromXML<NoiseFilter>(node, doc);
   if (!filter) {
@@ -3083,6 +3296,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
   gPendingMaskRefs.clear();
+  gPendingDisplacementMapRefs.clear();
 
   // First pass: Parse Resources.
   auto child = root->getFirstChild("Resources");
@@ -3133,6 +3347,18 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
   }
   gPendingMaskRefs.clear();
+
+  // Displacement map layers resolve with the same forward-reference pass.
+  for (const auto& pending : gPendingDisplacementMapRefs) {
+    auto* mapLayer = doc->findNode<Layer>(pending.mapId);
+    if (mapLayer) {
+      pending.owner->displacementMapLayer = mapLayer;
+    } else {
+      ReportError(doc, pending.node,
+                  "Resource '@" + pending.mapId + "' not found for 'map' attribute.");
+    }
+  }
+  gPendingDisplacementMapRefs.clear();
 }
 
 // Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:
