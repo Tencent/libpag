@@ -13,6 +13,9 @@ import { destroyVerify } from './utils/decorators';
 // still surfacing a stuck readback instead of waiting forever.
 const READBACK_TIMEOUT_MS = 30000;
 
+// Throttles the unsupported-surface warning of readPixelsAsync() to a single console entry.
+let readbackUnsupportedWarned = false;
+
 @destroyVerify
 export class PAGSurface {
   /**
@@ -29,11 +32,11 @@ export class PAGSurface {
       }
       const wasmIns = PAGModule._PAGSurface._FromCanvasObject!(canvas);
       if (!wasmIns) throw new Error('Make PAGSurface from canvas object fail!');
-      return new PAGSurface(wasmIns);
+      return new PAGSurface(wasmIns).markCanvasBacked();
     }
     const wasmIns = PAGModule._PAGSurface._FromCanvas(canvas);
     if (!wasmIns) throw new Error(`Make PAGSurface from canvas ${canvas} fail!`);
-    return new PAGSurface(wasmIns);
+    return new PAGSurface(wasmIns).markCanvasBacked();
   }
   /**
    * Make a PAGSurface from texture. On the WebGL backend, pass the numeric texture handle
@@ -83,10 +86,16 @@ export class PAGSurface {
   public isDestroyed = false;
 
   private webGPUTextureHandle = 0;
+  private isCanvasBacked = false;
 
   public constructor(wasmIns: any, webGPUTextureHandle = 0) {
     this.wasmIns = wasmIns;
     this.webGPUTextureHandle = webGPUTextureHandle;
+  }
+
+  private markCanvasBacked(): PAGSurface {
+    this.isCanvasBacked = true;
+    return this;
   }
   /**
    * The width of surface in pixels.
@@ -135,16 +144,28 @@ export class PAGSurface {
   }
   /**
    * Asynchronously reads pixels from current PAGSurface with specified color type and alpha type.
-   * Works on every backend: on WebGL the returned promise resolves within the current frame, on
-   * WebGPU it resolves once the GPU readback mapping completes. Returns null on failure or when
-   * the readback does not complete within 30 seconds. Do not call readPixelsAsync() again on the
-   * same surface before the previous call settles; each concurrent session holds its own GPU
-   * readback buffer.
+   * On WebGL the returned promise resolves within the current frame; on WebGPU it resolves once
+   * the GPU readback mapping completes. Returns null on failure or when the readback does not
+   * complete within 30 seconds.
+   *
+   * Canvas-backed surfaces (created by fromCanvas(), including the surfaces used by PAGView on
+   * the WebGPU backend) cannot be read back after the frame is presented, so this method always
+   * returns null for them; call PAGView.makeSnapshot() instead, or render to an offscreen
+   * PAGSurface and read from it. Do not call readPixelsAsync() again on the same surface before
+   * the previous call settles; each concurrent session holds its own GPU readback buffer.
    */
   public async readPixelsAsync(colorType: ColorType, alphaType: AlphaType): Promise<Uint8Array | null> {
     if (colorType === ColorType.Unknown) return null;
     const session = this.wasmIns._readPixelsAsync();
-    if (!session) return null;
+    if (!session) {
+      if (this.isCanvasBacked && !readbackUnsupportedWarned) {
+        readbackUnsupportedWarned = true;
+        console.warn(
+          'PAGSurface.readPixelsAsync() is not supported on canvas-backed surfaces. Use PAGView.makeSnapshot() or read from an offscreen PAGSurface instead.',
+        );
+      }
+      return null;
+    }
     try {
       const deadline = Date.now() + READBACK_TIMEOUT_MS;
       while (!session._isReady()) {

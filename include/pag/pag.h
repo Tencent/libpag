@@ -1319,7 +1319,9 @@ class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
    * PAGSurfaceReadback::isReady() until it returns true, then copy the pixels out with
    * PAGSurfaceReadback::readPixels(). On the WebGPU backend, where synchronous GPU readback is
    * unsupported, this is the only way to read pixels. The returned session keeps this PAGSurface
-   * alive. Returns nullptr if the readback could not be started.
+   * alive. Returns nullptr if the readback could not be started, which is always the case for
+   * canvas-backed surfaces (e.g. created from a web canvas): their frames can only be read back
+   * between drawing and presentation, which the PAGPlayer::flush() flow does not expose.
    */
   std::shared_ptr<PAGSurfaceReadback> asyncReadPixels();
 

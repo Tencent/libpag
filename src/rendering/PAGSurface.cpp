@@ -273,6 +273,10 @@ std::shared_ptr<PAGSurfaceReadback> PAGSurface::asyncReadPixels() {
   }
   auto readback = surface->asyncReadPixels(tgfx::Rect::MakeWH(surface->width(), surface->height()));
   if (readback == nullptr) {
+    LOGE(
+        "PAGSurface::asyncReadPixels() The surface does not support readback. Canvas-backed "
+        "surfaces can only be read between drawing and presentation, which the PAGPlayer::flush() "
+        "flow does not expose.");
     unlockContext();
     return nullptr;
   }
