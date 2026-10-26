@@ -566,7 +566,13 @@ PAGDisplayOptions* PAGScene::getDisplayOptions() const {
 
 void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
   if (_rootComposition != nullptr) {
-    _rootComposition->advance(deltaMicroseconds);
+    // Scale stretching (spec 3.4) rescales the scene clock; the loop-mode mapping (Repeat /
+    // RepeatInverted / None) rides the default timeline's runtime loop override instead.
+    auto scaledDelta =
+        _stretchRate != 1.0
+            ? static_cast<int64_t>(static_cast<double>(deltaMicroseconds) * _stretchRate)
+            : deltaMicroseconds;
+    _rootComposition->advance(scaledDelta);
     // Time-lock pass (spec 6.3): locked composition instances derive their position from the
     // default timeline's current time (the parent clock), not from their own advancement.
     auto defaultTimeline = getDefaultTimeline();
@@ -581,6 +587,56 @@ void PAGScene::advanceAndApply(int64_t deltaMicroseconds) {
 
 std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
   return rootViewModel;
+}
+
+TimeStretchMode PAGScene::timeStretchMode() const {
+  return _stretchMode;
+}
+
+void PAGScene::setTimeStretchMode(TimeStretchMode mode) {
+  _stretchMode = mode;
+  applyTimeStretch();
+}
+
+void PAGScene::setDuration(double seconds) {
+  _stretchTargetSeconds = seconds;
+  applyTimeStretch();
+}
+
+double PAGScene::timeStretchRate() const {
+  return _stretchRate;
+}
+
+void PAGScene::applyTimeStretch() {
+  // Loop mapping: Repeat / RepeatInverted map onto Loop / PingPong; None and Scale hold the
+  // last frame instead of looping.
+  auto timeline = getDefaultTimeline();
+  auto animation = std::dynamic_pointer_cast<PAGAnimation>(timeline);
+  if (animation != nullptr) {
+    switch (_stretchMode) {
+      case TimeStretchMode::Repeat:
+        animation->setLoopMode(LoopMode::Loop);
+        break;
+      case TimeStretchMode::RepeatInverted:
+        animation->setLoopMode(LoopMode::PingPong);
+        break;
+      case TimeStretchMode::None:
+      case TimeStretchMode::Scale:
+        animation->setLoopMode(LoopMode::Once);
+        break;
+    }
+  }
+  // Clock scaling applies to Scale only: rate = originalDuration / targetDuration, so the
+  // content finishes exactly at the target. A non-positive target (or a missing timeline)
+  // resets the clock.
+  _stretchRate = 1.0;
+  if (_stretchMode == TimeStretchMode::Scale && _stretchTargetSeconds > 0.0 &&
+      animation != nullptr) {
+    auto originalSeconds = static_cast<double>(animation->duration()) / 1000000.0;
+    if (originalSeconds > 0.0) {
+      _stretchRate = originalSeconds / _stretchTargetSeconds;
+    }
+  }
 }
 
 void PAGScene::flushDataBinds() {

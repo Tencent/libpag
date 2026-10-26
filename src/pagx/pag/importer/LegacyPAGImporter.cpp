@@ -313,6 +313,14 @@ Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* l
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
+  // Audio (spec 3.4): same carry as vector compositions.
+  if (legacy->audioBytes != nullptr) {
+    composition->audioData =
+        Data::MakeWithCopy(legacy->audioBytes->data(), legacy->audioBytes->length());
+    composition->audioStartTime =
+        legacy->frameRate > 0 ? static_cast<float>(legacy->audioStartTime) / legacy->frameRate
+                              : 0.0f;
+  }
   Image* primaryImage = nullptr;
   if (legacy->type() == pag::CompositionType::Video) {
     auto* video = static_cast<pag::VideoComposition*>(legacy);
@@ -413,6 +421,15 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
+  // Audio (spec 3.4): the AAC stream is carried as-is; the start time converts from legacy
+  // frames to seconds on the composition's frame rate.
+  if (legacy->audioBytes != nullptr) {
+    composition->audioData =
+        Data::MakeWithCopy(legacy->audioBytes->data(), legacy->audioBytes->length());
+    composition->audioStartTime =
+        legacy->frameRate > 0 ? static_cast<float>(legacy->audioStartTime) / legacy->frameRate
+                              : 0.0f;
+  }
   // Composition-scoped animations (spec 5.4) auto-play in the instance; the migrated
   // keyframe animation is attached here (or stays absent for fully static compositions).
   auto animIt = state->compositionAnimations.find(legacy);

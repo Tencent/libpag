@@ -138,6 +138,9 @@ struct EncodeState {
   std::vector<PAGExportIssue> warnings;
   std::vector<ImageTableEntry> imageEntries;
   std::unordered_map<const Image*, uint32_t> imageIndices;
+  // Composition audio entries (spec 3.4): one ImageTable mediaType 4 entry per composition
+  // carrying audio, referenced from the composition block.
+  std::unordered_map<const Composition*, uint32_t> compositionAudioIndices;
   // Shared-image placement (spec §5.3, §12): sharing is content-based — patterns referencing
   // the same ImageTable entry (T4 already dedups identical bytes into one entry) share one
   // ResourceBlock slot in first-reference order (sharedImageOrder holds the representative
@@ -2251,6 +2254,23 @@ void WriteLayerTag(pag::EncodeStream* stream, Layer* layer, EncodeState* state);
 
 // CompositionBlock (spec §9.1 #297): DocumentAttributes (263: width/height, viewModel NodeRef)
 // followed by the composition's layer tags, animation and data-bind sections, End-terminated.
+// Collects the compositions reachable from a layer tree (layer->composition chains, recursing
+// into composition layers), used by the audio entry collection.
+void CollectCompositionsFromLayer(Layer* layer, std::vector<Composition*>* outCompositions) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->composition != nullptr) {
+    outCompositions->push_back(layer->composition);
+    for (auto* compLayer : layer->composition->layers) {
+      CollectCompositionsFromLayer(compLayer, outCompositions);
+    }
+  }
+  for (auto* child : layer->children) {
+    CollectCompositionsFromLayer(child, outCompositions);
+  }
+}
+
 void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
                            EncodeState* state) {
   pag::EncodeStream content(&state->streamContext);
@@ -2286,6 +2306,21 @@ void WriteCompositionBlock(pag::EncodeStream* stream, Composition* composition,
   }
   for (auto* bind : composition->dataBinds) {
     WriteDataBindTag(&content, bind, state);
+  }
+  // The audio track (spec 3.4) rides the ImageTable as a mediaType 4 entry; the block records
+  // the table reference plus the start time.
+  auto audioIt = state->compositionAudioIndices.find(composition);
+  if (audioIt != state->compositionAudioIndices.end()) {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasStartTime = composition->audioStartTime != 0.0f;
+    writer.writeFlag(true);
+    writer.writeFlag(hasStartTime);
+    auto* v = writer.valueStream();
+    v->writeEncodedUint32(audioIt->second + 1);
+    if (hasStartTime) v->writeFloat(composition->audioStartTime);
+    auto block = writer.release();
+    WritePAGTagHeader(&content, TagCode::CompositionAudio, static_cast<uint32_t>(block->length()));
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
   }
   WritePAGTagHeader(&content, TagCode::End, 0);
   WriteTag(stream, TagCode::CompositionBlock, &content);
@@ -4115,6 +4150,28 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
                          imageResult.warnings.end());
   state->imageEntries = std::move(imageResult.entries);
   state->imageIndices = std::move(imageResult.imageIndices);
+  // Composition audio tracks (spec 3.4) ride the same ImageTable as mediaType 4 entries. The
+  // walk covers the root document's compositions (nested through layer->composition chains);
+  // sub-document audio is a known gap pending a shared-entry use case.
+  {
+    std::vector<Composition*> compositions = {};
+    for (auto* rootLayer : doc->layers) {
+      CollectCompositionsFromLayer(rootLayer, &compositions);
+    }
+    for (auto* composition : compositions) {
+      if (composition == nullptr || composition->audioData == nullptr ||
+          composition->audioData->empty()) {
+        continue;
+      }
+      ImageTableEntry audioEntry = {};
+      audioEntry.mediaType = 4;
+      audioEntry.data = composition->audioData;
+      audioEntry.scaleFactor = 1.0f;
+      state->compositionAudioIndices[composition] =
+          static_cast<uint32_t>(state->imageEntries.size());
+      state->imageEntries.push_back(std::move(audioEntry));
+    }
+  }
   // Shared-image placement (spec §5.3): count references per ImageTable entry; entries
   // referenced by two or more patterns go into the ResourceBlock (first-reference order),
   // single-use entries are inlined at the referencing pattern's value-area end.

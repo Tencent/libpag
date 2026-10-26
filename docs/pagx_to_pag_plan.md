@@ -219,6 +219,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-10b 序列合成迁移（LegacyPAGImporter：VideoComposition/BitmapComposition → 序列 Image 全量入表（多分辨率保留、主序列=sequences.back() 对齐 Sequence::Get、渲染层=全幅 Rectangle+ImagePattern Stretch）；ImageProcessor 序列 Image 无条件收集；ExportToPAG 序列 Image id 合成保 XML hop 元数据。SequencePlayer 运行时帧调度/软解对比随 P3-10c） | fa8d6a847 |
 | P3-10c SequencePlayer 帧调度（src/pagx/runtime/SequencePlayer：容器重建旧内存结构复用 VideoSequenceDemuxer+VideoReader/BitmapSequenceReader，frameAt 惰性 SequenceFrameGenerator；LayerBuilder 序列 pattern 注册 RuntimeBinding.sequencePatterns；PAGScene::draw 前 flushSequenceFrames 递归整树按默认时间线刷帧。bitmap 与视频链路全验证（contentA/diff>0，双管线对照一致）；**视频修复**：frameAt 补 makeRGBAAA 双区重采样（根因：缺 RGBAAA 时 I420 双区帧无法采样，软/硬解均连锁失败，修复后两解码路径均正常）） | ec941f1a1 |
 | P3-10c-fix 视频帧 RGBAAA 修复（SequencePlayer::frameAt 对视频帧做 makeRGBAAA(w,h,alphaStart) 双区重采样对齐 SequenceInfo::MakeSequenceImage；解码器回退平台默认工厂列表（硬解优先+软解兜底）对齐旧管线；VideoSequenceFrameSchedulingTest 新旧双管线对照回归） | 75b29ca33 |
+| P3-11 时间伸缩与音频（TimeStretchMode + PAGScene::setTimeStretchMode/setDuration：Repeat/Inverted→运行时 Loop/PingPong 覆盖、None→Once、Scale→rate 注入；Composition.audioData/startTime：ImageTable mediaType=4 + CompositionAudio 588 + XML data URI + 迁移帧转秒） | 本次提交 |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip

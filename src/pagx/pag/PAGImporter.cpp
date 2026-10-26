@@ -156,6 +156,8 @@ struct DecodeContext {
   // DisplacementMapFilter map-layer NodeRefs: backfilled with the mask refs, when the node
   // table (creation order = emission order, spec 5.1) is complete.
   std::vector<std::pair<DisplacementMapFilter*, uint32_t>> pendingDisplacementMapRefs = {};
+  // Composition audio ImageTable references (spec 3.4), backfilled with the image refs.
+  std::vector<std::pair<Composition*, uint32_t>> pendingCompositionAudioRefs = {};
   PAGXDocument* document = nullptr;
   uint16_t tagLevel = 0;
 
@@ -826,10 +828,10 @@ void ReadImageTable(pag::DecodeStream* tagStream, size_t contentFileOffset,
       PAGThrowError(tagStream->context, "image data extends past the image table");
       return;
     }
-    if (entry.mediaType <= 3 && byteLength > 0) {
+    if (entry.mediaType <= 4 && byteLength > 0) {
       entry.data = Data::MakeSlice(context->fileData, dataOffset, byteLength);
     }
-    // Unknown mediaType (>3): the bytes are consumed but the entry stays empty and
+    // Unknown mediaType (>4): the bytes are consumed but the entry stays empty and
     // referencing images render as empty (§6.6).
     tagStream->readBytes(byteLength);
     entry.logicalWidth = tagStream->readUint32();
@@ -1190,6 +1192,17 @@ Composition* ReadCompositionBlock(pag::DecodeStream* tagStream, DecodeContext* c
       if (bind != nullptr) {
         composition->dataBinds.push_back(bind);
       }
+    } else if (header.code == TagCode::CompositionAudio) {
+      // The audio track (spec 3.4): an ImageTable reference plus the start time. The data
+      // itself backfills after the ImageTable decodes.
+      PAGAttributeBlockReader reader(&tagBytes, 2);
+      bool hasAudio = reader.flag(0);
+      bool hasStartTime = reader.flag(1);
+      tagBytes.alignWithBytes();
+      if (hasAudio) {
+        context->pendingCompositionAudioRefs.push_back({composition, tagBytes.readEncodedUint32()});
+      }
+      if (hasStartTime) composition->audioStartTime = tagBytes.readFloat();
     }
   }
   return composition;
@@ -2890,6 +2903,17 @@ std::shared_ptr<PAGXDocument> PAGImporter::LoadFromPAG(const std::string& filePa
     auto* node = doc->nodes[pending.second - 1].get();
     if (node->nodeType() == NodeType::Layer) {
       pending.first->displacementMapLayer = static_cast<Layer*>(node);
+    }
+  }
+
+  // Backfill composition audio refs against the ImageTable (mediaType 4 entries).
+  for (auto& pending : context.pendingCompositionAudioRefs) {
+    if (pending.second == 0 || pending.second > context.imageEntries.size()) {
+      continue;
+    }
+    auto& entry = context.imageEntries[pending.second - 1];
+    if (entry.mediaType == 4 && entry.data != nullptr) {
+      pending.first->audioData = entry.data;
     }
   }
   // Restore the retained ids once the emission-order node list is complete (spec §9.0): these

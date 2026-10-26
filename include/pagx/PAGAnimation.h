@@ -102,6 +102,14 @@ class PAGAnimation : public PAGTimeline {
   int64_t currentTime() const;
 
   /**
+   * Overrides the loop mode of the wrapped Animation for this runtime instance only (the
+   * document node stays untouched). Document-level time stretching (spec 3.4) maps Repeat /
+   * RepeatInverted onto Loop / PingPong this way. Passing reset clears the override back to the
+   * document value.
+   */
+  void setLoopMode(LoopMode mode, bool reset = false);
+
+  /**
    * Advances the current time by deltaMicroseconds, respecting the loop mode. Does not change the
    * content; call apply() to reflect the new time.
    * @param deltaMicroseconds the elapsed time in microseconds. May be negative.
@@ -148,6 +156,15 @@ class PAGAnimation : public PAGTimeline {
   // an incremental tree refresh changes binding membership in place, which keeps this timeline and
   // its binding pointer so no other signal would trigger a re-resolve.
   bool targetsDirty = true;
+  // Runtime loop override (spec 3.4 time stretching): when set, every loop-mode read goes
+  // through effectiveLoop() instead of the document node's value.
+  bool loopOverridden = false;
+  LoopMode loopOverride = LoopMode::Once;
+
+  LoopMode effectiveLoop() const {
+    return loopOverridden ? loopOverride : (animation != nullptr ? animation->loop : LoopMode::Once);
+  }
+
   // Raw accumulated time in microseconds, not folded by the loop mode. Folding is deferred to
   // currentTime() and apply() so the content offset can be subtracted on the raw timeline. May be
   // negative; advance() accumulates, setCurrentTime() clamps to >= 0.

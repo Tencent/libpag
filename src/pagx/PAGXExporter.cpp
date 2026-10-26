@@ -1801,6 +1801,15 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.addAttribute("id", comp->id);
       xml.addRequiredAttribute("width", comp->width);
       xml.addRequiredAttribute("height", comp->height);
+      if (comp->audioData != nullptr && !comp->audioData->empty()) {
+        // The audio track rides the binary ImageTable; the data URI keeps the internal XML hop
+        // lossless (spec 3.4).
+        const auto* audioBytes = comp->audioData->bytes();
+        auto audioSize = comp->audioData->size();
+        xml.addAttribute(
+            "audio", std::string("data:audio/mp4;base64,") + Base64Encode(audioBytes, audioSize));
+        xml.addAttribute("audioStartTime", comp->audioStartTime);
+      }
       if (comp->viewModel != nullptr) xml.addAttribute("viewModel", "@" + comp->viewModel->id);
       WriteCustomData(xml, node);
       if (comp->layers.empty() && comp->animations.empty() && comp->dataBinds.empty()) {

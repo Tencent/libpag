@@ -1690,6 +1690,13 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc) {
   }
   comp->width = GetFloatAttribute(node, "width", Default<Composition>().width, doc);
   comp->height = GetFloatAttribute(node, "height", Default<Composition>().height, doc);
+  // The audio track (spec 3.4): an AAC stream in an MP4 container, carried as a data URI.
+  auto audio = GetAttribute(node, "audio");
+  if (audio.rfind("data:audio/mp4;base64,", 0) == 0) {
+    comp->audioData = DecodeBase64DataURI(audio);
+  }
+  comp->audioStartTime =
+      GetFloatAttribute(node, "audioStartTime", Default<Composition>().audioStartTime, doc);
   auto viewModelAttr = GetAttribute(node, "viewModel");
   if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
     comp->viewModel = doc->findNode<ViewModel>(viewModelAttr.substr(1));

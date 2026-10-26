@@ -109,7 +109,7 @@ int64_t PAGAnimation::playbackPeriod() const {
     return 0;
   }
   auto duration = DurationMicros(animation);
-  return animation->loop == LoopMode::PingPong ? duration * 2 : duration;
+  return effectiveLoop() == LoopMode::PingPong ? duration * 2 : duration;
 }
 
 int64_t PAGAnimation::playbackPosition() const {
@@ -119,7 +119,7 @@ int64_t PAGAnimation::playbackPosition() const {
   }
   // Once does not repeat: clamp to [0, period] so the position stays at the end after finishing,
   // instead of wrapping back to 0 (which would make the progress bar jump to the start).
-  if (animation->loop == LoopMode::Once) {
+  if (effectiveLoop() == LoopMode::Once) {
     return std::clamp<int64_t>(elapsedUs, 0, period);
   }
   auto pos = elapsedUs % period;
@@ -138,6 +138,15 @@ int64_t PAGAnimation::playbackPosition() const {
 
 void PAGAnimation::setCurrentTime(int64_t microseconds) {
   elapsedUs = std::max<int64_t>(0, microseconds);
+}
+
+void PAGAnimation::setLoopMode(LoopMode mode, bool reset) {
+  if (reset) {
+    loopOverridden = false;
+    return;
+  }
+  loopOverridden = true;
+  loopOverride = mode;
 }
 
 // Maps an absolute time to a valid playback position according to the loop mode. Once clamps to
@@ -173,7 +182,7 @@ int64_t PAGAnimation::currentTime() const {
   if (animation == nullptr) {
     return 0;
   }
-  return WrapTime(elapsedUs, DurationMicros(animation), animation->loop);
+  return WrapTime(elapsedUs, DurationMicros(animation), effectiveLoop());
 }
 
 bool PAGAnimation::advance(int64_t deltaMicroseconds) {
@@ -184,7 +193,7 @@ bool PAGAnimation::advance(int64_t deltaMicroseconds) {
   if (duration <= 0) {
     return false;
   }
-  auto previousPhase = WrapTime(elapsedUs, duration, animation->loop);
+  auto previousPhase = WrapTime(elapsedUs, duration, effectiveLoop());
   // Use saturating add to prevent signed overflow UB when deltaMicroseconds is extreme.
   int64_t next = 0;
   if (deltaMicroseconds > 0 && elapsedUs > INT64_MAX - deltaMicroseconds) {
@@ -195,7 +204,7 @@ bool PAGAnimation::advance(int64_t deltaMicroseconds) {
     next = elapsedUs + deltaMicroseconds;
   }
   elapsedUs = next;
-  auto newPhase = WrapTime(elapsedUs, duration, animation->loop);
+  auto newPhase = WrapTime(elapsedUs, duration, effectiveLoop());
   return newPhase != previousPhase;
 }
 
@@ -227,13 +236,13 @@ void PAGAnimation::apply(float mix) {
   int64_t evaluationTimeUs;
   if (duration <= 0) {
     evaluationTimeUs = elapsedUs - evaluationOffsetUs;
-  } else if (animation->loop == LoopMode::Once) {
+  } else if (effectiveLoop() == LoopMode::Once) {
     evaluationTimeUs = std::clamp(elapsedUs, evaluationOffsetUs, evaluationOffsetUs + duration) -
                        evaluationOffsetUs;
   } else {
-    int64_t period = (animation->loop == LoopMode::PingPong) ? duration * 2 : duration;
+    int64_t period = (effectiveLoop() == LoopMode::PingPong) ? duration * 2 : duration;
     evaluationTimeUs =
-        WrapTime((elapsedUs % period) - evaluationOffsetUs, duration, animation->loop);
+        WrapTime((elapsedUs % period) - evaluationOffsetUs, duration, effectiveLoop());
   }
   ApplyResolved(resolvedTargets, animation, effectiveBinding, evaluationTimeUs, clamped);
 }

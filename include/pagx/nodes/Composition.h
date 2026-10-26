@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Data.h"
 
 namespace pagx {
 
@@ -54,6 +56,17 @@ class Composition : public Node {
    * StateMachine; check nodeType() to dispatch.
    */
   std::vector<Node*> animations = {};
+  /**
+   * The audio track of this composition (spec 3.4): an AAC stream in an MPEG-4 container,
+   * carried as-is from the legacy file. Null when the composition has no audio.
+   */
+  std::shared_ptr<Data> audioData = nullptr;
+
+  /**
+   * When the first frame of the audio plays on the composition's timeline, in seconds.
+   */
+  float audioStartTime = 0.0f;
+
   /**
    * The ViewModel schema bound to this composition.
    */

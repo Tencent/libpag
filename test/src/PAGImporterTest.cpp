@@ -2376,6 +2376,94 @@ PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
             0);
 }
 
+PAGX_TEST(PAGImporterTest, TimeStretchAndAudioTest) {
+  // P3-11: document-level time stretching (spec 3.4) rescales the scene clock under Scale and
+  // maps Repeat / RepeatInverted onto the default timeline's runtime loop; the composition
+  // audio track (AAC bytes + start time) round trips through the binary byte-identically.
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* animation = doc->makeNode<Animation>("stretchAnim");
+  animation->duration = 20;
+  animation->frameRate = 10;
+  auto* object = doc->makeNode<AnimationObject>();
+  object->target = "stretchLayer";
+  auto* channel = doc->makeNode<TypedChannel<float>>();
+  channel->name = "x";
+  Keyframe<float> k0 = {};
+  k0.time = 0;
+  k0.value = 0.0f;
+  k0.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(k0);
+  Keyframe<float> k1 = {};
+  k1.time = 19;
+  k1.value = 80.0f;
+  k1.interpolation = KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(k1);
+  object->channels.push_back(channel);
+  animation->objects.push_back(object);
+  doc->animations.push_back(animation);
+  auto* layer = doc->makeNode<Layer>("stretchLayer");
+  doc->layers.push_back(layer);
+
+  // Composition audio: a few distinctive bytes stand in for the AAC payload.
+  const char* kAudioBytes = "fake-aac-mp4-payload";
+  auto* rootComp = doc->makeNode<Composition>("audioComp");
+  rootComp->width = 100;
+  rootComp->height = 100;
+  rootComp->audioData = Data::MakeWithCopy(kAudioBytes, strlen(kAudioBytes));
+  rootComp->audioStartTime = 0.5f;
+  auto* holder = doc->makeNode<Layer>();
+  holder->composition = rootComp;
+  doc->layers.push_back(holder);
+
+  // Scale stretching: the original duration is 2s (20 frames at 10fps); targeting 1s doubles
+  // the clock rate.
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_EQ(scene->timeStretchMode(), TimeStretchMode::Repeat);
+  EXPECT_DOUBLE_EQ(scene->timeStretchRate(), 1.0);
+  scene->setDuration(1.0);
+  scene->setTimeStretchMode(TimeStretchMode::Scale);
+  EXPECT_DOUBLE_EQ(scene->timeStretchRate(), 2.0);
+  auto timeline = scene->getAnimation("stretchAnim");
+  auto stretchAnim = std::dynamic_pointer_cast<PAGAnimation>(timeline);
+  ASSERT_TRUE(stretchAnim != nullptr);
+  // The loop mapping rides the default timeline's runtime loop override. Repeat maps onto
+  // Loop: a seek past the end folds back into the cycle (2.5s of a 2s animation -> 0.5s).
+  scene->setTimeStretchMode(TimeStretchMode::Repeat);
+  EXPECT_DOUBLE_EQ(scene->timeStretchRate(), 1.0);
+  stretchAnim->setCurrentTime(2500000);
+  EXPECT_EQ(stretchAnim->currentTime(), 500000);
+  // RepeatInverted maps onto PingPong: 2.5s falls into the mirrored half of the doubled
+  // period, folding to 4s - 2.5s = 1.5s.
+  scene->setTimeStretchMode(TimeStretchMode::RepeatInverted);
+  stretchAnim->setCurrentTime(2500000);
+  EXPECT_EQ(stretchAnim->currentTime(), 1500000);
+  // None maps onto Once: the position clamps at the end instead of wrapping.
+  scene->setTimeStretchMode(TimeStretchMode::None);
+  stretchAnim->setCurrentTime(5000000);
+  EXPECT_EQ(stretchAnim->currentTime(), 2000000);
+
+  // The audio track round trips through the v4 binary byte-identically.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/stretch_audio.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/stretch_audio.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  Composition* decodedAudioComp = nullptr;
+  for (auto& node : decoded->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      if (comp->audioData != nullptr) {
+        decodedAudioComp = comp;
+        break;
+      }
+    }
+  }
+  ASSERT_TRUE(decodedAudioComp != nullptr);
+  ASSERT_TRUE(decodedAudioComp->audioData != nullptr);
+  EXPECT_EQ(decodedAudioComp->audioData->size(), strlen(kAudioBytes));
+  EXPECT_EQ(memcmp(decodedAudioComp->audioData->bytes(), kAudioBytes, strlen(kAudioBytes)), 0);
+  EXPECT_EQ(decodedAudioComp->audioStartTime, 0.5f);
+}
+
 PAGX_TEST(PAGImporterTest, VideoSequenceFrameSchedulingTest) {
   // P3-10c follow-up: video frame scheduling on both pipelines with the same sample. The
   // legacy pipeline renders through PAGPlayer; the new pipeline renders the migrated document

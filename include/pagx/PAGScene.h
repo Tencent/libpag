@@ -28,6 +28,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/TimeStretchMode.h"
 
 namespace tgfx {
 class Context;
@@ -102,6 +103,32 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * PAGStateMachine; use getAnimation() / getStateMachineTimeline() for typed access.
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
+
+  /**
+   * Returns the current time-stretch mode (spec 3.4, document-level runtime state, not
+   * serialized). The default is Repeat.
+   */
+  TimeStretchMode timeStretchMode() const;
+
+  /**
+   * Sets how the default timeline stretches to fit a target duration: Repeat / RepeatInverted
+   * map onto the timeline's Loop / PingPong loop modes, None holds the last frame, and Scale
+   * rescales the scene clock by the ratio of the original duration to the one set via
+   * setDuration(). Re-applies the most recent setDuration() target, if any.
+   */
+  void setTimeStretchMode(TimeStretchMode mode);
+
+  /**
+   * Sets the playback duration in seconds. Under Scale the scene clock runs at
+   * (defaultDuration / target) so the content finishes at the target; values <= 0 reset the rate
+   * to 1. The mode's loop mapping applies to the default timeline.
+   */
+  void setDuration(double seconds);
+
+  /**
+   * The current clock scale applied to advanceAndApply() (Scale mode, spec 3.4).
+   */
+  double timeStretchRate() const;
 
   /**
    * Returns the ids of all top-level state machines in the source document, preserving declaration
@@ -232,6 +259,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   RuntimeBinding* mutableBinding();
 
   tgfx::DisplayList* getDisplayListForOptions() const;
+
+  // Time stretching (spec 3.4): the mode maps onto the default timeline's loop mode, and Scale
+  // rescales the scene clock by targetDuration / originalDuration.
+  TimeStretchMode _stretchMode = TimeStretchMode::Repeat;
+  double _stretchTargetSeconds = -1.0;
+  double _stretchRate = 1.0;
+
+  void applyTimeStretch();
 
   // Renders the scene into the surface without locking or managing the GPU context. The caller
   // must hold a valid context lock. Internal method used by draw() and pagx::Record().
