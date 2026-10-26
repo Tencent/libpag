@@ -3901,6 +3901,7 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
   std::vector<std::pair<Layer*, std::string>> restoredMaskIds = {};
   std::vector<std::pair<Layer*, std::string>> restoredDisplacementMapIds = {};
   std::vector<std::pair<PathData*, std::string>> restoredPathIds = {};
+  std::vector<std::pair<Image*, std::string>> restoredSequenceImageIds = {};
   std::unordered_set<std::string> takenIds = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
@@ -4008,6 +4009,24 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
       }
     }
   }
+  // Sequence images reference nothing by id in the authoring tree, but the XML hop must keep
+  // their sequence metadata: an id-less Image never reaches the Resources section and its
+  // pattern falls back to an anonymous data-URI image that loses the sequence attributes.
+  // Synthesize ids so each sequence image round trips as a resource.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (!image->isSequence || !image->id.empty()) {
+      continue;
+    }
+    restoredSequenceImageIds.push_back({image, image->id});
+    do {
+      image->id = "pag-v4-seqimg-" + std::to_string(synthIndex++);
+    } while (takenIds.count(image->id) > 0);
+    takenIds.insert(image->id);
+  }
   auto xml = PAGXExporter::ToXML(*document);
   for (auto& restore : restoredFontIds) {
     restore.first->id = restore.second;
@@ -4022,6 +4041,9 @@ PAGExportResult PAGExporter::ExportToPAG(std::shared_ptr<PAGXDocument> document,
     restore.first->id = restore.second;
   }
   for (auto& restore : restoredPathIds) {
+    restore.first->id = restore.second;
+  }
+  for (auto& restore : restoredSequenceImageIds) {
     restore.first->id = restore.second;
   }
   auto doc = PAGXImporter::FromXML(xml);

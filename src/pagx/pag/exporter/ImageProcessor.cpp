@@ -389,6 +389,44 @@ ImageProcessor::Result ImageProcessor::Process(PAGXDocument* document, const Opt
   // direct Image node in the tree with no ImagePattern would still be here. Skip them
   // (they won't appear in the ImageTable).
 
+  // Sequence images are data-preserving entries (spec 6.6.1): the migration creates one Image
+  // per legacy sequence while only the rendered one carries a pattern reference, so sequence
+  // nodes enter the table unconditionally — unreferenced ones keep their frames alive.
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<Image*>(node.get());
+    if (!image->isSequence || image->sequenceMediaType < 2 || image->data == nullptr ||
+        image->data->empty()) {
+      continue;
+    }
+    if (result.imageIndices.find(image) != result.imageIndices.end()) {
+      continue;
+    }
+    ImageTableEntry entry = {};
+    entry.mediaType = image->sequenceMediaType;
+    entry.data = image->data;
+    entry.scaleFactor = 1.0f;
+    entry.logicalWidth = image->logicalWidth;
+    entry.logicalHeight = image->logicalHeight;
+    if (image->sequenceMediaType == 2) {
+      VideoSequenceContainer container = {};
+      if (SequenceCodec::DecodeVideoSequence(image->data, &container)) {
+        entry.logicalWidth = container.width;
+        entry.logicalHeight = container.height;
+      }
+    } else {
+      BitmapSequenceContainer container = {};
+      if (SequenceCodec::DecodeBitmapSequence(image->data, &container)) {
+        entry.logicalWidth = container.width;
+        entry.logicalHeight = container.height;
+      }
+    }
+    result.imageIndices[image] = static_cast<uint32_t>(result.entries.size());
+    result.entries.push_back(entry);
+  }
+
   return result;
 }
 

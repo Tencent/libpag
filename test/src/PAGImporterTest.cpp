@@ -2284,6 +2284,95 @@ PAGX_TEST(PAGImporterTest, LegacyImporterSkeletonSmoke) {
   EXPECT_TRUE(decoded != nullptr);
 }
 
+PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
+  // P3-10b sequence migration: a legacy video composition converts with every sequence's
+  // frames preserved byte-identically in ImageTable sequence entries (the container keeps the
+  // codec headers, per-frame indices and raw payloads), the rendered sequence is the last one
+  // (matching Sequence::Get), and the entries survive the v4 round trip. Runtime frame
+  // scheduling lands with the sequence player; this asserts the data layer.
+  const std::string legacyPath =
+      pag::ProjectPath::Absolute("resources/apitest/video_sequence_with_mp4header.pag");
+  auto file = pag::File::Load(legacyPath);
+  if (file == nullptr) {
+    GTEST_SKIP() << "legacy sample missing: " << legacyPath;
+  }
+  auto* rootLayer = file->getRootLayer();
+  ASSERT_TRUE(rootLayer != nullptr && rootLayer->composition != nullptr);
+  ASSERT_EQ(rootLayer->composition->type(), pag::CompositionType::Video);
+  auto* videoComposition = static_cast<pag::VideoComposition*>(rootLayer->composition);
+  ASSERT_FALSE(videoComposition->sequences.empty());
+  auto* legacySequence = videoComposition->sequences.back();
+  ASSERT_FALSE(legacySequence->frames.empty());
+
+  std::vector<PAGExportIssue> issues = {};
+  auto doc = LegacyPAGImporter::Convert(file, &issues);
+  ASSERT_TRUE(doc != nullptr);
+
+  // Walk the converted document for sequence images (one per legacy sequence).
+  std::vector<Image*> sequenceImages = {};
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->isSequence && image->sequenceMediaType == 2) {
+        sequenceImages.push_back(image);
+      }
+    }
+  }
+  ASSERT_EQ(sequenceImages.size(), videoComposition->sequences.size());
+
+  // Every sequence converted with identical frame data (compare against the legacy list).
+  std::vector<VideoSequenceContainer> containers = {};
+  for (size_t i = 0; i < videoComposition->sequences.size(); i++) {
+    auto* image = sequenceImages[i];
+    VideoSequenceContainer container = {};
+    ASSERT_TRUE(image->data != nullptr);
+    ASSERT_TRUE(SequenceCodec::DecodeVideoSequence(image->data, &container));
+    EXPECT_EQ(container.frames.size(), videoComposition->sequences[i]->frames.size());
+    containers.push_back(container);
+  }
+  // The rendered (last) sequence mirrors the legacy metadata and keeps raw frame payloads.
+  auto& rendered = containers.back();
+  EXPECT_EQ(rendered.frameRate, legacySequence->frameRate);
+  EXPECT_EQ(rendered.width, static_cast<uint32_t>(legacySequence->width));
+  EXPECT_EQ(rendered.height, static_cast<uint32_t>(legacySequence->height));
+  EXPECT_EQ(rendered.alphaStartX, legacySequence->alphaStartX);
+  EXPECT_EQ(rendered.alphaStartY, legacySequence->alphaStartY);
+  ASSERT_EQ(rendered.headers.size(), legacySequence->headers.size());
+  auto* firstFrame = legacySequence->frames.front();
+  ASSERT_TRUE(firstFrame->fileBytes != nullptr);
+  ASSERT_TRUE(!rendered.frames.empty());
+  ASSERT_TRUE(rendered.frames.front().data != nullptr);
+  EXPECT_EQ(rendered.frames.front().data->size(), firstFrame->fileBytes->length());
+  EXPECT_EQ(memcmp(rendered.frames.front().data->bytes(), firstFrame->fileBytes->data(),
+                   firstFrame->fileBytes->length()),
+            0);
+
+  // The v4 round trip preserves the container bytes.
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/legacy_video_sequence.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/legacy_video_sequence.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  Image* decodedImage = nullptr;
+  for (auto& node : decoded->nodes) {
+    if (node->nodeType() == NodeType::Image) {
+      auto* image = static_cast<Image*>(node.get());
+      if (image->isSequence) {
+        decodedImage = image;
+        break;
+      }
+    }
+  }
+  ASSERT_TRUE(decodedImage != nullptr);
+  EXPECT_TRUE(decodedImage->isSequence);
+  EXPECT_EQ(decodedImage->sequenceMediaType, 2);
+  EXPECT_EQ(decodedImage->sequenceFrameCount, static_cast<uint32_t>(legacySequence->frames.size()));
+  EXPECT_EQ(decodedImage->sequenceFrameRate, legacySequence->frameRate);
+  ASSERT_TRUE(decodedImage->data != nullptr);
+  EXPECT_EQ(decodedImage->data->size(), sequenceImages.back()->data->size());
+  EXPECT_EQ(memcmp(decodedImage->data->bytes(), sequenceImages.back()->data->bytes(),
+                   sequenceImages.back()->data->size()),
+            0);
+}
+
 PAGX_TEST(PAGImporterTest, LegacyImporterKeyframeSmoke) {
   // P3-5 keyframe migration smoke: a legacy animated file (blend sample carries animated
   // transforms) converts with its keyframes migrated into composition-scoped animation

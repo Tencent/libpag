@@ -27,6 +27,8 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
@@ -34,6 +36,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/pag/SequenceCodec.h"
 #include "pagx/types/ColorSpace.h"
 
 namespace pagx {
@@ -275,6 +278,126 @@ Animation* EnsureCompositionAnimation(ConvertState* state, pag::VectorCompositio
 Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFrameRate);
 Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* legacy,
                                 float parentFrameRate);
+Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* legacy);
+Image* MakeSequenceImage(ConvertState* state, const std::shared_ptr<Data>& data, float frameRate,
+                         uint32_t frameCount, uint32_t width, uint32_t height, uint8_t mediaType);
+
+// Wraps an encoded sequence container into an Image node carrying the scheduling metadata.
+Image* MakeSequenceImage(ConvertState* state, const std::shared_ptr<Data>& data, float frameRate,
+                         uint32_t frameCount, uint32_t width, uint32_t height, uint8_t mediaType) {
+  auto* image = state->document->makeNode<Image>();
+  image->isSequence = true;
+  image->sequenceMediaType = mediaType;
+  image->data = data;
+  image->sequenceFrameRate = frameRate;
+  image->sequenceFrameCount = frameCount;
+  image->logicalWidth = width;
+  image->logicalHeight = height;
+  return image;
+}
+
+// Converts a legacy video/bitmap sequence composition (spec 3.3): every sequence becomes one
+// ImageTable sequence entry with its frames stored as-is; the last sequence - the one the
+// legacy runtime renders (Sequence::Get picks the back for best quality) - drives a
+// full-frame image pattern layer. Runtime frame scheduling lands with the sequence player;
+// until then the entry carries the data and the pattern presents the structure.
+Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* legacy) {
+  if (legacy == nullptr) {
+    return nullptr;
+  }
+  auto it = state->compositionNodes.find(legacy);
+  if (it != state->compositionNodes.end()) {
+    return it->second;
+  }
+  auto* composition = state->document->makeNode<Composition>();
+  composition->width = legacy->width;
+  composition->height = legacy->height;
+  state->compositionNodes[legacy] = composition;
+  Image* primaryImage = nullptr;
+  if (legacy->type() == pag::CompositionType::Video) {
+    auto* video = static_cast<pag::VideoComposition*>(legacy);
+    for (auto* sequence : video->sequences) {
+      if (sequence == nullptr) {
+        continue;
+      }
+      VideoSequenceContainer container = {};
+      container.frameRate = sequence->frameRate;
+      container.width = static_cast<uint32_t>(sequence->width);
+      container.height = static_cast<uint32_t>(sequence->height);
+      container.alphaStartX = sequence->alphaStartX;
+      container.alphaStartY = sequence->alphaStartY;
+      for (auto* header : sequence->headers) {
+        if (header != nullptr) {
+          container.headers.push_back(Data::MakeWithCopy(header->data(), header->length()));
+        }
+      }
+      for (auto* frame : sequence->frames) {
+        VideoSequenceFrame containerFrame = {};
+        containerFrame.isKeyframe = frame->isKeyframe;
+        containerFrame.frameIndex = static_cast<uint32_t>(frame->frame);
+        if (frame->fileBytes != nullptr) {
+          containerFrame.data =
+              Data::MakeWithCopy(frame->fileBytes->data(), frame->fileBytes->length());
+        }
+        container.frames.push_back(containerFrame);
+      }
+      auto* image = MakeSequenceImage(
+          state, SequenceCodec::EncodeVideoSequence(container), container.frameRate,
+          static_cast<uint32_t>(container.frames.size()), container.width, container.height, 2);
+      if (sequence == video->sequences.back()) {
+        primaryImage = image;
+      }
+    }
+  } else if (legacy->type() == pag::CompositionType::Bitmap) {
+    auto* bitmap = static_cast<pag::BitmapComposition*>(legacy);
+    for (auto* sequence : bitmap->sequences) {
+      if (sequence == nullptr) {
+        continue;
+      }
+      BitmapSequenceContainer container = {};
+      container.frameRate = sequence->frameRate;
+      container.width = static_cast<uint32_t>(sequence->width);
+      container.height = static_cast<uint32_t>(sequence->height);
+      for (auto* frame : sequence->frames) {
+        BitmapSequenceFrame containerFrame = {};
+        containerFrame.isKeyframe = frame->isKeyframe;
+        for (auto* rect : frame->bitmaps) {
+          BitmapSequenceBlock block = {};
+          block.x = rect->x;
+          block.y = rect->y;
+          if (rect->fileBytes != nullptr) {
+            block.data = Data::MakeWithCopy(rect->fileBytes->data(), rect->fileBytes->length());
+          }
+          containerFrame.bitmaps.push_back(block);
+        }
+        container.frames.push_back(containerFrame);
+      }
+      auto* image = MakeSequenceImage(
+          state, SequenceCodec::EncodeBitmapSequence(container), container.frameRate,
+          static_cast<uint32_t>(container.frames.size()), container.width, container.height, 3);
+      if (sequence == bitmap->sequences.back()) {
+        primaryImage = image;
+      }
+    }
+  }
+  if (primaryImage != nullptr) {
+    auto* layer = state->document->makeNode<Layer>();
+    layer->width = composition->width;
+    layer->height = composition->height;
+    auto* rect = state->document->makeNode<Rectangle>();
+    rect->size.width = composition->width;
+    rect->size.height = composition->height;
+    layer->contents.push_back(rect);
+    auto* fill = state->document->makeNode<Fill>();
+    auto* pattern = state->document->makeNode<ImagePattern>();
+    pattern->image = primaryImage;
+    pattern->scaleMode = ScaleMode::Stretch;
+    fill->color = pattern;
+    layer->contents.push_back(fill);
+    composition->layers.push_back(layer);
+  }
+  return composition;
+}
 
 // Converts a legacy composition into a Composition node, recursively converting its layers.
 Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* legacy,
@@ -350,12 +473,17 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
-      auto* composition =
-          legacy->composition != nullptr &&
-                  legacy->composition->type() == pag::CompositionType::Vector
-              ? ConvertComposition(state, static_cast<pag::VectorComposition*>(legacy->composition),
-                                   parentFrameRate)
-              : nullptr;
+      Composition* composition = nullptr;
+      if (legacy->composition != nullptr) {
+        if (legacy->composition->type() == pag::CompositionType::Vector) {
+          composition = ConvertComposition(
+              state, static_cast<pag::VectorComposition*>(legacy->composition), parentFrameRate);
+        } else if (legacy->composition->type() == pag::CompositionType::Video ||
+                   legacy->composition->type() == pag::CompositionType::Bitmap) {
+          // Sequence compositions (spec 3.3): frames migrate into ImageTable entries.
+          composition = ConvertSequenceComposition(state, legacy->composition);
+        }
+      }
       if (composition != nullptr) {
         layer->composition = composition;
         // Time-lock mount (spec 6.3): the legacy mapping is
@@ -446,12 +574,17 @@ std::shared_ptr<PAGXDocument> LegacyPAGImporter::Convert(const std::shared_ptr<p
   state.issues = issues;
 
   auto* rootLayer = file->getRootLayer();
-  if (rootLayer == nullptr || rootLayer->composition == nullptr ||
-      rootLayer->composition->type() != pag::CompositionType::Vector) {
+  if (rootLayer == nullptr || rootLayer->composition == nullptr) {
     return nullptr;
   }
-  auto* rootComposition = static_cast<pag::VectorComposition*>(rootLayer->composition);
-  auto* composition = ConvertComposition(&state, rootComposition, file->frameRate());
+  Composition* composition = nullptr;
+  if (rootLayer->composition->type() == pag::CompositionType::Vector) {
+    composition = ConvertComposition(
+        &state, static_cast<pag::VectorComposition*>(rootLayer->composition), file->frameRate());
+  } else if (rootLayer->composition->type() == pag::CompositionType::Video ||
+             rootLayer->composition->type() == pag::CompositionType::Bitmap) {
+    composition = ConvertSequenceComposition(&state, rootLayer->composition);
+  }
   if (composition == nullptr) {
     return nullptr;
   }
