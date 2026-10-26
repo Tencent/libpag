@@ -167,46 +167,46 @@ void CompareSample(const std::string& path, SampleResult* result) {
     result->error = "scene failed";
     return;
   }
-  auto migratedSurface = pagx::PAGSurface::MakeOffscreen(width, height);
-  if (migratedSurface == nullptr) {
-    result->error = "migrated surface failed";
-    return;
-  }
-  auto timeline = scene->getDefaultTimeline();
-  auto animation = std::dynamic_pointer_cast<pagx::PAGAnimation>(timeline);
-  if (animation == nullptr) {
-    result->error = "no default timeline";
-    return;
-  }
+auto migratedSurface = pagx::PAGSurface::MakeOffscreen(width, height);
+if (migratedSurface == nullptr) {
+  result->error = "migrated surface failed";
+  return;
+}
+auto timeline = scene->getDefaultTimeline();
+auto animation = std::dynamic_pointer_cast<pagx::PAGAnimation>(timeline);
+if (animation == nullptr) {
+  result->error = "no default timeline";
+  return;
+}
 
-  auto totalFrames = static_cast<int>(pagFile->duration());
-  auto frameRate = pagFile->frameRate() > 0 ? pagFile->frameRate() : 30.0f;
-  // Evenly sample at most kMaxFramesPerSample frames across the duration (always including the
-  // first and the last).
-  int step = totalFrames > kMaxFramesPerSample ? totalFrames / kMaxFramesPerSample : 1;
+auto totalFrames = static_cast<int>(pagFile->duration());
+auto frameRate = pagFile->frameRate() > 0 ? pagFile->frameRate() : 30.0f;
+// Evenly sample at most kMaxFramesPerSample frames across the duration (always including the
+// first and the last).
+int step = totalFrames > kMaxFramesPerSample ? totalFrames / kMaxFramesPerSample : 1;
 
-  std::vector<uint8_t> legacyPixels;
-  std::vector<uint8_t> migratedPixels;
-  for (int frame = 0; frame < totalFrames; frame += step) {
-    player->setProgress(frameRate > 0 ? static_cast<double>(frame) / totalFrames : 0.0);
-    if (!RenderLegacyFrame(player.get(), legacySurface, width, height, &legacyPixels)) {
-      continue;
-    }
-    auto frameSeconds = static_cast<double>(frame) / frameRate;
-    if (!RenderMigratedFrame(scene.get(), migratedSurface, animation.get(), frameSeconds, width,
-                             height, &migratedPixels)) {
-      continue;
-    }
-    result->framesCompared++;
-    auto diff = DiffPercent(legacyPixels, migratedPixels);
-    if (diff == 0.0) {
-      result->framesPassed++;
-    } else if (result->firstDiff.empty()) {
-      char buffer[64] = {};
-      snprintf(buffer, sizeof(buffer), "frame=%d diff=%.2f%%", frame, diff);
-      result->firstDiff = buffer;
-    }
+std::vector<uint8_t> legacyPixels;
+std::vector<uint8_t> migratedPixels;
+for (int frame = 0; frame < totalFrames; frame += step) {
+  player->setProgress(frameRate > 0 ? static_cast<double>(frame) / totalFrames : 0.0);
+  if (!RenderLegacyFrame(player.get(), legacySurface, width, height, &legacyPixels)) {
+    continue;
   }
+  auto frameSeconds = static_cast<double>(frame) / frameRate;
+  if (!RenderMigratedFrame(scene.get(), migratedSurface, animation.get(), frameSeconds, width,
+                           height, &migratedPixels)) {
+    continue;
+  }
+  result->framesCompared++;
+  auto diff = DiffPercent(legacyPixels, migratedPixels);
+  if (diff == 0.0) {
+    result->framesPassed++;
+  } else if (result->firstDiff.empty()) {
+    char buffer[64] = {};
+    snprintf(buffer, sizeof(buffer), "frame=%d diff=%.2f%%", frame, diff);
+    result->firstDiff = buffer;
+  }
+}
 }
 
 }  // namespace

@@ -23,22 +23,30 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/SequenceCodec.h"
@@ -167,6 +175,47 @@ Color ConvertColor(const pag::Color& color) {
 // Shape element conversion (skeleton scope): Rectangle / Ellipse / Polystar / Path geometry
 // and solid Fill / Stroke painters with static values. Trim paths, merge paths, and gradient
 // painters report an issue and are skipped until their phase-3 tasks.
+// Builds a PAGX gradient color source (Linear or Radial) from a legacy gradient element's
+// start/end points and color stops. Alpha stops fold into the color stop alpha values so a
+// single color-stop list carries both. Legacy gradients use absolute layer-space coordinates,
+// so fitsToGeometry stays false.
+ColorSource* ConvertGradientColorSource(ConvertState* state, pag::GradientFillType fillType,
+                                        const pag::Point& startPoint, const pag::Point& endPoint,
+                                        const std::shared_ptr<pag::GradientColor>& colors) {
+  Gradient* gradient = nullptr;
+  if (fillType == pag::GradientFillType::Linear) {
+    auto* linear = state->document->makeNode<LinearGradient>();
+    linear->startPoint = {startPoint.x, startPoint.y};
+    linear->endPoint = {endPoint.x, endPoint.y};
+    gradient = linear;
+  } else {
+    auto* radial = state->document->makeNode<RadialGradient>();
+    radial->center = {startPoint.x, startPoint.y};
+    radial->radius = sqrtf((endPoint.x - startPoint.x) * (endPoint.x - startPoint.x) +
+                           (endPoint.y - startPoint.y) * (endPoint.y - startPoint.y));
+    gradient = radial;
+  }
+  gradient->fitsToGeometry = false;
+  if (colors == nullptr) {
+    return gradient;
+  }
+  for (const auto& stop : colors->colorStops) {
+    auto* colorStop = state->document->makeNode<ColorStop>();
+    colorStop->offset = stop.position;
+    colorStop->color = ConvertColor(stop.color);
+    // The legacy color carries no alpha; the gradient alpha comes from the alpha stops only.
+    float alpha = 1.0f;
+    for (const auto& alphaStop : colors->alphaStops) {
+      if (alphaStop.position <= stop.position) {
+        alpha *= alphaStop.opacity / 255.0f;
+      }
+    }
+    colorStop->color.alpha = alpha;
+    gradient->colorStops.push_back(colorStop);
+  }
+  return gradient;
+}
+
 void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
                          std::vector<Element*>* contents, pag::Frame startFrame) {
   if (element == nullptr) {
@@ -259,6 +308,90 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
         ConvertShapeElement(state, child, &group->elements, startFrame);
       }
       contents->push_back(group);
+      break;
+    }
+    case pag::ShapeType::GradientFill: {
+      auto* legacy = static_cast<pag::GradientFillElement*>(element);
+      auto* fill = state->document->makeNode<Fill>();
+      fill->color = ConvertGradientColorSource(
+          state, legacy->fillType, PropertyValueAtStart(legacy->startPoint, startFrame, nullptr),
+          PropertyValueAtStart(legacy->endPoint, startFrame, nullptr),
+          PropertyValueAtStart(legacy->colors, startFrame, nullptr));
+      fill->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
+      fill->fillRule =
+          legacy->fillRule == pag::FillRule::NonZeroWinding ? FillRule::Winding : FillRule::EvenOdd;
+      contents->push_back(fill);
+      break;
+    }
+    case pag::ShapeType::GradientStroke: {
+      auto* legacy = static_cast<pag::GradientStrokeElement*>(element);
+      auto* stroke = state->document->makeNode<Stroke>();
+      stroke->color = ConvertGradientColorSource(
+          state, legacy->fillType, PropertyValueAtStart(legacy->startPoint, startFrame, nullptr),
+          PropertyValueAtStart(legacy->endPoint, startFrame, nullptr),
+          PropertyValueAtStart(legacy->colors, startFrame, nullptr));
+      stroke->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
+      stroke->width = PropertyValueAtStart(legacy->strokeWidth, startFrame, nullptr);
+      stroke->cap = static_cast<LineCap>(legacy->lineCap);
+      stroke->join = static_cast<LineJoin>(legacy->lineJoin);
+      stroke->miterLimit = PropertyValueAtStart(legacy->miterLimit, startFrame, nullptr);
+      if (legacy->dashOffset != nullptr) {
+        stroke->dashOffset = PropertyValueAtStart(legacy->dashOffset, startFrame, nullptr);
+      }
+      for (auto* dash : legacy->dashes) {
+        stroke->dashes.push_back(PropertyValueAtStart(dash, startFrame, nullptr));
+      }
+      contents->push_back(stroke);
+      break;
+    }
+    case pag::ShapeType::MergePaths: {
+      auto* legacy = static_cast<pag::MergePathsElement*>(element);
+      auto* merge = state->document->makeNode<MergePath>();
+      merge->mode = static_cast<MergePathMode>(legacy->mode);
+      contents->push_back(merge);
+      break;
+    }
+    case pag::ShapeType::TrimPaths: {
+      auto* legacy = static_cast<pag::TrimPathsElement*>(element);
+      auto* trim = state->document->makeNode<TrimPath>();
+      trim->start = PropertyValueAtStart(legacy->start, startFrame, nullptr) / 100.0f;
+      trim->end = PropertyValueAtStart(legacy->end, startFrame, nullptr) / 100.0f;
+      trim->offset = PropertyValueAtStart(legacy->offset, startFrame, nullptr);
+      trim->type = legacy->trimType == pag::TrimPathsType::Individually ? TrimType::Separate
+                                                                        : TrimType::Continuous;
+      contents->push_back(trim);
+      break;
+    }
+    case pag::ShapeType::Repeater: {
+      auto* legacy = static_cast<pag::RepeaterElement*>(element);
+      auto* repeater = state->document->makeNode<Repeater>();
+      repeater->copies = PropertyValueAtStart(legacy->copies, startFrame, nullptr);
+      repeater->offset = PropertyValueAtStart(legacy->offset, startFrame, nullptr);
+      repeater->order = legacy->composite == pag::RepeaterOrder::Above
+                            ? RepeaterOrder::AboveOriginal
+                            : RepeaterOrder::BelowOriginal;
+      if (legacy->transform != nullptr) {
+        auto anchorPoint =
+            PropertyValueAtStart(legacy->transform->anchorPoint, startFrame, nullptr);
+        repeater->anchor = {anchorPoint.x, anchorPoint.y};
+        auto position = PropertyValueAtStart(legacy->transform->position, startFrame, nullptr);
+        repeater->position = {position.x, position.y};
+        auto scale = PropertyValueAtStart(legacy->transform->scale, startFrame, nullptr);
+        repeater->scale = {scale.x / 100.0f, scale.y / 100.0f};
+        repeater->rotation = PropertyValueAtStart(legacy->transform->rotation, startFrame, nullptr);
+        repeater->startAlpha =
+            PropertyValueAtStart(legacy->transform->startOpacity, startFrame, nullptr) / 255.0f;
+        repeater->endAlpha =
+            PropertyValueAtStart(legacy->transform->endOpacity, startFrame, nullptr) / 255.0f;
+      }
+      contents->push_back(repeater);
+      break;
+    }
+    case pag::ShapeType::RoundCorners: {
+      auto* legacy = static_cast<pag::RoundCornersElement*>(element);
+      auto* round = state->document->makeNode<RoundCorner>();
+      round->radius = PropertyValueAtStart(legacy->radius, startFrame, nullptr);
+      contents->push_back(round);
       break;
     }
     default:
@@ -501,7 +634,7 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
     layer->y = position.y;
   }
   auto scale = PropertyValueAtStart(transform->scale, startFrame, nullptr);
-  layer->scale = {scale.x / 100.0f, scale.y / 100.0f};
+  layer->scale = {scale.x, scale.y};
   layer->rotation = PropertyValueAtStart(transform->rotation, startFrame, nullptr);
   auto opacity = PropertyValueAtStart(transform->opacity, startFrame, nullptr);
   layer->alpha = opacity / 255.0f;
@@ -633,6 +766,11 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      // The layer mirrors the image bounds so the layout system derives its size from the
+      // content instead of a default box (a default-sized layer clips its pattern fill).
+      auto imageBounds = legacyImage->getBounds();
+      layer->width = imageBounds.right - imageBounds.left;
+      layer->height = imageBounds.bottom - imageBounds.top;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       if (legacyImage->imageBytes != nullptr && legacyImage->imageBytes->fileBytes != nullptr) {
         auto bounds = legacyImage->getBounds();
@@ -728,6 +866,10 @@ std::shared_ptr<PAGXDocument> LegacyPAGImporter::Convert(const std::shared_ptr<p
   // The converted tree hangs off a single root layer that references the composition.
   auto* topLayer = document->makeNode<Layer>();
   topLayer->composition = composition;
+  // The slot layer mirrors the composition size so the layout system derives its bounds from
+  // the content instead of a default 4x4 box (a clipped slot would cut the content).
+  topLayer->width = composition->width;
+  topLayer->height = composition->height;
   document->layers.push_back(topLayer);
 
   // The root fallback animation always exists (design doc 7.3): legacy files have a single

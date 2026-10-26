@@ -2250,6 +2250,93 @@ PAGX_TEST(PAGImporterTest, TimeLockedCompositionRuntime) {
   }
 }
 
+PAGX_TEST(PAGImporterTest, ManualImagePatternRenderDiag) {
+  // Minimal case: Layer + Rectangle + Fill + ImagePattern + WebP from legacy file, no composition.
+  const std::string legacyPath = pag::ProjectPath::Absolute("resources/blend/Normal.pag");
+  auto rawFile = pag::File::Load(legacyPath);
+  ASSERT_TRUE(rawFile != nullptr);
+  auto* rootLayer = rawFile->getRootLayer();
+  auto* mainComp = static_cast<pag::VectorComposition*>(rootLayer->composition);
+  ASSERT_FALSE(mainComp->layers.empty());
+  auto* imageLayer = static_cast<pag::ImageLayer*>(mainComp->layers[0]);
+  ASSERT_TRUE(imageLayer->imageBytes != nullptr);
+  ASSERT_TRUE(imageLayer->imageBytes->fileBytes != nullptr);
+
+  auto doc = PAGXDocument::Make(400, 400);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 400;
+  layer->height = 400;
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 400;
+  rect->size.height = 400;
+  rect->position.x = 200;
+  rect->position.y = 200;
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* pattern = doc->makeNode<ImagePattern>();
+  auto* image = doc->makeNode<Image>();
+  image->data = Data::MakeWithCopy(imageLayer->imageBytes->fileBytes->data(),
+                                   imageLayer->imageBytes->fileBytes->length());
+  pattern->image = image;
+  pattern->scaleMode = ScaleMode::Stretch;
+  fill->color = pattern;
+  layer->contents.push_back(fill);
+
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = PAGSurface::MakeOffscreen(400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  std::vector<uint8_t> pixels(400 * 400 * 4, 0);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), 400 * 4));
+  int content = 0;
+  for (size_t i = 0; i < pixels.size(); i += 4) {
+    if (pixels[i] | pixels[i + 1] | pixels[i + 2]) content++;
+  }
+  printf("[manual-diag] content pixels: %d / 160000\n", content);
+  EXPECT_GT(content, 1000);
+}
+
+PAGX_TEST(PAGImporterTest, LegacyImageLayerRenderDiag) {
+  // Diag: image-layer composition renders through the migrated pipeline.
+  const std::string legacyPath = pag::ProjectPath::Absolute("resources/blend/Normal.pag");
+  auto rawFile = pag::File::Load(legacyPath);
+  if (rawFile == nullptr) {
+    GTEST_SKIP() << "sample missing";
+  }
+  std::vector<PAGExportIssue> issues = {};
+  auto doc = LegacyPAGImporter::Convert(rawFile, &issues);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_TRUE(doc->layers[0]->composition != nullptr);
+  ASSERT_EQ(doc->layers[0]->composition->layers.size(), 2u);
+
+  // Bypass the slot mechanism: promote the composition layers to the document root.
+  {
+    auto* comp = doc->layers[0]->composition;
+    doc->layers.clear();
+    for (auto* compLayer : comp->layers) {
+      doc->layers.push_back(compLayer);
+    }
+  }
+
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  int width = static_cast<int>(doc->width);
+  int height = static_cast<int>(doc->height);
+  auto surface = PAGSurface::MakeOffscreen(width, height);
+  ASSERT_TRUE(surface != nullptr);
+  std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4, 0);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), static_cast<size_t>(width) * 4));
+  int content = 0;
+  for (size_t i = 0; i < pixels.size(); i += 4) {
+    if (pixels[i] | pixels[i + 1] | pixels[i + 2]) content++;
+  }
+  EXPECT_GT(content, 1000);
+}
+
 PAGX_TEST(PAGImporterTest, LegacyImporterSkeletonSmoke) {
   // P3-4 skeleton smoke: a legacy static vector file converts into a PAGXDocument, renders
   // through the new pipeline, and the converted document exports to the v4 binary. Pixel

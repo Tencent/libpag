@@ -1401,8 +1401,8 @@ CLI_TEST(PAGXCliTest, Import_LegacyPagStrict) {
   auto ret = CallRun(pagx::cli::RunImport,
                      {"import", "--input", inputPath, "--output", outputPath, "--strict"});
   EXPECT_EQ(ret, 0);
-  // A sample with issues (grad_6 reports an unsupported shape element) fails strict with 2.
-  auto issuePath = ProjectPath::Absolute("resources/gradient/grad_6.pag");
+  // A sample with issues (displacement_map_shape reports a mask) fails strict with 2.
+  auto issuePath = ProjectPath::Absolute("resources/compare/displacement_map_shape.pag");
   auto ret2 = CallRun(pagx::cli::RunImport,
                       {"import", "--input", issuePath, "--output", outputPath, "--strict"});
   EXPECT_EQ(ret2, 2);
