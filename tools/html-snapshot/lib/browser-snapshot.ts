@@ -48,7 +48,10 @@ import * as layoutPasses from './layout-passes';
 const { dropCollapsedDetailsContent, hoistTableRowBackgrounds, expandStickyScrollytelling } = layoutPasses;
 
 import * as fontFacePass from './font-face-pass';
-const { collectCarryOverFontFaces, cssQuotedString } = fontFacePass;
+const {
+  collectCarryOverFontFaces, cssQuotedString, fontFaceRuleCss,
+  normalizeFontFaceStyle, normalizeFontFaceWeight,
+} = fontFacePass;
 
 import * as cssCounters from './css-counters';
 const { parseCssCounterList, cssRomanCounter, cssAlphaCounter, formatCssCounterValue, resolveCssCounterValue, resolvePseudoContentText, applyPseudoCounterOps } = cssCounters;
@@ -5625,10 +5628,12 @@ function snapshotMainImpl(opts) {
   // Carry the page's web fonts over as `@font-face` rules, either pointing at the absolute
   // file path (the same form local images take) or re-using the rule's own `data:` URI. The
   // importer registers both under the CSS family, so the subset keeps the authored name for
-  // every face instead of losing it with the cascade.
+  // every face instead of losing it with the cascade. The weight and style descriptors go
+  // with them: a family declared with a single 700 face answers the page's 400 text with
+  // those outlines, and the subset has to reproduce that choice rather than imply a regular
+  // cut the page never had.
   for (const face of collectCarryOverFontFaces(document.styleSheets, document.baseURI)) {
-    styleBlock += '@font-face{font-family:' + cssQuotedString(face.family) +
-      ';src:url(' + cssQuotedString(face.src) + ')}';
+    styleBlock += fontFaceRuleCss(face);
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -5985,6 +5990,9 @@ const HELPER_FNS = [
   visibleContentExtent,
   measureCanvas,
   cssQuotedString,
+  fontFaceRuleCss,
+  normalizeFontFaceWeight,
+  normalizeFontFaceStyle,
   collectCarryOverFontFaces,
   snapshotMainImpl,
   snapshotMain,

@@ -1,8 +1,13 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 
 import { DOMParser } from '@xmldom/xmldom';
-import type { Element, Node } from '@xmldom/xmldom';
+import type { Document as XmlDocument, Element, Node } from '@xmldom/xmldom';
 import { FontMatcher, type AvailableFont } from './font-matcher';
+import {
+  fontFaceRenderedStyle, fontFaceRenderedWeight, normalizeFontFaceStyle,
+  normalizeFontFaceWeight, selectFontFace,
+} from './font-face-pass';
+import type { FontFaceDescriptor } from './font-face-pass';
 import {
   collectFontMetadata, parseFontFamilyStack, fontWeightNumber,
 } from './font-metadata';
@@ -65,9 +70,157 @@ function readRequest(styles: Map<string, string>, lang: string): HtmlFontRequest
   return request;
 }
 
+function skipCssComment(text: string, index: number): number {
+  const end = text.indexOf('*/', index + 2);
+  return end < 0 ? text.length : end + 2;
+}
+
+// Quotes and comments hide braces and semicolons from every scan below: a `data:` URI keeps
+// its semicolons, a family name may contain `/*`, and a selector may quote `@font-face`.
+function skipCssString(text: string, index: number): number {
+  const quote = text[index];
+  for (let i = index + 1; i < text.length; i++) {
+    if (text[i] === '\\') { i++; continue; }
+    if (text[i] === quote) return i + 1;
+  }
+  return text.length;
+}
+
+function stripCssComments(text: string): string {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' || ch === "'") {
+      const end = skipCssString(text, i);
+      out += text.slice(i, end);
+      i = end - 1;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '*') {
+      i = skipCssComment(text, i) - 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Index of the `}` closing the block opened at `open`, ignoring braces inside strings,
+// comments and parentheses (a `url()` source may carry either character).
+function findCssBlockEnd(text: string, open: number): number {
+  let depth = 0, parens = 0;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '/' && text[i + 1] === '*') { i = skipCssComment(text, i) - 1; continue; }
+    if (ch === '"' || ch === "'") { i = skipCssString(text, i) - 1; continue; }
+    if (ch === '(') parens++;
+    else if (ch === ')') parens = Math.max(0, parens - 1);
+    else if (parens === 0 && ch === '{') depth++;
+    else if (parens === 0 && ch === '}' && --depth === 0) return i;
+  }
+  return -1;
+}
+
+// One `@font-face` rule, reduced to the descriptors that decide which cut gets painted.
+function readFontFaceDescriptor(body: string): FontFaceDescriptor | null {
+  const styles = parseStyle(stripCssComments(body));
+  const family = styles.get('font-family');
+  if (!family || !styles.get('src')) return null;
+  let name: string;
+  try {
+    name = parseFontFamilyStack(family)[0] || '';
+  } catch (_) {
+    return null;
+  }
+  if (!name) return null;
+  return {
+    family: name,
+    weight: normalizeFontFaceWeight(styles.get('font-weight') || ''),
+    style: normalizeFontFaceStyle(styles.get('font-style') || ''),
+  };
+}
+
+// Walk the `<style>` text as CSS instead of searching it: `@font-face` only counts as an
+// at-rule token outside strings, comments and parentheses, and its block is delimited by the
+// same rules. A quoted `content:'@font-face'` is therefore not a declaration.
+function collectFontFacesFromCss(cssText: string): FontFaceDescriptor[] {
+  const faces: FontFaceDescriptor[] = [];
+  const text = String(cssText || '');
+  let parens = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '/' && text[i + 1] === '*') { i = skipCssComment(text, i) - 1; continue; }
+    if (ch === '"' || ch === "'") { i = skipCssString(text, i) - 1; continue; }
+    if (ch === '(') { parens++; continue; }
+    if (ch === ')') { parens = Math.max(0, parens - 1); continue; }
+    if (ch !== '@' || parens !== 0) continue;
+    const atRule = /^@([-\w]+)/.exec(text.slice(i, i + 64));
+    if (!atRule || atRule[1].toLowerCase() !== 'font-face') continue;
+    let cursor = i + atRule[0].length;
+    while (cursor < text.length) {
+      if (/\s/.test(text[cursor])) { cursor++; continue; }
+      if (text[cursor] === '/' && text[cursor + 1] === '*') {
+        cursor = skipCssComment(text, cursor);
+        continue;
+      }
+      break;
+    }
+    if (text[cursor] !== '{') continue;
+    const end = findCssBlockEnd(text, cursor);
+    if (end < 0) break;
+    const face = readFontFaceDescriptor(text.slice(cursor + 1, end));
+    if (face) faces.push(face);
+    i = end;
+  }
+  return faces;
+}
+
+// Family names are compared after the same normalisation the catalog matcher uses for exact
+// lookups, so a rule declared as `"Brand"` answers a run that spells it `brand`.
+function familyKey(name: string): string {
+  return String(name || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function collectSnapshotFontFaces(doc: XmlDocument): Map<string, FontFaceDescriptor[]> {
+  const faces = new Map<string, FontFaceDescriptor[]>();
+  const styles = doc.getElementsByTagName('style');
+  for (let i = 0; i < styles.length; i++) {
+    const text = styles.item(i)?.textContent || '';
+    for (const face of collectFontFacesFromCss(text)) {
+      const key = familyKey(face.family);
+      const bucket = faces.get(key);
+      if (bucket) bucket.push(face);
+      else faces.set(key, [face]);
+    }
+  }
+  return faces;
+}
+
+// Only the head of the stack can be known to have painted with a declared face: any earlier
+// entry may resolve to a font installed on the machine, which the snapshot cannot see, and a
+// later family's cut would then rewrite the request for a family that never used it.
+function resolveSourceRequest(
+  request: HtmlFontRequest, faces: Map<string, FontFaceDescriptor[]>,
+): HtmlFontRequest {
+  const candidates = faces.get(familyKey(request.families[0]));
+  if (!candidates || !candidates.length) return request;
+  const face = selectFontFace(candidates, String(request.weight), request.style);
+  if (!face) return request;
+  const weight = fontFaceRenderedWeight(face, request.weight);
+  const style = fontFaceRenderedStyle(face, request.style);
+  if (weight === request.weight && style === request.style) return request;
+  return { ...request, weight, style: style as HtmlFontRequest['style'] };
+}
+
 function readSnapshot(html: string) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const runs: { element: Element; styles: Map<string, string>; request?: HtmlFontRequest }[] = [];
+  const faces = collectSnapshotFontFaces(doc);
+  const runs: {
+    element: Element;
+    styles: Map<string, string>;
+    request?: HtmlFontRequest;
+    matchRequest?: HtmlFontRequest;
+  }[] = [];
   function visit(node: Node, inherited: Map<string, string>, language: string, inSvg = false): void {
     if (node.nodeType !== 1) return;
     const element = node as Element;
@@ -87,8 +240,13 @@ function readSnapshot(html: string) {
       if (child.nodeType === 3 && child.nodeValue?.trim()) hasText = true;
     }
     // Inline SVG retains authored markup rather than computed text styles in the snapshot.
-    if (hasText) runs.push({ element, styles: resolved,
-      request: inSvg ? undefined : readRequest(resolved, lang) });
+    if (hasText) {
+      const request = inSvg ? undefined : readRequest(resolved, lang);
+      runs.push({
+        element, styles: resolved, request,
+        matchRequest: request ? resolveSourceRequest(request, faces) : undefined,
+      });
+    }
     for (let child = element.firstChild; child; child = child.nextSibling) {
       visit(child, resolved, lang, inSvg);
     }
@@ -120,9 +278,9 @@ export function prepareSnapshotFontReplacements(html: string, availableFonts: Av
   const { runs } = readSnapshot(html);
   const mapping = { replaced: 0, unmatched: 0, missingRequests: 0 };
   const replacements = new Map<string, FontReplacement>();
-  for (const { styles, request } of runs) {
+  for (const { styles, request, matchRequest } of runs) {
     if (!request) { mapping.missingRequests++; continue; }
-    const target = matcher.match(request);
+    const target = matcher.match(matchRequest || request);
     if (!target) { mapping.unmatched++; continue; }
     const replacement = {
       families: styles.get('font-family')!, weight: request.weight, style: request.style,

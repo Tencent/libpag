@@ -40,6 +40,8 @@ std::string ToLowerAscii(std::string s) {
   return s;
 }
 
+}  // namespace
+
 // Converts a CSS font-weight token to a numeric weight in the OpenType 1-1000 range. Returns
 // 400 for unrecognized inputs so unknown values collapse to Regular instead of producing a
 // surprising style. `bolder`/`lighter` are treated as relative-to-normal because the cascade
@@ -58,6 +60,8 @@ int CssFontWeightToNumeric(const std::string& cssFontWeight) {
   if (n > 1000) n = 1000;
   return static_cast<int>(n);
 }
+
+namespace {
 
 // Rounds a numeric weight to the nearest multiple of 100 and returns the canonical PAGX
 // keyword. Returns nullptr for Regular (400) so callers can leave the weight portion empty.

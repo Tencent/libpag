@@ -186,15 +186,25 @@ pre-flag behaviour. Use this when:
 A page whose `@font-face` rules point at font files on **local disk** (a saved
 page, or a design-tool HTML export with an `assets/fonts/` folder) needs no
 extra flag: the snapshot carries every such rule over into its `<style>` block
-as `@font-face{font-family:"…";src:url("<absolute path>")}` — the same absolute
-path form local images take. Rules whose `src` is a `data:` URI are carried
-over verbatim, so a page that inlines its fonts needs neither a file on disk nor
-any flag. The importer registers each source under the **CSS family the rule
-declares** — not the family stored inside the font file, which a page routinely
-aliases (`font-family: MaShanZheng` for a file named `Ma Shan Zheng`) — and
-`pagx import` then bakes the glyphs by default (`--fonts embed`). Remote
-sources are still not carried over this way; use `--download-fonts` below for
-them.
+as `@font-face{font-family:"…";src:url("<absolute path>");font-weight:…;font-style:…}`
+— the same absolute path form local images take. Rules whose `src` is a `data:`
+URI are carried over verbatim, so a page that inlines its fonts needs neither a
+file on disk nor any flag. The importer registers each source under the **CSS
+family the rule declares** — not the family stored inside the font file, which a
+page routinely aliases (`font-family: MaShanZheng` for a file named
+`Ma Shan Zheng`) — and `pagx import` then bakes the glyphs by default
+(`--fonts embed`). Remote sources are still not carried over this way; use
+`--download-fonts` below for them.
+
+The weight and style descriptors travel with the source because they decide
+which cut of the family the page actually painted. A page may declare a single
+`font-weight: 700` face for a family its CSS requests at 400 — the browser then
+matches that face and renders bold outlines — while a variable face declared as
+`font-weight: 400 900` answers the same 400 request at weight 400. Carrying only
+the family name and source would make the subset claim a regular cut the page
+never had, and the editor-catalog match built from it (below) would pick one.
+Faces are de-duplicated by family, source **and** descriptors, so the several
+cuts of one family survive as separate rules.
 
 ### Download web fonts
 
@@ -634,6 +644,18 @@ Provide the frontend's available font catalog in the same conversion request. Th
 reads original CSS family stacks, numeric weights and slants from the snapshot in memory,
 selects a catalog face and passes its exact family/style to native import before layout.
 No source-font JSON file or matching round trip is required.
+
+The match starts from the cut the page's own `@font-face` rules produced, not from the raw
+computed request: when the family at the **head** of the stack declares a face, that face's
+weight and slant drive the catalog search (a family declared only at 700 therefore maps to
+the catalog's bold face even though the text computes to 400). Requests already inside a
+variable face's range are left as computed, and a request is only ever promoted to a heavier
+declared cut, never lowered: a 700 heading served by a lone 400 face keeps its 700. A stack
+whose head declares no face is left untouched — a font installed on the machine may have
+answered it, so a later family's cut is never applied to it (in `Arial, Cinzel`, a declared
+700 cut of `Cinzel` never makes the `Arial` request bold). The `--font-replacement`
+arguments still carry the computed family, weight and style as the key — that is what the
+subset's inline styles declare — with the resolved catalog face as the target.
 
 ```json
 [

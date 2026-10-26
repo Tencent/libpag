@@ -113,10 +113,29 @@ local disk or inlines the font as a `data:` URI:
 @font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
 ```
 
-- Only the `font-family` and `src` descriptors are read. `src` is scanned for `url()` sources in
-  order, and the first usable one is taken: a local path (relative paths resolve against the HTML
-  file's directory) or a `data:` URI. `local()` names, `format()` hints and every other
-  descriptor are ignored.
+- The `font-family`, `src`, `font-weight` and `font-style` descriptors are read. `src` is
+  scanned for `url()` sources in order, and the first usable one is taken: a local path (relative
+  paths resolve against the HTML file's directory) or a `data:` URI. `local()` names, `format()`
+  hints and every other descriptor are ignored.
+- `font-weight` / `font-style` say which face the rule declares: one weight (`700`), a variable
+  range (`400 900`), and `normal` / `italic` / `oblique` for the slant. Weights are CSS numbers in
+  `[1, 1000]` and may be fractional, and the range endpoints are compared at that precision. An
+  `oblique` angle needs a CSS angle unit and has to fall within `[-90, 90]` degrees. A rule that
+  omits both declares a Regular upright face, and a descriptor value that is not valid CSS is
+  dropped the way a browser drops it. When a family is split over several rules, each text request
+  resolves
+  to the face the browser's font matching picks — the slant first, then the CSS weight preference
+  order — and `Text.fontStyle` names the heavier of the request and that face's weight, plus the
+  face's own slant when the family has no face on the requested axis. A family that only ships
+  `font-weight: 700` therefore exports `Bold` even for text that computes to 400, instead of
+  naming a Regular face the family does not have; a family whose only face is
+  `font-weight: 700; font-style: italic` exports `Bold Italic`; and a Regular-only family used for
+  a 700 heading keeps `Bold`, because that is the weight the browser synthesises rather than
+  dropping back to Regular.
+- Only a rule whose source the importer loaded can redirect the exported style. A `@font-face`
+  whose sources are all remote or unloadable declares a face the document never renders with, so the
+  text keeps the style the platform resolves; inside a family split between a loaded face and a
+  remote one, only the loaded face counts.
 - Both kinds of source are registered under the CSS family the rule declares, so
   `font-family` need not match the family name stored inside the font file. A used source becomes
   a `<Font file="…" fontFamily="…">` resource (PAGX spec §3.3.5): local files keep their paths and
@@ -249,7 +268,7 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
-| `font-weight: bold` / `600+` | bold weights (`bold` or numeric ≥ 600) map to the bold style; when the resolved typeface has no native bold face the importer applies synthetic `fauxBold` so the weight still shows |
+| `font-weight: <number>` / `normal` / `bold` | maps numeric weights to real-face style names such as Regular, Medium, SemiBold and Bold; no synthetic `fauxBold` is added. For an `@font-face` family, a heavier declared face can raise the exported weight, but a heavier CSS request is not lowered (see §3.5) |
 | `font-style: italic | oblique` | `Text.fontStyle = "Italic"` (combined with bold into `"Bold Italic"`) |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `-webkit-text-stroke: W C` (or the `-webkit-text-stroke-width` / `-webkit-text-stroke-color` longhands) | adds a text `<Stroke color="C" width="W"/>` to the glyph run |

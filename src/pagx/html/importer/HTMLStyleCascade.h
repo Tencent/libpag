@@ -122,6 +122,11 @@ class HTMLStyleCascade {
     return _fontFaces;
   }
 
+  /** Marks the rule at `index` of `fontFaces()` as one whose source the importer loaded. Only
+   *  marked rules take part in face selection, so a remote or unloadable declaration cannot
+   *  redirect the exported style. */
+  void markFontFaceUsable(size_t index);
+
  private:
   bool applyFontReplacement(HTMLInheritedStyle& style);
   std::vector<HTMLImporter::FontReplacement> _fontReplacements = {};
@@ -157,6 +162,8 @@ class HTMLStyleCascade {
   // sink. Skipped for pairs the parent already produced, which keeps the platform lookup to one
   // call per distinct pair instead of one per element.
   void applyFontFaceNames(HTMLInheritedStyle& out, const HTMLInheritedStyle& parent);
+
+  void applyFontFaceSelection(HTMLInheritedStyle& out, bool requestItalic);
 
   // Picks the family to write to `Text::fontFamily`: the first entry of `authoredFamilies` the
   // renderer can resolve, then the first of `genericFamilies`, and `fallback` when neither group
@@ -199,6 +206,10 @@ class HTMLStyleCascade {
 
   // `@font-face` rules collected from `<style>` blocks, in source order.
   std::vector<html::CssFontFaceRule> _fontFaces = {};
+
+  // The rules of `_fontFaces` whose source the importer could load, in source order, carrying only
+  // the descriptors face selection reads (no sources).
+  std::vector<html::CssFontFaceRule> _usableFontFaces = {};
 };
 
 }  // namespace pagx

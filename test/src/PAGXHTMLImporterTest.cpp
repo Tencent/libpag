@@ -7096,6 +7096,15 @@ static pagx::Text* FindFirstText(const pagx::PAGXDocument* doc) {
   return nullptr;
 }
 
+static pagx::Text* FindTextByContent(const pagx::PAGXDocument* doc, const std::string& content) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    if (text->text == content) return text;
+  }
+  return nullptr;
+}
+
 static void ExpectWebFontImported(const std::shared_ptr<pagx::PAGXDocument>& doc,
                                   const std::string& fontPath) {
   ASSERT_NE(doc, nullptr);
@@ -7435,6 +7444,393 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesTokenizeAndSerialize) {
     EXPECT_EQ(reparsed[i].family, fontFaces[i].family);
     EXPECT_EQ(reparsed[i].sources, fontFaces[i].sources);
   }
+}
+
+//==================================================================================================
+// Web fonts: `@font-face` weight/style descriptors pick the declared face (spec/html_subset.md §3.5)
+//==================================================================================================
+
+static pagx::html::CssFontFaceRule MakeFontFace(const std::string& family,
+                                                const std::string& weight,
+                                                const std::string& style = {}) {
+  pagx::html::CssFontFaceRule face = {};
+  face.family = family;
+  face.weight = weight;
+  face.style = style;
+  face.sources = {"face.woff2"};
+  return face;
+}
+
+// `font-weight` / `font-style` decide which face of a family a text request resolves to, so the
+// tokenizer keeps them and the serializer carries them across the subset transformer's cascade
+// inlining. A value that is not a valid descriptor is dropped rather than re-emitted: the browser
+// ignored it, and re-emitting it would describe a face the page never had.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceWeightAndStyleDescriptorsTokenizeAndSerialize) {
+  struct DescriptorCase {
+    std::string descriptors;
+    std::string weight;
+    std::string style;
+  };
+  // A descriptor that is not a value the browser accepts is dropped, which leaves the face at the
+  // CSS initial value; the rule itself survives, since its family and src are still valid.
+  const DescriptorCase cases[] = {
+      {"font-weight: 700; font-style: italic", "700", "italic"},
+      {"font-weight: 400 900", "400 900", ""},
+      {"font-style: oblique 10deg", "", "oblique 10deg"},
+      {"font-weight: heavy; font-style: slanted", "", ""},
+      {"font-weight: 900 400", "", ""},
+      {"font-weight: 450.5", "450.5", ""},
+      {"font-weight: 1001", "", ""},
+      {"font-weight: 0", "", ""},
+      {"font-weight: 400.9 400.1", "", ""},
+      {"font-style: oblique 120deg", "", ""},
+      {"font-style: oblique 0.1turn", "", "oblique 0.1turn"},
+      {"font-style: oblique 100grad", "", "oblique 100grad"},
+      {"font-style: oblique 1.6rad", "", ""},
+      {"font-style: oblique infdeg", "", ""},
+      {"font-style: oblique 0", "", ""},
+  };
+  constexpr size_t kCaseCount = sizeof(cases) / sizeof(cases[0]);
+  std::string css;
+  for (size_t i = 0; i < kCaseCount; i++) {
+    css += "@font-face { font-family: F" + std::to_string(i) + "; src: url(f" + std::to_string(i) +
+           ".woff2); " + cases[i].descriptors + "; }\n";
+  }
+  std::vector<std::string> dropped;
+  std::vector<pagx::html::CssKeyframesRule> keyframes;
+  std::vector<pagx::html::CssFontFaceRule> fontFaces;
+  pagx::html::TokenizeStyleSheet(css, dropped, keyframes, fontFaces);
+  ASSERT_EQ(fontFaces.size(), kCaseCount);
+  for (size_t i = 0; i < kCaseCount; i++) {
+    EXPECT_EQ(fontFaces[i].weight, cases[i].weight) << cases[i].descriptors;
+    EXPECT_EQ(fontFaces[i].style, cases[i].style) << cases[i].descriptors;
+  }
+  EXPECT_TRUE(dropped.empty());
+
+  std::vector<std::string> reDropped;
+  std::vector<pagx::html::CssFontFaceRule> reparsed;
+  pagx::html::TokenizeStyleSheet(pagx::html::SerializeFontFaces(fontFaces), reDropped, keyframes,
+                                 reparsed);
+  ASSERT_EQ(reparsed.size(), fontFaces.size());
+  for (size_t i = 0; i < fontFaces.size(); i++) {
+    EXPECT_EQ(reparsed[i].family, fontFaces[i].family);
+    EXPECT_EQ(reparsed[i].sources, fontFaces[i].sources);
+    EXPECT_EQ(reparsed[i].weight, fontFaces[i].weight);
+    EXPECT_EQ(reparsed[i].style, fontFaces[i].style);
+  }
+}
+
+// Face selection follows the CSS Fonts weight preference order rather than the nearest absolute
+// weight: a 400 request descends before it climbs, and a request inside a variable face's range
+// keeps its own weight.
+PAG_TEST(PAGXHTMLImporterTest, SelectFontFaceFollowsCssWeightPreference) {
+  std::vector<pagx::html::CssFontFaceRule> pair = {MakeFontFace("Pair", "300"),
+                                                   MakeFontFace("Pair", "700")};
+  pagx::html::CssFontFaceMatch match = {};
+  ASSERT_TRUE(pagx::html::SelectFontFace(pair, "Pair", 400, false, match));
+  EXPECT_EQ(match.rule->weight, "300");
+  EXPECT_EQ(match.weight, 300);
+  ASSERT_TRUE(pagx::html::SelectFontFace(pair, "Pair", 500, false, match));
+  EXPECT_EQ(match.weight, 300);
+  ASSERT_TRUE(pagx::html::SelectFontFace(pair, "Pair", 600, false, match));
+  EXPECT_EQ(match.rule->weight, "700");
+  EXPECT_EQ(match.weight, 700);
+
+  // The preference order decides, not the distance: a 400 request climbs to the 500 face even
+  // though the 350 face is closer, and at equal distances the climb still comes first.
+  std::vector<pagx::html::CssFontFaceRule> climb = {MakeFontFace("Climb", "350"),
+                                                    MakeFontFace("Climb", "500")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(climb, "Climb", 400, false, match));
+  EXPECT_EQ(match.rule->weight, "500");
+  EXPECT_EQ(match.weight, 500);
+  std::vector<pagx::html::CssFontFaceRule> tie = {MakeFontFace("Tie", "400"),
+                                                  MakeFontFace("Tie", "500")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(tie, "Tie", 450, false, match));
+  EXPECT_EQ(match.rule->weight, "500");
+
+  std::vector<pagx::html::CssFontFaceRule> exact = {MakeFontFace("Exact", "400"),
+                                                    MakeFontFace("Exact", "700")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(exact, "Exact", 400, false, match));
+  EXPECT_EQ(match.rule->weight, "400");
+  EXPECT_EQ(match.weight, 400);
+  ASSERT_TRUE(pagx::html::SelectFontFace(exact, "Exact", 700, false, match));
+  EXPECT_EQ(match.rule->weight, "700");
+  EXPECT_EQ(match.weight, 700);
+
+  // A family that only ships Bold answers every request with Bold, which is the weight the face
+  // actually renders.
+  std::vector<pagx::html::CssFontFaceRule> boldOnly = {MakeFontFace("BoldOnly", "700")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(boldOnly, "BoldOnly", 400, false, match));
+  EXPECT_EQ(match.rule->weight, "700");
+  EXPECT_EQ(match.weight, 700);
+
+  // A variable face keeps the requested weight inside its declared range and clamps outside it.
+  std::vector<pagx::html::CssFontFaceRule> variable = {MakeFontFace("Variable", "400 900")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(variable, "Variable", 700, false, match));
+  EXPECT_EQ(match.weight, 700);
+  ASSERT_TRUE(pagx::html::SelectFontFace(variable, "Variable", 300, false, match));
+  EXPECT_EQ(match.weight, 400);
+  ASSERT_TRUE(pagx::html::SelectFontFace(variable, "Variable", 950, false, match));
+  EXPECT_EQ(match.weight, 900);
+
+  // A fractional endpoint keeps its precision through selection: the clamped weight is the authored
+  // 400.5, not a truncated 400.
+  std::vector<pagx::html::CssFontFaceRule> fractional = {MakeFontFace("Fractional", "400.5 900")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(fractional, "Fractional", 400, false, match));
+  EXPECT_FLOAT_EQ(match.weight, 400.5f);
+  ASSERT_TRUE(pagx::html::SelectFontFace(fractional, "Fractional", 900, false, match));
+  EXPECT_FLOAT_EQ(match.weight, 900.0f);
+
+  // The slant picks the candidate faces first: an italic request takes the italic face, an upright
+  // request the upright one, and a family with no italic face falls back to its upright faces.
+  std::vector<pagx::html::CssFontFaceRule> slanted = {MakeFontFace("Slanted", "400"),
+                                                      MakeFontFace("Slanted", "400", "italic")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(slanted, "Slanted", 400, true, match));
+  EXPECT_EQ(match.rule->style, "italic");
+  EXPECT_TRUE(match.italic);
+  ASSERT_TRUE(pagx::html::SelectFontFace(slanted, "Slanted", 400, false, match));
+  EXPECT_TRUE(match.rule->style.empty());
+  EXPECT_FALSE(match.italic);
+  ASSERT_TRUE(pagx::html::SelectFontFace(pair, "Pair", 400, true, match));
+  EXPECT_TRUE(match.rule->style.empty());
+  EXPECT_FALSE(match.italic);
+
+  // A family whose only face is slanted answers an upright request with that face, and the match
+  // reports the slant so the exported name can describe the face rather than the request.
+  std::vector<pagx::html::CssFontFaceRule> italicOnly = {
+      MakeFontFace("ItalicOnly", "700", "italic")};
+  ASSERT_TRUE(pagx::html::SelectFontFace(italicOnly, "ItalicOnly", 400, false, match));
+  EXPECT_EQ(match.weight, 700);
+  EXPECT_TRUE(match.italic);
+
+  EXPECT_FALSE(pagx::html::SelectFontFace(pair, "Missing", 400, false, match));
+}
+
+// Builds one `@font-face` rule declaring `family` at `weight` from the PUA test font.
+static std::string WebFontFaceRule(const std::string& family, const std::string& weight,
+                                   const std::string& style = {}) {
+  std::string rule = "@font-face{font-family:" + family + ";src:url('" + PuaWoff2FontPath() +
+                     "');font-weight:" + weight;
+  if (!style.empty()) {
+    rule += ";font-style:" + style;
+  }
+  return rule + "}";
+}
+
+// A family may ship a single face whose weight differs from the one the CSS computes to: a display
+// face declared `font-weight: 700` used by text that computes to 400 is the common case. A browser
+// paints such text with the Bold face, so the exported style has to name the declared face —
+// exporting the requested Regular names a face the family does not have, and the text resolves
+// nowhere on a host that only has those files.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSingleBoldFaceAnswersRegularRequest) {
+  auto doc = ParseFromString("<html><head><style>" + WebFontFaceRule("OnlyBold", "700") +
+                             "</style></head><body style='width:200px;height:40px'>"
+                             "<span style='position:absolute;left:0px;top:0px;"
+                             "font-family:OnlyBold;font-size:20px'>A</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "OnlyBold");
+  EXPECT_EQ(text->fontStyle, "Bold");
+}
+
+// The mirror case of the Bold-only family: a Regular-only family used for a 700 heading. A browser
+// synthesises the bold instead of dropping back to Regular, so the exported style has to keep the
+// requested weight — downgrading it is what turned a 700 heading into Regular once the importer
+// started naming the face a family actually ships.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSingleRegularFaceKeepsHeavierRequest) {
+  auto html = "<html><head><style>" + WebFontFaceRule("OnlyRegular", "400") +
+              "</style></head><body style='width:200px;height:80px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:OnlyRegular;"
+              "font-size:20px'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:OnlyRegular;"
+              "font-size:20px;font-weight:700'>B</span>"
+              "<span style='position:absolute;left:0px;top:40px;font-family:OnlyRegular;"
+              "font-size:20px;font-weight:900'>C</span></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* regular = FindTextByContent(doc.get(), "A");
+  auto* bold = FindTextByContent(doc.get(), "B");
+  auto* black = FindTextByContent(doc.get(), "C");
+  ASSERT_NE(regular, nullptr);
+  ASSERT_NE(bold, nullptr);
+  ASSERT_NE(black, nullptr);
+  EXPECT_EQ(regular->fontStyle, "Regular");
+  EXPECT_EQ(bold->fontStyle, "Bold");
+  EXPECT_EQ(black->fontStyle, "Black");
+}
+
+// A family whose only face is declared `700 italic` paints upright 400 text with that face, so
+// both axes of the declared face reach the exported name — aligning the weight while dropping the
+// declared slant would name a face that is neither the requested one nor the declared one.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSlantedFaceKeepsItsSlant) {
+  auto doc =
+      ParseFromString("<html><head><style>" + WebFontFaceRule("ItalicOnly", "700", "italic") +
+                      "</style></head><body style='width:200px;height:40px'>"
+                      "<span style='position:absolute;left:0px;top:0px;"
+                      "font-family:ItalicOnly;font-size:20px'>A</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "ItalicOnly");
+  EXPECT_EQ(text->fontStyle, "Bold Italic");
+}
+
+// A rule the importer cannot load declares a face the document never renders with, so it must not
+// redirect the exported style. A lighter request is the case that would show it: a remote-only 700
+// declaration leaves a 400 request at Regular, and inside a family split between a loaded 400 face
+// and a remote 700 one only the loaded face counts.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceUnloadableRuleDoesNotRedirectStyle) {
+  auto html = std::string("<html><head><style>") +
+              "@font-face{font-family:RemoteOnly;src:url(https://example.com/remote.woff2);" +
+              "font-weight:700}" + WebFontFaceRule("Mixed", "400") +
+              "@font-face{font-family:Mixed;src:url(https://example.com/remote.woff2);" +
+              "font-weight:700}</style></head><body style='width:200px;height:80px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:RemoteOnly;"
+              "font-size:20px'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:Mixed;font-size:20px;"
+              "font-weight:400'>B</span></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:font-face-no-local-source"));
+  auto* remoteOnly = FindTextByContent(doc.get(), "A");
+  auto* mixed = FindTextByContent(doc.get(), "B");
+  ASSERT_NE(remoteOnly, nullptr);
+  ASSERT_NE(mixed, nullptr);
+  EXPECT_EQ(remoteOnly->fontStyle, "Regular");
+  EXPECT_EQ(mixed->fontStyle, "Regular");
+}
+
+// A family split over several `@font-face` rules provides one face per declared weight. The face
+// the browser's font matching picks is 400 and 700 for the exact matches and 400 for a 500 request
+// (nothing is available up to 500, so the search descends), but the exported style keeps a heavier
+// request: 500 stays Medium so the renderer can synthesise it from the Regular face, while a 300
+// request is lifted to the only face that can paint it.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceWeightPicksDeclaredFace) {
+  auto faces = WebFontFaceRule("Faces", "400") + WebFontFaceRule("Faces", "700");
+  auto html = "<html><head><style>" + faces +
+              "</style></head><body style='width:200px;height:120px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:Faces;font-size:20px;"
+              "font-weight:400'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:Faces;font-size:20px;"
+              "font-weight:700'>B</span>"
+              "<span style='position:absolute;left:0px;top:40px;font-family:Faces;font-size:20px;"
+              "font-weight:500'>C</span>"
+              "<span style='position:absolute;left:0px;top:60px;font-family:Faces;font-size:20px;"
+              "font-weight:300'>D</span>"
+              "<span style='position:absolute;left:0px;top:80px;font-family:Faces;font-size:20px;"
+              "font-weight:bolder'>E</span></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* request400 = FindTextByContent(doc.get(), "A");
+  auto* request700 = FindTextByContent(doc.get(), "B");
+  auto* request500 = FindTextByContent(doc.get(), "C");
+  auto* request300 = FindTextByContent(doc.get(), "D");
+  auto* bolder = FindTextByContent(doc.get(), "E");
+  ASSERT_NE(request400, nullptr);
+  ASSERT_NE(request700, nullptr);
+  ASSERT_NE(request500, nullptr);
+  ASSERT_NE(request300, nullptr);
+  ASSERT_NE(bolder, nullptr);
+  EXPECT_EQ(request400->fontStyle, "Regular");
+  EXPECT_EQ(request700->fontStyle, "Bold");
+  EXPECT_EQ(request500->fontStyle, "Medium");
+  EXPECT_EQ(request300->fontStyle, "Regular");
+  // The keyword resolves through the same numeric weight the style label uses, so the face matches
+  // the name instead of falling back to the parent's Regular.
+  EXPECT_EQ(bolder->fontStyle, "Bold");
+}
+
+// A variable face declares the weight range it covers. Every request inside the range keeps its own
+// weight instead of collapsing to the face's first weight, and a request outside the range is
+// clamped to the range rather than named after a face the family cannot deliver.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceWeightRangeKeepsRequestedWeight) {
+  auto html = "<html><head><style>" + WebFontFaceRule("Range", "400 900") +
+              "</style></head><body style='width:200px;height:120px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:Range;font-size:20px;"
+              "font-weight:400'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:Range;font-size:20px;"
+              "font-weight:700'>B</span>"
+              "<span style='position:absolute;left:0px;top:40px;font-family:Range;font-size:20px;"
+              "font-weight:900'>C</span>"
+              "<span style='position:absolute;left:0px;top:60px;font-family:Range;font-size:20px;"
+              "font-weight:300'>D</span></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* request400 = FindTextByContent(doc.get(), "A");
+  auto* request700 = FindTextByContent(doc.get(), "B");
+  auto* request900 = FindTextByContent(doc.get(), "C");
+  auto* request300 = FindTextByContent(doc.get(), "D");
+  ASSERT_NE(request400, nullptr);
+  ASSERT_NE(request700, nullptr);
+  ASSERT_NE(request900, nullptr);
+  ASSERT_NE(request300, nullptr);
+  EXPECT_EQ(request400->fontStyle, "Regular");
+  EXPECT_EQ(request700->fontStyle, "Bold");
+  EXPECT_EQ(request900->fontStyle, "Black");
+  EXPECT_EQ(request300->fontStyle, "Regular");
+}
+
+// The face is chosen from each element's own request, not from the face its parent resolved to: a
+// child that only changes the weight must not inherit the parent's already-selected face.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceWeightIsResolvedPerElementRequest) {
+  auto faces = WebFontFaceRule("Faces", "400") + WebFontFaceRule("Faces", "700");
+  auto html = "<html><head><style>" + faces +
+              "</style></head><body style='width:200px;height:80px'>"
+              "<div style='position:absolute;left:0px;top:0px;font-family:Faces;font-size:20px;"
+              "font-weight:700'>"
+              "<span style='position:absolute;left:0px;top:0px'>A</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-weight:400'>B</span></div>"
+              "</body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* inherited = FindTextByContent(doc.get(), "A");
+  auto* overridden = FindTextByContent(doc.get(), "B");
+  ASSERT_NE(inherited, nullptr);
+  ASSERT_NE(overridden, nullptr);
+  EXPECT_EQ(inherited->fontStyle, "Bold");
+  EXPECT_EQ(overridden->fontStyle, "Regular");
+}
+
+// An unrecognised descriptor is not a weight, so the face keeps the CSS initial value (`normal`).
+// Nothing from the invalid value may reach the exported name: a 400 request names Regular, and a
+// 700 request keeps its own weight instead of being downgraded to the Regular face.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceInvalidWeightDescriptorIsIgnored) {
+  auto html = std::string("<html><head><style>@font-face{font-family:Bad;src:url('") +
+              PuaWoff2FontPath() +
+              "');font-weight:heavy;font-style:slanted}</style></head>"
+              "<body style='width:200px;height:60px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:Bad;font-size:20px'>A"
+              "</span>"
+              "<span style='position:absolute;left:0px;top:20px;font-family:Bad;font-size:20px;"
+              "font-weight:700'>B</span></body></html>";
+  auto doc = ParseFromString(html);
+  ASSERT_NE(doc, nullptr);
+  auto* plain = FindTextByContent(doc.get(), "A");
+  auto* heavy = FindTextByContent(doc.get(), "B");
+  ASSERT_NE(plain, nullptr);
+  ASSERT_NE(heavy, nullptr);
+  EXPECT_EQ(plain->fontStyle, "Regular");
+  EXPECT_EQ(heavy->fontStyle, "Bold");
+}
+
+// A matched font replacement names the face to render with, so `@font-face` selection must not
+// override it: the replacement source is still the CSS 400 request, and its target stays
+// authoritative even though the family also declares a 400 face of its own.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceSelectionYieldsToFontReplacement) {
+  pagx::HTMLImporter::Options options;
+  options.fontReplacements.push_back({"Faces", 400, "normal", "Target", "Bold"});
+  auto faces = WebFontFaceRule("Faces", "400") + WebFontFaceRule("Faces", "700");
+  auto html = "<html><head><style>" + faces +
+              "</style></head><body style='width:200px;height:40px'>"
+              "<span style='position:absolute;left:0px;top:0px;font-family:Faces;font-size:20px'>A"
+              "</span></body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html, options);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Target");
+  EXPECT_EQ(text->fontStyle, "Bold");
 }
 
 //==================================================================================================

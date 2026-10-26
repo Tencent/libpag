@@ -9,7 +9,7 @@ beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'font-map-pipelin
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 const availableFonts = [{ fontName: { family: 'SOURCE', style: 'SemiBold' } }];
 const html = `<html><body><span style="font-family:Source,sans-serif;font-weight:650">A</span></body></html>`;
-function setup() {
+function setup(pageHtml = html) {
   const input = path.join(dir, 'page.html'); fs.writeFileSync(input, '<html/>');
   const calls = path.join(dir, 'calls.jsonl');
   const bin = path.join(dir, 'fake-pagx');
@@ -27,7 +27,7 @@ if(command==='import') {
 `, { mode: 0o755 });
   return { input, pagxBin: bin, scriptDir: dir, outputDir: path.join(dir, 'out'),
     snapshotImpl: async args => {
-      fs.writeFileSync(args.output, html);
+      fs.writeFileSync(args.output, pageHtml);
       if (args.fontManifest) fs.writeFileSync(args.fontManifest, '');
       return { code: 0, stdout: '', stderr: '', durationMs: 0 };
     } };
@@ -70,4 +70,18 @@ test('rejects malformed catalogs before snapshot or native conversion', async ()
     .rejects.toThrow(/INVALID_AVAILABLE_FONTS/);
   expect(snapshot).not.toHaveBeenCalled();
   expect(fs.existsSync(path.join(dir, 'calls.jsonl'))).toBe(false);
+});
+
+test('keys the replacement on the computed request and targets the cut the snapshot declared', async () => {
+  const options = setup('<html><head><style>@font-face{font-family:"Cinzel Decorative";' +
+    'src:url("data:font/woff2;base64,AA");font-weight:700;font-style:normal}</style></head>' +
+    '<body><span style="font-family:\'Cinzel Decorative\'">A</span></body></html>');
+  await runHtmlToPagx({ ...options, doResolve: false, availableFonts: [
+    { fontName: { family: 'Cinzel Decorative', style: 'Regular' } },
+    { fontName: { family: 'Cinzel Decorative', style: 'Bold' } },
+  ] });
+  const args = fs.readFileSync(path.join(dir, 'calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)[0];
+  const offset = args.indexOf('--font-replacement');
+  expect(args.slice(offset + 1, offset + 6))
+    .toEqual(["'Cinzel Decorative'", '400', 'normal', 'Cinzel Decorative', 'Bold']);
 });

@@ -379,16 +379,63 @@ void HTMLStyleCascade::setFontFaceNameSink(FontFaceNameThunk thunk, void* userDa
   _fontFaceNameUserData = userData;
 }
 
-void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
-                                          const HTMLInheritedStyle& parent) {
-  if (_fontFaceNameThunk == nullptr || out.primaryFontFamily.empty()) {
+void HTMLStyleCascade::markFontFaceUsable(size_t index) {
+  if (index >= _fontFaces.size()) {
     return;
   }
-  // The parent's pair was already normalised, so a child that neither changed the family nor the
-  // weight inherits it as-is. Only a pair this element actually introduced needs the platform
-  // lookup, which keeps the one-lookup-per-distinct-pair cost.
-  if (out.primaryFontFamily == parent.primaryFontFamily &&
-      out.fontStyleName == parent.fontStyleName) {
+  // Only the descriptors selection reads are kept: a source may be a multi-megabyte base64 data
+  // URI, and copying one per usable face would hold it twice for the whole parse.
+  html::CssFontFaceRule face = {};
+  face.family = _fontFaces[index].family;
+  face.weight = _fontFaces[index].weight;
+  face.style = _fontFaces[index].style;
+  _usableFontFaces.push_back(std::move(face));
+}
+
+void HTMLStyleCascade::applyFontFaceSelection(HTMLInheritedStyle& out, bool requestItalic) {
+  if (_usableFontFaces.empty() || out.primaryFontFamily.empty()) {
+    return;
+  }
+  // The request keeps the precision its CSS declares, so a fractional weight is matched as authored;
+  // a keyword falls back to the numeric conversion the style label uses.
+  html::CssFontWeightRange request = {};
+  float requestWeight = html::ParseFontFaceWeight(out.fontWeight, request)
+                            ? request.minWeight
+                            : static_cast<float>(CssFontWeightToNumeric(out.fontWeight));
+  html::CssFontFaceMatch match = {};
+  if (!html::SelectFontFace(_usableFontFaces, out.primaryFontFamily, requestWeight, requestItalic,
+                            match)) {
+    return;
+  }
+  // The label names what the text renders with: the heavier of the request and the face's weight —
+  // a request lighter than the only face is lifted to it, while a heavier request is kept because a
+  // browser synthesises bold on top of a Regular-only family — plus the face's own slant, while a
+  // slant the family lacks stays in the name because fauxItalic asks the renderer to synthesise it.
+  // Truncating the weight keeps the thresholds the label mapping already used for an authored one.
+  bool labelItalic = requestItalic || match.italic;
+  int labelWeight = static_cast<int>(std::max(requestWeight, match.weight));
+  FontStyleSynthesis faceSynthesis =
+      ResolveFontStyleSynthesis(std::to_string(labelWeight), labelItalic ? "italic" : "");
+  out.fontStyleName = faceSynthesis.fontStyleName;
+}
+
+void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
+                                          const HTMLInheritedStyle& parent) {
+  if (out.primaryFontFamily.empty()) {
+    return;
+  }
+  // fauxItalic is exactly the authored slant: ResolveFontStyleSynthesis derives it from the CSS
+  // font-style alone, before any face is resolved.
+  applyFontFaceSelection(out, out.fauxItalic);
+  if (_fontFaceNameThunk == nullptr) {
+    return;
+  }
+  // The parent already resolved this exact request — same family, same authored weight and slant —
+  // so its names are the answer here too. Comparing the request rather than the style label keeps a
+  // child that changes only the weight from inheriting the face its parent selected.
+  if (out.primaryFontFamily == parent.primaryFontFamily && out.fontWeight == parent.fontWeight &&
+      out.fontStyle == parent.fontStyle) {
+    out.fontStyleName = parent.fontStyleName;
     return;
   }
   _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);

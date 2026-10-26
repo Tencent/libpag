@@ -18,6 +18,7 @@
 
 #include "pagx/html/importer/HTMLCssCascade.h"
 #include <cctype>
+#include <cmath>
 #include "pagx/html/importer/HTMLDetail.h"
 
 namespace pagx::html {
@@ -311,6 +312,93 @@ std::vector<std::string> ParseFontFaceSources(const std::string& value) {
   return sources;
 }
 
+// Parses one CSS weight token: `normal` / `bold` or a number in the OpenType 1-1000 range. The
+// value keeps its precision, so a fractional weight is compared as authored.
+bool ParseWeightToken(const std::string& token, float& outWeight) {
+  std::string lower = ToLower(token);
+  if (lower == "normal") {
+    outWeight = 400;
+    return true;
+  }
+  if (lower == "bold") {
+    outWeight = 700;
+    return true;
+  }
+  char* end = nullptr;
+  double value = std::strtod(lower.c_str(), &end);
+  if (end == lower.c_str() || *end != '\0' || !(value >= 1.0 && value <= 1000.0)) {
+    return false;
+  }
+  outWeight = static_cast<float>(value);
+  return true;
+}
+
+// Parses the angle of `oblique <angle>` into degrees. Any CSS angle unit is accepted and converted
+// with the factor the specification defines; a value without a unit is not an angle.
+bool ParseObliqueAngle(const std::string& token, double& outDegrees) {
+  std::string lower = ToLower(token);
+  static const char* kUnits[] = {"deg", "grad", "rad", "turn"};
+  constexpr size_t kUnitCount = sizeof(kUnits) / sizeof(kUnits[0]);
+  for (size_t i = 0; i < kUnitCount; i++) {
+    std::string suffix = kUnits[i];
+    if (lower.size() <= suffix.size() ||
+        lower.compare(lower.size() - suffix.size(), suffix.size(), suffix) != 0) {
+      continue;
+    }
+    std::string number = lower.substr(0, lower.size() - suffix.size());
+    char* end = nullptr;
+    double value = std::strtod(number.c_str(), &end);
+    if (end == number.c_str() || *end != '\0' || !std::isfinite(value)) {
+      return false;
+    }
+    if (i == 0) {
+      outDegrees = value;
+    } else if (i == 1) {
+      outDegrees = value * 0.9;
+    } else if (i == 2) {
+      outDegrees = value * 180.0 / 3.14159265358979323846;
+    } else {
+      outDegrees = value * 360.0;
+    }
+    return true;
+  }
+  return false;
+}
+
+// The CSS Fonts 4 §5.2 weight preference, expressed as a rank so candidate faces compare without
+// being sorted: group 0 is the face whose range contains the request, and the later groups follow
+// the order the specification searches for the request's band. Within a group the closest declared
+// weight wins, so the comparison is the CSS preference order rather than a nearest-weight search.
+struct FontWeightRank {
+  int group = 0;
+  float distance = 0;
+};
+
+FontWeightRank RankFontFaceWeight(const CssFontWeightRange& range, float request) {
+  FontWeightRank rank = {};
+  if (range.contains(request)) {
+    return rank;
+  }
+  if (range.minWeight > request) {
+    // A face heavier than the request: last for requests below 400, and past the 500 ceiling for a
+    // request in [400, 500].
+    rank.distance = range.minWeight - request;
+    if (request < 400) {
+      rank.group = 2;
+    } else if (request <= 500) {
+      rank.group = range.minWeight <= 500 ? 1 : 3;
+    } else {
+      rank.group = 1;
+    }
+    return rank;
+  }
+  // A face lighter than the request: first only for requests below 400. A request in [400, 500]
+  // climbs to 500 before it descends, so a lighter face comes after the heavier ones.
+  rank.distance = request - range.maxWeight;
+  rank.group = request < 400 ? 1 : 2;
+  return rank;
+}
+
 void ApplyFontFaceDescriptor(const std::string& declaration, CssFontFaceRule& rule) {
   // Descriptor names never contain a colon, so the first one ends the name.
   auto colon = declaration.find(':');
@@ -323,6 +411,18 @@ void ApplyFontFaceDescriptor(const std::string& declaration, CssFontFaceRule& ru
     rule.family = ParseFontFaceFamily(value);
   } else if (name == "src") {
     rule.sources = ParseFontFaceSources(value);
+  } else if (name == "font-weight") {
+    // The descriptor text is kept verbatim so the subset transformer can re-emit the rule, but only
+    // when it is a value the browser would have honoured.
+    CssFontWeightRange range = {};
+    if (ParseFontFaceWeight(value, range)) {
+      rule.weight = value;
+    }
+  } else if (name == "font-style") {
+    bool italic = false;
+    if (ParseFontFaceStyle(value, italic)) {
+      rule.style = value;
+    }
   }
 }
 
@@ -365,6 +465,104 @@ CssFontFaceRule ParseFontFaceBody(const std::string& body) {
 }
 
 }  // namespace
+
+bool ParseFontFaceWeight(const std::string& value, CssFontWeightRange& out) {
+  out = CssFontWeightRange();
+  auto tokens = SplitTopLevelWhitespace(value);
+  if (tokens.empty()) {
+    return true;
+  }
+  float minWeight = 0;
+  float maxWeight = 0;
+  if (!ParseWeightToken(tokens[0], minWeight)) {
+    return false;
+  }
+  if (tokens.size() == 1) {
+    out.minWeight = minWeight;
+    out.maxWeight = minWeight;
+    return true;
+  }
+  if (tokens.size() != 2 || !ParseWeightToken(tokens[1], maxWeight) || minWeight > maxWeight) {
+    return false;
+  }
+  out.minWeight = minWeight;
+  out.maxWeight = maxWeight;
+  return true;
+}
+
+bool ParseFontFaceStyle(const std::string& value, bool& outItalic) {
+  outItalic = false;
+  auto tokens = SplitTopLevelWhitespace(value);
+  if (tokens.empty()) {
+    return true;
+  }
+  std::string lower = ToLower(tokens[0]);
+  if (lower == "normal") {
+    return tokens.size() == 1;
+  }
+  if (lower == "italic") {
+    outItalic = true;
+    return tokens.size() == 1;
+  }
+  if (lower != "oblique") {
+    return false;
+  }
+  if (tokens.size() == 1) {
+    outItalic = true;
+    return true;
+  }
+  // An oblique face leans by at most a quarter turn; an angle outside that range is not a value a
+  // browser accepts, so the declaration is dropped rather than reinterpreted.
+  double degrees = 0;
+  if (tokens.size() != 2 || !ParseObliqueAngle(tokens[1], degrees) || degrees < -90.0 ||
+      degrees > 90.0) {
+    return false;
+  }
+  outItalic = true;
+  return true;
+}
+
+bool SelectFontFace(const std::vector<CssFontFaceRule>& faces, const std::string& family,
+                    float requestWeight, bool requestItalic, CssFontFaceMatch& out) {
+  out = CssFontFaceMatch();
+  CssFontWeightRange bestRange = {};
+  int bestStyleRank = 0;
+  FontWeightRank bestRank = {};
+  for (const auto& face : faces) {
+    // Rules are registered under the exact CSS family they declare, so the lookup uses the same
+    // spelling the authored font-family produced.
+    if (face.family != family) {
+      continue;
+    }
+    CssFontWeightRange range = {};
+    ParseFontFaceWeight(face.weight, range);
+    bool italic = false;
+    ParseFontFaceStyle(face.style, italic);
+    // A face of the requested slant wins; the other slant is the fallback, the way a browser
+    // synthesises the missing axis from the faces it has.
+    int styleRank = italic == requestItalic ? 0 : 1;
+    FontWeightRank rank = RankFontFaceWeight(range, requestWeight);
+    bool better = out.rule == nullptr || styleRank < bestStyleRank ||
+                  (styleRank == bestStyleRank &&
+                   (rank.group < bestRank.group ||
+                    (rank.group == bestRank.group && rank.distance < bestRank.distance)));
+    if (!better) {
+      continue;
+    }
+    out.rule = &face;
+    out.italic = italic;
+    bestRange = range;
+    bestStyleRank = styleRank;
+    bestRank = rank;
+  }
+  if (out.rule == nullptr) {
+    return false;
+  }
+  out.weight = requestWeight < bestRange.minWeight   ? bestRange.minWeight
+               : requestWeight > bestRange.maxWeight ? bestRange.maxWeight
+                                                     : requestWeight;
+  return true;
+}
 
 ParsedSelector ClassifySelector(const std::string& selector) {
   ParsedSelector result = {};
@@ -543,6 +741,16 @@ std::string SerializeFontFaces(const std::vector<CssFontFaceRule>& fontFaceRules
       out += "url(";
       out += QuoteCssString(rule.sources[i]);
       out += ')';
+    }
+    // The weight and style descriptors decide which face a text request resolves to, so they have
+    // to survive the round trip through the subset transformer.
+    if (!rule.weight.empty()) {
+      out += "; font-weight: ";
+      out += rule.weight;
+    }
+    if (!rule.style.empty()) {
+      out += "; font-style: ";
+      out += rule.style;
     }
     out += "; }\n";
   }

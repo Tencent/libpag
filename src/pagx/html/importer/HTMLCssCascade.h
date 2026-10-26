@@ -77,15 +77,57 @@ struct CssKeyframesRule {
 };
 
 /**
- * A parsed `@font-face { … }` rule, reduced to what PAGX consumes: the family it declares and the
- * URLs of its `url()` sources in declaration order. CSS escapes are resolved, but the URLs are not
- * resolved against any base. `local()` sources and descriptors other than `font-family` / `src`
- * are ignored.
+ * A parsed `@font-face { … }` rule: the family it declares, its `url()` sources in declaration
+ * order, and the `font-weight` / `font-style` descriptors that say which face of the family the
+ * rule declares. `local()` sources are ignored.
+ *
+ * `weight` and `style` keep the authored descriptor text verbatim (`700`, `400 900`, `italic`)
+ * so the subset transformer can re-emit the rule unchanged, and stay empty when the descriptor is
+ * missing or invalid — the face then keeps the CSS initial value `normal`.
  */
 struct CssFontFaceRule {
   std::string family = {};
   std::vector<std::string> sources = {};
+  std::string weight = {};
+  std::string style = {};
 };
+
+/** The weight interval a `@font-face` `font-weight` descriptor declares; a static face declares a
+ *  single weight, a variable face the range of its weight axis. Endpoints keep the precision of the
+ *  descriptor, so a fractional range is validated and compared as authored. */
+struct CssFontWeightRange {
+  float minWeight = 400;
+  float maxWeight = 400;
+
+  bool contains(float weight) const {
+    return weight >= minWeight && weight <= maxWeight;
+  }
+};
+
+/** Parses a `font-weight` descriptor (`normal`, `bold`, `700` or a range `400 900`) into the
+ *  interval it declares; an empty value reports the initial `{400, 400}`. Weights are CSS numbers in
+ *  `[1, 1000]` and may be fractional. Returns false for a value that is not a valid descriptor. */
+bool ParseFontFaceWeight(const std::string& value, CssFontWeightRange& out);
+
+/** Parses a `font-style` descriptor (`normal`, `italic`, `oblique`) into `outItalic`; an empty
+ *  value reports `normal`. Returns false for a value that is not a valid descriptor. */
+bool ParseFontFaceStyle(const std::string& value, bool& outItalic);
+
+/** The face a CSS weight/style request resolves to, with the weight and slant it actually delivers. */
+struct CssFontFaceMatch {
+  const CssFontFaceRule* rule = nullptr;
+  // The request clamped into `rule`'s range, keeping the precision the descriptor declares.
+  float weight = 400;
+  bool italic = false;
+};
+
+/** Resolves the `@font-face` face of `family` that a CSS weight/style request renders with, the way
+ *  a browser's font matching does: the slant picks the candidate faces, then the CSS weight
+ *  preference order picks one — `out.weight` is the request clamped into that face's range, so a
+ *  family that only ships a 700 face answers a 400 request with 700. Returns false when no rule
+ *  declares `family`. */
+bool SelectFontFace(const std::vector<CssFontFaceRule>& faces, const std::string& family,
+                    float requestWeight, bool requestItalic, CssFontFaceMatch& out);
 
 /**
  * Tokenises CSS text into top-level `(selectors, declarations)` rules. Most `@`-rules (`@media`,
@@ -117,7 +159,9 @@ std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRul
 /**
  * Serialises a list of `@font-face` rules back into CSS text (one rule per line) that
  * TokenizeStyleSheet parses into the same rules. Used by the subset transformer to carry the
- * font faces past the cascade-inlining pass, the same way it carries `@keyframes`.
+ * font faces past the cascade-inlining pass, the same way it carries `@keyframes`. The
+ * `font-weight` / `font-style` descriptors are re-emitted when the rule declares them, since the
+ * cascade reads them to pick the face a text request resolves to.
  */
 std::string SerializeFontFaces(const std::vector<CssFontFaceRule>& fontFaceRules);
 

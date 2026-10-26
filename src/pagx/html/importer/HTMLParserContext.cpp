@@ -627,7 +627,9 @@ void HTMLParserContext::registerMappedFontAliases(const void* bytes, size_t leng
 }
 
 void HTMLParserContext::loadWebFontFiles() {
-  for (const auto& rule : _styleCascade->fontFaces()) {
+  const auto& fontFaces = _styleCascade->fontFaces();
+  for (size_t index = 0; index < fontFaces.size(); index++) {
+    const auto& rule = fontFaces[index];
     bool registered = false;
     for (const auto& source : rule.sources) {
       if (IsInlineFontSource(source)) {
@@ -677,6 +679,9 @@ void HTMLParserContext::loadWebFontFiles() {
     // alias a face (`MaShanZheng` for a file whose family is "Ma Shan Zheng"), and only the
     // authored name ever appears in a Text's fontFamily.
     _webFontFamilies.insert(rule.family);
+    // Only a rule whose source loaded describes a face the text can render with, so only it may
+    // redirect the exported weight/style to the face it declares.
+    _styleCascade->markFontFaceUsable(index);
   }
 }
 

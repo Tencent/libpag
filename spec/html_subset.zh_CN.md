@@ -104,9 +104,22 @@
 @font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
 ```
 
-- 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个可用源：
-  本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；`local()` 名称、`format()` 提示
-  及其他描述符均被忽略。
+- 读取 `font-family`、`src`、`font-weight` 与 `font-style` 四个描述符。按顺序扫描 `src` 中的
+  `url()` 源，取第一个可用源：本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；
+  `local()` 名称、`format()` 提示及其他描述符均被忽略。
+- `font-weight` / `font-style` 指明该规则声明的是哪一面：单个字重（`700`）、可变范围
+  （`400 900`），以及 `normal` / `italic` / `oblique` 斜体轴。字重是 `[1, 1000]` 的 CSS 数值，
+  允许小数，区间端点按该精度比较；`oblique` 的角度必须带 CSS 角度单位，且须落在
+  `[-90, 90]` 度内。两个描述符都不写即为 Regular 正体面；不符合 CSS 语法的取值按浏览器的做法
+  丢弃。同一族名分散在多条规则时，每处文本请求
+  按浏览器的字体匹配选面——先比斜体轴，再按 CSS 字重优先顺序——`Text.fontStyle` 取「请求字重」
+  与「该面字重」中较重的一方；当该族在请求的斜体轴上没有面时，再取所选面自己的斜体轴。因此只
+  提供 `font-weight: 700` 的族名，即使文本计算值为 400 也导出 `Bold`，而不会写出该族并不存在
+  的 Regular；唯一面声明为 `font-weight: 700; font-style: italic` 时导出 `Bold Italic`；而只有
+  Regular 面的族名用于 700 标题时仍导出 `Bold`，因为浏览器是合成粗体而不是退回 Regular。
+- 只有导入器实际加载成功的规则才能改写导出样式。所有源都是远程或无法加载的 `@font-face`
+  声明的是产物里永远不会出现的面，文本保持平台解析出的样式；同一族名既有已加载面又有远程
+  规则时，只按已加载面参与选面。
 - 两种源都按规则声明的 CSS 族名注册，因此 `font-family` 与文件内部的族名不必一致。
   使用到的源生成 `<Font file="…" fontFamily="…">` 资源（见 PAGX 规范 §3.3.5）：本地文件保留
   路径，内联字体保留 base64 `data:` URI；保存的 CSS 族名保证重新加载后仍能匹配别名。
@@ -221,7 +234,7 @@
 | `text-decoration-color: <color>` | 下划线/删除线叠加矩形的颜色（继承,见 §6） |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
-| `font-weight: bold` / `600+` | 粗体（`bold` 或数值 ≥ 600）映射为粗体样式；当解析到的字体没有原生粗体时，导入器施加合成 `fauxBold`，使字重仍能呈现 |
+| `font-weight: <number>` / `normal` / `bold` | 数值字重映射为 Regular、Medium、SemiBold、Bold 等真实字体面样式，不添加合成 `fauxBold`。对 `@font-face` 声明的族名，更重的源面可以提升导出字重，但不会降低原本更重的 CSS 请求（见 §3.5） |
 | `font-style: italic | oblique` | `Text.fontStyle = "Italic"`（与粗体组合为 `"Bold Italic"`） |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `-webkit-text-stroke: W C`（或 `-webkit-text-stroke-width` / `-webkit-text-stroke-color` 长写） | 为字形 run 添加文本 `<Stroke color="C" width="W"/>` |
