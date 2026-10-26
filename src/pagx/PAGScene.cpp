@@ -38,12 +38,14 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/runtime/Drawable.h"
+#include "pagx/runtime/SequencePlayer.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
 
 namespace pagx {
 
@@ -520,6 +522,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   }
   flushDataBinds();
   flushTextHolders();
+  flushSequenceFrames();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -582,6 +585,44 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::flushSequenceFrames() {
+  if (_rootComposition == nullptr) {
+    return;
+  }
+  // The sequence composition clock rides the default timeline (the parent clock of the
+  // time-locked mount); nested lock chains with non-unit scales land with the precise
+  // per-instance local time pass.
+  double currentTime = 0.0;
+  auto defaultTimeline = getDefaultTimeline();
+  auto animation = std::dynamic_pointer_cast<PAGAnimation>(defaultTimeline);
+  if (animation != nullptr) {
+    currentTime = static_cast<double>(animation->currentTime()) / 1000000.0;
+  }
+  // Sequence patterns register into the binding of the composition that owns them (a
+  // sequence subtree builds through BuildCompositionSubtree), so the refresh walks the whole
+  // runtime composition tree instead of only the root binding.
+  FlushCompositionSequenceFrames(_rootComposition.get(), currentTime);
+}
+
+void PAGScene::FlushCompositionSequenceFrames(PAGComposition* composition, double currentTime) {
+  if (composition == nullptr) {
+    return;
+  }
+  auto* binding = composition->binding.get();
+  if (binding != nullptr) {
+    for (auto& entry : binding->sequencePatterns) {
+      if (entry.pattern != nullptr && entry.player != nullptr) {
+        entry.pattern->setImage(entry.player->frameAt(currentTime));
+      }
+    }
+  }
+  for (const auto& child : composition->getChildren()) {
+    if (child != nullptr && child->layerType() == LayerType::Composition) {
+      FlushCompositionSequenceFrames(static_cast<PAGComposition*>(child.get()), currentTime);
+    }
+  }
 }
 
 void PAGScene::flushTextHolders() {

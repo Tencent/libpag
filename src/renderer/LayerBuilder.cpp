@@ -65,6 +65,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/MixUtils.h"
+#include "pagx/runtime/SequencePlayer.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Data.h"
@@ -2199,6 +2200,25 @@ class LayerBuilderContext {
     }
 
     auto imageNode = node->image;
+    // Sequence images (spec 6.6.1): the frame source is the SequencePlayer, not the static
+    // decode cache. The first frame seeds the pattern; the scene refreshes it per draw.
+    if (imageNode->isSequence) {
+      auto player = SequencePlayer::Make(imageNode);
+      if (player != nullptr) {
+        auto sequenceImage = player->frameAt(0.0);
+        if (sequenceImage != nullptr) {
+          auto sampling = tgfx::SamplingOptions(ToTGFX(node->filterMode), ToTGFX(node->mipmapMode));
+          auto sequencePattern = tgfx::ImagePattern::Make(sequenceImage, ToTGFX(node->tileModeX),
+                                                          ToTGFX(node->tileModeY), sampling);
+          if (sequencePattern != nullptr) {
+            sequencePattern->setScaleMode(ToTGFX(node->scaleMode));
+            _result.binding.sequencePatterns.push_back({sequencePattern.get(), std::move(player)});
+            return sequencePattern;
+          }
+        }
+      }
+      return nullptr;
+    }
     auto image = getOrCreateImage(imageNode);
     if (!image) {
       // Image data is missing for this node (never loaded or decode failed); paint nothing

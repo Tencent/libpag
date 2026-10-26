@@ -32,12 +32,14 @@
 
 namespace tgfx {
 class Gradient;
+class ImagePattern;
 }  // namespace tgfx
 
 namespace pagx {
 
 class ColorSource;
 class ImagePattern;
+class SequencePlayer;
 class TextHolder;
 
 /**
@@ -127,6 +129,15 @@ struct RuntimeTarget {
 };
 
 struct RuntimeBinding {
+  // Sequence frame scheduling (spec 6.6.1): each entry pairs a sequence-driven pattern with its
+  // player. The scene refreshes the pattern image from the player before every draw, using the
+  // default timeline's current time as the composition clock.
+  struct SequencePatternEntry {
+    tgfx::ImagePattern* pattern = nullptr;
+    std::shared_ptr<SequencePlayer> player = nullptr;
+  };
+  std::vector<SequencePatternEntry> sequencePatterns = {};
+
   template <typename T>
   void set(const Node* node, std::shared_ptr<T> object) {
     if (node == nullptr || object == nullptr) {

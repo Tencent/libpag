@@ -217,6 +217,7 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 | P3-9a matrix3D 关键帧支持（ChannelValueType::Matrix3D=9 第 10 备选；逐元素插值；二进制每帧 16 float 列式 + XML "matrix3D" 类型；Layer.matrix3D 通道注册 + LayerRuntimeTarget 运行时写 tgfx setMatrix3D。**Transform3D/相机采样迁移暂缓**：旧运行时无 3D 求值实现可对齐（CameraLayer.cpp 仅 verify/bounds、transform3D 图层旧渲染直接跳过），公式确认后落地；渲染走 PAGX setMatrix3D） | f0bf078c9 |
 | P3-10a 序列条目格式层（§6.6.1 定稿：mediaType 2/3 容器——帧率/尺寸/编码头/帧列表原样；SequenceCodec 编解码 + ImageTable 扩展 + Image 序列元数据（mediaType/frameRate/frameCount）+ ImageProcessor 序列分支（不重编码）+ XML 结构保真（决策 5）。迁移器旧 VideoComposition/BitmapComposition 对接与 SequencePlayer 运行时帧调度随 P3-10b） | 5a8d6840a |
 | P3-10b 序列合成迁移（LegacyPAGImporter：VideoComposition/BitmapComposition → 序列 Image 全量入表（多分辨率保留、主序列=sequences.back() 对齐 Sequence::Get、渲染层=全幅 Rectangle+ImagePattern Stretch）；ImageProcessor 序列 Image 无条件收集；ExportToPAG 序列 Image id 合成保 XML hop 元数据。SequencePlayer 运行时帧调度/软解对比随 P3-10c） | fa8d6a847 |
+| P3-10c SequencePlayer 帧调度（src/pagx/runtime/SequencePlayer：容器重建旧内存结构复用 VideoSequenceDemuxer+VideoReader/BitmapSequenceReader，frameAt 惰性 SequenceFrameGenerator；LayerBuilder 序列 pattern 注册 RuntimeBinding.sequencePatterns；PAGScene::draw 前 flushSequenceFrames 递归整树按默认时间线刷帧。bitmap 链路全验证（contentA/diff>0）；视频 H.264 平台解码（软解失败/硬解二帧 stall）为已知遗留待查） | 本次提交 |
 
 - **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
   GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip

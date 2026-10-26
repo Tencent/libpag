@@ -96,10 +96,12 @@
 #include "pagx/pag/SequenceCodec.h"
 #include "pagx/pag/TagCode.h"
 #include "pagx/pag/exporter/ImageProcessor.h"
+#include "pagx/runtime/SequencePlayer.h"
 #include "pagx/types/ColorSpace.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
 #include "utils/ProjectPath.h"
 
 namespace pagx {
@@ -2371,6 +2373,99 @@ PAGX_TEST(PAGImporterTest, LegacyImporterVideoSequenceSmoke) {
   EXPECT_EQ(memcmp(decodedImage->data->bytes(), sequenceImages.back()->data->bytes(),
                    sequenceImages.back()->data->size()),
             0);
+}
+
+PAGX_TEST(PAGImporterTest, SequenceFrameSchedulingTest) {
+  // Scheduling probe with a hand-built two-frame bitmap sequence: two distinct webp frames
+  // drive the whole chain (container -> SequencePlayer -> pattern refresh at draw time), so
+  // the pixel assertions verify real content and real frame advancement without depending on
+  // legacy sample content.
+  auto frameA =
+      ReadFileBytes(pag::ProjectPath::Absolute("test/out/PAGShapeLayerTest/polygon_base.webp"));
+  auto frameB = ReadFileBytes(
+      pag::ProjectPath::Absolute("test/out/PAGShapeLayerTest/star_round_corner_base.webp"));
+  if (frameA.empty() || frameB.empty()) {
+    GTEST_SKIP() << "webp fixtures missing";
+  }
+
+  BitmapSequenceContainer container = {};
+  container.frameRate = 2.0f;
+  container.width = 200;
+  container.height = 200;
+  BitmapSequenceFrame first = {};
+  first.isKeyframe = true;
+  BitmapSequenceBlock firstBlock = {};
+  firstBlock.x = 0;
+  firstBlock.y = 0;
+  firstBlock.data = Data::MakeWithCopy(frameA.data(), frameA.size());
+  first.bitmaps.push_back(firstBlock);
+  container.frames.push_back(first);
+  BitmapSequenceFrame second = {};
+  second.isKeyframe = true;
+  BitmapSequenceBlock secondBlock = {};
+  secondBlock.x = 0;
+  secondBlock.y = 0;
+  secondBlock.data = Data::MakeWithCopy(frameB.data(), frameB.size());
+  second.bitmaps.push_back(secondBlock);
+  container.frames.push_back(second);
+  auto containerData = SequenceCodec::EncodeBitmapSequence(container);
+  ASSERT_TRUE(containerData != nullptr);
+
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  layer->width = 200;
+  layer->height = 200;
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->size.width = 200;
+  rect->size.height = 200;
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<Fill>();
+  auto* pattern = doc->makeNode<ImagePattern>();
+  auto* image = doc->makeNode<Image>();
+  image->isSequence = true;
+  image->sequenceMediaType = 3;
+  image->data = containerData;
+  image->logicalWidth = 200;
+  image->logicalHeight = 200;
+  image->sequenceFrameRate = 2.0f;
+  image->sequenceFrameCount = 2;
+  pattern->image = image;
+  pattern->scaleMode = ScaleMode::Stretch;
+  fill->color = pattern;
+  layer->contents.push_back(fill);
+
+  auto* animation = doc->makeNode<Animation>("seqSchedule");
+  animation->duration = 10;
+  animation->frameRate = 2;
+  doc->animations.push_back(animation);
+
+  auto scene = PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto timeline = scene->getAnimation("seqSchedule");
+  auto seqAnim = std::dynamic_pointer_cast<PAGAnimation>(timeline);
+  ASSERT_TRUE(seqAnim != nullptr);
+
+  std::vector<uint8_t> a(200 * 200 * 4, 0);
+  std::vector<uint8_t> b(200 * 200 * 4, 0);
+  seqAnim->setCurrentTime(0);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(a.data(), 200 * 4));
+  int contentA = 0;
+  for (size_t i = 0; i < a.size(); i += 4) {
+    if (a[i] | a[i + 1] | a[i + 2]) contentA++;
+  }
+  EXPECT_GT(contentA, 0);
+  seqAnim->setCurrentTime(500000);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(b.data(), 200 * 4));
+  int diff = 0;
+  for (size_t i = 0; i < a.size(); i += 4) {
+    if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2]) diff++;
+  }
+  EXPECT_GT(diff, 0);
 }
 
 PAGX_TEST(PAGImporterTest, LegacyImporterKeyframeSmoke) {
