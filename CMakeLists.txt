@@ -960,15 +960,22 @@ if (WEB)
             message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported.")
         endif ()
     endforeach ()
+    # The emsdk version policy lives in web/emsdk-versions.txt, shared with
+    # web/script/setup.emsdk.js so the install pin and the configure-time check cannot drift.
+    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/web/emsdk-versions.txt EMSDK_VERSION_ENTRIES REGEX "^[A-Z_]+=")
+    foreach (entry ${EMSDK_VERSION_ENTRIES})
+        string(REGEX MATCH "^([A-Z_]+)=(.*)$" _match "${entry}")
+        set(EMSDK_${CMAKE_MATCH_1} "${CMAKE_MATCH_2}")
+    endforeach ()
     if (PAG_USE_WEBGPU)
         # -sUSE_WEBGPU was removed in emsdk 4.0.18 in favor of --use-port=emdawnwebgpu, and
         # tgfx's WebGPU backend requires the 4.0.15 runtime (mirrors tgfx's own
         # web/cmake/check_emscripten.cmake). Pin the supported window here so the failure
         # surfaces at configure time instead of as obscure link errors.
-        if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.15" OR
-                NOT ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.18")
+        if (${EMSCRIPTEN_VERSION} VERSION_LESS "${EMSDK_MIN}" OR
+                NOT ${EMSCRIPTEN_VERSION} VERSION_LESS "${EMSDK_MAX_EXCLUSIVE}")
             message(FATAL_ERROR
-                    "PAG_USE_WEBGPU requires emsdk >= 4.0.15 and < 4.0.18, "
+                    "PAG_USE_WEBGPU requires emsdk >= ${EMSDK_MIN} and < ${EMSDK_MAX_EXCLUSIVE}, "
                     "but the current version is ${EMSCRIPTEN_VERSION}.")
         endif ()
     endif ()
