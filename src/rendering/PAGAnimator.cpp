@@ -462,10 +462,17 @@ void PAGAnimator::doUpdate(bool setStartTime) {
     std::lock_guard<std::mutex> autoLock(locker);
     if (isTaskRunning()) {
       if (asyncTaskRunning) {
-        asyncUpdateRequested = true;
         if (isEnding) {
+          // The ending update is one-shot, so merging it into the running task is bounded and
+          // keeps the end event from waiting for another vsync cycle.
+          asyncUpdateRequested = true;
           endingUpdatePending = false;
         }
+        // Ticker-driven updates arriving while a flush is still running are dropped instead of
+        // being merged into an immediate re-flush: merging made the task re-flush back-to-back
+        // once a single flush took longer than one vsync period, keeping the renderer 100% busy
+        // with no idle time (issue #3738). Dropping restores the throttled behavior, where the
+        // next vsync tick re-drives the flush through this method.
       }
       return;
     }

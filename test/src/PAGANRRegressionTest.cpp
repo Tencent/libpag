@@ -614,6 +614,32 @@ PAG_TEST(PAGANRRegressionTest, TimedOutUpdateRemainsSerialized) {
   EXPECT_EQ(listener->maximumConcurrentUpdates(), 1);
 }
 
+PAG_TEST(PAGANRRegressionTest, TickerUpdateDuringAsyncFlushIsThrottled) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  listener->blockFirstUpdate();
+  auto animator = MakeANRAnimator(listener);
+  animator->_isRunning = true;
+
+  animator->doUpdate(true);
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+
+  // Ticker-driven updates arriving while the first flush is still running are dropped instead of
+  // being merged into an immediate re-flush. Merging used to keep the renderer 100% busy without
+  // idle time once a single flush took longer than one vsync period (issue #3738).
+  RunANRAnimatorUpdate(animator.get());
+  RunANRAnimatorUpdate(animator.get());
+  EXPECT_EQ(listener->updateCount(), 1U);
+
+  listener->releaseFirstUpdate();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  EXPECT_EQ(listener->updateCount(), 1U);
+
+  // The next ticker tick re-drives the flush once the previous task has exited.
+  animator->doUpdate(true);
+  ASSERT_TRUE(listener->waitForUpdateCount(2));
+  animator->cancel();
+}
+
 PAG_TEST(PAGANRRegressionTest, StalledDecoderFallsBackOnNextRequest) {
   std::atomic_int stalledDecodeCount = 0;
   std::atomic_int fallbackDecodeCount = 0;

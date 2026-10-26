@@ -27,8 +27,13 @@
 #include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LockGuard.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
+
+// Matches the ceiling of the sequence decode retry backoff in RenderCache, so that each retry of
+// a failed render actually re-attempts the decode instead of re-rendering without one.
+static constexpr int64_t FAILED_RENDER_RETRY_INTERVAL = 2000000;
 
 static std::string DefaultCacheKeyGeneratorFunc(PAGDecoder* decoder,
                                                 std::shared_ptr<PAGComposition> composition) {
@@ -216,12 +221,22 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
   }
   auto success = sequenceFile->readFrame(index, bitmap);
   if (!success) {
+    // A failed render marks the whole decoder, not just the frame: the failing part is usually a
+    // sequence decoder shared by every frame, and any frame rendered without it is incomplete.
+    // Without the cooldown, looped playback would re-render every frame at full cost on every
+    // pass and keep the CPU/GPU continuously busy (issue #3738).
+    if (tgfx::Clock::Now() < failedRenderRetryTime) {
+      return false;
+    }
     success = renderFrame(composition, index, bitmap);
     if (success) {
+      failedRenderRetryTime = 0;
       success = sequenceFile->writeFrame(index, bitmap);
       if (!success) {
         LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
+    } else {
+      failedRenderRetryTime = tgfx::Clock::Now() + FAILED_RENDER_RETRY_INTERVAL;
     }
   }
   if (sequenceFile->isComplete() && composition != nullptr) {
@@ -299,6 +314,7 @@ void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composit
   sequenceFile = nullptr;
   lastContentVersion = contentVersion;
   lastReadIndex = -1;
+  failedRenderRetryTime = 0;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   _numFrames = result.first;
   _frameRate = result.second;
