@@ -3,18 +3,19 @@
 # Accept screenshot baseline changes through the /accept-baseline command only.
 # Run this when adding new screenshot tests or refactoring rendering with expected output changes.
 # WARNING: Only run after confirming ALL screenshots in test/out/ match expected results.
-# Usage: ./accept_baseline.sh [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL]
+# Usage: ./accept_baseline.sh <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>
 
 set -e
 cd "$(dirname "$0")"
 
-if [ "$#" -gt 1 ]; then
-  echo "Error: specify only one backend." >&2
+if [ "$#" -ne 1 ]; then
+  echo "Error: specify exactly one backend." >&2
+  echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>" >&2
   exit 1
 fi
 
 CMAKE_BACKEND_ARGS=(-DPAG_USE_METAL=OFF -DPAG_USE_OPENGL=ON -DPAG_USE_SWIFTSHADER=OFF)
-case "${1:-USE_OPENGL}" in
+case "$1" in
   USE_METAL)
     CMAKE_BACKEND_ARGS=(-DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF -DPAG_USE_SWIFTSHADER=OFF)
     TARGET_SUFFIX=Metal
@@ -27,7 +28,7 @@ case "${1:-USE_OPENGL}" in
     TARGET_SUFFIX=OpenGL
     ;;
   -h|--help)
-    echo "Usage: $0 [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL]"
+    echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>"
     exit 0
     ;;
   *) echo "Error: unknown backend '$1'." >&2; exit 1 ;;
