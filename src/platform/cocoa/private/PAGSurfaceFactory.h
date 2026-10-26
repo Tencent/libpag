@@ -20,6 +20,7 @@
 
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
+#import <TargetConditionals.h>
 #include "pag/pag.h"
 
 namespace pag::cocoa {
@@ -30,11 +31,13 @@ namespace pag::cocoa {
  */
 __attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host);
 
+#if TARGET_OS_IPHONE
 /**
  * Creates an iOS pixel-buffer surface using an optional native device or context for the selected
  * backend. The caller retains ownership of the pixel buffer and native device.
  */
 __attribute__((visibility("hidden"))) std::shared_ptr<PAGSurface> MakeSurfaceFromPixelBuffer(
     CVPixelBufferRef pixelBuffer, id device);
+#endif
 
 }  // namespace pag::cocoa
