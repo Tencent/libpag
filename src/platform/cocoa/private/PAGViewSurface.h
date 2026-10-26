@@ -59,8 +59,9 @@ class __attribute__((visibility("hidden"))) PAGViewSurface {
   static void UpdateWindowSize(id view, ::PAGSurface* surface);
 
   /**
-   * Locks the view-owned mutex for Metal operations, or returns an empty lock for OpenGL. Callers
-   * release this lock before updating the animator because synchronous updates reenter rendering.
+   * Locks the view-owned mutex on iOS for all backends and on macOS for Metal. macOS OpenGL returns
+   * an empty lock. Callers release this lock before updating or canceling the animator because
+   * updates can reenter rendering and cancellation can wait for an in-flight rendering task.
    */
   static std::unique_lock<std::mutex> Lock(std::mutex& mutex);
 };

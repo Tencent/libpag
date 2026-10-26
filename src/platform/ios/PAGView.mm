@@ -75,7 +75,7 @@
 - (void)dealloc {
   [animator cancel];
   {
-    std::lock_guard<std::mutex> autoLock(lock);
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
     [pagPlayer release];
     pagPlayer = nil;
     [pagSurface release];
@@ -112,7 +112,7 @@
     bool fromZero = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
     [self refreshSurfaceSize];
     // [animator update] must stay outside the lock refreshSurfaceSize takes: in sync mode it
-    // re-enters onAnimationFlush: on the same thread, which lock_guards the same non-recursive
+    // re-enters onAnimationFlush: on the same thread, which acquires the same non-recursive
     // mutex and would deadlock.
     if (fromZero) {
       [animator update];
@@ -219,7 +219,7 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (pagPlayer == nil) {
     return;
   }
@@ -264,12 +264,12 @@
 }
 
 - (NSString*)getPath {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
 - (BOOL)setPath:(NSString*)path {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -281,7 +281,7 @@
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -301,7 +301,7 @@
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;

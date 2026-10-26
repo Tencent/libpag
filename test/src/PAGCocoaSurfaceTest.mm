@@ -19,6 +19,7 @@
 #if defined(__APPLE__)
 
 #import <TargetConditionals.h>
+#include <thread>
 #include "base/PAGTest.h"
 #import "platform/cocoa/PAGPlayer.h"
 #include "platform/cocoa/private/PAGSurfaceFactory.h"
@@ -36,6 +37,13 @@
 @interface PAGView (CocoaSurfaceTests)
 - (void)initPAGSurface;
 @end
+
+static void ProbeViewMutex(std::mutex* mutex, bool* acquired) {
+  *acquired = mutex->try_lock();
+  if (*acquired) {
+    mutex->unlock();
+  }
+}
 
 static void CheckInvalidHost(id host) {
   SCOPED_TRACE([NSStringFromClass([host class]) UTF8String]);
@@ -110,15 +118,27 @@ PAG_TEST(PAGCocoaSurfaceTest, InvalidHostReturnsNil) {
 }
 
 /**
- * Verifies that backend lock selection preserves Metal serialization and OpenGL's empty lock.
+ * Verifies that all iOS backends and macOS Metal serialize view operations, while macOS OpenGL
+ * returns an empty lock.
  */
 PAG_TEST(PAGCocoaSurfaceTest, ViewBackendLockPolicy) {
+#if TARGET_OS_IPHONE
+  bool expectsLock = true;
+#else
+  bool expectsLock = pag::Devices::SupportsBackend(tgfx::Backend::Metal);
+#endif
   std::mutex mutex;
   {
     auto lock = pag::cocoa::PAGViewSurface::Lock(mutex);
-    EXPECT_EQ(lock.owns_lock(), pag::Devices::SupportsBackend(tgfx::Backend::Metal));
+    EXPECT_EQ(lock.owns_lock(), expectsLock);
     if (lock.owns_lock()) {
       EXPECT_EQ(lock.mutex(), &mutex);
+    }
+    bool acquired = false;
+    std::thread probe(ProbeViewMutex, &mutex, &acquired);
+    probe.join();
+    if (expectsLock) {
+      EXPECT_FALSE(acquired);
     }
   }
   ASSERT_TRUE(mutex.try_lock());

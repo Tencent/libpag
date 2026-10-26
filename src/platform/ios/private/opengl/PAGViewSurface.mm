@@ -48,8 +48,8 @@ void PAGViewSurface::UpdateSize(id, ::PAGSurface* surface) {
 void PAGViewSurface::UpdateWindowSize(id, ::PAGSurface*) {
 }
 
-std::unique_lock<std::mutex> PAGViewSurface::Lock(std::mutex&) {
-  return {};
+std::unique_lock<std::mutex> PAGViewSurface::Lock(std::mutex& mutex) {
+  return std::unique_lock<std::mutex>(mutex);
 }
 
 }  // namespace pag::cocoa
