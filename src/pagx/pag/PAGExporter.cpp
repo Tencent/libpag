@@ -75,6 +75,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -2421,6 +2422,105 @@ void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeS
 }
 
 // DropShadowStyle tag (spec §9.5 #355).
+// GradientOverlayStyle tag (spec 7.4 #577): the gradient is always inline (the shared
+// color-source inline sub-tag at the value-area end), alpha, angle, overlay type, reverse,
+// alignWithLayer, scale, offset, blendMode.
+void WriteGradientOverlayStyleTag(pag::EncodeStream* stream, GradientOverlayStyle* style,
+                                  EncodeState* state) {
+  pag::EncodeStream content(&state->streamContext);
+  {
+    PAGAttributeBlockWriter writer(&state->streamContext);
+    auto hasGradient = style->gradient != nullptr;
+    writer.writeFlag(style->excludeChildEffects);
+    writer.writeFlag(hasGradient);
+    writer.writeFlag(style->alpha != 1.0f);
+    writer.writeFlag(style->angle != 90.0f);
+    writer.writeFlag(style->overlayType != GradientOverlayType::Linear);
+    writer.writeFlag(style->reverse);
+    writer.writeFlag(!style->alignWithLayer);
+    writer.writeFlag(style->scale != 100.0f);
+    writer.writeFlag(style->offsetX != 0.0f);
+    writer.writeFlag(style->offsetY != 0.0f);
+    writer.writeFlag(style->blendMode != BlendMode::Normal);
+    auto* v = writer.valueStream();
+    if (hasGradient) {
+      v->writeEncodedUint32(0);  // 0 = inline gradient sub-tag at the value-area end
+    }
+    if (style->alpha != 1.0f) {
+      v->writeUint8(static_cast<uint8_t>(lroundf(style->alpha * 255.0f)));
+    }
+    if (style->angle != 90.0f) v->writeFloat(style->angle);
+    if (style->overlayType != GradientOverlayType::Linear) {
+      v->writeUint8(static_cast<uint8_t>(style->overlayType));
+    }
+    if (style->scale != 100.0f) v->writeFloat(style->scale);
+    if (style->offsetX != 0.0f) v->writeFloat(style->offsetX);
+    if (style->offsetY != 0.0f) v->writeFloat(style->offsetY);
+    if (style->blendMode != BlendMode::Normal) {
+      v->writeUint8(static_cast<uint8_t>(style->blendMode));
+    }
+    auto block = writer.release();
+    content.writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+  }
+  if (style->gradient != nullptr) {
+    WriteColorSourceInline(&content, style->gradient, state);
+  }
+  WriteTag(stream, TagCode::GradientOverlayStyle, &content);
+}
+
+// StrokeLayerStyle tag (spec 7.4 #576): color, size, alpha, position, blendMode.
+void WriteStrokeLayerStyleTag(pag::EncodeStream* stream, StrokeLayerStyle* style,
+                              EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(true);  // color always written
+  writer.writeFlag(style->size != 3.0f);
+  writer.writeFlag(style->alpha != 1.0f);
+  writer.writeFlag(style->position != StrokePosition::Outside);
+  writer.writeFlag(style->blendMode != BlendMode::Normal);
+  auto* v = writer.valueStream();
+  WritePAGColor(v, style->color);
+  if (style->size != 3.0f) v->writeFloat(style->size);
+  if (style->alpha != 1.0f) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(style->alpha * 255.0f)));
+  }
+  if (style->position != StrokePosition::Outside) {
+    v->writeUint8(static_cast<uint8_t>(style->position));
+  }
+  if (style->blendMode != BlendMode::Normal) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::StrokeLayerStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
+// OuterGlowStyle tag (spec 7.4 #578): color, size, alpha, spread, range, blendMode.
+void WriteOuterGlowStyleTag(pag::EncodeStream* stream, OuterGlowStyle* style, EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(style->excludeChildEffects);
+  writer.writeFlag(true);  // color always written
+  writer.writeFlag(style->size != 5.0f);
+  writer.writeFlag(style->alpha != 0.75f);
+  writer.writeFlag(style->spread != 0.0f);
+  writer.writeFlag(style->range != 50.0f);
+  writer.writeFlag(style->blendMode != BlendMode::Screen);
+  auto* v = writer.valueStream();
+  WritePAGColor(v, style->color);
+  if (style->size != 5.0f) v->writeFloat(style->size);
+  if (style->alpha != 0.75f) {
+    v->writeUint8(static_cast<uint8_t>(lroundf(style->alpha * 255.0f)));
+  }
+  if (style->spread != 0.0f) v->writeFloat(style->spread);
+  if (style->range != 50.0f) v->writeFloat(style->range);
+  if (style->blendMode != BlendMode::Screen) {
+    v->writeUint8(static_cast<uint8_t>(style->blendMode));
+  }
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::OuterGlowStyle, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
 void WriteDropShadowStyleTag(pag::EncodeStream* stream, DropShadowStyle* style,
                              EncodeState* state) {
   PAGAttributeBlockWriter writer(&state->streamContext);
@@ -2433,6 +2533,7 @@ void WriteDropShadowStyleTag(pag::EncodeStream* stream, DropShadowStyle* style,
   writer.writeFlag(
       true);  // color always written (opaque black is the default but colors are fixed-width)
   writer.writeFlag(!style->showBehindLayer);
+  writer.writeFlag(style->spread != 0.0f);
   auto* v = writer.valueStream();
   if (style->blendMode != BlendMode::Normal) {
     v->writeUint8(static_cast<uint8_t>(style->blendMode));
@@ -2443,6 +2544,7 @@ void WriteDropShadowStyleTag(pag::EncodeStream* stream, DropShadowStyle* style,
   if (style->blurY != 0.0f) v->writeFloat(style->blurY);
   WritePAGColor(v, style->color);
   if (!style->showBehindLayer) v->writeBoolean(style->showBehindLayer);
+  if (style->spread != 0.0f) v->writeFloat(style->spread);
   auto block = writer.release();
   WritePAGTagHeader(stream, TagCode::DropShadowStyle, static_cast<uint32_t>(block->length()));
   stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
@@ -2563,6 +2665,15 @@ void WriteLayerStyleTag(pag::EncodeStream* stream, LayerStyle* style, EncodeStat
   switch (style->nodeType()) {
     case NodeType::DropShadowStyle:
       WriteDropShadowStyleTag(stream, static_cast<DropShadowStyle*>(style), state);
+      break;
+    case NodeType::StrokeLayerStyle:
+      WriteStrokeLayerStyleTag(stream, static_cast<StrokeLayerStyle*>(style), state);
+      break;
+    case NodeType::GradientOverlayStyle:
+      WriteGradientOverlayStyleTag(stream, static_cast<GradientOverlayStyle*>(style), state);
+      break;
+    case NodeType::OuterGlowStyle:
+      WriteOuterGlowStyleTag(stream, static_cast<OuterGlowStyle*>(style), state);
       break;
     case NodeType::InnerShadowStyle:
       WriteInnerShadowStyleTag(stream, static_cast<InnerShadowStyle*>(style), state);
@@ -3202,9 +3313,15 @@ void AssignLayerNodeIndices(Layer* layer, EncodeState* state, uint32_t* index) {
     AssignElementNodeIndices(element, state, index);
   }
   // Styles and filters are emitted between contents and children (spec §9.2), and the decoder
-  // creates one node per tag at those positions, so the index walk must count them here.
+  // creates one node per tag at those positions, so the index walk must count them here. A
+  // gradient overlay's inline gradient sub-tag creates its nodes right after the style, so the
+  // color-source walk numbers those too.
   for (auto* style : layer->styles) {
     state->nodeIndices[style] = (*index)++;
+    if (style->nodeType() == NodeType::GradientOverlayStyle) {
+      AssignColorSourceNodeIndices(static_cast<GradientOverlayStyle*>(style)->gradient, state,
+                                   index);
+    }
   }
   for (auto* filter : layer->filters) {
     state->nodeIndices[filter] = (*index)++;

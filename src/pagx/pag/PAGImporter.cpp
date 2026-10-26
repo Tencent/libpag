@@ -71,6 +71,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -1154,7 +1155,7 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
   switch (code) {
     case TagCode::DropShadowStyle: {
       auto* style = context->document->makeNode<DropShadowStyle>();
-      PAGAttributeBlockReader reader(tagStream, 8);
+      PAGAttributeBlockReader reader(tagStream, 9);
       bool hasBlend = reader.flag(0);
       style->excludeChildEffects = reader.flag(1);
       bool hasOffsetX = reader.flag(2);
@@ -1163,6 +1164,7 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
       bool hasBlurY = reader.flag(5);
       bool hasColor = reader.flag(6);
       bool notShowBehind = reader.flag(7);
+      bool hasSpread = reader.flag(8);
       tagStream->alignWithBytes();
       if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
       if (hasOffsetX) style->offsetX = tagStream->readFloat();
@@ -1171,6 +1173,7 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
       if (hasBlurY) style->blurY = tagStream->readFloat();
       if (hasColor) style->color = ReadPAGColor(tagStream);
       if (notShowBehind) style->showBehindLayer = tagStream->readBoolean();
+      if (hasSpread) style->spread = tagStream->readFloat();
       return style;
     }
     case TagCode::InnerShadowStyle: {
@@ -1255,6 +1258,79 @@ LayerStyle* ReadLayerStyleTag(pag::DecodeStream* tagStream, TagCode code, Decode
       if (hasSplay) style->splay = tagStream->readFloat();
       if (hasLightAngle) style->lightAngle = tagStream->readFloat();
       if (hasLightIntensity) style->lightIntensity = tagStream->readFloat();
+      return style;
+    }
+    case TagCode::StrokeLayerStyle: {
+      auto* style = context->document->makeNode<StrokeLayerStyle>();
+      PAGAttributeBlockReader reader(tagStream, 6);
+      style->excludeChildEffects = reader.flag(0);
+      bool hasColor = reader.flag(1);
+      bool hasSize = reader.flag(2);
+      bool hasAlpha = reader.flag(3);
+      bool hasPosition = reader.flag(4);
+      bool hasBlend = reader.flag(5);
+      tagStream->alignWithBytes();
+      if (hasColor) style->color = ReadPAGColor(tagStream);
+      if (hasSize) style->size = tagStream->readFloat();
+      if (hasAlpha) style->alpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
+      if (hasPosition) style->position = static_cast<StrokePosition>(tagStream->readUint8());
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      return style;
+    }
+    case TagCode::GradientOverlayStyle: {
+      auto* style = context->document->makeNode<GradientOverlayStyle>();
+      PAGAttributeBlockReader reader(tagStream, 11);
+      style->excludeChildEffects = reader.flag(0);
+      bool hasGradient = reader.flag(1);
+      bool hasAlpha = reader.flag(2);
+      bool hasAngle = reader.flag(3);
+      bool hasOverlayType = reader.flag(4);
+      style->reverse = reader.flag(5);
+      style->alignWithLayer = !reader.flag(6);
+      bool hasScale = reader.flag(7);
+      bool hasOffsetX = reader.flag(8);
+      bool hasOffsetY = reader.flag(9);
+      bool hasBlend = reader.flag(10);
+      tagStream->alignWithBytes();
+      uint32_t gradientRef = 0;
+      if (hasGradient) gradientRef = tagStream->readEncodedUint32();
+      if (hasAlpha) style->alpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
+      if (hasAngle) style->angle = tagStream->readFloat();
+      if (hasOverlayType) {
+        style->overlayType = static_cast<GradientOverlayType>(tagStream->readUint8());
+      }
+      if (hasScale) style->scale = tagStream->readFloat();
+      if (hasOffsetX) style->offsetX = tagStream->readFloat();
+      if (hasOffsetY) style->offsetY = tagStream->readFloat();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
+      if (hasGradient && gradientRef == 0) {
+        auto csHeader = ReadPAGTagHeader(tagStream);
+        auto csBytes = tagStream->readBytes(csHeader.length);
+        auto* source = ReadColorSourceTag(&csBytes, csHeader.code, context);
+        if (source != nullptr && source->nodeType() != NodeType::SolidColor &&
+            source->nodeType() != NodeType::ImagePattern) {
+          style->gradient = static_cast<Gradient*>(source);
+        }
+      }
+      return style;
+    }
+    case TagCode::OuterGlowStyle: {
+      auto* style = context->document->makeNode<OuterGlowStyle>();
+      PAGAttributeBlockReader reader(tagStream, 7);
+      style->excludeChildEffects = reader.flag(0);
+      bool hasColor = reader.flag(1);
+      bool hasSize = reader.flag(2);
+      bool hasAlpha = reader.flag(3);
+      bool hasSpread = reader.flag(4);
+      bool hasRange = reader.flag(5);
+      bool hasBlend = reader.flag(6);
+      tagStream->alignWithBytes();
+      if (hasColor) style->color = ReadPAGColor(tagStream);
+      if (hasSize) style->size = tagStream->readFloat();
+      if (hasAlpha) style->alpha = static_cast<float>(tagStream->readUint8()) / 255.0f;
+      if (hasSpread) style->spread = tagStream->readFloat();
+      if (hasRange) style->range = tagStream->readFloat();
+      if (hasBlend) style->blendMode = static_cast<BlendMode>(tagStream->readUint8());
       return style;
     }
     default:
@@ -2009,7 +2085,9 @@ void ReadLayerBlockContent(pag::DecodeStream* tagStream, Layer* layer, DecodeCon
     } else if (header.code == TagCode::DropShadowStyle ||
                header.code == TagCode::InnerShadowStyle ||
                header.code == TagCode::BackgroundBlurStyle || header.code == TagCode::NoiseStyle ||
-               header.code == TagCode::GlassStyle) {
+               header.code == TagCode::GlassStyle || header.code == TagCode::StrokeLayerStyle ||
+               header.code == TagCode::GradientOverlayStyle ||
+               header.code == TagCode::OuterGlowStyle) {
       auto* style = ReadLayerStyleTag(&tagBytes, header.code, context);
       if (style != nullptr) {
         layer->styles.push_back(style);

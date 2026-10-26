@@ -136,6 +136,18 @@ enum class NodeType {
    */
   DropShadowStyle,
   /**
+   * A stroke layer style (spec 7.4).
+   */
+  StrokeLayerStyle,
+  /**
+   * A gradient overlay layer style (spec 7.4).
+   */
+  GradientOverlayStyle,
+  /**
+   * An outer glow layer style (spec 7.4).
+   */
+  OuterGlowStyle,
+  /**
    * An inner shadow layer style.
    */
   InnerShadowStyle,

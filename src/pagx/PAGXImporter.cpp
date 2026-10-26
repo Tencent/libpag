@@ -73,6 +73,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -193,6 +194,9 @@ static Glyph* ParseGlyph(const DOMNode* node, PAGXDocument* doc);
 static GlyphRun* ParseGlyphRun(const DOMNode* node, PAGXDocument* doc);
 static GlassStyle* ParseGlassStyle(const DOMNode* node, PAGXDocument* doc);
 static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc);
+static StrokeLayerStyle* ParseStrokeLayerStyle(const DOMNode* node, PAGXDocument* doc);
+static GradientOverlayStyle* ParseGradientOverlayStyle(const DOMNode* node, PAGXDocument* doc);
+static OuterGlowStyle* ParseOuterGlowStyle(const DOMNode* node, PAGXDocument* doc);
 static InnerShadowStyle* ParseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc);
 static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc);
 static BlurFilter* ParseBlurFilter(const DOMNode* node, PAGXDocument* doc);
@@ -820,6 +824,15 @@ static ColorSource* ParseColorSource(const DOMNode* node, PAGXDocument* doc) {
 static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
   if (node->name == "DropShadowStyle") {
     return ParseDropShadowStyle(node, doc);
+  }
+  if (node->name == "StrokeLayerStyle") {
+    return ParseStrokeLayerStyle(node, doc);
+  }
+  if (node->name == "GradientOverlayStyle") {
+    return ParseGradientOverlayStyle(node, doc);
+  }
+  if (node->name == "OuterGlowStyle") {
+    return ParseOuterGlowStyle(node, doc);
   }
   if (node->name == "InnerShadowStyle") {
     return ParseInnerShadowStyle(node, doc);
@@ -2419,8 +2432,79 @@ static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* 
       node, "excludeChildEffects", Default<DropShadowStyle>().excludeChildEffects, doc);
   ParseShadowAttributes<DropShadowStyle>(node, doc, style->offsetX, style->offsetY, style->blurX,
                                          style->blurY, style->color);
+  style->spread = GetFloatAttribute(node, "spread", Default<DropShadowStyle>().spread, doc);
   style->showBehindLayer =
       GetBoolAttribute(node, "showBehindLayer", Default<DropShadowStyle>().showBehindLayer, doc);
+  return style;
+}
+
+static StrokeLayerStyle* ParseStrokeLayerStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<StrokeLayerStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  style->excludeChildEffects = GetBoolAttribute(
+      node, "excludeChildEffects", Default<StrokeLayerStyle>().excludeChildEffects, doc);
+  style->color = GetColorAttribute(node, "color", doc);
+  style->size = GetFloatAttribute(node, "size", Default<StrokeLayerStyle>().size, doc);
+  style->alpha = GetFloatAttribute(node, "alpha", Default<StrokeLayerStyle>().alpha, doc);
+  auto position = GetAttribute(node, "position");
+  if (position == "inside") {
+    style->position = StrokePosition::Inside;
+  } else if (position == "center") {
+    style->position = StrokePosition::Center;
+  }
+  return style;
+}
+
+static GradientOverlayStyle* ParseGradientOverlayStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<GradientOverlayStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  style->excludeChildEffects = GetBoolAttribute(
+      node, "excludeChildEffects", Default<GradientOverlayStyle>().excludeChildEffects, doc);
+  style->alpha = GetFloatAttribute(node, "alpha", Default<GradientOverlayStyle>().alpha, doc);
+  style->angle = GetFloatAttribute(node, "angle", Default<GradientOverlayStyle>().angle, doc);
+  if (GetAttribute(node, "overlayType") == "radial") {
+    style->overlayType = GradientOverlayType::Radial;
+  }
+  style->reverse = GetBoolAttribute(node, "reverse", Default<GradientOverlayStyle>().reverse, doc);
+  style->alignWithLayer =
+      GetBoolAttribute(node, "alignWithLayer", Default<GradientOverlayStyle>().alignWithLayer, doc);
+  style->scale = GetFloatAttribute(node, "scale", Default<GradientOverlayStyle>().scale, doc);
+  style->offsetX = GetFloatAttribute(node, "offsetX", 0.0f, doc);
+  style->offsetY = GetFloatAttribute(node, "offsetY", 0.0f, doc);
+  auto child = node->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Element && child->name != "data") {
+      auto* source = ParseColorSource(child.get(), doc);
+      if (source != nullptr && source->nodeType() != NodeType::SolidColor &&
+          source->nodeType() != NodeType::ImagePattern) {
+        style->gradient = static_cast<Gradient*>(source);
+        break;
+      }
+    }
+    child = child->nextSibling;
+  }
+  return style;
+}
+
+static OuterGlowStyle* ParseOuterGlowStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<OuterGlowStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "screen", doc, BlendMode);
+  style->excludeChildEffects = GetBoolAttribute(node, "excludeChildEffects",
+                                                Default<OuterGlowStyle>().excludeChildEffects, doc);
+  style->color = GetColorAttribute(node, "color", doc);
+  style->size = GetFloatAttribute(node, "size", Default<OuterGlowStyle>().size, doc);
+  style->alpha = GetFloatAttribute(node, "alpha", Default<OuterGlowStyle>().alpha, doc);
+  style->spread = GetFloatAttribute(node, "spread", Default<OuterGlowStyle>().spread, doc);
+  style->range = GetFloatAttribute(node, "range", Default<OuterGlowStyle>().range, doc);
   return style;
 }
 

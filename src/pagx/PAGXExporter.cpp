@@ -66,6 +66,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -1282,8 +1283,75 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
                        Default<DropShadowStyle>().excludeChildEffects);
       WriteShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
                             style->color);
+      xml.addAttribute("spread", style->spread, Default<DropShadowStyle>().spread);
       xml.addAttribute("showBehindLayer", style->showBehindLayer,
                        Default<DropShadowStyle>().showBehindLayer);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::StrokeLayerStyle: {
+      auto style = static_cast<const StrokeLayerStyle*>(node);
+      xml.openElement("StrokeLayerStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<StrokeLayerStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<StrokeLayerStyle>().excludeChildEffects);
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      xml.addAttribute("size", style->size, Default<StrokeLayerStyle>().size);
+      xml.addAttribute("alpha", style->alpha, Default<StrokeLayerStyle>().alpha);
+      if (style->position != Default<StrokeLayerStyle>().position) {
+        xml.addAttribute("position",
+                         style->position == StrokePosition::Inside ? "inside" : "center");
+      }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::GradientOverlayStyle: {
+      auto style = static_cast<const GradientOverlayStyle*>(node);
+      xml.openElement("GradientOverlayStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<GradientOverlayStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<GradientOverlayStyle>().excludeChildEffects);
+      xml.addAttribute("alpha", style->alpha, Default<GradientOverlayStyle>().alpha);
+      xml.addAttribute("angle", style->angle, Default<GradientOverlayStyle>().angle);
+      if (style->overlayType != Default<GradientOverlayStyle>().overlayType) {
+        xml.addAttribute("overlayType", "radial");
+      }
+      xml.addAttribute("reverse", style->reverse, Default<GradientOverlayStyle>().reverse);
+      xml.addAttribute("alignWithLayer", style->alignWithLayer,
+                       Default<GradientOverlayStyle>().alignWithLayer);
+      xml.addAttribute("scale", style->scale, Default<GradientOverlayStyle>().scale);
+      xml.addAttribute("offsetX", style->offsetX);
+      xml.addAttribute("offsetY", style->offsetY);
+      xml.closeElementStart();
+      if (style->gradient != nullptr) {
+        WriteColorSource(xml, style->gradient);
+      }
+      WriteCustomData(xml, node);
+      xml.closeElement();
+      break;
+    }
+    case NodeType::OuterGlowStyle: {
+      auto style = static_cast<const OuterGlowStyle*>(node);
+      xml.openElement("OuterGlowStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<OuterGlowStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<OuterGlowStyle>().excludeChildEffects);
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
+      xml.addAttribute("size", style->size, Default<OuterGlowStyle>().size);
+      xml.addAttribute("alpha", style->alpha, Default<OuterGlowStyle>().alpha);
+      xml.addAttribute("spread", style->spread, Default<OuterGlowStyle>().spread);
+      xml.addAttribute("range", style->range, Default<OuterGlowStyle>().range);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

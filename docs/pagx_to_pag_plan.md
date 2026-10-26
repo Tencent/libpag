@@ -201,6 +201,25 @@ Animation/StateMachine/时间线 Tag 写出（规范 §9.6/§9.7 已定稿）→
 - 仓库 166 个可解码旧样本逐整数帧新旧渲染对比；业务素材复核；
   可编辑内容用旧 replaceText/replaceImage 与新 ViewModel 赋值同等操作后对比。
 
+## 三期完成记录
+
+| 任务 | Commit |
+|---|---|
+| P3-0 三期详细设计（docs/pagx_to_pag_migration_design.md：模块边界/时间锁定语义/视频栈复用/旧接口对照表/5 项决策确认） | 110679f99 |
+| P3-1 规范扩展（354 LayerTransform 分解字段 anchor/scale/skew/skewAxis/rotation + 反相遮罩 MaskType 3-5；格式层先行） | f57ada90c |
+| P3-2 时间锁定运行时（propagateTimeLock：子时间线跟随父时钟，advance 跳过锁定挂载） | e88f2c2a6 |
+| P3-4 旧 PAG 导入器骨架（LegacyPAGImporter：合成/图层树/PreCompose 时间锁挂载/根 Animation 兜底） | 6b83541e8 |
+| P3-5 旧关键帧与动画迁移（range→point 关键帧、空间插值逐帧采样、入出点→visible Hold 通道） | c8963d75b |
+| P3-3 文本属性通道扩展（tracking 1/1000em、TextHolder 容器通道、painter visible alpha 门控） | 89f3d007d |
+| P3-6 图层样式扩展（StrokeLayerStyle 576/GradientOverlayStyle 577/OuterGlowStyle 578 + DropShadow spread；二进制与 XML 双向编解码，tgfx 着色器随后） | 本次提交 |
+
+- **验收记录（P3-6）**：LayerStyleExtensionsRoundTrip 4 样式全字段往返一致（含
+  GradientOverlay 内联渐变子 Tag）；PAGFullTest 2724 tests，2723 通过 / 0 失败 / 1 skip
+  （性能基线加载）。
+- tgfx 渲染（三个新样式着色器、反相遮罩 ColorMatrix、baselineShift/firstBaseLine/文本
+  背景）与 P3-7 特效滤镜一起落地；P3-5 遗留的旧素材迁移渲染空白问题在 P3-15 验收时
+  逐帧对比收敛。
+
 ## 四期预告（平台接入，最后一期）
 平台接口设计（§8.2 一次覆盖一至三期全部能力）→ Android/iOS/macOS/OHOS/Web/C API 接入
 （播放统一、对象模型分离、ViewModel、字体注册、三期新增接口）→ 发版前全量回归（C33）。

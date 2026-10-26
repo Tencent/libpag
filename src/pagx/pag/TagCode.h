@@ -105,6 +105,10 @@ enum class TagCode : uint16_t {
   StateTransition = 487,
   StateTransitionAttributes = 491,
   TransitionCondition = 488,
+  // Phase three migration styles (spec 7.4), in the 576-767 reserved range.
+  StrokeLayerStyle = 576,
+  GradientOverlayStyle = 577,
+  OuterGlowStyle = 578,
   // 544-575 data binding.
   DataBind = 544,
   // 576-767 is reserved for the phase-3 migration capabilities (design doc §12.2),

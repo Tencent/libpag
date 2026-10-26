@@ -72,6 +72,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -2421,6 +2422,99 @@ PAGX_TEST(PAGImporterTest, TextChannelExtensionsRoundTrip) {
     }
   }
   EXPECT_GT(diffPixels, 0);
+}
+
+PAGX_TEST(PAGImporterTest, LayerStyleExtensionsRoundTrip) {
+  // P3-6 layer style extensions: StrokeLayerStyle / GradientOverlayStyle / OuterGlowStyle
+  // round trip through the binary with full fields, and DropShadowStyle carries the new
+  // spread field. The tgfx rendering for the three new styles lands with their shader
+  // implementations (format-layer first, matching the inverted-mask pattern).
+  auto doc = PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<Layer>();
+  doc->layers.push_back(layer);
+
+  auto* stroke = doc->makeNode<StrokeLayerStyle>();
+  stroke->color = {0.9f, 0.5f, 0.1f, 1.0f, ColorSpace::SRGB};
+  stroke->size = 6.0f;
+  stroke->alpha = 0.8f;
+  stroke->position = StrokePosition::Inside;
+  stroke->blendMode = BlendMode::Multiply;
+  layer->styles.push_back(stroke);
+
+  auto* overlay = doc->makeNode<GradientOverlayStyle>();
+  auto* gradient = doc->makeNode<LinearGradient>();
+  gradient->startPoint = {0.0f, 0.0f};
+  gradient->endPoint = {1.0f, 0.0f};
+  for (int i = 0; i < 2; i++) {
+    auto* stop = doc->makeNode<ColorStop>();
+    stop->offset = static_cast<float>(i);
+    stop->color = {1.0f - 0.5f * i, 0.3f, 0.8f, 1.0f, ColorSpace::SRGB};
+    gradient->colorStops.push_back(stop);
+  }
+  overlay->gradient = gradient;
+  overlay->alpha = 0.6f;
+  overlay->angle = 45.0f;
+  overlay->overlayType = GradientOverlayType::Radial;
+  overlay->reverse = true;
+  overlay->scale = 150.0f;
+  overlay->offsetX = 10.0f;
+  overlay->offsetY = -5.0f;
+  layer->styles.push_back(overlay);
+
+  auto* glow = doc->makeNode<OuterGlowStyle>();
+  glow->color = {0.4f, 0.9f, 0.2f, 1.0f, ColorSpace::SRGB};
+  glow->size = 8.0f;
+  glow->alpha = 0.5f;
+  glow->spread = 25.0f;
+  glow->range = 75.0f;
+  glow->blendMode = BlendMode::Normal;
+  layer->styles.push_back(glow);
+
+  auto* shadow = doc->makeNode<DropShadowStyle>();
+  shadow->offsetX = 4.0f;
+  shadow->offsetY = 6.0f;
+  shadow->blurX = 10.0f;
+  shadow->spread = 40.0f;
+  layer->styles.push_back(shadow);
+
+  ASSERT_TRUE(PAGExporter::ExportToPAG(doc, "/tmp/style_ext.pag").success);
+  auto decoded = PAGImporter::LoadFromPAG("/tmp/style_ext.pag");
+  ASSERT_TRUE(decoded != nullptr);
+  ASSERT_EQ(decoded->layers.size(), 1u);
+  auto* dstLayer = decoded->layers[0];
+  ASSERT_EQ(dstLayer->styles.size(), 4u);
+
+  auto* dStroke = static_cast<StrokeLayerStyle*>(dstLayer->styles[0]);
+  EXPECT_NEAR(dStroke->color.red, 0.9f, 0.01f);
+  EXPECT_EQ(dStroke->size, 6.0f);
+  EXPECT_NEAR(dStroke->alpha, 0.8f, 0.01f);
+  EXPECT_EQ(dStroke->position, StrokePosition::Inside);
+  EXPECT_EQ(dStroke->blendMode, BlendMode::Multiply);
+
+  auto* dOverlay = static_cast<GradientOverlayStyle*>(dstLayer->styles[1]);
+  ASSERT_TRUE(dOverlay->gradient != nullptr);
+  ASSERT_EQ(dOverlay->gradient->colorStops.size(), 2u);
+  EXPECT_NEAR(dOverlay->alpha, 0.6f, 0.01f);
+  EXPECT_EQ(dOverlay->angle, 45.0f);
+  EXPECT_EQ(dOverlay->overlayType, GradientOverlayType::Radial);
+  EXPECT_TRUE(dOverlay->reverse);
+  EXPECT_EQ(dOverlay->scale, 150.0f);
+  EXPECT_EQ(dOverlay->offsetX, 10.0f);
+  EXPECT_EQ(dOverlay->offsetY, -5.0f);
+
+  auto* dGlow = static_cast<OuterGlowStyle*>(dstLayer->styles[2]);
+  EXPECT_NEAR(dGlow->color.green, 0.9f, 0.01f);
+  EXPECT_EQ(dGlow->size, 8.0f);
+  EXPECT_NEAR(dGlow->alpha, 0.5f, 0.01f);
+  EXPECT_EQ(dGlow->spread, 25.0f);
+  EXPECT_EQ(dGlow->range, 75.0f);
+  EXPECT_EQ(dGlow->blendMode, BlendMode::Normal);
+
+  auto* dShadow = static_cast<DropShadowStyle*>(dstLayer->styles[3]);
+  EXPECT_EQ(dShadow->spread, 40.0f);
+
+  int byteCount = 0;
+  EXPECT_TRUE(AssertSteadyStateIdempotency(decoded, "style-ext", &byteCount));
 }
 
 PAGX_TEST(PAGImporterTest, TimelineMountRoundTrip) {
