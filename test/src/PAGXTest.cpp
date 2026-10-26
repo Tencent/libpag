@@ -6355,6 +6355,11 @@ PAGX_TEST(PAGXTest, EditOutsideTimelineTargetsSkipsTimelineApply) {
 
   auto* animHost = doc->makeNode<pagx::Layer>("animHost");
   animHost->composition = animComp;
+  // A composition's animations only reach the runtime through a driver on the referencing layer;
+  // Composition::animations alone spawns no timeline.
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "drive";
+  animHost->timelines.push_back(std::move(driver));
   auto* plainHost = doc->makeNode<pagx::Layer>("plainHost");
   plainHost->composition = plainComp;
   doc->layers.push_back(animHost);
@@ -6427,6 +6432,14 @@ PAGX_TEST(PAGXTest, EditSkipsAnimationsThatDoNotTargetIt) {
 
   auto* host = doc->makeNode<pagx::Layer>("host");
   host->composition = comp;
+  // A composition's animations only reach the runtime through a driver on the referencing layer;
+  // Composition::animations alone spawns no timeline.
+  auto driverA = std::make_unique<pagx::AnimationTimeline>();
+  driverA->animationId = "driveA";
+  host->timelines.push_back(std::move(driverA));
+  auto driverB = std::make_unique<pagx::AnimationTimeline>();
+  driverB->animationId = "driveB";
+  host->timelines.push_back(std::move(driverB));
   doc->layers.push_back(host);
 
   auto scene = pagx::PAGScene::Make(doc);
