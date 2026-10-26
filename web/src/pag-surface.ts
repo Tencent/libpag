@@ -6,6 +6,7 @@ import {
   unregisterWebGPUTexture,
   WebGPUTextureLike,
 } from './core/backend-context';
+import { GPU_TEXTURE_USAGE_COPY_SRC } from './constant';
 import { destroyVerify } from './utils/decorators';
 
 // Timeout for polling an async readback session. Generous enough for a stalled GPU queue while
@@ -38,7 +39,8 @@ export class PAGSurface {
    * Make a PAGSurface from texture. On the WebGL backend, pass the numeric texture handle
    * registered via BackendContext.registerTexture(). On the WebGPU backend, pass the host
    * GPUTexture directly; it must be created from the same GPUDevice that drives PAG rendering
-   * (the device passed to PAGInit) and with the RENDER_ATTACHMENT usage flag.
+   * (the device passed to PAGInit) and with both the RENDER_ATTACHMENT and COPY_SRC usage flags
+   * (COPY_SRC is required for reading pixels back via readPixelsAsync()).
    */
   public static fromTexture(
     texture: number | WebGPUTextureLike,
@@ -46,6 +48,14 @@ export class PAGSurface {
     height: number,
     flipY: boolean,
   ): PAGSurface {
+    if (typeof texture !== 'number' && ((texture.usage ?? 0) & GPU_TEXTURE_USAGE_COPY_SRC) === 0) {
+      // A host texture is wrapped as-is without extra usage flags. Without COPY_SRC the
+      // copyTextureToBuffer-based readback fails as a WebGPU validation error, leaving the
+      // readback buffer untouched and making readPixelsAsync() silently return all-zero pixels.
+      throw new Error(
+        'PAGSurface.fromTexture() requires the GPUTexture to be created with the COPY_SRC usage flag.',
+      );
+    }
     const { textureID, format, webGPUHandle } = resolveTextureHandle('PAGSurface.fromTexture()', texture);
     const wasmIns = PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY, format);
     if (!wasmIns) {

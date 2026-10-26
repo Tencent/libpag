@@ -18,6 +18,11 @@ export const isWebGPUBackend = (): boolean => {
  */
 export interface WebGPUTextureLike {
   readonly format: string;
+  /**
+   * GPUTexture.usage bitmask. Optional in the structural type, but required by
+   * PAGSurface.fromTexture(), which rejects textures without the COPY_SRC flag.
+   */
+  readonly usage?: number;
 }
 
 interface WebGPUObjectManager {
