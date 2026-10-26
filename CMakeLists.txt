@@ -561,6 +561,9 @@ if (WEB)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
+    # GPUDrawable reuses tgfx's ReadCanvasSize() from WebJSBindings.h, which tgfx keeps in its
+    # internal src tree instead of the public include directory.
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/src)
     list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
