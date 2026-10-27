@@ -35,7 +35,9 @@ describe.each(['puppeteer', 'playwright'])('%s interaction regressions', engine 
   };
 
   test('form, frame, scrolling and navigation actions preserve their observed state', async () => {
-    const html = `<!doctype html><body style="height:1400px">
+    // macOS Chromium can report Times for its default font while laying out with
+    // PingFang SC. Explicit metrics keep the source and static copy consistent.
+    const html = `<!doctype html><body style="height:1400px;font:16px/24px Arial">
       <input id="entry"><input type="checkbox" id="check" checked>
       <select id="pick"><option value="a">a</option><option value="b">b</option></select>
       <div id="scroller" style="width:100px;height:40px;overflow:auto"><div style="height:300px">scroll</div></div>
