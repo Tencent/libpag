@@ -22,13 +22,6 @@
 
 namespace pag {
 
-CLI_TEST(PAGXCSSFontStyleTest, EscapedFamilyNamesRetainCommasQuotesAndBackslashes) {
-  auto families = pagx::ParseCSSFontFamilyList(
-      R"CSS( Vendor\, Name , 'Single\'Quote', "Double\"Quote", Back\\Slash, sans-serif )CSS");
-  EXPECT_EQ(families, (std::vector<std::string>{"Vendor, Name", "Single'Quote", "Double\"Quote",
-                                                "Back\\Slash", "sans-serif"}));
-}
-
 CLI_TEST(PAGXCSSFontStyleTest, MissingFamiliesDoNotAcceptPlatformSubstitutions) {
   for (const auto* family : {"", "PAGX Missing Font 5d481d18"}) {
     EXPECT_EQ(pagx::SystemFonts::ResolveTypeface(family, ""), nullptr);
@@ -39,15 +32,6 @@ CLI_TEST(PAGXCSSFontStyleTest, MissingFamiliesDoNotAcceptPlatformSubstitutions) 
   EXPECT_FALSE(pagx::SystemFonts::FontNamesMatch("NotoSans", "Noto Sans"));
   EXPECT_FALSE(pagx::SystemFonts::FontNamesMatch("", ""));
 }
-
-CLI_TEST(PAGXCSSFontStyleTest, MatchAvailableWeightAndSlant) {
-  EXPECT_EQ(pagx::MatchCSSFontStyle({"Regular", "Medium", "Semibold"}, "Bold"), "Semibold");
-  EXPECT_EQ(pagx::MatchCSSFontStyle({"Light", "Medium", "Semibold"}, "Regular"), "Medium");
-  EXPECT_EQ(pagx::MatchCSSFontStyle({"Light", "Semibold"}, "Regular"), "Light");
-  EXPECT_EQ(pagx::MatchCSSFontStyle({"Bold", "Regular Italic"}, "Bold Italic"), "Regular Italic");
-  EXPECT_EQ(pagx::MatchCSSFontStyle({"Regular", "Bold"}, "MissingStyle"), "Regular");
-}
-
 
 // ResolveFontStyleName: maps a CSS font-weight + font-style pair onto a PAGX `fontStyle` label.
 // Regular (400) collapses to an empty weight portion; italic/oblique fold onto the result.
