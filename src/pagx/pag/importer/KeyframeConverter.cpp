@@ -76,6 +76,22 @@ void ConvertFloatChannel(pag::Property<float>* legacy, float frameRateDivisor,
     ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
     channel->keyframes.push_back(keyframe);
   }
+  // The legacy keyframe is a segment [startTime, endTime] interpolating startValue to
+  // endValue; contiguous keys carry the next start as their end, but the FINAL segment
+  // end value has no successor key: without appending it the evaluator clamps later
+  // times to the last start value.
+
+  if (!animatable->keyframes.empty()) {
+    auto* last = animatable->keyframes.back();
+    if (last->endTime > last->startTime) {
+      Keyframe<float> keyframe = {};
+      keyframe.time = last->endTime;
+      keyframe.value = last->endValue;
+      keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      channel->keyframes.push_back(keyframe);
+    }
+  }
 }
 
 using FloatKeyframeList = std::vector<Keyframe<float>>;
@@ -95,6 +111,18 @@ void ConvertOpacityChannel(pag::Property<pag::Opacity>* legacy, float frameRate,
     keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
     ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
     channel->keyframes.push_back(keyframe);
+  }
+
+  if (!animatable->keyframes.empty()) {
+    auto* last = animatable->keyframes.back();
+    if (last->endTime > last->startTime) {
+      Keyframe<float> keyframe = {};
+      keyframe.time = last->endTime;
+      keyframe.value = last->endValue / 255.0f;
+      keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      channel->keyframes.push_back(keyframe);
+    }
   }
 }
 
@@ -142,6 +170,25 @@ void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& b
       keyY.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
       ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyY);
       channelY->keyframes.push_back(keyY);
+    }
+    // The final legacy segment [startTime, endTime] carries an end value with no successor
+    // key; append it so later times clamp to the segment end (see ConvertFloatChannel).
+    if (!animatable->keyframes.empty()) {
+      auto* lastKey = animatable->keyframes.back();
+      if (lastKey->endTime > lastKey->startTime) {
+        Keyframe<float> endX = {};
+        endX.time = lastKey->endTime;
+        endX.value = lastKey->endValue.x;
+        endX.interpolation = ConvertInterpolation(lastKey->interpolationType);
+        ConvertEase(lastKey->bezierOut, lastKey->bezierIn, &endX);
+        channelX->keyframes.push_back(endX);
+        Keyframe<float> endY = {};
+        endY.time = lastKey->endTime;
+        endY.value = lastKey->endValue.y;
+        endY.interpolation = ConvertInterpolation(lastKey->interpolationType);
+        ConvertEase(lastKey->bezierOut, lastKey->bezierIn, &endY);
+        channelY->keyframes.push_back(endY);
+      }
     }
   }
   (void)frameRate;
