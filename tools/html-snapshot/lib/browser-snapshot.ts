@@ -1251,63 +1251,23 @@ function appendStyleProp(parts, computed, entry, ctx) {
   parts.push(`${outProp}: ${v.replace(/"/g, "'")}`);
 }
 
-// CSS matching for static faces and declared descriptor ranges. Keep this ordering in sync
-// with CompareCSSFontStyles; both implementations consume font-matching-cases.json in tests.
-function fontMatchRange(value, width) {
-  const widths = { 'ultra-condensed': 50, 'extra-condensed': 62.5, condensed: 75,
-    'semi-condensed': 87.5, normal: 100, 'semi-expanded': 112.5, expanded: 125,
-    'extra-expanded': 150, 'ultra-expanded': 200 };
-  const numbers = String(value || 'normal').trim().split(/\s+/).map(token => {
-    if (width && widths[token] !== undefined) return widths[token];
-    if (!width && token === 'normal') return 400;
-    if (!width && token === 'bold') return 700;
-    const number = Number(width ? token.replace(/%$/, '') : token);
-    return Number.isFinite(number) && number > 0 ? number : width ? 100 : 400;
-  });
-  return [numbers[0], numbers[1] ?? numbers[0]];
-}
-
-function fontMatchCompare(request, a, b) {
-  const desiredWeight = fontMatchRange(request.weight, false)[0];
-  const desiredWidth = fontMatchRange(request.stretch, true)[0];
-  const slant = value => /^oblique(?:\s|$)/.test(value || '') ? 'oblique' :
-    value === 'italic' ? 'italic' : 'normal';
-  const desiredSlant = slant(request.style);
-  const rank = face => {
-    const [loWidth, hiWidth] = fontMatchRange(face.stretch, true);
-    const width = Math.max(loWidth, Math.min(hiWidth, desiredWidth));
-    const widthRank = desiredWidth <= 100
-      ? width <= desiredWidth ? [0, desiredWidth - width] : [1, width - desiredWidth]
-      : width >= desiredWidth ? [0, width - desiredWidth] : [1, desiredWidth - width];
-    const actualSlant = slant(face.style);
-    const slantRank = actualSlant === desiredSlant ? 0 : desiredSlant === 'normal'
-      ? actualSlant === 'oblique' ? 1 : 2 : actualSlant === 'normal' ? 2 : 1;
-    const [loWeight, hiWeight] = fontMatchRange(face.weight, false);
-    const weight = Math.max(loWeight, Math.min(hiWeight, desiredWeight));
-    let weightRank;
-    if (desiredWeight < 400) weightRank = weight <= desiredWeight
-      ? [0, desiredWeight - weight] : [1, weight - desiredWeight];
-    else if (desiredWeight > 500) weightRank = weight >= desiredWeight
-      ? [0, weight - desiredWeight] : [1, desiredWeight - weight];
-    else if (weight >= desiredWeight && weight <= 500) weightRank = [0, weight - desiredWeight];
-    else weightRank = weight < desiredWeight ? [1, desiredWeight - weight] : [2, weight - desiredWeight];
-    return [...widthRank, slantRank, ...weightRank];
-  };
-  const first = rank(a), second = rank(b);
-  for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return first[i] - second[i];
-  return 0;
-}
-
 function snapshotFontFamily(value, computed) {
   const aliases = window.__pagxFontAliases || [];
   if (!aliases.length) return value;
   const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
-  const request = { weight: String(weight), style: computed.getPropertyValue('font-style') || 'normal',
-    stretch: computed.getPropertyValue('font-stretch') || '100%' };
+  const italic = /italic|oblique/.test(computed.getPropertyValue('font-style'));
   return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
     const family = part.trim().replace(/^["']|["']$/g, '');
     const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
-    matches.sort((a, b) => fontMatchCompare(request, a, b));
+    matches.sort((a, b) => {
+      const score = (face) => {
+        const range = (face.weight || '400').split(/\s+/).map(Number);
+        const lo = range[0] || 400, hi = range[1] || lo;
+        return (italic !== /italic|oblique/.test(face.style) ? 10000 : 0) +
+          Math.max(lo - weight, weight - hi, 0);
+      };
+      return score(a) - score(b);
+    });
     return matches.length ? `'${matches[0].to.replace(/'/g, "\\'")}'` : part.trim();
   }).join(', ');
 }
@@ -2211,7 +2171,7 @@ function freezeSvg(svgEl, rect) {
     'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
     'stroke-dasharray', 'stroke-dashoffset',
     'opacity', 'visibility', 'clip-rule', 'vector-effect',
-    'font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'letter-spacing',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'letter-spacing',
     'text-anchor', 'marker-start', 'marker-mid', 'marker-end',
     'stop-color', 'stop-opacity',
   ];
@@ -5316,7 +5276,6 @@ const STYLE_SCHEMA = [
   { prop: 'font-size',             scope: 'text' },
   { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
   { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
-  { prop: 'font-stretch',          scope: 'text', defaults: ['normal', '100%'] },
   { prop: 'letter-spacing',        scope: 'text', defaults: ['normal', '0px'] },
   { prop: 'line-height',           scope: 'text' },
   { prop: 'text-align',            scope: 'text', defaults: ['start', 'left'] },
@@ -5400,8 +5359,6 @@ const HELPER_FNS = [
   classify,
   appendStyleProp,
   snapshotFontFamily,
-  fontMatchRange,
-  fontMatchCompare,
   appendBorder,
   appendBoxShadow,
   appendAnimation,
@@ -5987,7 +5944,7 @@ async function materializeDecorativePseudoElements(resolvedContents) {
     'transform', 'transform-origin',
     'z-index',
     'box-sizing',
-    'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch',
+    'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align', 'white-space',
     // Animation longhands are forwarded so an *animated* decorative pseudo
     // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
@@ -6546,7 +6503,5 @@ export {
   canvasRootRect,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
-  fontMatchRange,
-  fontMatchCompare,
   snapshotFontFamily,
 };

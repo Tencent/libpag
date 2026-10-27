@@ -17,27 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CSSFontStyle.h"
-#include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <cstdlib>
-#include <iomanip>
-#include <limits>
-#include <locale>
-#include <sstream>
 #include <string>
-#include <tuple>
 
 namespace pagx {
 
 std::string MatchCSSFontStyle(const std::vector<std::string>& styles,
                               const std::string& requested) {
-  std::vector<CSSFontFace> faces;
+  auto target = ParseFontStyleName(requested);
+  int bestScore = 100000;
+  std::string best;
   for (const auto& style : styles) {
-    faces.push_back({style, FontStyleFromName(style)});
+    auto candidate = ParseFontStyleName(style);
+    int score = candidate.italic == target.italic ? 0 : 10000;
+    int weight = candidate.weight;
+    if (target.weight < 400) {
+      score += weight <= target.weight ? target.weight - weight : 1000 + weight - target.weight;
+    } else if (target.weight > 500) {
+      score += weight >= target.weight ? weight - target.weight : 1000 + target.weight - weight;
+    } else if (weight >= target.weight && weight <= 500) {
+      score += weight - target.weight;
+    } else if (weight < target.weight) {
+      score += 1000 + target.weight - weight;
+    } else {
+      score += 2000 + weight - target.weight;
+    }
+    if (score < bestScore || (score == bestScore && style < best)) {
+      best = style;
+      bestScore = score;
+    }
   }
-  auto best = MatchCSSFontFace(faces, FontStyleFromName(requested));
-  return best < 0 ? std::string() : faces[best].name;
+  return best;
 }
 
 std::vector<std::string> ParseCSSFontFamilyList(const std::string& value) {
@@ -181,140 +192,6 @@ int WeightKeywordToNumeric(const std::string& token) {
 }
 
 }  // namespace
-
-double CSSFontWidthFromClass(int widthClass) {
-  static constexpr double widths[] = {50, 62.5, 75, 87.5, 100, 112.5, 125, 150, 200};
-  return widthClass >= 1 && widthClass <= 9 ? widths[widthClass - 1] : 100;
-}
-
-CSSFontStyle ParseCSSFontStyle(const std::string& weight, const std::string& slant,
-                               const std::string& width) {
-  CSSFontStyle result;
-  auto w = ToLowerAscii(TrimAscii(weight));
-  if (w == "bold" || w == "bolder") result.weight = 700;
-  else if (w == "lighter")
-    result.weight = 300;
-  else {
-    char* end = nullptr;
-    double value = std::strtod(w.c_str(), &end);
-    if (end != w.c_str() && *end == '\0' && std::isfinite(value) && value >= 1 && value <= 1000)
-      result.weight = value;
-  }
-  auto s = ToLowerAscii(TrimAscii(slant));
-  if (s == "italic") result.slant = CSSFontSlant::Italic;
-  else if (s == "oblique" || s.compare(0, 8, "oblique ") == 0)
-    result.slant = CSSFontSlant::Oblique;
-  auto stretch = ToLowerAscii(TrimAscii(width));
-  static const char* names[] = {"ultra-condensed", "extra-condensed", "condensed",
-                                "semi-condensed",  "normal",          "semi-expanded",
-                                "expanded",        "extra-expanded",  "ultra-expanded"};
-  for (int i = 0; i < 9; ++i) {
-    if (stretch == names[i]) result.width = CSSFontWidthFromClass(i + 1);
-  }
-  char* end = nullptr;
-  double value = std::strtod(stretch.c_str(), &end);
-  if (end != stretch.c_str() && std::string(end) == "%" && std::isfinite(value) && value > 0)
-    result.width = value;
-  return result;
-}
-
-CSSFontStyle FontStyleFromName(const std::string& name) {
-  CSSFontStyle result;
-  result.weight = ParseFontStyleName(name).weight;
-  std::istringstream tokens(ToLowerAscii(name));
-  std::string token;
-  std::string modifier;
-  while (tokens >> token) {
-    // Vendors use both "Semi Condensed" and "SemiCondensed" (also hyphenated).
-    token.erase(std::remove(token.begin(), token.end(), '-'), token.end());
-    if (token == "ultra" || token == "extra" || token == "semi") {
-      modifier = token;
-      continue;
-    }
-    if (token == "condensed" || token == "expanded" || token == "bold" || token == "light")
-      token = modifier + token;
-    modifier.clear();
-    static const char* widths[] = {"ultracondensed", "extracondensed", "condensed",
-                                   "semicondensed",  "normal",         "semiexpanded",
-                                   "expanded",       "extraexpanded",  "ultraexpanded"};
-    for (int i = 0; i < 9; ++i) {
-      if (i != 4 && token == widths[i]) result.width = CSSFontWidthFromClass(i + 1);
-    }
-    if (token == "narrow" || token == "compressed") result.width = 75;
-    if (token == "extended") result.width = 125;
-    if (token == "italic") result.slant = CSSFontSlant::Italic;
-    if (token == "oblique") result.slant = CSSFontSlant::Oblique;
-    auto weight = WeightKeywordToNumeric(token);
-    if (weight) result.weight = weight;
-    char* end = nullptr;
-    auto number = std::strtod(token.c_str(), &end);
-    if (end != token.c_str() && std::isfinite(number)) {
-      if (*end == '\0' && number >= 1 && number <= 1000) result.weight = number;
-      else if (std::string(end) == "%" && number > 0)
-        result.width = number;
-    }
-  }
-  return result;
-}
-
-std::string FontStyleRequestName(const CSSFontStyle& style) {
-  std::ostringstream name;
-  name.imbue(std::locale::classic());
-  name << std::setprecision(std::numeric_limits<double>::max_digits10);
-  if (style.width != 100) name << style.width << "% ";
-  auto weight = static_cast<int>(style.weight);
-  const char* keyword = weight == style.weight && weight % 100 == 0 && weight <= 900
-                            ? WeightKeywordForRoundedHundreds(weight)
-                            : nullptr;
-  if (keyword) name << keyword;
-  else if (style.weight != 400)
-    name << style.weight;
-  if (style.slant != CSSFontSlant::Normal) {
-    if (!name.str().empty() && name.str().back() != ' ') name << ' ';
-    name << (style.slant == CSSFontSlant::Italic ? "Italic" : "Oblique");
-  }
-  return TrimAscii(name.str());
-}
-
-namespace {
-using Rank = std::pair<int, double>;
-Rank WidthRank(double desired, double value) {
-  if (desired <= 100) return value <= desired ? Rank{0, desired - value} : Rank{1, value - desired};
-  return value >= desired ? Rank{0, value - desired} : Rank{1, desired - value};
-}
-Rank WeightRank(double desired, double value) {
-  if (desired < 400) return value <= desired ? Rank{0, desired - value} : Rank{1, value - desired};
-  if (desired > 500) return value >= desired ? Rank{0, value - desired} : Rank{1, desired - value};
-  if (value >= desired && value <= 500) return {0, value - desired};
-  return value < desired ? Rank{1, desired - value} : Rank{2, value - desired};
-}
-int SlantRank(CSSFontSlant desired, CSSFontSlant value) {
-  if (desired == value) return 0;
-  if (desired == CSSFontSlant::Normal) return value == CSSFontSlant::Oblique ? 1 : 2;
-  return value == CSSFontSlant::Normal ? 2 : 1;
-}
-}  // namespace
-
-int CompareCSSFontStyles(const CSSFontStyle& request, const CSSFontStyle& a,
-                         const CSSFontStyle& b) {
-  auto rank = [&](const CSSFontStyle& value) {
-    return std::make_tuple(WidthRank(request.width, value.width),
-                           SlantRank(request.slant, value.slant),
-                           WeightRank(request.weight, value.weight));
-  };
-  auto first = rank(a);
-  auto second = rank(b);
-  return first < second ? -1 : first == second ? 0 : 1;
-}
-
-int MatchCSSFontFace(const std::vector<CSSFontFace>& faces, const CSSFontStyle& request) {
-  int best = -1;
-  for (size_t i = 0; i < faces.size(); ++i) {
-    auto order = best < 0 ? -1 : CompareCSSFontStyles(request, faces[i].style, faces[best].style);
-    if (order < 0 || (order == 0 && faces[i].name < faces[best].name)) best = static_cast<int>(i);
-  }
-  return best;
-}
 
 std::string ResolveFontStyleName(const std::string& cssFontWeight,
                                  const std::string& cssFontStyle) {

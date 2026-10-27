@@ -397,13 +397,13 @@ class HTMLParserContext {
   // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
   // exported PAGX carries names a host process can look up with an exact-matching font lookup
   // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
-  // Registered fonts retain their family alias and the selected face's registration style key.
-  // A platform substitution to another family keeps the authored name. Results are memoised.
-  void resolveFontFaceNames(std::string& family, std::string& style, const CSSFontStyle& request);
+  // Families registered or embedded in the document's FontConfig keep their names verbatim,
+  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
+  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style);
 
   // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
-  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style,
-                                       const CSSFontStyle& request);
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

@@ -3898,42 +3898,10 @@ PAG_TEST(PAGXHTMLImporterTest, SystemRegularTextUsesResolvedRegularFace) {
   }
 }
 
-PAG_TEST(PAGXHTMLImporterTest, CSSFontPropertiesReachFaceMatching) {
-#ifdef __APPLE__
-  for (const auto& item : std::vector<std::pair<std::string, std::string>>{
-           {"font-weight:800", "Bold"},
-           {"font-weight:800;font-stretch:condensed", "Condensed Black"},
-           {"font-weight:100", "UltraLight"},
-           {"font-weight:200", "Thin"}}) {
-    auto doc = ParseFromString("<html><body style=\"width:700px;height:100px;"
-                              "font-family:'Helvetica Neue';" + item.first +
-                              "\"><span>Visual Archive</span></body></html>");
-    ASSERT_NE(doc, nullptr);
-    auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-    ASSERT_NE(text, nullptr);
-    EXPECT_EQ(text->fontStyle, item.second) << item.first;
-  }
-  auto inherited = ParseFromString(R"HTML(
-    <html><body style="width:700px;height:100px;font-family:'Helvetica Neue';font-weight:200">
-      <span style="font-weight:100">Changed request</span>
-    </body></html>)HTML");
-  ASSERT_NE(inherited, nullptr);
-  auto* lighter = FindElementOfType<pagx::Text>(inherited->layers.front()->children.front());
-  ASSERT_NE(lighter, nullptr);
-  EXPECT_EQ(lighter->fontStyle, "UltraLight");
-#endif
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:300px;height:80px;font-family:'Missing CSS Fixture';font-stretch:87.5%">
-      <span style="font-weight:550.5;font-style:oblique;font-stretch:inherit">Unrounded</span>
-    </body></html>)HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->fontStyle, "87.5% 550.5 Oblique");
-}
-
-PAG_TEST(PAGXHTMLImporterTest, CSSWeightUsesAvailableRegisteredFace) {
-  // A CSS request selects the available face and retains its document-local registration key.
+PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
+  // Registered families are resolved by LayoutContext through an exact (family, style) key, so the
+  // importer must report their names verbatim — including an authored style label the platform has
+  // no face for. Registering keeps this assertion independent of the fonts installed on the host.
   pagx::FontConfig fontConfig;
   fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
                           "HTML Medium Test", "Regular");
@@ -3948,44 +3916,13 @@ PAG_TEST(PAGXHTMLImporterTest, CSSWeightUsesAvailableRegisteredFace) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // There is only a Regular face. The CSS request for Medium resolves to it without synthesis.
+  // Medium stays a real-face style label so font lookup can select it precisely. The importer does
+  // not bake a faux flag when that face is unavailable.
   EXPECT_EQ(text->fontFamily, "HTML Medium Test");
-  EXPECT_EQ(text->fontStyle, "Regular");
+  EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
 }
-
-#ifdef __APPLE__
-PAG_TEST(PAGXHTMLImporterTest, RegisteredCSSFacesUseMetadataAndKeepAliasKeys) {
-  pagx::FontConfig fontConfig;
-  // Deliberately misleading registration names must not override the font's real width.
-  for (const auto& entry : std::vector<std::pair<std::string, std::string>>{
-           {"Bold", "Condensed Alias"}, {"Condensed Black", "Normal Alias"}}) {
-    auto location = pagx::SystemFonts::FindFont("Helvetica Neue", entry.first);
-    ASSERT_FALSE(location.path.empty());
-    fontConfig.registerFont(location.path, location.ttcIndex, "CSS Registered Fixture", entry.second);
-  }
-  pagx::HTMLImporter::Options opts;
-  opts.fontConfig = &fontConfig;
-  for (const auto& entry : std::vector<std::pair<std::string, std::string>>{
-           {"100%", "Condensed Alias"}, {"75%", "Normal Alias"}}) {
-    auto doc = pagx::HTMLImporter::ParseString(
-        "<html><body style=\"width:300px;height:80px\"><span style=\""
-        "font-family:'CSS Registered Fixture';font-weight:800;font-stretch:" + entry.first +
-        "\">Registered</span></body></html>", opts);
-    ASSERT_NE(doc, nullptr);
-    auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-    ASSERT_NE(text, nullptr);
-    EXPECT_EQ(text->fontFamily, "CSS Registered Fixture");
-    EXPECT_EQ(text->fontStyle, entry.second);
-    doc->applyLayout();
-    ASSERT_NE(text->glyphData, nullptr);
-    ASSERT_FALSE(text->glyphData->layoutRuns.empty());
-    auto face = text->glyphData->layoutRuns.front().font.getTypeface();
-    EXPECT_EQ(face->fontStyle(), entry.first == "100%" ? "Bold" : "Condensed Black");
-  }
-}
-#endif
 
 PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   auto doc = ParseFromString(R"HTML(
