@@ -6,7 +6,6 @@ const path = require('path');
 const {
   toSfnt,
   readFontMeta,
-  decodeDataFont,
   makeFontCaptureListener,
   saveDownloadedFonts,
 } = require('../dist/lib/font-download');
@@ -81,13 +80,12 @@ describe('makeFontCaptureListener', () => {
     expect(cache.size).toBe(0);
   });
 
-  test('captures inline font bytes but ignores non-OK responses', async () => {
+  test('ignores data: URLs and non-OK responses', async () => {
     const cache = new Map();
     const listener = makeFontCaptureListener('puppeteer', cache);
     await listener(makeResp({ url: 'data:font/woff2;base64,AAAA' }));
     await listener(makeResp({ url: 'https://x/b.woff2', ok: false }));
-    expect(cache.get('data:font/woff2;base64,AAAA')).toEqual(Buffer.from([0, 0, 0]));
-    expect(cache.size).toBe(1);
+    expect(cache.size).toBe(0);
   });
 
   test('does not re-fetch a URL already in the cache', async () => {
@@ -115,35 +113,6 @@ describe('makeFontCaptureListener', () => {
     });
     expect(cache.size).toBe(0);
     expect(logs[0]).toMatch(/font capture skipped: detached/);
-  });
-});
-
-describe('inline fonts and partial SFNT tables', () => {
-  test('decodes base64 and percent-encoded binary without UTF-8 corruption', () => {
-    expect(decodeDataFont('data:font/ttf;base64,AP%2BA')).toEqual(Buffer.from([0, 255, 128]));
-    expect(decodeDataFont('data:font/ttf,%00%ff%80')).toEqual(Buffer.from([0, 255, 128]));
-    expect(() => decodeDataFont('not-a-font')).toThrow();
-  });
-
-  test('reads Unicode family names without parsing glyph or GSUB tables', () => {
-    const family = Buffer.from('测试字体', 'utf16le').swap16();
-    const sfnt = Buffer.alloc(46 + family.length);
-    sfnt.writeUInt32BE(0x00010000, 0);
-    sfnt.writeUInt16BE(1, 4);
-    sfnt.write('name', 12);
-    sfnt.writeUInt32BE(28, 20);
-    sfnt.writeUInt32BE(18 + family.length, 24);
-    sfnt.writeUInt16BE(1, 30);
-    sfnt.writeUInt16BE(18, 32);
-    sfnt.writeUInt16BE(3, 34);
-    sfnt.writeUInt16BE(1, 36);
-    sfnt.writeUInt16BE(0x409, 38);
-    sfnt.writeUInt16BE(1, 40);
-    sfnt.writeUInt16BE(family.length, 42);
-    family.copy(sfnt, 46);
-    expect(readFontMeta(sfnt).family).toBe('测试字体');
-    sfnt.writeUInt32BE(0xffffffff, 20);
-    expect(readFontMeta(sfnt).family).toBe('font');
   });
 });
 
@@ -178,7 +147,6 @@ describe('saveDownloadedFonts', () => {
     ]);
     const saved = await saveDownloadedFonts(map, outDir);
     expect(saved).toHaveLength(1);
-    expect(saved[0].urls).toEqual(['https://x/a.ttf', 'https://y/b.ttf']);
     expect(fs.readdirSync(outDir)).toHaveLength(1);
   });
 

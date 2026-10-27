@@ -74,17 +74,6 @@ class Text : public Element, public LayoutNode {
   float letterSpacing = 0.0f;
 
   /**
-   * Optional physical inline positions (x in horizontal text, y in vertical text), in pixels
-   * relative to the start of this Text run. There must be one finite value per Unicode scalar.
-   * Positions are applied to whole shaping clusters; a cluster uses the minimum of its character
-   * positions and keeps its internal glyph offsets. They describe a pre-laid-out single line:
-   * automatic wrapping and justification are disabled while positions are present. Newlines and
-   * tabs, invalid UTF-8, or a mismatched count make the entire list inactive. Pre-shaped glyphRuns
-   * take precedence.
-   */
-  std::vector<float> inlinePositions = {};
-
-  /**
    * Whether to apply algorithmic bolding. The default value is false.
    */
   bool fauxBold = false;

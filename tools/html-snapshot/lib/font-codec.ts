@@ -34,7 +34,6 @@ type Wawoff2Module = any;
 
 let opentype: OpenTypeModule | null = null;
 let wawoff2: Wawoff2Module | null = null;
-let decodeQueue: Promise<void> = Promise.resolve();
 
 export interface FontCodecBundle {
   opentype: OpenTypeModule;
@@ -47,19 +46,6 @@ export interface FontCodecBundle {
 // outsmart the require cache.
 export function loadFontCodec(): FontCodecBundle {
   if (!opentype) opentype = require('opentype.js') as OpenTypeModule;
-  if (!wawoff2) {
-    const module = require('wawoff2') as Wawoff2Module;
-    wawoff2 = {
-      ...module,
-      decompress(buffer: Buffer): Promise<Buffer> {
-        // The WASM binding returns a view into reused memory. Concurrent calls
-        // can overwrite an earlier result before its awaiting caller copies it.
-        // Serialize decode + copy across ALL users (including icon-font).
-        const result = decodeQueue.then(async () => Buffer.from(await module.decompress(buffer)));
-        decodeQueue = result.then(() => {}, () => {});
-        return result;
-      },
-    };
-  }
+  if (!wawoff2) wawoff2 = require('wawoff2') as Wawoff2Module;
   return { opentype, wawoff2 };
 }

@@ -35,7 +35,6 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
-#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -83,7 +82,6 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;
   t->letterSpacing = fragment.letterSpacing;
-  t->inlinePositions = fragment.inlinePositions;
   return t;
 }
 
@@ -130,11 +128,6 @@ void HTMLTextFragmentBuilder::applyPagxTextMetadata(TextFragment& frag, const DO
   if (const std::string* value = element->findAttribute("data-pagx-font-style")) {
     frag.fontStyleName = *value;
     frag.exactFontStyle = true;
-  }
-  if (const auto* value = element->findAttribute("data-pagx-inline-positions")) {
-    if (!ParseTextInlinePositions(frag.text, *value, &frag.inlinePositions)) {
-      _diagnostics.warn("html: invalid data-pagx-inline-positions on semantic text host");
-    }
   }
   if (const std::string* value = element->findAttribute("data-pagx-letter-spacing")) {
     // Strict parse: the exporter writes %.9g (possibly scientific notation); require the whole
@@ -418,14 +411,6 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   collapseFragmentWhitespace(fragments);
   if (fragments.empty()) {
     return nullptr;
-  }
-  if (auto positions = element->findAttribute("data-pagx-inline-positions")) {
-    if (fragments.size() != 1 ||
-        !ParseTextInlinePositions(fragments[0].text, *positions, &fragments[0].inlinePositions)) {
-      _diagnostics.warn(
-          "html: invalid data-pagx-inline-positions; expected one finite position "
-          "per Unicode scalar of a single-style line without tabs");
-    }
   }
   if (box.absolute) {
     _diagnostics.warn("html: position: absolute on text leaf '<" + element->name +

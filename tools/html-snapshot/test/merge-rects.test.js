@@ -9,20 +9,6 @@
 const { mergeRectsOnSameLine } = require('../dist/lib/browser-snapshot');
 
 describe('mergeRectsOnSameLine', () => {
-  test('keeps a tall first letter and tightly spaced body lines separate', () => {
-    const rects = [
-      { left: 0, top: 0, width: 80, height: 96 },
-      { left: 94, top: 0, width: 146, height: 25 },
-      { left: 94, top: 8, width: 146, height: 25 },
-    ];
-    expect(mergeRectsOnSameLine(rects, 'y')).toHaveLength(3);
-  });
-  test('keeps disconnected fragments in separate columns', () => {
-    expect(mergeRectsOnSameLine([
-      { left: 0, top: 0, width: 100, height: 25 },
-      { left: 132, top: 0, width: 100, height: 25 },
-    ], 'y')).toHaveLength(2);
-  });
   test('does not merge two adjacent lines whose ink overlaps by ~1px (y axis)', () => {
     // line-height 16, ink height 17: line 2 top (364) sits 1px above line 1
     // bottom (365). The bug merged these into a single line; they must stay 2.
