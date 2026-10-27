@@ -5,12 +5,13 @@ import type * as Libpag from '../../src/pag';
 import type { PAGComposition } from '../../src/pag-composition';
 import type { PAGLayer } from '../../src/pag-layer';
 import type { PAG } from '../../src/types';
+import { visitTestPage } from './lane';
 
 describe('PAGComposition', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

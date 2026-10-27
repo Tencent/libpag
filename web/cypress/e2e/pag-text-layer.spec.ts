@@ -4,6 +4,7 @@
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGTextLayer } from '../../src/pag-text-layer';
+import { visitTestPage } from './lane';
 
 describe('PAGTextLayer', async () => {
   let PAG: PAG;
@@ -12,7 +13,7 @@ describe('PAGTextLayer', async () => {
   let pagTextLayer: PAGTextLayer;
 
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

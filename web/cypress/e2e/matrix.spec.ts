@@ -3,13 +3,14 @@
 /* global describe it expect cy Cypress beforeEach */
 import type * as Libpag from '../../src/pag';
 import { PAG } from '../../src/types';
+import { visitTestPage } from './lane';
 
 describe('Matrix', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

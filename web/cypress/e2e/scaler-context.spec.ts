@@ -4,6 +4,7 @@
 import type * as Libpag from '../../src/pag';
 import type { PAG, Rect } from '../../src/types';
 import type { ScalerContext } from '../../src/interfaces';
+import { visitTestPage } from './lane';
 
 const scalerContextBaseline = {
   fontString:
@@ -19,7 +20,7 @@ describe('PAGTextLayer', async () => {
   let scalerContext: ScalerContext;
 
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

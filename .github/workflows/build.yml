@@ -283,7 +283,7 @@ jobs:
           npm run build:st
 
       - name: Cypress run:st
-        uses: cypress-io/github-action@v7.4.6
+        uses: cypress-io/github-action@v8
         with:
           working-directory: web
           start: npm run server:cypress
@@ -325,8 +325,9 @@ jobs:
             !web/node_modules
 
   web-webgpu:
-    # Compile-only verification of the WebGPU backend. WebGPU runtime tests are not run because
-    # GitHub Actions Linux runners lack GPU hardware (mirrors tgfx's web-webgpu job). The emsdk
+    # Compile and runtime verification of the WebGPU backend. The cypress WebGPU lane runs on
+    # SwiftShader (--use-webgpu-adapter=swiftshader injected in cypress.config.ts) because GitHub
+    # Actions Linux runners lack GPU hardware. The emsdk
     # version is read from web/emsdk-versions.txt by script/setup.emsdk.js, so the CI pin, the
     # configure-time window check, and local installs share a single source of truth.
     name: web (webgpu)
@@ -386,6 +387,18 @@ jobs:
           cd web
           source emsdk/emsdk_env.sh
           npm run build:webgpu:st
+
+      - name: Cypress run:webgpu
+        # Chrome is required instead of the bundled Electron: Electron ignores browser launch
+        # args, so the --use-webgpu-adapter=swiftshader fallback for the GPU-less Linux runners
+        # would never be applied (see cypress.config.ts).
+        uses: cypress-io/github-action@v8
+        with:
+          working-directory: web
+          start: npm run server:cypress
+          wait-on: 'http://localhost:8080'
+          browser: chrome
+          command: npm run cypress:webgpu
 
       - name: Save emsdk Cache
         if: ${{ (github.event_name == 'push') && (steps.emsdk-cache.outputs.cache-hit != 'true') }}

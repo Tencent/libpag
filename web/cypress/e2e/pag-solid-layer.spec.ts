@@ -6,13 +6,14 @@ import { Color, PAG } from '../../src/types';
 import type { PAGSolidLayer } from '../../src/pag-solid-layer';
 import type { PAGFile } from '../../src/pag-file';
 import type { PAGLayer } from '../../src/pag-layer';
+import { visitTestPage } from './lane';
 
 describe('PAGTextLayer', async () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

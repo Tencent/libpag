@@ -5,6 +5,7 @@ import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGPlayer } from '../../src/pag-player';
 import type { PAGFile } from '../../src/pag-file';
+import { visitTestPage } from './lane';
 
 describe('PAGPlayer', () => {
   let PAG: PAG;
@@ -13,7 +14,7 @@ describe('PAGPlayer', () => {
   let pagPlayer: PAGPlayer;
 
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

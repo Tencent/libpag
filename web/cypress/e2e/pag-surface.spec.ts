@@ -3,13 +3,14 @@
 /* global describe it expect cy Cypress beforeEach */
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
+import { itGL, visitTestPage } from './lane';
 
 describe('PAGSurface', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -22,7 +23,7 @@ describe('PAGSurface', () => {
     expect(pagSurface.wasmIns).to.be.a('Object');
   });
 
-  it('Make PAGSurface from Texture', () => {
+  itGL('Make PAGSurface from Texture', () => {
     const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
     const gl = canvas.getContext('webgl2', {
       depth: false,
@@ -53,17 +54,17 @@ describe('PAGSurface', () => {
     return pagSurface;
   };
 
-  it('Make PAGSurface from RenderTarget', () => {
+  itGL('Make PAGSurface from RenderTarget', () => {
     makePAGSurfaceFromRenderTarget();
   });
 
-  it('Get size', () => {
+  itGL('Get size', () => {
     const pagSurface = makePAGSurfaceFromRenderTarget();
     expect(pagSurface.width()).to.be.eq(300);
     expect(pagSurface.height()).to.be.eq(300);
   });
 
-  it('Read pixels', async () => {
+  itGL('Read pixels', async () => {
     const pagSurface = makePAGSurfaceFromRenderTarget();
     const pagPlayer = PAG.PAGPlayer.create();
     const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
@@ -79,12 +80,12 @@ describe('PAGSurface', () => {
     );
   });
 
-  it('Clear All', () => {
+  itGL('Clear All', () => {
     const pagSurface = makePAGSurfaceFromRenderTarget();
     pagSurface.clearAll();
   });
 
-  it('Free Cache', () => {
+  itGL('Free Cache', () => {
     const pagSurface = makePAGSurfaceFromRenderTarget();
     pagSurface.freeCache();
   });

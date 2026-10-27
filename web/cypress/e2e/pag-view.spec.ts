@@ -6,6 +6,7 @@ import type { PAG } from '../../src/types';
 import type { PAGView } from '../../src/pag-view';
 import type { PAGTextLayer } from '../../src/pag-text-layer';
 import { PAGFile } from '../../src/pag-file';
+import { visitTestPage } from './lane';
 
 describe('PAGView', async () => {
   let PAG: PAG;
@@ -14,7 +15,7 @@ describe('PAGView', async () => {
   let pagView: PAGView;
 
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -24,7 +25,10 @@ describe('PAGView', async () => {
       const pagFile = await PAG.PAGFile.load(buffer);
       expect(pagFile.wasmIns).to.be.a('Object');
       const pagCanvas = global.document.getElementById('pag') as HTMLCanvasElement;
-      pagView = (await PAG.PAGView.init(pagFile, pagCanvas)) as PAGView;
+      // useScale keeps the canvas at its attribute size, so the initial matrix assertion below
+      // stays independent of devicePixelRatio (Electron 130 headless follows the Retina screen
+      // scale factor, unlike the old Cypress 9 Electron headless which reported 1).
+      pagView = (await PAG.PAGView.init(pagFile, pagCanvas, { useScale: false })) as PAGView;
     });
   });
 

@@ -5,13 +5,14 @@ import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGImage } from '../../src/pag-image';
 import type { PAGView } from '../../src/pag-view';
+import { itGL, visitTestPage } from './lane';
 
 describe('PAGImage', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -63,7 +64,7 @@ describe('PAGImage', () => {
     expect(pagImage.wasmIns).to.be.a('object');
   });
 
-  it('Make from Texture', async () => {
+  itGL('Make from Texture', async () => {
     const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
     const gl = canvas.getContext('webgl2', {
       depth: false,
