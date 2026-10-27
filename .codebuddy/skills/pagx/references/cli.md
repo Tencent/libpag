@@ -335,9 +335,9 @@ against the requested result.
 ```bash
 pagx import icon.svg -o icon.pagx
 pagx import page.html -o page.pagx --render
-pagx import motion.html -o motion.pagx --capture-animations --render
-pagx import app.html --scenario states.json --output-dir out --preview
-pagx import app.html --scenario states.json --checkpoint filled -o filled.pagx
+pagx import motion.html -o motion.pagx --html-capture-animations --render
+pagx import app.html --html-scenario states.json --output-dir out --preview
+pagx import app.html --html-scenario states.json --html-checkpoint filled -o filled.pagx
 pagx import https://example.com --output-dir site-out --output-name demo
 pagx import --batch pages --output-dir batch-out --render
 pagx import prepared.subset.html --html-source snapshot -o prepared.pagx
@@ -355,13 +355,10 @@ These are independent examples; use `--overwrite` when intentionally replacing e
 | `--output-name <name>` | Basename for a single input in directory mode; required for URL directory output |
 | `--format html\|svg` | Force the format of a single input; batch mode infers each file's format |
 | `--batch <dir>` | Recursively import HTML/SVG, preserving relative directories; requires `--output-dir` |
-| `--scenario <file.json>` | Replay actions and export all named static states; requires directory output unless selecting a checkpoint |
-| `--checkpoint <name>` | Select one scenario capture; also permits `--output <file>` |
 | `--render` | Add PNGs (default output is PAGX only) |
 | `--preview` | Add PNGs and ordered contact sheets; does not start the live viewer |
 | `--preview-columns <1..32>` | Contact sheet columns; requires `--preview` |
 | `--scale <number>` | PNG scale, default 1; requires `--render` or `--preview` |
-| `--keep-snapshot` | Preserve intermediate `.subset.html` files for HTML inputs |
 | `--no-resolve` | Keep import directives; conflicts with rendering and font embedding |
 | `--images external\|embed` | Final image storage, default `external`; see [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Override local relative image lookup |
@@ -377,7 +374,7 @@ These are independent examples; use `--overwrite` when intentionally replacing e
 - Unselected scenarios require directory output even with one checkpoint. Output names are
   `<base>.<checkpoint>.pagx`; ordinary directory inputs use `<base>.pagx`.
 - Batch mode requires a distinct output directory, preserves relative paths, and cannot be
-  combined with `--format`, `--output-name` or `--scenario`. Format-specific flags must apply
+  combined with `--format`, `--output-name` or `--html-scenario`. Format-specific flags must apply
   to every input: HTML browser flags cannot be used on a mixed HTML/SVG batch.
 - Existing planned files/sidecar directories require `--overwrite`; collisions between planned
   outputs fail before capture. Failed jobs preserve earlier completed outputs and return nonzero.
@@ -402,28 +399,31 @@ fail the import. `--no-resolve` does not skip image processing.
 | Option | Description |
 |---|---|
 | `--html-source browser\|snapshot` | Capture a browser document (default) or import a prepared local subset without a browser |
-| `--browser-engine puppeteer\|playwright` | Browser driver, default Puppeteer; role locators require Playwright |
-| `--viewport-width <px>` / `--viewport-height <px>` | Initial viewport, default 1400×900 |
-| `--wait-ms <ms>` | Additional settling delay, default 800 |
-| `--selector <css>` | Wait for a selector before capture |
-| `--cookie <name=value>` / `--header <Key: Value>` | URL-only; repeatable |
-| `--download-fonts` | Acquire web fonts and retain them under `<output-stem>.fonts/` |
-| `--capture-animations` | Capture supported motion; off by default and incompatible with scenarios |
-| `--scroll-reveal` | Trigger scroll-revealed content before ordinary capture |
-| `--no-inline-icon-fonts` | Disable webfont icon conversion (enabled by default) |
+| `--html-scenario <file.json>` | Replay actions and export all named static states; requires directory output unless selecting a checkpoint |
+| `--html-checkpoint <name>` | Select one scenario capture; also permits `--output <file>` |
+| `--html-browser-engine puppeteer\|playwright` | Browser driver, default Puppeteer; role locators require Playwright |
+| `--html-viewport-width <px>` / `--html-viewport-height <px>` | Initial viewport, default 1400×900 |
+| `--html-wait-ms <ms>` | Additional settling delay, default 800 |
+| `--html-selector <css>` | Wait for a selector before capture |
+| `--html-cookie <name=value>` / `--html-header <Key: Value>` | URL-only; repeatable |
+| `--html-download-fonts` | Acquire web fonts and retain them under `<output-stem>.fonts/` |
+| `--html-capture-animations` | Capture supported motion; off by default and incompatible with scenarios |
+| `--html-scroll-reveal` | Trigger scroll-revealed content before ordinary capture |
+| `--html-no-inline-icon-fonts` | Disable webfont icon conversion (enabled by default) |
+| `--html-keep-snapshot` | Preserve captured or prepared `.subset.html` files |
 
-Rendering or `--embed-fonts` acquires web fonts automatically. Only `--download-fonts` retains
+Rendering or `--embed-fonts` acquires web fonts automatically. Only `--html-download-fonts` retains
 those downloaded files; `--embed-fonts` embeds shaped glyphs into the PAGX. For details see
 [Fonts and images](pipeline.md#fonts-and-images).
 
-A scenario owns its viewport, waits and capture selection. It rejects `--viewport-*`,
-`--wait-ms`, `--selector`, `--scroll-reveal`, `--capture-animations` and `--batch`.
+A scenario owns its viewport, waits and capture selection. It rejects `--html-viewport-*`,
+`--html-wait-ms`, `--html-selector`, `--html-scroll-reveal`, `--html-capture-animations` and `--batch`.
 Selected checkpoints execute prior actions and then stop. See [Interaction capture](interaction.md).
 
 `--html-source snapshot` accepts local subset HTML only and rejects browser/scenario options.
 It replaces the old environment-variable recipe for skipping browser capture in the public CLI.
 For a manually captured animation, enable animation capture in `snapshot.js` and import the
-prepared subset without `--capture-animations`.
+prepared subset without `--html-capture-animations`.
 
 Browser capture computes layout and paint order before emitting the subset. Normalization and
 flex inference remain enabled, but containers marked with fixed paint order retain their absolute

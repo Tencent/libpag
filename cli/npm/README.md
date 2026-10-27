@@ -33,8 +33,8 @@ npm install -g @libpag/pagx
 ```bash
 pagx import icon.svg -o icon.pagx
 pagx import page.html -o page.pagx --render
-pagx import page.html --scenario states.json --output-dir out --preview
-pagx import page.html --scenario states.json --checkpoint advanced -o advanced.pagx
+pagx import page.html --html-scenario states.json --output-dir out --preview
+pagx import page.html --html-scenario states.json --html-checkpoint advanced -o advanced.pagx
 pagx import https://example.com --output-dir out --output-name demo
 pagx import --batch pages --output-dir out --render
 ```
@@ -48,9 +48,9 @@ paths, and infer HTML/SVG formats per file. Name collisions are rejected before 
 
 Import produces PAGX by default. `--render` adds PNGs; `--preview` implies rendering
 and adds ordered contact sheets, including for ordinary files and batches.
-`--keep-snapshot` preserves intermediate HTML. `--images external` (default) writes
+`--html-keep-snapshot` preserves intermediate HTML. `--images external` (default) writes
 image bytes under `<output-stem>.assets/`; `--images embed` keeps them in the PAGX.
-Web fonts are acquired for rendering or `--embed-fonts`; `--download-fonts` also
+Web fonts are acquired for rendering or `--embed-fonts`; `--html-download-fonts` also
 preserves them under `<output-stem>.fonts/`. `--no-resolve` keeps import directives
 and conflicts with rendering and font embedding. Missing resources or failed
 reference expansion are errors, not silently dropped content.
@@ -62,10 +62,10 @@ Node/browser runtime. Prepared local HTML can be imported without a browser usin
 `--html-source snapshot`; the default `browser` mode captures the document first.
 
 Scenario capture exports independent static states in one source-page session.
-`--checkpoint` executes the necessary preceding actions and stops at the selected
+`--html-checkpoint` executes the necessary preceding actions and stops at the selected
 capture. Scenario files own viewport, waits and selection: `--batch`,
-`--capture-animations`, `--scroll-reveal`, `--viewport-*`, `--wait-ms` and `--selector`
-cannot be combined with a scenario. `--browser-engine playwright` enables role
+`--html-capture-animations`, `--html-scroll-reveal`, `--html-viewport-*`, `--html-wait-ms` and `--html-selector`
+cannot be combined with a scenario. `--html-browser-engine playwright` enables role
 locators; Puppeteer is the default. Batch HTML inputs have isolated browser contexts.
 
 Directory results include `manifest.json`, with version 1, task `status`
@@ -99,6 +99,35 @@ binary; an unrelated `PAGX_BIN` or `pagx` on PATH cannot select another version.
 
 `capture`, `html2pagx` and their old flags are removed without compatibility aliases.
 Use `pagx import --help` for supported options.
+
+### HTML import option migration
+
+**Breaking CLI change:** HTML-specific `pagx import` options now use the `--html-` prefix.
+Update scripts using the previous names; old names fail with a migration hint and exit code 2.
+Defaults and option behavior are unchanged. `--html-source` already uses this naming scheme.
+
+| Previous name | Current name |
+|---|---|
+| `--scenario` | `--html-scenario` |
+| `--checkpoint` | `--html-checkpoint` |
+| `--browser-engine` | `--html-browser-engine` |
+| `--viewport-width` | `--html-viewport-width` |
+| `--viewport-height` | `--html-viewport-height` |
+| `--wait-ms` | `--html-wait-ms` |
+| `--selector` | `--html-selector` |
+| `--cookie` | `--html-cookie` |
+| `--header` | `--html-header` |
+| `--capture-animations` | `--html-capture-animations` |
+| `--scroll-reveal` | `--html-scroll-reveal` |
+| `--no-inline-icon-fonts` | `--html-no-inline-icon-fonts` |
+| `--download-fonts` | `--html-download-fonts` |
+| `--keep-snapshot` | `--html-keep-snapshot` |
+
+Shared options such as `--render`, `--preview`, `--images` and `--embed-fonts` retain their names,
+as do SVG options (`--svg-*`). The standalone `snapshot.js` tool retains its own unprefixed
+options; the HTML adapter and HTTP JSON option names are unchanged.
+
+### Package validation
 
 For a release, stage the native binary (`./pack.sh --build`) and run
 `npm run check:import` on each supported OS/architecture. `prepack` rebuilds the

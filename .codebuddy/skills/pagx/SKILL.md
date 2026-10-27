@@ -63,7 +63,7 @@ pagx import --help
 ```
 
 The import workflow below requires the unified `pagx import` interface (`--html-source`,
-`--render`, and, for interaction capture, `--scenario`). Check the flags needed for the task;
+`--render`, and, for interaction capture, `--html-scenario`). Check the flags needed for the task;
 a version string alone does not establish support in a development build. If the installed
 package lacks them, update it with `npm update -g @libpag/pagx` and recheck. If the available
 release still lacks a required feature, use a compatible source build or report the limitation.
@@ -206,8 +206,8 @@ hand. The reliable path is two steps: **design a beautiful, ordinary HTML page**
 that HTML to PAGX with a single command**. The converter renders the page in a real headless
 browser and converts supported layout, paint, text and images to PAGX. CSS or browser features
 outside that support may need adjustment; inspect warnings and the rendered result.
-The default output is **static**. Use `--capture-animations` for supported motion, or a
-`--scenario` for named static interaction states. These modes are mutually exclusive.
+The default output is **static**. Use `--html-capture-animations` for supported motion, or a
+`--html-scenario` for named static interaction states. These modes are mutually exclusive.
 
 **When**: the goal is a finished PAGX and the user is approaching it visually — describes what they
 want in plain language ("一张活动海报", "a product card with price and button"), wants the result to
@@ -296,7 +296,7 @@ Core rules to honor while writing:
   `<svg>` or an icon webfont for graphical icons whose shape must be consistent across fonts.
 
 **If the design should move** (loader, animated banner, ambient motion, kinetic text), add the
-animation in the HTML and pass `--capture-animations` during import. Author it with CSS `@keyframes`
+animation in the HTML and pass `--html-capture-animations` during import. Author it with CSS `@keyframes`
 and `animation` (or GSAP / anime.js / the Web Animations API), and ensure it is attached when captured.
 Preserve the requested timing; use `infinite` for looping motion. The runtime plays back supported
 channels including `opacity`, `transform` (translate, scale, rotate, skew),
@@ -318,18 +318,18 @@ a PNG for review:
 pagx import <name>.html -o <name>.pagx --render
 ```
 
-- **Canvas / viewport:** add `--viewport-width <width> --viewport-height <height>` to match the
+- **Canvas / viewport:** add `--html-viewport-width <width> --html-viewport-height <height>` to match the
   design's intended viewport (default 1400×900). `--scale 2` increases PNG resolution only.
-- **Animation:** add `--capture-animations` when motion is requested. Without it, capture is static.
+- **Animation:** add `--html-capture-animations` when motion is requested. Without it, capture is static.
 - **Resources:** `--render` acquires web fonts for that render; `--embed-fonts` embeds shaped glyphs
   for portable playback. `--images embed` keeps images in the PAGX; the default `external` writes
   `<name>.assets/`, which must accompany the file. See [Fonts and images](references/pipeline.md#fonts-and-images).
 - **URL:** use `pagx import https://example.com/page -o <name>.pagx --render`.
-- **Interaction states:** use `--scenario states.json --output-dir out --preview`, or select one
-  `--checkpoint` with `-o`. Read [Interaction capture](references/interaction.md) first.
+- **Interaction states:** use `--html-scenario states.json --output-dir out --preview`, or select one
+  `--html-checkpoint` with `-o`. Read [Interaction capture](references/interaction.md) first.
 - **Iteration:** existing targets require `--overwrite`. Use it when intentionally replacing this
   task's generated outputs; choose a new destination for an unrelated existing file.
-- **Debugging:** add `--keep-snapshot -v` to retain the subset and inspect warnings, or `--dry-run`
+- **Debugging:** add `--html-keep-snapshot -v` to retain the subset and inspect warnings, or `--dry-run`
   to validate the output plan without launching a browser or writing outputs.
 
 Expect exit code `0`. In directory mode, also require `manifest.json` status `complete`; a failed
@@ -354,10 +354,10 @@ a working live viewer command as described in [Live browser preview](#live-brows
 3. Common fixes:
    - Text in the wrong font → check font loading and requested face/weight; re-import with
      `--embed-fonts` for portable output. For existing PAGX, use `pagx embed --fallback <font-file>`.
-   - Content clipped or off-canvas → match `--viewport-width`/`--viewport-height` to the `body` size.
+   - Content clipped or off-canvas → match `--html-viewport-width`/`--html-viewport-height` to the `body` size.
    - An element missing from the PNG → check visibility, capture readiness and unsupported-content
      warnings; see `references/authoring-html.md` §Capture boundaries and `references/pipeline.md`.
-   - Motion missing or wrong → first check `--capture-animations`; the animation may also have been
+   - Motion missing or wrong → first check `--html-capture-animations`; the animation may also have been
      hover/scroll-triggered, finished before the snapshot, or animated a non-playable property
      (a layout size like `width`/`height`, or a 3D transform); see `references/animation.md`.
 4. When the result matches the intent, deliver the PAGX with any required `.assets/` directories.

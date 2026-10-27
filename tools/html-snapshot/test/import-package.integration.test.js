@@ -65,8 +65,8 @@ packagedTest('help, dry-run and invalid scenario do not initialize an empty brow
   const emptyCache = path.join(dir, 'untouched-cache');
   const empty = { PAGX_HTML_SNAPSHOT_CACHE: emptyCache, PUPPETEER_EXECUTABLE_PATH: '/absent' };
   expect((await run(['import', '--help'], empty)).stdout).toContain('--preview');
-  await run(['import', 'page.html', '--scenario', 'states.json', '--dry-run', '--output-dir', path.join(dir, 'dry-output')], empty);
-  await expect(run(['import', 'page.html', '--scenario', 'states.json', '--checkpoint', 'missing', '--output-dir', path.join(dir, 'invalid-out')], empty))
+  await run(['import', 'page.html', '--html-scenario', 'states.json', '--dry-run', '--output-dir', path.join(dir, 'dry-output')], empty);
+  await expect(run(['import', 'page.html', '--html-scenario', 'states.json', '--html-checkpoint', 'missing', '--output-dir', path.join(dir, 'invalid-out')], empty))
     .rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown checkpoint') });
   const snapshot = await exec(process.execPath, [path.join(packageDir, 'html-snapshot/launch.js'), '--help'],
     { cwd: dir, env: { ...env, ...empty }, timeout: 15000 });
@@ -85,7 +85,7 @@ packagedTest('missing browser returns an actionable failure without enabling aut
 
 packagedTest.each(['puppeteer', 'playwright'])('installed import uses the external %s cache and its own native binary', async engine => {
   const out = path.join(dir, engine);
-  await run(['import', 'page.html', '--scenario', 'states.json', '--output-dir', out, '--preview', '--browser-engine', engine]);
+  await run(['import', 'page.html', '--html-scenario', 'states.json', '--output-dir', out, '--preview', '--html-browser-engine', engine]);
   const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')));
   expect(manifest.status).toBe('complete');
   expect(manifest.outputs.map(o => o.checkpoint)).toEqual(['initial', 'advanced']);
@@ -96,7 +96,7 @@ packagedTest.each(['puppeteer', 'playwright'])('installed import uses the extern
 
 packagedTest('bundled import supports a selected checkpoint with an exact file output', async () => {
   const output = path.join(dir, 'single.pagx');
-  await run(['import', '--input', 'page.html', '--scenario', 'states.json', '--checkpoint', 'advanced', '--output', output]);
+  await run(['import', '--input', 'page.html', '--html-scenario', 'states.json', '--html-checkpoint', 'advanced', '--output', output]);
   expect(fs.readFileSync(output, 'utf8')).toContain('Result: PAGX');
 });
 
@@ -115,7 +115,7 @@ packagedTest('installed native binary locates its bundled runtime without the np
     .map(platform => path.join(packageDir, 'bin', platform, process.platform === 'win32' ? 'pagx.exe' : 'pagx'))
     .find(file => fs.existsSync(file));
   const out = path.join(dir, 'direct-native');
-  await exec(executable, ['import', 'page.html', '--scenario', 'states.json', '--checkpoint', 'initial', '--output-dir', out],
+  await exec(executable, ['import', 'page.html', '--html-scenario', 'states.json', '--html-checkpoint', 'initial', '--output-dir', out],
     { cwd: dir, env: { ...env, PAGX_NODE_BIN: process.execPath }, timeout: 45000 });
   const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')));
   expect(manifest).toMatchObject({ status: 'complete', outputs: [{ checkpoint: 'initial', status: 'complete' }] });
@@ -127,7 +127,7 @@ packagedTest('installed native binary locates its bundled runtime without the np
     { type: 'waitFor', target: { css: '#never' }, state: 'visible', timeoutMs: 30000 },
     { type: 'capture', name: 'done' },
   ] }));
-  const child = spawn(process.execPath, [path.join(packageDir, 'bin/pagx.js'), 'import', 'page.html', '--scenario', plan, '--output-dir', out],
+  const child = spawn(process.execPath, [path.join(packageDir, 'bin/pagx.js'), 'import', 'page.html', '--html-scenario', plan, '--output-dir', out],
     { cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '', signalled = false;
   const timeout = setTimeout(() => child.kill('SIGKILL'), 15000);

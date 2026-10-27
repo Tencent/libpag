@@ -51,13 +51,13 @@ export function validateImportRequest(raw: unknown) {
   }
   const cookies = (options.cookies || []).map(value => {
     const at = value.indexOf('=');
-    if (at < 1 || /[\r\n\0]/.test(value)) throw new Error('--cookie expects name=value');
+    if (at < 1 || /[\r\n\0]/.test(value)) throw new Error('--html-cookie expects name=value');
     return { name: value.slice(0, at), value: value.slice(at + 1) };
   });
   const headers: Array<[string, string]> = (options.headers || []).map(value => {
     const at = value.indexOf(':');
     if (at < 1 || !/^[!#$%&'*+.^_`|~\w-]+$/.test(value.slice(0, at)) || /[\r\n\0]/.test(value))
-      throw new Error('--header expects Key: Value');
+      throw new Error('--html-header expects Key: Value');
     return [value.slice(0, at), value.slice(at + 1).trim()];
   });
   if ((cookies.length || headers.length) && req.inputs.some(source => !/^https?:\/\//.test(source.input)))
@@ -68,7 +68,7 @@ export function validateImportRequest(raw: unknown) {
     if (req.inputs.length !== 1) throw new Error('a scenario requires exactly one input');
     if (options.checkpoint) selectCheckpoint(scenario, options.checkpoint);
     if (engine !== 'playwright' && scenario.steps.some(step => step.target?.role))
-      throw new Error('Role locators require --browser-engine playwright');
+      throw new Error('Role locators require --html-browser-engine playwright');
   }
   if (req.operation === 'capture' && (!req.workDir || !path.isAbsolute(req.workDir)))
     throw new Error('capture requires an absolute work directory');

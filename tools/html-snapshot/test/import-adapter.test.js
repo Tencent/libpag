@@ -36,8 +36,9 @@ test('role locators are checked during inspect and credentials require URL input
   fs.writeFileSync(file, JSON.stringify({ version: 1, steps: [
     { type: 'click', target: { role: 'button', name: 'Open' } }, { type: 'capture', name: 'opened' },
   ] }));
-  expect(() => validateImportRequest({ ...request, options: { scenario: file } })).toThrow('playwright');
+  expect(() => validateImportRequest({ ...request, options: { scenario: file } })).toThrow('--html-browser-engine playwright');
   expect(() => validateImportRequest({ ...request, options: { scenario: file, browserEngine: 'playwright' } })).not.toThrow();
   expect(() => validateImportRequest({ ...request, options: { cookies: ['a=b'] } })).toThrow('URL');
-  expect(() => validateImportRequest({ ...request, options: { headers: ['invalid\n: value'] } })).toThrow('header');
+  expect(() => validateImportRequest({ ...request, options: { cookies: ['invalid'] } })).toThrow('--html-cookie expects name=value');
+  expect(() => validateImportRequest({ ...request, options: { headers: ['invalid\n: value'] } })).toThrow('--html-header expects Key: Value');
 });

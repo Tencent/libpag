@@ -41,18 +41,20 @@ struct ImportFormatOptions {
   bool svgPreserveUnknown = false;
   // HTML/URL inputs only: when true, the html-snapshot pre-pass is asked to
   // capture the page's animations (CSS @keyframes, Web Animations, GSAP,
-  // anime.js) into the subset (forwarded as `--capture-animations` to
-  // snapshot.js) so the importer can replay the motion. Off by default: the
-  // snapshot emits a single static frame.
+  // anime.js) into the subset (`pagx import --html-capture-animations`, forwarded as
+  // `--capture-animations` to standalone snapshot.js) so the importer can replay the motion.
+  // Off by default: the snapshot emits a single static frame.
   bool captureAnimations = false;
   // Replay an HTML interaction scenario and import one named static checkpoint.
+  // Public import flags are --html-scenario and --html-checkpoint; the standalone
+  // snapshot helper uses --scenario and --checkpoint.
   std::string scenario = {};
   std::string checkpoint = {};
 };
 
 /**
- * Parses format-specific options (e.g. --svg-*) from argv. Unrecognized arguments are
- * silently skipped.
+ * Parses the shared SVG importer flags used by resolve. Unrecognized arguments are
+ * silently skipped. Public import arguments are parsed by ParseImportRequest.
  */
 void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options);
 

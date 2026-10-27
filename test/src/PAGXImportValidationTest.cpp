@@ -19,29 +19,29 @@ CLI_TEST(PAGXImportValidationTest, ParsesAllBrowserOptionsAndRepeatedCredentials
                                   "out",
                                   "--output-name",
                                   "page",
-                                  "--browser-engine",
+                                  "--html-browser-engine",
                                   "playwright",
-                                  "--capture-animations",
-                                  "--scroll-reveal",
-                                  "--no-inline-icon-fonts",
-                                  "--download-fonts",
-                                  "--keep-snapshot",
+                                  "--html-capture-animations",
+                                  "--html-scroll-reveal",
+                                  "--html-no-inline-icon-fonts",
+                                  "--html-download-fonts",
+                                  "--html-keep-snapshot",
                                   "--embed-fonts",
-                                  "--cookie",
+                                  "--html-cookie",
                                   "a=1",
-                                  "--cookie",
+                                  "--html-cookie",
                                   "b=two=three",
-                                  "--header",
+                                  "--html-header",
                                   "X-A: 1",
-                                  "--header",
+                                  "--html-header",
                                   "X-B: 2",
-                                  "--viewport-width",
+                                  "--html-viewport-width",
                                   "16384",
-                                  "--viewport-height",
+                                  "--html-viewport-height",
                                   "1",
-                                  "--wait-ms",
+                                  "--html-wait-ms",
                                   "0",
-                                  "--selector",
+                                  "--html-selector",
                                   "#ready",
                                   "--images",
                                   "embed",
@@ -106,13 +106,17 @@ CLI_TEST(PAGXImportValidationTest, RejectsMalformedArgumentsWithSpecificDiagnost
       {{"a.html", "--format", "ppt"}, "html or svg"},
       {{"a.txt"}, "unsupported input format"},
       {{"a.html", "--html-source", "auto"}, "browser or snapshot"},
-      {{"a.html", "--browser-engine", "firefox"}, "unsupported --browser-engine"},
+      {{"a.html", "--html-browser-engine", "firefox"}, "unsupported --html-browser-engine"},
       {{"a.svg", "--svg-unknown"}, "unknown option"},
+      {{"a.html", "--html-unknown"}, "unknown option"},
+      {{"a.svg", "--html-keep-snapshot"}, "HTML options require HTML input"},
+      {{"a.svg", "--html-scenario", "s.json", "--output-dir", "out"},
+       "HTML options require HTML input"},
       {{"--batch", "input"}, "--batch requires --output-dir"},
       {{"--batch", "input", "--output-dir", "out", "--format", "svg"}, "batch infers"},
       {{"a.html", "--output-name", "a"}, "--output-name requires"},
-      {{"a.html", "--scenario", "s.json", "--output-dir", "out", "--html-source", "snapshot"},
-       "--scenario requires --html-source browser"},
+      {{"a.html", "--html-scenario", "s.json", "--output-dir", "out", "--html-source", "snapshot"},
+       "--html-scenario requires --html-source browser"},
       {{"https://example.test", "-o", "a.pagx", "--format", "svg"}, "URL input requires HTML"},
       {{"https://example.test", "-o", "a.pagx", "--html-source", "snapshot"}, "local file"},
       {{"https://example.test", "-o", "a.pagx", "--image-base-dir", "images"}, "local input"},
@@ -126,8 +130,8 @@ CLI_TEST(PAGXImportValidationTest, RejectsMalformedArgumentsWithSpecificDiagnost
     EXPECT_FALSE(ParseImportRequest(test.first, &options, &help, &error));
     EXPECT_NE(error.find(test.second), std::string::npos) << error;
   }
-  for (const auto& flag :
-       {"--viewport-width", "--viewport-height", "--wait-ms", "--preview-columns", "--scale"}) {
+  for (const auto& flag : {"--html-viewport-width", "--html-viewport-height", "--html-wait-ms",
+                           "--preview-columns", "--scale"}) {
     for (const auto& value : {"NaN", "inf", "abc", "1e999", "1x", "1000001"}) {
       SCOPED_TRACE(std::string(flag) + "=" + value);
       ImportRequest options;
@@ -140,19 +144,101 @@ CLI_TEST(PAGXImportValidationTest, RejectsMalformedArgumentsWithSpecificDiagnost
   }
 }
 
+CLI_TEST(PAGXImportValidationTest, LegacyHTMLFlagsReportTheirReplacement) {
+  const auto usage = ImportUsage();
+  for (const std::string flag :
+       {"--scenario", "--checkpoint", "--browser-engine", "--viewport-width", "--viewport-height",
+        "--wait-ms", "--selector", "--cookie", "--header", "--download-fonts",
+        "--capture-animations", "--scroll-reveal", "--no-inline-icon-fonts", "--keep-snapshot"}) {
+    SCOPED_TRACE(flag);
+    ImportRequest options;
+    bool help = false;
+    std::string error;
+    EXPECT_FALSE(ParseImportRequest({"a.html", flag}, &options, &help, &error));
+    const auto replacement = "--html-" + flag.substr(2);
+    EXPECT_EQ(error, flag + " has been renamed to " + replacement);
+    EXPECT_NE(usage.find(replacement), std::string::npos);
+    EXPECT_EQ(usage.find(flag), std::string::npos);
+  }
+}
+
+CLI_TEST(PAGXImportValidationTest, HTMLSingletonOptionsRejectDuplicates) {
+  for (const auto& extra :
+       std::vector<std::vector<std::string>>{{"--html-source", "browser"},
+                                             {"--html-scenario", "s.json"},
+                                             {"--html-checkpoint", "one"},
+                                             {"--html-browser-engine", "puppeteer"},
+                                             {"--html-viewport-width", "1400"},
+                                             {"--html-viewport-height", "900"},
+                                             {"--html-wait-ms", "0"},
+                                             {"--html-selector", "#ready"},
+                                             {"--html-capture-animations"},
+                                             {"--html-scroll-reveal"},
+                                             {"--html-no-inline-icon-fonts"},
+                                             {"--html-download-fonts"},
+                                             {"--html-keep-snapshot"}}) {
+    SCOPED_TRACE(extra.front());
+    std::vector<std::string> args = {"a.html"};
+    args.insert(args.end(), extra.begin(), extra.end());
+    args.insert(args.end(), extra.begin(), extra.end());
+    ImportRequest options;
+    bool help = false;
+    std::string error;
+    EXPECT_FALSE(ParseImportRequest(args, &options, &help, &error));
+    EXPECT_EQ(error, "duplicate option: " + extra.front());
+  }
+}
+
+CLI_TEST(PAGXImportValidationTest, HTMLNumericBoundsAndScenarioConflictsArePreserved) {
+  ImportRequest options;
+  bool help = false;
+  std::string error;
+  ASSERT_TRUE(ParseImportRequest({"a.html", "--html-viewport-width", "1", "--html-viewport-height",
+                                  "16384", "--html-wait-ms", "300000"},
+                                 &options, &help, &error))
+      << error;
+  EXPECT_EQ(options.browserOptions.at("viewport-width"), "1");
+  EXPECT_EQ(options.browserOptions.at("viewport-height"), "16384");
+  EXPECT_EQ(options.browserOptions.at("wait-ms"), "300000");
+  for (const auto& extra :
+       std::vector<std::vector<std::string>>{{"--html-viewport-width", "0"},
+                                             {"--html-viewport-height", "0"},
+                                             {"--html-viewport-width", "16385"},
+                                             {"--html-viewport-height", "16385"},
+                                             {"--html-wait-ms", "300001"},
+                                             {"--html-wait-ms", "0.5"}}) {
+    std::vector<std::string> args = {"a.html"};
+    args.insert(args.end(), extra.begin(), extra.end());
+    EXPECT_FALSE(ParseImportRequest(args, &options, &help, &error));
+    EXPECT_NE(error.find("invalid number for " + extra.front()), std::string::npos) << error;
+  }
+  for (const auto& extra : std::vector<std::vector<std::string>>{{"--html-viewport-width", "1400"},
+                                                                 {"--html-viewport-height", "900"},
+                                                                 {"--html-wait-ms", "0"},
+                                                                 {"--html-selector", "#ready"},
+                                                                 {"--html-capture-animations"},
+                                                                 {"--html-scroll-reveal"}}) {
+    std::vector<std::string> args = {"a.html", "--html-scenario", "s.json", "--output-dir", "out"};
+    args.insert(args.end(), extra.begin(), extra.end());
+    EXPECT_FALSE(ParseImportRequest(args, &options, &help, &error));
+    EXPECT_NE(error.find("--html-scenario owns"), std::string::npos) << error;
+    EXPECT_NE(error.find(extra.front()), std::string::npos) << error;
+  }
+}
+
 CLI_TEST(PAGXImportValidationTest, SnapshotRejectsEveryBrowserOnlyOption) {
   for (const auto& extra :
-       std::vector<std::vector<std::string>>{{"--capture-animations"},
-                                             {"--scroll-reveal"},
-                                             {"--download-fonts"},
-                                             {"--no-inline-icon-fonts"},
-                                             {"--cookie", "a=b"},
-                                             {"--header", "A: b"},
-                                             {"--selector", "#a"},
-                                             {"--viewport-width", "1"},
-                                             {"--viewport-height", "1"},
-                                             {"--wait-ms", "0"},
-                                             {"--browser-engine", "puppeteer"}}) {
+       std::vector<std::vector<std::string>>{{"--html-capture-animations"},
+                                             {"--html-scroll-reveal"},
+                                             {"--html-download-fonts"},
+                                             {"--html-no-inline-icon-fonts"},
+                                             {"--html-cookie", "a=b"},
+                                             {"--html-header", "A: b"},
+                                             {"--html-selector", "#a"},
+                                             {"--html-viewport-width", "1"},
+                                             {"--html-viewport-height", "1"},
+                                             {"--html-wait-ms", "0"},
+                                             {"--html-browser-engine", "puppeteer"}}) {
     SCOPED_TRACE(extra.front());
     std::vector<std::string> args = {"a.html", "--html-source", "snapshot"};
     args.insert(args.end(), extra.begin(), extra.end());

@@ -69,12 +69,12 @@ The browser captures the page's supported layout, paint, text and resources into
 The native importer converts it, resolves SVG/import directives and optimizes the document.
 PAGX is the default output; `--render` additionally writes `page.png`.
 
-- Set `--viewport-width` / `--viewport-height` to the intended CSS viewport (default 1400×900).
+- Set `--html-viewport-width` / `--html-viewport-height` to the intended CSS viewport (default 1400×900).
   Use `--scale` with rendering to change PNG resolution without changing the layout.
-- `--selector` waits for an element; `--wait-ms` adds a settle delay (default 800 ms).
+- `--html-selector` waits for an element; `--html-wait-ms` adds a settle delay (default 800 ms).
   For a specific application state, use a scenario with explicit readiness conditions.
-- Animation capture is off by default. Add `--capture-animations` for a playable timeline.
-- `--keep-snapshot` retains `page.subset.html` for inspection; the default does not retain it.
+- Animation capture is off by default. Add `--html-capture-animations` for a playable timeline.
+- `--html-keep-snapshot` retains `page.subset.html` for inspection; the default does not retain it.
 - `--no-resolve` keeps import directives. It conflicts with `--render`, `--preview` and
   `--embed-fonts`; resolve the document before subsequent rendering.
 
@@ -83,17 +83,17 @@ Examples below are independent. When intentionally regenerating an existing outp
 
 ```bash
 # A design with a fixed target viewport and portable resources.
-pagx import poster.html -o poster.pagx --viewport-width 1080 --viewport-height 1440 \
+pagx import poster.html -o poster.pagx --html-viewport-width 1080 --html-viewport-height 1440 \
   --embed-fonts --images embed --render --scale 2
 
 # A web page, with an explicit output filename.
 pagx import https://example.com/promo -o promo.pagx --render
 
 # A supported animation timeline.
-pagx import motion.html -o motion.pagx --capture-animations --render
+pagx import motion.html -o motion.pagx --html-capture-animations --render
 ```
 
-URL inputs accept repeatable `--cookie 'name=value'` and `--header 'Key: Value'` options.
+URL inputs accept repeatable `--html-cookie 'name=value'` and `--html-header 'Key: Value'` options.
 Local files are opened as `file:` URLs, so ordinary relative assets resolve against the HTML
 location. Apps needing HTTP-origin features should be served locally and imported by URL.
 
@@ -106,7 +106,7 @@ Browser font loading and portable PAGX font storage are separate steps:
 - `--embed-fonts` acquires web fonts and embeds shaped glyphs into the PAGX for use on other hosts.
   This is useful when the deliverable must reproduce the captured typography independently of
   installed fonts. It does not preserve downloaded font files unless requested separately.
-- `--download-fonts` also preserves acquired files under `<output-stem>.fonts/`. Use those files
+- `--html-download-fonts` also preserves acquired files under `<output-stem>.fonts/`. Use those files
   as `--fallback` inputs for later rendering or embedding. Check the actual family, weight and
   glyph coverage when a face differs from the browser result.
 
@@ -136,12 +136,12 @@ with `-o`. URL directory output additionally needs `--output-name`.
 ```bash
 pagx import https://example.com/promo --output-dir out --output-name promo --preview
 pagx import --batch pages --output-dir batch-out --render
-pagx import app.html --scenario states.json --output-dir states-out --preview
+pagx import app.html --html-scenario states.json --output-dir states-out --preview
 ```
 
 Batch mode recursively imports HTML/SVG inputs, preserves relative directories and isolates
 HTML browser contexts. It cannot be combined with a positional input, `--format`, `--output-name`
-or `--scenario`. See [Interaction capture](interaction.md) for scenario output selection.
+or `--html-scenario`. See [Interaction capture](interaction.md) for scenario output selection.
 
 Directory mode writes `manifest.json` with artifact paths relative to the manifest. Require both
 a successful exit code and top-level `status: "complete"`. Failed/cancelled jobs may retain completed
@@ -210,9 +210,9 @@ against the requested result rather than assuming every downgrade is harmless.
 | First HTML capture downloads a browser | Expected for the npm runtime; follow its printed instructions if automatic installation fails. |
 | Missing adapter, dependency or `dist` module in a checkout | Run setup, or install dependencies and rebuild `tools/html-snapshot`; check `PAGX_HTML_IMPORT_BIN` if overridden. |
 | Output already exists | Use a new destination, or `--overwrite` for an intentional regeneration. |
-| Blank or clipped PNG | Check viewport, readiness and warnings; use `--keep-snapshot` to inspect the captured content. |
+| Blank or clipped PNG | Check viewport, readiness and warnings; use `--html-keep-snapshot` to inspect the captured content. |
 | Wrong font / weight | Check that the intended faces loaded, use `--render` for captured-font rendering and `--embed-fonts` for portable output. |
 | Missing local asset | Check the HTML-relative path and browser access; use an HTTP URL when the application requires an HTTP origin. |
 | Missing chart | Wait for it to draw; canvas pixel capture also requires readable pixels. Use an SVG or image alternative when needed. |
-| Missing motion | Add `--capture-animations`, then inspect attachment/timing and supported channels in [Animation](animation.md). |
+| Missing motion | Add `--html-capture-animations`, then inspect attachment/timing and supported channels in [Animation](animation.md). |
 | Missing state or unsupported scenario content | Check explicit `waitFor` conditions and [capture boundaries](interaction.md#capture-boundaries); do not silently substitute another state. |

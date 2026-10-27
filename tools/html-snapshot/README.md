@@ -197,7 +197,7 @@ containing data URLs and captured CSS text. Missing resources can also trigger t
 viewport raster fallback. Runtime `FontFace` objects without a readable CSS declaration
 require that fallback. Browser-only collection does not include a fallback screenshot.
 
-Use `--download-fonts` for native render fallbacks, or `pagx import --embed-fonts` for portable
+Use `snapshot.js --download-fonts` for native render fallbacks, or `pagx import --embed-fonts` for portable
 PAGX fonts; structured snapshots warn when web fonts require this handling. `--download-images`
 writes captured image bytes to disk. These options also apply to scenario execution.
 The source application remains running during collection: `stableMs` detects visual
@@ -237,10 +237,10 @@ Use `pagx import` for both a selected checkpoint and the complete result set:
 ```bash
 # From the repository root.
 cmake-build-debug/pagx import tools/html-snapshot/test/fixtures/interaction.html \
-  --scenario tools/html-snapshot/test/fixtures/interaction.scenario.json \
-  --checkpoint advanced -o /tmp/advanced.pagx
+  --html-scenario tools/html-snapshot/test/fixtures/interaction.scenario.json \
+  --html-checkpoint advanced -o /tmp/advanced.pagx
 
-cmake-build-debug/pagx import page.html --scenario states.json --output-dir out --preview
+cmake-build-debug/pagx import page.html --html-scenario states.json --output-dir out --preview
 cmake-build-debug/pagx import page.html -o page.pagx --render
 cmake-build-debug/pagx import https://example.com --output-dir out --output-name demo
 cmake-build-debug/pagx import --batch pages --output-dir out --render
@@ -252,7 +252,7 @@ regardless of its number of checkpoints. Selected checkpoints execute prior acti
 before capturing, then stop. Exports are independent static documents.
 
 PAGX is the default output. `--render` adds PNGs, `--preview` adds PNGs and contact
-sheets, and `--keep-snapshot` keeps `.subset.html`. Preview works with ordinary
+sheets, and `--html-keep-snapshot` keeps `.subset.html`. Preview works with ordinary
 inputs, scenarios and batches. Directory mode writes `<base>.<checkpoint>.pagx`
 for scenarios, `<base>.pagx` for ordinary inputs, and `manifest.json` for the job.
 Batch inputs preserve relative directories and use isolated browser contexts.
@@ -272,8 +272,8 @@ within 320×480 thumbnails without cropping or upscaling; sheets paginate within
 4096-pixel edges and a 16-megapixel output budget. `--preview-columns` accepts 1–32.
 
 `--no-resolve` conflicts with rendering and font embedding. A scenario owns its
-viewport, waits and capture selection, so it rejects `--viewport-*`, `--wait-ms`,
-`--selector`, `--scroll-reveal`, `--capture-animations` and `--batch`. HTML-only
+viewport, waits and capture selection, so it rejects `--html-viewport-*`, `--html-wait-ms`,
+`--html-selector`, `--html-scroll-reveal`, `--html-capture-animations` and `--batch`. HTML-only
 options on SVG inputs are errors. `--dry-run` prints a validated JSON output plan
 without launching/installing browsers or creating output directories.
 
@@ -287,6 +287,9 @@ single-document library helper still uses `PAGX_HTML_SNAPSHOT_BIN` with HTML std
 The standalone `capture`/`html2pagx` entrypoints and duplicate orchestration have
 been removed. No compatibility flags or aliases are provided. See the
 [package import documentation](../../cli/npm/README.md) for the full output contract.
+All HTML-specific `pagx import` flags use `--html-`; see the
+[migration table](../../cli/npm/README.md#html-import-option-migration) for renamed options.
+The standalone `snapshot.js` options documented below keep their unprefixed names.
 
 For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
@@ -417,7 +420,7 @@ pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
 pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 ```
 
-`pagx import --download-fonts` wires all of this up automatically (see below).
+`pagx import --html-download-fonts` wires all of this up automatically (see below).
 
 **Caveats:**
 
@@ -438,14 +441,14 @@ pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 Use the native `pagx import` command above for complete conversion. For example:
 
 ```bash
-pagx import page.html -o page.pagx --render --keep-snapshot
+pagx import page.html -o page.pagx --render --html-keep-snapshot
 pagx import https://example.com/demo --output-dir /tmp/out --output-name demo \
-  --cookie session=abc123 --header 'X-User: alice' --embed-fonts
+  --html-cookie session=abc123 --html-header 'X-User: alice' --embed-fonts
 ```
 
 `--embed-fonts` acquires web fonts and embeds shaped glyphs. Rendering also acquires
 web fonts for accurate fallback, without embedding them by default.
-`--download-fonts` additionally preserves downloaded faces next to the output.
+`--html-download-fonts` additionally preserves downloaded faces next to the output.
 `--images external` writes image resources under `<stem>.assets/`; `embed` stores
 image bytes in the PAGX. `--no-resolve` only skips reference expansion, and never
 silently disables requested resource processing. Missing resources fail the import.
@@ -715,7 +718,9 @@ and is never Babel-compiled at runtime.
   `isolation`, `contain`) return `paint:animated-stacking`. The emitted paint order is static;
   captured opacity/transform channels retain their compositing groups.
 - Animation capture is **off by default** — the snapshot emits a single static
-  frame. Pass `--capture-animations` (`snapshot.js` / `pagx import`), set `captureAnimations: true` on the `runSnapshot` API, or send `captureAnimations: true` in the HTTP service's
+  frame. Pass `--capture-animations` to `snapshot.js` or `--html-capture-animations` to
+  `pagx import`, set `captureAnimations: true` on the `runSnapshot` API, or send
+  `captureAnimations: true` in the HTTP service's
   options to opt in. When enabled, animations are normalised into the canonical
   `@keyframes` + `animation` subset (`spec/html_subset.md` §13) so the importer
   can replay them. The capture pass (`lib/animation-capture.ts`) reads running

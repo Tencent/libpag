@@ -14,7 +14,7 @@ the authoritative subset reference is `spec/html_subset.md`.
 - [ ] Use SVG or icon fonts when an icon needs a predictable shape.
 - [ ] Real, selectable text for all copy (not text baked into images).
 - [ ] Choose ordinary capture, animation capture or a scenario to match the requested result.
-- [ ] Requested motion is attached at capture time, uses `--capture-animations`, and stays inside supported channels — `opacity`, `transform`
+- [ ] Requested motion is attached at capture time, uses `--html-capture-animations`, and stays inside supported channels — `opacity`, `transform`
       (translate/scale/rotate/skew), `color` / `background-color`, `filter` (drop-shadow/blur),
       `clip-path` (see §8 + `references/animation.md`).
 
@@ -28,7 +28,7 @@ For a fixed-size poster/card, set the `body` box to the target canvas:
 <body style="margin: 0; width: 1080px; height: 1440px;">
 ```
 
-- Match the converter's `--viewport-width` (and `--viewport-height` for tall designs) to these
+- Match the converter's `--html-viewport-width` (and `--html-viewport-height` for tall designs) to these
   numbers so the page is not clipped or letterboxed.
 - Design at 1× (real pixels). For crisp previews, render the PNG at a higher scale instead of
   inflating the canvas.
@@ -48,7 +48,7 @@ behavior blocked on `file:`). Keep assets available until conversion finishes.
   works because the page runs in a browser, but plain inline CSS is the most predictable.
 - **Fonts**: load the intended faces/weights with local `@font-face`, a stylesheet or an available
   system font. `pagx import --render` acquires web fonts for the preview; `--embed-fonts` embeds
-  shaped glyphs so the PAGX can reproduce the typography on other hosts. `--download-fonts` also
+  shaped glyphs so the PAGX can reproduce the typography on other hosts. `--html-download-fonts` also
   retains the acquired font files. See [Fonts and images](pipeline.md#fonts-and-images).
 
 ## 3. Layout
@@ -99,13 +99,13 @@ where it can preserve the captured result:
 
 - Chart libraries that draw on `<canvas>` (ECharts, Chart.js, D3-canvas) are captured as a static
   bitmap, so charts survive as a picture. If the chart animates in, give the page enough settle time
-  by raising the converter's `--wait-ms` option.
+  by raising the converter's `--html-wait-ms` option.
 - SVG-based charts (many D3 setups) convert as vectors, which is sharper — prefer them when
   available.
 
 ## 8. Animation
 
-With `--capture-animations`, supported CSS, GSAP, anime.js and Web Animations API motion can
+With `--html-capture-animations`, supported CSS, GSAP, anime.js and Web Animations API motion can
 become a PAGX timeline. Without that flag the output is static. Keep motion
 faithful by animating the channels the runtime can play — `opacity`, `transform` (translate, scale,
 rotate, skew), `color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and
@@ -170,6 +170,6 @@ Choose capture behavior based on the required appearance and editability:
 Convert with the selected `pagx` binary, matching the viewport and embedding fonts for portability:
 
 ```bash
-pagx import page.html -o page.pagx --viewport-width 640 --viewport-height 400 \
+pagx import page.html -o page.pagx --html-viewport-width 640 --html-viewport-height 400 \
   --embed-fonts --render
 ```

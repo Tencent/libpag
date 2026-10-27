@@ -386,8 +386,8 @@ export async function runSnapshot(
     // animation-capture machinery (virtual clock, transition recorder, WAAPI/
     // GSAP/anime.js sampler) runs. Callers that want the page's motion baked
     // into the subset as `@keyframes` + `animation` opt in via
-    // `captureAnimations: true` (surfaced as `--capture-animations` on the
-    // CLIs). See the init-script / sampler branches below.
+    // `captureAnimations: true` (`--html-capture-animations` on pagx import,
+    // `--capture-animations` on snapshot.js). See the init-script / sampler branches below.
     scrollReveal = false,
     downloadFonts = false,
     fontDir = '',

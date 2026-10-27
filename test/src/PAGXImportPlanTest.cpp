@@ -34,12 +34,15 @@ CLI_TEST(PAGXImportPlanTest, ExplicitOutputAndDefaults) {
 
 CLI_TEST(PAGXImportPlanTest, CardinalityDoesNotDependOnScenarioContents) {
   ImportRequest o;
-  EXPECT_FALSE(Parse({"page.html", "--scenario", "states.json", "-o", "one.pagx"}, &o));
-  EXPECT_TRUE(Parse({"page.html", "--scenario", "states.json", "--output-dir", "out"}, &o));
-  EXPECT_TRUE(Parse(
-      {"page.html", "--scenario", "states.json", "--checkpoint", "open", "-o", "one.pagx"}, &o));
-  EXPECT_FALSE(Parse({"page.html", "--checkpoint", "open"}, &o));
-  EXPECT_FALSE(Parse({"--batch", "pages", "--output-dir", "out", "--scenario", "s.json"}, &o));
+  EXPECT_FALSE(Parse({"page.html", "--html-scenario", "states.json", "-o", "one.pagx"}, &o));
+  EXPECT_TRUE(Parse({"page.html", "--html-scenario", "states.json", "--output-dir", "out"}, &o));
+  EXPECT_TRUE(o.hasHTMLOptions);
+  EXPECT_TRUE(Parse({"page.html", "--html-scenario", "states.json", "--html-checkpoint", "open",
+                     "-o", "one.pagx"},
+                    &o));
+  EXPECT_TRUE(o.hasHTMLOptions);
+  EXPECT_FALSE(Parse({"page.html", "--html-checkpoint", "open"}, &o));
+  EXPECT_FALSE(Parse({"--batch", "pages", "--output-dir", "out", "--html-scenario", "s.json"}, &o));
 }
 
 CLI_TEST(PAGXImportPlanTest, DependenciesAndFormatsAreValidated) {
@@ -55,11 +58,12 @@ CLI_TEST(PAGXImportPlanTest, DependenciesAndFormatsAreValidated) {
            {"page.html", "--render", "--scale", "2x"},
            {"page.html", "--preview-columns", "2"},
            {"page.html", "--preview", "--preview-columns", "1.5"},
-           {"icon.svg", "--browser-engine", "puppeteer"},
+           {"icon.svg", "--html-browser-engine", "puppeteer"},
            {"page.html", "--svg-no-expand-use"},
-           {"page.html", "--cookie", "a=b"},
-           {"page.html", "--html-source", "snapshot", "--scroll-reveal"},
-           {"page.html", "--scenario", "s.json", "--output-dir", "out", "--wait-ms", "0"}}) {
+           {"page.html", "--html-cookie", "a=b"},
+           {"page.html", "--html-source", "snapshot", "--html-scroll-reveal"},
+           {"page.html", "--html-scenario", "s.json", "--output-dir", "out", "--html-wait-ms",
+            "0"}}) {
     std::string error;
     EXPECT_FALSE(Parse(args, &o, &error)) << args.back();
     EXPECT_FALSE(error.empty());
@@ -128,7 +132,7 @@ CLI_TEST(PAGXImportPlanTest, PlannedCheckpointOrderAndSourceProtection) {
   std::ofstream(input) << "<html/>";
   ImportRequest o;
   ASSERT_TRUE(
-      Parse({input, "--scenario", "s.json", "--output-dir", (root / "out").u8string()}, &o));
+      Parse({input, "--html-scenario", "s.json", "--output-dir", (root / "out").u8string()}, &o));
   ImportPlan plan;
   std::string error;
   ASSERT_TRUE(BuildImportPlan(o, {"z", "a"}, &plan, &error)) << error;

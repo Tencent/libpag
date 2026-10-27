@@ -351,7 +351,7 @@ TEST_F(PAGXImportWorkflowTest, DownloadedFontsArePublishedByteForByte) {
       "if(req.operation === 'inspect') reply({checkpoints:[]}); else { "
       "const out = captured(); out.fonts = [" +
       JSON(font.u8string()).dump() + "]; reply({outputs:[out]}); }");
-  ASSERT_EQ(run({"--download-fonts"}), 0);
+  ASSERT_EQ(run({"--html-download-fonts"}), 0);
   auto fonts = manifest()["outputs"][0]["fonts"];
   ASSERT_EQ(fonts.size(), 1u);
   EXPECT_EQ(fonts[0], "page.fonts/1-NotoSansHebrew-Regular.ttf");
@@ -401,12 +401,12 @@ CLI_TEST(PAGXImportRuntimeTest, LibraryScenarioOptionsAreValidatedBeforeRunningS
   ImportFormatOptions options;
   options.checkpoint = "one";
   auto result = ImportFile("missing.html", "html", options);
-  EXPECT_NE(result.error.find("--checkpoint requires --scenario"), std::string::npos);
+  EXPECT_NE(result.error.find("checkpoint requires a scenario"), std::string::npos);
   options.scenario = "states.json";
   {
     ImportTestEnvironment enabled("PAGX_HTML_SNAPSHOT", "1");
     result = ImportFile("missing.svg", "svg", options);
-    EXPECT_NE(result.error.find("--scenario requires HTML"), std::string::npos);
+    EXPECT_NE(result.error.find("scenarios require HTML"), std::string::npos);
     options.captureAnimations = true;
     result = ImportFile("missing.html", "html", options);
     EXPECT_NE(result.error.find("cannot be combined"), std::string::npos);
@@ -422,9 +422,10 @@ TEST_F(PAGXImportWorkflowTest, BrowserOptionsAndCapturedMetadataReachTheManifest
 fs.writeFileSync(path.join(path.dirname(__filename), req.operation + '.json'), JSON.stringify(req));
 reply(req.operation === 'inspect' ? {checkpoints:[]} : {outputs:[captured()], errors:[]});
 )JS");
-  ASSERT_EQ(run({"--viewport-width", "640", "--viewport-height", "480", "--wait-ms", "0",
-                 "--selector", "#ready", "--keep-snapshot", "--verbose", "--images", "embed"}),
-            0);
+  ASSERT_EQ(
+      run({"--html-viewport-width", "640", "--html-viewport-height", "480", "--html-wait-ms", "0",
+           "--html-selector", "#ready", "--html-keep-snapshot", "--verbose", "--images", "embed"}),
+      0);
   auto request = ReadImportJSON(temp.path / "capture.json");
   EXPECT_EQ(request["options"]["viewportWidth"], 640);
   EXPECT_EQ(request["options"]["viewportHeight"], 480);
@@ -448,7 +449,8 @@ TEST_F(PAGXImportWorkflowTest, DryRunInspectsButDoesNotCaptureOrCreateOutputs) {
   adapter(
       "if(req.operation !== 'inspect') process.exit(31); reply({checkpoints:['later','first']});");
   testing::internal::CaptureStdout();
-  auto code = run({"--scenario", "states.json", "--preview", "--keep-snapshot", "--dry-run"});
+  auto code =
+      run({"--html-scenario", "states.json", "--preview", "--html-keep-snapshot", "--dry-run"});
   auto text = testing::internal::GetCapturedStdout();
   ASSERT_EQ(code, 0) << text;
   auto data = JSON::parse(text);
@@ -461,7 +463,7 @@ TEST_F(PAGXImportWorkflowTest, DryRunInspectsButDoesNotCaptureOrCreateOutputs) {
   adapter("process.exit(12);");
   EXPECT_EQ(run(), 2);
   EXPECT_FALSE(fs::exists(output));
-  EXPECT_EQ(run({"--scenario", "states.json"}), 2);
+  EXPECT_EQ(run({"--html-scenario", "states.json"}), 2);
 }
 
 TEST_F(PAGXImportWorkflowTest, PartialCapturesKeepCompletedArtifactsAndReportEveryFailure) {
@@ -469,7 +471,7 @@ TEST_F(PAGXImportWorkflowTest, PartialCapturesKeepCompletedArtifactsAndReportEve
 if (req.operation === 'inspect') reply({checkpoints:['first','missing']});
 else { reply({outputs:[captured('0','first')], errors:[{id:'0',error:'interaction failed'}]}); process.exitCode=1; }
 )JS");
-  EXPECT_EQ(run({"--scenario", "states.json"}), 1);
+  EXPECT_EQ(run({"--html-scenario", "states.json"}), 1);
   auto data = manifest();
   EXPECT_EQ(data["status"], "failed");
   EXPECT_EQ(data["outputs"][0]["status"], "complete");
@@ -559,7 +561,7 @@ else {
             0);
   EXPECT_EQ(manifest()["preview"]["pages"][0]["items"], JSON::array({"nested/icon.svg"}));
   output = temp.path / "states";
-  ASSERT_EQ(run({"--scenario", "states.json", "--preview"}), 0);
+  ASSERT_EQ(run({"--html-scenario", "states.json", "--preview"}), 0);
   auto data = manifest();
   EXPECT_EQ(data["outputs"][0]["checkpoint"], "second");
   EXPECT_EQ(data["outputs"][1]["checkpoint"], "first");

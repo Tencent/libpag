@@ -4,7 +4,7 @@ Use this workflow when the requested design is a particular UI state reached by 
 typing, hovering, focusing or scrolling. A version-1 scenario replays actions on one page and
 exports named checkpoints as independent **static** PAGX documents. It does not export event
 handlers, application state machines or an interactive application. For playable motion use
-[Animation](animation.md); `--scenario` and `--capture-animations` are mutually exclusive.
+[Animation](animation.md); `--html-scenario` and `--html-capture-animations` are mutually exclusive.
 
 ## Write a scenario
 
@@ -34,7 +34,7 @@ Save as `states.json` and adapt the locators, expected text and viewport to the 
 Actions run against the source application; choose only actions within the user's task.
 
 Targets specify exactly one of `css`, `testId` or `role`. `testId` matches `data-testid`.
-`role` requires `--browser-engine playwright` and can have an exact accessible `name`.
+`role` requires `--html-browser-engine playwright` and can have an exact accessible `name`.
 An optional `frame` CSS selector scopes the target to one iframe; capturing iframe content
 still has the limitations below.
 
@@ -63,20 +63,20 @@ capturing continuously moving content. The viewport defaults to 1400×900 if omi
 
 ```bash
 # All checkpoints, with a manifest, PNGs and a contact sheet.
-pagx import app.html --scenario states.json --output-dir out --preview
+pagx import app.html --html-scenario states.json --output-dir out --preview
 
 # One checkpoint; executes preceding actions, then stops at that capture.
-pagx import app.html --scenario states.json --checkpoint filled -o filled.pagx --render
+pagx import app.html --html-scenario states.json --html-checkpoint filled -o filled.pagx --render
 ```
 
-Without `--checkpoint`, a scenario always requires `--output-dir`, even if it has only one
+Without `--html-checkpoint`, a scenario always requires `--output-dir`, even if it has only one
 capture. Directory output uses `<base>.<checkpoint>.pagx`; a URL also requires `--output-name`.
 Use `--embed-fonts` and/or `--images embed` when portable resources are required. Otherwise,
 keep any `.assets/` directories with their PAGX files.
 
 All steps share one isolated page session. Captures do not reload the page, and selected
 checkpoints do not run later actions. The scenario owns its viewport and waits, so it rejects
-`--viewport-*`, `--wait-ms`, `--selector`, `--scroll-reveal`, `--capture-animations` and `--batch`.
+`--html-viewport-*`, `--html-wait-ms`, `--html-selector`, `--html-scroll-reveal`, `--html-capture-animations` and `--batch`.
 Use scenario fields/steps for those state-selection needs.
 
 Use `--dry-run` to validate the output plan before capture; it does not establish that locators

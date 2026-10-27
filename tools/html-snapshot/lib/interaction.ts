@@ -157,7 +157,7 @@ export function selectCheckpoint(scenario: Scenario, checkpoint?: string): strin
     if (!names.includes(checkpoint)) throw new Error(`Unknown checkpoint '${checkpoint}'`);
     return checkpoint;
   }
-  if (names.length !== 1) throw new Error('Multiple checkpoints: select one with --checkpoint (HTTP: options.checkpoint), or use pagx import --output-dir for all states');
+  if (names.length !== 1) throw new Error('Multiple checkpoints: select one with the checkpoint option, or use pagx import --output-dir for all states');
   return names[0];
 }
 
@@ -169,7 +169,7 @@ function selector(target: Target): string {
   // with control characters represented as CSS hex escapes.
   if (target.testId) return `[data-testid="${target.testId.replace(/[\\"\n\r\f]/g,
     c => `\\${c.codePointAt(0)!.toString(16)} `)}"]`;
-  throw new Error('Role locators require --browser-engine playwright');
+  throw new Error("Role locators require the 'playwright' browser engine");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -364,7 +364,7 @@ export async function runScenario(
   const { browser, engine } = engineHandle;
   const resourceCapture = new StateResources(engine, options.log);
   if (engine !== 'playwright' && scenario.steps.some(s => s.target?.role)) {
-    throw new Error('Role locators require --browser-engine playwright');
+    throw new Error("Role locators require the 'playwright' browser engine");
   }
   const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
   let mirror: EngineWrapper | undefined;

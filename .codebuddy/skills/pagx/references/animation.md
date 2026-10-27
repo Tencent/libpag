@@ -4,11 +4,11 @@ The converter can capture supported page motion as a PAGX animation timeline. An
 is **off by default** in both repository and npm workflows. Enable it explicitly:
 
 ```bash
-pagx import motion.html -o motion.pagx --capture-animations --render
+pagx import motion.html -o motion.pagx --html-capture-animations --render
 ```
 
-Use `--overwrite` when intentionally regenerating existing outputs. `--scenario` captures static
-interaction states and cannot be combined with `--capture-animations`; see
+Use `--overwrite` when intentionally regenerating existing outputs. `--html-scenario` captures static
+interaction states and cannot be combined with `--html-capture-animations`; see
 [Interaction capture](interaction.md). For prepared subset input, enable capture in the preceding
 snapshot step and import with `--html-source snapshot` without the animation-capture flag.
 
@@ -104,7 +104,7 @@ Add these on top of the static rules in `authoring-html.md`:
 - **Keep animated properties inside the playable set above.** Layout properties and 3D transforms
   become static. Re-express a size change as `scale`, a 3D flip as a 2D `rotate`/`scaleX`.
 - **Make the motion available at capture time.** Ordinary animation capture does not execute a
-  scenario's clicks or hovers. Use motion attached on load, or `--scroll-reveal` for scroll-triggered
+  scenario's clicks or hovers. Use motion attached on load, or `--html-scroll-reveal` for scroll-triggered
   content. If the request is for the static appearance after an interaction, use a scenario instead.
 - **Make looping motion `infinite`** so it is captured reliably and so the PAGX loops (a finite
   count > 1 is downgraded to play once — see below).
@@ -185,9 +185,9 @@ when conversion succeeds; compare the sampled frames with the intended behavior.
 | `subset:animation-multiple` | A regular element had several comma-separated animations (or timing functions); only the first was kept. Split into separate elements, or use an inline SVG shape (which supports a list). |
 | `subset:animation-finite-count` | A finite repeat count > 1 (or a finite `alternate`, or count `0`) was downgraded / suppressed. Use `infinite` to loop. |
 | `subset:animation-unknown-keyframes` | The `animation` referenced a `@keyframes` name that no longer exists; the animation was dropped. |
-| The element does not move in the preview | Check `--capture-animations` and render at distinct `--time` values. Then check whether the animation was attached at capture time, needed a trigger, or used an unsupported property. |
+| The element does not move in the preview | Check `--html-capture-animations` and render at distinct `--time` values. Then check whether the animation was attached at capture time, needed a trigger, or used an unsupported property. |
 | A rotate/scale "takes the short way" or snaps | Matrix interpolation cannot cross ±180° or a full turn in one segment; add intermediate `@keyframes` stops (`0% / 50% / 100%`). |
 | Color animation does nothing | The element paints no solid `color` / `background-color`; add one. |
 | A `clip-path` reveal is dropped | The keyframes animate between different shape functions (e.g. `circle()` → `polygon()`); CSS only interpolates matching shapes. Keep every stop the same function with the same point count. |
 | `paint:animated-stacking` | The animation changes stacking topology (for example `z-index` or `display`); exported paint order remains static. Use a fixed stacking structure or capture the desired static states separately. |
-| Want a purely static `.pagx` | Import the original HTML without `--capture-animations`. Use a scenario for a particular interaction state. |
+| Want a purely static `.pagx` | Import the original HTML without `--html-capture-animations`. Use a scenario for a particular interaction state. |

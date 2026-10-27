@@ -352,14 +352,14 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
       isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
   bool snapshotEnabled = HTMLSnapshotEnabled();
   if (!formatOptions.checkpoint.empty() && formatOptions.scenario.empty()) {
-    result.error = "--checkpoint requires --scenario";
+    result.error = "checkpoint requires a scenario";
     return result;
   }
   if (!formatOptions.scenario.empty() &&
       (effectiveFormat != "html" || !snapshotEnabled || formatOptions.captureAnimations)) {
     result.error =
-        "--scenario requires HTML with the snapshot pre-pass enabled and cannot be "
-        "combined with --capture-animations";
+        "interaction scenarios require HTML with the snapshot pre-pass enabled and cannot be "
+        "combined with animation capture";
     return result;
   }
   if (isUrl && !snapshotEnabled) {

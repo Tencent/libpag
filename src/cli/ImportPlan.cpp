@@ -79,7 +79,7 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
       }
       if (flag == "-o") flag = "--output";
       if (flag == "-v") flag = "--verbose";
-      if (flag != "--cookie" && flag != "--header")
+      if (flag != "--html-cookie" && flag != "--html-header")
         Require(seen.insert(flag).second, "duplicate option: " + flag);
       auto value = [&]() {
         Require(i + 1 < args.size() && !args[i + 1].empty() && args[i + 1][0] != '-',
@@ -113,10 +113,6 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
         o.batch = value();
       else if (flag == "--format")
         o.format = value();
-      else if (flag == "--scenario")
-        o.scenario = value();
-      else if (flag == "--checkpoint")
-        o.checkpoint = value();
       else if (flag == "--images") {
         auto mode = value();
         Require(mode == "external" || mode == "embed", "--images expects external or embed");
@@ -151,32 +147,51 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
           o.formatOptions.svgPreserveUnknown = true;
         else
           throw std::runtime_error("unknown option: " + flag);
-      } else {
+      } else if (flag.rfind("--html-", 0) == 0) {
         htmlFlags = true;
         if (flag == "--html-source") o.htmlSource = value();
-        else if (flag == "--browser-engine")
+        else if (flag == "--html-scenario")
+          o.scenario = value();
+        else if (flag == "--html-checkpoint")
+          o.checkpoint = value();
+        else if (flag == "--html-browser-engine")
           o.browserEngine = value();
-        else if (flag == "--keep-snapshot")
+        else if (flag == "--html-keep-snapshot")
           o.keepSnapshot = true;
-        else if (flag == "--capture-animations")
+        else if (flag == "--html-capture-animations")
           o.captureAnimations = true;
-        else if (flag == "--scroll-reveal")
+        else if (flag == "--html-scroll-reveal")
           o.scrollReveal = true;
-        else if (flag == "--no-inline-icon-fonts")
+        else if (flag == "--html-no-inline-icon-fonts")
           o.inlineIconFonts = false;
-        else if (flag == "--download-fonts")
+        else if (flag == "--html-download-fonts")
           o.downloadFonts = true;
-        else if (flag == "--cookie")
+        else if (flag == "--html-cookie")
           o.cookies.push_back(value());
-        else if (flag == "--header")
+        else if (flag == "--html-header")
           o.headers.push_back(value());
-        else if (flag == "--selector")
+        else if (flag == "--html-selector")
           o.browserOptions["selector"] = value();
-        else if (flag == "--viewport-width" || flag == "--viewport-height" || flag == "--wait-ms") {
-          auto n = number(flag == "--wait-ms" ? 0 : 1, flag == "--wait-ms" ? 300000 : 16384, true);
-          o.browserOptions[flag.substr(2)] = std::to_string(static_cast<int>(n));
-        } else
+        else if (flag == "--html-viewport-width")
+          o.browserOptions["viewport-width"] =
+              std::to_string(static_cast<int>(number(1, 16384, true)));
+        else if (flag == "--html-viewport-height")
+          o.browserOptions["viewport-height"] =
+              std::to_string(static_cast<int>(number(1, 16384, true)));
+        else if (flag == "--html-wait-ms")
+          o.browserOptions["wait-ms"] = std::to_string(static_cast<int>(number(0, 300000, true)));
+        else
           throw std::runtime_error("unknown option: " + flag);
+      } else {
+        static const std::set<std::string> renamedHTMLOptions = {
+            "--scenario",           "--checkpoint",      "--browser-engine",
+            "--viewport-width",     "--viewport-height", "--wait-ms",
+            "--selector",           "--cookie",          "--header",
+            "--capture-animations", "--scroll-reveal",   "--no-inline-icon-fonts",
+            "--download-fonts",     "--keep-snapshot"};
+        if (renamedHTMLOptions.count(flag))
+          throw std::runtime_error(flag + " has been renamed to --html-" + flag.substr(2));
+        throw std::runtime_error("unknown option: " + flag);
       }
     }
     Require(o.input.empty() != o.batch.empty(), "specify one input or --batch <directory>");
@@ -187,24 +202,26 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
     Require(o.htmlSource == "browser" || o.htmlSource == "snapshot",
             "--html-source expects browser or snapshot");
     Require(o.browserEngine == "puppeteer" || o.browserEngine == "playwright",
-            "unsupported --browser-engine");
+            "unsupported --html-browser-engine");
     Require(
         o.outputName.empty() || (!o.outputDir.empty() && o.batch.empty() && SafeName(o.outputName)),
         "--output-name requires --output-dir, a single input and a safe basename");
-    Require(o.checkpoint.empty() || !o.scenario.empty(), "--checkpoint requires --scenario");
+    Require(o.checkpoint.empty() || !o.scenario.empty(),
+            "--html-checkpoint requires --html-scenario");
     if (!o.batch.empty()) {
       Require(!o.outputDir.empty(), "--batch requires --output-dir");
-      Require(o.scenario.empty(), "--batch cannot be combined with --scenario");
+      Require(o.scenario.empty(), "--batch cannot be combined with --html-scenario");
       Require(o.format.empty(),
               "--format is only valid with a single input; batch infers each file's format");
     }
     if (!o.scenario.empty()) {
       Require(!o.outputDir.empty() || (!o.output.empty() && !o.checkpoint.empty()),
-              "--scenario requires --output-dir, or --checkpoint with --output");
+              "--html-scenario requires --output-dir, or --html-checkpoint with --output");
       Require(!o.captureAnimations && !o.scrollReveal && o.browserOptions.empty(),
-              "--scenario owns viewport, waiting and capture selection; it cannot be combined with "
-              "animation/scroll/viewport/wait/selector options");
-      Require(o.htmlSource == "browser", "--scenario requires --html-source browser");
+              "--html-scenario owns viewport, waiting and capture selection; it cannot be combined "
+              "with --html-capture-animations, --html-scroll-reveal, --html-viewport-width, "
+              "--html-viewport-height, --html-wait-ms or --html-selector");
+      Require(o.htmlSource == "browser", "--html-scenario requires --html-source browser");
     }
     o.render = o.render || o.preview;
     Require(o.resolve || (!o.render && !o.embedFonts),
@@ -213,19 +230,18 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
     Require(!seen.count("--scale") || o.render, "--scale requires --render or --preview");
     if (!o.input.empty()) {
       auto format = Format(o.input, o.format);
-      Require(format == "html" || (!htmlFlags && o.scenario.empty()),
-              "HTML options require HTML input");
+      Require(format == "html" || !htmlFlags, "HTML options require HTML input");
       Require(format == "svg" || !svgFlags, "SVG options require SVG input");
     }
     if (o.htmlSource == "snapshot") {
       Require(!IsImportURL(o.input), "snapshot input must be a local file");
       Require(!o.captureAnimations && !o.scrollReveal && !o.downloadFonts && o.inlineIconFonts &&
                   o.cookies.empty() && o.headers.empty() && o.browserOptions.empty() &&
-                  !seen.count("--browser-engine"),
+                  !seen.count("--html-browser-engine"),
               "browser options cannot be used with --html-source snapshot");
     }
     Require((o.cookies.empty() && o.headers.empty()) || IsImportURL(o.input),
-            "--cookie and --header require a URL input");
+            "--html-cookie and --html-header require a URL input");
     if (IsImportURL(o.input)) {
       Require(o.imageBaseDir.empty(), "--image-base-dir requires a local input");
       Require(!o.output.empty() || (!o.outputDir.empty() && !o.outputName.empty()),
@@ -378,38 +394,40 @@ Import SVG, HTML or web interaction states as PAGX.
   --output-dir <directory>      Result set, including manifest.json; exclusive with -o
   --output-name <name>          Basename in directory mode; required for URL input
   --input <file|url>            Alternative to the positional input
-  --format html|svg            Force a single input's format
-  --batch <directory>          Recursively import HTML/SVG, preserving relative directories
-  --scenario <file.json>        Capture all named states in one HTML session; needs --output-dir
-  --checkpoint <name>          Capture one state; also permits --output <file>
-  --render                     Also render PNG files (default: PAGX only)
-  --preview                    Render PNGs and an ordered contact sheet
+  --format html|svg             Force a single input's format
+  --batch <directory>           Recursively import HTML/SVG, preserving relative directories
+  --render                      Also render PNG files (default: PAGX only)
+  --preview                     Render PNGs and an ordered contact sheet
   --preview-columns <1..32>     Contact sheet columns (default: automatic)
   --scale <number>              PNG render scale; requires --render or --preview
-  --keep-snapshot              Keep captured .subset.html files
-  --no-resolve                 Keep import directives; conflicts with rendering/font embedding
-  --images external|embed      Final image storage (default: external)
+  --no-resolve                  Keep import directives; conflicts with rendering/font embedding
+  --images external|embed       Final image storage (default: external)
   --image-base-dir <directory>  Override local relative image lookup
-  --embed-fonts                Embed shaped fonts; acquire web fonts for HTML
-  --overwrite                  Replace planned outputs; never clear the output directory
-  --dry-run                    Print the output plan without capturing or writing outputs
-  --verbose, -v                Print conversion warnings
-  --help, -h                   Show this help without loading Node or a browser
+  --embed-fonts                 Embed shaped fonts; acquire web fonts for HTML
+  --overwrite                   Replace planned outputs; never clear the output directory
+  --dry-run                     Print the output plan without capturing or writing outputs
+  --verbose, -v                 Print conversion warnings
+  --help, -h                    Show this help without loading Node or a browser
 
 HTML options:
-  --html-source browser|snapshot  Browser document (default) or prepared local subset
-  --browser-engine puppeteer|playwright
-  --viewport-width <pixels>    Initial viewport width
-  --viewport-height <pixels>   Initial viewport height
-  --wait-ms <milliseconds>     Additional settling time
-  --selector <css>             Wait for a selector before capture
-  --cookie <name=value>        URL cookie (repeatable)
-  --header <Key: Value>        URL request header (repeatable)
-  --download-fonts             Acquire and preserve web fonts in <output-stem>.fonts/
-  --capture-animations         Capture supported animations; exclusive with --scenario
-  --scroll-reveal              Trigger scroll-based content before capture
-  --no-inline-icon-fonts       Disable webfont icon conversion
+  --html-source browser|snapshot   Browser document (default) or prepared local subset
+  --html-scenario <file.json>      Capture all named states; requires --output-dir unless
+                                   --html-checkpoint selects one state with --output
+  --html-checkpoint <name>         Select one state from --html-scenario
+  --html-browser-engine <engine>   puppeteer (default) or playwright
+  --html-viewport-width <pixels>   Initial viewport width (1..16384)
+  --html-viewport-height <pixels>  Initial viewport height (1..16384)
+  --html-wait-ms <milliseconds>    Additional settling time (0..300000)
+  --html-selector <css>            Wait for a selector before capture
+  --html-cookie <name=value>       URL cookie (repeatable)
+  --html-header <Key: Value>       URL request header (repeatable)
+  --html-download-fonts            Acquire and preserve web fonts in <output-stem>.fonts/
+  --html-capture-animations        Capture supported animations; exclusive with --html-scenario
+  --html-scroll-reveal             Trigger scroll-based content before capture
+  --html-no-inline-icon-fonts      Disable webfont icon conversion
+  --html-keep-snapshot             Preserve captured or prepared .subset.html files
   Scenario files own their viewport, waits and capture selection.
+  Browser capture options require --html-source browser.
 
 SVG options:
   --svg-no-expand-use

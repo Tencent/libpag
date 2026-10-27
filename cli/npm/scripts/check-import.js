@@ -30,7 +30,7 @@ function checkImportPackage(directory) {
   const version = run(['--version']).trim();
   if (version !== `pagx ${pkg.version}`) throw new Error(`native version ${version} does not match package ${pkg.version}`);
   const help = run(['import', '--help']);
-  if (!help.includes('pagx import') || !help.includes('--scenario') || !help.includes('--preview')) {
+  if (!help.includes('pagx import') || !help.includes('--html-scenario') || !help.includes('--preview')) {
     throw new Error('native CLI or import runtime is outdated: import help is incomplete');
   }
   if (run(['--help']).includes('  capture ')) throw new Error('native CLI still exposes removed capture command');

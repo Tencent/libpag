@@ -25,7 +25,13 @@ const svg = file => { fs.writeFileSync(file, '<svg width="32" height="24"><rect 
 
 nativeTest('help and SVG conversion/rendering do not need Node or Chromium', async () => {
   const env = { PAGX_NODE_BIN: '/absent/node', PAGX_HTML_IMPORT_BIN: '/absent/adapter' };
-  expect((await run(['--help'], env)).stdout).toContain('--output-dir');
+  const help = (await run(['--help'], env)).stdout;
+  expect(help).toContain('--output-dir');
+  expect(help).toContain('--html-scenario');
+  expect(help).not.toContain('--scenario');
+  await expect(run(['page.html', '--scenario', 'states.json'], env)).rejects.toMatchObject({
+    code: 2, stderr: expect.stringContaining('--scenario has been renamed to --html-scenario'),
+  });
   const input = svg(path.join(dir, 'icon.svg'));
   await run([input, '-o', 'icon.pagx', '--render'], env);
   expect(read(path.join(dir, 'icon.pagx'))).toContain('<pagx');
@@ -38,22 +44,22 @@ nativeTest('help and SVG conversion/rendering do not need Node or Chromium', asy
 
 nativeTest('scenario dry-run validates and plans all checkpoints without browser or output mutations', async () => {
   const out = path.join(dir, 'out');
-  const result = await run([fixture, '--scenario', scenario, '--output-dir', out, '--preview', '--dry-run'],
+  const result = await run([fixture, '--html-scenario', scenario, '--output-dir', out, '--preview', '--dry-run'],
     { PUPPETEER_EXECUTABLE_PATH: '/absent/browser' });
   const plan = JSON.parse(result.stdout);
   expect(plan.status).toBe('planned');
   expect(plan.outputs.map(o => o.checkpoint)).toEqual(['initial', 'advanced']);
   expect(fs.existsSync(out)).toBe(false);
-  await expect(run([fixture, '--scenario', scenario, '-o', 'one.pagx']))
+  await expect(run([fixture, '--html-scenario', scenario, '-o', 'one.pagx']))
     .rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('--output-dir') });
-  await expect(run([fixture, '--scenario', scenario, '--checkpoint', 'absent', '--output-dir', out]))
+  await expect(run([fixture, '--html-scenario', scenario, '--html-checkpoint', 'absent', '--output-dir', out]))
     .rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown checkpoint') });
   expect(fs.existsSync(out)).toBe(false);
 });
 
 nativeTest('scenario exports all states and preview uses only this run, including after overwrite', async () => {
   const out = path.join(dir, 'out');
-  await run([fixture, '--scenario', scenario, '--output-dir', out, '--preview', '--keep-snapshot'],
+  await run([fixture, '--html-scenario', scenario, '--output-dir', out, '--preview', '--html-keep-snapshot'],
     { PAGX_BIN: '/wrong/version', PAGX_HTML_SNAPSHOT: '0' });
   let data = manifest(out);
   expect(data.status).toBe('complete');
@@ -63,7 +69,7 @@ nativeTest('scenario exports all states and preview uses only this run, includin
   const second = PNG.sync.read(fs.readFileSync(path.join(out, data.outputs[1].png)));
   expect(first.data.equals(second.data)).toBe(false);
   expect(read(path.join(out, data.outputs[1].snapshot))).toContain('PAGX');
-  await run([fixture, '--scenario', scenario, '--checkpoint', 'advanced', '--output-dir', out, '--preview', '--overwrite']);
+  await run([fixture, '--html-scenario', scenario, '--html-checkpoint', 'advanced', '--output-dir', out, '--preview', '--overwrite']);
   data = manifest(out);
   expect(data.outputs.map(o => o.checkpoint)).toEqual(['advanced']);
   expect(data.preview.pages[0].items).toEqual(['advanced']);
@@ -72,7 +78,7 @@ nativeTest('scenario exports all states and preview uses only this run, includin
 
 nativeTest.each(['puppeteer', 'playwright'])('single checkpoint with %s has an exact file target and no default PNG', async engine => {
   const out = path.join(dir, 'selected.pagx');
-  await run([fixture, '--scenario', scenario, '--checkpoint', 'advanced', '-o', out, '--browser-engine', engine]);
+  await run([fixture, '--html-scenario', scenario, '--html-checkpoint', 'advanced', '-o', out, '--html-browser-engine', engine]);
   expect(read(out)).toContain('PAGX');
   expect(fs.existsSync(path.join(dir, 'selected.png'))).toBe(false);
   expect(fs.readdirSync(dir)).toEqual(['selected.pagx']);
@@ -91,7 +97,7 @@ nativeTest('URL scenario visits the source once; preview does not revisit it', a
     fs.writeFileSync(states, JSON.stringify({ version: 1, viewport: { width: 320, height: 200 }, steps: [
       { type: 'capture', name: 'initial' }, { type: 'click', target: { css: '#next' } }, { type: 'capture', name: 'done' },
     ] }));
-    await run([`http://127.0.0.1:${server.address().port}/`, '--output-name', 'web', '--scenario', states,
+    await run([`http://127.0.0.1:${server.address().port}/`, '--output-name', 'web', '--html-scenario', states,
       '--output-dir', out, '--preview']);
     expect(visits).toBe(1);
     expect(manifest(out).preview.pages[0].items).toEqual(['initial', 'done']);
@@ -105,7 +111,7 @@ nativeTest('failed later scenario step preserves already captured exports and ma
     { type: 'waitFor', target: { css: '#never' }, state: 'visible', timeoutMs: 50 },
     { type: 'capture', name: 'unreachable' },
   ] }));
-  await expect(run([fixture, '--scenario', states, '--output-dir', out])).rejects.toMatchObject({ code: 1 });
+  await expect(run([fixture, '--html-scenario', states, '--output-dir', out])).rejects.toMatchObject({ code: 1 });
   const data = manifest(out);
   expect(data.status).toBe('failed');
   expect(data.outputs.map(o => o.status)).toEqual(['complete', 'failed']);
@@ -143,8 +149,9 @@ nativeTest('prepared HTML resolves original relative resources and honors both i
   const subset = path.join(input, 'page.html');
   fs.writeFileSync(subset, '<html><body style="width:20px;height:20px"><img src="pixel.png" style="width:20px;height:20px"/></body></html>');
   const env = { PAGX_NODE_BIN: '/absent/node' };
-  await run([subset, '--html-source', 'snapshot', '--output-dir', out, '--render'], env);
+  await run([subset, '--html-source', 'snapshot', '--output-dir', out, '--render', '--html-keep-snapshot'], env);
   let data = manifest(out);
+  expect(read(path.join(out, data.outputs[0].snapshot))).toBe(read(subset));
   expect(data.outputs[0].assets).toHaveLength(1);
   expect(read(path.join(out, 'page.pagx'))).toContain('page.assets/image-1.png');
   expect(fs.existsSync(path.join(out, data.outputs[0].assets[0]))).toBe(true);
@@ -174,7 +181,7 @@ nativeTest('existing files require overwrite, and failed imports preserve the ol
   fs.writeFileSync(states, JSON.stringify({ version: 1, steps: [
     { type: 'waitFor', target: { css: '#never' }, state: 'visible', timeoutMs: 30000 }, { type: 'capture', name: 'done' },
   ] }));
-  const child = spawn(pagx, ['import', fixture, '--scenario', states, '--output-dir', out], {
+  const child = spawn(pagx, ['import', fixture, '--html-scenario', states, '--output-dir', out], {
     env: { ...process.env, PAGX_NODE_BIN: process.execPath }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stderr = '', signalled = false;
