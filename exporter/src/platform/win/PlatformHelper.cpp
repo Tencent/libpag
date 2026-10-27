@@ -18,6 +18,7 @@
 #include "platform/PlatformHelper.h"
 #include <shlobj.h>
 #include <windows.h>
+#include <QWindow>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -111,6 +112,26 @@ bool IsAEWindowActive() {
   GetClassNameA(foreground, className, sizeof(className));
   std::string name = className;
   return name.find_first_of("AE") == 0;
+}
+
+void AttachWindowToAEMainWindow(QWindow* window) {
+  if (window == nullptr) {
+    return;
+  }
+  auto hwnd = reinterpret_cast<HWND>(window->winId());
+  if (hwnd == nullptr || GetWindow(hwnd, GW_OWNER) != nullptr) {
+    return;
+  }
+  void* mainHwnd = nullptr;
+  if (GetSuites()->UtilitySuite6()->AEGP_GetMainHWND(&mainHwnd) != A_Err_NONE ||
+      mainHwnd == nullptr) {
+    return;
+  }
+  // Scan toolbars and floaters are owned by the main window inside After Effects itself. Owned
+  // windows are always displayed above their owner, so the plugin window can no longer be hidden
+  // behind the host window when the user switches back to After Effects from another app.
+  SetWindowLongPtr(hwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(mainHwnd));
+  SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 std::string GetPAGViewerPath() {

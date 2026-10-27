@@ -31,9 +31,19 @@ BaseWindow::BaseWindow(QApplication* app, QObject* parent) : QObject(parent), ap
 }
 
 void BaseWindow::show() {
-  if (window != nullptr) {
-    window->show();
+  if (window == nullptr) {
+    return;
   }
+  AttachWindowToAEMainWindow(window);
+  // The QML windows are created with "visible: true", so show() is a no-op once the window is
+  // on screen. A repeated menu click must bring the window back to the front instead of doing
+  // nothing when it is covered by the host application or minimized by the user.
+  if (window->windowStates() & Qt::WindowMinimized) {
+    window->setWindowStates(window->windowStates() & ~Qt::WindowMinimized);
+  }
+  window->show();
+  window->raise();
+  window->requestActivate();
 }
 
 void BaseWindow::switchLanguage() const {

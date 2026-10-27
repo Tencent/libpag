@@ -65,6 +65,7 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  AttachWindowToAEMainWindow(window);
   window->show();
 
   if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
