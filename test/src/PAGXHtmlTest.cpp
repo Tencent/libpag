@@ -3637,6 +3637,212 @@ CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextUsesPerTagKeyframes) {
   EXPECT_EQ(textRule.find("background-color"), std::string::npos) << textRule;
 }
 
+// Returns the keyframe stop line ("  <percent> { ...; }") of the animation attached to the tag that
+// contains `idMarker`, or an empty string when the tag, its animation or the stop is missing.
+static std::string KeyframeStopOf(const std::string& html, const std::string& idMarker,
+                                  const std::string& percent) {
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, idMarker)));
+  auto start = rule.find("\n  " + percent + " { ");
+  if (start == std::string::npos) {
+    return "";
+  }
+  auto end = rule.find('\n', start + 1);
+  return end == std::string::npos ? "" : rule.substr(start + 1, end - start - 1);
+}
+
+// The effective painter opacity in PAGX is the color alpha multiplied by the painter alpha. Each
+// keyframe stop replaces the element's static paint, so it must carry that product, taking the
+// static value for whichever factor is not animated.
+CLI_TEST(PAGXHtmlTest, AnimationFillColorKeepsStaticPainterAlphaOnBox) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/fill/03_color_with_alpha.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"tintedFill\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"tintedFill\"", "100%");
+  EXPECT_NE(first.find("background-color: rgba(37,99,235,0.251)"), std::string::npos) << first;
+  EXPECT_NE(last.find("background-color: rgba(249,115,22,0.251)"), std::string::npos) << last;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillAlphaMultipliesColorAlphaOnBox) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer width="200" height="200">
+      <Rectangle position="50,50" size="80,80"/>
+      <Fill id="boxFill" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="boxFade" duration="60" frameRate="60" loop="once">
+        <Object target="boxFill">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"boxFill\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"boxFill\"", "100%");
+  EXPECT_NE(first.find("background-color: rgba(37,99,235,0.502)"), std::string::npos) << first;
+  EXPECT_NE(last.find("background-color: rgba(37,99,235,0.251)"), std::string::npos) << last;
+  // Element opacity would also fade the box's children and stack with an animated Layer alpha.
+  EXPECT_EQ(first.find(" opacity:"), std::string::npos) << first;
+  EXPECT_EQ(last.find(" opacity:"), std::string::npos) << last;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillColorAndAlphaCompositeOnText) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer width="200" height="100">
+      <Text text="AB" fontFamily="Arial" fontSize="32" position="20,60"/>
+      <Fill id="tintText" color="#2563EB80" alpha="0.5"/>
+    </Layer>
+    <Layer y="100" width="200" height="100">
+      <Text text="AB" fontFamily="Arial" fontSize="32" position="20,60"/>
+      <Fill id="fadeText" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="textPaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintText">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F9731680"/>
+          </Channel>
+        </Object>
+        <Object target="fadeText">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  ASSERT_EQ(FindTagContaining(html, "id=\"tintText\"").rfind("<span", 0), static_cast<size_t>(0));
+  ASSERT_EQ(FindTagContaining(html, "id=\"fadeText\"").rfind("<span", 0), static_cast<size_t>(0));
+
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintText\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintText\"", "100%");
+  EXPECT_NE(tintFirst.find("color: rgba(37,99,235,0.251)"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("color: rgba(249,115,22,0.251)"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadeText\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadeText\"", "100%");
+  EXPECT_NE(fadeFirst.find("color: rgba(37,99,235,0.502)"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("color: rgba(37,99,235,0.251)"), std::string::npos) << fadeLast;
+  // Element opacity on a span would also fade its text stroke.
+  EXPECT_EQ(fadeFirst.find(" opacity:"), std::string::npos) << fadeFirst;
+  EXPECT_EQ(fadeLast.find(" opacity:"), std::string::npos) << fadeLast;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillColorAndAlphaCompositeOnSvg) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Fill id="tintPath" color="#2563EB80" alpha="0.5"/>
+    </Layer>
+    <Layer x="200" width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Fill id="fadePath" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="pathPaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintPath">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F97316FF"/>
+          </Channel>
+        </Object>
+        <Object target="fadePath">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  ASSERT_EQ(FindTagContaining(html, "id=\"tintPath\"").rfind("<path", 0), static_cast<size_t>(0));
+  ASSERT_EQ(FindTagContaining(html, "id=\"fadePath\"").rfind("<path", 0), static_cast<size_t>(0));
+
+  // The color key's own alpha changes from 0x80 to 0xFF, so fill-opacity must follow it.
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintPath\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintPath\"", "100%");
+  EXPECT_NE(tintFirst.find("fill: #2563EB"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintFirst.find("fill-opacity: 0.251"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("fill: #F97316"), std::string::npos) << tintLast;
+  EXPECT_NE(tintLast.find("fill-opacity: 0.5;"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadePath\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadePath\"", "100%");
+  EXPECT_NE(fadeFirst.find("fill-opacity: 0.502"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("fill-opacity: 0.251"), std::string::npos) << fadeLast;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationStrokeColorAndAlphaCompositeOnSvg) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Stroke id="tintStroke" color="#2563EB80" alpha="0.5" width="8"/>
+    </Layer>
+    <Layer x="200" width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Stroke id="fadeStroke" color="#2563EB80" width="8"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokePaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintStroke">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F97316FF"/>
+          </Channel>
+        </Object>
+        <Object target="fadeStroke">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintStroke\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintStroke\"", "100%");
+  EXPECT_NE(tintFirst.find("stroke: #2563EB"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintFirst.find("stroke-opacity: 0.251"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("stroke: #F97316"), std::string::npos) << tintLast;
+  EXPECT_NE(tintLast.find("stroke-opacity: 0.5;"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadeStroke\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadeStroke\"", "100%");
+  EXPECT_NE(fadeFirst.find("stroke-opacity: 0.502"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("stroke-opacity: 0.251"), std::string::npos) << fadeLast;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="rectLayer" width="80" height="80">
@@ -3718,8 +3924,10 @@ CLI_TEST(PAGXHtmlTest, AnimationSVGStrokeAndDashOffset) {
   EXPECT_EQ(pathTag.rfind("<path", 0), 0u);
   EXPECT_NE(pathTag.find("animation:"), std::string::npos);
 
-  EXPECT_NE(html.find("0% { stroke: #00FF00; stroke-dashoffset: 0; }"), std::string::npos);
-  EXPECT_NE(html.find("100% { stroke: #FF00FF; stroke-dashoffset: 30; }"), std::string::npos);
+  EXPECT_NE(html.find("0% { stroke: #00FF00; stroke-opacity: 1; stroke-dashoffset: 0; }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { stroke: #FF00FF; stroke-opacity: 1; stroke-dashoffset: 30; }"),
+            std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationGroupPreservation) {
