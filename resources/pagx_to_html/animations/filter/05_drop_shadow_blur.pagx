@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: DropShadowFilter blurX turns a hard shadow into a horizontally blurred one.
-     Target: DropShadowFilter  Channel: blurX  Type: float
+<!-- Tests: DropShadowFilter blurX and blurY grow together with identical keys, turning a hard shadow
+     into an evenly blurred one.
+     Target: DropShadowFilter  Channel: blurX,blurY  Type: float
      Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
@@ -11,12 +12,16 @@
   <Layer x="80" y="50" width="100" height="80">
     <Rectangle position="50,40" size="100,80" roundness="8"/>
     <Fill color="#2563EB"/>
-    <DropShadowFilter id="shadowBlurX" offsetX="40" offsetY="40" blurX="0" blurY="0" color="#1E3A8A"/>
+    <DropShadowFilter id="shadowBlur" offsetX="40" offsetY="40" blurX="0" blurY="0" color="#1E3A8A"/>
   </Layer>
   <Animations>
-    <Animation id="shadowBlurXGrow" duration="60" frameRate="60" loop="once">
-      <Object target="shadowBlurX">
+    <Animation id="shadowBlurGrow" duration="60" frameRate="60" loop="once">
+      <Object target="shadowBlur">
         <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="24" interpolation="linear"/>
+        </Channel>
+        <Channel name="blurY" type="float">
           <Key time="0" value="0" interpolation="linear"/>
           <Key time="60" value="24" interpolation="linear"/>
         </Channel>
