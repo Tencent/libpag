@@ -59,6 +59,10 @@
 namespace pag {
 
 PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   auto doc = pagx::PAGXDocument::Make(240, 240);
   auto* ancestor = doc->makeNode<pagx::Layer>();
   ancestor->x = 10;
@@ -135,6 +139,10 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"100\" height=\"100\"><Layer preserve3D=\"true\">"
       "<Layer z=\"100\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
@@ -168,6 +176,10 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"240\" height=\"240\">"
       "<Layer x=\"20\" y=\"30\" alpha=\"0.5\" perspective=\"500\" preserve3D=\"true\">"
@@ -197,6 +209,10 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
 }
 
 PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"100\" height=\"100\">"
       "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
@@ -234,6 +250,10 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
 }
 
 PAGX_TEST(PAGXUtilsTest, Matrix3DReflectionMidpointRemainsContinuous) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   pagx::Matrix3DComponents firstComponents = {};
   firstComponents.rotation[2] = 20;
   firstComponents.scale[1] = 2;
@@ -285,6 +305,10 @@ PAGX_TEST(PAGXUtilsTest, Matrix3DReflectionMidpointRemainsContinuous) {
 }
 
 PAGX_TEST(PAGXUtilsTest, MatrixWriteKeepsNormalizedZ) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"160\" height=\"160\">"
       "<Layer perspective=\"500\" preserve3D=\"true\"><Layer id=\"L\">"
@@ -327,6 +351,10 @@ PAGX_TEST(PAGXUtilsTest, MatrixWriteKeepsNormalizedZ) {
 }
 
 PAGX_TEST(PAGXUtilsTest, SingularZScaleKeepsPlanarPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
   doc->layers.push_back(layer);

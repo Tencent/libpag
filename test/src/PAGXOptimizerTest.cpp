@@ -384,6 +384,10 @@ static tgfx::Bitmap RenderMaskLayoutDocument(PAGXDocument* doc, tgfx::Context* c
 }
 
 PAGX_TEST(PAGXMaskLayoutTest, ParentPaddingPreservesMaskPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"200\" height=\"100\">"
       "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
@@ -413,6 +417,10 @@ PAGX_TEST(PAGXMaskLayoutTest, ParentPaddingPreservesMaskPixels) {
 }
 
 PAGX_TEST(PAGXMaskLayoutTest, ChildMaskPaddingPreservesPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   const std::string xml =
       "<pagx width=\"200\" height=\"100\"><Layer id=\"owner\" padding=\"20\" mask=\"@m\">"
       "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
