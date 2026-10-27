@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "Devices.h"
 
-#import "platform/mac/private/PAGSurfaceImpl.h"
+namespace pag {
 
-#import <QuartzCore/QuartzCore.h>
+// Metal has no global GPU state to restore. Web relies on emscripten's GL state management, and
+// Windows historically opts out of state preservation. CMake selects this factory for those builds.
+std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
+  return nullptr;
+}
 
-@interface PAGSurfaceImpl (Metal)
-
-+ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
-
-@end
+}  // namespace pag

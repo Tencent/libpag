@@ -279,7 +279,8 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
 }
 
 // Renders a single animation frame through the runtime animation path. The document's top-level
-// timelines are all seeked to `options.timeSeconds` and applied before drawing, so an animated
+// timelines are all seeked to `options.timeSeconds` and applied before drawing, and the timelines
+// mounted on Composition slots are advanced by the same amount from a fresh scene, so an animated
 // element's alpha / position / color reflect that playback time. Static documents (no animations)
 // fall through to a plain draw, which is equivalent to the layer-tree path at the default state.
 static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& document,
@@ -299,6 +300,10 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
     animation->setCurrentTime(timeUs);
     animation->apply(1.0f);
   }
+  // Composition timelines are not reachable through getAnimation(); the scene drives them through
+  // advanceAndApply(), which also applies each slot's evaluationOffset and skips paused timelines.
+  // A freshly built scene starts every slot at time 0, so advancing by timeUs lands on the target.
+  scene->advanceAndApply(timeUs);
 
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
   int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
