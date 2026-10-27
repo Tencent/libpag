@@ -25,10 +25,8 @@
 
 #if defined(TGFX_USE_OPENGL)
 #import "PAGSurface+OpenGL.h"
-#import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #elif defined(TGFX_USE_METAL)
 #import "PAGSurface+Metal.h"
-#import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
 #endif
 
 @implementation PAGSurface {
@@ -106,7 +104,7 @@
 @implementation PAGSurface (OpenGL)
 
 + (PAGSurface*)FromLayer:(CAEAGLLayer*)layer {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:layer];
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:layer];
   if (surface == nil) {
     return nil;
   }
@@ -116,7 +114,7 @@
 }
 
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:eaglContext];
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer device:eaglContext];
   if (surface == nil) {
     return nil;
   }
@@ -130,7 +128,7 @@
 @implementation PAGSurface (Metal)
 
 + (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:metalLayer];
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:metalLayer];
   if (surface == nil) {
     return nil;
   }

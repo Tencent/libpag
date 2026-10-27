@@ -39,7 +39,7 @@
 #   - cmake-build-debug/pagx executable must exist (any section)
 #   - for the pagx_to_html section's col 2: test/out/PAGXHtmlTest/<name>.html
 #     must exist. Run
-#     `PAGFullTest --gtest_filter=PAGXHtmlTest.BatchConvertAll` first.
+#     `PAGFullTest_{Backend} --gtest_filter=PAGXHtmlTest.BatchConvertAll` first.
 #     When these are missing the pagx_to_html section simply drops col 2.
 #
 # Usage:
@@ -125,11 +125,15 @@ done
 # Preconditions
 #-------------------------------------------------------------------------
 
-# Rebuild all targets to ensure binaries match current source. This prevents
-# stale pagx CLI or PAGFullTest from producing HTML that disagrees with the
-# latest code (a common pitfall when only one target was rebuilt manually).
-echo "== rebuilding pagx and PAGFullTest targets =="
-cmake --build "$REPO/cmake-build-debug" --target pagx PAGFullTest 2>&1 | tail -5
+# Rebuild all targets to ensure binaries match current source. Read the test target suffix from
+# the existing build configuration so this script also works with a Metal-configured build.
+if grep -q '^PAG_USE_METAL:BOOL=ON$' "$REPO/cmake-build-debug/CMakeCache.txt"; then
+  TEST_TARGET=PAGFullTest_Metal
+else
+  TEST_TARGET=PAGFullTest_OpenGL
+fi
+echo "== rebuilding pagx and $TEST_TARGET targets =="
+cmake --build "$REPO/cmake-build-debug" --target pagx "$TEST_TARGET" 2>&1 | tail -5
 echo ""
 
 if [ ! -x "$PAGX_BIN" ]; then
@@ -141,7 +145,7 @@ fi
 # Regenerate test-embedded HTMLs so they reflect the latest PAGFullTest binary.
 echo "== regenerating BatchConvertAll output =="
 rm -rf "$TEST_OUT"
-"$REPO/cmake-build-debug/PAGFullTest" --gtest_filter="PAGXHtmlTest.BatchConvertAll" 2>&1 | tail -3
+"$REPO/cmake-build-debug/$TEST_TARGET" --gtest_filter="PAGXHtmlTest.BatchConvertAll" 2>&1 | tail -3
 echo ""
 
 #-------------------------------------------------------------------------
@@ -279,7 +283,7 @@ if ls "$TEST_OUT"/*.html >/dev/null 2>&1; then
 else
   echo ""
   echo "note: $TEST_OUT has no HTMLs — pagx_to_html section will drop col 2."
-  echo "      run: ./cmake-build-debug/PAGFullTest --gtest_filter=PAGXHtmlTest.BatchConvertAll"
+  echo "      run: ./cmake-build-debug/$TEST_TARGET --gtest_filter=PAGXHtmlTest.BatchConvertAll"
   echo "      to populate it, then re-run this script."
 fi
 

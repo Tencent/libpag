@@ -16,18 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include "CGLDrawable.h"
 
-#import "platform/ios/private/PAGSurfaceImpl.h"
+namespace pag::cocoa {
 
-#import <QuartzCore/QuartzCore.h>
+std::shared_ptr<PAGSurface> MakeSurfaceFromHost(id host) {
+  if (![host isKindOfClass:[NSView class]]) {
+    return nullptr;
+  }
+  return PAGSurface::MakeFrom(CGLDrawable::FromView(host));
+}
 
-@protocol MTLDevice;
-
-@interface PAGSurfaceImpl (Metal)
-
-+ (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
-
-@end
+}  // namespace pag::cocoa

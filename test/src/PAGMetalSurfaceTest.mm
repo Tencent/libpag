@@ -21,6 +21,7 @@
 #import <TargetConditionals.h>
 #include <array>
 #include "base/PAGTest.h"
+#include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "platform/cocoa/private/metal/MetalLayerDrawable.h"
 #include "platform/cocoa/private/metal/MetalLayerHelper.h"
@@ -279,6 +280,17 @@ PAG_TEST(PAGMetalSurfaceTest, ExternalTextureDeviceResolution) {
     info.format = static_cast<unsigned>(texture.pixelFormat);
     tgfx::BackendTexture backendTexture(info, SURFACE_SIZE, SURFACE_SIZE);
     tgfx::BackendRenderTarget renderTarget(info, SURFACE_SIZE, SURFACE_SIZE);
+    pag::MtlTextureInfo pagInfo = {};
+    pagInfo.texture = (__bridge void*)texture;
+    auto convertedTexture = pag::ToTGFX(pag::BackendTexture(pagInfo, SURFACE_SIZE, SURFACE_SIZE));
+    auto convertedTarget = pag::ToTGFX(pag::BackendRenderTarget(pagInfo, SURFACE_SIZE, SURFACE_SIZE));
+    tgfx::MetalTextureInfo convertedInfo = {};
+    ASSERT_TRUE(convertedTexture.getMetalTextureInfo(&convertedInfo));
+    EXPECT_EQ(convertedInfo.texture, info.texture);
+    EXPECT_EQ(convertedInfo.format, info.format);
+    ASSERT_TRUE(convertedTarget.getMetalTextureInfo(&convertedInfo));
+    EXPECT_EQ(convertedInfo.texture, info.texture);
+    EXPECT_EQ(convertedInfo.format, info.format);
     EXPECT_EQ(pag::Devices::MakeForTexture(backendTexture), device);
     EXPECT_EQ(pag::Devices::MakeForTexture(renderTarget), device);
     auto identity = pag::Devices::CaptureFromTexture(backendTexture);

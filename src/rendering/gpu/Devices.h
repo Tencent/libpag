@@ -63,11 +63,9 @@ class ExternalDeviceRef {
 };
 
 /**
- * Backend glue for libpag. Every call into a concrete tgfx backend (OpenGL, Metal, Vulkan, D3D12,
- * WebGPU) is funneled through this class and dispatched via compile-time macros
- * (TGFX_USE_OPENGL / TGFX_USE_METAL / ...). The rest of libpag only sees the tgfx::Device base
- * class, so adding a new backend is a matter of extending the Devices_* implementation files
- * rather than modifying render code.
+ * Backend glue for libpag. CMake selects the implementation from the corresponding backend
+ * directory, while callers only see the tgfx::Device base class. Adding a backend requires its
+ * device implementation and platform integration without changing shared rendering code.
  */
 class Devices {
  public:
@@ -76,8 +74,8 @@ class Devices {
    * the CLI, and internal helpers.
    *   OpenGL: GLDevice::MakeWithFallback()
    *   Metal:  MetalDevice::Make()
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
-   *           time (see Devices_Backend.cpp).
+   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails during CMake
+   *           configuration.
    */
   static std::shared_ptr<tgfx::Device> MakeDefault();
 
@@ -174,10 +172,8 @@ class Devices {
    *                texture's creating context is current. The texture parameter is unused on this
    *                backend but kept for signature parity.
    *   Metal:       Reads MTLTexture.device and wraps it via MetalDevice::MakeFrom().
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
-   *                time (see Devices_Backend.cpp). Their texture types do not carry a device
-   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
-   *                first of them lands.
+   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails during CMake
+   *                configuration.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -186,7 +182,7 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; the remaining backends are not implemented yet (see Devices_Backend.cpp).
+   * usual; CMake rejects selection of the remaining, unimplemented backends.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);

@@ -18,8 +18,6 @@
 
 #include "rendering/gpu/Devices.h"
 
-#if defined(TGFX_USE_METAL)
-
 #import <Metal/Metal.h>
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
@@ -170,12 +168,4 @@ bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* dev
   return contextDevice == metalRef->device;
 }
 
-std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
-  // Metal is stateless command encoding — there is no global GPU state to save/restore around
-  // libpag rendering. Returning nullptr matches the Devices.h contract for non-GL backends.
-  return nullptr;
-}
-
 }  // namespace pag
-
-#endif  // TGFX_USE_METAL
