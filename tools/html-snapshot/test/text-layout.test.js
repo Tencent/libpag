@@ -110,25 +110,76 @@ describe('capturePseudoContents', () => {
 });
 
 describe('installTextLayout', () => {
-  test('installs only valid control element paths and replaces old metadata', () => {
-    document.body.innerHTML = '<p>Hello</p><input>';
-    const text = document.querySelector('p').firstChild;
+  test('installs only matching text sources and valid element paths, and replaces old metadata', () => {
+    document.body.innerHTML = '<p>Hello<span>changed</span></p><input>';
+    const host = document.querySelector('p');
+    const text = host.firstChild;
+    const changed = host.lastChild.firstChild;
     const input = document.querySelector('input');
+    const runs = [{ text: 'Hello', style: { color: 'red' }, boxes: [{ start: 0, length: 5 }] }];
+    const entry = { path: nodePath(text), source: 'Hello', runs };
     const control = { path: nodePath(input), fragments: [] };
     installTextLayout({
+      texts: [entry, { path: nodePath(changed), source: 'old', runs },
+        { path: nodePath(host), source: null, runs }, { path: [99, 0], source: 'Hello', runs }],
+      initials: [{ path: nodePath(host), runs }, { path: nodePath(text), runs }, { path: [99], runs }],
       controls: [control, { path: nodePath(text) }, { path: [99] }],
       warnings: ['fallback'],
     });
+    expect(window.__pagxTextLayouts.get(text)).toBe(entry);
+    expect(window.__pagxTextLayouts.has(changed)).toBe(false);
+    expect(window.__pagxTextLayouts.has(host)).toBe(false);
+    expect(window.__pagxInitialLayouts.get(host)).toBe(runs);
+    expect(window.__pagxInitialHosts).toEqual([{ node: host, runs }]);
     expect(window.__pagxControlTexts.get(input)).toBe(control);
     expect(window.__pagxControlTexts.has(text)).toBe(false);
     expect(window.__pagxTextLayoutWarnings).toEqual(['fallback']);
-    installTextLayout({});
+    installTextLayout({ texts: [], initials: [] });
+    expect(window.__pagxTextLayouts.has(text)).toBe(false);
+    expect(window.__pagxInitialHosts).toEqual([]);
     expect(window.__pagxControlTexts.has(input)).toBe(false);
     expect(window.__pagxTextLayoutWarnings).toEqual([]);
   });
 });
 
 describe('captureTextLayout', () => {
+  test.each(['puppeteer', 'playwright'])('%s keeps UTF-16 ranges, separate runs and first-letter ownership', async engine => {
+    const snapshot = snapshotFixture([
+      { type: 9 }, { parent: 0 },
+      { parent: 1, type: 3, value: 'A😀B' },
+      { parent: 1, pseudo: 'first-letter' },
+      { parent: 1, type: 3, value: 'X' },
+      { parent: 1, type: 3, value: ' \n' },
+      { parent: 1, pseudo: 'before' },
+      { parent: 6, pseudo: 'first-letter' },
+      { parent: 1, shadow: 'open' },
+      { parent: 8, type: 3, value: 'hidden' },
+      { parent: 8, pseudo: 'first-letter' },
+    ], [
+      { node: 2, text: '😀B', style: { color: 'red' }, boxes: [{ start: 0, length: 2 }, { start: 2, length: 1 }] },
+      { node: 2, text: 'B', boxes: [{ start: 0, length: 1 }] },
+      { node: 3, text: 'A', boxes: [{ start: 0, length: 1 }] },
+      { node: 4, text: 'X' }, // Entire source belongs to a first-letter pseudo.
+      { node: 5, text: '' },
+      { node: 7, text: '“', boxes: [{ start: 0, length: 1 }] },
+      { node: 10, text: 'h', boxes: [{ start: 0, length: 1 }] },
+    ]);
+    const { page, session } = protocolPage(snapshot);
+    const result = await captureTextLayout(page, engine);
+    expect(result.texts).toHaveLength(2);
+    expect(result.texts[0]).toMatchObject({ path: [0, 0], source: 'A😀B', runs: [
+      { text: '😀B', style: { color: 'red', 'font-size': '' }, boxes: [{ start: 0, length: 2 }, { start: 2, length: 1 }] },
+      { text: 'B', boxes: [{ start: 0, length: 1 }] },
+    ] });
+    expect(result.texts[1]).toEqual({ path: [0, 1], source: 'X', runs: [] });
+    expect(result.initials).toMatchObject([{ path: [0], runs: [{ text: 'A' }] }]);
+    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings.every(w => /generated\/shadow first-letter/.test(w))).toBe(true);
+    expect(page.evaluate).not.toHaveBeenCalled();
+    expect(session.send).toHaveBeenCalledWith('DOMSnapshot.captureSnapshot', { computedStyles: TEXT_LAYOUT_PROPERTIES });
+    expect(session.detach).toHaveBeenCalledTimes(1);
+  });
+
   function controlFixture() {
     document.body.innerHTML = '<input type="password" value="secret" style="transform:scale(2)"><select></select><textarea></textarea>';
     document.querySelectorAll('input,select,textarea').forEach(el => setRect(el, { width: 100, height: 20 }));
