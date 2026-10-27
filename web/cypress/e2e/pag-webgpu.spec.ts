@@ -119,4 +119,64 @@ describe('PAGWebGPU', () => {
     const pagImage = PAG.PAGImage.fromTexture(texture, 300, 300, true);
     expect(pagImage.wasmIns).to.be.a('Object');
   });
+
+  itWebGPU('PAGView renders through the canvas2D composite path', async () => {
+    const buffer = await global.fetch('/demo/assets/test.pag').then((res) => res.arrayBuffer());
+    const pagFile = await PAG.PAGFile.load(buffer);
+    const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
+    const pagView = await PAG.PAGView.init(pagFile, canvas, { useCanvas2D: true });
+    expect(pagView).to.not.be.undefined;
+    const snapshot = await pagView!.makeSnapshot();
+    const probe = global.document.createElement('canvas');
+    probe.width = snapshot.width;
+    probe.height = snapshot.height;
+    const ctx = probe.getContext('2d');
+    ctx!.drawImage(snapshot, 0, 0);
+    const data = ctx!.getImageData(0, 0, probe.width, probe.height).data;
+    let hasVisiblePixel = false;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) {
+        hasVisiblePixel = true;
+        break;
+      }
+    }
+    expect(hasVisiblePixel, 'the composite must draw visible pixels').to.be.true;
+    pagView!.destroy();
+  });
+
+  itWebGPU('readPixelsAsync returns null on canvas-backed surfaces', async () => {
+    const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
+    const pagSurface = PAG.PAGSurface.fromCanvas(canvas);
+    const pixels = await pagSurface.readPixelsAsync(
+      PAGTypes.ColorType.RGBA_8888,
+      PAGTypes.AlphaType.Unpremultiplied,
+    );
+    expect(pixels).to.be.null;
+  });
+
+  itWebGPU('PAGView assigns an id to a canvas without one', async () => {
+    const canvas = global.document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    global.document.body.appendChild(canvas);
+    const buffer = await global.fetch('/demo/assets/test.pag').then((res) => res.arrayBuffer());
+    const pagFile = await PAG.PAGFile.load(buffer);
+    const pagView = await PAG.PAGView.init(pagFile, canvas);
+    expect(canvas.id.startsWith('pag-webgpu-canvas-')).to.be.true;
+    pagView!.destroy();
+    global.document.body.removeChild(canvas);
+  });
+
+  itWebGPU('PAGSurface destroy releases the WebGPU texture handle', () => {
+    const pagSurface = PAG.PAGSurface.fromTexture(makeRenderTargetTexture(), 300, 300, true);
+    pagSurface.destroy();
+    expect(pagSurface.isDestroyed).to.be.true;
+    // The handle is private; reading it directly is the only way to verify that destroy()
+    // released the registered GPUTexture instead of leaking it until garbage collection.
+    const handle = (pagSurface as unknown as { webGPUTextureHandle: number }).webGPUTextureHandle;
+    expect(handle, 'destroy() must clear the registered texture handle').to.be.eq(0);
+    const recreated = PAG.PAGSurface.fromTexture(makeRenderTargetTexture(), 300, 300, true);
+    expect(recreated.wasmIns).to.be.a('Object');
+    recreated.destroy();
+  });
 });
