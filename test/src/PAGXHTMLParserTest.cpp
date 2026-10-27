@@ -289,7 +289,7 @@ PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalTex
     SCOPED_TRACE(spacing);
     ParserInput input;
     auto node =
-        ParseNode(std::string("<span data-pagx-text=\"AB\" data-pagx-inline-positions=\"bad\" ") +
+        ParseNode(std::string("<span data-pagx-text=\"AB\" ") +
                   "data-pagx-letter-spacing=\"" + spacing +
                   "\" data-pagx-faux-bold=\"true\" "
                   "data-pagx-faux-italic=\"no\">ignored glyphs</span>");
@@ -305,7 +305,6 @@ PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalTex
     EXPECT_FLOAT_EQ(text->letterSpacing, 3);
     EXPECT_FALSE(text->fauxBold);
     EXPECT_FALSE(text->fauxItalic);
-    EXPECT_TRUE(input.warned("invalid data-pagx-inline-positions"));
     EXPECT_TRUE(input.warned("invalid data-pagx-letter-spacing"));
     EXPECT_TRUE(input.warned("invalid data-pagx-faux-bold"));
     EXPECT_TRUE(input.warned("invalid data-pagx-faux-italic"));

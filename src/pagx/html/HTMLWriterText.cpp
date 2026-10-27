@@ -2156,16 +2156,6 @@ static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text) {
   out.addAttrAllowEmpty("data-pagx-text", text->text);
   out.addAttrAllowEmpty("data-pagx-font-family", text->fontFamily);
   out.addAttrAllowEmpty("data-pagx-font-style", text->fontStyle);
-  if (!text->inlinePositions.empty()) {
-    std::string positions;
-    for (float position : text->inlinePositions) {
-      if (!positions.empty()) positions += ',';
-      char buf[32];
-      std::snprintf(buf, sizeof(buf), "%.9g", position);
-      positions += buf;
-    }
-    out.addAttr("data-pagx-inline-positions", positions);
-  }
   // %.9g gives FLT_DECIMAL_DIG significant digits so the float survives the round trip
   // exactly (CssFloatToString's 4 fraction digits would not). NaN / infinity are treated as
   // the default and skipped so the importer never sees a non-finite literal.

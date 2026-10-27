@@ -85,7 +85,6 @@
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
-#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -976,13 +975,6 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->fontSize = GetFloatAttribute(node, "fontSize", Default<Text>().fontSize, doc);
   text->letterSpacing =
       GetFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
-  if (auto positions = node->findAttribute("inlinePositions")) {
-    if (!ParseTextInlinePositions(text->text, *positions, &text->inlinePositions)) {
-      ReportError(doc, node,
-                  "Invalid inlinePositions: expected one finite position per Unicode "
-                  "scalar of a single line without tabs.");
-    }
-  }
   text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);

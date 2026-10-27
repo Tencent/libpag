@@ -1796,54 +1796,6 @@ PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   EXPECT_FALSE(hasTextBox);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, InlinePositionsUseUnicodeScalarsAndRoundTrip) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:40px">
-      <span data-pagx-inline-positions="0, 30, 70" style="white-space:nowrap">A😀中</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->inlinePositions, (std::vector<float>{0, 30, 70}));
-  auto xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("inlinePositions=\"0,30,70\""), std::string::npos);
-  auto restored = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(restored, nullptr);
-  EXPECT_TRUE(restored->errors.empty());
-  auto* restoredText = FindElementOfType<pagx::Text>(restored->layers.front()->children.front());
-  ASSERT_NE(restoredText, nullptr);
-  EXPECT_EQ(restoredText->inlinePositions, text->inlinePositions);
-}
-
-PAG_TEST(PAGXHTMLImporterTest, InvalidInlinePositionsHaveADiagnosticAndUseNormalLayout) {
-  for (const auto* value : {"0,30", "0,30,70,90", "0,nan,70", "0,30junk,70", "0,,70", "0,30,70,"}) {
-    auto doc = ParseFromString(
-        std::string(
-            "<html><body style=\"width:200px;height:40px\"><span data-pagx-inline-positions=\"") +
-        value + "\">A😀中</span></body></html>");
-    ASSERT_NE(doc, nullptr);
-    auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-    ASSERT_NE(text, nullptr);
-    EXPECT_TRUE(text->inlinePositions.empty()) << value;
-    EXPECT_TRUE(HasDiagnosticContaining(doc, "invalid data-pagx-inline-positions")) << value;
-  }
-}
-
-PAG_TEST(PAGXHTMLImporterTest, SemanticTextHostRestoresInlinePositions) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:40px">
-      <span data-pagx-text="A😀中" data-pagx-inline-positions="0,30,70"
-            data-pagx-font-family="Arial" data-pagx-font-style="Regular">ignored</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->text, "A😀中");
-  EXPECT_EQ(text->inlinePositions, (std::vector<float>{0, 30, 70}));
-}
-
 PAG_TEST(PAGXHTMLImporterTest, WebkitTextStrokeProducesTextStroke) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
