@@ -1223,7 +1223,7 @@ if (PAG_BUILD_TESTS)
                 DEPENDS PAGCocoaStaticLinkTest
                 COMMENT "Running Cocoa static link regression"
                 VERBATIM)
-        add_dependencies(PAGFullTest PAGCocoaStaticLinkCheck)
+        add_dependencies(PAGFullTest_${TEST_TARGET_SUFFIX} PAGCocoaStaticLinkCheck)
     endif ()
 
 endif ()
