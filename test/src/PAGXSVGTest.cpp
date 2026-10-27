@@ -63,6 +63,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTransformParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
@@ -687,6 +688,19 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
  * container in snapshotted HTML) is legal and must import to a valid empty
  * document rather than failing the parse.
  */
+// CSS angles carry a deg suffix, and skipping it must not drop the following transform function.
+PAGX_TEST(PAGXSVGTest, SVGImport_DegreeUnitKeepsFollowingTransform) {
+  auto matrix = pagx::MatrixFromSVGTransform("rotate(45deg) translate(10px,5px)");
+  EXPECT_NEAR(matrix.a, 0.70710678f, 1.0e-5f);
+  EXPECT_NEAR(matrix.b, 0.70710678f, 1.0e-5f);
+  // The translation is rotated by the preceding rotate: 10*cos(45) - 5*sin(45) and
+  // 10*sin(45) + 5*cos(45).
+  EXPECT_NEAR(matrix.tx, 3.5355339f, 1.0e-5f);
+  EXPECT_NEAR(matrix.ty, 10.606602f, 1.0e-5f);
+  auto skewed = pagx::MatrixFromSVGTransform("skewX(30deg)");
+  EXPECT_NEAR(skewed.c, 0.57735027f, 1.0e-5f);
+}
+
 PAGX_TEST(PAGXSVGTest, SVGImport_ZeroSizeDefsOnly) {
   std::string svg =
       "<svg width=\"0\" height=\"0\"><defs><path id=\"p0\" d=\"M0 0L10 0L5 8Z\"/>"

@@ -97,7 +97,13 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // such a layer keeps its vector output.
   out.hasPreserve3D = layer->preserve3D && layer->filters.empty() && layer->styles.empty() &&
                       layer->mask == nullptr && !layer->hasScrollRect;
-  out.hasPerspectiveTransform = HasPerspective(BuildLayerLocalMatrix3D(layer));
+  // Same narrowing as the PPT probe: only an x/y-varying perspective cannot flatten into the 2D
+  // affine SVG output; a pure z-axis perspective matches tgfx's flattening (a constant w divide)
+  // and preserve3D subtrees bake through hasPreserve3D.
+  const auto localTransform = BuildLayerLocalMatrix3D(layer);
+  out.hasPerspectiveTransform = localTransform.getRowColumn(3, 0) != 0 ||
+                                localTransform.getRowColumn(3, 1) != 0 ||
+                                localTransform.getRowColumn(3, 3) <= 0;
   return out;
 }
 

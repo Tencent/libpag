@@ -34,8 +34,10 @@ static void SkipWhitespace(const char*& ptr, const char* end) {
 }
 
 // allowPixelUnit is true only for length arguments: CSS adds the px suffix to lengths such as
-// translate() or the pivot of rotate(), never to angles or scale factors.
-static float ReadNumber(const char*& ptr, const char* end, bool allowPixelUnit = false) {
+// translate() or the pivot of rotate(), never to angles or scale factors. allowDegreeUnit is true
+// only for angle arguments: CSS adds the deg suffix to angles such as rotate() or skewX().
+static float ReadNumber(const char*& ptr, const char* end, bool allowPixelUnit = false,
+                        bool allowDegreeUnit = false) {
   SkipWhitespace(ptr, end);
   const char* start = ptr;
   if (ptr < end && (*ptr == '-' || *ptr == '+')) {
@@ -56,10 +58,14 @@ static float ReadNumber(const char*& ptr, const char* end, bool allowPixelUnit =
   if (start == ptr) {
     return 0.0f;
   }
-  // CSS lengths inside <style> rules or inline styles carry a px suffix; SVG presentation
-  // attributes are unitless. Dropping the suffix keeps both forms parseable and matches browsers.
+  // CSS lengths inside <style> rules or inline styles carry a px suffix and angles a deg suffix;
+  // SVG presentation attributes are unitless. Dropping the suffix keeps both forms parseable and
+  // matches browsers.
   if (allowPixelUnit && ptr + 1 < end && ptr[0] == 'p' && ptr[1] == 'x') {
     ptr += 2;
+  }
+  if (allowDegreeUnit && ptr + 2 < end && ptr[0] == 'd' && ptr[1] == 'e' && ptr[2] == 'g') {
+    ptr += 3;
   }
   return strtof(start, nullptr);
 }
@@ -110,7 +116,7 @@ Matrix MatrixFromSVGTransform(const std::string& value) {
       }
       matrix = Matrix::Scale(sx, sy);
     } else if (funcLen == 6 && memcmp(funcStart, "rotate", 6) == 0) {
-      float angle = ReadNumber(ptr, end);
+      float angle = ReadNumber(ptr, end, false, true);
       SkipWhitespace(ptr, end);
       if (ptr < end && *ptr != ')') {
         float cx = ReadNumber(ptr, end, true);
@@ -120,10 +126,10 @@ Matrix MatrixFromSVGTransform(const std::string& value) {
         matrix = Matrix::Rotate(angle);
       }
     } else if (funcLen == 5 && memcmp(funcStart, "skewX", 5) == 0) {
-      float angle = ReadNumber(ptr, end);
+      float angle = ReadNumber(ptr, end, false, true);
       matrix.c = std::tan(DegreesToRadians(angle));
     } else if (funcLen == 5 && memcmp(funcStart, "skewY", 5) == 0) {
-      float angle = ReadNumber(ptr, end);
+      float angle = ReadNumber(ptr, end, false, true);
       matrix.b = std::tan(DegreesToRadians(angle));
     } else if (funcLen == 6 && memcmp(funcStart, "matrix", 6) == 0) {
       matrix.a = ReadNumber(ptr, end);
