@@ -1727,6 +1727,87 @@ PAGX_TEST(PAGXTest, InlineImportRetriesAfterContentFix) {
   EXPECT_FALSE(doc->hasUnresolvedImports());
 }
 
+/**
+ * Test case: resolving an inline <svg> that lives inside a Composition resource. Flattening it
+ * detaches the mounted sub-document, and PAGXDocument::detachInlineImport() then calls
+ * removeNodes(), which resizes and renumbers the document's node list. ResolveDocument must walk a
+ * snapshot and re-check ownership, otherwise iterating nodes past that point hands back destroyed
+ * unique_ptrs and the very first virtual call crashes.
+ */
+PAGX_TEST(PAGXTest, ResolveCompositionInlineSvgSurvivesNodeRemoval) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_NE(doc, nullptr);
+
+  auto comp = doc->makeNode<pagx::Composition>("inner");
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->width = 40;
+  host->height = 40;
+  host->importDirective.format = "svg";
+  host->importDirective.content =
+      R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">)"
+      R"(<rect x="0" y="0" width="10" height="10" fill="#FF0000"/></svg>)";
+  comp->layers.push_back(host);
+  auto* slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = comp;
+  doc->layers.push_back(slot);
+
+  // Layout mounts the inline import as a sub-document and appends its wrapper to doc->nodes — the
+  // state the resolve walk has to survive.
+  doc->applyLayout();
+  ASSERT_NE(host->composition, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+
+  pagx::cli::ImportFormatOptions options = {};
+  auto stats = pagx::cli::ResolveDocument(doc.get(), "", options);
+  EXPECT_EQ(stats.resolvedCount, 1);
+  EXPECT_EQ(stats.errorCount, 0);
+
+  // The directive is consumed and the SVG now lives under the layer as flattened content instead of
+  // behind a composition reference.
+  EXPECT_TRUE(host->importDirective.content.empty());
+  EXPECT_FALSE(host->children.empty());
+}
+
+/**
+ * Test case: detaching an inline import while a scene built from the document is still alive. The
+ * runtime tree holds nodes owned by the sub-document (PAGLayer::node, PAGComposition::document), so
+ * the document rebuilds every live scene before releasing the sub-document; afterwards the scene
+ * must still draw, hit test and traverse without reading freed memory.
+ */
+PAGX_TEST(PAGXTest, DetachInlineImportWithLiveScene) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  // Build the runtime tree so it references nodes owned by the sub-document.
+  scene->advanceAndApply(0);
+
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+
+  // The scene was rebuilt before the release, so it is still usable: every handle below dereferences
+  // a node that used to live in the sub-document.
+  scene->advanceAndApply(0);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_NE(surface, nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(scene->getLayersUnderPoint(30, 30).empty());
+  ASSERT_FALSE(scene->rootComposition()->children.empty());
+  for (const auto& child : scene->rootComposition()->children) {
+    ASSERT_NE(child, nullptr);
+    ASSERT_NE(child->getNode(), nullptr);
+    // The handle must resolve back to the host document's own node, not to one the released
+    // sub-document used to own.
+    EXPECT_EQ(child->getNode()->id, "host");
+  }
+}
+
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
   // Valid keys.
   EXPECT_TRUE(pagx::IsValidCustomDataKey("role"));
