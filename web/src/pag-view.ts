@@ -29,21 +29,6 @@ export interface PAGViewOptions {
   firstFrame?: boolean;
 }
 
-let autoCanvasID = 0;
-
-// The WebGPU backend locates a DOM canvas through a CSS selector (its C++ WebGPUWindow wraps
-// WGPUSurfaceDescriptorFromCanvasHTMLSelector), so the canvas element must carry an id.
-// OffscreenCanvas has no DOM id and takes the canvas-object path instead.
-const ensureCanvasSelector = (canvasElement: HTMLCanvasElement): string => {
-  if (!canvasElement.id) {
-    autoCanvasID += 1;
-    canvasElement.id = `pag-webgpu-canvas-${autoCanvasID}`;
-  }
-  // The selector reaches the wasm side via WGPUSurfaceDescriptorFromCanvasHTMLSelector, so ids
-  // with special characters (dots, colons) must be escaped to stay a valid CSS selector.
-  return `#${CSS.escape(canvasElement.id)}`;
-};
-
 @destroyVerify
 export class PAGView {
   /**
@@ -116,15 +101,11 @@ export class PAGView {
     canvasElement: HTMLCanvasElement | OffscreenCanvas,
     canvas2DSource: HTMLCanvasElement | OffscreenCanvas | null = null,
   ): PAGSurface {
-    // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow; the size
-    // is read from the canvas by the C++ side, so the canvas must be sized before wrapping.
-    if (canvas2DSource) {
-      return PAGSurface.fromCanvas(canvas2DSource);
-    }
-    if (isOffscreenCanvas(canvasElement)) {
-      return PAGSurface.fromCanvas(canvasElement);
-    }
-    return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement as HTMLCanvasElement));
+    // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow, which
+    // takes the canvas object directly, also covering canvases that are not attached to the
+    // DOM. The size is read from the canvas by the C++ side, so the canvas must be sized before
+    // wrapping.
+    return PAGSurface.fromCanvas(canvas2DSource ?? canvasElement);
   }
 
   protected static makeGLSurface(

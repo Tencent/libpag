@@ -2,6 +2,8 @@ import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
 import { isWebGPUBackend } from './core/backend-context';
 import {
+  clearWebGPUTextureHandle,
+  getWebGPUTextureHandle,
   unregisterWebGPUTexture,
   untrackWebGPUTextureHandle,
   WebGPUTextureLike,
@@ -113,20 +115,11 @@ export class PAGSurface {
   public wasmIns;
   public isDestroyed = false;
 
-  private webGPUTextureHandle = 0;
   private isCanvasBacked = false;
   private readbackPending = false;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
-  }
-
-  /**
-   * Attaches the WebGPU texture handle registered by fromTexture() so destroy() can release it.
-   * WebGPU backend only; called internally by the factory, do not invoke directly.
-   */
-  public attachWebGPUTextureHandle(handle: number): void {
-    this.webGPUTextureHandle = handle;
   }
 
   private markCanvasBacked(): PAGSurface {
@@ -184,8 +177,10 @@ export class PAGSurface {
   /**
    * Asynchronously reads pixels from current PAGSurface with specified color type and alpha type.
    * On WebGL the returned promise resolves within the current frame; on WebGPU it resolves once
-   * the GPU readback mapping completes. Returns null on failure, when the readback does not
-   * complete within timeoutMs, or when the surface is destroyed while waiting.
+   * the GPU readback mapping completes. Rejects if the readback fails on the GPU side; returns
+   * null when the surface is destroyed while waiting, when a readback is already pending, or
+   * when the readback does not complete within timeoutMs (default 30000 ms, the polling deadline
+   * for the GPU readback mapping; the session is discarded on timeout without side effects).
    *
    * Canvas-backed surfaces (created by fromCanvas(), including the surfaces used by PAGView on
    * the WebGPU backend) cannot be read back after the frame is presented, so this method always
@@ -224,7 +219,9 @@ export class PAGSurface {
         await nextTick();
         status = session._status();
       }
-      if (status === READBACK_STATUS_FAILED) return null;
+      if (status === READBACK_STATUS_FAILED) {
+        throw new Error('PAGSurface.readPixelsAsync() failed because the GPU readback did not complete successfully.');
+      }
       const rowBytes = session._width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
       return session._readPixels(colorType, alphaType, rowBytes) as Uint8Array | null;
     } finally {
@@ -235,10 +232,11 @@ export class PAGSurface {
 
   public destroy(): void {
     this.wasmIns.delete();
-    if (this.webGPUTextureHandle > 0) {
-      unregisterWebGPUTexture(this.webGPUTextureHandle);
+    const webGPUTextureHandle = getWebGPUTextureHandle(this.wasmIns);
+    if (webGPUTextureHandle > 0) {
+      clearWebGPUTextureHandle(this.wasmIns);
+      unregisterWebGPUTexture(webGPUTextureHandle);
       untrackWebGPUTextureHandle(this);
-      this.webGPUTextureHandle = 0;
     }
     this.isDestroyed = true;
   }

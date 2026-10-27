@@ -99,22 +99,42 @@ export const untrackWebGPUTextureHandle = (wrapper: object): void => {
   textureHandleRegistry?.unregister(wrapper);
 };
 
+// Key of the non-enumerable property under which wrapBackendTexture() stores the registered
+// WebGPU texture handle on the wasm instance. Kept module-private so no wrapper type exposes a
+// writable surface an external caller could use to inject an arbitrary handle.
+const TEXTURE_HANDLE_KEY = Symbol('pagWebGPUTextureHandle');
+
 /**
- * Implemented by wrappers (PAGSurface, PAGImage) whose fromTexture() factory registers a host
- * GPUTexture. The handle is attached by wrapBackendTexture() after construction instead of
- * flowing through the public constructor, so external code cannot inject an arbitrary handle
- * that destroy() would then release by mistake.
+ * Implemented by wrappers (PAGSurface, PAGImage) created around a wasm instance by
+ * wrapBackendTexture().
  */
-export interface WebGPUTextureHolder {
-  attachWebGPUTextureHandle: (handle: number) => void;
+export interface WasmInstanceHolder {
+  wasmIns: any;
 }
+
+/**
+ * WebGPU backend only. Returns the WebGPU texture handle stored on the wasm instance by
+ * wrapBackendTexture(), or 0 if the instance was not created from a host GPUTexture.
+ */
+export const getWebGPUTextureHandle = (wasmIns: any): number => {
+  const handle = wasmIns?.[TEXTURE_HANDLE_KEY];
+  return typeof handle === 'number' ? handle : 0;
+};
+
+/**
+ * WebGPU backend only. Clears the handle stored on the wasm instance so a repeated destroy()
+ * does not release the registration twice.
+ */
+export const clearWebGPUTextureHandle = (wasmIns: any): void => {
+  delete wasmIns?.[TEXTURE_HANDLE_KEY];
+};
 
 /**
  * Shared implementation of the fromTexture() factories of PAGSurface and PAGImage: resolves the
  * host texture, wraps it into a wasm instance, rolls the registration back on failure, and
  * tracks the wrapper for GC-time release of the WebGPU texture handle.
  */
-export const wrapBackendTexture = <T extends WebGPUTextureHolder>(
+export const wrapBackendTexture = <T extends WasmInstanceHolder>(
   apiName: string,
   texture: number | WebGPUTextureLike,
   makeWasmIns: (textureID: number, format: number) => any,
@@ -128,7 +148,15 @@ export const wrapBackendTexture = <T extends WebGPUTextureHolder>(
   }
   const wrapper = makeWrapper(wasmIns);
   if (webGPUHandle > 0) {
-    wrapper.attachWebGPUTextureHandle(webGPUHandle);
+    // The handle lives on the wasm instance as a non-enumerable property instead of a field on
+    // the wrapper: destroy() reads it back through getWebGPUTextureHandle(), and external code
+    // has no method or property to inject an arbitrary handle that destroy() would release.
+    Object.defineProperty(wasmIns, TEXTURE_HANDLE_KEY, {
+      value: webGPUHandle,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
     trackWebGPUTextureHandle(wrapper, webGPUHandle);
   }
   return wrapper;
