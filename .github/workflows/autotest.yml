@@ -153,7 +153,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
-          ./autotest.sh USE_METAL --skip-images
+          ./autotest.sh USE_METAL
         shell: bash
 
       - name: Save Third-Party Cache
@@ -165,9 +165,25 @@ jobs:
             test/baseline/.cache/metal
           key: third-party-autotest-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
+      - name: Diagnose Metal frame baseline stability
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          if [ ! -x build/PAGFullTest_Metal ]; then exit 0; fi
+          mkdir -p result/stability
+          cmake --build build --target UpdateBaseline_Metal -- -j 12
+          ./build/UpdateBaseline_Metal --gtest_filter=PAGFrameCompareTest.RenderFiles
+          cp test/baseline/.cache/metal/md5.json result/stability/reference-md5.json
+          status=0
+          ./build/PAGFullTest_Metal --gtest_filter=PAGFrameCompareTest.RenderFiles --gtest_repeat=2 --gtest_output=json:result/stability/PAGFullTest.json > result/stability/verify.log 2>&1 || status=$?
+          cp -R test/out result/stability/out
+          cat result/stability/verify.log
+          exit "$status"
+
       - name: Upload Metal Test Results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: mac_metal_result
           path: result
+          include-hidden-files: true
