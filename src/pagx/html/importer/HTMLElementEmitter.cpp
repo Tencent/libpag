@@ -1057,8 +1057,8 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   // color1, ...) first: they are numbered from scratch per document and would otherwise collide
   // with ids this document already uses, which would report duplicates or hijack its "@id"
   // references during registration.
+  // adoptNodes() drains svgDoc, so its layer list goes with the nodes.
   _document->adoptNodes(*svgDoc);
-  svgDoc->layers.clear();
 
   layer->mask = maskLayer;
   layer->maskType = maskType;

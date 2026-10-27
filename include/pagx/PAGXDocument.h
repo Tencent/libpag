@@ -40,8 +40,6 @@ class ViewModel;
 class Image;
 class ImagePattern;
 
-
-
 /**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
  * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
@@ -149,24 +147,12 @@ class PAGXDocument : public Node {
    * ownsNode(), breaking index-based lookups and any host that resolves a runtime layer back
    * to a source node.
    *
-   * `other` is drained and invalidated: its node list, ownership set and id index are cleared, so
-   * it can no longer answer ownsNode()/findNode() for nodes it has handed over. Passing *this is
-   * a no-op.
+   * `other` is drained and invalidated: its node list, ownership set, id index, and the layer and
+   * animation lists that reference the same nodes are all cleared, so it can no longer answer
+   * ownsNode()/findNode() or hand out layers for nodes it has given away. Passing *this is a no-op.
    * @param other the document to drain; emptied and invalidated on return.
    */
   void adoptNodes(PAGXDocument& other);
-
-  /**
-   * Renames ids in the given document that collide with ids already used by this document (or
-   * repeat within the given document itself) to fresh unique ones, so a subsequent adoptNodes()
-   * registers them without reporting duplicates. Importer auto-generated ids (image1, path1, ...)
-   * collide as a matter of course when several inline SVGs merge into one document; node
-   * references are in-memory pointers, so the exporter picks up the new id automatically. Call
-   * before adoptNodes().
-   * @param other the document whose ids are renamed in place. Its node list and id index are
-   * untouched.
-   */
-  void renameCollidingIds(PAGXDocument* other);
 
   /**
    * Errors collected during parsing. Non-empty errors indicate structural issues in the source
@@ -220,7 +206,6 @@ class PAGXDocument : public Node {
    */
   std::vector<std::string> getExternalImagePaths() const;
 
-  
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
@@ -380,6 +365,13 @@ class PAGXDocument : public Node {
                            LayoutContext* context);
 
   void registerNode(Node* node, const std::string& id);
+
+  // Renames ids in `other` that collide with ids already used by this document (or repeat within
+  // `other` itself) to fresh unique ones, so adoptNodes() can register them without duplicates.
+  // Importer auto-generated ids (image1, path1, ...) collide as a matter of course when several
+  // inline SVGs merge into one document. Only adoptNodes() should call this: renaming on its own
+  // changes ids on nodes the other document still owns, so call rename through adoptNodes().
+  void renameCollidingIds(PAGXDocument* other);
 
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);

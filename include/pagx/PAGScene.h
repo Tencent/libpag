@@ -41,7 +41,6 @@ namespace pagx {
 
 class Animation;
 class Node;
-class Layer;
 class PAGSurface;
 class PAGViewModel;
 class PAGXDocument;
@@ -188,25 +187,32 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * runtime-layer map.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
-   * @param shapeHitTest how a layer's own content is tested. false (the default) tests the
-   * bounding box and preserves the pre-existing behaviour. true tests the actual shape (glyph
-   * outlines for text, the filled or stroked area for geometry), so the gap between two glyphs,
-   * the inside of a stroke-only shape and a fully transparent fill are not hits. Callers that need
-   * precise picking pass true; everyone else keeps the old semantics.
+   */
+  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
+
+  /**
+   * Same as the two-argument form, with an explicit choice of how a layer's own content is tested.
+   * Declared as a separate overload rather than a defaulted argument so the two-argument symbol
+   * keeps its original mangled name for hosts that link libpag as a binary.
+   * @param surfaceX the x coordinate in surface (device) space.
+   * @param surfaceY the y coordinate in surface (device) space.
+   * @param shapeHitTest how a layer's own content is tested. false tests the bounding box and
+   * preserves the pre-existing behaviour. true tests the actual shape (glyph outlines for text, the
+   * filled or stroked area for geometry), so the gap between two glyphs, the inside of a stroke-only
+   * shape and a fully transparent fill are not hits. Callers that need precise picking pass true.
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY,
-                                                             bool shapeHitTest = false);
+                                                             bool shapeHitTest);
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
-   * on-screen transform (including animation and the display zoom/offset) applied. Returns an
-   * empty rectangle if the layer is null or does not belong to this scene. For the layer's
+   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
+   * rectangle if the layer is null or does not belong to this scene. For the layer's
    * untransformed local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
-  
  private:
   PAGScene();
 
@@ -242,8 +248,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Re-applies the ViewModel's current values to every data bind whose target is the given node
   // across the whole composition tree, immediately (mirrors the VM-change immediate-apply path).
-  // Used by PAGStateMachine::reset() and fresh timeline instantiation: both drop bound SM inputs
-  // back to their declared defaults, and the ViewModel is the truth source for those values.
+  // Used by PAGScene::getStateMachineTimeline() and PAGComposition::spawnTimelines(): both start
+  // from bound SM inputs dropped back to their declared defaults, and the ViewModel is the truth
+  // source for those values.
   // scopeBinding restricts the re-apply to runtimes bound against that binding: the same source
   // node can back several instances (a top-level pre-created one plus composition-spawned ones),
   // and a reset must only re-push the values of the instance it belongs to, not overwrite the

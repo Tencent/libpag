@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXNodeChannel.h"
-#include <climits>
 #include <cmath>
-#include <cstdlib>
 #include <optional>
 #include <string_view>
 #include <unordered_map>

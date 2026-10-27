@@ -347,6 +347,10 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
   other.nodes.clear();
   other.nodeSet.clear();
   other.nodeMap.clear();
+  // Its layer and animation lists reference the same transferred nodes, so they go too: a drained
+  // document that still lists them hands callers a way to reach memory it no longer owns.
+  other.layers.clear();
+  other.animations.clear();
 }
 
 void PAGXDocument::renameCollidingIds(PAGXDocument* other) {

@@ -317,6 +317,9 @@ class Node {
    * The line number where this node's end tag appears in the source XML. Equals sourceLine for
    * self-closing or single-line nodes. -1 means unavailable (e.g. programmatically created nodes
    * without a source span). Set by PAGXImporter during parsing.
+   *
+   * Not read in this PR: like index, it reaches the editor through getNodeSourceMap(), which arrives
+   * in a follow-up PR together with the reader for both fields.
    */
   int endLine = -1;
 

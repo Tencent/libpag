@@ -286,8 +286,8 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   // adoptNodes() renames the auto-numbered importer ids (image1, path1, ...) first: they collide
   // across separately resolved SVGs and with the host document's own ids, and adopting them
   // unrenamed would report duplicates or hijack the host's "@id" references.
+  // adoptNodes() drains svgDoc, so its layer list goes with the nodes.
   doc->adoptNodes(*svgDoc);
-  svgDoc->layers.clear();
 
   // Clear import fields and set resolved marker.
   layer->importDirective.source.clear();

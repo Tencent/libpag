@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
-#include <algorithm>
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -41,7 +40,6 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
-#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -765,6 +763,11 @@ bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, f
   // which is the order callers (editor selection) already rely on.
   out->push_back(layer);
   return true;
+}
+
+std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
+                                                                     float surfaceY) {
+  return getLayersUnderPoint(surfaceX, surfaceY, false);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX, float surfaceY,

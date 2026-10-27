@@ -63,7 +63,6 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
  */
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value);
 
-
 /**
  * Resets the node field identified by channel to its default — the value a freshly created node of
  * the same type carries. Use this to "clear" a previously edited channel: for optional fields
