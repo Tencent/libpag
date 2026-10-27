@@ -143,9 +143,9 @@ local disk or inlines the font as a `data:` URI:
 - Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
   source is registered: the last rule's file is the family's primary face, and the others join the
   fallback chain, so a character the primary face lacks still shapes with the subset that has it.
-- Whether the output keeps font sources is an import option: `pagx import --fonts embed` (the HTML
-  default) bakes glyphs and drops source resources. `--fonts external` keeps runtime shaping, copies
-  local font files next to the output, and preserves inline sources as self-contained data URIs.
+- Whether the output keeps font sources is an import option: `pagx import --fonts external` (the
+  default) keeps runtime shaping, copies local font files next to the output, and preserves inline
+  sources as self-contained data URIs. `--fonts embed` bakes glyphs and drops source resources.
   Replacing the caller's FontConfig during layout still reapplies the document's font resources.
 - Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
   cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`

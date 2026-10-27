@@ -126,9 +126,9 @@
 - 多条规则可以声明同一族名（例如中文字体按 unicode-range 拆成的分片）。每条规则的源都会注册：
   最后一条规则的文件作为该族的主字体，其余文件加入回退链，主字体缺少的字符仍会用包含它的分片
   整形。
-- 产物是否保留字体源由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
-  丢弃源资源；`--fonts external` 保留运行时排版，将本地字体复制到产物旁，内联字体则以自包含
-  data URI 保留。排版时即使替换调用方 FontConfig，文档自身的字体资源仍会重新注册。
+- 产物是否保留字体源由导入选项决定：`pagx import --fonts external`（默认）保留运行时排版，
+  将本地字体复制到产物旁，内联字体则以自包含 data URI 保留；`--fonts embed` 会烘焙字形并
+  丢弃源资源。排版时即使替换调用方 FontConfig，文档自身的字体资源仍会重新注册。
 - 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
   会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
   丢弃。

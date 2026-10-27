@@ -8,7 +8,7 @@ const { spawnSync } = require('node:child_process');
 const { describe, it, before, after } = require('node:test');
 const { PNG } = require('pngjs');
 const { launchBrowser } = require('../../dist/lib/browser-engine');
-const { takeSnapshot } = require('../../dist/lib/browser-snapshot');
+const { takeSnapshot, SNAPSHOT_INIT_SCRIPT } = require('../../dist/lib/browser-snapshot');
 
 const binary = process.env.PAGX_SVG_TEST_BIN ||
   path.resolve(__dirname, '../../../../cmake-build-debug/pagx');
@@ -38,11 +38,12 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
       const png = path.join(dir, `${format}.png`);
       fs.writeFileSync(input, source);
       for (const args of [
-        ['import', '--input', input, '--output', output, '--format', format],
+        ['import', '--input', input, '--output', output, '--format', format,
+          ...(format === 'html' ? ['--html-source', 'snapshot'] : [])],
         ['render', output, '--output', png],
       ]) {
         const result = spawnSync(binary, args, {
-          env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' }, encoding: 'utf8', timeout: 30000,
+          encoding: 'utf8', timeout: 30000,
         });
         assert.equal(result.status, 0, `${name}/${format}: ${result.stderr}; ${dir}`);
       }
@@ -154,6 +155,24 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
         <textPath href="#p" startOffset="50%" text-anchor="middle">A<tspan
           fill="#e02020">BC</tspan>D</textPath></text>`,
     { meanLimit: 1.5, flatTolerance: 8 });
+  });
+
+  it('strips current-state priorities inside symbol and use templates without resolving currentColor', async function () {
+    await page.setContent('<style>html,body{margin:0;padding:0;width:240px;height:180px}</style><body style="">' +
+      '<svg width="240" height="180"><defs>' +
+      '<symbol id="s"><path d="M0 0H20V20Z" style="fill:none!important;stroke:currentColor!important"/></symbol>' +
+      '<g id="g"><path d="M0 0H20V20Z" style="fill:none!important;stroke:currentColor!important"/></g>' +
+      '</defs><use href="#s" x="20" y="20" color="red"/>' +
+      '<use href="#g" x="80" y="20" color="blue"/></svg>');
+    const before = await page.content();
+    await page.evaluate(SNAPSHOT_INIT_SCRIPT);
+    const snapshot = await page.evaluate(function snapshotCurrentState() {
+      return window.__pagxSnapshot.takeSnapshot({ mode: 'current-state' });
+    });
+    assert.doesNotMatch(snapshot.html, /!important/);
+    assert.equal((snapshot.html.match(/stroke:\s*currentcolor/gi) || []).length, 2);
+    assert.equal((snapshot.html.match(/fill:\s*none/gi) || []).length, 2);
+    assert.equal(await page.content(), before);
   });
 
   it('keeps relative styles in symbols until each use is instantiated', async () => {

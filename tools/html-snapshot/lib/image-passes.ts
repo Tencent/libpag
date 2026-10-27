@@ -191,8 +191,6 @@ async function inlineExternalImages(cachedMap) {
     // skipped outright.
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
-    // A <picture> may select its source from a <source srcset> only, leaving
-    // both attributes on the <img> empty while `currentSrc` is real.
     const pictureSource = img.parentElement?.tagName === 'PICTURE' && img.currentSrc;
     if (!rawSrc && !rawSrcset && !pictureSource) continue;
     // Skip images an earlier pass already inlined (a `data:` URI or local path
@@ -270,61 +268,43 @@ async function inlineExternalImages(cachedMap) {
   // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
   // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
   // `background-image` with a `data:` URI so the walker emits a self-contained reference.
-  function firstCssUrl(value) {
-    const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
-    return m ? m[2] : '';
+  function cssUrls(value) {
+    return Array.from(value.matchAll(/url\(\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^)]*)\s*\)/gi));
   }
-
-  // A stack that mixes a colour wash with a photo — `linear-gradient(...), url(photo.jpg)`, the
-  // usual "tinted card" pattern — is inlined layer by layer. Replacing the whole declaration
-  // would throw the gradient away, and leaving the photo remote makes the importer emit an
-  // `<Image source="https://…">` the renderer cannot fetch, so the card renders as bare text.
-  // Only a single-url stack is handled: `url(...), url(...)` has no gradient to preserve and
-  // keeps the previous whole-declaration replacement.
-  function hasGradientLayer(value) {
-    return /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value || '');
-  }
-
-  // Replaces just the `url(...)` token, leaving every other background layer in place. The data
-  // URI is emitted single-quoted because `normalizeBackgroundImage` passes a gradient-bearing
-  // value through verbatim: the value lands inside the double-quoted `style="…"` attribute the
-  // walker writes, where a double-quoted url() would close the attribute early.
-  function replaceFirstCssUrl(value, replacement) {
-    const token = `url('${replacement.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
-    return value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/i, () => token);
-  }
-
   const bgPending = [];
   const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    const layered = hasGradientLayer(bg) && (bg.match(/url\(/gi) || []).length === 1;
-    if (!bg || (!/^url\(/i.test(bg) && !layered)) continue;
-    const url = firstCssUrl(bg);
-    if (!url || /^file:/i.test(url)) continue;
-    if (url.startsWith('data:')) {
-      bgInlinePending.push({ el, src: url, current: url, bg, layered });
-      continue;
+    const matches = cssUrls(bg);
+    // Each element owns one mutable token list. Concurrent downloads replace their own token;
+    // writing from the original string on each completion would erase previously inlined layers.
+    const state = { el, bg, matches, replacements: matches.map(m => m[0]) };
+    for (let index = 0; index < matches.length; index++) {
+      const token = matches[index][0];
+      let url = token.slice(token.indexOf('(') + 1, -1).trim();
+      if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+      url = url.replace(/\\(['"\\])/g, '$1');
+      if (!url || /^file:/i.test(url)) continue;
+      if (url.startsWith('data:')) {
+        bgInlinePending.push({ state, index, src: url, current: url });
+      } else if (/^https?:/i.test(url)) {
+        if (cache[url]) bgInlinePending.push({ state, index, src: cache[url], current: url });
+        else bgPending.push({ state, index, url });
+      }
     }
-    if (!/^https?:/i.test(url)) continue;
-    const cached = cache[url];
-    if (cached) {
-      // `current` records what the element still declares: a cache hit has to be written back even
-      // when the cached bytes already are in a portable format, because the element is carrying
-      // the remote URL that entry replaces.
-      bgInlinePending.push({ el, src: cached, current: url, bg, layered });
-      continue;
-    }
-    bgPending.push({ el, url, bg, layered });
   }
 
-  // The inline declaration a fetched/cached url layer is written back into: a layered stack gets
-  // only its url token swapped, anything else keeps the whole-declaration replacement.
   function writeInlinedBackground(entry, value) {
-    entry.el.style.backgroundImage = entry.layered
-      ? replaceFirstCssUrl(entry.bg, value)
-      : `url("${value.replace(/"/g, '\\"')}")`;
+    const state = entry.state;
+    state.replacements[entry.index] = `url('${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+    let at = 0, result = '';
+    for (let i = 0; i < state.matches.length; i++) {
+      const match = state.matches[i];
+      result += state.bg.slice(at, match.index) + state.replacements[i];
+      at = match.index + match[0].length;
+    }
+    state.el.style.backgroundImage = result + state.bg.slice(at);
   }
 
   async function processOneBg(entry) {
@@ -336,7 +316,7 @@ async function inlineExternalImages(cachedMap) {
       }
       writeInlinedBackground(entry, await blobToNormalizedDataUri(await res.blob()));
     } catch (err) {
-      console.warn(`html-snapshot: failed to inline bg ${entry.urls.join(', ')}: ${err && err.message}`);
+      console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
     }
   }
 
@@ -359,162 +339,6 @@ async function inlineExternalImages(cachedMap) {
     await Promise.all(slice.map(processOneBg));
   }
 
-  // Top-level comma split of a CSS value list. Commas nested inside `rgb(...)`,
-  // `linear-gradient(...)` or a quoted `url('…')` argument — a `data:` URI in particular — must
-  // not split the list. Mirrors the importer's `SplitTopLevelCommas`.
-  function splitTopLevelCommas(value) {
-    const out = [];
-    let depth = 0;
-    let cur = '';
-    for (const ch of String(value || '')) {
-      if (ch === '(') depth++;
-      else if (ch === ')') depth = Math.max(0, depth - 1);
-      if (ch === ',' && depth === 0) {
-        if (cur.trim() !== '') out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-      cur += ch;
-    }
-    if (cur.trim() !== '') out.push(cur.trim());
-    return out;
-  }
-
-  // A stack that layers a colour wash over a photo cannot be expressed as one PAGX background:
-  // the importer paints either the gradient layers or the image, never both. Split it into two
-  // boxes that the existing paths already handle — the element keeps the photo as a lone url()
-  // background (so its `background-size` / `-position` / `-repeat` apply as usual), and a
-  // synthesized full-bleed child carries the wash on top of it. Only backdrop boxes are split:
-  // an element with content of its own would need the wash slotted between its background and
-  // that content, which the flattened subset has no way to express.
-  function splitTintedBackgrounds() {
-    for (const el of Array.from(document.querySelectorAll('*'))) {
-      const computed = getComputedStyle(el);
-      const bg = (computed.getPropertyValue('background-image') || '').trim();
-      const layers = splitTopLevelCommas(bg);
-      if (!hasGradientLayer(bg)) {
-        // A stack of two url() layers cannot be expressed as one PAGX background: the importer
-        // reads a single source per element, so the whole declaration would resolve to only its
-        // first layer. Keep the bottom layer on the element and peel the top one into a
-        // synthesized full-bleed child — the same shape as the wash split below. Only the exact
-        // two-layer, unblended, default-clip form is split; every other stack keeps the
-        // declaration, which the importer now resolves to its first layer.
-        //
-        // Unlike the wash split this branch also handles boxes with content of their own: the
-        // synthesized child is inserted *ahead* of the existing children, so the replay paints
-        // the element background, then the top image layer, then the content — exactly how CSS
-        // stacks every background layer beneath content. The one mismatch a full-bleed child
-        // would introduce is the corner clip, so it inherits the host's `border-radius`.
-        if (layers.length !== 2 || !/^url\(/i.test(layers[0]) || !/^url\(/i.test(layers[1])) {
-          continue;
-        }
-        const blendModes = splitTopLevelCommas(
-          computed.getPropertyValue('background-blend-mode') || 'normal');
-        if (blendModes.some((mode) => {
-          const m = mode.trim().toLowerCase();
-          return m !== '' && m !== 'normal';
-        })) {
-          continue;
-        }
-        const clips = splitTopLevelCommas(
-          computed.getPropertyValue('background-clip') || 'border-box');
-        if (clips.some((clip) => {
-          const c = clip.trim().toLowerCase();
-          return c !== '' && c !== 'border-box';
-        })) {
-          continue;
-        }
-        // The synthesized child's absolute inset resolves against the host, so a static host
-        // (the usual grid-tile shape — the markup carries only the background-image) must
-        // become positioned first. Promoting a static box to `relative` is otherwise a no-op
-        // for live layout, but it does re-anchor any absolutely-positioned descendant whose
-        // containing block currently sits further up the tree — bail on those instead of
-        // silently moving them.
-        if (computed.position === 'static') {
-          const reanchorsDescendant = Array.from(el.querySelectorAll('*')).some(
-            (descendant) => getComputedStyle(descendant).position === 'absolute');
-          if (reanchorsDescendant) continue;
-          el.style.position = 'relative';
-        }
-        // Each fitting property is a per-layer list; the element now carries a single layer, so
-        // it needs that layer's own entry rather than the list. A one-entry value is already
-        // shared by every layer and passes through unchanged. The synthesized top child needs
-        // the CSS-topmost layer's entry instead.
-        const pickLayer = (value, index, fallback) => {
-          const entries = splitTopLevelCommas(value || '');
-          const picked = entries.length > 1 ? entries[index] : entries[0];
-          return picked || fallback;
-        };
-        el.style.backgroundImage = layers[1];
-        el.style.backgroundSize = pickLayer(computed.getPropertyValue('background-size'), 1, 'auto');
-        el.style.backgroundPosition = pickLayer(
-          computed.getPropertyValue('background-position'), 1, '0% 0%');
-        el.style.backgroundRepeat = pickLayer(
-          computed.getPropertyValue('background-repeat'), 1, 'repeat');
-        const top = document.createElement('div');
-        top.setAttribute('data-pagx-tint', '');
-        top.setAttribute(
-          'style',
-          // The synthesized child matches the page's container rules (`.tile div { … }` shapes
-          // are common), so its own computed background/border/shadow would replay onto the
-          // layer and paint over the host's lower image. Pin those back to the no-op values.
-          // `z-index: -1` pins the layer into the walker's negative paint band so it replays
-          // ahead of the host's content — a plain `auto` z-index sorts it *after* the content
-          // (whose positioning comes from the authored CSS), painting the image over the very
-          // text the stack was supposed to sit behind.
-          'position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;border-radius:inherit;' +
-            'background-color:transparent;border:0;box-shadow:none;' +
-            'background-image:' +
-            layers[0] +
-            ';background-size:' +
-            pickLayer(computed.getPropertyValue('background-size'), 0, 'auto') +
-            ';background-position:' +
-            pickLayer(computed.getPropertyValue('background-position'), 0, '0% 0%') +
-            ';background-repeat:' +
-            pickLayer(computed.getPropertyValue('background-repeat'), 0, 'repeat') +
-            ';'
-        );
-        el.insertBefore(top, el.firstChild);
-        continue;
-      }
-      // The wash split stays backdrop-only: slotted between the host's background and its
-      // content it would also be sound, but no sample needs it and rebuilding the gradient
-      // list for grounded content risks double-painting pseudo stand-ins. The wash child is
-      // positioned against the element, so the element has to be its own containing block; on
-      // a static box the inset would resolve against some distant ancestor.
-      if (computed.position === 'static') continue;
-      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
-      const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
-      if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
-      const wash = layers.filter((layer, index) => index !== urlIndex);
-      if (wash.length === 0) continue;
-      // Each fitting property is a per-layer list; the element now carries a single layer, so it
-      // needs that layer's own entry rather than the list. A one-entry value is already shared by
-      // every layer and passes through unchanged.
-      const entryFor = (value, fallback) => {
-        const entries = splitTopLevelCommas(value);
-        const picked = entries.length > 1 ? entries[urlIndex] : entries[0];
-        return picked || fallback;
-      };
-      const size = entryFor(computed.getPropertyValue('background-size'), 'auto');
-      const position = entryFor(computed.getPropertyValue('background-position'), '0% 0%');
-      const repeat = entryFor(computed.getPropertyValue('background-repeat'), 'repeat');
-      el.style.backgroundImage = layers[urlIndex];
-      el.style.backgroundSize = size;
-      el.style.backgroundPosition = position;
-      el.style.backgroundRepeat = repeat;
-      const tint = document.createElement('div');
-      tint.setAttribute('data-pagx-tint', '');
-      tint.setAttribute(
-        'style',
-        'position:absolute;left:0;top:0;width:100%;height:100%;background-image:' +
-          wash.join(', ') +
-          ';'
-      );
-      el.appendChild(tint);
-    }
-  }
-  splitTintedBackgrounds();
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====

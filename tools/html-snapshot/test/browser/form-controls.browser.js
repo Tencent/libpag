@@ -49,6 +49,21 @@ describe('form control capture', () => {
     assert.match(result.html, /第二行/);
   });
 
+  it('preserves fallback input whitespace and clips multiline text without a layout provider', async function () {
+    await load('<input id="entry" value="  padded  " placeholder="  hint  " style="width:100px">' +
+      '<input type="password" value="A😀中">' +
+      '<textarea style="width:100px;height:60px;padding:8px">  first line\nsecond line  </textarea>');
+    const result = await page.evaluate(takeSnapshot);
+    assert.match(result.html, />  padded  <\/span>/);
+    assert.match(result.html, />•••<\/span>/);
+    assert.doesNotMatch(result.html, /A😀中/);
+    assert.match(result.html, /white-space: pre-wrap; width: 100%; height: 100%; overflow: hidden/);
+    assert.match(result.html, />  first line\nsecond line  <\/span>/);
+    await page.evaluate(function clearInput() { document.querySelector('#entry').value = ''; });
+    const placeholder = await page.evaluate(takeSnapshot);
+    assert.match(placeholder.html, />  hint  <\/span>/);
+  });
+
   it('keeps a disabled control layout slot when no paint provider is installed', async () => {
     await load('<label style="display:flex;align-items:center;gap:6px"><input type=radio disabled>Frozen</label>');
     const result = await page.evaluate(takeSnapshot);

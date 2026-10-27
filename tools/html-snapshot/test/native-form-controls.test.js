@@ -63,6 +63,7 @@ describe('nativeControlKind', () => {
 describe('maskPasswordText', () => {
   test('emits one bullet per character', () => {
     expect(maskPasswordText('secret')).toBe('\u2022\u2022\u2022\u2022\u2022\u2022');
+    expect(maskPasswordText('A😀中')).toBe('\u2022\u2022\u2022');
   });
 
   test('is empty for an empty value', () => {

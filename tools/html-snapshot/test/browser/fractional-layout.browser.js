@@ -42,11 +42,11 @@ describe('fractional layout at the canvas boundary', { skip: !fs.existsSync(bina
       fs.writeFileSync(input, snapshot.html);
       fs.writeFileSync(path.join(dir, 'reference.png'), PNG.sync.write(reference));
       for (const args of [
-        ['import', '--input', input, '--output', output],
+        ['import', '--html-source', 'snapshot', '--input', input, '--output', output],
         ['render', output, '--scale', String(scale), '--output', path.join(dir, 'actual.png')],
       ]) {
         const result = spawnSync(binary, args, {
-          env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' }, encoding: 'utf8', timeout: 30000,
+          encoding: 'utf8', timeout: 30000,
         });
         assert.equal(result.status, 0, `${result.stderr}; ${dir}`);
       }

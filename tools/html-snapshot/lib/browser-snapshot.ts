@@ -1345,7 +1345,7 @@ function imgAlt(el) {
 // character. Emitting the raw `value` would leak the password into the snapshot
 // as plain text (and render it verbatim in PAGX).
 function maskPasswordText(value) {
-  return value ? '\u2022'.repeat(value.length) : '';
+  return value ? '\u2022'.repeat(Array.from(value).length) : '';
 }
 
 function syntheticText(el) {
@@ -1359,9 +1359,9 @@ function syntheticText(el) {
     if (type === 'password') {
       const value = el.value || '';
       if (value) return maskPasswordText(value);
-      return (el.getAttribute('placeholder') || '').trim();
+      return el.getAttribute('placeholder') || '';
     }
-    return (el.value || el.getAttribute('placeholder') || '').trim();
+    return el.value || el.getAttribute('placeholder') || '';
   }
   if (tag === 'select') {
     const opt = el.options && el.options[el.selectedIndex];
@@ -1385,7 +1385,9 @@ function needsNativeControlPaint(el, computed) {
 function renderControlPaint(el, parentRect, rect, left, top, computed, opts) {
   const paint = window.__pagxControlPaints && window.__pagxControlPaints.get(el);
   if (!paint) {
-    PAINT_CAPTURE.warnings.push(`html-snapshot: native paint unavailable for <${el.tagName.toLowerCase()}>; preserved its layout box`);
+    PAINT_CAPTURE.warnings.push(`html-snapshot: native paint unavailable for <${el.tagName.toLowerCase()}>; using fallback`);
+    const nativeKind = nativeControlKind(el, computed);
+    if (nativeKind) return renderNativeControl(el, nativeKind, rect, left, top, computed, opts);
     if (syntheticText(el)) return renderTextInput(el, parentRect, rect, left, top, computed, opts);
     return renderContainer(el, parentRect, rect, left, top, computed, opts);
   }
@@ -2603,7 +2605,7 @@ function freezeSvg(svgEl, rect) {
         dst.setAttribute('fill', resolvedAttrs['fill'] || here);
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
-      if (dst.style && !inTemplate) {
+      if (dst.style) {
         // Current-state collection already resolved the cascade and removed
         // author stylesheets. Its inline !important markers only protect the
         // inert mirror's layout; the native SVG parser treats them as part of
@@ -2616,9 +2618,11 @@ function freezeSvg(svgEl, rect) {
             }
           }
         }
-        if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
-        if (dst.style.fill === 'currentColor') dst.style.fill = here;
-        if (dst.style.color === 'currentColor') dst.style.color = here;
+        if (!inTemplate) {
+          if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
+          if (dst.style.fill === 'currentColor') dst.style.fill = here;
+          if (dst.style.color === 'currentColor') dst.style.color = here;
+        }
       }
       // Freeze any CSS-resolved presentation attribute that the cloned
       // ancestor chain doesn't already supply. This is what carries
@@ -3963,34 +3967,18 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
     : '';
   const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
-  let textStyle = buildStyle(0, 0, 0, 0, computed, {
+  const textStyle = buildStyle(0, 0, 0, 0, computed, {
     box: false, text: true, positioned: false,
     textColorOverride: placeholderColor || undefined,
   });
+  const multiline = el.tagName.toLowerCase() === 'textarea';
   PAINT_CAPTURE.warnings.push('html-snapshot: control text layout unavailable; using CSS text fallback');
-  // A <textarea> soft-wraps its value to the box width (and keeps embedded
-  // newlines), unlike <input>/<select> which never wrap. The default path forces
-  // `white-space: nowrap`, but even with the textarea's own `pre-wrap` a bare
-  // <Text> never wraps — the importer only synthesises a wrapping TextBox when
-  // the text leaf hands it a box to wrap against. Pinning the span to the
-  // content-box width and adding `overflow: hidden` (a textarea clips its
-  // content) gives it that box, so the value wraps instead of running off as one
-  // long line. The content is top-aligned, as a textarea's is.
-  const isTextarea = String(el.tagName || '').toLowerCase() === 'textarea';
-  let alignItems = 'center';
-  if (isTextarea) {
-    const contentWidth = Math.max(0, rect.width
-      - borderWidthOf(computed, 'left') - borderWidthOf(computed, 'right')
-      - pad.left - pad.right);
-    const wrap = /white-space:/.test(textStyle) ? '' : '; white-space: pre-wrap';
-    const extra = `width: ${px(contentWidth)}; overflow: hidden${wrap}`;
-    textStyle = textStyle ? `${textStyle}; ${extra}` : extra;
-    alignItems = 'flex-start';
-  } else {
-    textStyle = withNowrap(textStyle);
-  }
-  const innerLayout = `display: flex; align-items: ${alignItems}` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  const finalTextStyle = multiline
+    ? joinStyles(textStyle, 'white-space: pre-wrap; width: 100%; height: 100%; overflow: hidden')
+    : withNowrap(textStyle);
+  const innerLayout = (multiline ? 'display: block' : 'display: flex; align-items: center') +
+    '; overflow: hidden' + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const inner = `<span${buildLanguageAttribute(el)} style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   if (String(el.tagName || '').toLowerCase() === 'select') {
     // Place the chevron on the control's own (unpadded) box rather than inside the padded flex
     // host — see selectArrowMarkup for why the host's padding would drift the two renderings
@@ -5385,23 +5373,6 @@ function renderElementBox(el, parentRect, opts, precomputed) {
     ? null : classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
-  }
-
-  // Native form controls have no light-DOM paint for `classify` to keep (their
-  // check tick / radio dot / range thumb / bar / swatch / date text all live in
-  // the UA shadow DOM), so synthesise their static appearance inline before the
-  // kind dispatch can drop them. Handled here — ahead of `classify` and outside
-  // the flex branch above — so a control that is itself a flex item (the common
-  // `<label style="display:flex"><input type=checkbox>…`) is covered too.
-  const nativeKind = nativeControlKind(el, computed);
-  if (nativeKind) {
-    const controlRect = el.getBoundingClientRect();
-    if (opts.flexItem || nonZero(controlRect)) {
-      const controlLeft = controlRect.left - parentRect.left;
-      const controlTop = controlRect.top - parentRect.top;
-      return renderNativeControl(el, nativeKind, controlRect, controlLeft, controlTop, computed, opts);
-    }
-    return '';
   }
 
   const kind = classify(el, computed);

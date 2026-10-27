@@ -389,8 +389,9 @@ URI are carried over verbatim, so a page that inlines its fonts needs neither a
 file on disk nor any flag. The importer registers each source under the **CSS
 family the rule declares** — not the family stored inside the font file, which a
 page routinely aliases (`font-family: MaShanZheng` for a file named
-`Ma Shan Zheng`) — and `pagx import` then bakes the glyphs by default
-(`--fonts embed`). Remote sources are still not carried over this way; use
+`Ma Shan Zheng`) — and `pagx import` retains these font sources by default
+(`--fonts external`). Use `--fonts embed` to bake glyphs instead. Remote sources
+are still not carried over this way; use
 `--download-fonts` below for them.
 
 The weight and style descriptors travel with the source because they decide
