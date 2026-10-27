@@ -2,7 +2,7 @@
 <!-- Tests: Group anchor.x shifts the group contents because the content is translated by the
      negated anchor before the position is applied.
      Target: Group  Channel: anchor.x  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
