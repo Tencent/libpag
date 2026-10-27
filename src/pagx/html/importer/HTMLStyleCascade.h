@@ -123,7 +123,7 @@ class HTMLStyleCascade {
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
-                        bool deferBorderRadius = false);
+                       bool deferBorderRadius = false);
   void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);

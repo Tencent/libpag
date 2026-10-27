@@ -1339,7 +1339,8 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_ValidateSimple) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_Basic.svg");
   auto outputPath = TempDir() + "/ImportSVG_Basic.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
   auto output = ReadFile(outputPath);
@@ -1350,7 +1351,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
   auto svgPath = ExportToSVG("render_gradient.pagx", "ImportSVG_Gradient.svg");
   auto outputPath = TempDir() + "/ImportSVG_Gradient.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1359,7 +1361,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
   auto svgPath = ExportToSVG("render_text.pagx", "ImportSVG_Text.svg");
   auto outputPath = TempDir() + "/ImportSVG_Text.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1368,14 +1371,16 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_RoundTrip) {
   auto svgPath = ExportToSVG("verify_simple.pagx", "ImportSVG_RoundTrip.svg");
   auto outputPath = TempDir() + "/ImportSVG_RoundTrip.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
   auto svgPath = ExportToSVG("render_scale.pagx", "ImportSVG_Scale.svg");
   auto outputPath = TempDir() + "/ImportSVG_Scale.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1384,8 +1389,8 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
 CLI_TEST(PAGXCliTest, Import_ForceFormat) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_ForceFormat.xml", {"--format", "svg"});
   auto outputPath = TempDir() + "/ImportSVG_ForceFormat.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--format", "svg", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input",
+                                            svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   auto output = ReadFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
@@ -1401,21 +1406,22 @@ CLI_TEST(PAGXCliTest, Import_DefaultOutput) {
 
 CLI_TEST(PAGXCliTest, Import_MissingFile) {
   auto outputPath = TempDir() + "/ImportSVG_Missing.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", "nonexistent.svg", "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "nonexistent.svg",
+                                            "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_InvalidSvg) {
   auto inputPath = TestResourcePath("verify_not_xml.pagx");
   auto outputPath = TempDir() + "/ImportSVG_Invalid.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--format", "svg", "--input", inputPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input",
+                                            inputPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_UnknownOption) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--unknown", "--input", "test.svg"});
+  auto ret =
+      CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--unknown", "--input", "test.svg"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1425,7 +1431,8 @@ CLI_TEST(PAGXCliTest, Import_MissingInput) {
 }
 
 CLI_TEST(PAGXCliTest, Import_UnsupportedFormat) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "xyz", "--input", "test.xyz"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--format", "xyz", "--input", "test.xyz"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1589,7 +1596,8 @@ CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
 
 // RunImport with a URL input but no --output is rejected during option parsing.
 CLI_TEST(PAGXCliTest, Import_UrlRequiresOutput) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "https://example.com/demo"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", "https://example.com/demo"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1598,8 +1606,8 @@ CLI_TEST(PAGXCliTest, Import_UrlRequiresOutput) {
 CLI_TEST(PAGXCliTest, Import_NoResolve) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoResolve.svg");
   auto outputPath = TempDir() + "/ImportNoResolve.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--no-resolve"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--no-resolve"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1608,8 +1616,8 @@ CLI_TEST(PAGXCliTest, Import_NoResolve) {
 CLI_TEST(PAGXCliTest, Import_Verbose) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportVerbose.svg");
   auto outputPath = TempDir() + "/ImportVerbose.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--verbose"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--verbose"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1618,8 +1626,8 @@ CLI_TEST(PAGXCliTest, Import_Verbose) {
 CLI_TEST(PAGXCliTest, Import_ImagesExternal) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesExternal.svg");
   auto outputPath = TempDir() + "/ImportImagesExternal.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath,
-                                            "--images", "external"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--images", "external"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1628,15 +1636,16 @@ CLI_TEST(PAGXCliTest, Import_ImagesExternal) {
 CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesEmbed.svg");
   auto outputPath = TempDir() + "/ImportImagesEmbed.pagx";
-  auto ret = CallRun(pagx::cli::RunImport,
-                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath, "--images", "embed"});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--images", "embed"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
 
 // An invalid --images value is rejected during option parsing.
 CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", "test.svg", "--images", "bogus"});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", "test.svg", "--images", "bogus"});
   EXPECT_NE(ret, 0);
 }
 
@@ -1644,8 +1653,8 @@ CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
 CLI_TEST(PAGXCliTest, Import_ImageBaseDir) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportImageBaseDir.svg");
   auto outputPath = TempDir() + "/ImportImageBaseDir.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath,
-                                            "--image-base-dir", TempDir()});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output",
+                                            outputPath, "--image-base-dir", TempDir()});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
@@ -1940,13 +1949,15 @@ CLI_TEST(PAGXCliTest, Export_MultipleInputsRejectedForSvg) {
 CLI_TEST(PAGXCliTest, Import_WriteFailure) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_WriteFail.svg");
   auto outputPath = "/nonexistent_dir_xyz/output.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--input", svgPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
 }
 
 CLI_TEST(PAGXCliTest, Import_DefaultOutputNoExtInput) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoExt", {"--format", "svg"});
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--overwrite", "--format", "svg", "--input", svgPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--overwrite", "--format", "svg", "--input", svgPath});
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ImportNoExt.pagx";
   EXPECT_TRUE(std::filesystem::exists(defaultOutput));

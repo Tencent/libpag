@@ -37,7 +37,8 @@ std::vector<std::string> ParseCSSFontFamilyList(const std::string& value) {
       escaped = true;
     } else if (quote != 0) {
       if (c == quote) quote = 0;
-      else current += c;
+      else
+        current += c;
     } else if (c == '"' || c == '\'') {
       quote = c;
     } else if (c == ',') {
@@ -69,9 +70,11 @@ std::string ResolveCSSGenericFontFamily(const std::string& name) {
   const char* sans = "DejaVu Sans";
 #endif
   if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
-      lower == "-apple-system" || lower == "blinkmacsystemfont") return sans;
+      lower == "-apple-system" || lower == "blinkmacsystemfont")
+    return sans;
   if (lower == "cursive" || lower == "fantasy" || lower == "ui-rounded" || lower == "emoji" ||
-      lower == "math" || lower == "fangsong") return {};
+      lower == "math" || lower == "fangsong")
+    return {};
   return name;
 }
 

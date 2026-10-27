@@ -19,8 +19,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
-#include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLCSSPosition.h"
+#include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 
 namespace pagx {

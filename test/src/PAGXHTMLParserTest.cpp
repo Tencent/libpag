@@ -288,11 +288,10 @@ PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalTex
   for (const auto& spacing : {"", "nan", "1px", "1e100", "1e-100"}) {
     SCOPED_TRACE(spacing);
     ParserInput input;
-    auto node =
-        ParseNode(std::string("<span data-pagx-text=\"AB\" ") +
-                  "data-pagx-letter-spacing=\"" + spacing +
-                  "\" data-pagx-faux-bold=\"true\" "
-                  "data-pagx-faux-italic=\"no\">ignored glyphs</span>");
+    auto node = ParseNode(std::string("<span data-pagx-text=\"AB\" ") +
+                          "data-pagx-letter-spacing=\"" + spacing +
+                          "\" data-pagx-faux-bold=\"true\" "
+                          "data-pagx-faux-italic=\"no\">ignored glyphs</span>");
     ASSERT_NE(node, nullptr);
     pagx::HTMLInheritedStyle inherited;
     inherited.letterSpacing = "3px";
