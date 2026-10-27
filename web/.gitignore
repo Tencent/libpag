@@ -16,6 +16,8 @@ emsdk/
 api-docs
 *.js.map
 demo/*.js
+demo/index.html
+demo/index-*.html
 cypress/videos
 cypress/screenshots
 demo/wechat-miniprogram/utils/libpag.js
