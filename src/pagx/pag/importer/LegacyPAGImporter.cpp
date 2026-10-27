@@ -22,6 +22,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -866,6 +867,36 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
   layer->alpha = opacity / 255.0f;
 }
 
+// Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
+// (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
+// mode). Other effect types report an issue until their phase-3 filters land.
+void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
+  for (auto* effect : legacyLayer->effects) {
+    if (effect == nullptr) {
+      continue;
+    }
+    if (effect->type() == pag::EffectType::FastBlur) {
+      auto* legacy = static_cast<pag::FastBlurEffect*>(effect);
+      auto* blur = state->document->makeNode<BlurFilter>();
+      auto blurriness = PropertyValueAtStart(legacy->blurriness, legacyLayer->startTime, nullptr);
+      auto direction =
+          PropertyValueAtStart(legacy->blurDimensions, legacyLayer->startTime, nullptr);
+      // The legacy GaussianBlurFilter divides blurriness by 2 before passing to tgfx (see
+      // src/rendering/filters/gaussianblur/GaussianBlurFilter.cpp), and repeatEdgePixels maps
+      // to Clamp (not Repeat) per the same implementation.
+      auto radius = blurriness / 2.0f;
+      blur->blurX = direction == pag::BlurDimensionsDirection::Vertical ? 0.0f : radius;
+      blur->blurY = direction == pag::BlurDimensionsDirection::Horizontal ? 0.0f : radius;
+      auto repeatEdge =
+          PropertyValueAtStart(legacy->repeatEdgePixels, legacyLayer->startTime, nullptr);
+      blur->tileMode = repeatEdge ? TileMode::Clamp : TileMode::Decal;
+      layer->filters.push_back(blur);
+    } else {
+      state->warn(PAGExportWarning::UnsupportedColorSource, "unsupported layer effect");
+    }
+  }
+}
+
 Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFrameRate) {
   if (legacyLayer == nullptr) {
     return nullptr;
@@ -940,9 +971,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       if (legacyLayer->masks.empty() == false) {
         state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
       }
-      if (legacyLayer->effects.empty() == false) {
-        state->warn(PAGExportWarning::UnsupportedColorSource, "layer effects");
-      }
+      ConvertLayerEffects(state, legacyLayer, layer);
       if (legacyLayer->layerStyles.empty() == false) {
         state->warn(PAGExportWarning::UnsupportedColorSource, "layer styles");
       }
@@ -1044,6 +1073,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         layer->contents.push_back(fill);
         state->convertedImages.push_back({legacyImage, pattern, state->currentComposition});
       }
+      ConvertLayerEffects(state, legacyLayer, layer);
       return layer;
     }
     default:
