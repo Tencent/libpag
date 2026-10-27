@@ -36,7 +36,8 @@ describe('dashedBorderSideSvg — dashed sides', () => {
   });
 
   test('centres the top line at half the border width', () => {
-    expect(dashedBorderSideSvg('top', 100, 40, b)).toContain('d="M 0 0.75 L 100 0.75"');
+    // y = width/2 = 0.75 → roundPx → 0.8
+    expect(dashedBorderSideSvg('top', 100, 40, b)).toContain('d="M 0 0.8 L 100 0.8"');
   });
 
   test('centres the bottom line at height minus half the border width', () => {

@@ -5,13 +5,6 @@ absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
 fed directly to `pagx import --format html`.
 
-Measured geometry retains fractional CSS pixels through snapshot and PAGX serialization. HTML
-import uses `layoutRounding="none"` on the body Layer so nested positions and percentage backgrounds
-remain aligned. Only the final raster canvas extent is rounded outward to integer pixels.
-Snapshot, baseline screenshots and viewport checks share the same body-based canvas measurement,
-including the body's offset from the document origin. Collapsed trailing margins outside the body
-remain outside this capture; a small fixed canvas is not expanded to the viewport's minimum height.
-
 Text capture uses Chromium layout text fragments for source boundaries and effective styles
 (including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
 This preserves drop caps, columns, and overlapping line boxes without relying on global

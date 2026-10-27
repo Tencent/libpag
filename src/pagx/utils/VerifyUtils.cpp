@@ -73,9 +73,6 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
   if (layer->layout != LayoutMode::None) {
     return true;
   }
-  if (layer->layoutRounding != LayoutRounding::Inherit) {
-    return true;
-  }
   if (layer->gap != 0.0f) {
     return true;
   }

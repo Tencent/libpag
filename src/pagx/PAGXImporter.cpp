@@ -483,7 +483,6 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
-  layer->layoutRounding = GET_ENUM(node, "layoutRounding", "inherit", doc, LayoutRounding);
   layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
   layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
   layer->padding = GetPaddingAttribute(node, doc);
