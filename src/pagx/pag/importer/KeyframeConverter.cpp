@@ -324,23 +324,42 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
   }
   auto* channel = document->makeNode<TypedChannel<bool>>();
   channel->name = "visible";
+  // TrackMatteIsEmpty semantics (legacy Modifier::MakeMask): a NON-inverted matte whose source
+  // left its in/out window skips the target entirely, so the window is the intersection of both.
+  // An INVERTED matte with an empty source keeps the target fully visible (MakeMask returns
+  // null), which is exactly what the runtime already does when the mask layer turns invisible
+  // (tgfx drops the mask), so inverted mattes keep their own window.
+  auto startTime = legacyLayer->startTime;
+  auto duration = legacyLayer->duration;
+  auto matteType = legacyLayer->trackMatteType;
+  auto invertedMatte = matteType == pag::TrackMatteType::AlphaInverted ||
+                       matteType == pag::TrackMatteType::LumaInverted;
+  if (legacyLayer->trackMatteLayer != nullptr && !invertedMatte) {
+    auto* source = legacyLayer->trackMatteLayer;
+    auto start = std::max(startTime, source->startTime);
+    auto end = std::min(startTime + duration, source->startTime + source->duration);
+    startTime = start;
+    duration = end > start ? end - start : 0;
+  }
   // A delayed in point means the layer is hidden before it: without this leading key the
   // Hold evaluation clamps to the first keyframe and the layer leaks visible from time 0.
-  if (legacyLayer->startTime > 0) {
+  if (startTime > 0) {
     Keyframe<bool> off = {};
     off.time = 0;
     off.value = false;
     off.interpolation = KeyframeInterpolationType::Hold;
     channel->keyframes.push_back(off);
   }
-  Keyframe<bool> on = {};
-  on.time = legacyLayer->startTime;
-  on.value = true;
-  on.interpolation = KeyframeInterpolationType::Hold;
-  channel->keyframes.push_back(on);
+  if (duration > 0) {
+    Keyframe<bool> on = {};
+    on.time = startTime;
+    on.value = true;
+    on.interpolation = KeyframeInterpolationType::Hold;
+    channel->keyframes.push_back(on);
+  }
   // The visible window closes at the out point; when the window covers the whole composition
   // no closing keyframe is needed (the Hold keeps true forever).
-  auto outPoint = legacyLayer->startTime + legacyLayer->duration;
+  auto outPoint = startTime + duration;
   auto containing = legacyLayer->containingComposition;
   auto containingFrameCount =
       containing != nullptr
