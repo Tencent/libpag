@@ -492,17 +492,32 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->skewX = GetFloatAttribute(node, "skewX", Default<Layer>().skewX, doc);
   layer->skewY = GetFloatAttribute(node, "skewY", Default<Layer>().skewY, doc);
   layer->perspective = GetFloatAttribute(node, "perspective", Default<Layer>().perspective, doc);
+  // Rotation and scale accept any finite value; NaN / inf cannot compose into a transform.
+  if (!std::isfinite(layer->rotationX) || !std::isfinite(layer->rotationY) ||
+      !std::isfinite(layer->rotationZ)) {
+    ReportError(doc, node, "Rotation attributes must be finite numbers.");
+    layer->rotationX = Default<Layer>().rotationX;
+    layer->rotationY = Default<Layer>().rotationY;
+    layer->rotationZ = Default<Layer>().rotationZ;
+  }
+  if (!std::isfinite(layer->scaleX) || !std::isfinite(layer->scaleY) ||
+      !std::isfinite(layer->scaleZ)) {
+    ReportError(doc, node, "Scale attributes must be finite numbers.");
+    layer->scaleX = Default<Layer>().scaleX;
+    layer->scaleY = Default<Layer>().scaleY;
+    layer->scaleZ = Default<Layer>().scaleZ;
+  }
   // A skew of exactly +/-90 degrees has no finite tangent and a negative viewing distance is not a
   // projection, so both are rejected here instead of silently rendering a fallback transform.
-  if (std::abs(layer->skewX) >= 90.0f) {
+  if (!std::isfinite(layer->skewX) || std::abs(layer->skewX) >= 90.0f) {
     ReportError(doc, node, "'skewX' must be within (-90, 90) degrees.");
     layer->skewX = Default<Layer>().skewX;
   }
-  if (std::abs(layer->skewY) >= 90.0f) {
+  if (!std::isfinite(layer->skewY) || std::abs(layer->skewY) >= 90.0f) {
     ReportError(doc, node, "'skewY' must be within (-90, 90) degrees.");
     layer->skewY = Default<Layer>().skewY;
   }
-  if (layer->perspective < 0.0f) {
+  if (!std::isfinite(layer->perspective) || layer->perspective < 0.0f) {
     ReportError(doc, node, "'perspective' must be zero or a positive distance.");
     layer->perspective = Default<Layer>().perspective;
   }

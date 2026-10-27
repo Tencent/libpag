@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXNodeChannel.h"
+#include <cmath>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -95,6 +96,46 @@ static bool AccessFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   }
   const auto* value = std::get_if<float>(setIn);
   if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessSkewAngle(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  // A skew of +/-90 degrees has no finite tangent; larger magnitudes wrap modulo 180 degrees.
+  if (value == nullptr || !std::isfinite(*value) || std::abs(*value) >= 90.0f) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessPerspectiveDistance(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  // A negative distance is not a projection.
+  if (value == nullptr || !std::isfinite(*value) || *value < 0.0f) {
     return false;
   }
   self->*Field = *value;
@@ -384,6 +425,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 // table entries; all access logic lives in the templated generators above.
 #define FIELD_FLOAT(T, name, member, cls) \
   { name, cls, &AccessFloat<T, &T::member> }
+#define FIELD_SKEW(T, name, member, cls) \
+  { name, cls, &AccessSkewAngle<T, &T::member> }
+#define FIELD_PERSPECTIVE(T, name, member, cls) \
+  { name, cls, &AccessPerspectiveDistance<T, &T::member> }
 #define FIELD_BOOL(T, name, member, cls) \
   { name, cls, &AccessBool<T, &T::member> }
 #define FIELD_INT(T, name, member, cls) \
@@ -453,9 +498,9 @@ static std::vector<ChannelDef> BuildLayerFields() {
       FIELD_FLOAT(Layer, "scale.x", scaleX, Anim),
       FIELD_FLOAT(Layer, "scale.y", scaleY, Anim),
       FIELD_FLOAT(Layer, "scale.z", scaleZ, Anim),
-      FIELD_FLOAT(Layer, "skew.x", skewX, Anim),
-      FIELD_FLOAT(Layer, "skew.y", skewY, Anim),
-      FIELD_FLOAT(Layer, "perspective", perspective, Anim),
+      FIELD_SKEW(Layer, "skew.x", skewX, Anim),
+      FIELD_SKEW(Layer, "skew.y", skewY, Anim),
+      FIELD_PERSPECTIVE(Layer, "perspective", perspective, Anim),
       FIELD_MATRIX(Layer, "matrix", matrix, Anim),
       FIELD_MATRIX3D(Layer, "matrix3D", matrix3D, Anim),
       FIELD_BOOL(Layer, "preserve3D", preserve3D, NoFlags),
