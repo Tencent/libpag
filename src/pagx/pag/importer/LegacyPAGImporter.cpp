@@ -446,6 +446,31 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
               static_cast<Group*>(element)->position.x += bakeX;
               static_cast<Group*>(element)->position.y += bakeY;
               break;
+            case NodeType::Fill:
+            case NodeType::Stroke: {
+              // A fitsToGeometry=false gradient lives in the same space as the geometry, so
+              // the baked translation must shift its anchor points too, or the gradient
+              // stays behind while the geometry moves and degenerates to a flat color.
+              auto* colorSource = element->nodeType() == NodeType::Fill
+                                      ? static_cast<Fill*>(element)->color
+                                      : static_cast<Stroke*>(element)->color;
+              if (colorSource == nullptr || colorSource->nodeType() == NodeType::SolidColor ||
+                  colorSource->nodeType() == NodeType::ImagePattern) {
+                break;
+              }
+              if (colorSource->nodeType() == NodeType::LinearGradient) {
+                auto* linear = static_cast<LinearGradient*>(colorSource);
+                linear->startPoint.x += bakeX;
+                linear->startPoint.y += bakeY;
+                linear->endPoint.x += bakeX;
+                linear->endPoint.y += bakeY;
+              } else if (colorSource->nodeType() == NodeType::RadialGradient) {
+                auto* radial = static_cast<RadialGradient*>(colorSource);
+                radial->center.x += bakeX;
+                radial->center.y += bakeY;
+              }
+              break;
+            }
             default:
               break;
           }
