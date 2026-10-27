@@ -281,9 +281,9 @@ static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readbac
   auto deadline = start + std::chrono::milliseconds(timeoutMs);
   while (!readback->isReady()) {
     if (std::chrono::steady_clock::now() >= deadline) {
-      auto elapsed =
-          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
-              .count();
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - start)
+                         .count();
       LOGE("WaitReadbackReady() timed out after %lld ms.", static_cast<long long>(elapsed));
       return false;
     }
