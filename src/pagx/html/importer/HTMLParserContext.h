@@ -102,8 +102,8 @@ class HTMLParserContext {
                                             const std::string& svgSource,
                                             const std::string& svgContent);
   void emitImageContent(Layer* layer, const HTMLBoxAttributes& box,
-                         const HTMLImageIntrinsicSize& intrinsic, Image* image,
-                         const std::string& svgSource, const std::string& svgContent);
+                        const HTMLImageIntrinsicSize& intrinsic, Image* image,
+                        const std::string& svgSource, const std::string& svgContent);
   void finishImageLayouts();
 
   // Recovers a CSS `url(...)` background into an `ImagePattern` Fill appended to `layer`

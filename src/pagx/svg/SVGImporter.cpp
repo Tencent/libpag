@@ -168,7 +168,8 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
         (sourceW > 0 || width.empty() || width == "auto" || width.find('%') != std::string::npos))
       sourceW = _options.targetWidth;
     if (std::isfinite(_options.targetHeight) &&
-        (sourceH > 0 || height.empty() || height == "auto" || height.find('%') != std::string::npos))
+        (sourceH > 0 || height.empty() || height == "auto" ||
+         height.find('%') != std::string::npos))
       sourceH = _options.targetHeight;
     _viewBoxWidth = sourceW;
     _viewBoxHeight = sourceH;
@@ -1372,8 +1373,8 @@ Layer* SVGParserContext::convertViewport(const std::shared_ptr<DOMNode>& element
 }
 
 Layer* SVGParserContext::convertUseViewport(const std::shared_ptr<DOMNode>& useElement,
-                                             const std::shared_ptr<DOMNode>& refElement,
-                                             const InheritedStyle& inheritedStyle, int depth) {
+                                            const std::shared_ptr<DOMNode>& refElement,
+                                            const InheritedStyle& inheritedStyle, int depth) {
   std::string refId = resolveUrl(getHrefAttribute(useElement));
   float x = parseLength(getAttribute(useElement, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(useElement, "y"), _viewBoxHeight);
@@ -1383,9 +1384,8 @@ Layer* SVGParserContext::convertUseViewport(const std::shared_ptr<DOMNode>& useE
 
   InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
   _useStack.insert(refId);
-  float width =
-      parseLength(getAttribute(useElement, "width", getAttribute(refElement, "width", "100%")),
-                  _viewBoxWidth);
+  float width = parseLength(
+      getAttribute(useElement, "width", getAttribute(refElement, "width", "100%")), _viewBoxWidth);
   float height =
       parseLength(getAttribute(useElement, "height", getAttribute(refElement, "height", "100%")),
                   _viewBoxHeight);

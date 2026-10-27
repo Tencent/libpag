@@ -724,8 +724,8 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
-  parseBoxVisuals(box, props, element->name == "img" &&
-                                 (std::isnan(box.widthPx) || std::isnan(box.heightPx)));
+  parseBoxVisuals(box, props,
+                  element->name == "img" && (std::isnan(box.widthPx) || std::isnan(box.heightPx)));
   parseBoxTransform(box, props);
   return box;
 }
@@ -907,7 +907,7 @@ bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* o
 }
 
 void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
-                                      bool deferBorderRadius) {
+                                       bool deferBorderRadius) {
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
@@ -1191,8 +1191,8 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
 }
 
 void HTMLStyleCascade::resolveUsedBoxSize(HTMLBoxAttributes& box,
-                                        const std::shared_ptr<DOMNode>& element,
-                                        float width, float height) {
+                                          const std::shared_ptr<DOMNode>& element, float width,
+                                          float height) {
   box.widthPx = width;
   box.heightPx = height;
   const auto& props = getResolvedStyle(element);

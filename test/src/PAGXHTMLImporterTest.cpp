@@ -38,11 +38,11 @@
 #include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
-#include "pagx/html/importer/HTMLObjectLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
+#include "pagx/html/importer/HTMLObjectLayout.h"
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
@@ -13387,9 +13387,11 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageFoldRequiresEquivalentGeometryAndEffe
                       "width:100px;height:100px;clip-path:inset(10px)",
                       "width:100px;height:100px;object-position:right bottom"}) {
     SCOPED_TRACE(style);
-    auto doc = ParseRaw(std::string("<html><body style=\"width:100px;height:100px\">"
-        "<div style=\"width:100px;height:100px;border-radius:20px;overflow:hidden\">"
-        "<img src=\"test.png\" style=\"") + style + "\"/></div></body></html>");
+    auto doc = ParseRaw(
+        std::string("<html><body style=\"width:100px;height:100px\">"
+                    "<div style=\"width:100px;height:100px;border-radius:20px;overflow:hidden\">"
+                    "<img src=\"test.png\" style=\"") +
+        style + "\"/></div></body></html>");
     ASSERT_NE(doc, nullptr);
     auto* wrapper = doc->layers.front()->children.front();
     auto* fill = FindElementOfType<pagx::Fill>(wrapper);
@@ -13399,10 +13401,13 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageFoldRequiresEquivalentGeometryAndEffe
 }
 
 PAG_TEST(PAGXHTMLImporterTest, ImageNaturalSizesArePerInstanceAndRoundTrip) {
-  const std::string source = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==";
+  const std::string source =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/"
+      "qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==";
   std::string html = "<html><body style=\"width:300px;height:100px\">";
   for (int width : {16, 8, 4}) {
-    html += "<img src=\"" + source + "\" data-id=\"photo\" data-pagx-image-width=\"" +
+    html +=
+        "<img src=\"" + source + "\" data-id=\"photo\" data-pagx-image-width=\"" +
         std::to_string(width) + "\" data-pagx-image-height=\"" + std::to_string(width / 2) +
         "\" style=\"width:100px;height:60px;object-fit:scale-down;object-position:right bottom\"/>";
   }
@@ -13446,9 +13451,12 @@ PAG_TEST(PAGXHTMLImporterTest, ImageNaturalSizesArePerInstanceAndRoundTrip) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, SvgViewBoxSuppliesRatioWithoutNaturalDimensions) {
-  auto path = SaveFile("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 20\">"
-                       "<rect width=\"60\" height=\"20\"/></svg>", "object-layout-ratio.svg");
-  auto doc = ParseRaw("<html><body style=\"width:240px;height:200px\"><img src=\"" + path +
+  auto path = SaveFile(
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 20\">"
+      "<rect width=\"60\" height=\"20\"/></svg>",
+      "object-layout-ratio.svg");
+  auto doc = ParseRaw(
+      "<html><body style=\"width:240px;height:200px\"><img src=\"" + path +
       "\" style=\"width:210px;height:180px;object-fit:none;object-position:right bottom\"/>"
       "</body></html>");
   ASSERT_NE(doc, nullptr);
@@ -13464,14 +13472,23 @@ PAG_TEST(PAGXHTMLObjectLayoutTest, PositionGrammarAndAffineLengths) {
   float width = 200, height = 100;
   pagx::HTMLDiagnosticSink diagnostics(false);
   pagx::HTMLValueParser parser(diagnostics, width, height);
-  struct Case { const char* source; float x, y; };
+  struct Case {
+    const char* source;
+    float x, y;
+  };
   const Case cases[] = {
-      {"left top", 0, 0}, {"bottom right", -40, 60}, {"top", -20, 0},
-      {"center left", 0, 30}, {"20% 80%", -8, 48}, {"-20% 130%", 8, 78},
-      {"right 7px bottom 9px", -47, 51}, {"bottom 9px right 7px", -47, 51},
+      {"left top", 0, 0},
+      {"bottom right", -40, 60},
+      {"top", -20, 0},
+      {"center left", 0, 30},
+      {"20% 80%", -8, 48},
+      {"-20% 130%", 8, 78},
+      {"right 7px bottom 9px", -47, 51},
+      {"bottom 9px right 7px", -47, 51},
       {"calc(100% - 7px) calc(50% + 2px)", -47, 32},
       {"calc((25% + 3px) * 2) calc(80px / 2)", -14, 40},
-      {"10px bottom", 10, 60}, {"right 10px", -40, 10},
+      {"10px bottom", 10, 60},
+      {"right 10px", -40, 10},
   };
   for (auto& c : cases) {
     SCOPED_TRACE(c.source);
@@ -13481,8 +13498,8 @@ PAG_TEST(PAGXHTMLObjectLayoutTest, PositionGrammarAndAffineLengths) {
     EXPECT_FLOAT_EQ(position.y.resolve(60), c.y);
   }
   for (auto* invalid : {"left right", "top bottom", "left 10px top", "top 10px", "10px left",
-                       "10px junk", "calc(10px+2px) top", "calc(1px / 0) 0",
-                       "calc(2px * 3px) 0", "min(10px,20px) center", "0x20px 0"}) {
+                        "10px junk", "calc(10px+2px) top", "calc(1px / 0) 0", "calc(2px * 3px) 0",
+                        "min(10px,20px) center", "0x20px 0"}) {
     SCOPED_TRACE(invalid);
     pagx::HTMLCSSPosition position;
     EXPECT_FALSE(pagx::ParseHTMLCSSPosition(invalid, parser, position));
@@ -13498,9 +13515,14 @@ PAG_TEST(PAGXHTMLObjectLayoutTest, PositionGrammarAndAffineLengths) {
 PAG_TEST(PAGXHTMLObjectLayoutTest, ConcreteObjectSizeAndPosition) {
   const pagx::Rect content = {11, 17, 248, 160};
   const pagx::HTMLImageIntrinsicSize large = {600, 360, 600.f / 360};
-  struct Case { const char* fit; float width, height; };
-  const Case cases[] = {{"fill", 248, 160}, {"contain", 248, 148.8f},
-                        {"cover", 266.66667f, 160}, {"none", 600, 360},
+  struct Case {
+    const char* fit;
+    float width, height;
+  };
+  const Case cases[] = {{"fill", 248, 160},
+                        {"contain", 248, 148.8f},
+                        {"cover", 266.66667f, 160},
+                        {"none", 600, 360},
                         {"scale-down", 248, 148.8f}};
   for (auto& c : cases) {
     SCOPED_TRACE(c.fit);
@@ -13535,13 +13557,14 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, ObjectPositionKeepsCalcAndNormalizesUnit
   auto result = RunTransform(R"HTML(<html><body style="width:200px;height:100px">
     <img style="object-position:right 1in bottom 12pt"/>
     <img style="object-position:calc(50% + 1in) calc(100% - 2px)"/>
-    </body></html>)HTML", &root);
+    </body></html>)HTML",
+                             &root);
   ASSERT_TRUE(result.ok);
   auto first = FirstBodyChild(root, "img");
   ASSERT_NE(first, nullptr);
   EXPECT_TRUE(StyleContains(first, "object-position: right 96px bottom 16px"));
   EXPECT_TRUE(StyleContains(first->getNextSibling("img"),
-      "object-position: calc(50% + 96px) calc(100% - 2px)"));
+                            "object-position: calc(50% + 96px) calc(100% - 2px)"));
 }
 
 PAG_TEST(PAGXHTMLBackgroundLayoutTest, GeneratedImageSizingAndPositions) {

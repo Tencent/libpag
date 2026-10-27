@@ -44,7 +44,6 @@ class LayoutContext {
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle);
 
-
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
   // fonts first, then system fallback fonts. Typefaces are created on demand.
   std::shared_ptr<tgfx::Typeface> fallbackTypeface(int32_t codepoint,

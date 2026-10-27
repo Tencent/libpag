@@ -202,7 +202,8 @@ bool IsLayoutOnlyWrapperBox(const HTMLBoxAttributes& box) {
   if (box.paddingSet) return false;
   if (!box.maskImage.empty() || !box.clipPathRef.empty() || box.isolate) return false;
   if (box.marginTopPx != 0 || box.marginRightPx != 0 || box.marginBottomPx != 0 ||
-      box.marginLeftPx != 0 || box.flexGrowSet) return false;
+      box.marginLeftPx != 0 || box.flexGrowSet)
+    return false;
   if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
   return true;
 }
@@ -677,8 +678,9 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   if (!WrapperBoxCoversOuter(imgBox, box)) return false;
   if (!_styleCascade->getStyleProperty(img, "animation").empty()) return false;
   if (!imgBox.objectPosition.isCenter() || imgBox.objectFit == "none" ||
-      imgBox.objectFit == "scale-down" || !IsLayoutOnlyWrapperBox(imgBox) ||
-      imgBox.paddingSet || imgBox.clipOverflow) return false;
+      imgBox.objectFit == "scale-down" || !IsLayoutOnlyWrapperBox(imgBox) || imgBox.paddingSet ||
+      imgBox.clipOverflow)
+    return false;
 
   auto* imageNode = registerImageResource(resolveImageSource(src));
   if (!imageNode) return false;
@@ -727,8 +729,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   bool compact = !svg && box.objectPosition.isCenter() && box.objectFit != "none" &&
                  box.objectFit != "scale-down" && !box.paddingSet && !box.borderSet &&
                  box.maskImage.empty() && box.clipPathRef.empty() &&
-                 !(box.flexGrowSet && box.flexGrow > 0) &&
-                 std::isfinite(box.widthPx) && std::isfinite(box.heightPx);
+                 !(box.flexGrowSet && box.flexGrow > 0) && std::isfinite(box.widthPx) &&
+                 std::isfinite(box.heightPx);
   if (compact) {
     auto* fill = _document->makeNode<Fill>();
     auto* pattern = _document->makeNode<ImagePattern>();

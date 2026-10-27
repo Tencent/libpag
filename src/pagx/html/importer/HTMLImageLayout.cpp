@@ -120,7 +120,7 @@ void HTMLParserContext::emitImageContent(Layer* layer, const HTMLBoxAttributes& 
   }
   if (object.width <= 0 || object.height <= 0 || content.width <= 0 || content.height <= 0) return;
   auto* clip = box.borderRadiusSet ? _layerBuilder->makeBackgroundClip(box, content)
-                                  : _document->makeNode<Layer>();
+                                   : _document->makeNode<Layer>();
   clip->left = content.x;
   clip->top = content.y;
   clip->width = content.width;
