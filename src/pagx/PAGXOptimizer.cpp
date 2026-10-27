@@ -628,17 +628,21 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
     return false;
   }
   // Read the measured geometry the renderer uses (Rectangle::onMeasure): authored width/height
-  // override the intrinsic size, and position is the center with NaN meaning the origin.
+  // override the intrinsic size, and position is the center, with a NaN axis meaning the top-left
+  // sits at the origin on that axis.
   float w = std::isnan(rect->width) ? rect->size.width : rect->width;
   float h = std::isnan(rect->height) ? rect->size.height : rect->height;
-  float posX = std::isnan(rect->position.x) ? 0.0f : rect->position.x;
-  float posY = std::isnan(rect->position.y) ? 0.0f : rect->position.y;
-  if (!std::isfinite(w) || !std::isfinite(h) || w <= 0.0f || h <= 0.0f || !std::isfinite(posX) ||
-      !std::isfinite(posY)) {
+  if (!std::isfinite(w) || !std::isfinite(h) || w <= 0.0f || h <= 0.0f) {
     return false;
   }
-  float left = posX - w * 0.5f;
-  float top = posY - h * 0.5f;
+  if (!std::isnan(rect->position.x) && !std::isfinite(rect->position.x)) {
+    return false;
+  }
+  if (!std::isnan(rect->position.y) && !std::isfinite(rect->position.y)) {
+    return false;
+  }
+  float left = std::isnan(rect->position.x) ? 0.0f : rect->position.x - w * 0.5f;
+  float top = std::isnan(rect->position.y) ? 0.0f : rect->position.y - h * 0.5f;
   layer->scrollRect = {left, top, w, h};
   layer->hasScrollRect = true;
   // scrollRect shifts the contents by (-left, -top); translating the owner by the same amount

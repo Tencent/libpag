@@ -311,6 +311,11 @@ CLI_TEST(PAGXOptimizerTest, RectMaskUsesMeasuredGeometryAndRejectsSizeDependentC
   EXPECT_EQ(user->mask, nullptr);
   EXPECT_FLOAT_EQ(user->scrollRect.width, 100);
   EXPECT_FLOAT_EQ(user->scrollRect.height, 50);
+  // An omitted position places the rect's top-left at the origin, not its center.
+  EXPECT_FLOAT_EQ(user->scrollRect.x, 0);
+  EXPECT_FLOAT_EQ(user->scrollRect.y, 0);
+  EXPECT_FLOAT_EQ(user->x, 0);
+  EXPECT_FLOAT_EQ(user->y, 0);
   EXPECT_FLOAT_EQ(user->width, 100);
   EXPECT_FLOAT_EQ(user->height, 50);
 
