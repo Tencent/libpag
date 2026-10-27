@@ -291,17 +291,14 @@ PAGX_TEST(PAGXUtilsTest, Matrix3DReflectionMidpointRemainsContinuous) {
   auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
   ASSERT_NE(build.root, nullptr);
   ASSERT_TRUE(build.binding.apply(layer, "matrix3D", midpoint, 1));
+  // Whether a singular matrix draws anything is up to the backend (Metal draws nothing while
+  // SwiftShader rasterizes the degenerate quad), so only check the draw does not crash.
   auto surface = tgfx::Surface::Make(context, 300, 300);
   ASSERT_NE(surface, nullptr);
   build.root->draw(surface->getCanvas());
   tgfx::Bitmap pixels(300, 300, false, false);
   tgfx::Pixmap pixmap(pixels);
-  ASSERT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
-  for (int y = 0; y < 300; ++y) {
-    for (int x = 0; x < 300; ++x) {
-      EXPECT_FLOAT_EQ(pixmap.getColor(x, y).alpha, 0);
-    }
-  }
+  EXPECT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
 }
 
 PAGX_TEST(PAGXUtilsTest, MatrixWriteKeepsNormalizedZ) {
