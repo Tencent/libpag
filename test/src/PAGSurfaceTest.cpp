@@ -273,6 +273,12 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 
 namespace pag {
 
+// Poll interval of the readback readiness loops. status() takes the surface's context lock on
+// every call, so a 1ms interval polls at ~kHz and competes with the render thread for the lock;
+// readiness is a one-shot event (fence drain or mapAsync callback), so a 10ms detection delay is
+// negligible against the 5s timeout budget.
+static const int READBACK_POLL_INTERVAL_MS = 10;
+
 // GL readback readiness is fence-based: it only flips after the GPU drains previously queued
 // work, so tests must poll instead of assuming immediate readiness.
 static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readback,
@@ -287,7 +293,7 @@ static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readbac
       LOGE("WaitReadbackReady() timed out after %lld ms.", static_cast<long long>(elapsed));
       return false;
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(READBACK_POLL_INTERVAL_MS));
   }
   return true;
 }
@@ -415,9 +421,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadbackStatus) {
   ASSERT_TRUE(readback != nullptr);
   auto status = readback->status();
   EXPECT_TRUE(status == ReadbackStatus::Ready || status == ReadbackStatus::Pending);
-  for (int i = 0; i < 5000 && readback->status() == ReadbackStatus::Pending; i++) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
+  ASSERT_TRUE(WaitReadbackReady(readback));
   EXPECT_EQ(readback->status(), ReadbackStatus::Ready);
   EXPECT_TRUE(readback->isReady());
 }
