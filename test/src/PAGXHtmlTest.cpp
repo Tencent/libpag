@@ -3843,6 +3843,86 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeColorAndAlphaCompositeOnSvg) {
   EXPECT_NE(fadeLast.find("stroke-opacity: 0.251"), std::string::npos) << fadeLast;
 }
 
+// Returns the opening tag of the innermost <svg> that encloses the tag containing `idMarker`, or an
+// empty string when that tag is not inside an <svg>.
+static std::string EnclosingSvgTag(const std::string& html, const std::string& idMarker) {
+  auto idPos = html.find(idMarker);
+  if (idPos == std::string::npos) {
+    return "";
+  }
+  auto svgStart = html.rfind("<svg", idPos);
+  if (svgStart == std::string::npos) {
+    return "";
+  }
+  auto closePos = html.find("</svg>", svgStart);
+  if (closePos == std::string::npos || closePos < idPos) {
+    return "";
+  }
+  auto svgEnd = html.find('>', svgStart);
+  return svgEnd == std::string::npos ? "" : html.substr(svgStart, svgEnd - svgStart + 1);
+}
+
+// The SVG viewport is sized for the static paint, so a stroke animated wider than its static width
+// would be clipped by the viewport. The <svg> hosting an animated shape must not clip, while
+// static SVGs keep their viewport clipping.
+CLI_TEST(PAGXHtmlTest, AnimationSvgHostingAnimatedShapeDoesNotClip) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="160" height="200">
+      <Rectangle position="80,100" size="100,100"/>
+      <Stroke id="growStroke" color="#2563EB" width="4"/>
+    </Layer>
+    <Layer x="160" width="160" height="200">
+      <Rectangle position="80,100" size="100,100"/>
+      <Stroke id="staticStroke" color="#F97316" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
+        <Object target="growStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="4" interpolation="linear"/>
+            <Key time="60" value="24"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto animatedSvg = EnclosingSvgTag(html, "id=\"growStroke\"");
+  ASSERT_FALSE(animatedSvg.empty());
+  EXPECT_NE(animatedSvg.find("overflow:visible"), std::string::npos) << animatedSvg;
+
+  // The static stroke carries no animated id, so locate its <svg> through its stroke color.
+  auto staticSvg = EnclosingSvgTag(html, "stroke=\"#F97316\"");
+  ASSERT_FALSE(staticSvg.empty());
+  EXPECT_EQ(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
+
+  pagx::HTMLExportOptions offOpts;
+  offOpts.extractStyleSheet = false;
+  offOpts.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, offOpts);
+  ASSERT_FALSE(staticHtml.empty());
+  EXPECT_EQ(staticHtml.find("overflow:visible"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/stroke/03_width.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto svgTag = EnclosingSvgTag(html, "id=\"widthStroke\"");
+  ASSERT_FALSE(svgTag.empty());
+  EXPECT_NE(svgTag.find("overflow:visible"), std::string::npos) << svgTag;
+  // The viewport itself stays sized for the static stroke; only the clipping is lifted.
+  EXPECT_NE(svgTag.find("viewBox=\"76 36 168 128\""), std::string::npos) << svgTag;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="rectLayer" width="80" height="80">

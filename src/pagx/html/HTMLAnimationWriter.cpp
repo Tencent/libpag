@@ -449,6 +449,65 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
   return m.isIdentity() ? PathDataToSVGString(rebuilt) : TransformPathDataToSVG(rebuilt, m);
 }
 
+// Returns the start of the innermost `<svg` opening tag that encloses `pos`, or npos when `pos` is
+// not inside an <svg>. Scans backwards, skipping sibling <svg> elements that close before `pos`.
+size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
+  int closedSiblings = 0;
+  size_t cursor = pos;
+  while (cursor > 0) {
+    size_t openPos = html.rfind("<svg", cursor - 1);
+    size_t closePos = html.rfind("</svg>", cursor - 1);
+    if (openPos == std::string::npos) {
+      return std::string::npos;
+    }
+    if (closePos != std::string::npos && closePos > openPos) {
+      closedSiblings++;
+      cursor = closePos;
+      continue;
+    }
+    if (closedSiblings == 0) {
+      return openPos;
+    }
+    closedSiblings--;
+    cursor = openPos;
+  }
+  return std::string::npos;
+}
+
+// The SVG viewport is sized for the static paint, but an animated shape can paint beyond it (for
+// example a stroke animated wider than its static width), which the viewport would clip. Lifts the
+// clipping on the <svg> hosting the animated tag at `tagStart` while keeping its viewport size.
+void LiftEnclosingSvgClip(std::string& bodyHtml, size_t tagStart) {
+  size_t svgStart = FindEnclosingSvgStart(bodyHtml, tagStart);
+  if (svgStart == std::string::npos) {
+    return;
+  }
+  size_t svgEnd = bodyHtml.find('>', svgStart);
+  if (svgEnd == std::string::npos) {
+    return;
+  }
+  std::string svgTag = bodyHtml.substr(svgStart, svgEnd - svgStart);
+  size_t stylePos = svgTag.find(" style=\"");
+  if (stylePos == std::string::npos) {
+    bodyHtml.insert(svgEnd, " style=\"overflow:visible\"");
+    return;
+  }
+  size_t valStart = stylePos + 8;
+  size_t valEnd = svgTag.find('"', valStart);
+  if (valEnd == std::string::npos) {
+    return;
+  }
+  std::string styleVal = svgTag.substr(valStart, valEnd - valStart);
+  if (styleVal.find("overflow:") != std::string::npos) {
+    return;
+  }
+  if (!styleVal.empty() && styleVal.back() != ';') {
+    styleVal += ';';
+  }
+  styleVal += "overflow:visible";
+  bodyHtml.replace(svgStart + valStart, valEnd - valStart, styleVal);
+}
+
 // Injects `animation` declaration (and optional extra style properties such as
 // `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`.
 bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
@@ -478,6 +537,7 @@ bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
       styleVal += "animation:" + animDecl;
       tagStr.replace(valStart, valEnd - valStart, styleVal);
       bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
+      LiftEnclosingSvgClip(bodyHtml, tagStart);
       return true;
     }
   }
@@ -493,6 +553,7 @@ bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
   }
   tagStr.insert(insertPos, newStyle);
   bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
+  LiftEnclosingSvgClip(bodyHtml, tagStart);
   return true;
 }
 
