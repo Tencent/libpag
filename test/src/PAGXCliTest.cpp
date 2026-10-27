@@ -413,6 +413,42 @@ CLI_TEST(PAGXCliTest, Render_BackdropStyles) {
   EXPECT_GT(glassBlue.alpha, 0.99f);
 }
 
+static tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  std::vector<std::string> args = {"render", "--time", timeSeconds, inputPath};
+  std::vector<char*> argv = {};
+  for (auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+  return pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+}
+
+// --time must drive both the top-level animations and the timelines mounted on Composition slots,
+// honoring each slot's evaluationOffset and playing state.
+CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
+  auto start = RenderAnimatedTimelinesAt("0.05");
+  ASSERT_FALSE(start.isEmpty());
+  EXPECT_GT(start.getColor(50, 50).blue, 0.9f);
+  EXPECT_GT(start.getColor(150, 50).green, 0.9f);
+  EXPECT_GT(start.getColor(250, 50).green, 0.9f);
+
+  // Frame 12: past the top-level switch at frame 10, still inside the slot's 5-frame offset.
+  auto delayed = RenderAnimatedTimelinesAt("0.2");
+  ASSERT_FALSE(delayed.isEmpty());
+  EXPECT_GT(delayed.getColor(50, 50).red, 0.9f);
+  EXPECT_LT(delayed.getColor(50, 50).blue, 0.1f);
+  EXPECT_GT(delayed.getColor(150, 50).green, 0.9f);
+  EXPECT_LT(delayed.getColor(150, 50).red, 0.1f);
+
+  // Frame 18: the offset slot has switched to red, the paused slot keeps its first frame.
+  auto switched = RenderAnimatedTimelinesAt("0.3");
+  ASSERT_FALSE(switched.isEmpty());
+  EXPECT_GT(switched.getColor(150, 50).red, 0.9f);
+  EXPECT_LT(switched.getColor(150, 50).green, 0.1f);
+  EXPECT_GT(switched.getColor(250, 50).green, 0.9f);
+  EXPECT_LT(switched.getColor(250, 50).red, 0.1f);
+}
+
 CLI_TEST(PAGXCliTest, Render_WebpFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderWebpFormat.webp";

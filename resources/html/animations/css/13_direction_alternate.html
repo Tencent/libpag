@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Direction - alternate</title>
+    <style>
+      @keyframes bounce {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(160px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 110px; background-color: #1C1917;">
+    <div id="pong"
+         style="position: absolute; left: 16px; top: 35px;
+                width: 40px; height: 40px; border-radius: 8px;
+                background-color: #FACC15;
+                animation: bounce 1s ease-in-out infinite alternate;"></div>
+  </body>
+</html>

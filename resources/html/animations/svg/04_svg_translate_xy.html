@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG translate(x, y) - x + y channels</title>
+    <style>
+      @keyframes diag {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(150px, 110px); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 200px; background-color: #052E16;">
+    <!-- translate(x, y) 同时拆出 x 与 y 两个通道 (§13.2) -->
+    <div id="plane"
+         style="position: absolute; left: 18px; top: 18px; width: 44px; height: 44px;
+                animation: diag 1.8s ease-in-out infinite alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 12l19-8-7 8 7 8z" fill="#34D399"/>
+      </svg>
+    </div>
+  </body>
+</html>

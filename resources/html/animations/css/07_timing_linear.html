@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Easing - linear</title>
+    <style>
+      @keyframes runLinear {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(180px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 100px; background-color: #1F2937;">
+    <div id="r"
+         style="position: absolute; left: 16px; top: 30px;
+                width: 40px; height: 40px; border-radius: 20px;
+                background-color: #60A5FA;
+                animation: runLinear 2s linear infinite;"></div>
+  </body>
+</html>

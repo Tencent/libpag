@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>background-color -> color</title>
+    <style>
+      @keyframes status {
+        0%   { background-color: #22C55E; }
+        50%  { background-color: #F59E0B; }
+        100% { background-color: #EF4444; }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 160px; background-color: #0B1120;">
+    <!-- §13.2: background-color 映射为容器 Fill 内 SolidColor 的 color 通道；SVG 图标固定白色 -->
+    <div id="badge"
+         style="position: absolute; left: 64px; top: 44px; width: 72px; height: 72px;
+                border-radius: 50%; background-color: #22C55E;
+                animation: status 2.4s linear infinite;">
+      <div style="position: absolute; left: 16px; top: 16px; width: 40px; height: 40px;">
+        <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 12l4 4 10-10" fill="none" stroke="#FFFFFF" stroke-width="2.5"/>
+        </svg>
+      </div>
+    </div>
+  </body>
+</html>

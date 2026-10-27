@@ -31,7 +31,7 @@ struct Rect;
 class Context;
 class Surface;
 class ImageInfo;
-class GLDevice;
+class Device;
 }  // namespace tgfx
 
 namespace pag {
@@ -1179,6 +1179,11 @@ class Composition;
 
 class PAGPlayer;
 
+/**
+ * A GPU-backed render target that manages its device's context lock internally. Callers must not
+ * hold the same GPU device's context lock while calling methods that access its GPU resources,
+ * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ */
 class PAG_API PAGSurface {
  public:
   /**
@@ -1271,7 +1276,7 @@ class PAG_API PAGSurface {
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
   bool externalContext = false;
-  void* glRestorer = nullptr;
+  void* stateGuard = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
@@ -1295,6 +1300,11 @@ class PAG_API PAGSurface {
 
 class FileReporter;
 
+/**
+ * Renders a composition into a PAGSurface and manages its device's context lock internally.
+ * Callers must not hold the same GPU device's context lock while calling methods that access GPU
+ * resources, including flush(), flushAndSignalSemaphore(), wait(), prepare(), and pixel hit tests.
+ */
 class PAG_API PAGPlayer {
  public:
   PAGPlayer();
@@ -1645,7 +1655,7 @@ class PAG_API PAGDecoder {
   int _numFrames = 0;
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
-  std::shared_ptr<tgfx::GLDevice> sharedDevice = nullptr;
+  std::shared_ptr<tgfx::Device> sharedDevice = nullptr;
   int lastReadIndex = -1;
   tgfx::ImageInfo* lastImageInfo = nullptr;
   uint32_t lastContentVersion = 0;
@@ -1663,7 +1673,7 @@ class PAG_API PAGDecoder {
                                                    int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate, std::shared_ptr<tgfx::GLDevice> sharedDevice);
+             float frameRate, float maxFrameRate, std::shared_ptr<tgfx::Device> sharedDevice);
 
   bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,

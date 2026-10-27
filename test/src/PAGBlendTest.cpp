@@ -16,9 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "base/utils/TGFXCast.h"
 #include "utils/TestUtils.h"
 
+#ifdef TGFX_USE_OPENGL
+#include "tgfx/gpu/opengl/GLDevice.h"
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
 #else
@@ -27,12 +29,14 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
+#endif  // TGFX_USE_OPENGL
 
 namespace pag {
 using namespace tgfx;
 
 /**
  * 用例描述: 测试基础混合模式
+ * Backend-agnostic: only touches OffscreenSurface + Baseline::Compare, no GL/Metal specifics.
  */
 PAG_TEST(PAGBlendTest, Blend) {
   auto files = GetAllPAGFiles("resources/blend");
@@ -52,6 +56,18 @@ PAG_TEST(PAGBlendTest, Blend) {
     EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_" + fileName));
   }
 }
+
+}  // namespace pag
+
+// The remaining cases construct external GL textures via tgfx::GLTextureInfo and feed them into
+// PAGImage::FromTexture / PAGImage::setMatrix workflows. Metal / Vulkan / D3D12 / WebGPU cannot
+// consume GLTextureInfo, so the rest of the GL section is gated on TGFX_USE_OPENGL. Metal
+// equivalents are tracked for a follow-up PR together with their baseline keys (main has no
+// Metal code yet, so the baseline script cannot generate them here).
+#ifdef TGFX_USE_OPENGL
+
+namespace pag {
+using namespace tgfx;
 
 tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
@@ -173,3 +189,5 @@ PAG_TEST(PAGBlendTest, BothBottomLeft) {
   device->unlock();
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

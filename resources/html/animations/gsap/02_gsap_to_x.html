@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - to x (translateX)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 120px; background-color: #1E1B4B; position: relative; margin: 0;">
+    <div id="box"
+         style="position: absolute; left: 16px; top: 36px;
+                width: 48px; height: 48px; border-radius: 8px;
+                background-color: #A78BFA;"></div>
+    <script>
+      // gsap 的 x 即 transform: translateX -> x 通道
+      gsap.to("#box", {
+        x: 160,
+        duration: 2,
+        ease: "none",
+        repeat: -1
+      });
+    </script>
+  </body>
+</html>

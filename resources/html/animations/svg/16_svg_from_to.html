@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG from / to keywords</title>
+    <style>
+      @keyframes grow {
+        from { opacity: 0.3; transform: translateY(40px); }
+        to   { opacity: 1; transform: translateY(0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 180px; background-color: #1E1B4B;">
+    <!-- from (=0%) / to (=100%) 关键字 (§13.1) -->
+    <div id="leaf"
+         style="position: absolute; left: 68px; top: 50px; width: 64px; height: 64px;
+                animation: grow 1.4s ease-out infinite alternate;">
+      <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 19C5 10 12 4 20 4c0 9-7 15-15 15z" fill="#4ADE80"/>
+        <path d="M5 19C9 14 14 10 18 8" fill="none" stroke="#1E1B4B" stroke-width="1.2"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

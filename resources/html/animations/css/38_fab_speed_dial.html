@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>FAB Speed Dial</title>
+    <style>
+      /* Floating action button speed-dial: child actions rise from
+         behind the FAB via translateY + opacity, staggered, and
+         retract again through animation-direction: alternate. */
+      @keyframes dial1 { 0% { transform: translateY(0px); opacity: 0; } 100% { transform: translateY(-72px); opacity: 1; } }
+      @keyframes dial2 { 0% { transform: translateY(0px); opacity: 0; } 100% { transform: translateY(-136px); opacity: 1; } }
+      @keyframes dial3 { 0% { transform: translateY(0px); opacity: 0; } 100% { transform: translateY(-200px); opacity: 1; } }
+      @keyframes fabBob { 0% { transform: translateY(0px); } 50% { transform: translateY(-4px); } 100% { transform: translateY(0px); } }
+      .mini {
+        position: absolute; right: 42px; bottom: 36px;
+        display: flex; align-items: center; justify-content: center;
+        width: 48px; height: 48px; border-radius: 9999px;
+        box-shadow: 0 8px 18px #0F172A40;
+      }
+    </style>
+  </head>
+  <body style="width: 360px; height: 440px; background-color: #F1F5F9; overflow: hidden;">
+
+    <div class="mini" style="background-color: #34D399; animation: dial1 1.8s ease-in-out infinite alternate; animation-delay: 0.3s;">
+      <svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h10v4H4z" fill="#FFFFFF"/></svg>
+    </div>
+    <div class="mini" style="background-color: #60A5FA; animation: dial2 1.8s ease-in-out infinite alternate; animation-delay: 0.15s;">
+      <svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 3l9 6v12H3V9z" fill="#FFFFFF"/></svg>
+    </div>
+    <div class="mini" style="background-color: #FBBF24; animation: dial3 1.8s ease-in-out infinite alternate; animation-delay: 0s;">
+      <svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" fill="#FFFFFF"/></svg>
+    </div>
+
+    <div style="position: absolute; right: 30px; bottom: 30px;
+                display: flex; align-items: center; justify-content: center;
+                width: 64px; height: 64px; border-radius: 9999px;
+                background-image: linear-gradient(135deg, #6366F1, #8B5CF6);
+                box-shadow: 0 12px 26px #6366F14D;
+                animation: fabBob 1.8s ease-in-out infinite;">
+      <svg width="30" height="30" viewBox="0 0 24 24"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" fill="#FFFFFF"/></svg>
+    </div>
+  </body>
+</html>

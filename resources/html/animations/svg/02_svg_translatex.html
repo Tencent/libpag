@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG translateX - x channel</title>
+    <style>
+      @keyframes slideX {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(168px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 120px; background-color: #082F49;">
+    <!-- 内联 SVG 箭头，translateX → x 通道 (§13.2) -->
+    <div id="arrow"
+         style="position: absolute; left: 24px; top: 40px; width: 40px; height: 40px;
+                animation: slideX 1.4s ease-in-out infinite alternate;">
+      <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 12h13M12 5l7 7-7 7" fill="none" stroke="#38BDF8"
+              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

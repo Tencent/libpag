@@ -22,11 +22,15 @@
 #include "rendering/drawables/BitmapDrawable.h"
 #include "rendering/utils/BitmapBuffer.h"
 
+namespace tgfx {
+class Device;
+}  // namespace tgfx
+
 namespace pag {
 class CompositionReader {
  public:
   static std::shared_ptr<CompositionReader> Make(
-      int width, int height, std::shared_ptr<tgfx::GLDevice> sharedDevice = nullptr);
+      int width, int height, std::shared_ptr<tgfx::Device> sharedDevice = nullptr);
 
   ~CompositionReader();
 

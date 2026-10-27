@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Combined opacity + translate (longhand)</title>
+    <style>
+      @keyframes fadeMove {
+        0%   { opacity: 0; transform: translateX(0px); }
+        100% { opacity: 1; transform: translateX(40px); }
+      }
+    </style>
+  </head>
+  <body style="width: 220px; height: 110px; background-color: #0B132B;">
+    <div id="card"
+         style="position: absolute; left: 24px; top: 31px;
+                width: 120px; height: 48px; border-radius: 10px;
+                background-color: #5BC0BE;
+                animation-name: fadeMove;
+                animation-duration: 2s;
+                animation-timing-function: linear;
+                animation-iteration-count: infinite;"></div>
+  </body>
+</html>

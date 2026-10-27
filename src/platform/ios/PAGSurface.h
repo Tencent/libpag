@@ -9,12 +9,14 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
 
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreVideo/CoreVideo.h>
@@ -22,26 +24,19 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
+// Backend-specific factories are declared in separate category headers. The generated
+// PAGSurfaceBackend.h imports the selected category after this class declaration, so importing
+// PAGSurface.h alone exposes all factories supported by the framework.
 PAG_API @interface PAGSurface : NSObject
 
 /**
- * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
- * by PAGSurface.
- */
-+ (PAGSurface*)FromLayer:(CAEAGLLayer*)layer;
-
-/**
- * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
- * by PAGSurface.
+ * Creates a new PAGSurface from the specified CVPixelBuffer. The GPU device or context is
+ * resolved internally. Metal builds use the system default MTLDevice and share its GPU caches;
+ * the pixel buffer must be Metal-compatible (set kCVPixelBufferMetalCompatibilityKey to YES when
+ * creating it). Metal builds support this method on arm64 simulators. On the simulator this
+ * returns nil when the GL build's EAGL backend has no hardware buffers.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
-/**
- * Creates a new PAGSurface from specified CVPixelBuffer and EAGLContext. Multiple PAGSurfaces with
- * the same context share the same GPU caches. The caches are not destroyed when resetting a
- * PAGPlayer's surface to another PAGSurface with the same context.
- */
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead)
@@ -82,21 +77,30 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if the
- * PAGSurface is created by [PAGSurface FromLayer], or the app is running in the simulator.
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if the
+ * PAGSurface is created from a layer — [PAGSurface FromLayer:] with either a CAEAGLLayer
+ * (OpenGL backend) or a CAMetalLayer (Metal backend) — or if the app is running in the simulator
+ * on the OpenGL backend.
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
- * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
- * the PAGSurface will not be captured.
+ * Returns a CVPixelBuffer object capturing the contents of the PAGSurface, or nil if readback
+ * fails. Subsequent rendering of the PAGSurface will not be captured.
+ * On a PAGSurface created from a CAMetalLayer, readback is rejected if the layer is
+ * framebuffer-only or the frame's drawing batch has already been flushed. A presented window frame
+ * is not retained for later snapshots. Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if
+ * you need reliable readback with Metal.
  */
 - (CVPixelBufferRef)makeSnapshot;
 
 /**
  * Copies the pixels of the PAGSurface to the specified memory address. The format of the copied
- * pixels is in the BGRA color type with the premultiplied alpha type. Returns false if failed.
+ * pixels is in the BGRA color type with the premultiplied alpha type. Returns NO if copying fails,
+ * including when CAMetalLayer readback is rejected as described by makeSnapshot.
  */
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end
+
+#import "PAGSurfaceBackend.h"

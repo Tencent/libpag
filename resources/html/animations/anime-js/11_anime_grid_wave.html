@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Grid Wave</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #0F172A; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 48px; width: 100%; height: 100%;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <p id="title" style="font-size: 30px; font-weight: bold; color: #E2E8F0; opacity: 0;">Grid Wave</p>
+        <p id="subtitle" style="font-size: 15px; color: #64748B; opacity: 0;">staggered translate + opacity ripple</p>
+      </div>
+
+      <div id="grid" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; flex-direction: row; gap: 14px;">
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #38BDF8; opacity: 0;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 14px;">
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #818CF8; opacity: 0;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 14px;">
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #C084FC; opacity: 0;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 14px;">
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="cell" style="width: 56px; height: 56px; border-radius: 14px; background-color: #F472B6; opacity: 0;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      anime({
+        targets: '#title',
+        opacity: [0, 1],
+        translateY: [-20, 0],
+        duration: 700,
+        easing: 'easeOutCubic'
+      });
+      anime({
+        targets: '#subtitle',
+        opacity: [0, 1],
+        translateY: [-12, 0],
+        delay: 200,
+        duration: 700,
+        easing: 'easeOutCubic'
+      });
+
+      anime({
+        targets: '.cell',
+        opacity: [0, 1],
+        translateY: [
+          { value: -26, duration: 600, easing: 'easeOutQuad' },
+          { value: 0, duration: 600, easing: 'easeInOutSine' }
+        ],
+        delay: anime.stagger(80, { grid: [6, 4], from: 'center' }),
+        loop: true,
+        direction: 'alternate'
+      });
+    </script>
+  </body>
+</html>

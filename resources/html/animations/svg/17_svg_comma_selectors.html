@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG comma selectors (0%, 100%)</title>
+    <style>
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.25; }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 160px; background-color: #111827;">
+    <!-- 单 stop 逗号分隔选择器 0%, 100% 共享同一组声明 (§13.1) -->
+    <div id="wifi"
+         style="position: absolute; left: 68px; top: 48px; width: 64px; height: 64px;
+                animation: pulse 1.2s ease-in-out infinite;">
+      <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 8.5a15 15 0 0 1 20 0" fill="none" stroke="#60A5FA" stroke-width="2"
+              stroke-linecap="round"/>
+        <path d="M5.5 12.5a10 10 0 0 1 13 0" fill="none" stroke="#60A5FA" stroke-width="2"
+              stroke-linecap="round"/>
+        <path d="M9 16.5a5 5 0 0 1 6 0" fill="none" stroke="#60A5FA" stroke-width="2"
+              stroke-linecap="round"/>
+        <circle cx="12" cy="20" r="1.6" fill="#60A5FA"/>
+      </svg>
+    </div>
+  </body>
+</html>

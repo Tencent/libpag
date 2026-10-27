@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pulse Dot Loader</title>
+    <style>
+      /* Classic CSS loader: staggered bounce combining
+         translateY + background-color in a single timeline. */
+      @keyframes dotBounce {
+        0%   { transform: translateY(0px); background-color: #38BDF8; }
+        50%  { transform: translateY(-28px); background-color: #6366F1; }
+        100% { transform: translateY(0px); background-color: #38BDF8; }
+      }
+      @keyframes labelFade {
+        0%   { opacity: 0.35; }
+        50%  { opacity: 1; }
+        100% { opacity: 0.35; }
+      }
+      .dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 9999px;
+        background-color: #38BDF8;
+        box-shadow: 0 6px 14px #6366F140;
+      }
+    </style>
+  </head>
+  <body style="width: 480px; height: 260px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 36px;
+               background-image: linear-gradient(135deg, #0F172A, #1E293B); font-family: Arial;">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 22px;">
+      <div class="dot" style="animation: dotBounce 1.2s ease-in-out infinite; animation-delay: 0s;"></div>
+      <div class="dot" style="animation: dotBounce 1.2s ease-in-out infinite; animation-delay: 0.15s;"></div>
+      <div class="dot" style="animation: dotBounce 1.2s ease-in-out infinite; animation-delay: 0.3s;"></div>
+      <div class="dot" style="animation: dotBounce 1.2s ease-in-out infinite; animation-delay: 0.45s;"></div>
+      <div class="dot" style="animation: dotBounce 1.2s ease-in-out infinite; animation-delay: 0.6s;"></div>
+    </div>
+    <p style="font-size: 18px; font-weight: bold; letter-spacing: 4px; color: #E2E8F0;
+              animation: labelFade 1.2s ease-in-out infinite;">LOADING</p>
+  </body>
+</html>

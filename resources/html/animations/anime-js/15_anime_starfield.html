@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Starfield Drift</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-image: radial-gradient(circle at 30% 20%, #1E1B4B, #020617); font-family: Arial;">
+    <div id="field" style="width: 100%; height: 100%;">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 100%;">
+        <p id="headline" style="font-size: 38px; font-weight: bold; letter-spacing: 2px; color: #F8FAFC; opacity: 0;">Cosmos</p>
+        <p id="sub" style="font-size: 15px; letter-spacing: 5px; color: #818CF8; opacity: 0;">DRIFTING THROUGH SPACE</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      const field = document.getElementById('field');
+      const palette = ['#FFFFFF', '#C7D2FE', '#A5F3FC', '#FBCFE8', '#FDE68A'];
+      const COUNT = 70;
+
+      for (let i = 0; i < COUNT; i++) {
+        const size = anime.random(2, 6);
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.setAttribute('style',
+          'position: absolute;' +
+          'left: ' + anime.random(0, 780) + 'px;' +
+          'top: ' + anime.random(0, 580) + 'px;' +
+          'width: ' + size + 'px;' +
+          'height: ' + size + 'px;' +
+          'border-radius: ' + size + 'px;' +
+          'background-color: ' + palette[anime.random(0, palette.length - 1)] + ';' +
+          'opacity: 0;'
+        );
+        field.appendChild(star);
+      }
+
+      // twinkle: opacity flicker, randomized per element
+      anime({
+        targets: '.star',
+        opacity: [
+          { value: () => anime.random(30, 90) / 100 },
+          { value: () => anime.random(10, 40) / 100 }
+        ],
+        duration: () => anime.random(900, 2200),
+        delay: () => anime.random(0, 1500),
+        easing: 'easeInOutSine',
+        loop: true,
+        direction: 'alternate'
+      });
+
+      // slow parallax drift
+      anime({
+        targets: '.star',
+        translateX: () => anime.random(-30, 30),
+        translateY: () => anime.random(-24, 24),
+        duration: () => anime.random(4000, 8000),
+        delay: () => anime.random(0, 1000),
+        easing: 'easeInOutQuad',
+        loop: true,
+        direction: 'alternate'
+      });
+
+      anime({
+        targets: '#headline',
+        opacity: [0, 1],
+        translateY: [20, 0],
+        duration: 1000,
+        easing: 'easeOutCubic'
+      });
+      anime({
+        targets: '#sub',
+        opacity: [0, 1],
+        translateY: [16, 0],
+        delay: 300,
+        duration: 1000,
+        easing: 'easeOutCubic'
+      });
+    </script>
+  </body>
+</html>

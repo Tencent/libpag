@@ -37,7 +37,7 @@ using namespace tgfx;
 
 static std::unique_ptr<Baseline> baseline = nullptr;
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline");
-static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache";
+static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache/" + PAG_BACKEND_NAME;
 static const std::string EXISTING_OUT_ROOT = TestDir::GetRoot() + "/out";
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = TestDir::GetRoot() + "/baseline-out";

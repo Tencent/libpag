@@ -18,11 +18,16 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include <memory>
+#include "tgfx/gpu/Device.h"
 
 namespace pag {
+/**
+ * Thread-local test-only device cache. Kept backend-agnostic: the device is obtained through
+ * pag::Devices::MakeDefault() so the same fixture code works on any tgfx backend compiled in.
+ */
 class DevicePool {
  public:
-  static std::shared_ptr<tgfx::GLDevice> Make();
+  static std::shared_ptr<tgfx::Device> Make();
 };
 }  // namespace pag

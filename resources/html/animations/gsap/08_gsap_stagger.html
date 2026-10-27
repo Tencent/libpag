@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - stagger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #1E1B4B; position: relative; margin: 0;">
+    <div class="bar" id="b1"
+         style="position: absolute; left: 40px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #C084FC;"></div>
+    <div class="bar" id="b2"
+         style="position: absolute; left: 100px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #E879F9;"></div>
+    <div class="bar" id="b3"
+         style="position: absolute; left: 160px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #F0ABFC;"></div>
+    <script>
+      // stagger：对一组元素施加错峰动画，捕获时每个元素得到各自的时间线
+      gsap.to(".bar", {
+        y: -30,
+        duration: 0.6,
+        ease: "sine.inOut",
+        repeat: -1,
+        yoyo: true,
+        stagger: 0.2
+      });
+    </script>
+  </body>
+</html>

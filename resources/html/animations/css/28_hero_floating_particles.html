@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Hero Card With Floating Particles</title>
+    <style>
+      /* Composite scene: floating particles (translateY + opacity),
+         a glass-like gradient card, and a CTA whose fill breathes
+         through the color channel while it bobs (translateY). */
+      @keyframes floatA {
+        0%   { transform: translateY(0px); opacity: 0.35; }
+        50%  { transform: translateY(-26px); opacity: 0.9; }
+        100% { transform: translateY(0px); opacity: 0.35; }
+      }
+      @keyframes floatB {
+        0%   { transform: translateY(0px); opacity: 0.25; }
+        50%  { transform: translateY(22px); opacity: 0.8; }
+        100% { transform: translateY(0px); opacity: 0.25; }
+      }
+      @keyframes ctaBreathe {
+        0%   { transform: translateY(0px); background-color: #6366F1; }
+        50%  { transform: translateY(-6px); background-color: #8B5CF6; }
+        100% { transform: translateY(0px); background-color: #6366F1; }
+      }
+      @keyframes badgeFade {
+        0%   { opacity: 0; transform: translateY(10px); }
+        100% { opacity: 1; transform: translateY(0px); }
+      }
+      .particle { border-radius: 9999px; background-color: #A78BFA; }
+    </style>
+  </head>
+  <body style="width: 600px; height: 380px; overflow: hidden;
+               background-image: linear-gradient(135deg, #0B1120, #1E1B4B 60%, #312E81); font-family: Arial;">
+
+    <div class="particle" style="position: absolute; top: 60px; left: 70px; width: 22px; height: 22px;
+                                 animation: floatA 4s ease-in-out infinite; animation-delay: 0s;"></div>
+    <div class="particle" style="position: absolute; top: 260px; left: 110px; width: 14px; height: 14px;
+                                 animation: floatB 5s ease-in-out infinite; animation-delay: 0.6s;"></div>
+    <div class="particle" style="position: absolute; top: 90px; right: 80px; width: 18px; height: 18px;
+                                 animation: floatB 4.4s ease-in-out infinite; animation-delay: 1s;"></div>
+    <div class="particle" style="position: absolute; bottom: 50px; right: 120px; width: 26px; height: 26px;
+                                 animation: floatA 5.2s ease-in-out infinite; animation-delay: 0.3s;"></div>
+
+    <div style="position: absolute; top: 60px; left: 100px; width: 400px; height: 260px;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                gap: 18px; padding: 32px; border-radius: 24px;
+                background-image: linear-gradient(160deg, #FFFFFF, #EEF2FF);
+                box-shadow: 0 30px 60px #6366F133;">
+
+      <div style="display: flex; align-items: center; justify-content: center;
+                  width: 64px; height: 64px; border-radius: 18px;
+                  background-image: linear-gradient(135deg, #6366F1, #EC4899);
+                  box-shadow: 0 12px 24px #EC489940;">
+        <svg width="34" height="34" viewBox="0 0 24 24">
+          <path d="M13 2L4 14h6l-1 8 9-12h-6z" fill="#FFFFFF"/>
+        </svg>
+      </div>
+
+      <span style="font-size: 26px; font-weight: bold; color: #0F172A;">Ship Faster</span>
+      <span style="font-size: 15px; color: #64748B; text-align: center;
+                   animation: badgeFade 1.2s ease-out infinite alternate;">Animations that convert to PAGX</span>
+
+      <div style="display: flex; align-items: center; justify-content: center;
+                  padding: 12px 28px; border-radius: 9999px;
+                  background-color: #6366F1;
+                  box-shadow: 0 10px 22px #6366F14D;
+                  animation: ctaBreathe 2.6s ease-in-out infinite;">
+        <span style="font-size: 15px; font-weight: bold; color: #FFFFFF; letter-spacing: 1px;">GET STARTED</span>
+      </div>
+    </div>
+  </body>
+</html>

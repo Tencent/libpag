@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Staggered Headline Reveal</title>
+    <style>
+      /* Kinetic typography: each word rises into place with
+         translateY + opacity, offset by animation-delay to create
+         the classic word-by-word reveal. */
+      @keyframes rise {
+        0%   { opacity: 0; transform: translateY(34px); }
+        60%  { opacity: 1; transform: translateY(-6px); }
+        100% { opacity: 1; transform: translateY(0px); }
+      }
+      @keyframes underlineSweep {
+        0%   { transform: translateX(-220px); }
+        100% { transform: translateX(0px); }
+      }
+      .word { font-size: 52px; font-weight: bold; }
+    </style>
+  </head>
+  <body style="width: 600px; height: 320px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 20px;
+               background-image: linear-gradient(135deg, #0F172A, #334155); font-family: Arial;">
+    <div style="display: flex; flex-direction: row; gap: 18px;">
+      <span class="word" style="color: #F8FAFC;
+            animation: rise 2.2s ease-out infinite; animation-delay: 0s;">Design.</span>
+      <span class="word" style="color: #818CF8;
+            animation: rise 2.2s ease-out infinite; animation-delay: 0.3s;">Convert.</span>
+      <span class="word" style="color: #F472B6;
+            animation: rise 2.2s ease-out infinite; animation-delay: 0.6s;">Ship.</span>
+    </div>
+    <div style="width: 220px; height: 30px; overflow: hidden;">
+      <div style="width: 220px; height: 6px; border-radius: 9999px;
+                  background-image: linear-gradient(90deg, #818CF8, #F472B6);
+                  animation: underlineSweep 2.2s ease-out infinite; animation-delay: 0.9s;"></div>
+    </div>
+    <span style="font-size: 16px; color: #94A3B8; letter-spacing: 2px;">PAGX-READY MOTION</span>
+  </body>
+</html>

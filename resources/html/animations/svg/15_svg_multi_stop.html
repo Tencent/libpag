@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG multi-stop keyframes</title>
+    <style>
+      @keyframes path {
+        0%   { transform: translateX(0px); }
+        25%  { transform: translateX(160px); }
+        50%  { transform: translateX(160px); }
+        75%  { transform: translateX(0px); }
+        100% { transform: translateX(0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 120px; background-color: #082F49;">
+    <!-- 多关键帧 0/25/50/75/100% → 多个 Key (§13.1)，分段行进 + 停顿 -->
+    <div id="bot"
+         style="position: absolute; left: 24px; top: 40px; width: 44px; height: 44px;
+                animation: path 3s ease-in-out infinite;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="5" y="7" width="14" height="11" rx="3" fill="#38BDF8"/>
+        <circle cx="9.5" cy="12" r="1.6" fill="#082F49"/>
+        <circle cx="14.5" cy="12" r="1.6" fill="#082F49"/>
+        <path d="M12 7V4M9 4h6" stroke="#38BDF8" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

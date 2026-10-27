@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Easing - ease-in-out</title>
+    <style>
+      @keyframes runEase {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(180px); }
+      }
+    </style>
+  </head>
+  <body style="width: 280px; height: 100px; background-color: #1F2937;">
+    <div id="r"
+         style="position: absolute; left: 16px; top: 30px;
+                width: 40px; height: 40px; border-radius: 20px;
+                background-color: #FBBF24;
+                animation: runEase 2s ease-in-out infinite;"></div>
+  </body>
+</html>

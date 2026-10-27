@@ -31,7 +31,7 @@ std::shared_ptr<TextureDrawable> TextureDrawable::MakeFrom(std::shared_ptr<tgfx:
 
 TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
                                  const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin)
-    : _device(std::move(device)), _texture(texture), _origin(origin) {
+    : Drawable(std::move(device), nullptr), _texture(texture), _origin(origin) {
 }
 
 std::shared_ptr<tgfx::Surface> TextureDrawable::getSurface(tgfx::Context* context) {

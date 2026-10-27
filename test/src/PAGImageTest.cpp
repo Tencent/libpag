@@ -25,7 +25,6 @@
 #include "pag/pag.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

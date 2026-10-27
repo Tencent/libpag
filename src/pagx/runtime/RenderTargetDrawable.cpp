@@ -33,7 +33,7 @@ std::shared_ptr<RenderTargetDrawable> RenderTargetDrawable::MakeFrom(
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                                            const tgfx::BackendRenderTarget& renderTarget,
                                            tgfx::ImageOrigin origin)
-    : _device(std::move(device)), _renderTarget(renderTarget), _origin(origin) {
+    : Drawable(std::move(device), nullptr), _renderTarget(renderTarget), _origin(origin) {
 }
 
 std::shared_ptr<tgfx::Surface> RenderTargetDrawable::getSurface(tgfx::Context* context) {

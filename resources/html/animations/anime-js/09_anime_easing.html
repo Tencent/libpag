@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - easing (easeInOutQuad)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 110px; background-color: #18181B; position: relative; margin: 0;">
+    <div id="r"
+         style="position: absolute; left: 16px; top: 35px;
+                width: 40px; height: 40px; border-radius: 20px;
+                background-color: #F472B6;"></div>
+    <script>
+      // 内置缓动 easeInOutQuad；采样后归一化为关键帧，曲线由采样点体现
+      anime({
+        targets: "#r",
+        translateX: 180,
+        duration: 1600,
+        easing: "easeInOutQuad",
+        direction: "alternate",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

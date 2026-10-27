@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Segmented Control</title>
+    <style>
+      /* Segmented control / tab bar: a single highlight pill slides
+         across the three segments via a multi-stop translateX timeline,
+         pausing on each option. */
+      @keyframes slideTab {
+        0%   { transform: translateX(0px); }
+        28%  { transform: translateX(0px); }
+        33%  { transform: translateX(120px); }
+        61%  { transform: translateX(120px); }
+        66%  { transform: translateX(240px); }
+        94%  { transform: translateX(240px); }
+        100% { transform: translateX(0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 480px; height: 260px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 24px;
+               background-color: #0F172A; font-family: Arial;">
+    <span style="font-size: 15px; color: #94A3B8; letter-spacing: 2px;">VIEW</span>
+    <div style="position: relative; width: 372px; height: 56px; padding: 6px; border-radius: 14px;
+                background-color: #1E293B;">
+      <div style="position: absolute; top: 6px; left: 6px; width: 120px; height: 44px;
+                  border-radius: 10px;
+                  background-image: linear-gradient(135deg, #6366F1, #8B5CF6);
+                  box-shadow: 0 6px 14px #6366F14D;
+                  animation: slideTab 4.5s ease-in-out infinite;"></div>
+      <div style="position: relative; display: flex; flex-direction: row; align-items: center;">
+        <div style="display: flex; align-items: center; justify-content: center; width: 120px; height: 44px;">
+          <span style="font-size: 15px; font-weight: bold; color: #E2E8F0;">Day</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; width: 120px; height: 44px;">
+          <span style="font-size: 15px; font-weight: bold; color: #E2E8F0;">Week</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; width: 120px; height: 44px;">
+          <span style="font-size: 15px; font-weight: bold; color: #E2E8F0;">Month</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

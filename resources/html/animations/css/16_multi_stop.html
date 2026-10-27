@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Multi-stop keyframes</title>
+    <style>
+      @keyframes journey {
+        0%   { transform: translateX(0px); opacity: 0.3; }
+        25%  { transform: translateX(60px); opacity: 1; }
+        50%  { transform: translateX(120px); opacity: 0.6; }
+        75%  { transform: translateX(180px); opacity: 1; }
+        100% { transform: translateX(240px); opacity: 0.3; }
+      }
+    </style>
+  </head>
+  <body style="width: 320px; height: 100px; background-color: #0F172A;">
+    <div id="walker"
+         style="position: absolute; left: 12px; top: 32px;
+                width: 36px; height: 36px; border-radius: 18px;
+                background-color: #F87171;
+                animation: journey 3s linear infinite;"></div>
+  </body>
+</html>

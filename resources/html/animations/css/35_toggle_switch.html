@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Toggle Switch</title>
+    <style>
+      /* Toggle microinteraction: the track pulses through the color
+         channel (off-gray to on-color) while the knob slides via
+         translateX. animation-direction: alternate cycles on/off. */
+      @keyframes trackGreen {
+        0%   { background-color: #CBD5E1; }
+        100% { background-color: #22C55E; }
+      }
+      @keyframes trackBlue {
+        0%   { background-color: #CBD5E1; }
+        100% { background-color: #3B82F6; }
+      }
+      @keyframes trackPink {
+        0%   { background-color: #CBD5E1; }
+        100% { background-color: #EC4899; }
+      }
+      @keyframes knobSlide {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(32px); }
+      }
+      .track { position: relative; width: 68px; height: 36px; border-radius: 9999px; background-color: #CBD5E1; }
+      .knob {
+        position: absolute; top: 4px; left: 4px;
+        width: 28px; height: 28px; border-radius: 9999px;
+        background-color: #FFFFFF; box-shadow: 0 3px 6px #0F172A33;
+      }
+      .label { font-size: 16px; color: #334155; flex: 1; }
+      .field { display: flex; flex-direction: row; align-items: center; gap: 24px; width: 280px; }
+    </style>
+  </head>
+  <body style="width: 440px; height: 300px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 26px;
+               background-color: #F8FAFC; font-family: Arial;">
+    <div class="field">
+      <span class="label">Notifications</span>
+      <div class="track" style="animation: trackGreen 1.6s ease-in-out infinite alternate;">
+        <div class="knob" style="animation: knobSlide 1.6s ease-in-out infinite alternate;"></div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="label">Dark mode</span>
+      <div class="track" style="animation: trackBlue 1.6s ease-in-out infinite alternate; animation-delay: 0.25s;">
+        <div class="knob" style="animation: knobSlide 1.6s ease-in-out infinite alternate; animation-delay: 0.25s;"></div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="label">Auto-sync</span>
+      <div class="track" style="animation: trackPink 1.6s ease-in-out infinite alternate; animation-delay: 0.5s;">
+        <div class="knob" style="animation: knobSlide 1.6s ease-in-out infinite alternate; animation-delay: 0.5s;"></div>
+      </div>
+    </div>
+  </body>
+</html>

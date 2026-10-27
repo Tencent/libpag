@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - from (text color)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 320px; height: 120px; background-color: #0B1120; position: relative; margin: 0; font-family: Arial;">
+    <h1 id="title"
+        style="position: absolute; left: 24px; top: 30px; margin: 0;
+               font-size: 40px; font-weight: bold; color: #22D3EE;">PAGX</h1>
+    <script>
+      // gsap.from：从给定值动画到元素当前值；这里驱动 color -> color 通道
+      gsap.from("#title", {
+        color: "#FACC15",
+        duration: 2,
+        ease: "none",
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

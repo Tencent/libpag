@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anime.js Pulsing Stat Cards</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #0B1120; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; gap: 32px; width: 100%; height: 100%; padding: 56px;">
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <p id="heading" style="font-size: 28px; font-weight: bold; color: #F8FAFC; opacity: 0;">Live Metrics</p>
+        <p id="caption" style="font-size: 14px; color: #64748B; opacity: 0;">updating in real time</p>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 24px;">
+        <div class="stat" style="display: flex; flex-direction: column; gap: 12px; flex: 1; padding: 28px; border-radius: 20px; background-color: #1E293B;">
+          <p style="font-size: 14px; color: #94A3B8;">Active Users</p>
+          <p style="font-size: 38px; font-weight: bold; color: #38BDF8;">12,480</p>
+        </div>
+        <div class="stat" style="display: flex; flex-direction: column; gap: 12px; flex: 1; padding: 28px; border-radius: 20px; background-color: #1E293B;">
+          <p style="font-size: 14px; color: #94A3B8;">Revenue</p>
+          <p style="font-size: 38px; font-weight: bold; color: #34D399;">$48.2k</p>
+        </div>
+        <div class="stat" style="display: flex; flex-direction: column; gap: 12px; flex: 1; padding: 28px; border-radius: 20px; background-color: #1E293B;">
+          <p style="font-size: 14px; color: #94A3B8;">Conversion</p>
+          <p style="font-size: 38px; font-weight: bold; color: #FBBF24;">6.7%</p>
+        </div>
+      </div>
+
+      <div id="bar" style="display: flex; align-items: center; padding: 20px 28px; border-radius: 16px; background-color: #312E81;">
+        <p style="font-size: 15px; color: #C7D2FE;">System healthy — all services operational</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+      anime({
+        targets: '#heading',
+        opacity: [0, 1],
+        translateX: [-24, 0],
+        duration: 700,
+        easing: 'easeOutCubic'
+      });
+      anime({
+        targets: '#caption',
+        opacity: [0, 1],
+        translateX: [-24, 0],
+        delay: 150,
+        duration: 700,
+        easing: 'easeOutCubic'
+      });
+
+      anime({
+        targets: '.stat',
+        translateY: [-8, 8],
+        delay: anime.stagger(220),
+        duration: 1600,
+        easing: 'easeInOutSine',
+        loop: true,
+        direction: 'alternate'
+      });
+
+      anime({
+        targets: '#bar',
+        backgroundColor: ['#312E81', '#4338CA'],
+        duration: 1400,
+        easing: 'easeInOutQuad',
+        loop: true,
+        direction: 'alternate'
+      });
+    </script>
+  </body>
+</html>

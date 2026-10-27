@@ -20,6 +20,12 @@
 #import "PAGImage.h"
 #import "PAGLayer.h"
 
+// PAGView is an NSView-backed UI wrapper. On the OpenGL backend it renders into an NSView
+// through the PAGSurface (OpenGL) category; on the Metal backend it renders into a CAMetalLayer
+// through the PAGSurface (Metal) category. Both backends share the same PAGPlayer + PAGAnimator
+// animation loop and listener surface. The public API is backend-agnostic, so the class is always
+// declared here; backend-specific surface creation is resolved inside the implementation.
+
 @class PAGView;
 @protocol PAGViewListener <NSObject>
 
@@ -231,7 +237,12 @@ PAG_API @interface PAGView : NSView
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGView. Subsequent rendering of
- * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
+ * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet or
+ * readback fails.
+ * On the Metal backend this method returns nil: PAGView uses a framebuffer-only CAMetalLayer and
+ * submits the drawing batch before a snapshot can be requested. Presented window frames are not
+ * retained for later readback. Use an offscreen PAGSurface if you need reliable snapshots with
+ * Metal.
  */
 - (CVPixelBufferRef)makeSnapshot;
 

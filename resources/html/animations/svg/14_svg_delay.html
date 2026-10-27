@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG animation-delay</title>
+    <style>
+      @keyframes fadeUp {
+        0%   { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 160px; background-color: #0F172A;">
+    <!-- animation-delay: 0.8s → 所有关键帧时间整体后移 (§13.3) -->
+    <div id="bell"
+         style="position: absolute; left: 68px; top: 48px; width: 64px; height: 64px;
+                animation: fadeUp 1s ease-out 0.8s infinite;">
+      <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 3a6 6 0 0 0-6 6c0 5-2 6-2 6h16s-2-1-2-6a6 6 0 0 0-6-6z" fill="#FBBF24"/>
+        <path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="#FBBF24" stroke-width="1.8"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

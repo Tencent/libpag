@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG timing - steps (hold)</title>
+    <style>
+      @keyframes tick {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(120px); }
+      }
+    </style>
+  </head>
+  <body style="width: 160px; height: 200px; background-color: #052E16;">
+    <!-- steps(6) → PAGX hold (§13.3)，阶梯式下落（无平滑插值） -->
+    <div id="block"
+         style="position: absolute; left: 56px; top: 16px; width: 48px; height: 48px;
+                animation: tick 2.4s steps(6) infinite;">
+      <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="18" height="18" rx="3" fill="#4ADE80"/>
+        <path d="M7 12h10M12 7v10" stroke="#052E16" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

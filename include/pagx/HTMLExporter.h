@@ -75,6 +75,8 @@ struct HTMLExportOptions {
  * HTMLExporter converts a PAGXDocument into HTML/CSS/SVG format.
  * The output is a standalone HTML fragment that renders the PAGX content visually
  * equivalent to the native PAGX renderer in modern browsers.
+ * GPU locking: callers must not hold the same GPU device's context lock while calling export
+ * methods. The exporter acquires and releases device locks internally when rasterizing assets.
  */
 class HTMLExporter {
  public:

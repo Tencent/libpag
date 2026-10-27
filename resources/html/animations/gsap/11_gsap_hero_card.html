@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Hero Card Entrance</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-image: linear-gradient(135deg, #1E1B4B, #312E81); font-family: Arial;">
+    <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 60px;">
+      <div id="card" style="display: flex; flex-direction: column; gap: 20px; width: 460px; padding: 40px; border-radius: 24px; background-color: #FFFFFF; box-shadow: 0 24px 60px #00000059; opacity: 0;">
+
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 16px;">
+          <div id="avatar" style="width: 64px; height: 64px; border-radius: 32px; background-image: linear-gradient(135deg, #6366F1, #EC4899); opacity: 0;"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <p id="name" style="font-size: 20px; font-weight: bold; color: #0F172A; opacity: 0;">Jordan Rivera</p>
+            <p id="role" style="font-size: 14px; color: #6366F1; opacity: 0;">Product Designer</p>
+          </div>
+        </div>
+
+        <p id="bio" style="font-size: 15px; line-height: 24px; color: #475569; opacity: 0;">Crafting delightful interfaces with motion that feels natural. Available for new collaborations this quarter.</p>
+
+        <div style="display: flex; flex-direction: row; gap: 12px;">
+          <div id="btn-primary" style="display: flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 12px; background-color: #6366F1; opacity: 0;">
+            <p style="font-size: 14px; font-weight: bold; color: #FFFFFF;">Follow</p>
+          </div>
+          <div id="btn-ghost" style="display: flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 12px; background-color: #EEF2FF; opacity: 0;">
+            <p style="font-size: 14px; font-weight: bold; color: #4338CA;">Message</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 0.7 } });
+      tl.fromTo('#card', { opacity: 0, y: 60 }, { opacity: 1, y: 0 })
+        .fromTo('#avatar', { opacity: 0, x: -24 }, { opacity: 1, x: 0 }, '-=0.3')
+        .fromTo('#name', { opacity: 0, x: -20 }, { opacity: 1, x: 0 }, '-=0.5')
+        .fromTo('#role', { opacity: 0, x: -20 }, { opacity: 1, x: 0 }, '-=0.55')
+        .fromTo('#bio', { opacity: 0, y: 18 }, { opacity: 1, y: 0 }, '-=0.4')
+        .fromTo('#btn-primary', { opacity: 0, y: 16 }, { opacity: 1, y: 0 }, '-=0.4')
+        .fromTo('#btn-ghost', { opacity: 0, y: 16 }, { opacity: 1, y: 0 }, '-=0.55');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Easing - cubic-bezier</title>
+    <style>
+      @keyframes pop {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(120px); }
+      }
+    </style>
+  </head>
+  <body style="width: 160px; height: 200px; background-color: #18181B;">
+    <div id="r"
+         style="position: absolute; left: 56px; top: 16px;
+                width: 48px; height: 48px; border-radius: 12px;
+                background-color: #F472B6;
+                animation: pop 1.4s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;"></div>
+  </body>
+</html>

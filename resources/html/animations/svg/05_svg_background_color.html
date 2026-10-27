@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG badge background-color - color channel</title>
+    <style>
+      @keyframes badge {
+        0%   { background-color: #2563EB; }
+        100% { background-color: #DB2777; }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 160px; background-color: #0B1120;">
+    <!-- 圆形徽章背景色动画 → Fill 内 SolidColor 的 color 通道 (§13.2)；内部 SVG 图标固定白色 -->
+    <div id="badge"
+         style="position: absolute; left: 60px; top: 40px; width: 80px; height: 80px;
+                border-radius: 40px; background-color: #2563EB;
+                display: flex; align-items: center; justify-content: center;
+                animation: badge 2s ease-in-out infinite alternate;">
+      <svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2L4.5 13.5H11l-1 8.5 8.5-12H12z" fill="#FFFFFF"/>
+      </svg>
+    </div>
+  </body>
+</html>

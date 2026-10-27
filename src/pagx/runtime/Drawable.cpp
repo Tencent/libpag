@@ -17,14 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Drawable.h"
+#include "base/utils/Log.h"
+#include "tgfx/gpu/Context.h"
 
 namespace pagx {
 
-std::shared_ptr<Drawable> Drawable::MakeFrom(std::shared_ptr<tgfx::Surface> surface) {
-  if (surface == nullptr) {
+std::shared_ptr<Drawable> Drawable::MakeFrom(std::shared_ptr<tgfx::Device> device,
+                                             std::shared_ptr<tgfx::Surface> surface) {
+  if (device == nullptr || surface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Drawable>(new Drawable(std::move(surface)));
+  auto context = surface->getContext();
+  if (context == nullptr || context->device() != device.get()) {
+    LOGE("pagx::Drawable::MakeFrom() requires a surface created on the supplied device.");
+    return nullptr;
+  }
+  return std::shared_ptr<Drawable>(new Drawable(std::move(device), std::move(surface)));
 }
 
 }  // namespace pagx

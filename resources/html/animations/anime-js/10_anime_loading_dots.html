@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - loading dots (stagger + opacity + y)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 200px; height: 100px; background-color: #0F172A; position: relative; margin: 0;">
+    <div class="dot"
+         style="position: absolute; left: 60px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8; opacity: 0.2;"></div>
+    <div class="dot"
+         style="position: absolute; left: 92px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8; opacity: 0.2;"></div>
+    <div class="dot"
+         style="position: absolute; left: 124px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px; background-color: #38BDF8; opacity: 0.2;"></div>
+    <script>
+      // 真实加载点：opacity + translateY 双通道，stagger 错峰，alternate 往返
+      anime({
+        targets: ".dot",
+        translateY: -12,
+        opacity: [0.2, 1],
+        duration: 500,
+        easing: "easeInOutSine",
+        delay: anime.stagger(150),
+        direction: "alternate",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

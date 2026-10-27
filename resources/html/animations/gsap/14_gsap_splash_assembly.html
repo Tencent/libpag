@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Splash Assembly</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-image: radial-gradient(circle at 50% 40%, #1E293B, #020617); font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; width: 100%; height: 100%;">
+
+      <!-- logo grid: 9 shards converge from offset positions into a 3x3 mark -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; flex-direction: row; gap: 8px;">
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #38BDF8; opacity: 0;"></div>
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #C084FC; opacity: 0;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 8px;">
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="shard core" style="width: 44px; height: 44px; border-radius: 12px; background-color: #F472B6; opacity: 0;"></div>
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #818CF8; opacity: 0;"></div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 8px;">
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #C084FC; opacity: 0;"></div>
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #818CF8; opacity: 0;"></div>
+          <div class="shard" style="width: 44px; height: 44px; border-radius: 12px; background-color: #38BDF8; opacity: 0;"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <p id="wordmark" style="font-size: 34px; font-weight: bold; letter-spacing: 6px; color: #F8FAFC; opacity: 0;">AURORA</p>
+        <div id="rule" style="width: 60px; height: 3px; border-radius: 2px; background-color: #38BDF8; opacity: 0;"></div>
+        <p id="tag" style="font-size: 14px; letter-spacing: 3px; color: #64748B; opacity: 0;">DESIGN SYSTEM</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const shards = gsap.utils.toArray('.shard');
+      // converge offsets: corners come from diagonals, edges from sides
+      const offsets = [
+        { x: -120, y: -120 }, { x: 0, y: -150 }, { x: 120, y: -120 },
+        { x: -150, y: 0 },    { x: 0, y: 0 },    { x: 150, y: 0 },
+        { x: -120, y: 120 },  { x: 0, y: 150 },  { x: 120, y: 120 }
+      ];
+
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+      tl.add('assemble');
+      shards.forEach((s, i) => {
+        tl.fromTo(s,
+          { opacity: 0, x: offsets[i].x, y: offsets[i].y },
+          { opacity: 1, x: 0, y: 0, duration: 0.9, ease: 'back.out(1.4)' },
+          'assemble+=' + (i * 0.07)
+        );
+      });
+
+      tl.fromTo('.core', { opacity: 1 }, { opacity: 0.55, duration: 0.6, yoyo: true, repeat: 3, ease: 'sine.inOut' }, 'assemble+=0.9')
+        .add('reveal', '-=0.3')
+        .fromTo('#wordmark', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.7 }, 'reveal')
+        .fromTo('#rule', { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6 }, 'reveal+=0.15')
+        .fromTo('#tag', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6 }, 'reveal+=0.3');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - opacity</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A; position: relative; margin: 0;">
+    <div id="dot"
+         style="position: absolute; left: 88px; top: 56px;
+                width: 64px; height: 64px; border-radius: 32px;
+                background-color: #38BDF8;"></div>
+    <script>
+      // opacity -> alpha 通道；loop:true 让实例常驻 anime.running 以便采样
+      anime({
+        targets: "#dot",
+        opacity: [1, 0],
+        duration: 1500,
+        easing: "linear",
+        direction: "alternate",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

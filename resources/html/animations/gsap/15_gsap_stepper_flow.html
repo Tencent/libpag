@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Stepper Flow</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #0F172A; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; width: 100%; height: 100%; padding: 48px;">
+
+      <p id="flow-title" style="font-size: 26px; font-weight: bold; color: #F8FAFC; opacity: 0;">Deployment Pipeline</p>
+
+      <div style="display: flex; flex-direction: row; align-items: flex-start;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 110px;">
+          <div class="node" style="width: 52px; height: 52px; border-radius: 26px; background-color: #334155;"></div>
+          <p class="node-label" style="font-size: 14px; font-weight: bold; color: #64748B; opacity: 0;">Build</p>
+        </div>
+
+        <div style="width: 90px; height: 5px; border-radius: 3px; background-color: #1E293B; overflow: hidden; margin: 24px 0 0 0;">
+          <div class="track" style="width: 90px; height: 100%; background-color: #38BDF8;"></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 110px;">
+          <div class="node" style="width: 52px; height: 52px; border-radius: 26px; background-color: #334155;"></div>
+          <p class="node-label" style="font-size: 14px; font-weight: bold; color: #64748B; opacity: 0;">Test</p>
+        </div>
+
+        <div style="width: 90px; height: 5px; border-radius: 3px; background-color: #1E293B; overflow: hidden; margin: 24px 0 0 0;">
+          <div class="track" style="width: 90px; height: 100%; background-color: #38BDF8;"></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 110px;">
+          <div class="node" style="width: 52px; height: 52px; border-radius: 26px; background-color: #334155;"></div>
+          <p class="node-label" style="font-size: 14px; font-weight: bold; color: #64748B; opacity: 0;">Stage</p>
+        </div>
+
+        <div style="width: 90px; height: 5px; border-radius: 3px; background-color: #1E293B; overflow: hidden; margin: 24px 0 0 0;">
+          <div class="track" style="width: 90px; height: 100%; background-color: #38BDF8;"></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 110px;">
+          <div class="node" style="width: 52px; height: 52px; border-radius: 26px; background-color: #334155;"></div>
+          <p class="node-label" style="font-size: 14px; font-weight: bold; color: #64748B; opacity: 0;">Deploy</p>
+        </div>
+      </div>
+
+      <div id="status" style="display: flex; align-items: center; justify-content: center; padding: 14px 28px; border-radius: 999px; background-color: #1E293B; opacity: 0;">
+        <p style="font-size: 15px; font-weight: bold; color: #34D399;">All stages passed</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const nodes = gsap.utils.toArray('.node');
+      const labels = gsap.utils.toArray('.node-label');
+      const tracks = gsap.utils.toArray('.track');
+
+      // tracks start hidden by sliding their fill out to the left
+      gsap.set(tracks, { x: -90 });
+
+      const tl = gsap.timeline({
+        repeat: -1,
+        repeatDelay: 1.0,
+        defaults: { ease: 'power2.out' }
+      });
+
+      tl.fromTo('#flow-title', { opacity: 0, y: -18 }, { opacity: 1, y: 0, duration: 0.6 });
+
+      nodes.forEach((node, i) => {
+        tl.to(node, { backgroundColor: '#38BDF8', duration: 0.4 }, '+=0.1')
+          .fromTo(node, { y: 0 }, { y: -10, duration: 0.2, yoyo: true, repeat: 1, ease: 'sine.inOut' }, '<')
+          .to(labels[i], { opacity: 1, y: 0, duration: 0.35 }, '<');
+        if (i < tracks.length) {
+          tl.to(tracks[i], { x: 0, duration: 0.5, ease: 'power1.inOut' });
+        }
+      });
+
+      tl.fromTo('#status', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5 }, '+=0.1')
+        .to({}, { duration: 0.8 })
+        // reset for the loop
+        .to(nodes, { backgroundColor: '#334155', duration: 0.3 })
+        .set(tracks, { x: -90 })
+        .set(labels, { opacity: 0 })
+        .set('#status', { opacity: 0 });
+    </script>
+  </body>
+</html>

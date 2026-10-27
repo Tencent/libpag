@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG icon + text color - color channel</title>
+    <style>
+      @keyframes hue {
+        0%   { color: #94A3B8; }
+        100% { color: #F472B6; }
+      }
+    </style>
+  </head>
+  <body style="width: 260px; height: 120px; background-color: #111827; font-family: Arial;">
+    <!-- 固定的内联 SVG 心形图标 + 文本 color 动画 → 文本 Fill 的 color 通道 (§13.2) -->
+    <div style="position: absolute; left: 40px; top: 40px; width: 36px; height: 36px;">
+      <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 21s-7-4.5-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z"
+              fill="#F472B6"/>
+      </svg>
+    </div>
+    <p id="label"
+       style="position: absolute; left: 86px; top: 44px;
+              font-size: 24px; font-weight: bold; color: #94A3B8;
+              animation: hue 1.5s ease-in-out infinite alternate;">Favorite</p>
+  </body>
+</html>

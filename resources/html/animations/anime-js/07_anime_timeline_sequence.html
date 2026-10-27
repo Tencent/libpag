@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - timeline sequence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 160px; background-color: #1A1A2E; position: relative; margin: 0;">
+    <div id="t1"
+         style="position: absolute; left: 24px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px; background-color: #F87171;"></div>
+    <div id="t2"
+         style="position: absolute; left: 116px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px; background-color: #FBBF24;"></div>
+    <div id="t3"
+         style="position: absolute; left: 208px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px; background-color: #34D399;"></div>
+    <script>
+      // anime.timeline：顺序编排多段动画；timeline 实例本身进入 anime.running 被采样
+      const tl = anime.timeline({
+        easing: "linear",
+        direction: "alternate",
+        loop: true
+      });
+      tl.add({ targets: "#t1", translateY: -40, duration: 500 })
+        .add({ targets: "#t2", translateY: -40, duration: 500 })
+        .add({ targets: "#t3", translateY: -40, duration: 500 });
+    </script>
+  </body>
+</html>

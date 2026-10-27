@@ -9,23 +9,22 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGSurface+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
-#include "rendering/drawables/HardwareBufferDrawable.h"
-#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -41,46 +40,25 @@
   return _pagSurface;
 }
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
-  auto drawable = pag::GPUDrawable::FromLayer(layer);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
++ (PAGSurfaceImpl*)FromHost:(id)host {
+  auto surface = pag::cocoa::MakeSurfaceFromHost(host);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 }
 
-#if TARGET_IPHONE_SIMULATOR
-
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:].");
-  return nil;
+  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer device:nil];
 }
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:context:].");
-  return nil;
-}
-
-#else
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:nil];
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
-  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer device:(id)device {
+  auto surface = pag::cocoa::MakeSurfaceFromPixelBuffer(pixelBuffer, device);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
 }
-
-#endif
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),

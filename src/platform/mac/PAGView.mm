@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGView.h"
+
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
-#import "platform/mac/private/GPUDrawable.h"
+#include "platform/cocoa/private/PAGViewSurface.h"
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -35,6 +36,7 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
+  std::mutex renderLock;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -44,7 +46,15 @@
   return self;
 }
 
+- (CALayer*)makeBackingLayer {
+  Class layerClass = pag::cocoa::PAGViewSurface::LayerClass();
+  return layerClass == Nil ? [super makeBackingLayer] : [layerClass layer];
+}
+
 - (void)initPAG {
+#if defined(TGFX_USE_METAL)
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
@@ -58,18 +68,20 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(onAsyncSurfacePrepared:)
-                                               name:pag::AsyncSurfacePreparedNotification
-                                             object:self];
+  pag::cocoa::PAGViewSurface::ObserveSurfacePrepared(self, @selector(onAsyncSurfacePrepared:));
 }
 
 - (void)dealloc {
   [animator cancel];
   [animator release];
   [animatorListenerProxy release];
-  [pagPlayer release];
-  [pagSurface release];
+  {
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+    [pagPlayer release];
+    pagPlayer = nil;
+    [pagSurface release];
+    pagSurface = nil;
+  }
   [pagFile release];
   [filePath release];
   [listeners release];
@@ -78,25 +90,39 @@
   [super dealloc];
 }
 
+- (void)refreshSurfaceSize {
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+  if (pagSurface == nil) {
+    return;
+  }
+  pag::cocoa::PAGViewSurface::UpdateSize(self, pagSurface);
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // Resizing the view's coordinate system directly does not necessarily go through
+  // setFrameSize:, and AppKit does not document which internal paths call which setter. Both
+  // overrides therefore call the same helper, and the size comparison here keeps an
+  // already-applied change from being applied twice.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
     }
   }
 }
 
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+- (void)setFrameSize:(NSSize)newSize {
+  NSSize oldSize = self.bounds.size;
+  [super setFrameSize:newSize];
+  // setFrame: calls this internally, and autoresizing / Auto Layout drive it directly, so this is
+  // the main entry for frame-driven resizes. Handling the same change in setFrame: as well would
+  // run updateSize twice per resize.
+  if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
+    [self refreshSurfaceSize];
+    if (oldSize.width == 0 || oldSize.height == 0) {
       [animator update];
     }
   }
@@ -105,6 +131,12 @@
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
   [self checkVisible];
+}
+
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+  pag::cocoa::PAGViewSurface::UpdateWindowSize(self, pagSurface);
 }
 
 - (void)setAlphaValue:(CGFloat)alphaValue {
@@ -134,8 +166,12 @@
 }
 
 - (void)initPAGSurface {
-  pagSurface = [[PAGSurface FromView:self] retain];
-  [pagPlayer setSurface:pagSurface];
+  {
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
+    pagSurface = [pag::cocoa::PAGViewSurface::CreateSurface(self) retain];
+    [pagPlayer setSurface:pagSurface];
+  }
+  // Synchronous updates re-enter onAnimationFlush:, which acquires renderLock.
   [animator update];
 }
 
@@ -189,6 +225,7 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -315,6 +352,7 @@
 }
 
 - (BOOL)flush {
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(renderLock);
   return [pagPlayer flush];
 }
 

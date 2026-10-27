@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG longhand animation properties</title>
+    <style>
+      @keyframes fadeMove {
+        0%   { opacity: 0; transform: translateX(0px); }
+        100% { opacity: 1; transform: translateX(60px); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 140px; background-color: #052E16;">
+    <!--
+      longhand 写法（name/duration/timing/iteration/direction/delay）归一化折叠为
+      shorthand (§13.1)；opacity + translateX 双通道，对应 spec §13.4 范例
+    -->
+    <div id="tag"
+         style="position: absolute; left: 30px; top: 48px; width: 48px; height: 48px;
+                animation-name: fadeMove;
+                animation-duration: 2s;
+                animation-timing-function: linear;
+                animation-iteration-count: infinite;
+                animation-direction: alternate;
+                animation-delay: 0.2s;">
+      <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 11l8-8 9 1 1 9-8 8z" fill="#4ADE80"/>
+        <circle cx="15" cy="9" r="1.8" fill="#052E16"/>
+      </svg>
+    </div>
+  </body>
+</html>

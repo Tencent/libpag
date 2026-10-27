@@ -94,6 +94,8 @@ class PAGSurface {
    * premultiplied alpha and rowBytes equal to the row stride of the destination buffer.
    * The destination buffer must hold at least height() * dstRowBytes bytes, with
    * dstRowBytes >= width() * 4. Returns true on success.
+   * This method manages the device's context lock internally. Callers must not already hold the
+   * same GPU device's context lock.
    * @param dstPixels   pointer to destination buffer, must not be null.
    * @param dstRowBytes number of bytes per destination row.
    */

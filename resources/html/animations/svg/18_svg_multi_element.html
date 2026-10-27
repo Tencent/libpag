@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG multi-element - staggered icons</title>
+    <style>
+      @keyframes floatY {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(-22px); }
+      }
+    </style>
+  </head>
+  <body style="width: 300px; height: 160px; background-color: #0B1120;">
+    <!-- 多个内联 SVG 元素共享同一 @keyframes，靠 delay 错峰形成波浪 (§13) -->
+    <div id="ic1"
+         style="position: absolute; left: 36px; top: 70px; width: 44px; height: 44px;
+                animation: floatY 0.9s ease-in-out 0s infinite alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="9" fill="#F87171"/>
+      </svg>
+    </div>
+    <div id="ic2"
+         style="position: absolute; left: 128px; top: 70px; width: 44px; height: 44px;
+                animation: floatY 0.9s ease-in-out 0.2s infinite alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="18" height="18" rx="4" fill="#FBBF24"/>
+      </svg>
+    </div>
+    <div id="ic3"
+         style="position: absolute; left: 220px; top: 70px; width: 44px; height: 44px;
+                animation: floatY 0.9s ease-in-out 0.4s infinite alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 3l9 16H3z" fill="#34D399"/>
+      </svg>
+    </div>
+  </body>
+</html>

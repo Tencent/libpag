@@ -25,6 +25,7 @@
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 
+#ifdef TGFX_USE_OPENGL
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
 #else
@@ -33,6 +34,7 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
+#endif  // TGFX_USE_OPENGL
 
 namespace pag {
 using namespace tgfx;
@@ -45,6 +47,7 @@ std::string ToString(Frame frame) {
   return result;
 }
 
+#ifdef TGFX_USE_OPENGL
 BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height) {
   GLTextureInfo glInfo = {};
   glInfo.id = texture.id;
@@ -52,6 +55,7 @@ BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, i
   glInfo.format = texture.format;
   return {glInfo, width, height};
 }
+#endif
 
 std::vector<std::string> GetAllPAGFiles(const std::string& path) {
   return Directory::FindFiles(ProjectPath::Absolute(path), ".pag");
@@ -94,6 +98,7 @@ std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerTy
   return nullptr;
 }
 
+#ifdef TGFX_USE_OPENGL
 bool CreateGLTexture(Context*, int width, int height, tgfx::GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;
   texture->format = GL_RGBA8;
@@ -110,6 +115,7 @@ bool CreateGLTexture(Context*, int width, int height, tgfx::GLTextureInfo* textu
   glBindTexture(texture->target, 0);
   return true;
 }
+#endif  // TGFX_USE_OPENGL
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path) {
   return PAGFile::Load(ProjectPath::Absolute(path));

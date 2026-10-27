@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Slot Counter</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-image: linear-gradient(160deg, #111827, #1F2937); font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; width: 100%; height: 100%;">
+
+      <p id="cap" style="font-size: 14px; letter-spacing: 5px; color: #6EE7B7; opacity: 0;">TOTAL DOWNLOADS</p>
+
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+        <div id="reels" style="display: flex; flex-direction: row; gap: 6px;"></div>
+      </div>
+
+      <div id="badge" style="display: flex; align-items: center; justify-content: center; padding: 10px 22px; border-radius: 999px; background-color: #064E3B; opacity: 0;">
+        <p style="font-size: 14px; font-weight: bold; color: #6EE7B7;">+18% this month</p>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      const reels = document.getElementById('reels');
+      const target = [2, 4, 8, 1, 6];     // final number 24,816
+      const DIGIT_H = 84;
+      const strips = [];
+
+      target.forEach((d, idx) => {
+        // grouping comma between thousands
+        if (idx === 2) {
+          const comma = document.createElement('p');
+          comma.setAttribute('style', 'margin: 0; height: ' + DIGIT_H + 'px; line-height: ' + DIGIT_H + 'px; font-size: 64px; font-weight: bold; color: #F8FAFC;');
+          comma.textContent = ',';
+          reels.appendChild(comma);
+        }
+        const win = document.createElement('div');
+        win.setAttribute('style', 'width: 50px; height: ' + DIGIT_H + 'px; border-radius: 10px; background-color: #0B1220; overflow: hidden;');
+        const strip = document.createElement('div');
+        strip.className = 'strip';
+        strip.setAttribute('style', 'display: flex; flex-direction: column; align-items: center;');
+        for (let n = 0; n <= 9; n++) {
+          const cell = document.createElement('p');
+          cell.setAttribute('style', 'margin: 0; flex-shrink: 0; width: 50px; height: ' + DIGIT_H + 'px; line-height: ' + DIGIT_H + 'px; font-size: 60px; font-weight: bold; text-align: center; color: #F8FAFC;');
+          cell.textContent = String(n);
+          strip.appendChild(cell);
+        }
+        win.appendChild(strip);
+        reels.appendChild(win);
+        strips.push({ el: strip, value: d });
+      });
+
+      // loop the whole roll-up so the counter keeps animating
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.4 });
+      tl.fromTo('#cap', { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' });
+
+      strips.forEach((s, i) => {
+        // scroll the strip so the target digit lands in the window, with staggered settle
+        tl.fromTo(s.el,
+          { y: 0 },
+          { y: -s.value * DIGIT_H, duration: 1.6 + i * 0.25, ease: 'expo.out' },
+          0.3
+        );
+      });
+
+      tl.fromTo('#badge', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' }, '-=0.4');
+    </script>
+  </body>
+</html>

@@ -53,7 +53,7 @@ std::string AlphaEdgeDetectLayerEffect::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> AlphaEdgeDetectLayerEffect::uniformBlocks() const {
-  return {{"FilterUniforms", 0}};
+  return {{"FilterUniforms", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void AlphaEdgeDetectLayerEffect::onUpdateUniforms(

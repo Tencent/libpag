@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,12 +25,18 @@
 
 @interface PAGSurfaceImpl : NSObject
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
+/**
+ * Creates a surface from the selected backend's native layer or view without retaining the host.
+ */
++ (PAGSurfaceImpl*)FromHost:(id)host;
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
+/**
+ * Creates a pixel-buffer surface with an optional native device or context for the selected
+ * backend.
+ */
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer device:(id)device;
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 

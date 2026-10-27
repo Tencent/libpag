@@ -24,8 +24,8 @@ namespace pagx {
 
 /**
  * RenderTargetDrawable backs a PAGSurface with an externally created backend render target. The
- * device is obtained from GLDevice::Current() so that the PAGSurface shares the same GPU context
- * as the caller.
+ * device is adopted from the host thread's current GPU context (via pag::Devices::AdoptCurrent())
+ * so that the PAGSurface shares the same GPU context as the caller.
  */
 class RenderTargetDrawable : public Drawable {
  public:
@@ -41,17 +41,12 @@ class RenderTargetDrawable : public Drawable {
     return _renderTarget.height();
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() override {
-    return _device;
-  }
-
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                        const tgfx::BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
 
-  std::shared_ptr<tgfx::Device> _device = nullptr;
   tgfx::BackendRenderTarget _renderTarget = {};
   tgfx::ImageOrigin _origin = tgfx::ImageOrigin::TopLeft;
 };

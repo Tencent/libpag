@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat Conversation</title>
+    <style>
+      /* Messenger UI: each bubble enters with translateX + opacity,
+         staggered by animation-delay (incoming from the left,
+         outgoing from the right). */
+      @keyframes inLeft {
+        0%   { opacity: 0; transform: translateX(-40px); }
+        100% { opacity: 1; transform: translateX(0px); }
+      }
+      @keyframes inRight {
+        0%   { opacity: 0; transform: translateX(40px); }
+        100% { opacity: 1; transform: translateX(0px); }
+      }
+      .avatar {
+        display: flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; border-radius: 9999px;
+      }
+      .bubbleIn {
+        max-width: 260px; padding: 12px 16px; border-radius: 16px;
+        background-color: #FFFFFF; color: #0F172A; font-size: 14px;
+        box-shadow: 0 6px 14px #64748B1F;
+      }
+      .bubbleOut {
+        max-width: 260px; padding: 12px 16px; border-radius: 16px;
+        background-image: linear-gradient(135deg, #6366F1, #8B5CF6);
+        color: #FFFFFF; font-size: 14px;
+        box-shadow: 0 6px 14px #6366F133;
+      }
+    </style>
+  </head>
+  <body style="width: 480px; height: 360px; display: flex; flex-direction: column;
+               justify-content: center; gap: 16px; padding: 28px;
+               background-color: #EEF2FF; font-family: Arial;">
+
+    <div style="display: flex; flex-direction: row; align-items: flex-end; gap: 10px;
+                animation: inLeft 0.5s ease-out infinite alternate; animation-delay: 0s;">
+      <div class="avatar" style="background-color: #34D399;">
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" fill="#FFFFFF"/>
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6z" fill="#FFFFFF"/>
+        </svg>
+      </div>
+      <span class="bubbleIn">Hey! Did the new animations import cleanly?</span>
+    </div>
+
+    <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: flex-end;
+                animation: inRight 0.5s ease-out infinite alternate; animation-delay: 0.25s;">
+      <span class="bubbleOut">Yep, zero warnings. Translate + opacity only.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: row; align-items: flex-end; gap: 10px;
+                animation: inLeft 0.5s ease-out infinite alternate; animation-delay: 0.5s;">
+      <div class="avatar" style="background-color: #34D399;">
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" fill="#FFFFFF"/>
+          <path d="M4 20c0-4 4-6 8-6s8 2 8 6z" fill="#FFFFFF"/>
+        </svg>
+      </div>
+      <span class="bubbleIn">Perfect. Shipping it.</span>
+    </div>
+  </body>
+</html>

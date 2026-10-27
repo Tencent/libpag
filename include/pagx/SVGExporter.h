@@ -112,6 +112,8 @@ struct SVGExportOptions {
 /**
  * SVGExporter converts a PAGXDocument into SVG format.
  * This is the reverse of SVGImporter: it maps PAGX node types back to SVG elements.
+ * GPU locking: callers must not hold the same GPU device's context lock while calling export
+ * methods. The exporter acquires and releases device locks internally when rasterizing assets.
  */
 class SVGExporter {
  public:
