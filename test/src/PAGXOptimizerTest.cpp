@@ -243,6 +243,7 @@ CLI_TEST(PAGXOptimizerTest, CanonicalizePathToRectangle) {
 CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRect) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* mask = AddTopLayer(doc.get());
+  mask->visible = false;
   auto* maskRect = doc->makeNode<Rectangle>();
   maskRect->position = {25, 25};
   maskRect->size = {50, 50};
@@ -262,6 +263,79 @@ CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRect) {
   EXPECT_FLOAT_EQ(user->scrollRect.y, 0.0f);
   EXPECT_FLOAT_EQ(user->scrollRect.width, 50.0f);
   EXPECT_FLOAT_EQ(user->scrollRect.height, 50.0f);
+}
+
+// A mask layer that is not hidden renders as regular content once its mask reference is detached,
+// so the rewrite keeps it.
+CLI_TEST(PAGXOptimizerTest, RectMaskVisibleMaskIsKept) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->position = {25, 25};
+  maskRect->size = {50, 50};
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_FALSE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, mask);
+}
+
+// The rewrite reads the measured geometry: authored width/height override the intrinsic size and
+// an omitted position means the origin, and a size-dependent child (here a right constraint)
+// blocks pinning the owner's frame.
+CLI_TEST(PAGXOptimizerTest, RectMaskUsesMeasuredGeometryAndRejectsSizeDependentContent) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  mask->visible = false;
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->width = 100;
+  maskRect->height = 50;
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_TRUE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, nullptr);
+  EXPECT_FLOAT_EQ(user->scrollRect.width, 100);
+  EXPECT_FLOAT_EQ(user->scrollRect.height, 50);
+  EXPECT_FLOAT_EQ(user->width, 100);
+  EXPECT_FLOAT_EQ(user->height, 50);
+
+  auto doc2 = PAGXDocument::Make(100, 100);
+  auto* mask2 = AddTopLayer(doc2.get());
+  mask2->visible = false;
+  auto* maskRect2 = doc2->makeNode<Rectangle>();
+  maskRect2->size = {50, 50};
+  mask2->contents.push_back(maskRect2);
+  mask2->contents.push_back(MakeSolidFill(doc2.get(), 1, 1, 1));
+  auto* user2 = AddTopLayer(doc2.get());
+  user2->mask = mask2;
+  user2->maskType = MaskType::Alpha;
+  auto* badge = doc2->makeNode<Layer>();
+  badge->right = 0;
+  badge->width = 20;
+  badge->height = 20;
+  badge->contents.push_back(MakeSolidFill(doc2.get(), 0, 0, 1));
+  user2->children.push_back(badge);
+  user2->contents.push_back(MakeFilledRectGroup(doc2.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc2.get());
+
+  EXPECT_FALSE(user2->hasScrollRect);
+  EXPECT_EQ(user2->mask, mask2);
 }
 
 // scrollRect clips in the owner's own space while the mask is evaluated in the parent space, so a
@@ -1145,6 +1219,7 @@ CLI_TEST(PAGXOptimizerTest, RectMaskConversionRejectsSemanticAndGeometryChanges)
     Fixture f;
     f.doc = PAGXDocument::Make(100, 100);
     f.mask = AddTopLayer(f.doc.get());
+    f.mask->visible = false;
     f.rect = f.doc->makeNode<Rectangle>();
     f.rect->position = {25, 25};
     f.rect->size = {50, 50};

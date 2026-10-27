@@ -190,6 +190,33 @@ bool LayoutNodeHasConstraints(const LayoutNode* node) {
   return node->hasConstraints();
 }
 
+// Returns true when the node's size or position resolves against its container's dimensions:
+// opposite-edge / center constraints and percent sizes do, while left / top do not.
+bool LayoutNodeDependsOnContainerSize(const LayoutNode* node) {
+  if (node == nullptr) {
+    return false;
+  }
+  return !std::isnan(node->right) || !std::isnan(node->bottom) || !std::isnan(node->centerX) ||
+         !std::isnan(node->centerY) || !std::isnan(node->percentWidth) ||
+         !std::isnan(node->percentHeight);
+}
+
+// Returns true when any content element or child layer depends on the owner's dimensions, in which
+// case pinning the owner's frame would move or resize it.
+bool HasSizeDependentContent(const Layer* layer) {
+  for (auto* element : layer->contents) {
+    if (LayoutNodeDependsOnContainerSize(LayoutNode::AsLayoutNode(element))) {
+      return true;
+    }
+  }
+  for (auto* child : layer->children) {
+    if (LayoutNodeDependsOnContainerSize(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool ElementHasConstraints(Element* element) {
   return LayoutNodeHasConstraints(LayoutNode::AsLayoutNode(element));
 }
@@ -588,14 +615,31 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   if (LayoutNodeHasConstraints(layer)) {
     return false;
   }
-  // If the layer already declares an explicit frame size, leave it alone — overwriting an
-  // author-supplied width/height could change layout semantics for downstream consumers.
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+  // A mask layer may legally keep the default visible=true (the attribute is ignored while it is
+  // referenced as a mask), but once the reference is detached the layer renders as regular
+  // content. Only rewrite masks that are already hidden.
+  if (m->visible) {
     return false;
   }
-  float left = rect->position.x - rect->size.width * 0.5f;
-  float top = rect->position.y - rect->size.height * 0.5f;
-  layer->scrollRect = {left, top, rect->size.width, rect->size.height};
+  // If the layer already declares an explicit frame size, leave it alone — overwriting an
+  // author-supplied width/height could change layout semantics for downstream consumers. Pinning
+  // the frame below would also move or resize contents whose layout depends on the owner's size.
+  if (!std::isnan(layer->width) || !std::isnan(layer->height) || HasSizeDependentContent(layer)) {
+    return false;
+  }
+  // Read the measured geometry the renderer uses (Rectangle::onMeasure): authored width/height
+  // override the intrinsic size, and position is the center with NaN meaning the origin.
+  float w = std::isnan(rect->width) ? rect->size.width : rect->width;
+  float h = std::isnan(rect->height) ? rect->size.height : rect->height;
+  float posX = std::isnan(rect->position.x) ? 0.0f : rect->position.x;
+  float posY = std::isnan(rect->position.y) ? 0.0f : rect->position.y;
+  if (!std::isfinite(w) || !std::isfinite(h) || w <= 0.0f || h <= 0.0f || !std::isfinite(posX) ||
+      !std::isfinite(posY)) {
+    return false;
+  }
+  float left = posX - w * 0.5f;
+  float top = posY - h * 0.5f;
+  layer->scrollRect = {left, top, w, h};
   layer->hasScrollRect = true;
   // scrollRect shifts the contents by (-left, -top); translating the owner by the same amount
   // keeps them where they were while the window moves to the rect.
@@ -605,8 +649,8 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   // layer's frame to those dimensions so layoutBounds() reflects the visible region instead of
   // the (much larger) un-clipped child extent — otherwise verify's child-exceeds-parent check
   // (which only suppresses on the parent's clip, not the child's) would fire false positives.
-  layer->width = rect->size.width;
-  layer->height = rect->size.height;
+  layer->width = w;
+  layer->height = h;
   layer->mask = nullptr;
   return true;
 }
