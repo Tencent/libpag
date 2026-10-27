@@ -33,7 +33,6 @@
 
 import { setViewport, type EngineName, type Page } from './browser-engine';
 import { MAX_CAPTURE_HEIGHT_PX } from './common';
-import { MEASURE_BODY_CANVAS_SRC } from './canvas-measure';
 
 export interface CanvasSize {
   width: number;
@@ -53,7 +52,6 @@ export interface CanvasViewportDecision {
 // Serialised into the page via `page.evaluate`, so it must stay a
 // self-contained expression string (both engines accept that form).
 const CONTENT_FINGERPRINT_EXPR = `(() => {
-  ${MEASURE_BODY_CANVAS_SRC}
   var b = document.body; if (!b) return { score: 0, height: 0 };
   void b.offsetHeight;
   var els = b.getElementsByTagName('*'), n = 0;
@@ -65,7 +63,7 @@ const CONTENT_FINGERPRINT_EXPR = `(() => {
     if (r.width * r.height < 64) continue;
     n++;
   }
-  return { score: n, height: measureBodyCanvas().height };
+  return { score: n, height: Math.max(b.scrollHeight, Math.round(b.getBoundingClientRect().height)) };
 })()`;
 
 interface Fingerprint {

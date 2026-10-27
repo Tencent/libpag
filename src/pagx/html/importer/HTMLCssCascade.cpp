@@ -282,7 +282,7 @@ std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRul
     out += " {";
     for (const auto& stop : rule.stops) {
       out += ' ';
-      out += FormatNumber(stop.percent);
+      out += FormatRoundedNumber(stop.percent);
       out += "% { ";
       out += stop.declarations;
       // Ensure the declaration block is terminated so re-parsing stays robust.

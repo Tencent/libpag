@@ -13804,35 +13804,4 @@ PAG_TEST(PAGXHTMLBackgroundLayoutTest, ConicDualStopsUnitsPhaseAndFixup) {
   EXPECT_TRUE(ColorNear(gradient->colorStops.front()->color, pagx::Color{.5f, 0, .5f, 1}));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FractionalBoxesKeepBorderGeometryAfterRoundTripAndResize) {
-  auto doc = pagx::HTMLImporter::ParseString(R"HTML(<html><body style="width:1400px;height:4108px">
-    <div id="article" style="position:absolute;left:340px;top:703.796875px;width:720px;height:3404.1875px">
-      <div id="tags" style="position:absolute;left:0;top:3372.84375px;width:720px;height:31.34375px;display:flex;gap:8px">
-        <div id="badge" style="width:85.8125px;height:31.34375px;border:1px solid black;border-radius:999px"></div>
-      </div>
-    </div>
-  </body></html>)HTML");
-  ASSERT_NE(doc, nullptr);
-  ASSERT_EQ(doc->layers.size(), 1u);
-  EXPECT_EQ(doc->layers[0]->layoutRounding, pagx::LayoutRounding::None);
-  auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
-  ASSERT_NE(copy, nullptr);
-  copy->applyLayout();
-  auto* article = copy->findNode<pagx::Layer>("article");
-  auto* tags = copy->findNode<pagx::Layer>("tags");
-  auto* badge = copy->findNode<pagx::Layer>("badge");
-  ASSERT_NE(article, nullptr);
-  ASSERT_NE(tags, nullptr);
-  ASSERT_NE(badge, nullptr);
-  ASSERT_FALSE(badge->contents.empty());
-  auto* rect = dynamic_cast<pagx::Rectangle*>(badge->contents.front());
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->layoutHeight, badge->layoutHeight);
-  EXPECT_FLOAT_EQ(article->layoutY + tags->layoutY + badge->layoutY + rect->layoutHeight,
-                  4107.984375f);
-  badge->height = 28.125f;
-  copy->applyLayout();
-  EXPECT_FLOAT_EQ(rect->layoutHeight, 28.125f);
-}
-
 }  // namespace pag

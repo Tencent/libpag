@@ -131,12 +131,6 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
                                          float containerH, const Padding& padding,
                                          LayoutContext* context) {
   bool hasPadding = !padding.isZero();
-  auto roundSize = [context](float value) {
-    return context ? context->roundLayoutSize(value) : std::ceil(value);
-  };
-  auto roundPosition = [context](float value) {
-    return context ? context->roundLayoutPosition(value) : std::round(value);
-  };
   // A NaN container axis means the parent is still resolving that axis (pass 1 of a
   // content-measured parent). Propagate NaN downward so percent children fall back to their
   // preferred size instead of locking onto a provisional value.
@@ -154,21 +148,20 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
     // An authored width/height is NOT considered here: the child already folds it into its
     // preferred size during onMeasure(), so passing NAN lets setLayoutSize fall back to it.
     // Rounding policy: `targetW` / `targetH` produced here are layout-allocated sizes (the
-    // engine derived them from constraints or percent), so the container's rounding policy applies.
-    // Pixel mode ceils them to whole pixels; None preserves fractional allocations. Authored
+    // engine derived them from constraints or percent), so we ceil them to whole pixels. Authored
     // widths/heights and content-measured preferred sizes keep their exact values — they are
     // carried through setLayoutSize's NaN fallback, not through this branch.
     float targetW = NAN;
     if (!std::isnan(child->left) && !std::isnan(child->right)) {
-      targetW = std::isnan(cw) ? NAN : std::max(0.0f, roundSize(cw - child->left - child->right));
+      targetW = std::isnan(cw) ? NAN : std::max(0.0f, std::ceil(cw - child->left - child->right));
     } else if (!std::isnan(child->percentWidth)) {
-      targetW = roundSize(cw * child->percentWidth / 100.0f);
+      targetW = std::ceil(cw * child->percentWidth / 100.0f);
     }
     float targetH = NAN;
     if (!std::isnan(child->top) && !std::isnan(child->bottom)) {
-      targetH = std::isnan(ch) ? NAN : std::max(0.0f, roundSize(ch - child->top - child->bottom));
+      targetH = std::isnan(ch) ? NAN : std::max(0.0f, std::ceil(ch - child->top - child->bottom));
     } else if (!std::isnan(child->percentHeight)) {
-      targetH = roundSize(ch * child->percentHeight / 100.0f);
+      targetH = std::ceil(ch * child->percentHeight / 100.0f);
     }
     // Phase 2: write self rendering attributes and layoutWidth/layoutHeight.
     child->setLayoutSize(context, targetW, targetH);
@@ -179,8 +172,8 @@ void LayoutNode::PerformConstraintLayout(const std::vector<LayoutNode*>& nodes, 
           CalculateConstrainedPosition(cw, ch, child->layoutWidth, child->layoutHeight, *child);
       float relX = std::isnan(pos.x) ? 0.0f : pos.x;
       float relY = std::isnan(pos.y) ? 0.0f : pos.y;
-      float finalX = roundPosition(relX + padding.left);
-      float finalY = roundPosition(relY + padding.top);
+      float finalX = hasPadding ? std::round(relX + padding.left) : std::round(relX);
+      float finalY = hasPadding ? std::round(relY + padding.top) : std::round(relY);
       // Phase 4: write self position and layoutX/layoutY.
       child->setLayoutPosition(context, finalX, finalY);
     }

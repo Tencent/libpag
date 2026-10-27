@@ -138,8 +138,8 @@ class LayoutNode {
    *
    * Rounding policy: the measure phase (`onMeasure` / `preferredWidth` / `preferredHeight`) must
    * preserve authored values exactly, so it does not round. Only sizes allocated by the layout
-   * phase — constraint-resolved `targetWidth`/`targetHeight` — follow the enclosing container's
-   * layoutRounding policy in `PerformConstraintLayout` (ceil in Pixel mode, exact in None). When
+   * phase — constraint-resolved `targetWidth`/`targetHeight` — are ceiled (in
+   * `PerformConstraintLayout`) to keep each allocation on whole-pixel boundaries. When
    * `setLayoutSize` falls back to `preferredWidth`/`preferredHeight` (NaN target), it passes that
    * value through without rounding so the authored or content-measured size stays exact.
    *

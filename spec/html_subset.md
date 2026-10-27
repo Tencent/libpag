@@ -145,10 +145,6 @@ Disallowed (warning + skip): `flex-wrap`, `flex-grow`, `flex-basis`
 
 ### 4.2 Sizing
 
-The body Layer uses `layoutRounding="none"`, inherited by its descendants. Constraint and Flex
-layout preserve fractional CSS pixel positions and sizes, including percentage-based backgrounds
-and borders when a container is resized. PAGX serialization preserves the resulting float values.
-
 | CSS | PAGX |
 |-----|------|
 | `width: N px` / `height: N px` | `width="N"` / `height="N"` |
