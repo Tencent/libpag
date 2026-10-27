@@ -3938,6 +3938,268 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
   EXPECT_NE(svgTag.find("viewBox=\"76 36 168 128\""), std::string::npos) << svgTag;
 }
 
+// A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
+// keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
+// an animation that would play empty stops.
+CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
+  const char* cases[] = {
+      "layer/07_blend_mode.pagx",
+      "stroke/05_miter_limit.pagx",
+  };
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  for (const char* name : cases) {
+    auto html = LoadAndConvert(
+        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
+    ASSERT_FALSE(html.empty()) << name;
+    EXPECT_EQ(html.find("@keyframes"), std::string::npos) << name;
+    EXPECT_EQ(html.find("animation:"), std::string::npos) << name;
+    EXPECT_EQ(html.find("{ ; }"), std::string::npos) << name;
+  }
+}
+
+// Returns the `animation:` declaration value on the tag containing `idMarker`.
+static std::string AnimationDeclOfTag(const std::string& html, const std::string& idMarker) {
+  auto tag = FindTagContaining(html, idMarker);
+  auto pos = tag.find("animation:");
+  if (pos == std::string::npos) {
+    return "";
+  }
+  auto end = tag.find_first_of(";\"", pos);
+  return end == std::string::npos ? "" : tag.substr(pos, end - pos);
+}
+
+// Exports `animatedXml` twice: as is, and with `unsupportedChannelXml` removed. The supported
+// channels must produce identical keyframes and animation timing in both, so an unsupported channel
+// on the same object neither splits the supported keyframes nor overrides their easing.
+static void ExpectUnsupportedChannelIgnored(const std::string& animatedXml,
+                                            const std::string& unsupportedChannelXml,
+                                            const std::string& idMarker) {
+  auto pos = animatedXml.find(unsupportedChannelXml);
+  ASSERT_NE(pos, std::string::npos);
+  std::string supportedOnlyXml = animatedXml;
+  supportedOnlyXml.erase(pos, unsupportedChannelXml.size());
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto mixedHtml = LoadXMLAndConvert(animatedXml, opts);
+  auto supportedHtml = LoadXMLAndConvert(supportedOnlyXml, opts);
+  ASSERT_FALSE(mixedHtml.empty());
+  ASSERT_FALSE(supportedHtml.empty());
+
+  auto supportedDecl = AnimationDeclOfTag(supportedHtml, idMarker);
+  ASSERT_FALSE(supportedDecl.empty());
+  EXPECT_EQ(AnimationDeclOfTag(mixedHtml, idMarker), supportedDecl);
+  auto supportedRule = KeyframesRuleNamed(
+      supportedHtml, AnimationNameOfTag(FindTagContaining(supportedHtml, idMarker)));
+  ASSERT_FALSE(supportedRule.empty());
+  EXPECT_EQ(
+      KeyframesRuleNamed(mixedHtml, AnimationNameOfTag(FindTagContaining(mixedHtml, idMarker))),
+      supportedRule);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerAlphaLinear) {
+  const char* blendChannel = R"(
+        <Channel name="blendMode" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="30" value="1" interpolation="hold"/>
+          <Key time="60" value="1" interpolation="hold"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer id="mixLayer" x="40" y="40" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="layerMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixLayer">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1" interpolation="linear"/>
+          </Channel>)") +
+                    blendChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixLayer\"");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
+  const char* visibleChannel = R"(
+        <Channel name="visible" type="bool">
+          <Key time="0" value="true" interpolation="hold"/>
+          <Key time="20" value="false" interpolation="hold"/>
+          <Key time="40" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer id="mixSlide" x="40" y="60" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="slideMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixSlide">
+          <Channel name="x" type="float">
+            <Key time="0" value="40" interpolation="bezier" bezierOut="0.42,0" bezierIn="0.58,1"/>
+            <Key time="60" value="200"/>
+          </Channel>)") +
+                    visibleChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, visibleChannel, "id=\"mixSlide\"");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
+  const char* miterChannel = R"(
+        <Channel name="miterLimit" type="float">
+          <Key time="0" value="4" interpolation="hold"/>
+          <Key time="45" value="1" interpolation="hold"/>
+          <Key time="60" value="1"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Path data="M 40 160 L 160 40 L 280 160"/>
+      <Stroke id="mixStroke" color="#2563EB" width="8" join="miter"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="8" interpolation="linear"/>
+            <Key time="60" value="16"/>
+          </Channel>)") +
+                    miterChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, miterChannel, "id=\"mixStroke\"");
+}
+
+// PAGX composes a Group transform as
+//   T(position) * R(rotation) * R(-skewAxis) * Shear(tan(-skew)) * R(skewAxis) * S(scale) * T(-anchor)
+// (see BuildGroupMatrix). Each animated factor maps to its own CSS transform function in the same
+// order, so the browser interpolates every factor independently, as the runtime does.
+CLI_TEST(PAGXHtmlTest, AnimationGroupAnchorCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/08_anchor_x.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"anchorGroupX\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"anchorGroupX\"", "100%");
+  EXPECT_EQ(first, "  0% { transform: translate(180px, 60px) translate(0px, 0px); }");
+  EXPECT_EQ(last, "  100% { transform: translate(180px, 60px) translate(-80px, 0px); }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/09_skew.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"skewGroup\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"skewGroup\"", "100%");
+  EXPECT_EQ(first, "  0% { transform: translate(120px, 60px) skewX(0deg); }");
+  EXPECT_EQ(last, "  100% { transform: translate(120px, 60px) skewX(-45deg); }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewAxisCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/10_skew_axis.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"skewAxisGroup\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"skewAxisGroup\"", "100%");
+  EXPECT_EQ(first,
+            "  0% { transform: translate(120px, 40px) rotate(0deg) skewX(-30deg) rotate(0deg); }");
+  EXPECT_EQ(
+      last,
+      "  100% { transform: translate(120px, 40px) rotate(-90deg) skewX(-30deg) rotate(90deg); }");
+}
+
+// The anchor is the pivot for rotation and scale, so an animated anchor under a static rotation
+// must stay inside the rotated frame rather than becoming a plain screen-space translation.
+CLI_TEST(PAGXHtmlTest, AnimationGroupAnchorKeepsRotationPivot) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Group id="pivotGroup" position="160,100" rotation="90">
+        <Rectangle size="80,80"/>
+        <Fill color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="pivotShift" duration="60" frameRate="60" loop="once">
+        <Object target="pivotGroup">
+          <Channel name="anchor.x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"pivotGroup\"", "0%"),
+            "  0% { transform: translate(160px, 100px) rotate(90deg) translate(0px, 0px); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"pivotGroup\"", "100%"),
+            "  100% { transform: translate(160px, 100px) rotate(90deg) translate(-40px, 0px); }");
+}
+
+// Every static factor stays in its slot while skew and anchor.y animate, which pins the full
+// function order against BuildGroupMatrix.
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewKeepsTransformOrder) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Group id="orderGroup" position="100,100" rotation="30" skewAxis="15" scale="2,2"
+             anchor="10,20">
+        <Rectangle size="40,40"/>
+        <Fill color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="orderShift" duration="60" frameRate="60" loop="once">
+        <Object target="orderGroup">
+          <Channel name="skew" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="20"/>
+          </Channel>
+          <Channel name="anchor.y" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"orderGroup\"", "0%"),
+            "  0% { transform: translate(100px, 100px) rotate(30deg) rotate(-15deg) skewX(0deg) "
+            "rotate(15deg) scale(2) translate(-10px, -20px); }");
+  EXPECT_EQ(
+      KeyframeStopOf(html, "id=\"orderGroup\"", "100%"),
+      "  100% { transform: translate(100px, 100px) rotate(30deg) rotate(-15deg) skewX(-20deg) "
+      "rotate(15deg) scale(2) translate(-10px, 0px); }");
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="rectLayer" width="80" height="80">
