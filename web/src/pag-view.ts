@@ -15,7 +15,7 @@ import { calculateDisplaySize, isOffscreenCanvas } from '@tgfx/utils/canvas';
 
 export interface PAGViewOptions {
   /**
-   * Use style to scale canvas. default false.
+   * Use style to scale canvas. default true.
    * When target canvas is offscreen canvas, useScale is false.
    */
   useScale?: boolean;
