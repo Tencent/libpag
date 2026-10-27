@@ -373,8 +373,8 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::ShapeGroup: {
       auto* legacy = static_cast<pag::ShapeGroupElement*>(element);
-      auto* group = state->document->makeNode<Group>(
-          "pag-legacy-group-" + std::to_string(state->groupIdCounter++));
+      auto* group = state->document->makeNode<Group>("pag-legacy-group-" +
+                                                     std::to_string(state->groupIdCounter++));
       // The group's own ShapeTransform places/scales its contents; dropping it would render
       // the children at identity. The PAGX Group position is layout-driven (the content bounds
       // land at the position), which does not reproduce the legacy content-space translation,
@@ -394,8 +394,8 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
         auto opacity = PropertyValueAtStart(t->opacity, startFrame, nullptr);
         group->alpha = opacity / 255.0f;
         auto identityScale = scale.x == 1.0f && scale.y == 1.0f;
-        auto identityRest = group->rotation == 0.0f && group->skew == 0.0f && anchor.x == 0.0f &&
-                            anchor.y == 0.0f;
+        auto identityRest =
+            group->rotation == 0.0f && group->skew == 0.0f && anchor.x == 0.0f && anchor.y == 0.0f;
         auto transformAnimated = (t->position != nullptr && t->position->animatable()) ||
                                  (t->scale != nullptr && t->scale->animatable()) ||
                                  (t->rotation != nullptr && t->rotation->animatable()) ||
