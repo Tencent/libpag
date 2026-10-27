@@ -281,6 +281,8 @@ struct LayerRuntimeTarget : RuntimeTarget {
   float layoutY = 0;
   bool hasStaticMatrix = false;
   bool hasStaticMatrix3D = false;
+  bool rejectedMaskedWriteLogged = false;
+  bool rejectedComponentWriteLogged = false;
 
   static int TranslationAxis(const std::string& channel) {
     return channel == "x" ? 0 : (channel == "y" ? 1 : 2);
@@ -329,7 +331,16 @@ struct LayerRuntimeTarget : RuntimeTarget {
   // directly, which gives the same result without decomposition round-off.
   bool applyTranslation(int axis, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
-    if (v == nullptr || !std::isfinite(*v) || isTranslationMasked(axis)) {
+    if (v == nullptr || !std::isfinite(*v)) {
+      return false;
+    }
+    if (isTranslationMasked(axis)) {
+      // Log once: an animation or binding driving a channel a static matrix overrides otherwise
+      // fails silently every frame.
+      if (!rejectedMaskedWriteLogged) {
+        LOGE("LayerRuntimeTarget: ignored a translation write overridden by the static matrix.");
+        rejectedMaskedWriteLogged = true;
+      }
       return false;
     }
     if (hasComponents) {
@@ -405,9 +416,22 @@ struct LayerRuntimeTarget : RuntimeTarget {
   // if it cannot be decomposed or carries perspective other than a Z distance.
   bool applyComponent(Matrix3DComponent component, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || !std::isfinite(*v)) {
+      return false;
+    }
+    if (hasStaticMatrix || hasStaticMatrix3D) {
+      if (!rejectedMaskedWriteLogged) {
+        LOGE("LayerRuntimeTarget: ignored a component write overridden by the static matrix.");
+        rejectedMaskedWriteLogged = true;
+      }
+      return false;
+    }
     Matrix3DComponents next = {};
-    if (v == nullptr || !std::isfinite(*v) || hasStaticMatrix || hasStaticMatrix3D ||
-        !currentComponents(&next)) {
+    if (!currentComponents(&next)) {
+      if (!rejectedComponentWriteLogged) {
+        LOGE("LayerRuntimeTarget: rejected a component write on a non-decomposable pose.");
+        rejectedComponentWriteLogged = true;
+      }
       return false;
     }
     auto* field = Matrix3DComponentValue(&next, component);
