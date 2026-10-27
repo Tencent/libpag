@@ -10897,6 +10897,33 @@ PAGX_TEST(PAGXTest, LayerRotationKeepsWrittenAnglesAndReadsCanonicalEulerBranch)
 }
 
 /**
+ * Test case: float Layer attributes serialize with full precision and never in scientific notation,
+ * so extreme values round-trip and the text stays a valid xs:decimal.
+ */
+PAGX_TEST(PAGXTest, LayerTransformAttributeSerializationRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  layer->perspective = 1000000;
+  layer->scaleX = 0.00001f;
+  layer->skewX = 89.999995f;
+  doc->layers.push_back(layer);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("perspective=\"1000000\""), std::string::npos);
+  EXPECT_EQ(xml.find("e+"), std::string::npos);
+  EXPECT_EQ(xml.find("e-"), std::string::npos);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(loaded, nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  auto* loadedLayer = static_cast<pagx::Layer*>(loaded->findNode("L"));
+  ASSERT_NE(loadedLayer, nullptr);
+  EXPECT_FLOAT_EQ(loadedLayer->perspective, 1000000);
+  EXPECT_FLOAT_EQ(loadedLayer->scaleX, 0.00001f);
+  // skewX survives the round trip instead of being reset to the default by range validation.
+  EXPECT_FLOAT_EQ(loadedLayer->skewX, 89.999995f);
+}
+
+/**
  * Test case: static Layer transform components round-trip through XML and compose with x / y as
  * T * R * S, while a non-identity matrix overrides them and rejects component writes.
  */
