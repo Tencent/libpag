@@ -192,11 +192,11 @@ PAG_TEST(TGFXCastTest, ForeignMetalTexturePreservesBackendTag) {
  * 用例描述: WebGPU 后端纹理/渲染目标在 pag 与 tgfx 之间的往返转换（纯逻辑，无需 GPU 设备）
  */
 PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
-  WgpuTextureInfo wgpuInfo = {};
-  wgpuInfo.texture = reinterpret_cast<void*>(3);
-  wgpuInfo.textureView = reinterpret_cast<void*>(4);
-  wgpuInfo.format = 5;
-  BackendTexture texture(wgpuInfo, 640, 360);
+  WebGPUTextureInfo webGPUInfo = {};
+  webGPUInfo.texture = reinterpret_cast<void*>(3);
+  webGPUInfo.textureView = reinterpret_cast<void*>(4);
+  webGPUInfo.format = 5;
+  BackendTexture texture(webGPUInfo, 640, 360);
   EXPECT_TRUE(texture.isValid());
   EXPECT_EQ(texture.backend(), Backend::WEBGPU);
 
@@ -206,10 +206,10 @@ PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
 
   // Copy semantics preserve the WebGPU variant.
   BackendTexture copy = texture;
-  WgpuTextureInfo readBack = {};
-  ASSERT_TRUE(copy.getWgpuTextureInfo(&readBack));
-  EXPECT_EQ(readBack.texture, wgpuInfo.texture);
-  EXPECT_EQ(readBack.textureView, wgpuInfo.textureView);
+  WebGPUTextureInfo readBack = {};
+  ASSERT_TRUE(copy.getWebGPUTextureInfo(&readBack));
+  EXPECT_EQ(readBack.texture, webGPUInfo.texture);
+  EXPECT_EQ(readBack.textureView, webGPUInfo.textureView);
   EXPECT_EQ(readBack.format, 5u);
 
   // ToTGFX carries the WebGPU variant through, including the explicit format.
@@ -218,17 +218,17 @@ PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
   EXPECT_EQ(tgfxTexture.backend(), tgfx::Backend::WebGPU);
   tgfx::WebGPUTextureInfo tgfxInfo = {};
   ASSERT_TRUE(tgfxTexture.getWebGPUTextureInfo(&tgfxInfo));
-  EXPECT_EQ(tgfxInfo.texture, wgpuInfo.texture);
-  EXPECT_EQ(tgfxInfo.textureView, wgpuInfo.textureView);
+  EXPECT_EQ(tgfxInfo.texture, webGPUInfo.texture);
+  EXPECT_EQ(tgfxInfo.textureView, webGPUInfo.textureView);
   EXPECT_EQ(tgfxInfo.format, 5u);
 
   // A zero format means unspecified WGPUTextureFormat and must be rejected.
-  WgpuTextureInfo noFormat = wgpuInfo;
+  WebGPUTextureInfo noFormat = webGPUInfo;
   noFormat.format = 0;
   EXPECT_FALSE(ToTGFX(BackendTexture(noFormat, 640, 360)).isValid());
 
   // Render targets share the same conversion path.
-  BackendRenderTarget renderTarget(wgpuInfo, 640, 360);
+  BackendRenderTarget renderTarget(webGPUInfo, 640, 360);
   auto tgfxTarget = ToTGFX(renderTarget);
   ASSERT_TRUE(tgfxTarget.isValid());
   EXPECT_EQ(tgfxTarget.backend(), tgfx::Backend::WebGPU);

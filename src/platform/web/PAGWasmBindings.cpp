@@ -65,10 +65,10 @@ static val CopyToNewUint8Array(const uint8_t* data, size_t dataSize) {
 // ignored.
 #if defined(TGFX_USE_WEBGPU)
 static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int format) {
-  WgpuTextureInfo wgpuInfo = {};
-  wgpuInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
-  wgpuInfo.format = static_cast<unsigned>(format);
-  return BackendTexture(wgpuInfo, width, height);
+  WebGPUTextureInfo webGPUInfo = {};
+  webGPUInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
+  webGPUInfo.format = static_cast<unsigned>(format);
+  return BackendTexture(webGPUInfo, width, height);
 }
 #else
 static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int) {

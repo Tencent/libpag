@@ -39,7 +39,7 @@ static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Luminosity, tgfx::BlendMode::Luminosity},
     {BlendMode::Add, tgfx::BlendMode::PlusLighter}};
 
-static tgfx::WebGPUTextureInfo ToTGFX(const WgpuTextureInfo& info) {
+static tgfx::WebGPUTextureInfo ToTGFX(const WebGPUTextureInfo& info) {
   tgfx::WebGPUTextureInfo result = {};
   result.texture = info.texture;
   result.textureView = info.textureView;
@@ -47,11 +47,10 @@ static tgfx::WebGPUTextureInfo ToTGFX(const WgpuTextureInfo& info) {
   return result;
 }
 
-// tgfx::WebGPUTextureInfo uses const void* handles while pag::WgpuTextureInfo predates that and
-// uses void*. The pointers are opaque to libpag and never written through, so the const_cast is
-// safe.
-static WgpuTextureInfo ToPAG(const tgfx::WebGPUTextureInfo& info) {
-  WgpuTextureInfo result = {};
+// tgfx::WebGPUTextureInfo uses const void* handles while pag::WebGPUTextureInfo uses void*. The
+// pointers are opaque to libpag and never written through, so the const_cast is safe.
+static WebGPUTextureInfo ToPAG(const tgfx::WebGPUTextureInfo& info) {
+  WebGPUTextureInfo result = {};
   result.texture = const_cast<void*>(info.texture);
   result.textureView = const_cast<void*>(info.textureView);
   result.format = info.format;
@@ -199,11 +198,11 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
     }
     case Backend::WEBGPU: {
-      WgpuTextureInfo wgpuInfo = {};
-      if (!texture.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
+      WebGPUTextureInfo webGPUInfo = {};
+      if (!texture.getWebGPUTextureInfo(&webGPUInfo) || webGPUInfo.format == 0) {
         return {};
       }
-      return tgfx::BackendTexture{ToTGFX(wgpuInfo), texture.width(), texture.height()};
+      return tgfx::BackendTexture{ToTGFX(webGPUInfo), texture.width(), texture.height()};
     }
     case Backend::VULKAN:
     case Backend::MOCK:
@@ -238,11 +237,11 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       return {sampler, texture.width(), texture.height()};
     }
     case tgfx::Backend::WebGPU: {
-      tgfx::WebGPUTextureInfo wgpuInfo = {};
-      if (!texture.getWebGPUTextureInfo(&wgpuInfo)) {
+      tgfx::WebGPUTextureInfo webGPUInfo = {};
+      if (!texture.getWebGPUTextureInfo(&webGPUInfo)) {
         return {};
       }
-      return {ToPAG(wgpuInfo), texture.width(), texture.height()};
+      return {ToPAG(webGPUInfo), texture.width(), texture.height()};
     }
     default:
       return {};
@@ -272,11 +271,11 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
     case Backend::WEBGPU: {
-      WgpuTextureInfo wgpuInfo = {};
-      if (!renderTarget.getWgpuTextureInfo(&wgpuInfo) || wgpuInfo.format == 0) {
+      WebGPUTextureInfo webGPUInfo = {};
+      if (!renderTarget.getWebGPUTextureInfo(&webGPUInfo) || webGPUInfo.format == 0) {
         return {};
       }
-      return tgfx::BackendRenderTarget(ToTGFX(wgpuInfo), renderTarget.width(),
+      return tgfx::BackendRenderTarget(ToTGFX(webGPUInfo), renderTarget.width(),
                                        renderTarget.height());
     }
     case Backend::VULKAN:

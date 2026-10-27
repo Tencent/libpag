@@ -144,7 +144,7 @@ struct VkImageInfo {
  * preinitializedWebGPUDevice) — WGPUTexture carries no device back-reference, so a mismatched
  * device cannot be detected at runtime and leads to undefined behavior.
  */
-struct WgpuTextureInfo {
+struct WebGPUTextureInfo {
   /**
    * Pointer to a WGPUTexture. On Web this is the numeric handle registered in Emscripten's
    * WebGPU runtime (Module.WebGPU.mgrTexture).
@@ -189,7 +189,7 @@ class PAG_API BackendTexture {
   /**
    * Creates a WebGPU backend texture.
    */
-  BackendTexture(const WgpuTextureInfo& wgpuInfo, int width, int height);
+  BackendTexture(const WebGPUTextureInfo& webGPUInfo, int width, int height);
 
   BackendTexture(const BackendTexture& that);
 
@@ -242,11 +242,11 @@ class PAG_API BackendTexture {
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
   /**
-   * If the backend API is WebGPU, copies a snapshot of the WgpuTextureInfo struct into the
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the
    * passed in pointer and returns true. Otherwise, returns false if the backend API is not
    * WebGPU.
    */
-  bool getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const;
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
 
  private:
   Backend _backend = Backend::MOCK;
@@ -257,7 +257,7 @@ class PAG_API BackendTexture {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
-    WgpuTextureInfo wgpuInfo;
+    WebGPUTextureInfo webGPUInfo;
   };
 };
 
@@ -289,7 +289,7 @@ class PAG_API BackendRenderTarget {
    * is the render target, so this takes the same description as a WebGPU backend texture. The
    * texture must be created with the RENDER_ATTACHMENT usage flag.
    */
-  BackendRenderTarget(const WgpuTextureInfo& wgpuInfo, int width, int height);
+  BackendRenderTarget(const WebGPUTextureInfo& webGPUInfo, int width, int height);
 
   BackendRenderTarget(const BackendRenderTarget& that);
 
@@ -342,11 +342,11 @@ class PAG_API BackendRenderTarget {
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
   /**
-   * If the backend API is WebGPU, copies a snapshot of the WgpuTextureInfo struct into the
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the
    * passed in pointer and returns true. Otherwise, returns false if the backend API is not
    * WebGPU.
    */
-  bool getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const;
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
 
  private:
   Backend _backend = Backend::MOCK;
@@ -356,7 +356,7 @@ class PAG_API BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
-    WgpuTextureInfo wgpuInfo;
+    WebGPUTextureInfo webGPUInfo;
   };
 };
 
