@@ -84,6 +84,7 @@ function main() {
   if (!fs.existsSync(path.join(TOOL_DIR, 'node_modules'))) {
     runNpm(['ci'], TOOL_DIR);
   }
+  runNpm(['run', 'clean'], TOOL_DIR);
   runNpm(['run', 'build'], TOOL_DIR);
 
   const distDir = path.join(TOOL_DIR, 'dist');
