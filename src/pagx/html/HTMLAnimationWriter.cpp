@@ -999,6 +999,9 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
       auto* bf = static_cast<const BlurFilter*>(f);
       float bx = fc ? EvalFloatChannel(fc->blurX, t, bf->blurX) : bf->blurX;
       float by = fc ? EvalFloatChannel(fc->blurY, t, bf->blurY) : bf->blurY;
+      // CSS blur() takes a single radius applied to both axes, so differing blurX and blurY can
+      // only be approximated here by the larger one. A per-axis blur needs an SVG feGaussianBlur,
+      // whose stdDeviation is an attribute that CSS keyframes cannot animate.
       float r = std::max(bx, by);
       if (!filterVal.empty()) filterVal += ' ';
       filterVal += "blur(" + CssFloatToString(r) + "px)";
