@@ -91,11 +91,4 @@ bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* dev
   return context != nullptr;
 }
 
-std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
-  // WebGPU is stateless command encoding — there is no global GPU state to save/restore
-  // around libpag rendering. Returning nullptr matches the Devices.h contract for non-GL
-  // backends.
-  return nullptr;
-}
-
 }  // namespace pag
