@@ -61,13 +61,14 @@ jobs:
           path: ios
 
   mac_metal:
-    # Compile-only verification of the Metal backend on macOS. Building PAGFullTest covers all
-    # test modules on top of the library itself. Executing baseline-independent Metal behavior
-    # tests in CI and adding backend-specific screenshot baselines are deferred to a follow-up PR.
+    # Run the full native Metal suite against its own baseline cache, including screenshot tests.
     runs-on: macos-14
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -75,10 +76,9 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: |
-            third-party-mac-metal-
-            third-party-autotest-
+            test/baseline/.cache/metal
+          key: third-party-autotest-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-autotest-metal-
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
@@ -90,11 +90,25 @@ jobs:
           depsync
         shell: bash
 
-      - name: Build macOS Metal
+      - name: Get Puppeteer Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            test/node_modules
+            ~/.cache/puppeteer
+          key: puppeteer-autotest-mac-${{ hashFiles('test/package-lock.json') }}
+          restore-keys: puppeteer-autotest-mac-
+
+      - name: Install Puppeteer
+        run: npm ci --prefix test
+        shell: bash
+
+      - name: Run macOS Metal Autotest
         run: |
           mkdir -p third_party/tgfx/out/cache
-          cmake -G Ninja -DPAG_USE_METAL=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B build-metal
-          cmake --build build-metal --target PAGFullTest_Metal -- -j 12
+          chmod +x autotest.sh
+          ./autotest.sh USE_METAL --skip-images
+        shell: bash
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -102,7 +116,15 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+            test/baseline/.cache/metal
+          key: third-party-autotest-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Upload Metal Test Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac_metal_result
+          path: result
 
   ios_metal:
     # Compile-only verification of the Metal backend on iOS devices (arm64). The deployment

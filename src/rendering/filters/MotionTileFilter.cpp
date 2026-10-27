@@ -119,7 +119,7 @@ std::vector<tgfx::BindingEntry> MotionTileFilter::uniformBlocks() const {
 void MotionTileFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                         const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                         const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float tileCenterX = 0.0f;
     float tileCenterY = 0.0f;
     float tileWidth = 0.0f;
@@ -130,6 +130,8 @@ void MotionTileFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU*
     float phase = 0.0f;
     int isHorizontalPhaseShift = 0;
   };
+
+  static_assert(sizeof(Uniforms) == 48, "Args must match the std140 layout.");
 
   Uniforms uniforms = {};
   uniforms.tileCenterX = tileCenter.x;

@@ -18,6 +18,10 @@
 
 #include "DevicePool.h"
 #include "rendering/gpu/Devices.h"
+#if defined(TGFX_USE_METAL)
+#include "core/AtlasManager.h"
+#include "tgfx/gpu/Context.h"
+#endif
 
 namespace pag {
 thread_local std::shared_ptr<tgfx::Device> cachedDevice = nullptr;
@@ -29,5 +33,19 @@ std::shared_ptr<tgfx::Device> DevicePool::Make() {
     cachedDevice = device;
   }
   return device;
+}
+
+bool DevicePool::ResetAtlasForComparison() {
+#if defined(TGFX_USE_METAL)
+  DeviceLockScope scope(Devices::MakeDefault());
+  if (!scope) {
+    return false;
+  }
+  auto context = scope.context();
+  context->flushAndSubmit(true);
+  // Like tgfx's ContextScope, keep atlas placement independent of earlier pixel comparisons.
+  context->atlasManager()->releaseAll();
+#endif
+  return true;
 }
 }  // namespace pag

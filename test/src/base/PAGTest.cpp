@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTest.h"
+#include "utils/DevicePool.h"
 
 namespace pag {
 static bool hasFailure = false;
@@ -26,6 +27,8 @@ bool PAGTest::HasFailure() {
 }
 
 void PAGTest::SetUp() {
+  // Pure CPU tests must still run when a GPU is unavailable.
+  DevicePool::ResetAtlasForComparison();
 }
 
 void PAGTest::TearDown() {

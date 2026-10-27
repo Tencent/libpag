@@ -91,10 +91,40 @@ namespace pag {
  */
 PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   auto cacheDir = Platform::Current()->getCacheDir();
+  ASSERT_FALSE(cacheDir.empty());
+  auto diskCache = DiskCache::GetInstance();
+  auto worker = DiskIOWorker::GetInstance();
+  worker->waitAll();
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_TRUE(diskCache->openedFiles.empty());
+    ASSERT_EQ(diskCache->getCacheDir(), cacheDir);
+  }
+  struct CacheCleanup {
+    size_t originalMaxDiskSize;
+    ~CacheCleanup() {
+      auto worker = DiskIOWorker::GetInstance();
+      worker->waitAll();
+      PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
+      worker->waitAll();
+      PAGDiskCache::RemoveAll();
+      worker->waitAll();
+    }
+  } cleanup{PAGDiskCache::MaxDiskSize()};
+  PAGDiskCache::RemoveAll();
+  worker->waitAll();
   std::filesystem::remove_all(cacheDir);
   std::filesystem::create_directories(cacheDir);
   std::filesystem::copy(ProjectPath::Absolute("resources/disk/libpag"), cacheDir,
                         std::filesystem::copy_options::recursive);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    // Reload the fixture into the already-live singleton, not just its on-disk files.
+    diskCache->fileIDCount = 1;
+    diskCache->maxDiskSize = 1073741824;
+    ASSERT_TRUE(diskCache->readConfig());
+  }
+  worker->waitAll();
   auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
   ASSERT_TRUE(pagFile != nullptr);
   auto info =
@@ -108,7 +138,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_EQ(sequenceFile->frameRate(), pagFile->frameRate());
   EXPECT_FALSE(sequenceFile->isComplete());
   EXPECT_EQ(sequenceFile->cachedFrames, 11);
-  auto diskCache = sequenceFile->diskCache;
+  EXPECT_EQ(sequenceFile->diskCache, diskCache);
   DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions during readConfig()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
@@ -200,9 +230,9 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   success = sequenceFile->readFrame(22, buffer);
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
+  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions from checkDiskSpace()
   EXPECT_EQ(diskCache->totalDiskSize,
             lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions from checkDiskSpace()
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   PAGDiskCache::SetMaxDiskSize(0);
@@ -224,8 +254,6 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   sequenceFile2 = nullptr;
   DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-  PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
-  pag::PAGDiskCache::RemoveAll();
 }
 
 PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
@@ -335,6 +363,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
   auto decoder7 = PAGDecoder::MakeFrom(pagFile2, 20, 0.f);
   EXPECT_TRUE(decoder7 == nullptr);
 
+  DiskIOWorker::GetInstance()->waitAll();
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
