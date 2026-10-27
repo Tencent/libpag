@@ -581,6 +581,10 @@ enum class TargetChannelRole {
   Rotation,
   ScaleX,
   ScaleY,
+  AnchorX,
+  AnchorY,
+  Skew,
+  SkewAxis,
   FillColor,
   FillAlpha,
   StrokeColor,
@@ -620,12 +624,20 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Group, "rotation", TargetChannelRole::Rotation},
     {NodeType::Group, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Group, "scale.y", TargetChannelRole::ScaleY},
+    {NodeType::Group, "anchor.x", TargetChannelRole::AnchorX},
+    {NodeType::Group, "anchor.y", TargetChannelRole::AnchorY},
+    {NodeType::Group, "skew", TargetChannelRole::Skew},
+    {NodeType::Group, "skewAxis", TargetChannelRole::SkewAxis},
     {NodeType::TextBox, "alpha", TargetChannelRole::Opacity},
     {NodeType::TextBox, "position.x", TargetChannelRole::GroupPosX},
     {NodeType::TextBox, "position.y", TargetChannelRole::GroupPosY},
     {NodeType::TextBox, "rotation", TargetChannelRole::Rotation},
     {NodeType::TextBox, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::TextBox, "scale.y", TargetChannelRole::ScaleY},
+    {NodeType::TextBox, "anchor.x", TargetChannelRole::AnchorX},
+    {NodeType::TextBox, "anchor.y", TargetChannelRole::AnchorY},
+    {NodeType::TextBox, "skew", TargetChannelRole::Skew},
+    {NodeType::TextBox, "skewAxis", TargetChannelRole::SkewAxis},
 
     // Painter & ColorResource channels
     {NodeType::Fill, "color", TargetChannelRole::FillColor},
@@ -685,6 +697,10 @@ struct BundleChannelSet {
   const Channel* rotCh = nullptr;
   const Channel* scaleXCh = nullptr;
   const Channel* scaleYCh = nullptr;
+  const Channel* anchorXCh = nullptr;
+  const Channel* anchorYCh = nullptr;
+  const Channel* skewCh = nullptr;
+  const Channel* skewAxisCh = nullptr;
   const Channel* posXCh = nullptr;
   const Channel* posYCh = nullptr;
   const Channel* fillColorCh = nullptr;
@@ -714,7 +730,10 @@ struct BundleTimingInfo {
   SegmentEasing commonEasing = {};
 };
 
-void BindChannelToBundleSet(
+// Binds `ch` to the CSS-mapped slot it drives and returns true, or returns false when the exporter
+// has no CSS mapping for it (an unknown channel, a SolidColor no painter uses, or a malformed Path
+// point channel). Only bound channels may contribute keyframe stops and easing to the bundle.
+bool BindChannelToBundleSet(
     const Node* objTarget, const Channel* ch,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
     BundleChannelSet& out) {
@@ -722,89 +741,106 @@ void BindChannelToBundleSet(
   if (tType == NodeType::Path) {
     size_t ptIdx = 0;
     bool isX = false;
-    if (ParsePointChannelName(ch->name, ptIdx, isX)) {
-      out.animatedMaskPath = static_cast<const Path*>(objTarget);
-      if (isX) {
-        out.maskPtX[ptIdx] = ch;
-      } else {
-        out.maskPtY[ptIdx] = ch;
-      }
+    if (!ParsePointChannelName(ch->name, ptIdx, isX)) {
+      return false;
     }
-    return;
+    out.animatedMaskPath = static_cast<const Path*>(objTarget);
+    if (isX) {
+      out.maskPtX[ptIdx] = ch;
+    } else {
+      out.maskPtY[ptIdx] = ch;
+    }
+    return true;
   }
 
   TargetChannelRole role = LookupChannelRole(tType, ch->name);
   switch (role) {
     case TargetChannelRole::Opacity:
       out.alphaCh = ch;
-      break;
+      return true;
     case TargetChannelRole::LayerX:
       out.xCh = ch;
-      break;
+      return true;
     case TargetChannelRole::LayerY:
       out.yCh = ch;
-      break;
+      return true;
     case TargetChannelRole::LayerMatrix:
       out.matrixCh = ch;
-      break;
+      return true;
     case TargetChannelRole::GroupPosX:
       out.posXCh = ch;
-      break;
+      return true;
     case TargetChannelRole::GroupPosY:
       out.posYCh = ch;
-      break;
+      return true;
     case TargetChannelRole::Rotation:
       out.rotCh = ch;
-      break;
+      return true;
     case TargetChannelRole::ScaleX:
       out.scaleXCh = ch;
-      break;
+      return true;
     case TargetChannelRole::ScaleY:
       out.scaleYCh = ch;
-      break;
+      return true;
+    case TargetChannelRole::AnchorX:
+      out.anchorXCh = ch;
+      return true;
+    case TargetChannelRole::AnchorY:
+      out.anchorYCh = ch;
+      return true;
+    case TargetChannelRole::Skew:
+      out.skewCh = ch;
+      return true;
+    case TargetChannelRole::SkewAxis:
+      out.skewAxisCh = ch;
+      return true;
     case TargetChannelRole::FillColor:
       out.fillColorCh = ch;
       out.fillPainter = static_cast<const Fill*>(objTarget);
-      break;
+      return true;
     case TargetChannelRole::FillAlpha:
       out.fillAlphaCh = ch;
       out.fillPainter = static_cast<const Fill*>(objTarget);
-      break;
+      return true;
     case TargetChannelRole::StrokeColor:
       out.strokeColorCh = ch;
       out.strokePainter = static_cast<const Stroke*>(objTarget);
-      break;
+      return true;
     case TargetChannelRole::StrokeAlpha:
       out.strokeAlphaCh = ch;
       out.strokePainter = static_cast<const Stroke*>(objTarget);
-      break;
+      return true;
     case TargetChannelRole::StrokeWidth:
       out.strokeWidthCh = ch;
-      break;
+      return true;
     case TargetChannelRole::StrokeDashOffset:
       out.dashOffsetCh = ch;
-      break;
+      return true;
     case TargetChannelRole::SolidColorValue:
     case TargetChannelRole::SolidColorAlpha: {
       auto sIt = solidToPainter.find(static_cast<const SolidColor*>(objTarget));
-      if (sIt != solidToPainter.end() && sIt->second != nullptr) {
-        if (sIt->second->nodeType() == NodeType::Fill) {
-          out.fillPainter = static_cast<const Fill*>(sIt->second);
-          if (role == TargetChannelRole::SolidColorValue) {
-            out.fillColorCh = ch;
-          } else {
-            out.fillAlphaCh = ch;
-          }
-        } else if (sIt->second->nodeType() == NodeType::Stroke) {
-          out.strokePainter = static_cast<const Stroke*>(sIt->second);
-          if (role == TargetChannelRole::SolidColorValue) {
-            out.strokeColorCh = ch;
-          } else {
-            out.strokeAlphaCh = ch;
-          }
-        }
+      if (sIt == solidToPainter.end() || sIt->second == nullptr) {
+        return false;
       }
-      break;
+      if (sIt->second->nodeType() == NodeType::Fill) {
+        out.fillPainter = static_cast<const Fill*>(sIt->second);
+        if (role == TargetChannelRole::SolidColorValue) {
+          out.fillColorCh = ch;
+        } else {
+          out.fillAlphaCh = ch;
+        }
+        return true;
+      }
+      if (sIt->second->nodeType() == NodeType::Stroke) {
+        out.strokePainter = static_cast<const Stroke*>(sIt->second);
+        if (role == TargetChannelRole::SolidColorValue) {
+          out.strokeColorCh = ch;
+        } else {
+          out.strokeAlphaCh = ch;
+        }
+        return true;
+      }
+      return false;
     }
     case TargetChannelRole::FilterBlurX:
     case TargetChannelRole::FilterBlurY:
@@ -826,14 +862,15 @@ void BindChannelToBundleSet(
         fc.offsetY = ch;
       } else if (role == TargetChannelRole::FilterColor) {
         fc.color = ch;
-      } else if (role == TargetChannelRole::FilterAlpha) {
+      } else {
         fc.alpha = ch;
       }
-      break;
+      return true;
     }
     case TargetChannelRole::Unknown:
-      break;
+      return false;
   }
+  return false;
 }
 
 BundleChannelSet CollectBundleChannels(
@@ -849,8 +886,11 @@ BundleChannelSet CollectBundleChannels(
       if (ch == nullptr) {
         continue;
       }
-      ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings);
-      BindChannelToBundleSet(objTarget, ch, solidToPainter, result);
+      // An unbound channel has no CSS property to drive, so its keys must not split the bound
+      // channels' keyframes or override their easing.
+      if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
+        ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings);
+      }
     }
   }
   return result;
@@ -932,13 +972,16 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     return;
   }
   if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
-      chSet.posXCh != nullptr || chSet.posYCh != nullptr) {
+      chSet.posXCh != nullptr || chSet.posYCh != nullptr || chSet.anchorXCh != nullptr ||
+      chSet.anchorYCh != nullptr || chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr) {
     float basePosX = 0.0f;
     float basePosY = 0.0f;
     float baseRot = 0.0f;
     float baseSX = 1.0f;
     float baseSY = 1.0f;
-    Point anchor = {0.0f, 0.0f};
+    float baseSkew = 0.0f;
+    float baseSkewAxis = 0.0f;
+    Point baseAnchor = {0.0f, 0.0f};
     bool isTextBoxHost =
         (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::TextBox);
     if (bundle.primaryHost != nullptr &&
@@ -950,7 +993,9 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       baseRot = grp->rotation;
       baseSX = grp->scale.x;
       baseSY = grp->scale.y;
-      anchor = grp->anchor;
+      baseSkew = grp->skew;
+      baseSkewAxis = grp->skewAxis;
+      baseAnchor = grp->anchor;
     }
     float px = EvalFloatChannel(chSet.posXCh, t, basePosX);
     float py = EvalFloatChannel(chSet.posYCh, t, basePosY);
@@ -964,29 +1009,52 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     float rot = EvalFloatChannel(chSet.rotCh, t, baseRot);
     float sx = EvalFloatChannel(chSet.scaleXCh, t, baseSX);
     float sy = EvalFloatChannel(chSet.scaleYCh, t, baseSY);
+    float skew = EvalFloatChannel(chSet.skewCh, t, baseSkew);
+    float skewAxis = EvalFloatChannel(chSet.skewAxisCh, t, baseSkewAxis);
+    float anchorX = EvalFloatChannel(chSet.anchorXCh, t, baseAnchor.x);
+    float anchorY = EvalFloatChannel(chSet.anchorYCh, t, baseAnchor.y);
 
+    // Mirrors BuildGroupMatrix: T(position) * R(rotation) * R(-skewAxis) * Shear(tan(-skew)) *
+    // R(skewAxis) * S(scale) * T(-anchor). Every factor gets its own transform function so the
+    // browser interpolates each one independently, as the runtime does. Whether a factor is
+    // emitted depends only on its channel or static value, so all stops share one function list.
     std::string tf;
+    auto appendFunction = [&tf](const std::string& function) {
+      if (!tf.empty()) {
+        tf += ' ';
+      }
+      tf += function;
+    };
     if (!FloatNearlyZero(px) || !FloatNearlyZero(py) || chSet.posXCh != nullptr ||
         chSet.posYCh != nullptr) {
-      tf += "translate(" + CssFloatToString(px) + "px, " + CssFloatToString(py) + "px)";
+      appendFunction("translate(" + CssFloatToString(px) + "px, " + CssFloatToString(py) + "px)");
     }
     if (chSet.rotCh != nullptr || !FloatNearlyZero(rot)) {
-      if (!tf.empty()) tf += ' ';
-      tf += "rotate(" + CssFloatToString(rot) + "deg)";
+      appendFunction("rotate(" + CssFloatToString(rot) + "deg)");
+    }
+    // A zero skew is an identity shear, so the skew axis only matters while there is a skew.
+    if (chSet.skewCh != nullptr || !FloatNearlyZero(baseSkew)) {
+      bool hasSkewAxis = chSet.skewAxisCh != nullptr || !FloatNearlyZero(baseSkewAxis);
+      if (hasSkewAxis) {
+        appendFunction("rotate(" + CssFloatToString(-skewAxis) + "deg)");
+      }
+      appendFunction("skewX(" + CssFloatToString(-skew) + "deg)");
+      if (hasSkewAxis) {
+        appendFunction("rotate(" + CssFloatToString(skewAxis) + "deg)");
+      }
     }
     if (chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr || !FloatNearlyZero(sx - 1.0f) ||
         !FloatNearlyZero(sy - 1.0f)) {
-      if (!tf.empty()) tf += ' ';
       if (FloatNearlyZero(sx - sy)) {
-        tf += "scale(" + CssFloatToString(sx) + ")";
+        appendFunction("scale(" + CssFloatToString(sx) + ")");
       } else {
-        tf += "scale(" + CssFloatToString(sx) + ", " + CssFloatToString(sy) + ")";
+        appendFunction("scale(" + CssFloatToString(sx) + ", " + CssFloatToString(sy) + ")");
       }
     }
-    if (!FloatNearlyZero(anchor.x) || !FloatNearlyZero(anchor.y)) {
-      if (!tf.empty()) tf += ' ';
-      tf +=
-          "translate(" + CssFloatToString(-anchor.x) + "px, " + CssFloatToString(-anchor.y) + "px)";
+    if (chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr ||
+        !FloatNearlyZero(baseAnchor.x) || !FloatNearlyZero(baseAnchor.y)) {
+      appendFunction("translate(" + CssFloatToString(-anchorX) + "px, " +
+                     CssFloatToString(-anchorY) + "px)");
     }
     if (tf.empty()) {
       tf = "rotate(0deg)";
