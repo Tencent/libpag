@@ -230,20 +230,26 @@ Scenario mode owns viewport, readiness and scroll behavior; it rejects `--viewpo
 `--wait-ms`, `--selector`, `--scroll-reveal` and `--capture-animations`. `--batch` with a
 scenario is currently unsupported. The legacy invocation remains unchanged.
 
-Add `--preview` to `html2pagx --scenario` to assemble the current run's rendered PNGs
-into a contact sheet, in capture order:
+Add `--preview` to `html2pagx` or `pagx capture` to assemble the current run's rendered
+PNGs into a contact sheet. Ordinary inputs, scenarios and batches share this preview:
 
 ```bash
 ./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json \
   -o /tmp/states --preview
 # Optional: --preview-columns 4, or --checkpoint advanced --preview for a single state.
+./html2pagx page.html -o /tmp/page --preview
+./html2pagx --batch pages --output-root /tmp/batch --preview
 ```
 
 The sheets are written to `<base>.preview/sheet-001.png`, `sheet-002.png`, etc.
 This directory avoids collisions with a checkpoint named `preview`. No browser session
 is replayed, and existing files in the output directory are not used as inputs.
-Preview is opt-in, currently scenario-only, and incompatible with `--no-render`,
-`--no-resolve`, and `--batch`. `--preview-columns` requires `--preview` and accepts
+Batch sheets are written under `<output-root>/preview/` (or `<input-dir>/preview/`
+without an output root). Batch previews include only inputs successfully converted
+in this run; skipped or failed inputs are excluded. An entirely skipped batch creates
+no preview. Batches reuse the browser process with a separate context for each input.
+Preview is opt-in and incompatible with `--no-render` and `--no-resolve`.
+`--preview-columns` requires `--preview` and accepts
 integers from 1 to 32 (up to that many columns per page). By default, the layout chooses
 1–6 columns to approximate a 4:3 sheet.
 
@@ -287,9 +293,13 @@ not scan the directory. With preview disabled, no `preview` field is written.
 The version-1 manifest also has a top-level `status`: `running`, `complete`, or
 `failed`. A run replaces the old manifest before opening the source page, appends
 only successfully converted checkpoints to `outputs`, and records `error` on failure.
+Each checkpoint is saved as it is captured. Native conversion starts after the source
+session closes, so conversion time does not delay later interaction steps. If a later
+interaction fails, already saved checkpoints are still converted and listed, while
+the job remains failed. Actions are never replayed to recover earlier checkpoints.
 Preview failure preserves completed per-checkpoint outputs and exits nonzero.
 On POSIX, SIGINT/SIGTERM cancel the active CLI, close its browser sessions and native
-children, and return 130/143. Interrupted scenario runs record failure when cleanup
+children, stop further conversions, and return 130/143. Interrupted scenario runs record failure when cleanup
 can finish; abrupt termination such as SIGKILL can leave `running` in the manifest.
 Consumers must require `status: "complete"` for manifests carrying this field.
 

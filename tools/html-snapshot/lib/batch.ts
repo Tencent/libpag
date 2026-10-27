@@ -11,7 +11,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { throwIfCancelled } from './cli-lifecycle';
+import { writeFileAtomic } from './atomic-write';
+import { generateContactSheet, validatePreviewOptions, type ContactSheetItem, type ContactSheetResult } from './contact-sheet';
 
 import { launchBrowser, type EngineWrapper } from './browser-engine';
 import { runSnapshot } from './snapshot-runner';
@@ -87,9 +90,11 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
     const startedAt = Date.now();
     const targetUrl = isHttpUrl(snapshotArgs.input)
       ? snapshotArgs.input
-      : `file://${path.resolve(snapshotArgs.input)}`;
+      : pathToFileURL(path.resolve(snapshotArgs.input)).href;
     const stderrChunks: string[] = [];
     const log = (msg: string) => { stderrChunks.push(`html-snapshot: ${msg}`); };
+    const { engine, browser } = engineHandle;
+    const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
     try {
       const cookieParams = (snapshotArgs.cookies || []).map((c) => {
         const eq = c.indexOf('=');
@@ -103,7 +108,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
           ? [h.slice(0, colon).trim(), h.slice(colon + 1).trim()] as [string, string]
           : [h, ''] as [string, string];
       });
-      const result = await runSnapshot(engineHandle, targetUrl, {
+      const result = await runSnapshot({ engine, browser: context }, targetUrl, {
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
         waitMs: snapshotArgs.waitMs,
@@ -112,6 +117,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         headers: headerPairs,
         inlineIconFonts: snapshotArgs.inlineIconFonts,
         captureAnimations: snapshotArgs.captureAnimations,
+        reducedMotion: !snapshotArgs.captureAnimations,
         scrollReveal: snapshotArgs.scrollReveal,
         downloadFonts: snapshotArgs.downloadFonts,
         fontDir: snapshotArgs.fontDir,
@@ -119,14 +125,15 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         imageDir: snapshotArgs.imageDir,
         log,
       });
-      fs.writeFileSync(snapshotArgs.output, result.html, 'utf8');
+      await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false });
       const stderr = stderrChunks.join('\n');
       if (stderr) process.stderr.write(stderr + '\n');
-      return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '' };
+      return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '',
+        fontFiles: (result.fonts || []).map(font => font.path) };
     } catch (err) {
       const stderr = stderrChunks.concat([errMessage(err)]).join('\n');
       return { code: 1, durationMs: Date.now() - startedAt, stdout: '', stderr };
-    }
+    } finally { await context.close(); }
   };
 }
 
@@ -158,6 +165,8 @@ export interface RunBatchOptions {
   viewportHeight?: number;
   waitMs?: number;
   selector?: string;
+  preview?: boolean;
+  previewColumns?: number;
 }
 
 export interface RunBatchResult {
@@ -165,10 +174,13 @@ export interface RunBatchResult {
   skipped: number;
   failed: number;
   total: number;
+  preview?: ContactSheetResult;
 }
 
 // Run the batch.
 export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
+  throwIfCancelled();
+  validatePreviewOptions(opts);
   const log = opts.log || ((line: string) => process.stdout.write(line + '\n'));
   const inputDir = opts.inputDir ? path.resolve(opts.inputDir) : '';
   if (!inputDir) throw new Error('runBatch: inputDir is required');
@@ -176,12 +188,16 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
     throw new Error(`runBatch: input directory not found: ${inputDir}`);
   }
   let outputRoot = opts.outputRoot || '';
-  if (outputRoot) {
-    if (!opts.dryRun) fs.mkdirSync(outputRoot, { recursive: true });
-    outputRoot = path.resolve(outputRoot);
-  }
+  if (outputRoot) outputRoot = path.resolve(outputRoot);
 
   const files = collectHtmlInputs(inputDir);
+  const destinations = new Set<string>();
+  for (const file of files) {
+    const target = path.join(resolveOutputDir(file, inputDir, outputRoot), `${basenameStem(file)}.pagx`);
+    const key = process.platform === 'win32' || process.platform === 'darwin' ? target.normalize('NFC').toLowerCase() : target;
+    if (destinations.has(key)) throw new Error(`batch output name collision: ${target}`);
+    destinations.add(key);
+  }
   const total = files.length;
   if (total === 0) {
     log(`No non-subset HTML files found under: ${inputDir}`);
@@ -218,6 +234,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   let processed = 0;
   let skipped = 0;
   let failed = 0;
+  const previewItems: ContactSheetItem[] = [];
 
   try {
     for (let i = 0; i < total; i++) {
@@ -239,7 +256,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       log(`[${index}/${total}] process   ${rel}`);
 
       try {
-        await runHtmlToPagx({
+        const result = await runHtmlToPagx({
           input: file,
           outputDir: outDir,
           outputName: stem,
@@ -268,8 +285,13 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           log,
           snapshotImpl,
         });
+        if (opts.preview) {
+          if (!result.png) throw new Error(`preview requires a rendered PNG for ${rel}`);
+          previewItems.push({ name: rel.split(path.sep).join('/'), png: result.png });
+        }
         processed++;
       } catch (err) {
+        throwIfCancelled();
         failed++;
         const msg = err instanceof PipelineStepError
           ? `${err.step} failed`
@@ -285,6 +307,15 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
     }
   }
 
+  throwIfCancelled();
+  let preview: ContactSheetResult | undefined;
+  if (opts.preview) {
+    preview = previewItems.length ? await generateContactSheet(previewItems, {
+      outputDir: path.join(outputRoot || inputDir, 'preview'), columns: opts.previewColumns,
+      pagxBin: opts.pagxBin, log,
+    }) : { pages: [] };
+    for (const page of preview.pages) log(`[done] ${page.file}`);
+  }
   log(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}`);
-  return { processed, skipped, failed, total };
+  return { processed, skipped, failed, total, ...(preview ? { preview } : {}) };
 }

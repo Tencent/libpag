@@ -332,7 +332,8 @@ describe('runBatch — in-process snapshot adapter', () => {
       const real = jest.requireActual('../dist/lib/browser-engine');
       return {
         ...real,
-        launchBrowser: async () => ({ browser: { close: async () => {} }, engine: 'puppeteer' }),
+        launchBrowser: async () => ({ browser: { close: async () => {},
+          createBrowserContext: async () => ({ close: async () => {} }) }, engine: 'puppeteer' }),
       };
     });
     jest.doMock('../dist/lib/snapshot-runner', () => {

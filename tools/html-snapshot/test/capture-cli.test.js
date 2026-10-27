@@ -15,7 +15,7 @@ test('positional and named inputs share the same contract', () => {
 });
 
 test.each([
-  ['--scenario', '--preview'], ['--preview'], ['--checkpoint', 'missing'],
+  ['--scenario', '--preview'], ['--checkpoint', 'missing'],
   ['--scenario', scenario, '--preview', '--no-resolve'],
   ['--scenario', scenario, '--preview', '--no-render'],
   ['--scenario', scenario, '--capture-animations'],
@@ -23,6 +23,16 @@ test.each([
   ['--preview-columns', '4'], ['--unknown'],
 ])('rejects invalid options without requiring a browser: %j', (...args) => {
   expect(() => parseCaptureArgs([fixture, ...args])).toThrow();
+});
+
+test('ordinary and batch previews keep legacy output and render defaults', () => {
+  expect(parseCaptureArgs([fixture, '-o', 'out', '--preview'])).toMatchObject({
+    outputDir: 'out', preview: true, doRender: true, keepSubsetHtml: true,
+  });
+  expect(parseCaptureArgs(['--batch', 'pages', '--output-root', 'out', '--preview'])).toMatchObject({
+    batchDir: 'pages', outputRoot: 'out', preview: true,
+  });
+  expect(() => parseCaptureArgs([fixture, '--preview', '--no-render'])).toThrow('preview');
 });
 
 test('scenario content and checkpoint names are validated before runtime preparation', () => {

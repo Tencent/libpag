@@ -86,6 +86,36 @@ nativeTest('URL scenario loads the source once including preview generation', as
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
+nativeTest('a later failed interaction preserves the earlier checkpoint without replay', async () => {
+  const plan = path.join(dir, 'partial.json');
+  fs.writeFileSync(plan, JSON.stringify({ version: 1, viewport: { width: 320, height: 200 }, steps: [
+    { type: 'capture', name: 'initial' },
+    { type: 'waitFor', target: { css: '#missing' }, state: 'visible', timeoutMs: 100 },
+    { type: 'capture', name: 'later' },
+  ] }));
+  await expect(run(['capture', fixture, '--scenario', plan, '-o', dir]))
+    .rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('Scenario step 2') });
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'interaction.captures.json')));
+  expect(manifest).toMatchObject({ status: 'failed', outputs: [{ name: 'initial' }] });
+  expect(manifest.outputs).toHaveLength(1);
+  expect(fs.existsSync(manifest.outputs[0].pagx)).toBe(true);
+  expect(PNG.sync.read(fs.readFileSync(manifest.outputs[0].png)).width).toBe(320);
+});
+
+nativeTest('ordinary and batch previews use newly rendered files with legacy output paths', async () => {
+  const input = path.join(dir, 'pages'), out = path.join(dir, 'batch'), single = path.join(dir, 'single');
+  fs.mkdirSync(input);
+  fs.writeFileSync(path.join(input, 'a # 中文.html'), '<!doctype html><body style="margin:0;background:red">First</body>');
+  fs.writeFileSync(path.join(input, 'b.html'), '<!doctype html><body style="margin:0;background:blue">Second</body>');
+  await run(['capture', path.join(input, 'b.html'), '-o', single, '--preview']);
+  expect(fs.existsSync(path.join(single, 'b.subset.html'))).toBe(true);
+  expect(PNG.sync.read(fs.readFileSync(path.join(single, 'b.preview/sheet-001.png'))).width).toBeGreaterThan(0);
+  await run(['capture', '--batch', input, '--output-root', out, '--preview']);
+  expect(fs.existsSync(path.join(out, 'a # 中文.pagx'))).toBe(true);
+  expect(fs.existsSync(path.join(out, 'b.pagx'))).toBe(true);
+  expect(PNG.sync.read(fs.readFileSync(path.join(out, 'preview/sheet-001.png'))).width).toBeGreaterThan(0);
+});
+
 (process.platform !== 'win32' ? nativeTest : test.skip)('SIGTERM cancels the active session and records failure', async () => {
   const plan = path.join(dir, 'waiting.json');
   fs.writeFileSync(plan, JSON.stringify({ version: 1, steps: [

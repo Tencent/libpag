@@ -14,6 +14,14 @@ const { runScenario } = require('../dist/lib/interaction');
 const { runHtmlToPagx } = require('../dist/lib/pipeline');
 const { generateContactSheet } = require('../dist/lib/contact-sheet');
 const { runScenarioToPagx } = require('../dist/lib/scenario-pipeline');
+const { withCliLifecycle } = require('../dist/lib/cli-lifecycle');
+
+const checkpoint = name => ({ name, url: 'file:///page.html', width: 390, height: 844, warnings: [], html: name });
+const capture = names => async (_, __, ___, opts) => {
+  const results = names.map(checkpoint);
+  for (const result of results) await opts.onCheckpoint(result);
+  return results;
+};
 
 let dir, options, close;
 const readManifest = () => JSON.parse(fs.readFileSync(path.join(dir, 'page.captures.json'), 'utf8'));
@@ -25,7 +33,7 @@ beforeEach(() => {
   options = { input: path.join(dir, 'page.html'), scenario, outputDir: dir };
   close = jest.fn().mockResolvedValue(undefined);
   launchBrowser.mockResolvedValue({ browser: { close } });
-  runScenario.mockResolvedValue(['preview', 'last'].map(name => ({ name, url: 'file:///page.html', width: 390, height: 844, warnings: [], html: name })));
+  runScenario.mockImplementation(capture(['preview', 'last']));
   runHtmlToPagx.mockImplementation(async opts => {
     const files = { subsetHtml: path.join(dir, `${opts.outputName}.subset.html`), pagx: path.join(dir, `${opts.outputName}.pagx`),
       png: path.join(dir, `${opts.outputName}.png`), fonts: [] };
@@ -81,7 +89,7 @@ test('preview uses only this run, in capture order, with relative paths and no r
 });
 
 test('a selected checkpoint generates a one-item preview', async () => {
-  runScenario.mockResolvedValue([{ name: 'last', url: 'file:///page.html', width: 390, height: 844, warnings: [], html: 'last' }]);
+  runScenario.mockImplementation(capture(['last']));
   await runScenarioToPagx({ ...options, checkpoint: 'last', preview: true });
   expect(runScenario.mock.calls[0][3].checkpoint).toBe('last');
   expect(readManifest().preview.pages[0].items).toEqual(['last']);
@@ -107,8 +115,6 @@ test.each([
 });
 
 test.each([
-  ['missing.html', '--preview'],
-  ['--batch', 'missing-dir', '--preview'],
   ['missing.html', '--scenario', 'missing.json', '--preview', '--no-render'],
   ['missing.html', '--scenario', 'missing.json', '--no-resolve', '--preview'],
   ['missing.html', '--scenario', 'missing.json', '--preview-columns', '4'],
@@ -118,4 +124,43 @@ test.each([
   expect(result.status).toBe(2);
   expect(result.stderr).toMatch(/preview/);
   expect(result.stderr).not.toMatch(/input not found|browser|Chrome is missing/);
+});
+
+test('a later interaction failure still converts saved checkpoints after closing the browser', async () => {
+  runScenario.mockImplementation(async (_, __, ___, opts) => {
+    await opts.onCheckpoint({ ...checkpoint('preview'), fonts: [{ path: '/fonts/first.ttf' }] });
+    expect(runHtmlToPagx).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+    throw new Error('later interaction failed');
+  });
+  const convert = runHtmlToPagx.getMockImplementation();
+  runHtmlToPagx.mockImplementation(async opts => {
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(opts.fontFiles).toEqual(['/fonts/first.ttf']);
+    return convert(opts);
+  });
+  await expect(runScenarioToPagx({ ...options, preview: true })).rejects.toThrow('later interaction failed');
+  expect(fs.readFileSync(path.join(dir, 'page.preview.subset.html'), 'utf8')).toBe('preview');
+  expect(readManifest()).toMatchObject({ status: 'failed', error: 'later interaction failed',
+    outputs: [{ name: 'preview' }], preview: { status: 'failed', pages: [] } });
+  expect(readManifest().outputs).toHaveLength(1);
+  expect(generateContactSheet).not.toHaveBeenCalled();
+  expect(runScenario).toHaveBeenCalledTimes(1);
+});
+
+test('cancellation stops conversion and rejects late checkpoint callbacks', async () => {
+  let onCheckpoint;
+  runScenario.mockImplementation(async (_, __, ___, opts) => {
+    onCheckpoint = opts.onCheckpoint;
+    await onCheckpoint(checkpoint('preview'));
+    process.emit('SIGTERM');
+    throw new Error('page closed');
+  });
+  await expect(withCliLifecycle(() => runScenarioToPagx(options))).rejects.toMatchObject({ exitCode: 143 });
+  expect(runHtmlToPagx).not.toHaveBeenCalled();
+  expect(close).toHaveBeenCalledTimes(1);
+  const finished = readManifest();
+  expect(finished).toMatchObject({ status: 'failed', outputs: [], error: expect.stringContaining('SIGTERM') });
+  await expect(onCheckpoint(checkpoint('last'))).rejects.toThrow('session has ended');
+  expect(readManifest()).toEqual(finished);
 });

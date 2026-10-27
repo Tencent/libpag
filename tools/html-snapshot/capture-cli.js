@@ -9,7 +9,7 @@ const path = require('path');
 const { defaultPagxBin, runHtmlToPagx, isHttpUrl } = require('./dist/lib/pipeline');
 const { runBatch } = require('./dist/lib/batch');
 const { runScenarioToPagx } = require('./dist/lib/scenario-pipeline');
-const { validateContactSheetColumns } = require('./dist/lib/contact-sheet');
+const { generateContactSheet, validateContactSheetColumns, validatePreviewOptions } = require('./dist/lib/contact-sheet');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE, checkBrowserRuntime } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
 const { parseCookie, parseHeader } = require('./dist/lib/cli');
@@ -63,8 +63,8 @@ Options (unknown options are errors):
   --scenario <file.json>     Replay one interaction session; export <base>.<checkpoint>
                              files and <base>.captures.json for all capture steps
   --checkpoint <name>        With --scenario, export only the selected checkpoint
-  --preview                  With --scenario, assemble rendered PNGs into
-                             <base>.preview/sheet-NNN.png (default: disabled)
+  --preview                  Assemble this run's rendered PNGs into contact sheets
+                             (<base>.preview/; batch: <output-root>/preview/)
   --preview-columns <N>      With --preview, use up to N columns (1–32;
                              default: automatic, 1–6). Requires resolve/render.
   --scroll-reveal            Forwarded to snapshot.js: walk the page top-to-
@@ -293,11 +293,7 @@ function parseCaptureArgs(argv) {
     }
   }
   if (opts.checkpoint && !opts.scenario) failArg('--checkpoint requires --scenario');
-  if (opts.previewColumns !== undefined && !opts.preview) failArg('--preview-columns requires --preview');
-  if (opts.preview && (!opts.scenario || opts.batchDir)) failArg('--preview requires --scenario and is not supported with --batch');
-  if (opts.preview && (!opts.doRender || !opts.doResolve)) {
-    failArg('--preview cannot be combined with --no-render or --no-resolve');
-  }
+  try { validatePreviewOptions(opts); } catch (error) { failArg(error.message); }
   if (opts.scenario) {
     for (const flag of ['--batch', '--capture-animations', '--scroll-reveal', '--viewport-width',
       '--viewport-height', '--wait-ms', '--selector']) {
@@ -394,8 +390,20 @@ async function runCaptureCli(argv, { toolName = 'html2pagx', scriptDir = __dirna
         const result = await runBatch({ ...opts, inputDir: opts.batchDir, scriptDir, log });
         return result.failed ? 1 : 0;
       }
-      const run = opts.scenario ? runScenarioToPagx : runHtmlToPagx;
-      await run({ ...opts, scriptDir, log });
+      if (opts.scenario) {
+        await runScenarioToPagx({ ...opts, scriptDir, log });
+      } else {
+        const result = await runHtmlToPagx({ ...opts, scriptDir, log });
+        if (opts.preview) {
+          if (!result.png) throw new Error('preview requires a rendered PNG');
+          const base = path.basename(result.pagx, '.pagx');
+          const preview = await generateContactSheet([{ name: base, png: result.png }], {
+            outputDir: path.join(path.dirname(result.pagx), `${base}.preview`),
+            columns: opts.previewColumns, pagxBin: opts.pagxBin, log,
+          });
+          for (const page of preview.pages) log(`[done] ${page.file}`);
+        }
+      }
       return 0;
     });
   } catch (err) {

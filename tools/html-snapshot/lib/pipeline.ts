@@ -63,6 +63,8 @@ export interface SpawnCaptureResult {
   durationMs: number;
   stdout: string;
   stderr: string;
+  // In-process snapshots can identify this input's faces without scanning a shared cache.
+  fontFiles?: string[];
 }
 
 // Internal: spawn a child, capture stdout/stderr, optionally tee stderr to a
@@ -496,7 +498,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
 
     let fonts: string[] = [];
     if (downloadFonts) {
-      fonts = opts.fontFiles ?? collectFontFallbacks({ fontDir });
+      fonts = opts.fontFiles ?? snapshotResult.fontFiles ?? collectFontFallbacks({ fontDir });
       if (fonts.length === 0) {
         log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
       }

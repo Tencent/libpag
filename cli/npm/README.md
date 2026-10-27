@@ -47,6 +47,10 @@ pagx capture page.html --scenario states.json --checkpoint advanced -o out --pre
 # URLs require an output basename
 pagx capture https://example.com --output-name demo -o out
 
+# Ordinary and batch previews use the same rendered-image contact sheets
+pagx capture page.html -o out --preview
+pagx capture --batch pages --output-root out --preview
+
 # Use Playwright, including its role locators in scenarios
 pagx capture page.html --scenario states.json --browser-engine playwright -o out
 
@@ -65,9 +69,12 @@ stops at the selected capture. The version-1 manifest records top-level `status`
 (`running`, `complete`, or `failed`), completed `outputs`, and an optional `preview`
 status and page list. Use the manifest instead of scanning the directory, which can
 contain older outputs after a shorter repeated run. A failed preview returns a
-nonzero exit status while preserving completed checkpoint exports.
+nonzero exit status while preserving completed checkpoint exports. Each checkpoint
+is saved during capture, then converted after the browser session ends. A later
+interaction failure still exports earlier saved checkpoints and records failed status.
+Cancellation stops further actions and conversions and preserves completed exports.
 
-`--preview` requires a scenario and rendering; it conflicts with `--no-render` and
+`--preview` works with ordinary files, scenarios and batches; it conflicts with `--no-render` and
 `--no-resolve`. `--preview-columns` requires `--preview` and accepts 1–32. Scenario
 mode rejects `--batch`, `--capture-animations`, `--scroll-reveal`, `--viewport-*`,
 `--wait-ms`, and `--selector`; configure viewport and readiness in the scenario.
@@ -78,6 +85,10 @@ rendering. An explicit `--pagx-bin` can override it. It also supports ordinary
 recursive batches (`--batch <dir> --output-root <dir>`); `--dry-run` lists the work
 without initializing a browser or creating output directories. Help and invalid
 arguments also avoid browser installation.
+Batch inputs use independent browser contexts. Batch previews are written to
+`<output-root>/preview/` (or `<input-dir>/preview/`), including only newly completed
+inputs in order; skipped and failed inputs are excluded. An entirely skipped batch
+does not generate a preview. Ordinary files use `<base>.preview/`.
 
 Runtime configuration:
 

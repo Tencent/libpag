@@ -77,6 +77,21 @@ export function validateContactSheetColumns(columns: number | undefined): void {
   }
 }
 
+export interface PreviewOptions {
+  preview?: boolean;
+  previewColumns?: number;
+  doRender?: boolean;
+  doResolve?: boolean;
+}
+
+export function validatePreviewOptions(options: PreviewOptions): void {
+  if (options.previewColumns !== undefined && !options.preview) throw new Error('--preview-columns requires --preview');
+  validateContactSheetColumns(options.previewColumns);
+  if (options.preview && (options.doRender === false || options.doResolve === false)) {
+    throw new Error('--preview requires rendering; it cannot be combined with --no-render or --no-resolve');
+  }
+}
+
 function layoutOptions(options: ContactSheetLayoutOptions) {
   validateContactSheetColumns(options.columns);
   const limits: Record<keyof typeof CONTACT_SHEET_DEFAULTS, number> = { ...CONTACT_SHEET_DEFAULTS };
