@@ -870,8 +870,10 @@ CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(oss.str().empty());
   EXPECT_EQ(oss.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
 }
 
@@ -900,8 +902,10 @@ CLI_TEST(PAGXCliTest, Verify_MaskWithAuthoredOffsetDoesNotSuggestBoundsClip) {
   }
   std::ostringstream output;
   auto* old = std::cerr.rdbuf(output.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(output.str().empty());
   EXPECT_EQ(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
   EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
 }
@@ -971,8 +975,10 @@ CLI_TEST(PAGXCliTest, Verify_FullCanvasMaskInTransformedSpaceIsNotRedundant) {
   }
   std::ostringstream output;
   auto* old = std::cerr.rdbuf(output.rdbuf());
-  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
   std::cerr.rdbuf(old);
+  // A fully clean run returns 0 with no diagnostics.
+  EXPECT_EQ(ret, 0);
   EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
 }
 

@@ -707,6 +707,63 @@ PAGX_TEST(PAGXViewModelTest, DataBindReappliesAfterLayerRefresh) {
   EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.3f);
 }
 
+// A document refresh re-seeds the pose from the authored values; animated and bound transform
+// channels must be re-applied on the next frame, not stay at the authored defaults.
+PAGX_TEST(PAGXViewModelTest, LayerTransformChannelsReapplyAfterLayerRefresh) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "x";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  prop->defaultNumber = 50.0f;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+  auto layer = doc->makeNode<pagx::Layer>("rect");
+  layer->width = 100;
+  layer->height = 100;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "rect";
+  anim->objects.push_back(object);
+  auto* rotation = doc->makeNode<pagx::TypedChannel<float>>();
+  rotation->name = "rotation.z";
+  rotation->keyframes.push_back({0, 90.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(rotation);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.x";
+  db->target = "@rect";
+  db->channel = "x";
+  doc->dataBinds.push_back(db);
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  timeline->setCurrentTime(0);
+  timeline->apply(1.0f);
+  pagx::KeyValue value;
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 90);
+  ASSERT_TRUE(binding->read(layer, "x", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 50);
+
+  doc->notifyChange({layer}, false);
+  ASSERT_TRUE(scene->draw(surface));
+  timeline->apply(1.0f);
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 90);
+  ASSERT_TRUE(binding->read(layer, "x", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 50);
+}
+
 // ========== Rendering ==========
 PAGX_TEST(PAGXViewModelTest, RenderWithViewModel) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -1465,6 +1522,14 @@ PAGX_TEST(PAGXViewModelTest, LayerPositionDataBindIsOverriddenByStaticMatrix) {
   ASSERT_NE(xProp, nullptr);
   auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_NE(timeline, nullptr);
+  // Anchor the intent: the binding is registered, and readback of the masked channel reports no
+  // value instead of syncing the animated one.
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_NE(rootComp->dataBindRuntime, nullptr);
+  ASSERT_EQ(rootComp->dataBindRuntime->entries.size(), 1u);
+  pagx::KeyValue readBack;
+  EXPECT_FALSE(scene->mutableBinding()->read(layer, "x", &readBack));
   timeline->setCurrentTime(500000);
   timeline->apply();
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
