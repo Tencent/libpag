@@ -210,7 +210,8 @@ jobs:
           name: android_build
           path: android
 
-  web:
+  web-webgl:
+    name: web (webgl)
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
@@ -317,7 +318,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: web_build
+          name: web_webgl_build
           path: |
             web
             !web/emsdk

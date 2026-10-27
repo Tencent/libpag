@@ -46,7 +46,7 @@ if (envVersion) {
     process.stdout.write(`emcc ${envVersion.join('.')} is outside the supported window [${versionPolicy.MIN}, ${versionPolicy.MAX_EXCLUSIVE}), installing the pinned ${versionPolicy.PIN} instead.\n`);
 }
 
-const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
+const emsdkPath = path.resolve(__dirname, '../emsdk');
 if (!fs.existsSync(emsdkPath)) {
     Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${Utils.escapeSpace(emsdkPath)}`);
 } else {
