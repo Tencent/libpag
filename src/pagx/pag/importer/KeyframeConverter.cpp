@@ -183,6 +183,48 @@ void ConvertPositionChannel(pag::Property<pag::Point>* legacy, float frameRate,
   object->channels.push_back(channelY);
 }
 
+// Group transform channels: the Group node exposes position as a point ("position.x"/"position.y"),
+// unlike Layer's separated x/y fields, so position routes through ConvertPointChannel.
+void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameRate,
+                                    PAGXDocument* document, AnimationObject* object) {
+  if (transform == nullptr) {
+    return;
+  }
+  if (transform->anchorPoint != nullptr && transform->anchorPoint->animatable()) {
+    ConvertPointChannel(transform->anchorPoint, "anchor", true, frameRate, document, object);
+  }
+  if (transform->position != nullptr && transform->position->animatable()) {
+    ConvertPointChannel(transform->position, "position", true, frameRate, document, object);
+  }
+  if (transform->scale != nullptr && transform->scale->animatable()) {
+    ConvertPointChannel(transform->scale, "scale", false, frameRate, document, object);
+  }
+  if (transform->rotation != nullptr && transform->rotation->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "rotation";
+    ConvertFloatChannel(transform->rotation, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (transform->skew != nullptr && transform->skew->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "skew";
+    ConvertFloatChannel(transform->skew, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (transform->skewAxis != nullptr && transform->skewAxis->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "skewAxis";
+    ConvertFloatChannel(transform->skewAxis, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (transform->opacity != nullptr && transform->opacity->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "alpha";
+    ConvertOpacityChannel(transform->opacity, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,

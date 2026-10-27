@@ -18,6 +18,7 @@
 
 #include "pagx/LegacyPAGImporter.h"
 #include <unordered_map>
+#include <unordered_set>
 #include "pag/file.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -58,6 +59,8 @@ void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
                                  PAGXDocument* document, AnimationObject* object);
 void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
                             AnimationObject* object);
+void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameRate,
+                                    PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -98,6 +101,12 @@ struct ConvertState {
     ImagePattern* node = nullptr;
     Composition* composition = nullptr;
   };
+  // Shape-group conversion state: every converted Group gets a targetable id, and the current
+  // composition's animation (plus its frame rate) receives the group's animated transform
+  // channels.
+  int groupIdCounter = 0;
+  Animation* currentAnimation = nullptr;
+  float currentFrameRate = 30.0f;
   std::vector<ConvertedTextEntry> convertedTexts = {};
   std::vector<ConvertedImageEntry> convertedImages = {};
   Composition* currentComposition = nullptr;
@@ -247,10 +256,28 @@ ColorSource* ConvertGradientColorSource(ConvertState* state, pag::GradientFillTy
     colorStop->offset = stop.position;
     colorStop->color = ConvertColor(stop.color);
     // The legacy color carries no alpha; the gradient alpha comes from the alpha stops only.
+    // The alpha stops form an opacity ramp; the color stop's alpha is the ramp's interpolated
+    // value at the stop's position. Multiplying the qualifying stops instead would zero out
+    // every stop after a transparent one (e.g. ramp 0 -> 127 made the far stop alpha 0).
     float alpha = 1.0f;
-    for (const auto& alphaStop : colors->alphaStops) {
-      if (alphaStop.position <= stop.position) {
-        alpha *= alphaStop.opacity / 255.0f;
+    if (!colors->alphaStops.empty()) {
+      const auto& first = colors->alphaStops.front();
+      const auto& last = colors->alphaStops.back();
+      if (stop.position <= first.position) {
+        alpha = first.opacity / 255.0f;
+      } else if (stop.position >= last.position) {
+        alpha = last.opacity / 255.0f;
+      } else {
+        for (size_t i = 0; i + 1 < colors->alphaStops.size(); i++) {
+          const auto& a = colors->alphaStops[i];
+          const auto& b = colors->alphaStops[i + 1];
+          if (stop.position >= a.position && stop.position <= b.position) {
+            auto span = b.position - a.position;
+            auto t = span > 0.0f ? (stop.position - a.position) / span : 0.0f;
+            alpha = (a.opacity + (b.opacity - a.opacity) * t) / 255.0f;
+            break;
+          }
+        }
       }
     }
     colorStop->color.alpha = alpha;
@@ -346,9 +373,84 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::ShapeGroup: {
       auto* legacy = static_cast<pag::ShapeGroupElement*>(element);
-      auto* group = state->document->makeNode<Group>();
+      auto* group = state->document->makeNode<Group>(
+          "pag-legacy-group-" + std::to_string(state->groupIdCounter++));
+      // The group's own ShapeTransform places/scales its contents; dropping it would render
+      // the children at identity. The PAGX Group position is layout-driven (the content bounds
+      // land at the position), which does not reproduce the legacy content-space translation,
+      // so a static translation-only transform bakes directly into the child geometry; other
+      // transforms map onto the group's decomposed fields with the position passed through.
+      bool bakeTranslate = false;
+      float bakeX = 0.0f;
+      float bakeY = 0.0f;
+      if (legacy->transform != nullptr) {
+        auto* t = legacy->transform;
+        auto anchor = PropertyValueAtStart(t->anchorPoint, startFrame, nullptr);
+        auto position = PropertyValueAtStart(t->position, startFrame, nullptr);
+        auto scale = PropertyValueAtStart(t->scale, startFrame, nullptr);
+        group->rotation = PropertyValueAtStart(t->rotation, startFrame, nullptr);
+        group->skew = PropertyValueAtStart(t->skew, startFrame, nullptr);
+        group->skewAxis = PropertyValueAtStart(t->skewAxis, startFrame, nullptr);
+        auto opacity = PropertyValueAtStart(t->opacity, startFrame, nullptr);
+        group->alpha = opacity / 255.0f;
+        auto identityScale = scale.x == 1.0f && scale.y == 1.0f;
+        auto identityRest = group->rotation == 0.0f && group->skew == 0.0f && anchor.x == 0.0f &&
+                            anchor.y == 0.0f;
+        auto transformAnimated = (t->position != nullptr && t->position->animatable()) ||
+                                 (t->scale != nullptr && t->scale->animatable()) ||
+                                 (t->rotation != nullptr && t->rotation->animatable()) ||
+                                 (t->anchorPoint != nullptr && t->anchorPoint->animatable());
+        if (identityScale && identityRest && !transformAnimated) {
+          bakeTranslate = true;
+          bakeX = position.x;
+          bakeY = position.y;
+        } else {
+          group->anchor = {anchor.x, anchor.y};
+          group->position = {position.x, position.y};
+          group->scale = {scale.x, scale.y};
+          if (state->currentAnimation != nullptr) {
+            auto* object = state->document->makeNode<AnimationObject>();
+            object->target = group->id;
+            MigrateGroupTransformAnimation(t, state->currentFrameRate, state->document, object);
+            if (!object->channels.empty()) {
+              state->currentAnimation->objects.push_back(object);
+            }
+          }
+        }
+      }
       for (auto* child : legacy->elements) {
         ConvertShapeElement(state, child, &group->elements, startFrame);
+      }
+      if (bakeTranslate && (bakeX != 0.0f || bakeY != 0.0f)) {
+        for (auto* element : group->elements) {
+          if (element == nullptr) {
+            continue;
+          }
+          switch (element->nodeType()) {
+            case NodeType::Rectangle:
+              static_cast<Rectangle*>(element)->position.x += bakeX;
+              static_cast<Rectangle*>(element)->position.y += bakeY;
+              break;
+            case NodeType::Ellipse:
+              static_cast<Ellipse*>(element)->position.x += bakeX;
+              static_cast<Ellipse*>(element)->position.y += bakeY;
+              break;
+            case NodeType::Polystar:
+              static_cast<Polystar*>(element)->position.x += bakeX;
+              static_cast<Polystar*>(element)->position.y += bakeY;
+              break;
+            case NodeType::Path:
+              static_cast<Path*>(element)->position.x += bakeX;
+              static_cast<Path*>(element)->position.y += bakeY;
+              break;
+            case NodeType::Group:
+              static_cast<Group*>(element)->position.x += bakeX;
+              static_cast<Group*>(element)->position.y += bakeY;
+              break;
+            default:
+              break;
+          }
+        }
       }
       contents->push_back(group);
       break;
@@ -643,16 +745,37 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   // matching CSS). Push the converted layers in reverse so the visual stacking is preserved.
   // topmost), while PAGX paints layers in document order (the first layer is the bottom,
   // matching CSS). Push the converted layers in reverse so the visual stacking is preserved.
+  auto* previousAnimation = state->currentAnimation;
+  auto previousFrameRate = state->currentFrameRate;
+  state->currentFrameRate = legacy->frameRate;
+  // Legacy track mattes: the matted layer consumes its trackMatteLayer as an alpha mask, and the
+  // source layer itself never renders as regular content. PAGX models masks as explicit
+  // per-layer references, so until that wiring lands the matte source layers are skipped (with a
+  // reported issue) instead of double-rendering on top of the composition.
+  std::unordered_set<pag::Layer*> matteSources = {};
+  for (auto* legacyLayer : legacy->layers) {
+    if (legacyLayer->trackMatteLayer != nullptr) {
+      matteSources.insert(legacyLayer->trackMatteLayer);
+    }
+  }
   for (auto it = legacy->layers.rbegin(); it != legacy->layers.rend(); ++it) {
     auto* legacyLayer = *it;
+    if (matteSources.find(legacyLayer) != matteSources.end()) {
+      state->warn(PAGExportWarning::UnsupportedColorSource, "track matte source layer");
+      continue;
+    }
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
     if (child != nullptr) {
       composition->layers.push_back(child);
-      // P3-5: migrate this layer's animated channels into the composition animation.
+      // P3-5: migrate this layer's animated channels into the composition animation. Shape
+      // groups converted inside the layer append their channels to the same animation.
       auto* animation = EnsureCompositionAnimation(state, legacy);
+      state->currentAnimation = animation;
       MigrateLayerAnimation(state, legacyLayer, animation, legacy->frameRate);
     }
   }
+  state->currentAnimation = previousAnimation;
+  state->currentFrameRate = previousFrameRate;
   // Composition-scoped animations (spec 5.4) auto-play in the instance. The attachment runs
   // AFTER the layer loop: EnsureCompositionAnimation creates the animation lazily while the
   // layers convert, so looking it up before the loop would always miss it and the runtime
