@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Test file for C13: Simple rectangular mask (can use scrollRect instead) -->
+<!-- Test file for C13: a rectangular mask smaller than the layer frame must NOT be rewritten to clipToBounds or scrollRect (frame mismatch and owner constraints keep the mask) -->
 <pagx width="200" height="100">
   <Layer id="maskLayer" name="RectMask" visible="false">
     <Rectangle width="100" height="50"/>

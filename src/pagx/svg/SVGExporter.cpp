@@ -3249,7 +3249,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   // Probe for features SVG cannot losslessly represent (TextPath, TextModifier,
-  // diamond/conic gradient). If any trip AND rasterization is enabled, bake the whole layer to a
+  // diamond/conic gradient, an x/y-varying perspective, shared 3D depth). If any trip AND
+  // rasterization is enabled, bake the whole layer to a
   // PNG so the visual result is preserved. The alternative (silently dropping unsupported
   // elements / degrading gradients to radial) is what the vector path below does.
   // Note: the SVG feature probe only covers layer->contents; layer styles (including

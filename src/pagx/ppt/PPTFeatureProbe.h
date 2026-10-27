@@ -72,6 +72,9 @@ struct PPTFeatureFlags {
    * blend modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
+  // preserve3D bakes the whole subtree even though a fully 2D subtree would flatten identically:
+  // preserving depth changes the offscreen group-opacity semantics, so the conservative raster
+  // output is intentional.
   bool needsRasterization(bool bakeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
         hasDiamondGradient || hasShearTransform || hasPerspectiveTransform || hasPreserve3D) {

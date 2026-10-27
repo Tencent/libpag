@@ -10,6 +10,19 @@
   <!-- float: standard xs:decimal covers float values -->
 
   <!-- bool: true/false -->
+  <xs:simpleType name="SkewAngleType">
+    <xs:restriction base="xs:decimal">
+      <xs:minExclusive value="-90"/>
+      <xs:maxExclusive value="90"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PerspectiveDistanceType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="BoolType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="true"/>
@@ -970,9 +983,9 @@
     <xs:attribute name="scaleX" type="xs:decimal" default="1"/>
     <xs:attribute name="scaleY" type="xs:decimal" default="1"/>
     <xs:attribute name="scaleZ" type="xs:decimal" default="1"/>
-    <xs:attribute name="skewX" type="xs:decimal" default="0"/>
-    <xs:attribute name="skewY" type="xs:decimal" default="0"/>
-    <xs:attribute name="perspective" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewX" type="SkewAngleType" default="0"/>
+    <xs:attribute name="skewY" type="SkewAngleType" default="0"/>
+    <xs:attribute name="perspective" type="PerspectiveDistanceType" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
