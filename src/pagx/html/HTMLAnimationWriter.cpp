@@ -627,6 +627,8 @@ struct BundleChannelSet {
   const Channel* strokeAlphaCh = nullptr;
   const Channel* strokeWidthCh = nullptr;
   const Channel* dashOffsetCh = nullptr;
+  const Fill* fillPainter = nullptr;
+  const Stroke* strokePainter = nullptr;
 
   std::unordered_map<const LayerFilter*, FilterChannelSlot> filterChMap = {};
   bool hasFilterAnim = false;
@@ -696,15 +698,19 @@ void BindChannelToBundleSet(
       break;
     case TargetChannelRole::FillColor:
       out.fillColorCh = ch;
+      out.fillPainter = static_cast<const Fill*>(objTarget);
       break;
     case TargetChannelRole::FillAlpha:
       out.fillAlphaCh = ch;
+      out.fillPainter = static_cast<const Fill*>(objTarget);
       break;
     case TargetChannelRole::StrokeColor:
       out.strokeColorCh = ch;
+      out.strokePainter = static_cast<const Stroke*>(objTarget);
       break;
     case TargetChannelRole::StrokeAlpha:
       out.strokeAlphaCh = ch;
+      out.strokePainter = static_cast<const Stroke*>(objTarget);
       break;
     case TargetChannelRole::StrokeWidth:
       out.strokeWidthCh = ch;
@@ -717,12 +723,14 @@ void BindChannelToBundleSet(
       auto sIt = solidToPainter.find(static_cast<const SolidColor*>(objTarget));
       if (sIt != solidToPainter.end() && sIt->second != nullptr) {
         if (sIt->second->nodeType() == NodeType::Fill) {
+          out.fillPainter = static_cast<const Fill*>(sIt->second);
           if (role == TargetChannelRole::SolidColorValue) {
             out.fillColorCh = ch;
           } else {
             out.fillAlphaCh = ch;
           }
         } else if (sIt->second->nodeType() == NodeType::Stroke) {
+          out.strokePainter = static_cast<const Stroke*>(sIt->second);
           if (role == TargetChannelRole::SolidColorValue) {
             out.strokeColorCh = ch;
           } else {
@@ -922,31 +930,46 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
   }
 }
 
+// Returns the solid color a painter shows when its color is not animated, or opaque black when the
+// painter has no solid color (gradient and image painters are not color-animated).
+Color StaticPainterColor(const ColorSource* source) {
+  if (source != nullptr && source->nodeType() == NodeType::SolidColor) {
+    return static_cast<const SolidColor*>(source)->color;
+  }
+  return Color{};
+}
+
 void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
                          std::string& decls) {
   bool isSvgShape =
       (tagName == "path" || tagName == "rect" || tagName == "ellipse" || tagName == "use");
-  if (chSet.fillColorCh != nullptr) {
-    Color c = EvalColorChannel(chSet.fillColorCh, t, Color{});
-    if (tagName == "span") {
-      AppendCssDecl(decls, "color", ColorToRGBA(c));
-    } else if (isSvgShape) {
-      AppendCssDecl(decls, "fill", ColorToSVGHex(c));
+  // PAGX paints with the color's own alpha multiplied by the painter alpha. A keyframe stop
+  // replaces the element's static paint, so each stop re-emits that product, taking the static
+  // value for whichever factor is not animated. The product is folded into the paint color rather
+  // than element `opacity`, which would also fade the element's children and text stroke and
+  // collide with an animated Layer alpha.
+  if (chSet.fillColorCh != nullptr || chSet.fillAlphaCh != nullptr) {
+    const Fill* fill = chSet.fillPainter;
+    Color staticColor = fill != nullptr ? StaticPainterColor(fill->color) : Color{};
+    Color color = EvalColorChannel(chSet.fillColorCh, t, staticColor);
+    float painterAlpha =
+        EvalFloatChannel(chSet.fillAlphaCh, t, fill != nullptr ? fill->alpha : 1.0f);
+    if (isSvgShape) {
+      AppendCssDecl(decls, "fill", ColorToSVGHex(color));
+      AppendCssDecl(decls, "fill-opacity", CssFloatToString(color.alpha * painterAlpha));
     } else {
-      AppendCssDecl(decls, "background-color", ColorToRGBA(c));
+      AppendCssDecl(decls, tagName == "span" ? "color" : "background-color",
+                    ColorToRGBA(color, painterAlpha));
     }
   }
-  if (chSet.fillAlphaCh != nullptr) {
-    float fa = EvalFloatChannel(chSet.fillAlphaCh, t, 1.0f);
-    AppendCssDecl(decls, isSvgShape ? "fill-opacity" : "opacity", CssFloatToString(fa));
-  }
-  if (chSet.strokeColorCh != nullptr) {
-    Color sc = EvalColorChannel(chSet.strokeColorCh, t, Color{});
-    AppendCssDecl(decls, "stroke", ColorToSVGHex(sc));
-  }
-  if (chSet.strokeAlphaCh != nullptr) {
-    float sa = EvalFloatChannel(chSet.strokeAlphaCh, t, 1.0f);
-    AppendCssDecl(decls, "stroke-opacity", CssFloatToString(sa));
+  if (chSet.strokeColorCh != nullptr || chSet.strokeAlphaCh != nullptr) {
+    const Stroke* stroke = chSet.strokePainter;
+    Color staticColor = stroke != nullptr ? StaticPainterColor(stroke->color) : Color{};
+    Color color = EvalColorChannel(chSet.strokeColorCh, t, staticColor);
+    float painterAlpha =
+        EvalFloatChannel(chSet.strokeAlphaCh, t, stroke != nullptr ? stroke->alpha : 1.0f);
+    AppendCssDecl(decls, "stroke", ColorToSVGHex(color));
+    AppendCssDecl(decls, "stroke-opacity", CssFloatToString(color.alpha * painterAlpha));
   }
   if (chSet.strokeWidthCh != nullptr) {
     float sw = EvalFloatChannel(chSet.strokeWidthCh, t, 1.0f);
