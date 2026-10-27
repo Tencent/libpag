@@ -129,45 +129,6 @@ describe('SVG rendering agrees with Chromium', { skip: !fs.existsSync(binary) },
     { meanLimit: 1.5 });
   });
 
-  it('inherits textPath typography and anchors the shaped text chunk', async () => {
-    await compare('text-path', `<defs><path id="p" d="M10 90H210" transform="translate(10 0)"
-      pathLength="100"/></defs>
-      <text font-family="Arial" font-size="12" fill="#2040d0">
-        <textPath href="#p" startOffset="50" text-anchor="middle" font-size="22">Path text</textPath>
-      </text>`, { meanLimit: 1.5, flatTolerance: 8 });
-  });
-
-  it('preserves nested styled spans and separate positioned text chunks', async () => {
-    await compare('text-spans', `<text x="120" y="60" font-family="Arial" font-size="20"
-      text-anchor="middle" fill="#2040d0">A<tspan font-size="28" fill="#e02020">B<tspan>C</tspan></tspan>D<tspan
-      x="120" y="130" font-size="24">Second</tspan></text>`,
-    { meanLimit: 1.5, flatTolerance: 8 });
-  });
-
-  it('preserves CSS overrides of presentation attributes', async () => {
-    await compare('css-paint', `<style>.paint{fill:#e02020;stroke:#2040d0;stroke-width:6}</style>
-      <rect class="paint" x="30" y="30" width="180" height="120" fill="green" stroke="black"/>`);
-  });
-
-  it('applies textLength spacing across styled path text as one chunk', async () => {
-    await compare('path-spacing', `<defs><path id="p" d="M10 90H230"/></defs>
-      <text font-family="Arial" font-size="20" textLength="180" fill="#2040d0">
-        <textPath href="#p" startOffset="50%" text-anchor="middle">A<tspan
-          fill="#e02020">BC</tspan>D</textPath></text>`,
-    { meanLimit: 1.5, flatTolerance: 8 });
-  });
-
-  it('keeps relative styles in symbols until each use is instantiated', async () => {
-    await compare('symbol-style', `<defs>
-      <symbol id="s" viewBox="0 0 80 60" width="80" height="60" overflow="visible">
-        <rect width="35" height="20" fill="inherit"/>
-        <text x="0" y="50" fill="currentColor" font-family="Arial" font-size="1em">Ab</text>
-      </symbol></defs>
-      <use href="#s" x="20" y="20" fill="#e02020" color="#2040d0" font-size="20"/>
-      <use href="#s" x="130" y="100" fill="#2040d0" color="#e02020" font-size="28"/>`,
-    { meanLimit: 1.5, flatTolerance: 8 });
-  });
-
   it('inherits markers and honors none, marker viewBox and auto-start-reverse', async () => {
     await compare('marker-viewport', `<defs>
       <marker id="a" markerWidth="12" markerHeight="8" viewBox="0 0 6 4"

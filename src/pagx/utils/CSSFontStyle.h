@@ -19,13 +19,8 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 namespace pagx {
-
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value);
-std::string ResolveCSSGenericFontFamily(const std::string& name);
-std::string MatchCSSFontStyle(const std::vector<std::string>& styles, const std::string& requested);
 
 // Resolves a CSS font-weight string and a CSS font-style string into the PAGX `fontStyle`
 // attribute value. Supported font-weight inputs are numeric values (1-1000) and the

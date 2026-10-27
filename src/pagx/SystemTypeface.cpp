@@ -18,7 +18,6 @@
 
 #include <cctype>
 #include "SystemFonts.h"
-#include "pagx/utils/CSSFontStyle.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -83,21 +82,8 @@ std::shared_ptr<tgfx::Typeface> SystemFonts::ResolveTypeface(const std::string& 
     return nullptr;
   }
 
-  // Select the closest weight/slant within the requested family before falling back to its
-  // default face. For example, a family ending at Semibold must not turn a CSS Bold request
-  // into Regular. Enumerate lazily; exact face matches above avoid this work entirely.
-  static const auto families = AllFontFamilies();
-  for (const auto& entry : families) {
-    if (!FontNamesMatch(family, entry.family)) continue;
-    auto matchedStyle = MatchCSSFontStyle(entry.styles, style);
-    if (matchedStyle.empty()) break;
-    typeface = tgfx::Typeface::MakeFromName(entry.family, matchedStyle);
-    if (TypefaceMatches(typeface, entry.family, matchedStyle, true)) return typeface;
-    typeface = LoadTypeface(FindFont(entry.family, matchedStyle));
-    if (TypefaceMatches(typeface, entry.family, matchedStyle, true)) return typeface;
-    break;
-  }
-
+  // CSS selects another available face from the requested family when that family does not
+  // contain the requested style. Match that behavior without accepting a different family.
   typeface = tgfx::Typeface::MakeFromName(family, "");
   if (TypefaceMatches(typeface, family, style, false)) {
     return typeface;

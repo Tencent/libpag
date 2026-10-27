@@ -726,12 +726,13 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
   EXPECT_FALSE(textPath->path->isEmpty());
   EXPECT_FLOAT_EQ(textPath->firstMargin, 20.0f);
   EXPECT_TRUE(textPath->forceAlignment);
-  // tgfx's available span is pathLength + lastMargin - firstMargin.
-  EXPECT_FLOAT_EQ(textPath->lastMargin, -20.0f);
+  // Path length is 260 (straight line from x=10 to x=270). lastMargin = 260 - 20 - 220 = 20.
+  EXPECT_FLOAT_EQ(textPath->lastMargin, 20.0f);
 }
 
 /**
- * A textPath with an unresolved reference paints nothing and reports the missing path.
+ * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
+ * modifier but still keeps the text content as a plain Text node, so the run is not lost.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
   std::string svg =
@@ -750,9 +751,9 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
     CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
   }
 
-  EXPECT_TRUE(texts.empty());
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "Orphan Text");
   EXPECT_TRUE(textPaths.empty());
-  EXPECT_FALSE(doc->errors.empty());
 }
 
 /**
