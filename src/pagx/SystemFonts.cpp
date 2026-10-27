@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SystemFonts.h"
-#include <algorithm>
-#include <cmath>
 
 #if defined(__APPLE__)
 
@@ -53,42 +51,6 @@ static std::string StringFromCFURL(CFURLRef cfURL) {
   auto path = StringFromCFString(cfPath);
   CFRelease(cfPath);
   return path;
-}
-
-static CSSFontStyle DescriptorStyle(CTFontDescriptorRef descriptor, const std::string& name) {
-  auto result = FontStyleFromName(name);
-  auto traits = static_cast<CFDictionaryRef>(
-      CTFontDescriptorCopyAttribute(descriptor, kCTFontTraitsAttribute));
-  if (!traits) return result;
-  auto number = [&](CFStringRef key, double* out) {
-    auto value = static_cast<CFNumberRef>(CFDictionaryGetValue(traits, key));
-    return value && CFGetTypeID(value) == CFNumberGetTypeID() &&
-           CFNumberGetValue(value, kCFNumberDoubleType, out) && std::isfinite(*out);
-  };
-  double value = 0;
-  if (number(kCTFontWeightTrait, &value)) {
-    static const double weights[] = {-0.8, -0.6, -0.4, 0, 0.23, 0.3, 0.4, 0.56, 0.62, 0.7};
-    int index = 0;
-    while (index < 9 && value > weights[index + 1]) ++index;
-    result.weight =
-        index == 9 ? 1000
-                   : (index + 1) * 100 + 100 * std::clamp((value - weights[index]) /
-                                                              (weights[index + 1] - weights[index]),
-                                                          0.0, 1.0);
-  }
-  if (number(kCTFontWidthTrait, &value)) {
-    result.width =
-        CSSFontWidthFromClass(std::clamp(static_cast<int>(std::round(value * 5)) + 5, 1, 9));
-  }
-  if (number(kCTFontSymbolicTrait, &value)) {
-    if (static_cast<uint32_t>(value) & kCTFontItalicTrait) {
-      if (result.slant == CSSFontSlant::Normal) result.slant = CSSFontSlant::Italic;
-    } else {
-      result.slant = CSSFontSlant::Normal;
-    }
-  }
-  CFRelease(traits);
-  return result;
 }
 
 static FontLocation GetFontLocationFromDescriptor(CTFontDescriptorRef descriptor) {
@@ -268,7 +230,6 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
               continue;
             }
             if (seenStyles.insert(styleStr).second) {
-              entry.faces.push_back({styleStr, DescriptorStyle(descriptor, styleStr)});
               entry.styles.push_back(std::move(styleStr));
             }
           }
@@ -558,18 +519,11 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
         continue;
       }
       auto faceName = GetFaceName(font);
-      CSSFontStyle properties;
-      properties.weight = font->GetWeight();
-      properties.width = CSSFontWidthFromClass(font->GetStretch());
-      properties.slant = font->GetStyle() == DWRITE_FONT_STYLE_ITALIC    ? CSSFontSlant::Italic
-                         : font->GetStyle() == DWRITE_FONT_STYLE_OBLIQUE ? CSSFontSlant::Oblique
-                                                                         : CSSFontSlant::Normal;
       SafeRelease(&font);
       if (faceName.empty()) {
         continue;
       }
       if (seenStyles.insert(faceName).second) {
-        entry.faces.push_back({faceName, properties});
         entry.styles.push_back(std::move(faceName));
       }
     }
@@ -800,8 +754,7 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
   if (pattern == nullptr) {
     return {};
   }
-  FcObjectSet* objectSet =
-      FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_WEIGHT, FC_WIDTH, FC_SLANT, (char*)0);
+  FcObjectSet* objectSet = FcObjectSetBuild(FC_FAMILY, FC_STYLE, (char*)0);
   if (objectSet == nullptr) {
     FcPatternDestroy(pattern);
     return {};
@@ -849,19 +802,6 @@ std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
 
     size_t idx = it->second;
     if (seenStylesPerEntry[idx].insert(styleStr).second) {
-      auto properties = FontStyleFromName(styleStr);
-      int value = 0;
-      if (FcPatternGetInteger(font, FC_WEIGHT, 0, &value) == FcResultMatch) {
-        auto weight = FcWeightToOpenType(value);
-        if (weight > 0) properties.weight = weight;
-      }
-      if (FcPatternGetInteger(font, FC_WIDTH, 0, &value) == FcResultMatch && value > 0)
-        properties.width = value;
-      if (FcPatternGetInteger(font, FC_SLANT, 0, &value) == FcResultMatch)
-        properties.slant = value == FC_SLANT_ITALIC    ? CSSFontSlant::Italic
-                           : value == FC_SLANT_OBLIQUE ? CSSFontSlant::Oblique
-                                                       : CSSFontSlant::Normal;
-      entries[idx].faces.push_back({styleStr, properties});
       entries[idx].styles.push_back(std::move(styleStr));
     }
   }

@@ -26,7 +26,6 @@
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Padding.h"
-#include "pagx/utils/CSSFontStyle.h"
 
 namespace pagx {
 
@@ -76,8 +75,6 @@ struct HTMLInheritedStyle {
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
-  std::string fontStretch = {};
-  CSSFontStyle fontRequest = {};
   std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Italic" / ""
   // Synthetic slant the renderer must emboss on top of the resolved face. Set by
   // `resolveInheritedStyle` for italic/oblique requests and carried through to `Text::fauxItalic`
