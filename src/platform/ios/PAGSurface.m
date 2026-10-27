@@ -9,21 +9,25 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGSurface.h"
+#import "platform/ios/private/PAGSurface+Internal.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
 
-@interface PAGSurface ()
-
-@property(nonatomic, strong) PAGSurfaceImpl* surface;
-
-@end
+#if defined(TGFX_USE_OPENGL)
+#import "PAGSurface+OpenGL.h"
+#elif defined(TGFX_USE_METAL)
+#import "PAGSurface+Metal.h"
+#endif
 
 @implementation PAGSurface {
 }
@@ -32,28 +36,8 @@
   return _surface;
 }
 
-+ (PAGSurface*)FromLayer:(CAEAGLLayer*)layer {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:layer];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:eaglContext];
   if (surface == nil) {
     return nil;
   }
@@ -114,3 +98,44 @@
 }
 
 @end
+
+// Keep category implementations with the class so static linking loads their methods without -ObjC.
+#if defined(TGFX_USE_OPENGL)
+@implementation PAGSurface (OpenGL)
+
++ (PAGSurface*)FromLayer:(CAEAGLLayer*)layer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:layer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
++ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer device:eaglContext];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
+@end
+#elif defined(TGFX_USE_METAL)
+@implementation PAGSurface (Metal)
+
++ (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
+@end
+#endif

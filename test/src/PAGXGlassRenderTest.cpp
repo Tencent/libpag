@@ -155,6 +155,12 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleOrphanDirectDrawMatchesDisplayList) {
   auto displayListControlDocument = MakeGlassDocument(false);
   auto orphanControlDocument = MakeGlassDocument(false);
 
+  // The fixture no longer holds the device lock across the test body (it would deadlock code
+  // that fetches the shared default device), so lock locally for the render passes below.
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
   auto displayListGlass = RenderViaDisplayList(displayListGlassDocument.get(), context);
   auto orphanGlass = RenderViaOrphanDirectDraw(orphanGlassDocument.get(), context);
   auto displayListControl = RenderViaDisplayList(displayListControlDocument.get(), context);

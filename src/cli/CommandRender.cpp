@@ -38,10 +38,10 @@
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx::cli {
@@ -270,7 +270,8 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
 }
 
 // Renders a single animation frame through the runtime animation path. The document's top-level
-// timelines are all seeked to `options.timeSeconds` and applied before drawing, so an animated
+// timelines are all seeked to `options.timeSeconds` and applied before drawing, and the timelines
+// mounted on Composition slots are advanced by the same amount from a fresh scene, so an animated
 // element's alpha / position / color reflect that playback time. Static documents (no animations)
 // fall through to a plain draw, which is equivalent to the layer-tree path at the default state.
 static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& document,
@@ -290,6 +291,10 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
     animation->setCurrentTime(timeUs);
     animation->apply(1.0f);
   }
+  // Composition timelines are not reachable through getAnimation(); the scene drives them through
+  // advanceAndApply(), which also applies each slot's evaluationOffset and skips paused timelines.
+  // A freshly built scene starts every slot at time 0, so advancing by timeUs lands on the target.
+  scene->advanceAndApply(timeUs);
 
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
   int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
@@ -439,14 +444,14 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
 
-  auto device = tgfx::GLDevice::Make();
+  auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
-    std::cerr << "pagx render: failed to create GL device\n";
+    std::cerr << "pagx render: failed to create the GPU device\n";
     return {};
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    std::cerr << "pagx render: failed to lock GL context\n";
+    std::cerr << "pagx render: failed to lock the GPU context\n";
     return {};
   }
 

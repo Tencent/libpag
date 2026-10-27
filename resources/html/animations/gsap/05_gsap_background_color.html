@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - backgroundColor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 220px; height: 160px; background-color: #111827; position: relative; margin: 0;">
+    <div id="swatch"
+         style="position: absolute; left: 30px; top: 30px;
+                width: 160px; height: 100px; border-radius: 16px;
+                background-color: #EF4444;"></div>
+    <script>
+      // backgroundColor -> color 通道（作用于 Fill 的 SolidColor）
+      gsap.to("#swatch", {
+        backgroundColor: "#3B82F6",
+        duration: 2.4,
+        ease: "none",
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

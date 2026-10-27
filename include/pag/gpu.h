@@ -312,8 +312,18 @@ class PAG_API BackendSemaphore {
  public:
   BackendSemaphore();
 
+  /**
+   * Returns true if the backend semaphore has been initialized.
+   */
   bool isInitialized() const {
     return _isInitialized;
+  }
+
+  /**
+   * Returns the backend API of this semaphore.
+   */
+  Backend backend() const {
+    return _backend;
   }
 
   void initGL(void* sync);
