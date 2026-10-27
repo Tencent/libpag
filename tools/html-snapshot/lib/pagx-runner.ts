@@ -5,8 +5,10 @@
 // `server.js` so the HTTP service can return PAGX directly instead of the
 // intermediate flat HTML.
 //
-// Evaluation and preview process helpers live in lib/pipeline.ts.
-// Full source acquisition and artifact orchestration belong to the native import workflow.
+// The on-disk pipeline (snapshot.js → pagx import → resolve → render) used by
+// the html2pagx CLI and eval/run.js lives in `lib/pipeline.ts`; that module
+// also exposes a `filterKnownWarnings` helper that mirrors what we do here
+// for stderr cleanup, so the two stay aligned.
 //
 // The CLI binary is spawned per request — one tiny native invocation against
 // a per-request temp file — which keeps the warm-browser model intact (no
@@ -14,7 +16,7 @@
 // that PAGX generation fits in the same request as the snapshot itself.
 //
 // Why temp files: pagx import takes paths only — it does not accept stdin
-// for input nor stdout for output (ImportPlan.cpp parses --input and
+// for input nor stdout for output (CommandImport.cpp parses --input and
 // --output as filesystem paths). We therefore have to materialise both the
 // input HTML and the output PAGX on disk; the wrapper guarantees the temp
 // directory is removed when the call returns, success or failure.
@@ -25,8 +27,9 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 
-// Use `<repo-root>/cmake-build-debug/pagx` for development callers that do
-// not supply a binary or $PAGX_BIN. We don't verify the file exists here —
+// Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
+// does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
+// canonical local-dev location. We don't verify the file exists here —
 // servers may legitimately boot without a pagx build (PAGX-format requests
 // then fail at use time with a clear message) — but we do collapse the
 // path so logs stay readable.
@@ -34,7 +37,8 @@ export function defaultPagxBin(): string {
   if (process.env.PAGX_BIN) return process.env.PAGX_BIN;
   // tools/html-snapshot/dist/lib/pagx-runner.js → repo root is four levels up
   // (dist/lib/<file> → dist/ → tools/html-snapshot/ → tools/ → repo root).
-  // This helper executes from the compiled dist/lib directory.
+  // Source layout (lib/<file>) and compiled layout (dist/lib/<file>) both
+  // resolve correctly: __dirname is the location of the running .js file.
   const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
   return path.join(repoRoot, 'cmake-build-debug', 'pagx');
 }
@@ -78,15 +82,17 @@ function spawnPagxImport(
       // `pagx import` resolves import directives by default; the server returns the raw imported
       // PAGX and leaves resolution to the caller (see the response comment in server.js), so opt
       // out here to preserve that contract and avoid work the caller may not want.
-      '--html-source', 'snapshot', '--images', 'embed', '--no-resolve',
+      '--no-resolve',
     ];
-    // Explicit prepared-input mode avoids a second browser pass. Embed images because
-    // the HTTP response must survive removal of its temporary output directory.
+    // Flex inference is always on inside the importer now, so there is no flag
+    // to pass. We feed it the already-rendered subset HTML, so disable the
+    // importer's own snapshot pre-pass (PAGX_HTML_SNAPSHOT=0) — otherwise it
+    // would render our flat subset in a second browser pass.
     const child = spawn(pagxBin, args, {
       // stdin: not needed (input is a file path); stdout/stderr piped so we
       // can capture pagx's diagnostics for forwarding into our own log.
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
     });
 
     const stderrChunks: Buffer[] = [];

@@ -9817,7 +9817,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceKeepsChildrenWhenDomOrderMa
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderStretchParent) {
-  // Regression for the snapshot.js → pagx import pipeline. The body has a
+  // Regression for the snapshot.js → pagx import pipeline (`html2pagx`). The body has a
   // column-stretch flex layout (children span the full body width), so the outer pass
   // erases each child's `width: 320px`. The inner child is itself a row container whose
   // own children stop short of both edges (`left:14..286`), and its row padding must be

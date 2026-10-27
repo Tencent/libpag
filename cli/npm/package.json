@@ -31,8 +31,8 @@
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
     "check:binaries": "node scripts/check-binaries.js",
     "check:preview": "node scripts/check-preview.js",
-    "check:import": "node scripts/check-import.js",
-    "prepack": "node scripts/build-html-snapshot.js && node scripts/check-import.js",
+    "check:capture": "node scripts/check-capture.js",
+    "prepack": "node scripts/build-html-snapshot.js && node scripts/check-capture.js",
     "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
   "os": [

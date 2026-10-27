@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Tencent. Licensed under the Apache License, Version 2.0.
 'use strict';
 
-// Lazy bootstrap for snapshot and the native import workflow's private adapter.
+// Shared lazy bootstrap for snapshot (single HTML stdout) and capture (artifact set).
 // Runtime validation happens before any install, browser launch, or cache mutation.
 const fs = require('fs');
 const os = require('os');
@@ -107,18 +107,18 @@ function validateSnapshot(args) {
 
 async function launchBundled(kind, args = process.argv.slice(2)) {
   try {
-    let opts, needsBrowser = true;
-    if (kind === 'import') {
-      if (args.length !== 2) throw new Error('internal import adapter expects request and response paths');
-      const { validateImportRequest } = require('./dist/lib/import-adapter');
-      const validated = validateImportRequest(JSON.parse(fs.readFileSync(args[0], 'utf8')));
-      opts = validated.options;
-      needsBrowser = validated.req.operation === 'capture';
+    let opts;
+    if (kind === 'capture') {
+      const cli = require('./capture-cli');
+      opts = cli.parseCaptureArgs(args);
+      if (!opts) { process.stdout.write(cli.captureUsage('pagx capture') + '\n'); return 0; }
+      cli.validateCaptureOptions(opts);
+      if (!opts.dryRun) cli.preflightPagxBin(opts);
     } else {
       opts = validateSnapshot(args);
     }
-    const env = needsBrowser ? await prepareBrowser(opts.browserEngine || 'puppeteer') : process.env;
-    return await runProcess(process.execPath, [path.join(HERE, kind === 'import' ? 'import-adapter.js' : 'snapshot.js'), ...args], { env });
+    const env = opts.dryRun ? process.env : await prepareBrowser(opts.browserEngine);
+    return await runProcess(process.execPath, [path.join(HERE, kind === 'capture' ? 'capture.js' : 'snapshot.js'), ...args], { env });
   } catch (error) {
     log(error.message);
     return error.exitCode || (error.code === 2 ? 2 : 1);

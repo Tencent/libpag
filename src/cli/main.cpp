@@ -20,6 +20,7 @@
 #include <iostream>
 #include <string>
 #include "cli/CommandBounds.h"
+#include "cli/CommandCapture.h"
 #include "cli/NodeTool.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -54,7 +55,8 @@ static void PrintUsage() {
             << "  font           Query font metrics\n"
             << "  embed          Embed fonts and images into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
-            << "  import         Import SVG, HTML and interaction states as PAGX\n"
+            << "  capture        Capture web pages and interaction states as PAGX and PNG\n"
+            << "  import         Import from another format (e.g. SVG, HTML) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
             << "Options:\n"
@@ -102,6 +104,9 @@ static int RunCommand(int argc, char* argv[]) {
   }
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
+  }
+  if (command == "capture") {
+    return pagx::cli::RunCapture(argc - 1, argv + 1);
   }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);

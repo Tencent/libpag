@@ -43,10 +43,10 @@ nativeTest('native import forwards scenario arguments including quoted paths', a
     .rejects.toMatchObject({stderr:expect.stringContaining('--checkpoint requires --scenario')});
 });
 
-nativeTest('import replays once and renders all named checkpoints', async () => {
-  await run(pagx,['import',input,'--scenario',scenario,'--output-dir',output,'--images','embed','--preview','--overwrite']);
-  const manifest = JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
-  expect(manifest.outputs.map(s => s.checkpoint)).toEqual(['initial','advanced']);
+nativeTest('html2pagx replays once and renders all named checkpoints', async () => {
+  await run(process.execPath,['html2pagx',input,'--scenario',scenario,'-o',output,'--pagx-bin',pagx,'--pagx-images','embed','--preview']);
+  const manifest = JSON.parse(fs.readFileSync(path.join(output,'interaction.captures.json'),'utf8'));
+  expect(manifest.outputs.map(s => s.name)).toEqual(['initial','advanced']);
   expect(manifest.preview.status).toBe('complete');
   expect(manifest.preview.pages[0].items).toEqual(['initial','advanced']);
   const sheet = PNG.sync.read(fs.readFileSync(path.join(output, manifest.preview.pages[0].file)));
@@ -78,13 +78,13 @@ nativeTest('selected checkpoint named preview is safe at scale 2 and on repeated
   fs.writeFileSync(plan, JSON.stringify({ version:1, viewport:{width:320,height:200}, steps:[
     {type:'capture',name:'preview'}, {type:'click',target:{css:'#next'}}, {type:'capture',name:'blue'},
   ] }));
-  const args = ['import',fixture,'--scenario',plan,'--output-dir',output,'--preview','--scale','2','--overwrite'];
-  await run(pagx, args);
+  const args = ['html2pagx',fixture,'--scenario',plan,'-o',output,'--pagx-bin',pagx,'--preview','--scale','2'];
+  await run(process.execPath, args);
   const sourcePath = path.join(output, 'preview-scale.preview.png');
   const original = fs.readFileSync(sourcePath);
-  await run(pagx, [...args,'--checkpoint','preview','--preview-columns','4']);
-  const manifest = JSON.parse(fs.readFileSync(path.join(output,'manifest.json'),'utf8'));
-  expect(manifest.outputs.map(item => item.checkpoint)).toEqual(['preview']);
+  await run(process.execPath, [...args,'--checkpoint','preview','--preview-columns','4']);
+  const manifest = JSON.parse(fs.readFileSync(path.join(output,'preview-scale.captures.json'),'utf8'));
+  expect(manifest.outputs.map(item => item.name)).toEqual(['preview']);
   expect(manifest.preview.pages).toHaveLength(1);
   expect(manifest.preview.pages[0].items).toEqual(['preview']);
   expect(fs.readFileSync(sourcePath)).toEqual(original);
@@ -101,11 +101,11 @@ nativeTest('downloaded snapshot images resolve and render through the native pip
   const fixture=path.join(output,'image.html'),plan=path.join(output,'image.json');
   fs.writeFileSync(fixture,`<!doctype html><body style="margin:0"><img width="100" height="100" src="data:image/png;base64,${PNG.sync.write(png).toString('base64')}"></body>`);
   fs.writeFileSync(plan,JSON.stringify({version:1,viewport:{width:320,height:200},steps:[{type:'capture',name:'ready'}]}));
-  await run(pagx,['import',fixture,'--scenario',plan,'--output-dir',output,'--images','external','--render','--overwrite']);
+  await run(process.execPath,['html2pagx',fixture,'--scenario',plan,'-o',output,'--download-images','--pagx-bin',pagx]);
   const actual=PNG.sync.read(fs.readFileSync(path.join(output,'image.ready.png')));
   expect(Array.from(actual.data.slice((30*320+30)*4,(30*320+30)*4+4))).toEqual([255,0,0,255]);
   expect(Array.from(actual.data.slice((150*320+150)*4,(150*320+150)*4+4))).toEqual([255,255,255,255]);
-  expect(fs.readFileSync(path.join(output,'image.ready.pagx'),'utf8')).not.toContain('data:image/');
+  expect(fs.readFileSync(path.join(output,'image.ready.subset.html'),'utf8')).not.toContain('data:image/');
 });
 
 nativeTest('scenario exports visible forms and CSS-painted SVG outlines', async () => {
@@ -123,7 +123,7 @@ nativeTest('scenario exports visible forms and CSS-painted SVG outlines', async 
     <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="20"/></svg></body></html>`);
   fs.writeFileSync(plan, JSON.stringify({ version:1, viewport:{width:320,height:200},
     steps:[{type:'capture',name:'ready'}] }));
-  const result = await run(pagx, ['import',fixture,'--scenario',plan,'--output-dir',output,'--render','--keep-snapshot','--overwrite']);
+  const result = await run(process.execPath, ['html2pagx',fixture,'--scenario',plan,'-o',output,'--pagx-bin',pagx]);
   const subset = fs.readFileSync(path.join(output, 'form-svg.ready.subset.html'), 'utf8');
   const xml = fs.readFileSync(path.join(output, 'form-svg.ready.pagx'), 'utf8');
   for (const text of ['Captured input', 'Captured draft', 'Send comment']) {

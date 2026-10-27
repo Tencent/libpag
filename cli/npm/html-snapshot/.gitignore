@@ -3,7 +3,8 @@
 /dist/
 /node_modules/
 /snapshot.js
-/import-adapter.js
+/capture.js
+/capture-cli.js
 /ensure-built.js
 /package.json
 /package-lock.json

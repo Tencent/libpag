@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
 #include "tgfx/core/Bitmap.h"
 
 namespace pagx::cli {
@@ -33,9 +31,5 @@ tgfx::Bitmap RenderToBitmap(int argc, char* argv[]);
  * Renders a PAGX file to an image (PNG/WebP).
  */
 int RunRender(int argc, char* argv[]);
-
-// Shared native entry for import artifacts; does not parse CLI args or print temporary paths.
-bool RenderPNG(const std::string& input, const std::string& output, float scale,
-               const std::vector<std::string>& fallbacks);
 
 }  // namespace pagx::cli

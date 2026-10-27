@@ -6,7 +6,7 @@ const path = require('path');
 const { createRequire } = require('module');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
-const { checkImportPackage } = require('../../../cli/npm/scripts/check-import');
+const { checkCapturePackage } = require('../../../cli/npm/scripts/check-capture');
 const exec = promisify(execFile);
 // Run against an unpacked/installed tarball, never implicitly against source staging.
 const packageDir = process.env.PAGX_PACKAGE_TEST_DIR;
@@ -41,7 +41,7 @@ function copyDriver(name, output, copied = new Set()) {
 
 beforeAll(() => {
   if (!packageDir) return;
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), "installed import 中文 ' "));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "installed capture 中文 ' "));
   cache = path.join(dir, 'browser-cache');
   copyDriver('puppeteer', cache);
   copyDriver('playwright', cache);
@@ -49,7 +49,7 @@ beforeAll(() => {
     PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL: '1', PAGX_BIN: path.join(dir, 'wrong-version'),
     PUPPETEER_EXECUTABLE_PATH: require('puppeteer').executablePath(),
     PLAYWRIGHT_EXECUTABLE_PATH: require('playwright').chromium.executablePath() };
-  for (const key of ['PAGX_HTML_SNAPSHOT_BIN', 'PAGX_HTML_IMPORT_BIN', 'PAGX_NODE_BIN']) delete env[key];
+  for (const key of ['PAGX_HTML_SNAPSHOT_BIN', 'PAGX_HTML_CAPTURE_BIN', 'PAGX_NODE_BIN']) delete env[key];
   fs.copyFileSync(path.join(__dirname, 'fixtures/interaction.html'), path.join(dir, 'page.html'));
   fs.copyFileSync(path.join(__dirname, 'fixtures/interaction.scenario.json'), path.join(dir, 'states.json'));
 });
@@ -58,15 +58,15 @@ const run = (args, extraEnv = {}) => exec(process.execPath, [path.join(packageDi
   { cwd: dir, env: { ...env, ...extraEnv }, timeout: 45000, maxBuffer: 8 * 1024 * 1024 });
 
 packagedTest('packed files, runtime dependencies and native version pass release checks', () => {
-  expect(() => checkImportPackage(packageDir)).not.toThrow();
+  expect(() => checkCapturePackage(packageDir)).not.toThrow();
 });
 
 packagedTest('help, dry-run and invalid scenario do not initialize an empty browser cache', async () => {
   const emptyCache = path.join(dir, 'untouched-cache');
   const empty = { PAGX_HTML_SNAPSHOT_CACHE: emptyCache, PUPPETEER_EXECUTABLE_PATH: '/absent' };
-  expect((await run(['import', '--help'], empty)).stdout).toContain('--preview');
-  await run(['import', 'page.html', '--scenario', 'states.json', '--dry-run', '--output-dir', path.join(dir, 'dry-output')], empty);
-  await expect(run(['import', 'page.html', '--scenario', 'states.json', '--checkpoint', 'missing', '--output-dir', path.join(dir, 'invalid-out')], empty))
+  expect((await run(['capture', '--help'], empty)).stdout).toContain('--preview');
+  await run(['capture', '--batch', dir, '--dry-run', '--output-root', path.join(dir, 'dry-output')], empty);
+  await expect(run(['capture', 'page.html', '--scenario', 'states.json', '--checkpoint', 'missing'], empty))
     .rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown checkpoint') });
   const snapshot = await exec(process.execPath, [path.join(packageDir, 'html-snapshot/launch.js'), '--help'],
     { cwd: dir, env: { ...env, ...empty }, timeout: 15000 });
@@ -77,37 +77,27 @@ packagedTest('help, dry-run and invalid scenario do not initialize an empty brow
 
 packagedTest('missing browser returns an actionable failure without enabling auto-install', async () => {
   const emptyCache = path.join(dir, 'no-browser');
-  await expect(run(['import', 'page.html', '--output-dir', path.join(dir, 'missing-out')], {
+  await expect(run(['capture', 'page.html', '-o', path.join(dir, 'missing-out')], {
     PAGX_HTML_SNAPSHOT_CACHE: emptyCache, PUPPETEER_EXECUTABLE_PATH: '/absent',
   })).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('auto-install disabled') });
   expect(fs.existsSync(emptyCache)).toBe(false);
 });
 
-packagedTest.each(['puppeteer', 'playwright'])('installed import uses the external %s cache and its own native binary', async engine => {
+packagedTest.each(['puppeteer', 'playwright'])('installed capture uses the external %s cache and its own native binary', async engine => {
   const out = path.join(dir, engine);
-  await run(['import', 'page.html', '--scenario', 'states.json', '--output-dir', out, '--preview', '--browser-engine', engine]);
-  const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')));
+  await run(['capture', 'page.html', '--scenario', 'states.json', '-o', out, '--preview', '--browser-engine', engine]);
+  const manifest = JSON.parse(fs.readFileSync(path.join(out, 'page.captures.json')));
   expect(manifest.status).toBe('complete');
-  expect(manifest.outputs.map(o => o.checkpoint)).toEqual(['initial', 'advanced']);
+  expect(manifest.outputs.map(o => o.name)).toEqual(['initial', 'advanced']);
   expect(manifest.preview.status).toBe('complete');
   expect(fs.existsSync(path.join(out, manifest.preview.pages[0].file))).toBe(true);
   expect(fs.readFileSync(path.join(out, 'page.advanced.pagx'), 'utf8')).toContain('Result: PAGX');
 });
 
-packagedTest('bundled import supports a selected checkpoint with an exact file output', async () => {
+packagedTest('bundled import retains single-checkpoint HTML stdout bridging', async () => {
   const output = path.join(dir, 'single.pagx');
   await run(['import', '--input', 'page.html', '--scenario', 'states.json', '--checkpoint', 'advanced', '--output', output]);
   expect(fs.readFileSync(output, 'utf8')).toContain('Result: PAGX');
-});
-
-packagedTest('installed SVG previews use bundled helpers without browser installation', async () => {
-  fs.writeFileSync(path.join(dir, 'icon.svg'), '<svg width="24" height="24"><circle cx="12" cy="12" r="10" fill="red"/></svg>');
-  const out = path.join(dir, 'svg-preview'), emptyCache = path.join(dir, 'svg-browser-cache');
-  await run(['import', 'icon.svg', '--output-dir', out, '--preview'], {
-    PAGX_HTML_SNAPSHOT_CACHE: emptyCache, PUPPETEER_EXECUTABLE_PATH: '/absent',
-  });
-  expect(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'))).preview.status).toBe('complete');
-  expect(fs.existsSync(emptyCache)).toBe(false);
 });
 
 packagedTest('installed native binary locates its bundled runtime without the npm wrapper', async () => {
@@ -115,10 +105,10 @@ packagedTest('installed native binary locates its bundled runtime without the np
     .map(platform => path.join(packageDir, 'bin', platform, process.platform === 'win32' ? 'pagx.exe' : 'pagx'))
     .find(file => fs.existsSync(file));
   const out = path.join(dir, 'direct-native');
-  await exec(executable, ['import', 'page.html', '--scenario', 'states.json', '--checkpoint', 'initial', '--output-dir', out],
+  await exec(executable, ['capture', 'page.html', '--scenario', 'states.json', '--checkpoint', 'initial', '-o', out, '--no-render'],
     { cwd: dir, env: { ...env, PAGX_NODE_BIN: process.execPath }, timeout: 45000 });
-  const manifest = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')));
-  expect(manifest).toMatchObject({ status: 'complete', outputs: [{ checkpoint: 'initial', status: 'complete' }] });
+  const manifest = JSON.parse(fs.readFileSync(path.join(out, 'page.captures.json')));
+  expect(manifest).toMatchObject({ status: 'complete', outputs: [{ name: 'initial', png: null }] });
 });
 
 (process.platform === 'win32' ? test.skip : packagedTest)('npm launcher cancellation reaches the source session and manifest', async () => {
@@ -127,7 +117,7 @@ packagedTest('installed native binary locates its bundled runtime without the np
     { type: 'waitFor', target: { css: '#never' }, state: 'visible', timeoutMs: 30000 },
     { type: 'capture', name: 'done' },
   ] }));
-  const child = spawn(process.execPath, [path.join(packageDir, 'bin/pagx.js'), 'import', 'page.html', '--scenario', plan, '--output-dir', out],
+  const child = spawn(process.execPath, [path.join(packageDir, 'bin/pagx.js'), 'capture', 'page.html', '--scenario', plan, '-o', out],
     { cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '', signalled = false;
   const timeout = setTimeout(() => child.kill('SIGKILL'), 15000);
@@ -139,6 +129,6 @@ packagedTest('installed native binary locates its bundled runtime without the np
     const code = await new Promise((resolve, reject) => { child.on('close', resolve); child.on('error', reject); });
     expect(signalled).toBe(true);
     expect(code).toBe(143);
-    expect(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')))).toMatchObject({ status: 'cancelled', outputs: [{ status: 'cancelled' }] });
+    expect(JSON.parse(fs.readFileSync(path.join(out, 'page.captures.json')))).toMatchObject({ status: 'failed', outputs: [] });
   } finally { clearTimeout(timeout); }
 });
