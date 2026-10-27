@@ -19,6 +19,7 @@
 #include "pagx/utils/RasterUtils.h"
 #include <cmath>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
@@ -67,8 +68,19 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
   if (width <= 0 || height <= 0 || pixelScale <= 0.0f) {
     return nullptr;
   }
-  int pixelWidth = static_cast<int>(std::ceil(static_cast<float>(width) * pixelScale));
-  int pixelHeight = static_cast<int>(std::ceil(static_cast<float>(height) * pixelScale));
+  // Compute in double and cap the pixel dimensions: an extreme transform (e.g. a 1e7 scale) would
+  // otherwise overflow the int conversion or attempt a boundless allocation. The caller's vector
+  // fallback keeps the layer vector output.
+  double pixelWidthD = std::ceil(static_cast<double>(width) * pixelScale);
+  double pixelHeightD = std::ceil(static_cast<double>(height) * pixelScale);
+  constexpr double MAX_BAKE_PIXELS_PER_SIDE = 8192.0;
+  if (pixelWidthD > MAX_BAKE_PIXELS_PER_SIDE || pixelHeightD > MAX_BAKE_PIXELS_PER_SIDE) {
+    LOGE("RasterUtils: bake size %.0fx%.0f exceeds the %d px limit, keeping vector output.",
+         pixelWidthD, pixelHeightD, static_cast<int>(MAX_BAKE_PIXELS_PER_SIDE));
+    return nullptr;
+  }
+  int pixelWidth = static_cast<int>(pixelWidthD);
+  int pixelHeight = static_cast<int>(pixelHeightD);
   if (pixelWidth <= 0 || pixelHeight <= 0) {
     return nullptr;
   }
@@ -257,6 +269,15 @@ void GPUContext::unlock() {
 tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer>& targetLayer,
                                                const tgfx::Layer* coordinateSpace) {
   auto bounds = targetLayer->getBounds(coordinateSpace, true);
+  // A huge or non-finite extent (e.g. from an extreme matrix3D scale) would overflow the int
+  // conversions below; reject it before any of that, so the callers keep the vector output.
+  constexpr float MAX_BAKE_LOGICAL_DIMENSION = 1.0e8f;
+  if (!std::isfinite(bounds.width()) || !std::isfinite(bounds.height()) ||
+      bounds.width() > MAX_BAKE_LOGICAL_DIMENSION || bounds.height() > MAX_BAKE_LOGICAL_DIMENSION) {
+    LOGE("RasterUtils: bake bounds %.0fx%.0f are not renderable, keeping vector output.",
+         static_cast<double>(bounds.width()), static_cast<double>(bounds.height()));
+    return tgfx::Rect::MakeEmpty();
+  }
   auto scrollRect = targetLayer->scrollRect();
   if (!scrollRect.isEmpty()) {
     // getRelativeMatrix already folds in scrollRect's preTranslate (see tgfx
