@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Music Equalizer</title>
+    <style>
+      /* anime.js-style staggered timeline: each bar shares one
+         translateY keyframes but offsets its delay; pingPong via
+         animation-direction: alternate. */
+      @keyframes eq {
+        0%   { transform: translateY(78px); }
+        100% { transform: translateY(0px); }
+      }
+      .bar {
+        width: 26px;
+        height: 150px;
+        border-radius: 8px;
+        background-image: linear-gradient(180deg, #F472B6, #8B5CF6);
+        box-shadow: 0 8px 18px #8B5CF640;
+      }
+    </style>
+  </head>
+  <body style="width: 460px; height: 320px; display: flex; flex-direction: column;
+               align-items: center; justify-content: flex-end; padding: 40px;
+               background-image: linear-gradient(160deg, #111827, #312E81);">
+    <div style="display: flex; flex-direction: row; align-items: flex-end; gap: 16px;">
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.18s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.36s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.12s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.30s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.06s;"></div>
+      <div class="bar" style="animation: eq 0.7s ease-in-out infinite alternate; animation-delay: 0.24s;"></div>
+    </div>
+  </body>
+</html>

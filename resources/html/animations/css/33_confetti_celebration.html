@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Confetti Celebration</title>
+    <style>
+      /* Confetti burst: translate(x, y) drives both x and y channels
+         while opacity fades the piece out near the floor. Colors and
+         delays are varied per piece for a natural scatter. */
+      @keyframes fallL {
+        0%   { opacity: 0; transform: translate(0px, -30px); }
+        15%  { opacity: 1; }
+        100% { opacity: 0; transform: translate(-50px, 300px); }
+      }
+      @keyframes fallR {
+        0%   { opacity: 0; transform: translate(0px, -30px); }
+        15%  { opacity: 1; }
+        100% { opacity: 0; transform: translate(55px, 300px); }
+      }
+      @keyframes badgePop {
+        0%   { transform: translateY(8px); opacity: 0.6; }
+        50%  { transform: translateY(-8px); opacity: 1; }
+        100% { transform: translateY(8px); opacity: 0.6; }
+      }
+      .c { width: 14px; height: 14px; border-radius: 4px; }
+    </style>
+  </head>
+  <body style="width: 520px; height: 360px; overflow: hidden;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+               background-image: linear-gradient(160deg, #1E1B4B, #4C1D95); font-family: Arial;">
+
+    <div class="c" style="position: absolute; top: 0px; left: 90px;  background-color: #F472B6; animation: fallL 2.4s linear infinite; animation-delay: 0s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 150px; background-color: #FBBF24; animation: fallR 2.4s linear infinite; animation-delay: 0.4s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 210px; background-color: #34D399; animation: fallL 2.4s linear infinite; animation-delay: 0.8s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 270px; background-color: #60A5FA; animation: fallR 2.4s linear infinite; animation-delay: 0.2s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 330px; background-color: #F87171; animation: fallL 2.4s linear infinite; animation-delay: 1s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 390px; background-color: #A78BFA; animation: fallR 2.4s linear infinite; animation-delay: 0.6s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 120px; background-color: #FCD34D; animation: fallR 2.4s linear infinite; animation-delay: 1.2s;"></div>
+    <div class="c" style="position: absolute; top: 0px; left: 360px; background-color: #4ADE80; animation: fallL 2.4s linear infinite; animation-delay: 1.4s;"></div>
+
+    <div style="display: flex; align-items: center; justify-content: center;
+                width: 84px; height: 84px; border-radius: 24px;
+                background-image: linear-gradient(135deg, #FBBF24, #F472B6);
+                box-shadow: 0 16px 30px #F472B64D;
+                animation: badgePop 2s ease-in-out infinite;">
+      <svg width="44" height="44" viewBox="0 0 24 24">
+        <path d="M6 3h12v3a6 6 0 0 1-12 0z" fill="#FFFFFF"/>
+        <path d="M11 9h2v5h-2z" fill="#FFFFFF"/>
+        <path d="M8 14h8v3H8z" fill="#FFFFFF"/>
+        <path d="M3 4h3v3a3 3 0 0 1-3-3zM18 4h3a3 3 0 0 1-3 3z" fill="#FFFFFF"/>
+      </svg>
+    </div>
+    <span style="font-size: 28px; font-weight: bold; color: #FFFFFF;">Congratulations!</span>
+    <span style="font-size: 15px; color: #C4B5FD;">You unlocked the next level</span>
+  </body>
+</html>

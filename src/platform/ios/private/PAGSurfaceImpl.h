@@ -23,11 +23,20 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-// Backend factory declarations live in the opengl/ and metal/ category headers. The selected
-// category implementation shares PAGSurfaceImpl.mm with the class for ordinary static linking.
 @interface PAGSurfaceImpl : NSObject
 
+/**
+ * Creates a surface from the selected backend's native layer or view without retaining the host.
+ */
++ (PAGSurfaceImpl*)FromHost:(id)host;
+
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
+
+/**
+ * Creates a pixel-buffer surface with an optional native device or context for the selected
+ * backend.
+ */
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer device:(id)device;
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 

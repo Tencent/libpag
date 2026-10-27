@@ -17,18 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXCast.h"
-
-namespace pag {
-#if defined(TGFX_USE_METAL)
-// Defined in TGFXCast_Metal.mm: reads the actual MTLPixelFormat from the MTLTexture, so the
-// pixel format never depends on a caller-supplied value.
-unsigned GetMetalTexturePixelFormat(const void* mtlTexture);
-#else
-static unsigned GetMetalTexturePixelFormat(const void*) {
-  return 0;
-}
-#endif
-}  // namespace pag
+#include "cast/MetalTexture.h"
 
 namespace pag {
 static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {

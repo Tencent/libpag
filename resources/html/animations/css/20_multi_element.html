@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Multiple elements - distinct timelines</title>
+    <style>
+      @keyframes a1 {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(-30px); }
+      }
+      @keyframes a2 {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(-30px); }
+      }
+      @keyframes a3 {
+        0%   { transform: translateY(0px); }
+        100% { transform: translateY(-30px); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #1E1B4B;">
+    <div id="bar1"
+         style="position: absolute; left: 40px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px;
+                background-color: #C084FC;
+                animation: a1 0.6s ease-in-out 0s infinite alternate;"></div>
+    <div id="bar2"
+         style="position: absolute; left: 100px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px;
+                background-color: #E879F9;
+                animation: a2 0.6s ease-in-out 0.2s infinite alternate;"></div>
+    <div id="bar3"
+         style="position: absolute; left: 160px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px;
+                background-color: #F0ABFC;
+                animation: a3 0.6s ease-in-out 0.4s infinite alternate;"></div>
+  </body>
+</html>

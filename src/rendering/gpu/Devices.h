@@ -63,11 +63,9 @@ class ExternalDeviceRef {
 };
 
 /**
- * Backend glue for libpag. Every call into a concrete tgfx backend (OpenGL, Metal, Vulkan, D3D12,
- * WebGPU) is funneled through this class and dispatched via compile-time macros
- * (TGFX_USE_OPENGL / TGFX_USE_METAL / ...). The rest of libpag only sees the tgfx::Device base
- * class, so adding a new backend is a matter of extending the Devices_* implementation files
- * rather than modifying render code.
+ * Backend glue for libpag. CMake selects the implementation from the corresponding backend
+ * directory, while callers only see the tgfx::Device base class. Adding a backend requires its
+ * device implementation and platform integration without changing shared rendering code.
  */
 class Devices {
  public:
@@ -76,11 +74,11 @@ class Devices {
    * the CLI, and internal helpers.
    *   OpenGL: GLDevice::MakeWithFallback()
    *   Metal:  MetalDevice::Make()
-   *   WebGPU: WebGPUDevice::Make() — reads the GPUDevice preinitialized on the JS side; only
-   *           callable on the main runtime thread.
-   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails at compile
-   *           time (see Devices_Backend.cpp).
-   */
+*   WebGPU: WebGPUDevice::Make() — reads the GPUDevice preinitialized on the JS side; only
+*           callable on the main runtime thread.
+*   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
+*           configuration.
+*/
   static std::shared_ptr<tgfx::Device> MakeDefault();
 
   /**
@@ -179,8 +177,8 @@ class Devices {
    *   WebGPU:      Returns MakeDefault(); WGPUTexture carries no device back-reference, but Web
    *                runs on a single shared GPUDevice, so the default device is always the one
    *                that created the caller's texture.
-   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails at compile
-   *                time (see Devices_Backend.cpp). Their texture types do not carry a device
+   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
+   *                configuration. Their texture types do not carry a device
    *                back-reference; a SetSharedDevice-style API is planned to lift that once the
    *                first of them lands.
    * Used by PAGImage::FromTexture() for implicit device inference.
@@ -191,8 +189,8 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; Vulkan /
-   * D3D12 are not implemented yet (see Devices_Backend.cpp).
+   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; CMake
+   * rejects selection of the remaining, unimplemented backends.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);

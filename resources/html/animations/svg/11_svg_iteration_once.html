@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG iteration - once (entrance)</title>
+    <style>
+      @keyframes pop {
+        0%   { opacity: 0; transform: translateY(24px); }
+        100% { opacity: 1; transform: translateY(0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 160px; background-color: #064E3B;">
+    <!-- iteration-count: 1（有限）→ once (§13.3)，一次性入场（淡入 + 上浮） -->
+    <div id="check"
+         style="position: absolute; left: 68px; top: 48px; width: 64px; height: 64px;
+                animation: pop 0.8s ease-out 1;">
+      <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#34D399"/>
+        <path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#064E3B"
+              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

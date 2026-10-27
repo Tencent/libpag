@@ -20,6 +20,7 @@
 #include <type_traits>
 #include "base/PAGTest.h"
 #include "base/utils/TGFXCast.h"
+#include "base/utils/cast/MetalTexture.h"
 #include "pag/pag.h"
 #include "tgfx/gpu/Context.h"
 
@@ -148,6 +149,43 @@ PAG_TEST(TGFXCastTest, UnsupportedBackendReturnsEmpty) {
 
   auto emptyRenderTarget = ToTGFX(BackendRenderTarget{});
   EXPECT_FALSE(emptyRenderTarget.isValid());
+}
+
+/**
+ * Verifies that every backend's pixel-format query accepts a null Metal texture.
+ */
+PAG_TEST(TGFXCastTest, NullMetalTexturePixelFormat) {
+  EXPECT_EQ(GetMetalTexturePixelFormat(nullptr), 0u);
+}
+
+/**
+ * Verifies that non-Metal conversions preserve resource tags without accessing native textures.
+ */
+PAG_TEST(TGFXCastTest, ForeignMetalTexturePreservesBackendTag) {
+  if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
+    GTEST_SKIP() << "Metal builds require a live native texture.";
+  }
+  MtlTextureInfo info = {};
+  info.texture = reinterpret_cast<void*>(1);
+  EXPECT_EQ(GetMetalTexturePixelFormat(info.texture), 0u);
+
+  auto texture = ToTGFX(BackendTexture(info, 10, 10));
+  EXPECT_TRUE(texture.isValid());
+  EXPECT_EQ(texture.backend(), tgfx::Backend::Metal);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(texture.getMetalTextureInfo(&textureInfo));
+  EXPECT_EQ(textureInfo.texture, info.texture);
+  EXPECT_EQ(textureInfo.format, 0u);
+
+  auto renderTarget = ToTGFX(BackendRenderTarget(info, 10, 10));
+  EXPECT_TRUE(renderTarget.isValid());
+  EXPECT_EQ(renderTarget.backend(), tgfx::Backend::Metal);
+  tgfx::MetalTextureInfo targetInfo = {};
+  ASSERT_TRUE(renderTarget.getMetalTextureInfo(&targetInfo));
+  EXPECT_EQ(targetInfo.texture, info.texture);
+  EXPECT_EQ(targetInfo.format, 0u);
+  EXPECT_FALSE(Devices::SupportsBackend(texture.backend()));
+  EXPECT_FALSE(Devices::SupportsBackend(renderTarget.backend()));
 }
 
 /**

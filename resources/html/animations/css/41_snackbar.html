@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Snackbar</title>
+    <style>
+      /* Material snackbar: slides up from the bottom edge with
+         translateY + opacity, holds, then retreats — driven by a
+         single multi-stop timeline. */
+      @keyframes snackUp {
+        0%   { opacity: 0; transform: translateY(80px); }
+        12%  { opacity: 1; transform: translateY(0px); }
+        80%  { opacity: 1; transform: translateY(0px); }
+        100% { opacity: 0; transform: translateY(80px); }
+      }
+      @keyframes undoFlash {
+        0%   { color: #818CF8; }
+        50%  { color: #C7D2FE; }
+        100% { color: #818CF8; }
+      }
+    </style>
+  </head>
+  <body style="width: 480px; height: 280px; display: flex; flex-direction: column;
+               align-items: center; justify-content: flex-end; padding: 30px;
+               background-color: #F1F5F9; font-family: Arial;">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 16px;
+                width: 400px; padding: 16px 20px; border-radius: 12px;
+                background-color: #1E293B;
+                box-shadow: 0 16px 34px #0F172A40;
+                animation: snackUp 3.4s ease-in-out infinite;">
+      <div style="display: flex; align-items: center; justify-content: center;
+                  width: 28px; height: 28px; border-radius: 9999px; background-color: #22C55E;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="font-size: 15px; color: #F1F5F9; flex: 1;">Message archived</span>
+      <span style="font-size: 14px; font-weight: bold; letter-spacing: 1px;
+                   color: #818CF8;
+                   animation: undoFlash 1.4s ease-in-out infinite;">UNDO</span>
+    </div>
+  </body>
+</html>

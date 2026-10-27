@@ -19,50 +19,67 @@
 #if defined(__APPLE__)
 
 #import <TargetConditionals.h>
+#include <thread>
 #include "base/PAGTest.h"
 #import "platform/cocoa/PAGPlayer.h"
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
+#include "platform/cocoa/private/PAGViewSurface.h"
 
 #if TARGET_OS_IPHONE
+#include "platform/cocoa/private/PixelBufferUtil.h"
+#import "platform/ios/PAGView.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
-#if defined(TGFX_USE_METAL)
-#import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
 #else
-#import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
-#endif
-#else
+#import "platform/mac/PAGView.h"
 #import "platform/mac/private/PAGSurfaceImpl.h"
-#if defined(TGFX_USE_METAL)
-#import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
+#endif
+
+@interface PAGView (CocoaSurfaceTests)
+- (void)initPAGSurface;
+@end
+
+static void ProbeViewMutex(std::mutex* mutex, bool* acquired) {
+  *acquired = mutex->try_lock();
+  if (*acquired) {
+    mutex->unlock();
+  }
+}
+
+static void CheckInvalidHost(id host) {
+  SCOPED_TRACE([NSStringFromClass([host class]) UTF8String]);
+  EXPECT_EQ(pag::cocoa::MakeSurfaceFromHost(host), nullptr);
+  EXPECT_TRUE([PAGSurfaceImpl FromHost:host] == nil);
+#if TARGET_OS_IPHONE || defined(TGFX_USE_METAL)
+  EXPECT_TRUE([PAGSurface FromLayer:host] == nil);
 #else
-#import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
+  EXPECT_TRUE([PAGSurface FromView:host] == nil);
 #endif
-#endif
+}
 
 /**
  * Verifies that the selected backend's public and private factories are linked with their classes
  * without requiring Objective-C category force-loading linker options.
  */
 PAG_TEST(PAGCocoaSurfaceTest, BackendFactoriesAreLinked) {
+  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromHost:)]);
+  EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromLayer:)]);
+  EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromView:)]);
 #if TARGET_OS_IPHONE || defined(TGFX_USE_METAL)
   EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromLayer:)]);
-  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromLayer:)]);
 #else
   EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromView:)]);
-  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromView:)]);
 #endif
 #if TARGET_OS_IPHONE
   EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:)]);
   EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:)]);
-#if defined(TGFX_USE_METAL)
-  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
-  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
-  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
+  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:device:)]);
   EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
+  EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
+  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
+#if defined(TGFX_USE_METAL)
+  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
 #else
   EXPECT_TRUE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
-  EXPECT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
-  EXPECT_FALSE([PAGSurface respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
-  EXPECT_FALSE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
 #endif
 #endif
 }
@@ -73,17 +90,94 @@ PAG_TEST(PAGCocoaSurfaceTest, BackendFactoriesAreLinked) {
  */
 PAG_TEST(PAGCocoaSurfaceTest, NullHostReturnsNil) {
   @autoreleasepool {
+    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromHost:)]);
+    EXPECT_TRUE([PAGSurfaceImpl FromHost:nil] == nil);
 #if TARGET_OS_IPHONE || defined(TGFX_USE_METAL)
     ASSERT_TRUE([PAGSurface respondsToSelector:@selector(FromLayer:)]);
-    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromLayer:)]);
     EXPECT_TRUE([PAGSurface FromLayer:nil] == nil);
-    EXPECT_TRUE([PAGSurfaceImpl FromLayer:nil] == nil);
 #else
     ASSERT_TRUE([PAGSurface respondsToSelector:@selector(FromView:)]);
-    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromView:)]);
     EXPECT_TRUE([PAGSurface FromView:nil] == nil);
-    EXPECT_TRUE([PAGSurfaceImpl FromView:nil] == nil);
 #endif
+  }
+}
+
+/**
+ * Verifies that invalid hosts are rejected before accessing backend-specific native properties.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, InvalidHostReturnsNil) {
+  @autoreleasepool {
+    CheckInvalidHost([[NSObject alloc] init]);
+    CheckInvalidHost([CALayer layer]);
+#if defined(TGFX_USE_METAL)
+    CheckInvalidHost([[PAGView alloc] initWithFrame:CGRectMake(0, 0, 16, 16)]);
+#else
+    CheckInvalidHost([CAMetalLayer layer]);
+#endif
+  }
+}
+
+/**
+ * Verifies that all iOS backends and macOS Metal serialize view operations, while macOS OpenGL
+ * returns an empty lock.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, ViewBackendLockPolicy) {
+#if TARGET_OS_IPHONE
+  bool expectsLock = true;
+#else
+  bool expectsLock = pag::Devices::SupportsBackend(tgfx::Backend::Metal);
+#endif
+  std::mutex mutex;
+  {
+    auto lock = pag::cocoa::PAGViewSurface::Lock(mutex);
+    EXPECT_EQ(lock.owns_lock(), expectsLock);
+    if (lock.owns_lock()) {
+      EXPECT_EQ(lock.mutex(), &mutex);
+    }
+    bool acquired = false;
+    std::thread probe(ProbeViewMutex, &mutex, &acquired);
+    probe.join();
+    if (expectsLock) {
+      EXPECT_FALSE(acquired);
+    }
+  }
+  ASSERT_TRUE(mutex.try_lock());
+  mutex.unlock();
+}
+
+/**
+ * Verifies that both view backends retain one surface while resizing, including synchronous updates
+ * after growing from zero size.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, ViewSurfaceSurvivesResize) {
+  @autoreleasepool {
+    ASSERT_TRUE([NSThread isMainThread]);
+    auto view = [[PAGView alloc] initWithFrame:CGRectMake(0, 0, 16, 16)];
+#if TARGET_OS_IPHONE
+    [view setSync:YES];
+#else
+    EXPECT_EQ(view.wantsLayer, pag::Devices::SupportsBackend(tgfx::Backend::Metal));
+#endif
+    [view initPAGSurface];
+    PAGSurface* surface = [view valueForKey:@"pagSurface"];
+    ASSERT_TRUE(surface != nil);
+    int width = surface.width;
+    int height = surface.height;
+    [view setBounds:CGRectMake(0, 0, 32, 32)];
+    EXPECT_EQ([view valueForKey:@"pagSurface"], surface);
+    EXPECT_EQ(surface.width, width * 2);
+    EXPECT_EQ(surface.height, height * 2);
+#if TARGET_OS_IPHONE
+    [view setBounds:CGRectMake(0, 0, 0, 0)];
+    [view setBounds:CGRectMake(0, 0, 16, 16)];
+#else
+    [view setBounds:CGRectMake(0, 0, 16, 16)];
+    [view setFrameSize:NSMakeSize(0, 0)];
+    [view setFrameSize:NSMakeSize(16, 16)];
+#endif
+    EXPECT_EQ([view valueForKey:@"pagSurface"], surface);
+    EXPECT_EQ(surface.width, width);
+    EXPECT_EQ(surface.height, height);
   }
 }
 
@@ -94,13 +188,29 @@ PAG_TEST(PAGCocoaSurfaceTest, NullHostReturnsNil) {
  */
 PAG_TEST(PAGCocoaSurfaceTest, DefaultPixelBufferFactoryDispatches) {
   @autoreleasepool {
-#if defined(TGFX_USE_METAL)
-    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:mtlDevice:)]);
-#else
-    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:context:)]);
-#endif
+    ASSERT_TRUE([PAGSurfaceImpl respondsToSelector:@selector(FromCVPixelBuffer:device:)]);
     EXPECT_TRUE([PAGSurface FromCVPixelBuffer:nil] == nil);
     EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:nil] == nil);
+    EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:nil device:nil] == nil);
+  }
+}
+
+/**
+ * Verifies that invalid native devices are rejected even when a valid pixel buffer is supplied.
+ */
+PAG_TEST(PAGCocoaSurfaceTest, InvalidPixelBufferDeviceReturnsNil) {
+  @autoreleasepool {
+    auto pixelBuffer = pag::PixelBufferUtil::Make(16, 16);
+    ASSERT_TRUE(pixelBuffer != nil);
+    NSArray* invalidDevices = @[[[NSObject alloc] init], [CALayer layer]];
+    for (id device in invalidDevices) {
+      SCOPED_TRACE([NSStringFromClass([device class]) UTF8String]);
+      EXPECT_EQ(pag::cocoa::MakeSurfaceFromPixelBuffer(pixelBuffer, device), nullptr);
+      EXPECT_TRUE([PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer device:device] == nil);
+#if defined(TGFX_USE_OPENGL)
+      EXPECT_TRUE([PAGSurface FromCVPixelBuffer:pixelBuffer context:device] == nil);
+#endif
+    }
   }
 }
 #endif
