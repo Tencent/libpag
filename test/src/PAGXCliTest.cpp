@@ -1709,6 +1709,25 @@ CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
             0);
 }
 
+// A CSS font stack can start with a hyphenated family (-apple-system), which the positional value
+// rule reads as an option; binding it with '=' keeps the stack verbatim.
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementAcceptsHyphenatedStack) {
+  auto input = TempDir() + "/font-replacement-stack.html";
+  auto output = TempDir() + "/font-replacement-stack.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style=\"font-family:-apple-system, LongCang;font-size:20px;"
+                          "font-weight:600\">A</span>"
+                          "</body></html>";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--html-source", "snapshot",
+                     "--font-replacement=-apple-system, LongCang", "600", "normal", "Target",
+                     "Bold", "--overwrite"}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+}
+
 // A zipped HTML export is extracted, imported from its index.html, and with `--fonts external` the
 // font file its @font-face names is published into the document's fonts directory, where the PAGX
 // references it by relative path instead of embedding glyphs. The reloaded document registers that

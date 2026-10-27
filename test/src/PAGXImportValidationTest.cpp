@@ -101,6 +101,8 @@ CLI_TEST(PAGXImportValidationTest, RejectsMalformedArgumentsWithSpecificDiagnost
       {{"a.html", "--output"}, "requires a value"},
       {{"a.html", "--output", ""}, "requires a value"},
       {{"a.html", "--output", "-file"}, "requires a value"},
+      {{"a.html", "--font-replacement="}, "requires a value"},
+      {{"a.html", "--render=1"}, "does not take a value"},
       {{"a.html", "-v", "--verbose"}, "duplicate option"},
       {{"a.html", "--images", "auto"}, "external or embed"},
       {{"a.html", "--format", "ppt"}, "html or svg"},
@@ -138,6 +140,29 @@ CLI_TEST(PAGXImportValidationTest, RejectsMalformedArgumentsWithSpecificDiagnost
       EXPECT_NE(error.find("invalid number"), std::string::npos) << error;
     }
   }
+}
+
+// A value bound with '=' is taken verbatim, so an option can carry text that starts with '-'
+// (a CSS font stack such as -apple-system) without the "./" path escape.
+CLI_TEST(PAGXImportValidationTest, InlineValueBindsTextVerbatim) {
+  ImportRequest options;
+  bool help = false;
+  std::string error;
+  ASSERT_TRUE(
+      ParseImportRequest({"a.html", "--font-replacement=-apple-system, 'system-ui', sans-serif",
+                          "400", "normal", "Target", "Bold"},
+                         &options, &help, &error))
+      << error;
+  ASSERT_EQ(options.formatOptions.fontReplacements.size(), 1u);
+  EXPECT_EQ(options.formatOptions.fontReplacements[0].families,
+            "-apple-system, 'system-ui', sans-serif");
+  EXPECT_FLOAT_EQ(options.formatOptions.fontReplacements[0].weight, 400);
+  EXPECT_EQ(options.formatOptions.fontReplacements[0].style, "normal");
+  EXPECT_EQ(options.formatOptions.fontReplacements[0].targetFamily, "Target");
+  EXPECT_EQ(options.formatOptions.fontReplacements[0].targetStyle, "Bold");
+  ASSERT_TRUE(ParseImportRequest({"a.html", "--output=-file.pagx"}, &options, &help, &error))
+      << error;
+  EXPECT_EQ(options.output, "-file.pagx");
 }
 
 CLI_TEST(PAGXImportValidationTest, SnapshotRejectsEveryBrowserOnlyOption) {

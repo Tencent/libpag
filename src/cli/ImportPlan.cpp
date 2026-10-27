@@ -74,6 +74,18 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
         positionalOnly = true;
         continue;
       }
+      // `--option=value` binds the value verbatim, so an option can carry text starting with '-'
+      // (a CSS font stack such as -apple-system) instead of relying on the "./" path escape.
+      std::string inlineValue;
+      bool hasInlineValue = false;
+      if (!positionalOnly && flag.size() > 2 && flag[0] == '-' &&
+          flag.find('=') != std::string::npos) {
+        auto separator = flag.find('=');
+        hasInlineValue = true;
+        inlineValue = flag.substr(separator + 1);
+        flag = flag.substr(0, separator);
+        Require(!inlineValue.empty(), flag + " requires a value");
+      }
       if (positionalOnly || flag.empty() || flag[0] != '-') {
         Require(o.input.empty(), "only one input may be specified");
         Require(!flag.empty(), "input must not be empty");
@@ -89,6 +101,10 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
           key != "--font-alias" && key != "--fallback")
         Require(seen.insert(key).second, "duplicate option: " + flag);
       auto value = [&]() {
+        if (hasInlineValue) {
+          hasInlineValue = false;
+          return inlineValue;
+        }
         Require(i + 1 < args.size() && !args[i + 1].empty() && args[i + 1][0] != '-',
                 flag + " requires a value (use ./ for paths starting with '-')");
         return args[++i];
@@ -209,6 +225,7 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
         } else
           throw std::runtime_error("unknown option: " + flag);
       }
+      Require(!hasInlineValue, flag + " does not take a value");
     }
     Require(o.input.empty() != o.batch.empty(), "specify one input or --batch <directory>");
     Require(o.output.empty() || o.outputDir.empty(),
@@ -409,7 +426,8 @@ std::string ImportUsage() {
        pagx import --batch <directory> --output-dir <directory> [options]
 
 Import SVG, HTML or web interaction states as PAGX. A .zip HTML export is extracted and its
-entry page is imported.
+entry page is imported. A value that starts with '-' needs './' when it is a path, or the
+--option=value form (--font-replacement=-apple-system, sans-serif 400 normal Target Bold).
 
   -o, --output <file>           One PAGX main file (default: <input-stem>.pagx)
   --output-dir <directory>      Result set, including manifest.json; exclusive with -o
