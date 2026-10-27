@@ -135,7 +135,7 @@ static std::shared_ptr<PAGAnimator> MakeANRAnimator(
 }
 
 static void RunANRAnimatorUpdate(PAGAnimator* animator) {
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
 }
 
 class ANRVideoDemuxer : public VideoDemuxer {
@@ -464,7 +464,7 @@ PAG_TEST(PAGANRRegressionTest, EndWaitsUntilFinalUpdateIsSubmitted) {
   EXPECT_EQ(updateEvents.size(), 1U);
   EXPECT_TRUE(animator->doAdvance().empty());
 
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
   ASSERT_TRUE(listener->waitForUpdateCount(1));
   std::vector<int> endEvents = {};
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
@@ -567,7 +567,7 @@ PAG_TEST(PAGANRRegressionTest, EndingUpdateStaysAsynchronousAfterSyncChange) {
   animator->isEnding = true;
   animator->setSync(true);
 
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
 
   ASSERT_TRUE(listener->waitForUpdateCount(1));
   EXPECT_NE(listener->firstUpdateThread(), callingThread);
@@ -620,7 +620,7 @@ PAG_TEST(PAGANRRegressionTest, TickerUpdateDuringAsyncFlushIsThrottled) {
   auto animator = MakeANRAnimator(listener);
   animator->_isRunning = true;
 
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
   ASSERT_TRUE(listener->waitForUpdateCount(1));
 
   // Ticker-driven updates arriving while the first flush is still running are dropped instead of
@@ -635,7 +635,7 @@ PAG_TEST(PAGANRRegressionTest, TickerUpdateDuringAsyncFlushIsThrottled) {
   EXPECT_EQ(listener->updateCount(), 1U);
 
   // The next ticker tick re-drives the flush once the previous task has exited.
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
   ASSERT_TRUE(listener->waitForUpdateCount(2));
   animator->cancel();
 }

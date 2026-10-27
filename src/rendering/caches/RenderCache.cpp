@@ -26,6 +26,7 @@
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
+#include "rendering/sequences/SequenceRetryPolicy.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -36,8 +37,6 @@ static constexpr int PURGEABLE_EXPIRED_FRAME = 10;
 static constexpr float SCALE_FACTOR_PRECISION = 0.001f;
 static constexpr float MIPMAP_ENABLED_THRESHOLD = 0.4f;
 static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
-static constexpr int64_t SEQUENCE_RETRY_INITIAL_DELAY = 100000;
-static constexpr int64_t SEQUENCE_RETRY_MAX_DELAY = 2000000;
 
 RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(stage) {
 }
@@ -670,9 +669,8 @@ bool RenderCache::canRetrySequence(ID uniqueID) {
 
 void RenderCache::recordSequenceFailure(ID uniqueID) {
   auto& state = sequenceFailureStates[uniqueID];
-  auto shift = std::min<uint32_t>(state.consecutiveFailures, 5);
+  auto delay = SequenceRetryDelay(state.consecutiveFailures);
   state.consecutiveFailures++;
-  auto delay = std::min<int64_t>(SEQUENCE_RETRY_INITIAL_DELAY << shift, SEQUENCE_RETRY_MAX_DELAY);
   state.retryAfterTime = tgfx::Clock::Now() + delay;
 }
 

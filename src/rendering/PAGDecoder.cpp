@@ -25,15 +25,12 @@
 #include "rendering/caches/DiskCache.h"
 #include "rendering/gpu/Devices.h"
 #include "rendering/layers/ContentVersion.h"
+#include "rendering/sequences/SequenceRetryPolicy.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LockGuard.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
-
-// Matches the ceiling of the sequence decode retry backoff in RenderCache, so that each retry of
-// a failed render actually re-attempts the decode instead of re-rendering without one.
-static constexpr int64_t FAILED_RENDER_RETRY_INTERVAL = 2000000;
 
 static std::string DefaultCacheKeyGeneratorFunc(PAGDecoder* decoder,
                                                 std::shared_ptr<PAGComposition> composition) {
@@ -224,19 +221,25 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
     // A failed render marks the whole decoder, not just the frame: the failing part is usually a
     // sequence decoder shared by every frame, and any frame rendered without it is incomplete.
     // Without the cooldown, looped playback would re-render every frame at full cost on every
-    // pass and keep the CPU/GPU continuously busy (issue #3738).
+    // pass and keep the CPU/GPU continuously busy (issue #3738). The cooldown uses the same
+    // graduated backoff as RenderCache (SequenceRetryDelay): it starts short so a transient
+    // decode failure (for example an iOS background fallback) recovers on the next retry instead
+    // of freezing for the full ceiling, and escalates toward the ceiling only for persistent
+    // failures, keeping the two layers aligned so each retry actually re-attempts the decode.
     if (tgfx::Clock::Now() < failedRenderRetryTime) {
       return false;
     }
     success = renderFrame(composition, index, bitmap);
     if (success) {
       failedRenderRetryTime = 0;
+      failedRenderCount = 0;
       success = sequenceFile->writeFrame(index, bitmap);
       if (!success) {
         LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
     } else {
-      failedRenderRetryTime = tgfx::Clock::Now() + FAILED_RENDER_RETRY_INTERVAL;
+      failedRenderRetryTime = tgfx::Clock::Now() + SequenceRetryDelay(failedRenderCount);
+      failedRenderCount++;
     }
   }
   if (sequenceFile->isComplete() && composition != nullptr) {
@@ -315,6 +318,7 @@ void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composit
   lastContentVersion = contentVersion;
   lastReadIndex = -1;
   failedRenderRetryTime = 0;
+  failedRenderCount = 0;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   _numFrames = result.first;
   _frameRate = result.second;

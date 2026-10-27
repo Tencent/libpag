@@ -308,7 +308,7 @@ void PAGAnimator::update() {
     }
   }
   if (updateTask == nullptr) {
-    doUpdate(false);
+    doUpdate(false, false);
     return;
   }
   SubmitAnimatorUpdateTask(std::move(updateTask));
@@ -403,7 +403,7 @@ void PAGAnimator::advance() {
         listener->onAnimationRepeat(this);
         break;
       case AnimationTypeUpdate:
-        doUpdate(true);
+        doUpdate(true, true);
       default:
         break;
     }
@@ -455,7 +455,7 @@ std::vector<int> PAGAnimator::doAdvance() {
   return {AnimationTypeUpdate};
 }
 
-void PAGAnimator::doUpdate(bool setStartTime) {
+void PAGAnimator::doUpdate(bool setStartTime, bool fromTicker) {
   std::shared_ptr<AnimatorUpdateTask> updateTask = nullptr;
   bool shouldFlushSynchronously = false;
   {
@@ -467,6 +467,11 @@ void PAGAnimator::doUpdate(bool setStartTime) {
           // keeps the end event from waiting for another vsync cycle.
           asyncUpdateRequested = true;
           endingUpdatePending = false;
+        } else if (!fromTicker) {
+          // A manual update() must still be merged into the running flush so the latest progress
+          // is rendered once the current flush finishes, honoring the documented update() merge
+          // contract even when a stuck async task kept the previous flush alive past its timeout.
+          asyncUpdateRequested = true;
         }
         // Ticker-driven updates arriving while a flush is still running are dropped instead of
         // being merged into an immediate re-flush: merging made the task re-flush back-to-back

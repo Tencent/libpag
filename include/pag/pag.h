@@ -1664,6 +1664,7 @@ class PAG_API PAGDecoder {
   std::shared_ptr<CompositionReader> reader = nullptr;
   std::vector<TimeRange> staticTimeRanges = {};
   int64_t failedRenderRetryTime = 0;
+  uint32_t failedRenderCount = 0;
   std::function<std::string(PAGDecoder*, std::shared_ptr<PAGComposition>)> cacheKeyGeneratorFun =
       nullptr;
 

@@ -185,7 +185,7 @@ class PAGAnimator {
   void extractAndWaitTask(std::unique_lock<std::mutex>& lock);
   void advance();
   std::vector<int> doAdvance();
-  void doUpdate(bool setStartTime);
+  void doUpdate(bool setStartTime, bool fromTicker);
   void onAsyncFlush(AnimatorUpdateTask* currentTask, bool setStartTime);
   void onFlush(bool setStartTime);
   void startAnimation();
