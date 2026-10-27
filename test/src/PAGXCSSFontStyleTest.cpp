@@ -22,6 +22,13 @@
 
 namespace pag {
 
+CLI_TEST(PAGXCSSFontStyleTest, EscapedFamilyNamesRetainCommasQuotesAndBackslashes) {
+  auto families = pagx::ParseCSSFontFamilyList(
+      R"CSS( Vendor\, Name , 'Single\'Quote', "Double\"Quote", Back\\Slash, sans-serif )CSS");
+  EXPECT_EQ(families, (std::vector<std::string>{"Vendor, Name", "Single'Quote", "Double\"Quote",
+                                                "Back\\Slash", "sans-serif"}));
+}
+
 CLI_TEST(PAGXCSSFontStyleTest, MissingFamiliesDoNotAcceptPlatformSubstitutions) {
   for (const auto* family : {"", "PAGX Missing Font 5d481d18"}) {
     EXPECT_EQ(pagx::SystemFonts::ResolveTypeface(family, ""), nullptr);

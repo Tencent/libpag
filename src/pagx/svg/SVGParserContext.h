@@ -96,6 +96,17 @@ struct InheritedStyle {
   std::string textAnchor = {};     // Empty means not set (start/middle/end).
 };
 
+struct SVGTextRun {
+  std::string text = {};
+  InheritedStyle style = {};
+  std::shared_ptr<DOMNode> element = nullptr;
+  std::shared_ptr<DOMNode> path = nullptr;
+  float x = NAN;
+  float y = NAN;
+  float dx = 0;
+  float dy = 0;
+};
+
 /**
  * Internal SVG parser implementation using expat-based XML DOM parsing.
  */
@@ -133,6 +144,10 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  void collectTextRuns(const std::shared_ptr<DOMNode>& element, SVGTextRun& pending,
+                       const InheritedStyle& style, const std::shared_ptr<DOMNode>& path,
+                       std::vector<SVGTextRun>& runs, bool& previousSpace, int depth = 0);
+  Text* makeTextRun(const SVGTextRun& run);
   TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);

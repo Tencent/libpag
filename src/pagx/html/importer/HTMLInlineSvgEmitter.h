@@ -26,6 +26,7 @@ namespace pagx {
 
 struct DOMNode;
 struct Color;
+struct HTMLInheritedStyle;
 class HTMLValueParser;
 
 /**
@@ -84,6 +85,8 @@ class HTMLInlineSvgEmitter {
    * not inherit, so only the root's own value is stripped — descendants keep their opacity.
    */
   void stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot);
+  // Preserve inherited HTML typography at the boundary of the standalone SVG import.
+  void inheritTextStyle(const std::shared_ptr<DOMNode>& svgRoot, const HTMLInheritedStyle& style);
 
   /**
    * Rewrites the exporter's conic-gradient-stroke workaround back into native stroked shapes.
