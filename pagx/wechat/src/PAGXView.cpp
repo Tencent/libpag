@@ -1678,13 +1678,13 @@ bool PAGXView::draw() {
     }
     // Wrap the surface so pagx::Record() renders into the same GL framebuffer. Recreated in
     // lockstep with `surface` so the wrapper never points at a stale render target.
-    pagSurface = pagx::MakeFrom(surface);
+    pagSurface = pagx::MakeFrom(device, surface);
   } else if (pagSurface == nullptr) {
     // `surface` survived (same-size reload), so the surface-recreation branch above did not run,
     // but the wrapper may have been dropped independently (e.g. by parsePAGX during a page switch).
     // Re-wrap the still-valid surface: Record() requires a non-null PAGSurface, so without this the
     // freshly built scene would never be submitted and the new document would never appear.
-    pagSurface = pagx::MakeFrom(surface);
+    pagSurface = pagx::MakeFrom(device, surface);
   }
   if constexpr (DRAW_LOG_ENABLED) {
     surfaceMs = emscripten_get_now() - surfaceStartMs;
@@ -1988,7 +1988,7 @@ void PAGXView::captureFitSnapshot(tgfx::Context* context) {
   if (offscreen == nullptr) {
     return;
   }
-  auto offPagSurface = pagx::MakeFrom(offscreen);
+  auto offPagSurface = pagx::MakeFrom(device, offscreen);
   if (offPagSurface == nullptr) {
     return;
   }

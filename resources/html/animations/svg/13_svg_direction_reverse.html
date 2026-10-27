@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG direction - reverse</title>
+    <style>
+      @keyframes rise {
+        0%   { opacity: 0.2; transform: translateY(0px); }
+        100% { opacity: 1; transform: translateY(-110px); }
+      }
+    </style>
+  </head>
+  <body style="width: 180px; height: 200px; background-color: #2E1065;">
+    <!-- direction: reverse → 反转关键帧顺序 (§13.3)，火箭由上向下回落播放 -->
+    <div id="rocket"
+         style="position: absolute; left: 66px; top: 140px; width: 48px; height: 48px;
+                animation: rise 1.6s ease-in infinite reverse;">
+      <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2c3.5 2 5 6 5 10l-2.5 2h-5L7 12c0-4 1.5-8 5-10z" fill="#F0ABFC"/>
+        <circle cx="12" cy="9" r="1.8" fill="#2E1065"/>
+        <path d="M10 16l-1 4M14 16l1 4M12 16v5" stroke="#FB923C" stroke-width="1.6"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+  </body>
+</html>

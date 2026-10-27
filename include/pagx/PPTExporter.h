@@ -118,6 +118,8 @@ struct PPTExportOptions {
  * the whole deck. Later documents keep their native coordinates; content outside the first
  * document's canvas is clipped rather than scaled. A structurally valid document with no visible
  * content intentionally produces a blank slide.
+ * GPU locking: callers must not hold the same GPU device's context lock while calling export
+ * methods. The exporter acquires and releases device locks internally when rasterizing assets.
  */
 class PPTExporter {
  public:

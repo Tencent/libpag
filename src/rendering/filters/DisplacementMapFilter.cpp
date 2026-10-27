@@ -148,7 +148,7 @@ std::string DisplacementMapFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> DisplacementMapFilter::uniformBlocks() const {
-  return {{"FilterUniforms", 0}};
+  return {{"FilterUniforms", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 std::vector<tgfx::BindingEntry> DisplacementMapFilter::textureSamplers() const {

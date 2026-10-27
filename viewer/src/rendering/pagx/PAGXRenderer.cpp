@@ -113,7 +113,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   }
 
   auto renderStart = tgfx::Clock::Now();
-  auto pagSurface = pagx::MakeFrom(tgfxSurface);
+  auto pagSurface = pagx::MakeFrom(device, tgfxSurface);
   if (pagSurface == nullptr) {
     device->unlock();
     return metrics;

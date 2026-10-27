@@ -21,7 +21,6 @@
 #include <memory>
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Device.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -41,10 +40,12 @@ class Drawable {
   virtual ~Drawable() = default;
 
   /**
-   * Creates a Drawable that takes ownership of the given tgfx::Surface. The surface is returned
-   * from getSurface() and kept alive for the lifetime of the Drawable.
+   * Creates a Drawable that renders into the given tgfx::Surface on the given tgfx::Device. The
+   * device must be the one the surface was created from. Both are kept alive for the lifetime of
+   * the Drawable. Returns nullptr if either is null or the surface belongs to a different device.
    */
-  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface);
+  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Device> device,
+                                            std::shared_ptr<tgfx::Surface> surface);
 
   virtual int width() const {
     return surface ? surface->width() : 0;
@@ -54,15 +55,12 @@ class Drawable {
   }
 
   virtual std::shared_ptr<tgfx::Device> getDevice() {
-    return tgfx::GLDevice::Current();
+    return device;
   }
 
   virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {
-    // A surface created from a specific context cannot be used with a different one. Without this
-    // guard, a PAGSurface built via pagx::MakeFrom(tgfx::Surface) would silently hand its surface
-    // to whichever context PAGScene::draw() happens to lock, even if that context belongs to a
-    // different device. Callers that need cross-device rendering should use pagx::Record() with
-    // the matching context instead.
+    // A surface wrapped by pagx::MakeFrom(device, surface) must only be used with its original
+    // context, including when pagx::Record() is called with a caller-supplied context.
     if (surface && context != nullptr && surface->getContext() != context) {
       return nullptr;
     }
@@ -79,9 +77,11 @@ class Drawable {
 
  protected:
   Drawable() = default;
-  explicit Drawable(std::shared_ptr<tgfx::Surface> surface) : surface(std::move(surface)) {
+  Drawable(std::shared_ptr<tgfx::Device> device, std::shared_ptr<tgfx::Surface> surface)
+      : device(std::move(device)), surface(std::move(surface)) {
   }
 
+  std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 };
 

@@ -16,12 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGView.h"
+
+#include <mutex>
+
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
-#import "platform/ios/private/GPUDrawable.h"
+#include "platform/cocoa/private/PAGViewSurface.h"
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -63,16 +69,13 @@
                                            selector:@selector(applicationDidReceiveMemoryWarning:)
                                                name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(AsyncSurfacePrepared:)
-                                               name:pag::AsyncSurfacePreparedNotification
-                                             object:self.layer];
+  pag::cocoa::PAGViewSurface::ObserveSurfacePrepared(self, @selector(onAsyncSurfacePrepared:));
 }
 
 - (void)dealloc {
   [animator cancel];
   {
-    std::lock_guard<std::mutex> autoLock(lock);
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
     [pagPlayer release];
     pagPlayer = nil;
     [pagSurface release];
@@ -87,28 +90,31 @@
 }
 
 + (Class)layerClass {
-  return [CAEAGLLayer class];
+  return pag::cocoa::PAGViewSurface::LayerClass();
+}
+
+- (void)refreshSurfaceSize {
+  if (pagSurface == nil) {
+    return;
+  }
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
+  pag::cocoa::PAGViewSurface::UpdateSize(self, pagSurface);
 }
 
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // UIView updates its bounds from within setFrame:, so frame, autoresizing and Auto Layout
+  // driven resizes all land here. Overriding setFrame: as well would run the whole update — and
+  // take the lock — twice for a single resize.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-    [pagSurface updateSize];
-    if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-      [animator update];
-    }
-  }
-}
-
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+    bool fromZero = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
+    [self refreshSurfaceSize];
+    // [animator update] must stay outside the lock refreshSurfaceSize takes: in sync mode it
+    // re-enters onAnimationFlush: on the same thread, which acquires the same non-recursive
+    // mutex and would deadlock.
+    if (fromZero) {
       [animator update];
     }
   }
@@ -117,13 +123,17 @@
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
-  if (pagSurface != nil && oldScaleFactor != scaleFactor) {
-    [pagSurface updateSize];
+  if (oldScaleFactor != scaleFactor) {
+    [self refreshSurfaceSize];
   }
 }
 
 - (void)didMoveToWindow {
   [super didMoveToWindow];
+  if (self.window != nil) {
+    auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
+    pag::cocoa::PAGViewSurface::UpdateWindowSize(self, pagSurface);
+  }
   [self checkVisible];
 }
 
@@ -154,8 +164,7 @@
 }
 
 - (void)initPAGSurface {
-  CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
-  pagSurface = [[PAGSurface FromLayer:layer] retain];
+  pagSurface = [pag::cocoa::PAGViewSurface::CreateSurface(self) retain];
   [pagPlayer setSurface:pagSurface];
   [animator update];
 }
@@ -210,7 +219,7 @@
 }
 
 - (void)onAnimationFlush:(double)progress {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (pagPlayer == nil) {
     return;
   }
@@ -255,12 +264,12 @@
 }
 
 - (NSString*)getPath {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
 - (BOOL)setPath:(NSString*)path {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -272,7 +281,7 @@
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -292,7 +301,7 @@
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
-  std::lock_guard<std::mutex> autoLock(lock);
+  auto autoLock = pag::cocoa::PAGViewSurface::Lock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -421,7 +430,7 @@
   return CGRectNull;
 }
 
-- (void)AsyncSurfacePrepared:(NSNotification*)notification {
+- (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
 @end

@@ -10,14 +10,16 @@ alwaysApply: true
 ```bash
 ./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest
+cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ```
 
 ## 测试框架
 
 - 测试用例位于 `test/src/`，基于 Google Test 框架
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
-- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest`
+- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest_OpenGL`；Metal 配置执行 `PAGFullTest_Metal`
+- 基线缓存按后端隔离到 `test/baseline/.cache/{backend}/`，其中 `{backend}` 为 `opengl`、`opengl-swiftshader` 或 `metal`
+- 版本台账 `test/baseline/version.json` 和截图输出目录 `test/out/` 保持共享，不要在同一工作区并行运行不同后端
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
 - 测试用例构造时，所有字号、坐标、矩阵等数值尽可能使用整数，避免小数点，以确保清晰度
 
@@ -25,13 +27,29 @@ cmake --build cmake-build-debug --target PAGFullTest
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `PAGSurfaceTest/Mask`
 - 截图输出到 `test/out/{folder}/{name}.webp`，基准图为同目录下 `{name}_base.webp`
-- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地）中同一 key 的版本号
+- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/{backend}/version.json`（本地）中同一 key 的版本号
     - 两边 key 都存在且版本号不同：跳过比较并返回成功（用于接受截图变更）
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
+- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline_{Backend}` target（包括 `UpdateBaseline_OpenGL`、`UpdateBaseline_Metal`）、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
 - 接受截图基准变更的**唯一方式**是用户主动执行 `/accept-baseline` 斜杠命令
+
+### Metal 截图基线过渡状态
+
+**Metal 截图基准未接受，7 例会失败。** 以下截图 key 尚未纳入 `test/baseline/version.json`：
+
+- `PAGBlendMetalTest/CopyDstTexture`
+- `PAGBlendMetalTest/TextureBottomLeft`
+- `PAGBlendMetalTest/BothBottomLeft`
+- `PAGSurfaceMetalTest/Mask`
+- `PAGSurfaceMetalTest/BottomLeftScissor`
+- `PAGXRuntimeTest/MetalPAGSurfaceFromBackendTexture`
+- `PAGXRuntimeTest/MetalPAGSurfaceFromBackendRenderTarget`
+
+正常运行到这些截图比较时，缺少基线 key 会使 `Baseline::Compare()` 返回失败，`PAGFullTest_Metal` 因此返回非零；这 7 例不是完整 Metal 测试中所有潜在失败的清单。现有 Metal CI 只做编译，不运行截图测试，CI 通过不代表这些基线已建立。
+
+当前保留测试及比较逻辑，不自动跳过缺失基线。后续独立 PR 将通过 `/accept-baseline` 流程审核并接受这 7 个截图基线，再运行 `PAGFullTest_Metal` 核验并移除本过渡说明。
 
 ## HTML 测试集（浏览器保真度评测）
 
@@ -69,5 +87,5 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DTGFX_DIR=../tgfx -B cmake-build-debuglocal
-cmake --build cmake-build-debuglocal --target PAGFullTest
+cmake --build cmake-build-debuglocal --target PAGFullTest_OpenGL
 ```
