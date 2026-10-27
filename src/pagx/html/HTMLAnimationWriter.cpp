@@ -474,8 +474,8 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
   return std::string::npos;
 }
 
-// The SVG viewport is sized for the static paint, but an animated shape can paint beyond it (for
-// example a stroke animated wider than its static width), which the viewport would clip. Lifts the
+// The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
+// extent (a stroke animated wider than its static width) would be clipped by the viewport. Lifts the
 // clipping on the <svg> hosting the animated tag at `tagStart` while keeping its viewport size.
 void LiftEnclosingSvgClip(std::string& bodyHtml, size_t tagStart) {
   size_t svgStart = FindEnclosingSvgStart(bodyHtml, tagStart);
@@ -509,9 +509,11 @@ void LiftEnclosingSvgClip(std::string& bodyHtml, size_t tagStart) {
 }
 
 // Injects `animation` declaration (and optional extra style properties such as
-// `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`.
+// `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`. When `liftSvgClip`
+// is set, also lifts the viewport clipping of the <svg> hosting that tag.
 bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
-                               const std::string& animDecl, bool needsZeroTransformOrigin) {
+                               const std::string& animDecl, bool needsZeroTransformOrigin,
+                               bool liftSvgClip) {
   size_t tagStart = 0;
   size_t tagEnd = 0;
   std::string tagName;
@@ -520,6 +522,7 @@ bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
   }
   std::string tagStr = bodyHtml.substr(tagStart, tagEnd - tagStart);
   size_t stylePos = tagStr.find(" style=\"");
+  bool styleWoven = false;
   if (stylePos != std::string::npos) {
     size_t valStart = stylePos + 8;
     size_t valEnd = tagStr.find('"', valStart);
@@ -536,24 +539,26 @@ bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
       }
       styleVal += "animation:" + animDecl;
       tagStr.replace(valStart, valEnd - valStart, styleVal);
-      bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
-      LiftEnclosingSvgClip(bodyHtml, tagStart);
-      return true;
+      styleWoven = true;
     }
   }
-  // No existing style="..." attribute on the tag (e.g. SVG <path/>). Insert one before `/>` or `>`.
-  std::string newStyle = " style=\"";
-  if (needsZeroTransformOrigin) {
-    newStyle += "transform-origin:0 0;";
+  if (!styleWoven) {
+    // No existing style="..." attribute on the tag (e.g. SVG <path/>). Insert one before `/>`/`>`.
+    std::string newStyle = " style=\"";
+    if (needsZeroTransformOrigin) {
+      newStyle += "transform-origin:0 0;";
+    }
+    newStyle += "animation:" + animDecl + "\"";
+    size_t insertPos = tagStr.size() - 1;
+    if (insertPos > 0 && tagStr[insertPos - 1] == '/') {
+      insertPos -= 1;
+    }
+    tagStr.insert(insertPos, newStyle);
   }
-  newStyle += "animation:" + animDecl + "\"";
-  size_t insertPos = tagStr.size() - 1;
-  if (insertPos > 0 && tagStr[insertPos - 1] == '/') {
-    insertPos -= 1;
-  }
-  tagStr.insert(insertPos, newStyle);
   bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
-  LiftEnclosingSvgClip(bodyHtml, tagStart);
+  if (liftSvgClip) {
+    LiftEnclosingSvgClip(bodyHtml, tagStart);
+  }
   return true;
 }
 
@@ -1380,6 +1385,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   std::vector<std::string> elementIdOrder = {};
   std::unordered_map<std::string, std::vector<std::string>> elementAnimDecls = {};
   std::unordered_map<std::string, bool> elementNeedsZeroOrigin = {};
+  std::unordered_map<std::string, bool> elementLiftsSvgClip = {};
 
   for (auto* animNode : _doc.animations) {
     if (animNode == nullptr || animNode->nodeType() != NodeType::Animation) {
@@ -1448,6 +1454,13 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           elementNeedsZeroOrigin[element.id] = true;
         }
       }
+      // Of the paint written onto SVG shapes, only the stroke width changes the painted extent;
+      // color, opacity and dash offset stay inside the viewport sized for the static paint.
+      if (chSet.strokeWidthCh != nullptr) {
+        for (const auto& element : elements) {
+          elementLiftsSvgClip[element.id] = true;
+        }
+      }
     }
   }
 
@@ -1460,7 +1473,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       combined += decls[i];
     }
-    WeaveStyleIntoElementById(bodyHtml, elementId, combined, elementNeedsZeroOrigin[elementId]);
+    WeaveStyleIntoElementById(bodyHtml, elementId, combined, elementNeedsZeroOrigin[elementId],
+                              elementLiftsSvgClip[elementId]);
   }
 
   return keyframesCss;
