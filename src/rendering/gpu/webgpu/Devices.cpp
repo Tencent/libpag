@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/gpu/Devices.h"
-
-#if defined(TGFX_USE_WEBGPU)
-
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 
 namespace pag {
@@ -102,5 +99,3 @@ std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
 }
 
 }  // namespace pag
-
-#endif  // TGFX_USE_WEBGPU
