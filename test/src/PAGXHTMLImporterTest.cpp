@@ -28,6 +28,7 @@
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLImporter.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGXDocument.h"
@@ -78,6 +79,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/xml/XMLDOM.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/layers/Layer.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -7563,6 +7566,65 @@ PAG_TEST(PAGXHTMLImporterTest,
   ASSERT_EQ(last->keyframes.size(), 2u);
   EXPECT_EQ(last->keyframes.front().time, 27);
   EXPECT_EQ(last->keyframes.back().time, 93);
+}
+
+// Plays a staggered infinite group through the runtime to pin the trade-off documented in
+// spec/html_subset.md §13 (animation-delay): delayed members play to their last keyframe instead of
+// being truncated, the undelayed member holds its last value across the shared tail on every pass
+// (an intended pause, not a bug), the stagger stays aligned one full period later, and the
+// replayed delay is reported once per delayed element.
+PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteDelayPlaysDelayedMembersToTheEnd) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="a" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear infinite both"></div>
+      <div id="b" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.5s infinite both"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Animation*>(doc->animations.front())->duration, 90);
+  size_t replayedWarnings = 0;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-delay-replayed") != std::string::npos) replayedWarnings++;
+  }
+  EXPECT_EQ(replayedWarnings, 1u);
+
+  // Play the exported XML, as `pagx import` writes it, so the shared duration also survives the
+  // export round trip.
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  ASSERT_EQ(reloaded->animations.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Animation*>(reloaded->animations.front())->duration, 90);
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_NE(scene, nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_NE(timeline, nullptr);
+  auto* binding = scene->rootComposition()->binding.get();
+  ASSERT_NE(binding, nullptr);
+  auto a = binding->get<tgfx::Layer>(reloaded->findNode<pagx::Layer>("a"));
+  auto b = binding->get<tgfx::Layer>(reloaded->findNode<pagx::Layer>("b"));
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+
+  // Frame 75 (75 * 1'000'000 / 60 us). `b` runs 30 -> 90, so it is 45 / 60 of the way through;
+  // before the fix the 60-frame window wrapped to frame 15 and `b` never got past its first value.
+  timeline->advanceAndApply(1'250'000);
+  EXPECT_NEAR(b->alpha(), 45.0f / 60.0f, 1e-2f);
+  // `a` finished at frame 60 and holds its last value until the shared window ends at frame 90.
+  EXPECT_NEAR(a->alpha(), 1.0f, 1e-2f);
+
+  // One full period (90 frames) later both members are back at the same phase.
+  timeline->advanceAndApply(1'500'000);
+  EXPECT_NEAR(b->alpha(), 45.0f / 60.0f, 1e-2f);
+  EXPECT_NEAR(a->alpha(), 1.0f, 1e-2f);
 }
 
 // Infinite animations are grouped by cycle length (the CSS animation-duration) and loop mode, not by

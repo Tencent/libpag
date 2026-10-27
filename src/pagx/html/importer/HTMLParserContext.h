@@ -251,14 +251,19 @@ class HTMLParserContext {
   // Post-tree animation coalescing: `HTMLAnimationBuilder` emits one `Animation` per animated
   // element (each driving a single element's channels), so a page that animates many siblings
   // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
-  // The runtime plays every top-level animation, so this is only a structural verbosity — but a
-  // single timeline is easier to read, edit, and drive. Merge animations that share the same
-  // timing into one `Animation` (their objects concatenated): Once animations by `duration` /
-  // `frameRate` / `loop`; infinite animations by CSS cycle length / `frameRate` / `loop`, with the
-  // merged duration extended to the latest `delay + cycle` so delayed members are not truncated.
-  // Animations with different lengths or loop behaviour (some `once`, some infinite) stay in
-  // separate `Animation` nodes so they are never forced onto a mismatched shared timeline. Runs
-  // after both animation build passes.
+  // A single timeline is easier to read, edit, and drive, so animations that share the same timing
+  // are merged into one `Animation` (their objects concatenated): Once animations by `duration` /
+  // `frameRate` / `loop`; infinite animations by CSS cycle length / `frameRate` / `loop`.
+  //
+  // For infinite animations the merge is not just structural: it decides each member's period.
+  // The merged duration is the latest `delay + cycle` in the group, and all members share one
+  // playhead, so every member pauses for its own delay at the head and for `maxDelay - delay` at
+  // the tail of every pass (a still share of `maxDelay / (maxDelay + cycle)` per member, including
+  // members without a delay). This deliberately keeps a staggered group aligned on every pass at
+  // the cost of a longer period than CSS; splitting members into separate Animations would keep
+  // undelayed members seamless but let the stagger drift apart over time. Animations with
+  // different cycle lengths or loop behaviour stay in separate `Animation` nodes. Runs after both
+  // animation build passes.
   void coalesceAnimations();
 
   // Wraps multiple independent top-level animations in one parallel StateMachine so hosts that

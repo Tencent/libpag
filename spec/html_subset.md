@@ -566,16 +566,33 @@ timeline emit a channel.
   `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
   and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
 - `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
-  are clamped to 0. `Animation.duration` always ends at `delay + duration`, so delayed keyframes
-  are never truncated. For looping animations the delay is replayed as a pause on every pass
-  (CSS applies it to the first iteration only). Looping animations with the same cycle length and
-  loop mode share one `Animation` whose duration is the latest `delay + duration` among them, so a
-  staggered group keeps its offsets aligned on every pass.
+  are clamped to 0. `Animation.duration` is the end of the playback window (which always starts at
+  frame 0), so it covers at least `delay + duration` and delayed keyframes are never truncated.
+  - **Looping animations (deliberate trade-off).** CSS applies the delay to the first iteration
+    only and then loops seamlessly. A PAGX `Animation` repeats its whole `[0, duration]` window,
+    so the importer replays the delay as a pause on every pass and warns with
+    `subset:animation-delay-replayed`. Seamless looping would require either a first-iteration
+    offset in the PAGX model or keyframes rotated by the delay and split at the cycle seam; both
+    are rejected so the imported keyframes stay a plain, editable offset of the CSS `@keyframes`.
+  - **Staggered groups.** Looping animations with the same cycle length and loop mode share one
+    `Animation` whose duration is the latest `delay + duration` among them, so the stagger stays
+    aligned on every pass. All members share one playhead, which has these visible consequences:
+    - every member pauses for its own delay at the head and for `maxDelay - delay` at the tail of
+      every pass, so each member is still for `maxDelay / (maxDelay + duration)` of the period —
+      including members without a delay;
+    - the period grows from `duration` to `maxDelay + duration` (`pingPong` round trips become
+      `2 × (maxDelay + duration)`), slower than the browser;
+    - at the window ends (the `pingPong` turning points and the loop seam) all members reach
+      their extreme values at the same time, so the stagger collapses there.
+    - Example: four bars with a `1.1s` (66-frame) `alternate` cycle staggered by `0.15s` (9
+      frames) share `duration="93"`. The undelayed bar holds its last value for 27 frames per
+      pass, and a round trip takes 186 frames instead of the browser's 132.
 - `animation-fill-mode`: `none` (default) shows the element's non-animated baseline before the
   delay elapses and after a `once` animation ends; `forwards` holds the final keyframe past the
   end; `backwards` shows the first keyframe during the delay; `both` combines the two. Implemented
   by injecting baseline `hold` keyframes at the boundaries (`Loop` / `PingPong` have no "after"
-  region, so only the leading baseline applies there).
+  region, so only the leading baseline applies there). Because looping animations replay the
+  delay, the leading baseline also reappears on every pass under `none` / `forwards`.
 
 ### 13.4 Resulting PAGX
 
@@ -632,4 +649,5 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | `subset:animation-filter-approximated` | animated `brightness()` is mapped to opacity and values above 1 are clamped |
 | `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
 | `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
+| `subset:animation-delay-replayed` | an infinite animation has a positive `animation-delay`; the delay is replayed as a pause on every cycle instead of only before the first iteration |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |

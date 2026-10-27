@@ -100,6 +100,7 @@ class HTMLAnimationBuilder {
  private:
   void setAnimationTiming(Animation* animation, LoopMode loopMode, long long durationFrames,
                           long long delayFrames, bool needsTrailingBaseline);
+  void addAnimation(Animation* animation);
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;

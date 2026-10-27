@@ -1005,16 +1005,30 @@ void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loo
   animation->loop = loopMode;
   // Keyframes are shifted by delayFrames, so the playback window (which always starts at frame 0)
   // must end at `delay + duration` for every loop mode; a shorter window wraps before the delayed
-  // keyframes finish. For Loop / PingPong the delay is therefore replayed as a pause on every pass
-  // instead of only before the first iteration as in CSS: the PAGX timeline has no first-iteration
-  // offset, and a plain keyframe offset stays readable and editable for animators. Once extends by
-  // one more frame when fill-mode requires a trailing baseline sample, because LoopMode::Once
-  // clamps currentTime to `animation->duration` once playback ends.
+  // keyframes finish. Once extends by one more frame when fill-mode requires a trailing baseline
+  // sample, because LoopMode::Once clamps currentTime to `animation->duration` once playback ends.
+  //
+  // Deliberate trade-off for Loop / PingPong: CSS delays only the first iteration and then loops
+  // seamlessly, but a PAGX Animation repeats its whole [0, duration] window, so the delay is
+  // replayed as a pause on every pass. Seamless looping would need either a first-iteration offset
+  // in the PAGX model or keyframes rotated by the delay and split at the cycle seam. Both were
+  // rejected: the imported keyframes must stay a plain, readable offset of the CSS @keyframes that
+  // animators can edit on the canvas. A visible pause is acceptable there; truncation is not.
   bool loopOnce = (loopMode == LoopMode::Once);
   animation->duration =
       static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
   if (!loopOnce) {
     _loopCycleFrames[animation] = static_cast<Frame>(durationFrames);
+  }
+}
+
+void HTMLAnimationBuilder::addAnimation(Animation* animation) {
+  _document->animations.push_back(animation);
+  auto it = _loopCycleFrames.find(animation);
+  if (it != _loopCycleFrames.end() && animation->duration > it->second) {
+    _diagnostics.warn(
+        "html: animation-delay on an infinite animation is replayed as a pause on every cycle "
+        "instead of only before the first iteration [subset:animation-delay-replayed]");
   }
 }
 
@@ -1861,7 +1875,7 @@ bool HTMLAnimationBuilder::buildForElement(
   if (animation->objects.empty()) {
     return false;
   }
-  _document->animations.push_back(animation);
+  addAnimation(animation);
   return true;
 }
 
@@ -2233,7 +2247,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
 
     if (animation->objects.empty()) continue;
-    _document->animations.push_back(animation);
+    addAnimation(animation);
     builtAny = true;
   }
   return builtAny;

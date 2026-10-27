@@ -513,14 +513,26 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   `alternate` 无法表达，被降级为 `once` 并告警 `subset:animation-finite-count`）；`reverse` /
   `alternate-reverse` 会同时反转关键帧顺序与缓动（`ease-in` 变 `ease-out`，step 的 jump 互换）；
   `normal` 保持原序。
-- `animation-delay`：正延迟把每个关键帧时间前移；负延迟告警并钳制为 0。`Animation.duration` 始终
-  结束于 `delay + duration`，因此带延迟的关键帧不会被截断。对于循环动画，延迟在每个周期都会作为停顿
-  重放（CSS 只作用于第一次迭代）。循环周期与循环模式相同的循环动画共用一个 `Animation`，其时长取组内
-  最晚的 `delay + duration`，使错峰排列在每个周期都保持对齐。
+- `animation-delay`：正延迟把每个关键帧时间前移；负延迟告警并钳制为 0。`Animation.duration` 是播放
+  窗口的终点（起点始终为第 0 帧），因此至少覆盖到 `delay + duration`，带延迟的关键帧不会被截断。
+  - **循环动画（有意的取舍）。** CSS 只在第一次迭代前应用延迟，之后无缝循环；PAGX 的 `Animation`
+    每次重复整个 `[0, duration]` 窗口，因此导入器在每个周期都把延迟作为停顿重放，并告警
+    `subset:animation-delay-replayed`。无缝循环需要在 PAGX 模型中引入"仅首轮"的起始偏移，或把关键帧
+    按延迟做相位旋转并在周期接缝处拆分；两者都被否决，以保证导入后的关键帧仍是 CSS `@keyframes` 的
+    简单平移，方便动画师在画布上编辑。
+  - **错峰分组。** 循环周期与循环模式相同的循环动画共用一个 `Animation`，其时长取组内最晚的
+    `delay + duration`，使错峰排列在每个周期都保持对齐。所有成员共用一个播放头，会带来以下可见后果：
+    - 每个成员在每个周期的开头停顿自身的延迟、结尾停顿 `maxDelay - delay`，因此每个成员都有
+      `maxDelay / (maxDelay + duration)` 的时间处于静止，没有延迟的成员也一样；
+    - 周期从 `duration` 变为 `maxDelay + duration`（`pingPong` 的一个来回变为
+      `2 × (maxDelay + duration)`），比浏览器慢；
+    - 在窗口两端（`pingPong` 的折返点与循环接缝处），所有成员同时到达极值，错峰在这些位置消失。
+    - 示例：四根周期为 `1.1s`（66 帧）、`alternate`、依次错开 `0.15s`（9 帧）的条形共用
+      `duration="93"`。没有延迟的那根每个周期在末值停住 27 帧；一个来回需要 186 帧，浏览器中为 132 帧。
 - `animation-fill-mode`：`none`（默认）在延迟结束前以及 `once` 动画结束后显示元素的非动画基线值；
   `forwards` 在结束后保持最后一个关键帧；`backwards` 在延迟期间显示第一个关键帧；`both` 两者兼有。
   通过在边界注入基线 `hold` 关键帧实现（`Loop` / `PingPong` 没有"结束之后"的区域，因此那里只有前导
-  基线生效）。
+  基线生效）。由于循环动画会重放延迟，在 `none` / `forwards` 下前导基线也会在每个周期重新出现。
 
 ### 13.4 结果 PAGX
 
@@ -575,4 +587,5 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | `subset:animation-filter-approximated` | 动画 `brightness()` 被映射为 opacity，大于 1 的值会被钳制 |
 | `subset:animation-unknown-keyframes` | `animation` 引用了未定义的 `@keyframes` 名称；该动画被丢弃 |
 | `subset:animation-finite-count` | `animation-iteration-count` 是有限值 > 1；被强制为 `once` |
+| `subset:animation-delay-replayed` | 无限循环动画带有正的 `animation-delay`；延迟在每个周期都作为停顿重放，而不是只在第一次迭代前生效 |
 | `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |
