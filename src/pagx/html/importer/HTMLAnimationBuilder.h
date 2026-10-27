@@ -98,6 +98,7 @@ class HTMLAnimationBuilder {
   Frame loopCycleFrames(const Animation* animation) const;
 
  private:
+  long long resolveDelayFrames(float delaySeconds);
   void setAnimationTiming(Animation* animation, LoopMode loopMode, long long durationFrames,
                           long long delayFrames, bool needsTrailingBaseline);
   void addAnimation(Animation* animation);

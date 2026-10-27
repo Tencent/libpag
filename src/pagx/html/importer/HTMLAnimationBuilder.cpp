@@ -998,6 +998,16 @@ Frame HTMLAnimationBuilder::loopCycleFrames(const Animation* animation) const {
   return it != _loopCycleFrames.end() ? it->second : 0;
 }
 
+long long HTMLAnimationBuilder::resolveDelayFrames(float delaySeconds) {
+  if (delaySeconds < 0.0f) {
+    _diagnostics.warn(
+        "html: negative animation-delay is not supported; clamped to 0 "
+        "[subset:animation-unsupported-property]");
+    return 0;
+  }
+  return std::llround(delaySeconds * kFrameRate);
+}
+
 void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loopMode,
                                               long long durationFrames, long long delayFrames,
                                               bool needsTrailingBaseline) {
@@ -1121,14 +1131,7 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
-  long long delayFrames = 0;
-  if (spec.delaySeconds < 0.0f) {
-    _diagnostics.warn(
-        "html: negative animation-delay is not supported; clamped to 0 "
-        "[subset:animation-unsupported-property]");
-  } else {
-    delayFrames = std::llround(spec.delaySeconds * kFrameRate);
-  }
+  long long delayFrames = resolveDelayFrames(spec.delaySeconds);
 
   // Per-channel keyframe collection.
   std::vector<Keyframe<float>> alphaKeys;
@@ -1950,8 +1953,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
 
     long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
-    long long delayFrames =
-        spec.delaySeconds > 0.0f ? std::llround(spec.delaySeconds * kFrameRate) : 0;
+    long long delayFrames = resolveDelayFrames(spec.delaySeconds);
 
     std::vector<Keyframe<Color>> fillColorKeys;
     std::vector<Keyframe<float>> fillAlphaKeys;

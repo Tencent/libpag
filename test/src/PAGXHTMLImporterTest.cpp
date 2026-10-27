@@ -7759,6 +7759,52 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgInfiniteDelayExtendsSharedDuration) {
   EXPECT_EQ(lastKeyTimes[1], 90);
 }
 
+// A negative animation-delay on an infinite animation is clamped to 0 with a warning on both the
+// element and the inline-SVG paths, so the duration stays at the plain cycle and no
+// replayed-delay warning is raised.
+PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayClampsAndWarnsOnBothPaths) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear -0.5s infinite"></div>
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="30" fill="#000"
+                style="animation:fade 1s linear -0.5s infinite"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  size_t negativeWarnings = 0;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("negative animation-delay") != std::string::npos) negativeWarnings++;
+    EXPECT_EQ(msg.find("subset:animation-delay-replayed"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  EXPECT_EQ(negativeWarnings, 2u);
+
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 60);
+  ASSERT_EQ(anim->objects.size(), 2u);
+  for (auto* obj : anim->objects) {
+    ASSERT_NE(obj, nullptr);
+    ASSERT_FALSE(obj->channels.empty());
+    auto* ch = obj->channels.front();
+    ASSERT_EQ(ch->valueType(), pagx::ChannelValueType::Float);
+    auto* alpha = static_cast<pagx::TypedChannel<float>*>(ch);
+    ASSERT_EQ(alpha->keyframes.size(), 2u);
+    EXPECT_EQ(alpha->keyframes.front().time, 0);
+    EXPECT_EQ(alpha->keyframes.back().time, 60);
+  }
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
