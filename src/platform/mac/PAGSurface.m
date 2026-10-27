@@ -22,10 +22,8 @@
 
 #if defined(TGFX_USE_OPENGL)
 #import "PAGSurface+OpenGL.h"
-#import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #elif defined(TGFX_USE_METAL)
 #import "PAGSurface+Metal.h"
-#import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
 #endif
 
 @implementation PAGSurface {
@@ -85,7 +83,7 @@
 @implementation PAGSurface (OpenGL)
 
 + (PAGSurface*)FromView:(NSView*)view {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromView:view];
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:view];
   if (surface == nil) {
     return nil;
   }
@@ -99,7 +97,7 @@
 @implementation PAGSurface (Metal)
 
 + (PAGSurface*)FromLayer:(CAMetalLayer*)metalLayer {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:metalLayer];
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromHost:metalLayer];
   if (surface == nil) {
     return nil;
   }

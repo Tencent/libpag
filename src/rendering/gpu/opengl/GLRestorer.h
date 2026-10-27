@@ -18,8 +18,6 @@
 
 #pragma once
 
-#if defined(TGFX_USE_OPENGL) && !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-
 #include "rendering/gpu/Devices.h"
 
 namespace pag {
@@ -58,5 +56,3 @@ class GLRestorer : public ExternalStateGuard {
 };
 
 }  // namespace pag
-
-#endif  // TGFX_USE_OPENGL && !PAG_BUILD_FOR_WEB && !_WIN32

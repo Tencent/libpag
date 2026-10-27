@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "MetalTexture.h"
 
-#import "platform/mac/private/PAGSurfaceImpl.h"
+namespace pag {
 
-#import <AppKit/AppKit.h>
+// Preserve the Metal backend tag during conversion without dereferencing foreign native handles.
+// GPU resource consumers reject the backend mismatch after conversion.
+unsigned GetMetalTexturePixelFormat(const void*) {
+  return 0;
+}
 
-@interface PAGSurfaceImpl (OpenGL)
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view;
-
-@end
+}  // namespace pag

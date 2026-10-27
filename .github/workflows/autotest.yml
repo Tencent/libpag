@@ -9,6 +9,7 @@ on:
 jobs:
   mac:
     # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
+    name: mac (opengl-swiftshader)
     runs-on: macos-14
     steps:
       - name: Check Out Repo
@@ -23,9 +24,9 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-
+            test/baseline/.cache/opengl-swiftshader
+          key: third-party-autotest-opengl-swiftshader-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-autotest-opengl-swiftshader-
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
@@ -69,7 +70,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
-          ./autotest.sh USE_SWIFTSHADER
+          ./autotest.sh USE_OPENGL_SWIFTSHADER --skip-images
 
       - name: Run Codecov
         run: |
@@ -89,8 +90,8 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+            test/baseline/.cache/opengl-swiftshader
+          key: third-party-autotest-opengl-swiftshader-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
