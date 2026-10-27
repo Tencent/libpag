@@ -610,7 +610,8 @@ Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* l
   if (it != state->compositionNodes.end()) {
     return it->second;
   }
-  auto* composition = state->document->makeNode<Composition>();
+  auto* composition =
+      state->document->makeNode<Composition>("pag-legacy-comp-" + std::to_string(legacy->uniqueID));
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
@@ -723,7 +724,8 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   if (it != state->compositionNodes.end()) {
     return it->second;
   }
-  auto* composition = state->document->makeNode<Composition>();
+  auto* composition =
+      state->document->makeNode<Composition>("pag-legacy-comp-" + std::to_string(legacy->uniqueID));
   composition->width = legacy->width;
   composition->height = legacy->height;
   state->compositionNodes[legacy] = composition;
