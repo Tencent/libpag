@@ -81,6 +81,9 @@ export const EDITOR_STYLES = `
     font-size: 13px;
     font-weight: 500;
     user-select: none;
+    /* Push the close button to the far right while keeping the inspect button + title grouped on
+       the left. Overrides justify-content: space-between on .editor-header. */
+    margin-right: auto;
 }
 
 #editor-panel .editor-close-btn {
@@ -101,52 +104,134 @@ export const EDITOR_STYLES = `
     background: #3C3C3C;
 }
 
+/* Inspect (selection) toggle inside the editor header. DevTools-style: active state mirrors
+   selectMode so the user can see at a glance whether canvas hover drives XML highlighting. */
+#editor-panel .editor-select-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #CCCCCC;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0;
+    margin-right: 4px;
+}
+
+#editor-panel .editor-select-btn:hover {
+    background: #3C3C3C;
+}
+
+#editor-panel .editor-select-btn.active {
+    background: rgba(68, 142, 249, 0.3);
+    color: #fff;
+}
+
 #editor-panel .editor-host {
     flex: 1;
     overflow: hidden;
     position: relative;
 }
 
-#editor-panel .editor-host .cm-editor {
+/* Shown in place of the editor when Monaco fails to load from the CDN (offline / intranet). */
+#editor-panel .editor-host .pagx-editor-load-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     height: 100%;
+    padding: 24px;
+    box-sizing: border-box;
+    color: #CCCCCC;
     font-size: 13px;
-    font-family: Menlo, Monaco, 'Courier New', monospace;
+    line-height: 1.5;
+    text-align: center;
 }
 
-#editor-panel .editor-host .cm-scroller {
-    overflow: auto;
-}
-
-/* Fix white square at scrollbar corner */
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-corner {
+#editor-panel .editor-host .monaco-editor {
+    height: 100%;
     background: #1E1E1E;
 }
 
-#editor-panel .editor-host .cm-gutters {
+#editor-panel .editor-host .monaco-editor .margin {
     background: #1E1E1E;
     border-right: 1px solid #3C3C3C;
     color: #6E7681;
 }
 
-#editor-panel .editor-host .cm-focused {
-    outline: none;
+/* In the read-only state, hide Monaco's virtual cursor (<div class="cursor">) so a single
+   click doesn't show a blinking caret the user can never type at. Monaco 0.47.0's
+   cursorStyle enum doesn't include 'hidden' (added in a later version), so the toggle
+   is driven by the pagx-editor-readonly class that SourceEditor adds/removes on the
+   editor-host element when entering/leaving edit mode. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .cursor {
+    display: none !important;
 }
 
-/* Selection highlight. !important guards against CodeMirror's baseTheme and any focused-state
-   rule that may be injected inline; specificity alone is not always enough. */
-#editor-panel .editor-host .cm-editor .cm-selectionBackground,
-#editor-panel .editor-host .cm-editor.cm-focused .cm-selectionBackground,
-#editor-panel .editor-host .cm-editor ::selection {
-    background-color: rgba(68, 142, 249, 0.35) !important;
+/* The theme's opaque light-blue selection is reserved for editable text. In read-only browsing,
+   native text selection uses the same translucent blue as a canvas-picked element's source line,
+   preserving syntax colors and keeping both selection paths visually consistent. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .selected-text {
+    background-color: rgba(111, 168, 220, 0.32) !important;
 }
 
-/* highlightSelectionMatches - subtle highlight for matching text under cursor */
-#editor-panel .editor-host .cm-editor .cm-selectionMatch {
-    background-color: rgba(234, 179, 8, 0.15);
+/* Browsing/highlighting source is not text entry. Use the normal pointer in read-only mode so a
+   grey hover line does not advertise an editable insertion cursor. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .monaco-mouse-cursor-text,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .view-lines,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .view-line,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .inputarea {
+    cursor: default !important;
 }
 
-#editor-panel .editor-host .cm-editor .cm-selectionMatch-selected {
-    background-color: rgba(68, 142, 249, 0.3);
+/* Node-span highlights mirrored from the canvas selection state. Monaco applies the decoration's
+   className to each .view-line, so these selectors target the line within the editor. Class
+   order matters: select after hover so the blue wins on overlap; edit after select. */
+#editor-panel .editor-host .monaco-editor .pagx-hover-line {
+    background-color: rgba(140, 140, 140, 0.28);
+}
+
+/* Same Chrome-inspect blue family as the canvas overlay, at a lower alpha so code stays readable. */
+#editor-panel .editor-host .monaco-editor .pagx-select-line {
+    background-color: rgba(111, 168, 220, 0.32);
+    box-shadow: inset 2px 0 0 rgba(26, 115, 232, 0.9);
+}
+
+/* Editing is a distinct mode from canvas/node selection. Keep node selection blue in read-only
+   mode, but mute it once a range is unlocked so there is never a blue-on-blue collision with
+   Monaco's native text selection. The unlocked line and the in-edit text selection follow Chrome
+   DevTools' dark editing look: a subtly lifted dark box with a thin dark edge, and a periwinkle
+   blue selection that keeps the text readable. */
+#editor-panel .editor-host.pagx-editor-editing .monaco-editor .pagx-select-line {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#editor-panel .editor-host .monaco-editor .pagx-edit-line {
+    background-color: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Monaco renders the native selection and delayed matching-word highlights in independent layers,
+   so selectors cannot express "word highlight except where native selection overlaps". SourceEditor
+   mirrors only the real selection into the text layer as this inline decoration. Giving that span
+   its own opaque blue background and a higher stacking order guarantees it stays above the delayed
+   grey word highlights, while unmatched occurrences retain Monaco's original grey decoration. */
+#editor-panel .editor-host.pagx-editor-editing .monaco-editor .view-line .pagx-edit-selection {
+    position: relative;
+    z-index: 2;
+    background-color: #A8C7FA !important;
+    color: #000000 !important;
+}
+
+/* Indent guides are separate absolutely positioned lines above Monaco's text decorations. Their
+   one-pixel borders show through an opaque multiline selection as dotted marks at each line box.
+   Hide only those guides while an edit selection is non-empty; they return as soon as it collapses. */
+#editor-panel .editor-host.pagx-editor-editing.pagx-editor-has-selection .monaco-editor .core-guide {
+    visibility: hidden;
 }
 
 /* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's
@@ -225,21 +310,63 @@ export const EDITOR_STYLES = `
     border-color: #81C784;
 }
 
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+/* DevTools-style scrollbars. Use Monaco's native geometry instead of shortening either track in
+   CSS: Monaco already makes the horizontal track stop before the vertical lane (as shown by its
+   inline width). The vertical track is appended after the horizontal track in Monaco's DOM, so it
+   naturally paints the opaque bottom-right corner without masking either thumb. CSS resizing or a
+   pseudo-element mask desynchronizes Monaco's internal thumb transform and causes the thumb to be
+   covered at the far edge. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar {
+    background: #1E1E1E !important;
+    box-sizing: border-box;
 }
 
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb {
-    background: rgba(75, 75, 90, 0.67);
-    border-radius: 4px;
+/* Do not use inset box-shadows for these separators: the vertical shadow spans through the
+   bottom-right corner. Explicit pseudo-elements let the vertical separator stop 14px before the
+   bottom while leaving the overlap as a solid background, matching DevTools. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.vertical::before {
+    position: absolute;
+    top: 0;
+    bottom: 14px;
+    left: 0;
+    width: 1px;
+    background: #3C3C3C;
+    content: '';
+    pointer-events: none;
 }
 
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-track {
-    background: transparent;
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.horizontal::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background: #3C3C3C;
+    content: '';
+    pointer-events: none;
 }
 
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb:hover {
-    background: rgba(90, 90, 110, 0.8);
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider {
+    background: rgb(121, 121, 121) !important;
+    border-radius: 5px !important;
+}
+
+/* The track is 14px wide, while the thumb remains the 10px DevTools width. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.vertical > .slider {
+    left: 2px !important;
+    width: 10px !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.horizontal > .slider {
+    top: 2px !important;
+    height: 10px !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider:hover {
+    background: rgb(150, 150, 150) !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider.active {
+    background: rgb(170, 170, 170) !important;
 }
 `;

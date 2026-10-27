@@ -33,5 +33,6 @@ export type {
     PlayerView,
     SeekEventDetail,
     StatusOptions,
+    TimelineTreeNode,
     ToolbarSlot,
 } from './types';
