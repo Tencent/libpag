@@ -4916,10 +4916,11 @@ PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
   ASSERT_TRUE(ExportAndVerify(*doc, "glass_style_with_backdrop", options));
 }
 
-// A perspective cannot be flattened into any 2D affine, so the layer must bake even when the caller
-// did not opt into baking unsupported features. A Z translation on its own is still affine and
-// stays on the vector path.
-PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
+// An x/y-varying perspective cannot be flattened into a 2D affine, so the layer must bake even
+// when the caller did not opt into baking unsupported features. A pure z-axis perspective matches
+// tgfx's flattening of a non-preserve3D layer (a constant w divide), so it stays on the vector
+// path, as does a Z translation on its own. preserve3D keeps shared depth and bakes.
+PAGX_TEST(PAGXPPTTest, PerspectiveLayerBakes) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   layer->perspective = 500;
@@ -4930,11 +4931,10 @@ PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
   EXPECT_TRUE(features.hasPerspectiveTransform);
   EXPECT_TRUE(features.needsRasterization(false));
 
-  // A perspective on its own still bakes: a descendant at another z would otherwise lose the
-  // projection scale the renderer applies to it.
   layer->rotationY = 0;
   features = pagx::ProbeLayerFeatures(layer);
-  EXPECT_TRUE(features.hasPerspectiveTransform);
+  EXPECT_FALSE(features.hasPerspectiveTransform);
+  EXPECT_FALSE(features.needsRasterization(false));
 
   layer->perspective = 0;
   layer->z = -500;
@@ -4944,6 +4944,9 @@ PAGX_TEST(PAGXPPTTest, PerspectiveLayerAlwaysBakes) {
 
   layer->z = 0;
   layer->perspective = 500;
+  features = pagx::ProbeLayerFeatures(layer);
+  EXPECT_FALSE(features.hasPerspectiveTransform);
+
   layer->preserve3D = true;
   features = pagx::ProbeLayerFeatures(layer);
   EXPECT_TRUE(features.hasPreserve3D);
