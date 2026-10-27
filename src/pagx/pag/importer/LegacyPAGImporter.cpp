@@ -18,7 +18,6 @@
 
 #include "pagx/LegacyPAGImporter.h"
 #include <unordered_map>
-#include <unordered_set>
 #include "pag/file.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -748,22 +747,8 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   auto* previousAnimation = state->currentAnimation;
   auto previousFrameRate = state->currentFrameRate;
   state->currentFrameRate = legacy->frameRate;
-  // Legacy track mattes: the matted layer consumes its trackMatteLayer as an alpha mask, and the
-  // source layer itself never renders as regular content. PAGX models masks as explicit
-  // per-layer references, so until that wiring lands the matte source layers are skipped (with a
-  // reported issue) instead of double-rendering on top of the composition.
-  std::unordered_set<pag::Layer*> matteSources = {};
-  for (auto* legacyLayer : legacy->layers) {
-    if (legacyLayer->trackMatteLayer != nullptr) {
-      matteSources.insert(legacyLayer->trackMatteLayer);
-    }
-  }
   for (auto it = legacy->layers.rbegin(); it != legacy->layers.rend(); ++it) {
     auto* legacyLayer = *it;
-    if (matteSources.find(legacyLayer) != matteSources.end()) {
-      state->warn(PAGExportWarning::UnsupportedColorSource, "track matte source layer");
-      continue;
-    }
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
     if (child != nullptr) {
       composition->layers.push_back(child);
@@ -776,6 +761,41 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   }
   state->currentAnimation = previousAnimation;
   state->currentFrameRate = previousFrameRate;
+  // Legacy track mattes (spec 6.4): the matted layer consumes its trackMatteLayer as an
+  // alpha/luminance mask. The matte source converts as a regular layer - keeping it in the
+  // composition's layer list preserves the legacy sibling coordinate space, and the renderer
+  // suppresses its own drawing once the mask is attached (maskOwner). The reference resolves by
+  // the deterministic legacy target id.
+  for (auto* legacyLayer : legacy->layers) {
+    if (legacyLayer->trackMatteType == pag::TrackMatteType::None ||
+        legacyLayer->trackMatteLayer == nullptr) {
+      continue;
+    }
+    auto* matted = state->document->findNode<Layer>(LegacyLayerTargetId(legacyLayer));
+    auto* source =
+        state->document->findNode<Layer>(LegacyLayerTargetId(legacyLayer->trackMatteLayer));
+    if (matted == nullptr || source == nullptr) {
+      state->warn(PAGExportWarning::UnsupportedColorSource, "unresolved track matte");
+      continue;
+    }
+    matted->mask = source;
+    switch (legacyLayer->trackMatteType) {
+      case pag::TrackMatteType::Alpha:
+        matted->maskType = MaskType::Alpha;
+        break;
+      case pag::TrackMatteType::AlphaInverted:
+        matted->maskType = MaskType::AlphaInverted;
+        break;
+      case pag::TrackMatteType::Luma:
+        matted->maskType = MaskType::Luminance;
+        break;
+      case pag::TrackMatteType::LumaInverted:
+        matted->maskType = MaskType::LuminanceInverted;
+        break;
+      case pag::TrackMatteType::None:
+        break;
+    }
+  }
   // Composition-scoped animations (spec 5.4) auto-play in the instance. The attachment runs
   // AFTER the layer loop: EnsureCompositionAnimation creates the animation lazily while the
   // layers convert, so looking it up before the loop would always miss it and the runtime
