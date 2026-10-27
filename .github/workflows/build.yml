@@ -361,11 +361,12 @@ jobs:
           key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-webgpu-
 
-      - name: Install emsdk
-        if: ${{ (steps.emsdk-cache.outputs.cache-hit != 'true') }}
+      # depsync must run before Install emsdk: script/setup.emsdk.js requires
+      # third_party/vendor_tools, which is only populated by depsync (or the cache above).
+      - name: Run depsync
         run: |
-          cd web
-          node script/setup.emsdk.js
+          npm install depsync -g
+          depsync
 
       - name: Install node_modules
         if: ${{ (steps.node-cache.outputs.cache-hit != 'true') }}
@@ -373,10 +374,11 @@ jobs:
           cd web
           npm install
 
-      - name: Run depsync
+      - name: Install emsdk
+        if: ${{ (steps.emsdk-cache.outputs.cache-hit != 'true') }}
         run: |
-          npm install depsync -g
-          depsync
+          cd web
+          node script/setup.emsdk.js
 
       - name: Build WebGPU
         run: |
