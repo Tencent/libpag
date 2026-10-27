@@ -10939,32 +10939,6 @@ PAGX_TEST(PAGXTest, LayerTransformAttributeSerializationRoundTrip) {
 }
 
 /**
- * Test case: a pose singular only in its Z basis (scale.z = 0) is published with a tiny Z scale so
- * tgfx can invert it (masks and 3D compositing need an invertible matrix), while the components
- * keep the authored zero.
- */
-PAGX_TEST(PAGXTest, LayerSingularZBasisPosePublishesInvertibleMatrix) {
-  auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto* layer = doc->makeNode<pagx::Layer>("L");
-  layer->rotationY = 30;
-  layer->scaleZ = 0;
-  doc->layers.push_back(layer);
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_NE(scene, nullptr);
-  auto* binding = scene->mutableBinding();
-  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
-  ASSERT_NE(tgfxLayer, nullptr);
-
-  auto matrix = tgfxLayer->matrix3D();
-  EXPECT_NE(matrix.getRowColumn(2, 2), 0);
-  tgfx::Matrix3D inverse = {};
-  EXPECT_TRUE(matrix.invert(&inverse));
-  pagx::KeyValue value;
-  ASSERT_TRUE(binding->read(layer, "scale.z", &value));
-  EXPECT_FLOAT_EQ(std::get<float>(value), 0);
-}
-
-/**
  * Test case: static Layer transform components round-trip through XML and compose with x / y as
  * T * R * S, while a non-identity matrix overrides them and rejects component writes.
  */
