@@ -433,7 +433,23 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (layer == nullptr) {
       return;
     }
-    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(pose, layoutX, layoutY)));
+    auto matrix = ApplyLayoutPosition(pose, layoutX, layoutY);
+    // A pose that is singular only because its Z basis column is zero (for example scale.z = 0)
+    // still renders a well-defined z=0 plane, but tgfx cannot invert such a matrix, which breaks
+    // masks and 3D compositing. Substitute a tiny Z scale, which leaves the z=0 plane untouched.
+    // The pose itself keeps the authored value.
+    if (matrix.getRowColumn(0, 2) == 0 && matrix.getRowColumn(1, 2) == 0 &&
+        matrix.getRowColumn(2, 2) == 0 && matrix.getRowColumn(3, 2) == 0) {
+      float a = matrix.getRowColumn(0, 0);
+      float b = matrix.getRowColumn(1, 0);
+      float c = matrix.getRowColumn(0, 1);
+      float d = matrix.getRowColumn(1, 1);
+      float determinant2D = a * d - b * c;
+      if (std::abs(determinant2D) > 1e-8f) {
+        matrix.setRowColumn(2, 2, 1e-4f);
+      }
+    }
+    layer->setMatrix3D(ToTGFX3D(matrix));
   }
 };
 
