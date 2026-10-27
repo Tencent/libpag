@@ -176,29 +176,51 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-color: <color>` | `<Rectangle width="100%" height="100%" roundness="…"/>` + `<Fill color="…"/>` (background pair, see §5) |
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | inline `<LinearGradient>` inside `<Fill>` (`startPoint`/`endPoint` derived from angle) |
 | `background-image: radial-gradient(…)` | inline `<RadialGradient>` (center/radius derived from `circle at … N%`) |
-| `background-image: conic-gradient(from angle, …)` | inline `<ConicGradient>` (CSS 0° = top, PAGX 0° = right; angle shifted by −90°) |
-| `background-clip: text` (alias `-webkit-background-clip: text`) | combined with a gradient `background-image`: routes the gradient onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient) and suppresses the rectangle that would otherwise paint behind the text. Without a gradient `background-image`, the property is a no-op. |
-| `background-image: url(...)` | recovered as an `<ImagePattern>` fill on the background rectangle (the inverse of `HTMLWriter`'s url-background emission). `background-size` / `background-repeat` / `background-position` drive the pattern's `scaleMode` / tile modes / matrix |
-| `background-blend-mode: <mode>` | sets `Fill.blendMode` on the gradient / image fill so it composites against the `background-color`, which is kept as a solid `<Fill>` underneath (the backdrop the blend needs). `normal` (the default) is a no-op and the opaque gradient/image keeps hiding the colour |
+| `background-image: conic-gradient(from angle at position, …)` | a full `0..360°` `<ConicGradient>` with a rotation matrix of `angle − 90°` about its center; resolved tiles use pixel coordinates and `fitsToGeometry="false"` |
+| `background-clip: text` (alias `-webkit-background-clip: text`) | routes the element's background onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient, or the solid colour when no gradient layer is present) and suppresses the rectangle that would otherwise paint behind the text. This mirrors CSS, where the inherited transparent `text-fill-color` leaves the clipped background as the only glyph paint, so the background outranks `color`. A gradient `background-image` wins over a solid `background-color` (CSS paints the colour below the image layers). A fully transparent `background-color` carries no paint: the property is a no-op for that element. |
+| `background-image: url(...)` | raster images use tile-sized `<ImagePattern>` fills; SVG tiles remain vector import directives |
+| `background-size`, `background-position`, `background-repeat`, `background-origin`, `background-clip` | per-image layout for both URLs and gradients on resolved pixel boxes; supports `auto`, lengths/percentages, `contain`/`cover`, position keywords and edge offsets, and two-axis `repeat`/`no-repeat`/`space`/`round` |
+| `background-blend-mode: <mode>, …` | each background layer blends against preceding background layers in an isolated background stack, below the element's content and border |
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
-| `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning |
+| `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
 | `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
-| `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>` |
+| `isolation: isolate \| auto` | `isolate` sets `Layer.passThroughBackground = false`; `auto` keeps the default background pass-through |
+| `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
 | `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
+| `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
-`background-clip: border-box` / `padding-box` / `content-box` are silent no-ops (only the
-`text` keyword has a PAGX effect, see above).
+`background-clip: text` fills the glyphs (see the row above). Box clips use rounded contour
+masks independently from `background-origin` (default `padding-box`). The background color
+uses the bottom image layer's clip. Short property lists cycle; `none` image entries retain
+their indices. The `background` shorthand preserves these per-layer descriptors.
+
+Generated gradients have no intrinsic dimensions or aspect ratio: `20px auto` uses a 20px
+tile width and the positioning area's height. Gradient repetition describes colors within a
+tile; background repetition places tiles. Repeated vector tiles use `Repeater`, with shared
+internal edges drawn without per-tile antialiasing and outer edges clipped separately.
+The importer limits a background image to 65,536 visible tiles (4,096 SVG tiles), and expanded
+gradient periods to 4,096 color stops; exceeding a limit emits a diagnostic and omits that
+image. Unsupported layout syntax also emits a diagnostic. Position `calc()` supports sums
+of absolute lengths and percentages.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
 `outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
 `path`), and compound / non-`matrix3d` 3D `transform` chains.
+
+The importer paints sibling layers in document order; it does not resolve CSS `z-index`.
+`tools/html-snapshot` resolves the source page's stacking contexts and paint phases before
+emitting this subset. It retains compositing groups with `isolation: isolate`, and marks
+planned containers `data-pagx-paint-order="fixed"`. Flex inference must leave these containers'
+absolute children in their emitted order: geometric separation alone does not prove that
+descendants, shadows or overflowing content can be reordered safely. Explicit flex layouts
+remain supported.
 
 ### 4.5 Text
 
@@ -217,7 +239,7 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"` (horizontal modes are the default) |
-| `overflow: hidden` on a text container | `TextBox.overflow = "hidden"` |
+| `overflow: hidden` (or any non-`visible` axis) on a text container | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
@@ -275,9 +297,26 @@ to isolate its `<Fill>`.
   URI accepted; relative paths are resolved against the input file's directory) and emits
   `<Rectangle width="100%" height="100%"/>` filled with `<ImagePattern image="@id"/>`.
   `border-radius` set directly on the `<img>` rounds that rectangle.
-- `object-fit` on the `<img>` sets `ImagePattern.scaleMode`: `fill`→`Stretch`,
-  `contain`→`LetterBox`, `cover`→`Zoom`. `none` and `scale-down` are downgraded to
-  `contain` with a warning. Omitting `object-fit` defaults to `Stretch` (CSS `fill`).
+- All five `object-fit` values are supported. The default is `fill`. `none` uses natural
+  CSS dimensions; `scale-down` selects the smaller of `none` and `contain`.
+- `object-position` defaults to `50% 50%`. Keywords, percentages, absolute lengths,
+  four-token edge offsets, and affine `calc()` expressions are supported. Percentages resolve
+  against **content-box size minus concrete object size**, including negative space for `cover`.
+  The generic one/two/four-token position grammar is distinct from background's three-token form.
+- Simple centered raster images retain `Stretch` / `LetterBox` / `Zoom` fills. Other images use
+  a positioned content layer, sized after percentage/flex layout, with a content-box clip. Border,
+  padding, rounded content corners, backgrounds and shadows remain independent of image fitting.
+  The resulting geometry captures the import-time layout; editing the outer size or replacing
+  a resource later does not re-run CSS object sizing.
+- Snapshot images carry private `data-pagx-image-width` / `data-pagx-image-height` metadata
+  for the browser's natural CSS dimensions, separately from encoded resource pixels. This preserves
+  density-selected sources and browser fallback viewports for dimensionless SVG without changing
+  a shared resource. The metadata is consumed by the importer and is not exported as custom data.
+  Direct SVG import treats `viewBox` as an aspect ratio, not a natural size; its concrete object
+  rectangle becomes the SVG viewport, with native `preserveAspectRatio` semantics.
+- The object sizing algorithm follows CSS Images. Chromium currently applies the `scale-down`
+  no-enlargement limit to encoded pixels for density-selected raster images; those browser captures
+  can differ from the CSS-correct result. `none` uses density-corrected natural dimensions in both.
 - Inline `<svg>...</svg>` is captured verbatim and stored as the host `Layer`'s
   `<svg>` import directive. The SVG is resolved during `pagx verify` / `pagx resolve`.
 - `<img src="path.svg"/>` is converted into an external import directive
@@ -306,7 +345,8 @@ rounded `Rectangle` directly when **all** of the following hold:
 - the wrapper has exactly one element child, which is an `<img>` (no other elements; only
   whitespace text), and
 - that `<img>` exactly covers the wrapper's content box (matching `width` / `height`,
-  anchored at `(0, 0)`).
+  anchored at `(0, 0)`), has no independent effects, padding, border or animation, and uses
+  centered `fill`, `contain` or `cover`. Other cases retain separate geometry and clipping.
 
 The importer walks through up to three nested layout-only wrapper `<div>`s (wrappers that only
 pass layout through, with no paint of their own) to find the `<img>`, so common
@@ -330,8 +370,8 @@ through their own external-import directive path.
 
 - All HTML coordinates are converted to PAGX's top-left origin (y-down).
 - CSS gradient angles are measured from the top going clockwise. PAGX gradient angles are
-  measured from the +X axis. The importer converts as `pagx_angle = css_angle − 90°` for
-  `linear-gradient` and `conic-gradient`.
+  measured from the +X axis. Linear directions use `css_angle − 90°`. Conic gradients rotate
+  a canonical full turn by that angle, instead of changing the native sweep endpoints.
 - `linear-gradient` `to bottom right` style keywords are converted to numeric angles.
 
 ## 9. Pitfalls
@@ -375,7 +415,7 @@ form so that the rest of the pipeline only ever sees compliant HTML. It is on by
 `HTMLImporter::Options::autoNormalize = false` disables it (API-level only — `pagx import`
 exposes no `--html-*` flag for it).
 
-The transformer runs as a fixed pipeline of eight core passes plus one optional pass (the
+The transformer runs as a fixed pipeline of nine core passes plus one optional pass (the
 optional `HTMLFlexInference` runs between PropertyFilter and MarginToGapPromotion).
 Behaviour:
 
@@ -384,10 +424,11 @@ Behaviour:
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `writing-mode`, `background-image` + `background-size`/`background-repeat`/`background-position` (url backgrounds), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `object-position` (including affine `calc()`), `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |
+| SpaceEvenlyPaddingCompensation | on a `display: flex` container using `space-evenly`, rewrites `justify-content` to `space-between` and adds the freed step `g = R / (n + 1)` (`R` = free space left after the children and the `n - 1` gaps) to both main-axis paddings, which places every child exactly where `space-evenly` would (`subset:space-evenly-padding-compensated`) | left untouched unless the container has an explicit px main-axis size, a px `gap`, and free space left on the line; an in-flow child whose main-axis size does not resolve to px, that declares `flex` grow, or that carries a non-zero main-axis margin also bails out, as does a padding that does not resolve to px |
 | StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `HTMLImporter::Options::preserveUnknownElements` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
 
@@ -443,3 +484,186 @@ Resulting PAGX (after `PAGXOptimizer`):
   </Layer>
 </pagx>
 ```
+
+## 13. Animation
+
+The subset supports a single, declarative animation form: CSS `@keyframes` rules combined with
+the `animation` shorthand on elements. This is the canonical contract between the
+`tools/html-snapshot` capture layer and the importer: the snapshot tool normalizes animations
+from many sources (plain CSS `@keyframes`, the Web Animations API, and JS animation libraries
+such as GSAP / anime.js — see `tools/html-snapshot/README.md`) into this one form, and the
+importer maps it onto the PAGX animation model (`<Animations>` + `Animation` / `Object` /
+`Channel` / `Key`).
+
+### 13.1 Accepted form
+
+```html
+<head>
+  <style>
+    @keyframes fadeMove {
+      0%   { opacity: 0; transform: translateX(0px); }
+      100% { opacity: 1; transform: translateX(40px); }
+    }
+  </style>
+</head>
+<body style="width: 200px; height: 100px;">
+  <div id="card" style="animation: fadeMove 2s linear infinite;"></div>
+</body>
+```
+
+- A `@keyframes <name> { <stop> { … } … }` block defines a named timeline. Stops are
+  percentages (`0%` … `100%`) or the keywords `from` (= `0%`) / `to` (= `100%`); a single stop
+  may list several comma-separated selectors.
+- `@keyframes` blocks survive the `<style>`-inlining normalization (a `<style>` element carrying
+  only the surviving `@keyframes` is preserved so the importer can read them).
+- The `animation` shorthand attaches a `@keyframes` timeline to the element. The longhand
+  `animation-name` / `animation-duration` / `animation-timing-function` /
+  `animation-iteration-count` / `animation-direction` / `animation-delay` properties are also
+  accepted and folded into the shorthand during normalization.
+- One animation per element. Comma-separated animation lists keep only the first entry
+  (`subset:animation-multiple` warning).
+
+### 13.2 Channel mapping
+
+Only properties that map to a PAGX channel the runtime can actually play back are emitted.
+Everything else inside a `@keyframes` stop is warned and dropped
+(`subset:animation-unsupported-property`).
+
+| CSS animated property | PAGX channel | Target node | Value type |
+|-----------------------|--------------|-------------|------------|
+| `opacity` | `alpha` | the element's `Layer` | float |
+| `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
+| `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
+| `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
+| `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
+| `filter: blur(...)` | `blurX` / `blurY` | a `BlurFilter` on the element's `Layer` | float |
+| `filter: brightness(...)` | `alpha` (clamped to `[0,1]`) | a generated nested `Layer` | float |
+| `clip-path` (geometric `inset`/`circle`/`ellipse`/`polygon`/`path`) | `point{i}.x` / `point{i}.y` | a `Path` inside a contour-mask `Layer` | float |
+
+`transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
+compound chains — `translate[X|Y]` / `scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`). When
+*every* keyframe is a pure translation the animation uses the cheaper `x` / `y` channels (which stack
+on top of the layout-assigned position). As soon as any keyframe carries scale / rotate / skew (or a
+non-translation `matrix(...)`), the *full* affine is routed through a single `matrix` channel,
+pivoted around the element's `transform-origin` exactly like the static `transform` path
+(`T(cx,cy) · M · T(-cx,-cy)`), so static and animated transforms agree. 3D forms
+(`matrix3d` / `rotate3d` / `perspective`) have no 2D affine representation and are dropped with
+`subset:animation-unsupported-property`. Layout-affecting properties (`width`, `height`, `margin`,
+`padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped the same way.
+
+> Matrix-channel interpolation decomposes each keyframe into translation / scale / rotation / shear
+> and interpolates those components (`pagx/runtime/MatrixDecompose.h`); it cannot recover full turns
+> or rotations crossing ±180° between two adjacent keyframes, so very large per-segment rotations
+> take the short way around. Authoring intermediate `@keyframes` stops (the common case) avoids this.
+
+The animated element's `Layer` is given a generated `id` (prefix `anim`) when it has no author
+`id`, so the emitted `<Object target="…">` can reference it. `color` animation requires the
+element to paint a solid `background-color` (or, for text, a solid `color`); when no `SolidColor`
+fill is present the `color` channel is dropped (`subset:animation-unsupported-property`).
+
+**Filter animation.** A `filter` chain animated between `none` and supported filter functions
+(or an animated `box-shadow`, which the capture layer folds into an equivalent `drop-shadow`) lowers
+onto runtime animation channels. Every `drop-shadow` in the chain is kept in author order
+— a "chromatic aberration" stack of several offset-only shadows becomes one animated
+`DropShadowFilter` per slot, so the whole stack composites rather than a single representative. A
+stop that omits a given shadow slot drives that slot's `color` alpha to zero so the ghost fades in
+and out instead of snapping. `blur(...)` folds onto a single `BlurFilter` radius. An existing static
+filter node on the element is reused as the animation target; otherwise a zero/transparent baseline
+node is minted so fill-mode can restore the "off" state. `brightness()` is approximated by an
+independent nested Layer opacity so it composes with authored `opacity`; values above `1` clamp to
+`1` because opacity cannot amplify RGB. Other animated colour-adjustment functions are dropped with
+`subset:animation-unsupported-property`.
+
+**Clip-path animation.** A `clip-path` animated through geometric shapes (`inset()` / `circle()` /
+`ellipse()` / `polygon()` / `path()`) becomes an animated contour mask — a wipe / reveal / iris.
+This is broader than the static path, which only accepts `clip-path: url(#id)` and drops geometric
+forms (§4.4): the capture layer normalizes every keyframe shape to a canonical `path("d")` in
+border-box pixels, and the importer drives the mask's `Path` with per-point `point{i}.x` / `.y`
+channels. All keyframes must resolve to the **same** shape structure (same verb / point count); CSS
+itself refuses to interpolate mismatched shapes, so a mismatch drops the clip channel with
+`subset:animation-unsupported-property`. Only the point coordinates that actually vary across the
+timeline emit a channel.
+
+### 13.3 Timing mapping
+
+- Frame rate is fixed at 60 fps. `@keyframes` percentages are converted to frame times:
+  `time = round(percent / 100 * duration_seconds * 60)`. `animation-duration` accepts `s` and
+  `ms` units.
+- `animation-timing-function`: `linear` → `linear`; `ease` / `ease-in` / `ease-out` /
+  `ease-in-out` and `cubic-bezier(x1, y1, x2, y2)` → `bezier` (the easing is written onto the
+  keyframe's `bezier-out` / next keyframe's `bezier-in` handles). `steps(n, <jump>)` /
+  `step-start` / `step-end` are not a runtime interpolation type; each `@keyframes` segment is
+  expanded into `n` `hold` sub-keyframes reproducing the CSS staircase (all four jump terms —
+  `jump-start` / `jump-end` / `jump-none` / `jump-both` — are honoured).
+- `animation-iteration-count`: `infinite` → `Animation.loop="loop"`; any finite count → `once`
+  (PAGX has no finite repeat count — a finite count > 1 warns with `subset:animation-finite-count`).
+  A non-positive count suppresses playback (dropped with the same diagnostic).
+- `animation-direction`: `alternate` → `Animation.loop="pingPong"` **only when the count is
+  infinite** (finite `alternate` cannot be expressed and is downgraded to `once` with
+  `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
+  and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
+- `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
+  are clamped to 0. For looping animations the delay applies to the first iteration only (it is
+  excluded from `Animation.duration` so the gap is not replayed each cycle).
+- `animation-fill-mode`: `none` (default) shows the element's non-animated baseline before the
+  delay elapses and after a `once` animation ends; `forwards` holds the final keyframe past the
+  end; `backwards` shows the first keyframe during the delay; `both` combines the two. Implemented
+  by injecting baseline `hold` keyframes at the boundaries (`Loop` / `PingPong` have no "after"
+  region, so only the leading baseline applies there).
+
+### 13.4 Resulting PAGX
+
+The example in §13.1 converts to:
+
+```xml
+<pagx width="200" height="100">
+  <Layer id="card" width="100%" height="100%"/>
+  <Animations>
+    <Animation id="card_anim" duration="120" frameRate="60" loop="loop">
+      <Object target="card">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="1"/>
+        </Channel>
+        <Channel name="x" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
+```
+
+### 13.5 Inline SVG shape animation
+
+Animations on inline `<svg>` shapes are lowered onto the per-shape painter nodes rather than the
+element `Layer`, unlocking icon and line-art motion:
+
+| SVG animated property | PAGX channel | Target node |
+|-----------------------|--------------|-------------|
+| `opacity` | `alpha` | the shape's `Layer` |
+| `transform` (pure translation only) | `x` / `y` | the shape's `Layer` |
+| `fill` | `color` | the shape's `Fill` |
+| `fill-opacity` | `alpha` | the shape's `Fill` |
+| `stroke` | `color` | the shape's `Stroke` |
+| `stroke-opacity` | `alpha` | the shape's `Stroke` |
+| `stroke-dashoffset` | `dashOffset` | the shape's `Stroke` |
+
+`stroke-dashoffset` drives the path-trace **line-draw** idiom (`stroke-dasharray: 1;
+stroke-dashoffset: 1 → 0` with `pathLength="1"`); the captured author-space value is rescaled into
+user units exactly like the static dash import. A non-translation `transform` on an SVG shape has no
+`matrix` channel (unlike a regular HTML element) and is dropped with
+`subset:animation-unsupported-property`. Unlike regular elements, one inline-SVG shape may carry a
+**comma-separated `animation` list** — each entry becomes its own `Animation` (the line-draw + fill-in
+idiom `animation: draw 1s …, fill 0.4s …` is the common case).
+
+### 13.6 Diagnostics
+
+| Code | Meaning |
+|------|---------|
+| `subset:animation-unsupported-property` | a `@keyframes` declaration targets a property/channel the runtime cannot play; dropped |
+| `subset:animation-filter-approximated` | animated `brightness()` is mapped to opacity and values above 1 are clamped |
+| `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
+| `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
+| `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |

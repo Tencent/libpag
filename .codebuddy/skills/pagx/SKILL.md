@@ -1,14 +1,11 @@
 ---
 name: pagx
 description: >-
-  Converts an HTML file/URL or a described visual (poster, card, banner, social
-  post) — static or animated — to a PAGX file, and edits existing PAGX files.
-  Captured motion (CSS @keyframes, GSAP, anime.js, Web Animations) becomes a real
-  PAGX animation timeline. Use when the user asks to create a PAGX from a visual
-  description, convert HTML to PAGX, make an animated PAGX or loading animation,
-  modify/update an existing PAGX, run pagx CLI commands (render, verify, format,
-  layout, bounds, font info/embed, import, resolve, export to SVG/HTML/PPTX,
-  preview in browser), or look up PAGX element attributes and syntax.
+  Creates PAGX files from HTML files/URLs or visual descriptions, captures
+  supported animations or named interaction states, and edits existing PAGX.
+  Use for HTML/SVG to PAGX conversion, animated PAGX, web UI state exports to PAGX,
+  PAGX editing, pagx CLI commands (render, verify, format, layout, bounds, font,
+  embed, import, resolve, export, preview), and PAGX syntax or attribute lookup.
 ---
 
 # PAGX Skill
@@ -22,9 +19,13 @@ Pick the workflow that fits the request:
 - **Update an existing PAGX** — edit PAGX XML directly with full control over structure,
   constraints, and animation-ready layout. Best for modifying an existing `.pagx`, precise
   PAGX semantics, or hand-editing XML. See [Update Workflow](#update-workflow).
+- **Capture interaction states** — replay actions on an HTML page and export selected states
+  as independent static PAGX files. Use for tabs, forms, menus, or scroll positions; see
+  [Interaction capture](references/interaction.md). This does not export application logic.
 
 To create a PAGX from scratch, use **HTML → PAGX**. To modify an existing `.pagx`, use the
-**Update Workflow**.
+**Update Workflow**. For an existing SVG source, import it directly with `pagx import`; see
+[CLI reference](references/cli.md#pagx-import).
 
 ## Reference Lookup
 
@@ -36,30 +37,36 @@ relevant reference:
 | `references/guide.md` | Spec rules, techniques, common pitfalls | Read before editing |
 | `references/patterns.md` | Structural patterns for UI components, layouts, tables, charts, decorative effects | Read before editing |
 | `references/attributes.md` | Attribute defaults, enumerations, required attributes | As needed |
-| `references/cli.md` | CLI commands — `render`, `verify`, `format`, `layout`, `bounds`, `font info`, `font embed`, `import`, `resolve`, `export` (SVG, HTML, PPTX), `preview` (live browser) | As needed |
+| `references/cli.md` | CLI commands, options, output contracts, fonts and image storage | As needed |
 | `references/authoring-html.md` | How to write HTML that converts cleanly to PAGX, plus design tips | Read before writing HTML (HTML → PAGX) |
 | `references/animation.md` | How to author motion that converts (playable channels, capture rules), preview frames with `pagx render --time`, and animation warnings | Read before writing animated HTML (HTML → PAGX) |
+| `references/interaction.md` | Scenario JSON, actions, checkpoints, static state exports and contact sheets | Read before capturing interaction states |
 | `references/pipeline.md` | Full HTML→PAGX converter usage, setup, fonts/images, URL input, troubleshooting | As needed (HTML → PAGX) |
-| `spec/html_subset.md` | Authoritative HTML/CSS subset the importer accepts — every allowed tag/property and its PAGX mapping, diagnostics, auto-normalization passes | Debugging conversion warnings or edge cases |
+| `spec/html_subset.md` | Bundled HTML/CSS subset specification: mappings, diagnostics, normalization and animation | Debugging conversion warnings or edge cases |
+
+When maintaining this skill in the repository, synchronize the bundled HTML subset reference
+from the repository's `spec/html_subset.md` so the two copies do not diverge.
 
 ---
 
 ## CLI Setup
 
-Before running any `pagx` command, ensure it is installed and meets the minimum version:
+Select the CLI before running commands. **Inside the libpag repo**, use the binary built from
+that checkout; see [Step 0 Case B](#step-0-one-time-setup). **Outside the repo**, install
+`@libpag/pagx` with `npm install -g @libpag/pagx` if it is missing.
+
+Check the selected binary's version and the help for the command you need:
 
 ```bash
-PAGX_MIN="0.4.47"
-if ! command -v pagx &>/dev/null; then
-  npm install -g @libpag/pagx
-elif [ "$(printf '%s\n' "$PAGX_MIN" "$(pagx -v | awk '{print $2}')" | sort -V | head -1)" != "$PAGX_MIN" ]; then
-  npm update -g @libpag/pagx
-fi
+pagx -v
+pagx import --help
 ```
 
-**Contributors working inside the libpag repo** should skip the npm package and use the `pagx` they
-build from source instead, so every command runs their local changes — see
-[Step 0 Case B](#step-0-one-time-setup).
+The import workflow below requires the unified `pagx import` interface (`--html-source`,
+`--render`, and, for interaction capture, `--scenario`). Check the flags needed for the task;
+a version string alone does not establish support in a development build. If the installed
+package lacks them, update it with `npm update -g @libpag/pagx` and recheck. If the available
+release still lacks a required feature, use a compatible source build or report the limitation.
 
 The most frequently used command is `pagx verify`:
 
@@ -74,7 +81,7 @@ working directory: `input.png` (screenshot), `input.layout.xml` (computed bounds
 `--id`, outputs are `input.{id}.png` and `input.{id}.layout.xml`. Always run `pagx verify`
 from the same directory as the `.pagx` file. See `references/cli.md` for verify options and
 all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`, `export`,
-`preview`).
+`embed`, `preview`).
 
 `pagx preview` starts a live browser preview with hot reload — present the command to the user
 after generating a `.pagx` (see [Live browser preview](#live-browser-preview)). Do not auto-launch
@@ -186,22 +193,9 @@ Keep final `input.png` for reference (do not commit). If further edits are made 
 this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
 scoped `{id}` artifacts produced during the fix.
 
-**Live browser preview (required deliverable)**: do not auto-launch it. After the final
-`pagx verify` exits 0 with no diagnostics, the final reply MUST include the following block exactly,
-replacing the placeholder with the absolute path to the generated `.pagx` file. Never omit this
-block, even when `pagx render` has already produced a PNG:
-
-```
-需要交互预览（带热重载）可手动执行：
-  pagx preview <需要预览的文件绝对路径>.pagx
-或告诉我，我帮你启动。
-运行 pagx preview stop 停止服务，pagx preview --help 查看更多。
-```
-
-Only start the daemon when the user explicitly asks to preview; then open the printed URL with the
-IDE's built-in browser tool (e.g. `preview_url`). The preview hot-reloads on save, so any later
-touch-ups refresh the open tab automatically. Stop the background daemon with `pagx preview stop`
-when done.
+After final verification, include a copy-ready live viewer command using the actual launcher
+available in the user's environment. See [Live browser preview](#live-browser-preview) for
+repository and npm entrypoints. Start the viewer only when the user requests it.
 
 ---
 
@@ -210,11 +204,10 @@ when done.
 Help regular users (no design-tool or PAGX experience) produce a PAGX file without writing PAGX by
 hand. The reliable path is two steps: **design a beautiful, ordinary HTML page**, then **convert
 that HTML to PAGX with a single command**. The converter renders the page in a real headless
-browser, so any modern HTML/CSS the design uses (flexbox, gradients, web fonts, Tailwind, inline SVG
-icons, charts on `<canvas>`) is flattened automatically into clean PAGX. **Motion is captured too**:
-animations the page runs (CSS `@keyframes`, GSAP, anime.js, Web Animations) are baked into the PAGX
-as a real animation timeline, automatically — so the skill produces animated PAGX, not just still
-frames.
+browser and converts supported layout, paint, text and images to PAGX. CSS or browser features
+outside that support may need adjustment; inspect warnings and the rendered result.
+The default output is **static**. Use `--capture-animations` for supported motion, or a
+`--scenario` for named static interaction states. These modes are mutually exclusive.
 
 **When**: the goal is a finished PAGX and the user is approaching it visually — describes what they
 want in plain language ("一张活动海报", "a product card with price and button"), wants the result to
@@ -236,7 +229,8 @@ Before the first conversion, make sure the tools are ready. There are two cases.
 [CLI Setup](#cli-setup) above (`npm install -g @libpag/pagx`); the snapshot tool is bundled inside
 it. This stays light — the ~150 MB headless browser is **not** downloaded then. It installs itself
 automatically on the first conversion that needs it (Step 3), into a per-user cache, with progress
-shown on screen. Requires `node` on PATH.
+shown on screen. HTML capture requires Node.js 18 or newer; use the capability checks in
+[CLI Setup](#cli-setup) before relying on the options below.
 
 **Case B — inside the libpag repository (contributor).** Build `pagx` from source and use it
 instead of the published npm package, so every conversion exercises local changes:
@@ -263,8 +257,9 @@ instead of the published npm package, so every conversion exercises local change
    Expected output ends with `setup: ready`. If it reports a missing headless browser, follow the
    exact install command it prints, then re-run it.
 
-Skip this step on later runs unless a conversion fails with a setup-related error (see
-`references/pipeline.md` §Troubleshooting). Rebuild `pagx` (step 1) after any change to the CLI source.
+Repeat setup after updating the snapshot tool's sources or after a setup-related failure. If its
+dependencies changed, run `npm install` in `tools/html-snapshot` first. Rebuild `pagx` after CLI
+source changes. See `references/pipeline.md` §Troubleshooting.
 
 ### Step 1: Understand the request
 
@@ -279,31 +274,35 @@ the user already answered or that has an obvious default.
 - **Style**: mood/colors/vibe ("clean and modern", "festive red and gold", "dark tech"). A reference
   image or brand color is ideal but optional.
 
-If the input is already an `.html` file or a URL, skip straight to Step 3.
+If the input is already an `.html` file or a URL, skip to Step 3. If the request depends on clicks,
+form values, tabs, or a particular scroll position, use [Interaction capture](references/interaction.md).
 
 ### Step 2: Generate the HTML
 
-Write one self-contained HTML file that renders the design exactly at the target size. **Read
+Prefer a self-contained HTML file that renders the design at the target size. **Read
 `references/authoring-html.md` before writing** — it lists the few rules that make the conversion
 clean (fixed canvas size, self-contained resources, icons as SVG, real text not pictures of text,
 what to avoid) plus design-quality tips.
 
 Core rules to honor while writing:
-- Set the canvas size on `body`, e.g. `<body style="margin:0; width:1080px; height:1440px;">`; the
-  importer sizes the PAGX from that `<body>`. If a design larger than the default 1400×900 snapshot
-  viewport comes out clipped, snapshot it with a matching viewport (Step 3, Custom viewport).
-- Make it self-contained: inline images as data URIs or use absolute `https://` URLs; pull web fonts
-  via a Google Fonts `<link>`; do not rely on local relative files.
-- Build the layout with normal CSS (flexbox, gradients, shadows, rounded corners). Use inline
-  `<svg>` or an icon webfont for icons — never typed glyphs like `+`, `×`, `→`.
+- For a fixed-size design, set the canvas size on `body`, e.g.
+  `<body style="margin:0; width:1080px; height:1440px;">`, and pass a matching import viewport.
+  The captured canvas depends on the browser layout; do not rely on the default 1400×900
+  viewport for a differently sized design (Step 3, Canvas / viewport).
+- Keep resources available: inline them, use reachable URLs, or preserve local files relative to
+  the HTML. Use a local HTTP URL for apps that require an HTTP origin. Load the intended font faces
+  and weights; use `--embed-fonts` when the result must carry its fonts to another machine.
+- Build the layout with normal CSS (flexbox, gradients, shadows, rounded corners). Prefer inline
+  `<svg>` or an icon webfont for graphical icons whose shape must be consistent across fonts.
 
 **If the design should move** (loader, animated banner, ambient motion, kinetic text), add the
-animation in the HTML — the converter captures it automatically into the PAGX timeline. Author it
-with CSS `@keyframes` + `animation` (or GSAP / anime.js / the Web Animations API), make it auto-play
-and `infinite`. The runtime plays back `opacity`, `transform` (translate, scale, rotate, skew),
+animation in the HTML and pass `--capture-animations` during import. Author it with CSS `@keyframes`
+and `animation` (or GSAP / anime.js / the Web Animations API), and ensure it is attached when captured.
+Preserve the requested timing; use `infinite` for looping motion. The runtime plays back supported
+channels including `opacity`, `transform` (translate, scale, rotate, skew),
 `color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and `clip-path` reveals;
-inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset` line-draw. Only layout
-properties (`width`, `height`, `margin`, …) and 3D transforms are not playable. **Read
+inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset` line-draw. Layout
+properties (`width`, `height`, `margin`, …) and 3D transforms are among the unsupported channels. **Read
 `references/animation.md` before writing any animation** for the full capture rules, the playable
 channels, and how to preview the motion.
 
@@ -311,68 +310,36 @@ Save it as `<name>.html` in the working directory (choose a short, descriptive `
 
 ### Step 3: Convert to PAGX
 
-**Inside the libpag repo (Case B):** drive the conversion with the locally built `pagx`
-(Step 0) directly — no `html2pagx` wrapper. `pagx import` snapshots the page in a headless browser,
-imports it to PAGX, **and resolves** inline `<svg>`/import directives in one command (it
-auto-locates `tools/html-snapshot/snapshot.js` in the repo), so no separate `pagx resolve` is
-needed. `pagx render` then writes the preview PNG:
+Use the selected `pagx` binary in both repository and npm installations. The import command
+captures the page, imports it, and resolves inline SVG/import directives. `--render` also writes
+a PNG for review:
 
 ```bash
-pagx import --input <name>.html --output <name>.pagx   # snapshot + import + resolve
-pagx render <name>.pagx -o <name>.png                  # preview PNG; add --scale 2 for a crisp image
+pagx import <name>.html -o <name>.pagx --render
 ```
 
-- Output: `<name>.pagx` (the result) and `<name>.png` (the preview render).
-- A public URL works the same way (`--input https://… --output <name>.pagx`).
-- **Custom viewport / tall designs.** `pagx import` snapshots at snapshot.js's default viewport
-  (1400×900) and cannot be given a viewport directly. When a design needs a specific viewport (or
-  comes out clipped), snapshot it separately with a matching `--viewport-width`/`--viewport-height`,
-  then import the flat subset with the browser pass disabled — still only the local `pagx`, never
-  `html2pagx`. See `references/pipeline.md` §Manual step-by-step pipeline.
-- **Fonts.** This path does not embed the page's web fonts. If text renders in the wrong typeface,
-  install that font on the machine, or embed it explicitly with `pagx font embed --file <font>`
-  (see `references/cli.md` §pagx font). See `references/pipeline.md` §Fonts.
+- **Canvas / viewport:** add `--viewport-width <width> --viewport-height <height>` to match the
+  design's intended viewport (default 1400×900). `--scale 2` increases PNG resolution only.
+- **Animation:** add `--capture-animations` when motion is requested. Without it, capture is static.
+- **Resources:** `--render` acquires web fonts for that render; `--embed-fonts` embeds shaped glyphs
+  for portable playback. `--images embed` keeps images in the PAGX; the default `external` writes
+  `<name>.assets/`, which must accompany the file. See [Fonts and images](references/pipeline.md#fonts-and-images).
+- **URL:** use `pagx import https://example.com/page -o <name>.pagx --render`.
+- **Interaction states:** use `--scenario states.json --output-dir out --preview`, or select one
+  `--checkpoint` with `-o`. Read [Interaction capture](references/interaction.md) first.
+- **Iteration:** existing targets require `--overwrite`. Use it when intentionally replacing this
+  task's generated outputs; choose a new destination for an unrelated existing file.
+- **Debugging:** add `--keep-snapshot -v` to retain the subset and inspect warnings, or `--dry-run`
+  to validate the output plan without launching a browser or writing outputs.
 
-Expected: the commands print their progress and exit `0`. Warnings about skipped/downgraded CSS are
-normal and usually harmless — pass `-v` to `pagx import` to see them (see `references/pipeline.md`).
-A hard failure or an empty/blank PNG means the design needs a fix (Step 4) or setup is incomplete
-(Step 0).
+Expect exit code `0`. In directory mode, also require `manifest.json` status `complete`; a failed
+job may leave earlier outputs behind. Review warnings about omitted or downgraded content against
+the design. `--preview` writes a static contact sheet; it does not start `pagx preview`.
+See [Conversion pipeline](references/pipeline.md) and [CLI reference](references/cli.md#pagx-import)
+for output rules, batch mode and prepared-subset import.
 
-**Installed via npm, no repo (Case A):** the one-shot `html2pagx` wrapper is not on PATH, so run the
-built-in pipeline. `pagx` shells out to its bundled snapshot tool automatically (the first call
-triggers the one-time browser download). `pagx import` snapshots, imports, **and resolves** inline
-`<svg>`/import directives in one command, so no separate `pagx resolve` step is needed:
-
-```bash
-pagx import --input <name>.html --output <name>.pagx
-pagx render <name>.pagx -o <name>.png   # preview PNG; add --scale 2 for a crisp image
-```
-
-A public URL works the same way (`--input https://… --output <name>.pagx`). Note: this path does not
-auto-embed web fonts — if text renders in the wrong typeface, either install that font on the
-machine, or embed it explicitly with `pagx font embed --file <font>`. See `references/pipeline.md`
-§Fonts.
-
-See `references/pipeline.md` for advanced options (URL inputs, image storage modes, custom viewport
-via `snapshot.js`, and a manual step-by-step path for debugging).
-
-**Deliver the live browser preview command; do not auto-launch it.** After Step 3 produces the
-`.pagx`, run `pagx verify` and fix every diagnostic until it exits 0 with no diagnostic output.
-Then the final reply MUST include the following block exactly, replacing the placeholder with the
-absolute path to the generated `.pagx` file. This is mandatory even when `pagx render` already
-produced a PNG:
-
-```
-需要交互预览（带热重载）可手动执行：
-  pagx preview <需要预览的文件绝对路径>.pagx
-或告诉我，我帮你启动。
-运行 pagx preview stop 停止服务，pagx preview --help 查看更多。
-```
-
-When the user asks to preview, run `pagx preview <absolute-path>.pagx`, parse the printed URL, and
-open it with the IDE's built-in browser tool (e.g. `preview_url`). The PNG from `pagx render` is
-only for internal QA comparison and never substitutes for the mandatory interactive preview
-command delivered to the user.
+Run `pagx verify` on the generated files and review their rendered output. For delivery, include
+a working live viewer command as described in [Live browser preview](#live-browser-preview).
 
 ### Step 4: Review and iterate
 
@@ -381,20 +348,23 @@ command delivered to the user.
      across one loop to check the motion: `pagx render <name>.pagx -o frame_05.png --time 0.5`
      (repeat at e.g. `--time 0`, `0.5`, `1.0`). Show the user the frame sequence. See
      `references/animation.md` §Previewing the motion.
-2. If something is wrong, **edit the `<name>.html`** (not the PAGX) and re-run Step 3. The HTML is
-   the source of truth; treat the `.pagx` as a build artifact.
+2. If something is wrong, **edit the `<name>.html`** (or the scenario for a captured state) and
+   re-run Step 3 with `--overwrite` for the generated outputs. The HTML/scenario is the source of
+   truth; treat the `.pagx` as a build artifact.
 3. Common fixes:
-   - Text in the wrong font → ensure the Google Fonts `<link>` is present; if the typeface is still
-     wrong, install that font on the machine or embed it with `pagx font embed --file <font>`.
+   - Text in the wrong font → check font loading and requested face/weight; re-import with
+     `--embed-fonts` for portable output. For existing PAGX, use `pagx embed --fallback <font-file>`.
    - Content clipped or off-canvas → match `--viewport-width`/`--viewport-height` to the `body` size.
-   - An element missing from the PNG → it was hidden, an unsupported widget, or a tainted
-     `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
-   - Motion missing or wrong → the animation was hover/scroll-triggered, finished before the
-     snapshot, or animated a non-playable property (a layout size like `width`/`height`, or a 3D
-     transform); see `references/animation.md`.
-4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
-   it contains. If a `pagx preview` daemon is running, stop it with `pagx preview stop`. Do not
-   commit generated `.png` / `.subset.html` files.
+   - An element missing from the PNG → check visibility, capture readiness and unsupported-content
+     warnings; see `references/authoring-html.md` §Capture boundaries and `references/pipeline.md`.
+   - Motion missing or wrong → first check `--capture-animations`; the animation may also have been
+     hover/scroll-triggered, finished before the snapshot, or animated a non-playable property
+     (a layout size like `width`/`height`, or a 3D transform); see `references/animation.md`.
+4. When the result matches the intent, deliver the PAGX with any required `.assets/` directories.
+   For a result set, retain the manifest and identify the requested checkpoints; validate and
+   inspect each delivered file. Include contact sheets when useful for comparing states.
+   If a `pagx preview` daemon is running, stop it with `pagx preview stop` when finished.
+   Do not commit generated `.png` / `.subset.html` files unless requested.
 
 For deeper polish of the resulting PAGX (precise spacing, constraints, animation-ready structure),
 switch to the [Update Workflow](#update-workflow), which edits the `.pagx` directly.
@@ -403,53 +373,42 @@ switch to the [Update Workflow](#update-workflow), which edits the `.pagx` direc
 
 ## Live browser preview
 
-`pagx preview <file>.pagx` starts a local HTTP server that renders the PAGX in a browser tab and
-watches the file for hot reload. Use it to let the user see the finished design interactively;
-use `pagx render` / `pagx verify` only for internal pixel-level QA screenshots (the sub-agent
-reviewer reads PNG files, not a live tab).
+Include a copy-ready viewer command when delivering a verified PAGX. Communicate in the user's
+language, use absolute paths, and explain how to stop the viewer. Static PNGs, animation frames
+and contact sheets can accompany the result; identify them as static previews.
 
-**Treat the preview command as a required deliverable; do not auto-launch it.** After generating a
-`.pagx` and completing a clean `pagx verify`, the final reply MUST include the following block
-exactly, replacing the placeholder with the absolute path to the generated `.pagx`. Never omit it,
-even when `pagx render` already produced a PNG:
+**Select the actual viewer launcher.** `pagx preview` is supplied by the npm wrapper; the native
+CMake-built `pagx` binary does not implement that command. When a native build is first on PATH,
+use the installed npm launcher by its absolute path, or the repository viewer entrypoint:
 
+```bash
+# npm installation
+pagx preview /absolute/path/design.pagx
+pagx preview stop
+
+# Repository entrypoint (use the actual checkout path)
+node /absolute/path/libpag/playground/pagx-preview/src/cli.js /absolute/path/design.pagx
+node /absolute/path/libpag/playground/pagx-preview/src/cli.js stop
 ```
-需要交互预览（带热重载）可手动执行：
-  pagx preview <需要预览的文件绝对路径>.pagx
-或告诉我，我帮你启动。
-运行 pagx preview stop 停止服务，pagx preview --help 查看更多。
-```
 
-Only start the daemon when the user explicitly asks to preview.
+Check the selected entrypoint with `--help`. If the repository viewer needs setup, follow the
+checkout's `playground/pagx-preview/README.md`. This does not change which native binary is used
+for conversion. For multiple captured states, point to a representative/requested checkpoint and
+identify the other output files.
 
-- **Absolute paths.** Prefer the absolute `.pagx` path in every command handed to the user because
-  their shell may not be in the file's directory.
-- **Non-blocking.** The default spawns a detached background daemon, prints
-  `pagx preview: http://127.0.0.1:<port>/...` to stdout, and returns the shell prompt — it does
-  not hang the session. In non-TTY / agent contexts no system browser is auto-opened; open the
-  printed URL in the IDE's built-in browser instead (e.g. the `preview_url` tool).
-- **Hot reload.** Saving the `.pagx` (or re-running `pagx import` in the HTML→PAGX workflow)
-  refreshes every open tab automatically — start the preview once, then iterate and watch it
-  update.
-- **Session reuse.** Running `pagx preview` again reuses the running daemon for a new file;
-  each file gets its own session, cleaned up independently when its tab closes.
-- **Always clean up.** The daemon stays up until stopped. Run `pagx preview stop` when the user
-  is done previewing to free the port and process.
-
-See `references/cli.md` §pagx preview for all options (`--port`, `--json`, `--foreground`, etc.).
+Do not auto-launch the viewer. When the user requests it, start the selected entrypoint, open the
+printed URL with the available browser tool, and reuse the session while iterating. The viewer
+hot-reloads on save. Stop the daemon when the user is finished. See [CLI reference](references/cli.md#pagx-preview)
+for options such as `--json`, `--no-open` and `--foreground`.
 
 ## Delivery Contract (read last)
 
-Before you end ANY PAGX task, your final reply MUST satisfy all of:
+When delivering generated or edited PAGX files:
 
-1. A `.pagx` that `pagx verify` exits 0 on — no diagnostics.
-2. The exact, copy-ready `pagx preview <absolute-path>.pagx` command is shown to the
-   user, using the mandated Chinese guidance block. This is a REQUIRED deliverable —
-   never omit it, even when `pagx verify` / `pagx render` already passed.
-3. The `pagx render` PNG was used only for your own QA comparison, never presented as
-   the user's interactive preview.
-4. (Update workflow) `pagx verify` final run exits 0 with zero diagnostics.
-
-Failure mode — do NOT do this: spend the whole turn iterating on `pagx verify` until it
-passes, then reply without the preview guidance because you "already rendered a PNG".
-The PNG is internal QA; the preview command is the mandatory user deliverable.
+1. Validate each delivered PAGX with `pagx verify` and inspect its rendered result; finish the
+   applicable QA workflow before declaring success.
+2. Include the copy-ready live viewer command appropriate to the environment, with the absolute
+   PAGX path. A rendered PNG does not replace this command.
+3. Label PNGs/contact sheets as static previews; captured states do not retain the web app's logic.
+4. Deliver required image sidecars with the PAGX. For result sets, retain the manifest and require
+   status `complete` before describing the whole job as successful.

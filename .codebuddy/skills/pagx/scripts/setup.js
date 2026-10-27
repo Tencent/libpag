@@ -10,8 +10,8 @@
 //   3. tools/html-snapshot - npm deps installed + TypeScript built (dist/)
 //   4. headless Chromium - bundled with puppeteer; reported (not auto-installed) if missing
 //
-// Idempotent: re-running only does work that is still needed. Prints "setup: ready"
-// on success. Run from anywhere inside the repository:
+// Installs dependencies only when absent and rebuilds TypeScript to match the checkout.
+// Prints "setup: ready" on success. Run from anywhere inside the repository:
 //   node .codebuddy/skills/pagx/scripts/setup.js
 
 const fs = require('fs');
@@ -88,14 +88,11 @@ if (!fs.existsSync(path.join(toolDir, 'node_modules'))) {
   say('snapshot tool dependencies present');
 }
 
-// --- snapshot tool: build (html2pagx requires dist/) ----------------------
-if (!fs.existsSync(path.join(toolDir, 'dist', 'lib'))) {
-  say('building snapshot tool (tsc)...');
-  const r = run('npm', ['run', 'build'], { cwd: toolDir });
-  if (r.status !== 0) die('npm run build failed in tools/html-snapshot');
-} else {
-  say('snapshot tool already built');
-}
+// --- snapshot tool: build -------------------------------------------------
+// Existing dist/ may belong to an older checkout and lack the current import adapter.
+say('building snapshot tool (tsc)...');
+const build = run('npm', ['run', 'build'], { cwd: toolDir });
+if (build.status !== 0) die('npm run build failed in tools/html-snapshot');
 
 // --- headless Chromium ----------------------------------------------------
 const home = process.env.HOME || process.env.USERPROFILE || '';

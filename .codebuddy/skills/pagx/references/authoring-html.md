@@ -1,20 +1,20 @@
 # Authoring HTML that converts cleanly to PAGX
 
 Read this before writing the design HTML in Step 2. The converter renders the page in a real
-headless browser and then flattens the rendered result into PAGX, so almost any modern HTML/CSS
-works. These rules keep the conversion faithful and the output clean. They are guidelines for the
+headless browser and converts supported layout, paint, text and images into PAGX. Review the
+render and warnings for unsupported behavior. These are guidelines for the
 **source design**, not the strict importer subset (the browser snapshot handles the translation);
 the authoritative subset reference is `spec/html_subset.md`.
 
 ## TL;DR checklist
 
-- [ ] One self-contained `.html` file (no local relative assets).
-- [ ] `body` has an explicit pixel `width` and `height` = the target canvas, and `margin:0`.
-- [ ] Web fonts loaded via a Google Fonts `<link>` (embed with `pagx font embed` if text renders in the wrong typeface).
-- [ ] Icons are inline `<svg>` or an icon webfont — never typed glyphs.
+- [ ] Resources are available through inline data, valid local paths or reachable URLs.
+- [ ] For a fixed-size design, `body` has the target pixel dimensions and `margin:0`; match the capture viewport.
+- [ ] Intended font faces and weights are loaded; use `--embed-fonts` for portable typography.
+- [ ] Use SVG or icon fonts when an icon needs a predictable shape.
 - [ ] Real, selectable text for all copy (not text baked into images).
-- [ ] No interactive widgets, no scrolling content, no video/iframe.
-- [ ] Any motion auto-plays and stays inside the playable channels — `opacity`, `transform`
+- [ ] Choose ordinary capture, animation capture or a scenario to match the requested result.
+- [ ] Requested motion is attached at capture time, uses `--capture-animations`, and stays inside supported channels — `opacity`, `transform`
       (translate/scale/rotate/skew), `color` / `background-color`, `filter` (drop-shadow/blur),
       `clip-path` (see §8 + `references/animation.md`).
 
@@ -22,7 +22,7 @@ the authoritative subset reference is `spec/html_subset.md`.
 
 ## 1. Canvas size
 
-The PAGX canvas size comes from the `body` box. Always pin it:
+For a fixed-size poster/card, set the `body` box to the target canvas:
 
 ```html
 <body style="margin: 0; width: 1080px; height: 1440px;">
@@ -32,26 +32,29 @@ The PAGX canvas size comes from the `body` box. Always pin it:
   numbers so the page is not clipped or letterboxed.
 - Design at 1× (real pixels). For crisp previews, render the PNG at a higher scale instead of
   inflating the canvas.
+- For an existing responsive application, preserve its layout and choose the intended viewport.
+  Scenario capture sets its viewport and capture extent in the scenario JSON.
 
 ## 2. Make the file self-contained
 
-For a local `.html` file, relative resources (`<img src="logo.png">`, local CSS) will **not**
-resolve when the page is rendered. Inline or absolutize everything:
+Self-contained HTML is convenient for a new design, but existing local assets are supported.
+Local files are opened as `file:` URLs and ordinary relative resources resolve against the HTML
+location. Use a local HTTP URL for apps that require an HTTP origin (for example module/fetch
+behavior blocked on `file:`). Keep assets available until conversion finishes.
 
-- **Images**: inline as `data:` URIs, or reference an absolute `https://` URL. The snapshot inlines
-  external images into the output automatically.
+- **Images**: use data URIs, local relative paths or reachable URLs. Final `--images external`
+  output has an `.assets/` directory; `--images embed` stores the bytes in the PAGX.
 - **CSS**: put it in a `<style>` block or inline `style=""` attributes. A Tailwind CDN `<script>`
   works because the page runs in a browser, but plain inline CSS is the most predictable.
-- **Fonts**: load via a Google Fonts (or other CDN) `<link rel="stylesheet">` so the browser fetches
-  them and the snapshot captures the right glyphs. PAGX resolves fonts by name at render time, so if
-  that typeface is not installed on the render host, install it there or embed it into the `.pagx`
-  with `pagx font embed --file <font>` (the optional `html2pagx` wrapper can do this in one step with
-  `--embed-fonts`). URL inputs resolve their own relative resources, so this caveat applies mainly to
-  local files.
+- **Fonts**: load the intended faces/weights with local `@font-face`, a stylesheet or an available
+  system font. `pagx import --render` acquires web fonts for the preview; `--embed-fonts` embeds
+  shaped glyphs so the PAGX can reproduce the typography on other hosts. `--download-fonts` also
+  retains the acquired font files. See [Fonts and images](pipeline.md#fonts-and-images).
 
 ## 3. Layout
 
-Use ordinary CSS — the converter flattens it to absolute boxes and then re-infers flex:
+Use ordinary CSS. The browser computes positions and paint order; the importer infers flex only
+where it can preserve the captured result:
 
 - Prefer **flexbox** (`display:flex`, `flex-direction`, `gap`, `align-items`, `justify-content`,
   `flex: N`) and `padding` for spacing. These map most directly to PAGX containers.
@@ -60,6 +63,10 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
   (`linear-/radial-/conic-gradient`), and `transform` all convert.
 - Avoid CSS Grid where flexbox suffices; grid is not modeled and is approximated from the rendered
   positions only.
+- Layered backgrounds, per-side border styles, outlines, text shadows and supported backdrop
+  effects are handled by the browser/import pipeline. Inspect complex combinations rather than
+  replacing them preemptively. Source-browser support does not imply that the same CSS can be
+  passed directly to `--html-source snapshot`.
 
 ## 4. Text
 
@@ -77,13 +84,14 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 - **Icon webfonts** (Phosphor, Material Icons, Font Awesome, Lucide, Remix, Tabler) used via
   `::before { content: "\eXXX" }` are automatically converted to inline `<svg>` during conversion,
   so the result does not depend on the icon font being installed.
-- **Never** use typed characters as icons (`+`, `×`, `→`, `★`); they render as plain text and look
-  wrong. Use an SVG or icon font instead.
+- Prefer SVG for graphical icons whose shape must stay consistent across fonts. Keep intentional
+  text and symbols as text when their typography is part of the design.
 
 ## 6. Images and photos
 
 - `<img>` with `width`/`height` becomes an image fill. Set `object-fit` to control scaling:
-  `cover` → zoom-to-fill, `contain` → letterbox, `fill` → stretch.
+  `cover` → zoom-to-fill, `contain` → letterbox, `fill` → stretch, `none` → natural size,
+  `scale-down` → the smaller of natural size and contain. Use `object-position` for alignment.
 - The rounded-avatar pattern (an `<img>` inside a `border-radius` + `overflow:hidden` wrapper)
   converts to a clipped rounded image.
 
@@ -97,37 +105,36 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 
 ## 8. Animation
 
-Motion is captured, not flattened: animations the page runs (CSS `@keyframes` + `animation`, GSAP,
-anime.js, the Web Animations API) become a real PAGX animation timeline, automatically. Keep it
+With `--capture-animations`, supported CSS, GSAP, anime.js and Web Animations API motion can
+become a PAGX timeline. Without that flag the output is static. Keep motion
 faithful by animating the channels the runtime can play — `opacity`, `transform` (translate, scale,
 rotate, skew), `color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and
 `clip-path` reveals; inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset`
-line-draw — and by making the animation auto-play and `infinite`. Only layout/size changes
+line-draw — and by keeping the animation attached at capture time. Use `infinite` for requested
+looping motion and preserve one-shot timing when requested. Layout/size changes
 (`width`, `height`, `margin`, …) and 3D transforms (`matrix3d`/`rotate3d`/`perspective`) are not
 animatable and convert to a static element. Full rules, playable-channel table, preview
 instructions, and warnings live in `references/animation.md` — read it before authoring any
 animation.
 
-## What to avoid
+## Capture boundaries
 
-These either drop out or convert poorly. Design around them:
+Choose capture behavior based on the required appearance and editability:
 
-- **Hidden content**: `display:none`, `visibility:hidden`, `opacity:0` elements are dropped (by
-  design — PAGX has no hidden nodes). Don't hide-then-reveal; just include what should show.
-- **Interactive / stateful widgets**: `<form>`, `<input>`, `<button>`, `<select>`, `<textarea>`
-  are reduced to their visible label/value only. Style a `<div>`/`<span>` to *look* like a button
-  instead of relying on a real control.
-- **Scrolling regions**: only the visible frame is captured. Lay content out to fit the canvas;
-  don't rely on overflow scrolling to reveal more.
-- **Interaction-triggered motion**: hover, focus, and click states are captured in whatever frame
-  the snapshot lands on (no interaction fires), so don't depend on them. Auto-playing animations
-  *are* captured, though — see §Animation below.
-- **No static visual**: `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`, `<map>` are
-  dropped. Use a poster image (`<img>`) instead of a `<video>`.
-- **Tainted/WebGL canvas**: a `<canvas>` drawn from a cross-origin image without CORS, or a WebGL
-  canvas without `preserveDrawingBuffer`, captures empty. Use same-origin/CORS-enabled sources.
-- **Per-side / dashed-dotted borders**: asymmetric borders become thin overlay rectangles and
-  dashed/dotted per-side borders may coerce to solid. Prefer uniform borders.
+- **Visibility and readiness:** static capture records the chosen state. Use explicit scenario
+  actions and `waitFor` conditions for content revealed by a click or completed async operation.
+- **Form controls:** supported controls preserve their current appearance/value as static content.
+  Keep meaningful source controls; use a scenario for filled, selected or focused states, and
+  inspect native-control styling in the result. The PAGX does not retain HTML event handlers.
+- **Scrolling:** use scenario `scroll` steps for a specific view. Document capture includes only
+  materialized content; it does not automatically load the rest of an infinite feed.
+- **Embedded/browser-only content:** media, iframes, shadow DOM and native top-layer UI have
+  limits. For scenario capture, unsupported content fails by default; an explicit viewport raster
+  fallback is available when a bitmap is acceptable. See [Interaction capture](interaction.md#capture-boundaries).
+- **Canvas:** supported readable canvas pixels become a bitmap. Tainted or unavailable WebGL
+  pixels may fail or be missing; use readable resources or a suitable image/SVG alternative.
+- **Paint and motion:** 3D composition and animated changes to stacking order are limited. Review
+  `paint:*` warnings; absolute children in paint-planned containers intentionally retain their order.
 
 ## Minimal template
 
@@ -160,11 +167,9 @@ These either drop out or convert poorly. Design around them:
 </html>
 ```
 
-Convert it in-repo with the locally built `pagx`. If the design fits the default snapshot viewport,
-`pagx import --input page.html --output page.pagx` is enough; to pin the 640px width, snapshot first
-then import the subset:
+Convert with the selected `pagx` binary, matching the viewport and embedding fonts for portability:
 
 ```bash
-node tools/html-snapshot/snapshot.js page.html --viewport-width 640 -o page.subset.html
-PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
+pagx import page.html -o page.pagx --viewport-width 640 --viewport-height 400 \
+  --embed-fonts --render
 ```

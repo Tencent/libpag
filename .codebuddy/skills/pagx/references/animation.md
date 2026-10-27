@@ -1,10 +1,16 @@
 # Animation: making the PAGX move
 
-The converter does not just flatten a still frame — it also captures the page's **motion** and
-bakes it into the `.pagx` as a real PAGX animation timeline. Capture is **automatic** (on by
-default in both the in-repo `html2pagx` path and the npm `pagx import` path); no flag is needed.
-This reference covers what gets captured, which channels play back, how to author HTML that
-animates faithfully, how to preview the motion, and how to read the warnings.
+The converter can capture supported page motion as a PAGX animation timeline. Animation capture
+is **off by default** in both repository and npm workflows. Enable it explicitly:
+
+```bash
+pagx import motion.html -o motion.pagx --capture-animations --render
+```
+
+Use `--overwrite` when intentionally regenerating existing outputs. `--scenario` captures static
+interaction states and cannot be combined with `--capture-animations`; see
+[Interaction capture](interaction.md). For prepared subset input, enable capture in the preceding
+snapshot step and import with `--html-source snapshot` without the animation-capture flag.
 
 ## Table of contents
 
@@ -22,7 +28,7 @@ animates faithfully, how to preview the motion, and how to read the warnings.
 
 The snapshot reads animations from every common source and normalizes them into one canonical form
 (CSS `@keyframes` + an `animation` shorthand) that the importer maps onto the PAGX animation model.
-Sources captured automatically:
+Sources recognized when capture is enabled:
 
 - **CSS `@keyframes` + `animation`** — plain stylesheet animations (the most reliable source).
 - **Web Animations API (WAAPI)** — `element.animate(...)`, and libraries built on it such as
@@ -56,7 +62,7 @@ A `box-shadow` that only appears in an animated state (e.g. a `.on` class toggle
 timeline) is folded into the drop-shadow filter channel automatically, so a pulsing glow animates
 even when authored as `box-shadow`.
 
-**Not playable** (silently flattened to the static frame): any **layout** property (`width`,
+**Not playable** (retained only as static appearance or dropped with a warning): **layout** properties (`width`,
 `height`, `margin`, `padding`, `gap`, `flex`, `top`/`left`, …) and **3D transforms**
 (`matrix3d`, `rotate3d`, `perspective`). Everything in the table above — including scale, rotate,
 and skew — now plays back; earlier versions dropped non-translation transforms, so do not assume a
@@ -97,9 +103,9 @@ Add these on top of the static rules in `authoring-html.md`:
   WAAPI also work, but the declarative CSS form captures its easing exactly.
 - **Keep animated properties inside the playable set above.** Layout properties and 3D transforms
   become static. Re-express a size change as `scale`, a 3D flip as a 2D `rotate`/`scaleX`.
-- **Auto-play on load.** Hover-, scroll-, or click-triggered animations have not fired when the
-  snapshot is taken (no interaction occurs). Use `animation` that starts immediately, or — for
-  scroll-revealed sections — convert with `--scroll-reveal` so they trigger. Do not rely on `:hover`.
+- **Make the motion available at capture time.** Ordinary animation capture does not execute a
+  scenario's clicks or hovers. Use motion attached on load, or `--scroll-reveal` for scroll-triggered
+  content. If the request is for the static appearance after an interaction, use a scenario instead.
 - **Make looping motion `infinite`** so it is captured reliably and so the PAGX loops (a finite
   count > 1 is downgraded to play once — see below).
 - **To animate color, give the element a solid `background-color` (or text `color`).** Without a
@@ -113,7 +119,7 @@ Example of a clean, fully-captured animation using several channels:
 <head>
   <style>
     @keyframes floatIn  { 0% { opacity:0; transform:translateY(24px);} 100% { opacity:1; transform:translateY(0);} }
-    @keyframes spin      { to { transform: rotate(360deg); } }
+    @keyframes spin      { 0% { transform: rotate(0deg); } 50% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
     @keyframes pulse     { 0%,100% { background-color:#6366F1;} 50% { background-color:#8B5CF6;} }
     @keyframes glow      { 0%,100% { filter: drop-shadow(0 0 4px #6366F1);} 50% { filter: drop-shadow(0 0 24px #8B5CF6);} }
     @keyframes iris      { 0% { clip-path: circle(0%);} 100% { clip-path: circle(75%);} }
@@ -140,9 +146,9 @@ pagx render <name>.pagx -o frame_05.png --time 0.5
 pagx render <name>.pagx -o frame_10.png --time 1.0
 ```
 
-Pick times that span one loop period (the longest `delay + duration` across the page's animations).
-Looping animations realign every period, so one period is enough to see the whole motion. `--time`
-cannot be combined with `--crop`, `--id`, or `--xpath`.
+Pick times that cover each animation's delay, key transitions and loop boundary. Animations with
+different durations do not necessarily realign after the longest duration. `--time` cannot be
+combined with `--crop`, `--id`, or `--xpath`.
 
 Show the user the frame sequence (or assemble them into a GIF/contact sheet) so they can confirm the
 motion, not just the still design.
@@ -170,7 +176,8 @@ How CSS animation timing maps onto PAGX (full detail in `spec/html_subset.md` §
 
 ## Warnings and troubleshooting
 
-`pagx import` prints `subset:animation-*` diagnostics; they are informational, not failures:
+Use `pagx import -v` to inspect `subset:animation-*` warnings. They can indicate lost motion even
+when conversion succeeds; compare the sampled frames with the intended behavior.
 
 | Symptom / warning | Cause / fix |
 |-------------------|-------------|
@@ -178,8 +185,9 @@ How CSS animation timing maps onto PAGX (full detail in `spec/html_subset.md` §
 | `subset:animation-multiple` | A regular element had several comma-separated animations (or timing functions); only the first was kept. Split into separate elements, or use an inline SVG shape (which supports a list). |
 | `subset:animation-finite-count` | A finite repeat count > 1 (or a finite `alternate`, or count `0`) was downgraded / suppressed. Use `infinite` to loop. |
 | `subset:animation-unknown-keyframes` | The `animation` referenced a `@keyframes` name that no longer exists; the animation was dropped. |
-| The element does not move in the preview | The animation was hover/scroll/click-triggered (never fired — make it auto-play or use `--scroll-reveal`), already finished before the snapshot (use `infinite`), or only animated a non-playable property. |
+| The element does not move in the preview | Check `--capture-animations` and render at distinct `--time` values. Then check whether the animation was attached at capture time, needed a trigger, or used an unsupported property. |
 | A rotate/scale "takes the short way" or snaps | Matrix interpolation cannot cross ±180° or a full turn in one segment; add intermediate `@keyframes` stops (`0% / 50% / 100%`). |
 | Color animation does nothing | The element paints no solid `color` / `background-color`; add one. |
 | A `clip-path` reveal is dropped | The keyframes animate between different shape functions (e.g. `circle()` → `polygon()`); CSS only interpolates matching shapes. Keep every stop the same function with the same point count. |
-| Want a purely static `.pagx` | Capture cannot be disabled from `html2pagx` today; remove the `animation` declarations from the HTML, or run `pagx import` on a static subset HTML with no `@keyframes`. |
+| `paint:animated-stacking` | The animation changes stacking topology (for example `z-index` or `display`); exported paint order remains static. Use a fixed stacking structure or capture the desired static states separately. |
+| Want a purely static `.pagx` | Import the original HTML without `--capture-animations`. Use a scenario for a particular interaction state. |
