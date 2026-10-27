@@ -106,6 +106,7 @@ ${ICON_FONT_HELPERS_SRC}
 ${BROWSER_EXPORTS.map((e) => e.fn.toString()).join('\n\n')}
 
 return {
+  installTextLayout: installTextLayout,
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,

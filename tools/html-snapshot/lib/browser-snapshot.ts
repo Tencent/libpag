@@ -1234,6 +1234,7 @@ function classify(el, computed) {
 // surgery on the joined style — see renderTextInput.
 function appendStyleProp(parts, computed, entry, ctx) {
   let raw = computed.getPropertyValue(entry.prop).trim();
+  if (entry.prop === 'font-family') raw = snapshotFontFamily(raw, computed);
   if (entry.prop === 'color' && ctx && ctx.textColorOverride) {
     raw = ctx.textColorOverride;
   }
@@ -1295,6 +1296,20 @@ function fontMatchCompare(request, a, b) {
   const first = rank(a), second = rank(b);
   for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return first[i] - second[i];
   return 0;
+}
+
+function snapshotFontFamily(value, computed) {
+  const aliases = window.__pagxFontAliases || [];
+  if (!aliases.length) return value;
+  const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
+  const request = { weight: String(weight), style: computed.getPropertyValue('font-style') || 'normal',
+    stretch: computed.getPropertyValue('font-stretch') || '100%' };
+  return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
+    const family = part.trim().replace(/^["']|["']$/g, '');
+    const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
+    matches.sort((a, b) => fontMatchCompare(request, a, b));
+    return matches.length ? `'${matches[0].to.replace(/'/g, "\\'")}'` : part.trim();
+  }).join(', ');
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -2393,21 +2408,180 @@ function freezeSvg(svgEl, rect) {
 
 // ===== Multi-line text emission =====
 
-// Collapse client rects that belong to the SAME visual line/column into one
-// rect spanning their inline-axis union. `blockAxis` names the wrap-progression
-// axis ('y' = horizontal lines stacking down; 'x-rl'/'x-lr' = vertical columns
-// stacking sideways): two rects are on the same line/column when their extents
-// ALONG that axis overlap. Chromium hands back a separate rect per glyph run on
-// a line (a soft-hyphen's visible hyphen, a bidi direction switch, etc.); the
-// caller's line bisection assumes one rect per line, so without this merge a
-// stray same-line rect would split that line's text at an arbitrary offset.
-//
-// Rects arrive in document order, which is also block-axis order, so a single
-// forward pass that extends the current group while the next rect overlaps it
-// on the block axis suffices. The merged rect keeps the group's block-axis
-// position/size (top/height for 'y', left/width for the vertical modes) and
-// unions the inline-axis interval so its leading edge and extent cover every
-// glyph run on the line.
+function textFragmentStyle(computed, overrides) {
+  return new Proxy(computed, {
+    get(target, key) {
+      if (key === 'getPropertyValue') {
+        return (name) => Object.prototype.hasOwnProperty.call(overrides, name)
+          ? overrides[name] : target.getPropertyValue(name);
+      }
+      const value = target[key];
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+// Resolve layout text offsets back to source UTF-16 offsets. Do not assume that
+// layoutText is the DOM text: first-letter removes a prefix, whitespace may be
+// collapsed, and text-transform may change the string length (e.g. ß -> SS).
+function mapLayoutText(source, layoutText, computed) {
+  const mode = computed.getPropertyValue('text-transform').trim();
+  const transformed = [];
+  const starts = [];
+  const ends = [];
+  let offset = 0;
+  for (const ch of source) {
+    const value = mode === 'uppercase' ? ch.toUpperCase()
+      : mode === 'lowercase' ? ch.toLowerCase() : ch;
+    for (let j = 0; j < value.length; j++) {
+      transformed.push(value[j]);
+      starts.push(offset);
+      ends.push(offset + ch.length);
+    }
+    offset += ch.length;
+  }
+  const candidates = [{ text: transformed.join(''), starts, ends }];
+  const collapsed = { text: '', starts: [], ends: [] };
+  for (let i = 0; i < transformed.length; i++) {
+    const ch = transformed[i];
+    if (/[ \t\r\n\f]/.test(ch)) {
+      if (collapsed.text.endsWith(' ')) collapsed.ends[collapsed.ends.length - 1] = ends[i];
+      else {
+        collapsed.text += ' ';
+        collapsed.starts.push(starts[i]);
+        collapsed.ends.push(ends[i]);
+      }
+    } else {
+      collapsed.text += ch;
+      collapsed.starts.push(starts[i]);
+      collapsed.ends.push(ends[i]);
+    }
+  }
+  candidates.push(collapsed);
+  for (const c of candidates) {
+    if (!c.text.endsWith(layoutText)) continue;
+    const index = c.text.length - layoutText.length;
+    return { starts: c.starts.slice(index), ends: c.ends.slice(index),
+      prefixEnd: layoutText ? c.starts[index] : source.length };
+  }
+  return null;
+}
+
+function initialLayoutForText(textNode) {
+  const layouts = window.__pagxInitialLayouts;
+  if (!layouts) return null;
+  for (let host = textNode.parentElement; host; host = host.parentElement) {
+    const runs = layouts.get(host);
+    if (runs) return runs;
+  }
+  return null;
+}
+
+function textLayoutWarning(textNode, reason) {
+  const host = textNode.parentElement;
+  const message = `html-snapshot: text: <${host.tagName.toLowerCase()}>` +
+    (host.id ? `#${host.id}` : '') + ': ' + reason;
+  if (!PAINT_CAPTURE.warnings.includes(message)) PAINT_CAPTURE.warnings.push(message);
+}
+
+function measuredTextFragments(textNode, computed, axis) {
+  const fragments = snapshotTextFragments(textNode, computed);
+  if (fragments) return fragments;
+  if (initialLayoutForText(textNode)) {
+    textLayoutWarning(textNode, 'first-letter source mapping unavailable; using DOM geometry');
+  } else if (!window.__pagxTextLayouts) {
+    // The standalone bundle cannot read pseudo source ranges. Report an
+    // authored first-letter style when it affects the first visible text node.
+    for (let host = textNode.parentElement; host; host = host.parentElement) {
+      const base = getComputedStyle(host), pseudo = getComputedStyle(host, '::first-letter');
+      const differs = ['font-size', 'font-family', 'color', 'float'].some((prop) =>
+        base.getPropertyValue(prop) !== pseudo.getPropertyValue(prop));
+      if (!differs) continue;
+      const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+      let first;
+      while ((first = walker.nextNode()) && !(first.nodeValue || '').trim()) {}
+      if (first === textNode) {
+        textLayoutWarning(textNode, 'first-letter style requires installed layout metadata');
+        break;
+      }
+    }
+  }
+  return splitTextNodeIntoLines(textNode, computed.getPropertyValue('white-space'), axis);
+}
+
+function snapshotTextFragments(textNode, computed) {
+  const entry = window.__pagxTextLayouts && window.__pagxTextLayouts.get(textNode);
+  if (!entry || entry.source !== textNode.nodeValue || entry.runs.length > 1) return null;
+  const source = textNode.nodeValue || '';
+  // Keep the soft-hyphen visibility resolver on the DOM path until the protocol
+  // provider also supplies the inserted hyphen's character mapping.
+  if (source.includes('\u00ad')) return null;
+  const normal = entry.runs[0];
+  const mapping = normal ? mapLayoutText(source, normal.text, computed)
+    : { starts: [], ends: [], prefixEnd: source.length };
+  if (!mapping) return null;
+  const out = [];
+  const range = document.createRange();
+  const add = (start, end, text, style, initial) => {
+    if (start >= end || !text) return;
+    range.setStart(textNode, start);
+    range.setEnd(textNode, end);
+    const rect = range.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    out.push({ start, end, text, rect, computed: style, initial });
+  };
+  if (mapping.prefixEnd > 0) {
+    const prefix = source.slice(0, mapping.prefixEnd);
+    // Collapsed leading whitespace isn't a first-letter fragment.
+    if (prefix.trim()) {
+      const initials = initialLayoutForText(textNode);
+      const initial = initials && initials.find((run) =>
+        applyTextTransform(prefix, textFragmentStyle(computed, run.style)) === run.text);
+      if (!initial) return null;
+      add(0, mapping.prefixEnd, initial.text,
+        textFragmentStyle(computed, initial.style), true);
+      if (window.__pagxInitialRunsUsed) window.__pagxInitialRunsUsed.add(initial);
+    }
+  }
+  if (normal) {
+    // Chromium's text-box offsets are inconsistent for length-changing
+    // transforms: starts can be source offsets while lengths are transformed
+    // lengths (e.g. ß -> SS). Reject that coordinate space and measure source
+    // fragments instead; never duplicate or truncate text based on those boxes.
+    const suffix = source.slice(mapping.prefixEnd);
+    const simpleOffsets = suffix.length === normal.text.length &&
+      normal.boxes.every((box, i) => i === 0 ||
+        box.start >= normal.boxes[i - 1].start + normal.boxes[i - 1].length);
+    if (!simpleOffsets) {
+      const style = textFragmentStyle(computed, normal.style);
+      const wm = computed.getPropertyValue('writing-mode');
+      const axis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
+      for (const line of splitTextNodeIntoLines(textNode,
+        computed.getPropertyValue('white-space'), axis)) {
+        if (line.end <= mapping.prefixEnd) continue;
+        // A first-letter and normal text have different measured block extents.
+        // If they cannot be separated safely, use the explicit DOM fallback.
+        if (line.start < mapping.prefixEnd && source.slice(line.start, mapping.prefixEnd).trim()) {
+          return null;
+        }
+        out.push({ ...line, text: applyTextTransform(line.text, style), computed: style,
+          initial: false });
+      }
+      return out;
+    }
+    for (const box of normal.boxes) {
+      if (box.length <= 0 || box.start + box.length > mapping.ends.length) return null;
+      add(mapping.starts[box.start], mapping.ends[box.start + box.length - 1],
+        normal.text.slice(box.start, box.start + box.length),
+        textFragmentStyle(computed, normal.style), false);
+    }
+  }
+  return out;
+}
+
+// Join connected glyph-run rectangles with the same block-axis edges. A tall
+// initial and adjacent lines with tight leading may overlap substantially but
+// must remain distinct. Source order need not be monotonic on either axis.
 function mergeRectsOnSameLine(rects, blockAxis) {
   if (rects.length <= 1) return rects.slice();
   // blockLo/blockHi read the wrap-axis interval; inlineLo/inlineHi the
@@ -2436,19 +2610,12 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   };
   for (let i = 1; i < rects.length; i++) {
     const r = rects[i];
-    // "Same line/column" means the two rects overlap on the block axis by a
-    // MAJORITY of the smaller rect's block extent — not merely by a sub-pixel
-    // sliver. A fixed pixel tolerance is wrong here: getClientRects reports
-    // glyph INK bounds, which routinely exceed the line-height (e.g. a 16px
-    // line renders ~17px of ink), so two ADJACENT lines whose tops differ by
-    // exactly the line-height still overlap by ~1px of ink. That sliver must
-    // NOT merge them. Same-line glyph runs (soft-hyphen glyph, bidi split)
-    // instead share the line's top/height, so they overlap almost fully.
-    // Requiring the overlap to cover ≥ half the smaller extent cleanly
-    // separates "next line, ink bleeds up by 1px" from "same line, split run".
-    const overlap = Math.min(blockHi(r), curBlockHi) - Math.max(blockLo(r), curBlockLo);
-    const minExtent = Math.min(blockHi(r) - blockLo(r), curBlockHi - curBlockLo);
-    const overlaps = overlap > 0 && overlap >= minExtent * 0.5;
+    // Overlap is insufficient: a drop cap or tight leading can overlap several
+    // distinct lines. Require matching block edges AND connected inline ranges.
+    // The latter also prevents one-line multicolumn fragments from being joined.
+    const overlaps = Math.abs(blockLo(r) - curBlockLo) < 0.5 &&
+      Math.abs(blockHi(r) - curBlockHi) < 0.5 &&
+      inlineLo(r) <= curInlineHi + 0.5 && inlineHi(r) >= curInlineLo - 0.5;
     if (overlaps) {
       curBlockLo = Math.min(curBlockLo, blockLo(r));
       curBlockHi = Math.max(curBlockHi, blockHi(r));
@@ -2466,56 +2633,12 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   return out;
 }
 
-// Split a text node into one entry per visually-rendered line (horizontal
-// writing modes) or column (vertical writing modes). We use
-// Range.getClientRects() to obtain the per-line/column bounding boxes from the
-// browser's own layout, then binary-search the character offsets at which one
-// line/column gives way to the next. This matches Chromium's line-break
-// decisions exactly while keeping the work to O(lines · log n)
-// getBoundingClientRect calls instead of the O(n) per-character scan the
-// original implementation performed.
-//
-// `axis` selects the block-progression axis along which the run wraps:
-//   - 'y' (horizontal writing modes): lines stack downward, so the per-line
-//     rects arrive in increasing `top` order and the bisection key is a
-//     character's mid-Y.
-//   - 'x-rl' (vertical-rl): columns stack leftward, so the rects arrive in
-//     DECREASING `left` order (rightmost column first, matching document
-//     order); the bisection key is the NEGATED mid-X so it stays monotonically
-//     increasing like the 'y' case.
-//   - 'x-lr' (vertical-lr): columns stack rightward, rects in increasing
-//     `left`; key is mid-X.
-// Treating all three as "a monotonically increasing key along the block axis"
-// lets one bisection serve every writing mode.
-//
-// The host element's `white-space` controls whether embedded whitespace is
-// collapsed (`normal`, `nowrap`) or preserved (`pre`, `pre-wrap`, `pre-line`).
-// Collapsing in preserve modes would mangle code snippets, indentation, and
-// other pre-formatted content.
+// DOM-only fallback: match source graphemes to measured line/column rectangles.
+// `axis` is 'y' for horizontal lines, 'x-rl' / 'x-lr' for vertical columns.
+// The single-fragment case is constant-time; fragmented text takes O(n) Range
+// measurements. The protocol provider supplies boundaries for the common path.
 function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   const blockAxis = axis || 'y';
-  // Map a rect to its block-axis LEADING edge (the side a column/line starts
-  // from in progression order) and a character's mid-point to the same
-  // monotonically-increasing key, so "first char whose key >= the next rect's
-  // leading-edge key" lands exactly on that rect's first character.
-  //   - 'y': lines advance downward, leading edge = rect.top, char key = mid-Y.
-  //   - 'x-lr': columns advance rightward, leading edge = rect.left, char key
-  //     = mid-X.
-  //   - 'x-rl': columns advance leftward; once X is negated to make the order
-  //     ascending, the leading edge becomes the column's RIGHT edge
-  //     -(left + width), NOT -left. Using -left would place the threshold at
-  //     the column's trailing edge, half a column past the glyph centres, so
-  //     every column's characters would be misassigned to the column before it.
-  const rectKey = (r) => {
-    if (blockAxis === 'x-rl') return -(r.left + r.width);
-    if (blockAxis === 'x-lr') return r.left;
-    return r.top;
-  };
-  const charKey = (r) => {
-    if (blockAxis === 'x-rl') return -(r.left + r.width / 2);
-    if (blockAxis === 'x-lr') return r.left + r.width / 2;
-    return r.top + r.height / 2;
-  };
   const text = textNode.nodeValue || '';
   if (!text.trim()) return [];
   const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
@@ -2561,7 +2684,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
       range.setStart(textNode, idx);
       range.setEnd(textNode, idx + 1);
       const r = range.getBoundingClientRect();
-      softHyphenVisible.set(idx, r.width > 0 || r.height > 0);
+      softHyphenVisible.set(idx, blockAxis === 'y' ? r.width > 0 : r.height > 0);
     }
   }
   // Resolve the [start, end) slice's soft hyphens against the measured map,
@@ -2581,17 +2704,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
     }
     return cleanLine(resolved);
   };
-  // A single text node can hand back MORE than one client rect for the same
-  // visual line/column. The common trigger is a soft-hyphen (U+00AD) wrap:
-  // Chromium materialises the visible hyphen glyph as its own rect that shares
-  // the line's `top` (and height) but sits to the right of the text rect —
-  // e.g. `Compre­hensive` wrapped at 100px yields [Compre]+[-] both at top=0,
-  // then [hensive], then [overview]. The bisection treats every rect as a
-  // distinct line, so the stray hyphen rect would split the first line into
-  // `C` + `ompre­` at an arbitrary offset. Bidi runs split a line the same way.
-  // Merge rects whose block-axis intervals overlap (same line/column) into one
-  // inline-union rect BEFORE bisecting, so one visual line maps to exactly one
-  // entry regardless of how many glyph runs Chromium reported for it.
+  // Merge adjacent same-line runs, including a separately painted soft hyphen.
   const lineRects = mergeRectsOnSameLine(rawRects, blockAxis);
   if (lineRects.length === 0) {
     range.detach && range.detach();
@@ -2601,57 +2714,54 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
     const out = [{
       text: sliceText(0, text.length),
       rect: lineRects[0],
+      start: 0, end: text.length,
     }];
     range.detach && range.detach();
     return out.filter((b) => b.text);
   }
 
-  // Binary-search the first character index whose block-axis mid-key is >=
-  // `lineKey` within [lo, hi). When the candidate char has an empty rect
-  // (whitespace collapsed at a wrap point) we treat it as before the boundary
-  // and step right; this keeps the search O(log n) at the cost of binding
-  // collapsed whitespace to whichever side wins the bisection (visually
-  // invisible either way).
-  //
-  // `loStart` lets the caller pass the previously-found boundary as the
-  // lower bound, since boundaries are strictly increasing across lines.
-  // Without this, every line's search starts from index 0 and re-flushes
-  // layout for the leading characters that we already know belong to a
-  // higher line — for a 1000-char × 20-line block that's the difference
-  // between log2(1000)·20 ≈ 200 layout flushes and roughly half that.
-  function findFirstCharAtOrBelow(lineKey, loStart) {
-    let lo = loStart;
-    let hi = text.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      range.setStart(textNode, mid);
-      range.setEnd(textNode, mid + 1);
-      const r = range.getBoundingClientRect();
-      const empty = r.width === 0 && r.height === 0;
-      const key = empty ? -Infinity : charKey(r);
-      if (empty || key < lineKey) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
-      }
-    }
-    return lo;
-  }
-
-  // Boundary i = first char index of line i (boundaries[0] = 0).
-  const boundaries = [0];
-  for (let k = 1; k < lineRects.length; k++) {
-    boundaries.push(findFirstCharAtOrBelow(rectKey(lineRects[k]), boundaries[k - 1] + 1));
-  }
-  boundaries.push(text.length);
-  range.detach && range.detach();
-
+  // A DOM-only fallback cannot assume Y/X is monotonic in source order: columns
+  // reset it, and bidi runs can reverse the inline axis. Match grapheme ranges
+  // to their actual fragment rectangles instead. Protocol-backed captures avoid
+  // this O(n) measurement by supplying exact layout text-box boundaries.
+  const segments = typeof Intl.Segmenter === 'function'
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text))
+    : Array.from(text).map((segment) => ({ segment }));
   const out = [];
-  for (let i = 0; i < lineRects.length; i++) {
-    const cleaned = sliceText(boundaries[i], boundaries[i + 1]);
-    if (cleaned) out.push({ text: cleaned, rect: lineRects[i] });
+  let offset = 0;
+  let active = null;
+  for (const { segment } of segments) {
+    const start = offset;
+    offset += segment.length;
+    range.setStart(textNode, start);
+    range.setEnd(textNode, offset);
+    const r = range.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) {
+      if (active) active.end = offset;
+      continue;
+    }
+    const blockStart = blockAxis === 'y' ? r.top : r.left;
+    const blockSize = blockAxis === 'y' ? r.height : r.width;
+    const mid = blockAxis === 'y' ? r.left + r.width / 2 : r.top + r.height / 2;
+    const index = lineRects.findIndex((box) => {
+      const lo = blockAxis === 'y' ? box.left : box.top;
+      const size = blockAxis === 'y' ? box.width : box.height;
+      return Math.abs((blockAxis === 'y' ? box.top : box.left) - blockStart) < 0.5 &&
+        Math.abs((blockAxis === 'y' ? box.height : box.width) - blockSize) < 0.5 &&
+        mid >= lo - 0.5 && mid <= lo + size + 0.5;
+    });
+    // A font fallback run can have a different block extent. Preserve that
+    // measured rectangle as its own fragment instead of attaching it to a
+    // neighboring line merely because they overlap.
+    if (!active || index < 0 || active.index !== index) {
+      active = { start, end: offset, index, rect: index < 0 ? r : lineRects[index] };
+      out.push(active);
+    } else {
+      active.end = offset;
+    }
   }
-  return out;
+  return out.map((item) => ({ ...item, text: sliceText(item.start, item.end) }))
+    .filter((item) => item.text);
 }
 
 // True when `node` is an element that shares its line box with adjacent text —
@@ -2733,11 +2843,12 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     return emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve);
   }
   const ws = computed.getPropertyValue('white-space');
-  const lines = splitTextNodeIntoLines(textNode, ws, 'y');
-  const lineHeightPx = readNum(computed, 'line-height');
+  const lines = measuredTextFragments(textNode, computed, 'y');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lineComputed = line.computed || computed;
+    const lineHeightPx = readNum(lineComputed, 'line-height');
     let lt = line.rect.top;
     let lh = line.rect.height;
     if (lineHeightPx > lh + 0.1) {
@@ -2751,15 +2862,21 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     }
     const tl = line.rect.left - parentRect.left;
     const tt = lt - parentRect.top;
-    const base = buildStyle(tl, tt, line.rect.width, lh, computed, {
+    const base = buildStyle(tl, tt, line.rect.width, lh, lineComputed, {
       box: false, text: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
-    let transformed = applyTextTransform(line.text, computed);
+    let transformed = line.computed ? line.text : applyTextTransform(line.text, lineComputed);
     // Re-materialise the seam whitespace the browser rendered against an
     // inline sibling: leading on the first line, trailing on the last.
-    if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
-    if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
+    if (line.computed) {
+      // Protocol ranges already include rendered seam whitespace. Preserve it
+      // through the importer's trimming without adding it for a second time.
+      transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
+    } else {
+      if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
+      if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
+    }
     const intrinsicMode = opts && opts.intrinsicWidth;
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
@@ -2790,11 +2907,12 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
   const seam = preserve || { leading: false, trailing: false };
   const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
-  const columns = splitTextNodeIntoLines(textNode, ws, axis);
-  const lineHeightPx = readNum(computed, 'line-height');
+  const columns = measuredTextFragments(textNode, computed, axis);
   const out = [];
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
+    const colComputed = col.computed || computed;
+    const lineHeightPx = readNum(colComputed, 'line-height');
     let cl = col.rect.left;
     let cw = col.rect.width;
     if (lineHeightPx > cw + 0.1) {
@@ -2808,12 +2926,16 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     }
     const tl = cl - parentRect.left;
     const tt = col.rect.top - parentRect.top;
-    const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+    const base = buildStyle(tl, tt, cw, col.rect.height, colComputed, {
       box: false, text: true,
     });
-    let transformed = applyTextTransform(col.text, computed);
-    if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
-    if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
+    let transformed = col.computed ? col.text : applyTextTransform(col.text, colComputed);
+    if (col.computed) {
+      transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
+    } else {
+      if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
+      if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
+    }
     out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -3365,19 +3487,6 @@ function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
-function textFragmentStyle(computed, overrides) {
-  return new Proxy(computed, {
-    get(target, key) {
-      if (key === 'getPropertyValue') {
-        return (name) => Object.prototype.hasOwnProperty.call(overrides, name)
-          ? overrides[name] : target.getPropertyValue(name);
-      }
-      const value = target[key];
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-}
-
 // <input> / <textarea> / <select>: outer box for bg/border/radius + inner
 // span sitting inside the padding box. `<input>` paints its background
 // across the full element rect, but the actual text sits inside the padding
@@ -3736,6 +3845,8 @@ function isIntrinsicWidthInlineRunChild(el) {
 // the inter-run advance with whatever font it actually has loaded, so the
 // runs always touch correctly regardless of font fallback.
 function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
+  if (window.__pagxInitialLayouts && window.__pagxInitialLayouts.has(el)) return false;
+  if (computed.getPropertyValue('text-align') === 'justify') return false;
   if (paintNeedsSeparateChildren(el)) return false;
   const hasChildren = precomputedHasChildren !== undefined
     ? precomputedHasChildren
@@ -5081,8 +5192,17 @@ ${clipDefsSvg}${content}
 // then always restore the live DOM once the flat snapshot has been built.
 function snapshotMain(opts) {
   normalizeEmptyImagePlaceholders();
+  window.__pagxInitialRunsUsed = new WeakSet();
   try {
     const result = snapshotMainImpl(opts);
+    for (const entry of window.__pagxInitialHosts || []) {
+      if (paintSource(entry.node) &&
+          entry.runs.some((run) => !window.__pagxInitialRunsUsed.has(run))) {
+        PAINT_CAPTURE.warnings.push('html-snapshot: text: first-letter on <' +
+          entry.node.tagName.toLowerCase() + '> could not be mapped to emitted DOM text ' +
+          '(including generated content); its pseudo style may be missing');
+      }
+    }
     result.warnings = [...new Set([
       ...(window.__pagxTextLayoutWarnings || []), ...PAINT_CAPTURE.warnings,
     ])];
@@ -5279,6 +5399,7 @@ const HELPER_FNS = [
   applyTextTransform,
   classify,
   appendStyleProp,
+  snapshotFontFamily,
   fontMatchRange,
   fontMatchCompare,
   appendBorder,
@@ -5307,6 +5428,11 @@ const HELPER_FNS = [
   isSvgSource,
   freezeSvg,
   textFragmentStyle,
+  mapLayoutText,
+  initialLayoutForText,
+  textLayoutWarning,
+  measuredTextFragments,
+  snapshotTextFragments,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
   isInlineLevelSibling,
@@ -6422,4 +6548,5 @@ export {
   PAYLOAD_CONSTANTS_SRC,
   fontMatchRange,
   fontMatchCompare,
+  snapshotFontFamily,
 };
