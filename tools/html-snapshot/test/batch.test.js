@@ -375,8 +375,8 @@ describe('runBatch — in-process snapshot adapter', () => {
           viewportHeight: 600,
           waitMs: 10,
           selector: '#root',
-          cookies: ['session=abc', 'bare'],
-          headers: ['X-Test: yes', 'NoColonHeader'],
+          cookies: ['session=abc', 'empty='],
+          headers: ['X-Test: yes', 'X-Empty:'],
           inlineIconFonts: true,
           downloadFonts: false,
           downloadImages: false,
@@ -396,14 +396,14 @@ describe('runBatch — in-process snapshot adapter', () => {
     // file:// URL was synthesised from the local input path.
     expect(seenUrl.startsWith('file://')).toBe(true);
     expect(seenUrl.endsWith('page.html')).toBe(true);
-    // Cookies / headers were split into name/value pairs (bare entries → empty value).
+    // Cookies / headers preserve explicitly empty values.
     expect(seenOpts.cookies).toEqual([
       { name: 'session', value: 'abc' },
-      { name: 'bare', value: '' },
+      { name: 'empty', value: '' },
     ]);
     expect(seenOpts.headers).toEqual([
       ['X-Test', 'yes'],
-      ['NoColonHeader', ''],
+      ['X-Empty', ''],
     ]);
     expect(seenOpts.inlineIconFonts).toBe(true);
     // The flattened HTML was written to the requested output path.

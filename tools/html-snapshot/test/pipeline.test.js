@@ -648,6 +648,26 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(fs.existsSync(result.pagx)).toBe(true);
   });
 
+  test.each(['manifest', 'in-process'])('%s font lists exclude stale shared-cache faces', async mode => {
+    const input = path.join(dir, 'fonts.html'), fontDir = path.join(dir, 'shared-fonts');
+    fs.writeFileSync(input, '<html/>');
+    fs.mkdirSync(fontDir);
+    fs.writeFileSync(path.join(fontDir, 'stale.ttf'), 'old font');
+    let manifest;
+    const result = await runHtmlToPagx({ input, fontDir, downloadFonts: true,
+      outputDir: path.join(dir, 'out'), pagxBin: makeFakePagx().path, scriptDir: dir, doResolve: false,
+      snapshotImpl: async args => {
+        manifest = args.fontManifest;
+        fs.writeFileSync(args.output, '<html/>');
+        if (mode === 'manifest') fs.writeFileSync(manifest, '');
+        return { code: 0, durationMs: 0, stdout: '', stderr: '', ...(mode === 'in-process' ? { fontFiles: [] } : {}) };
+      },
+    });
+    expect(result.fonts).toEqual([]);
+    expect(fs.existsSync(manifest)).toBe(false);
+    expect(fs.readFileSync(path.join(fontDir, 'stale.ttf'), 'utf8')).toBe('old font');
+  });
+
   test('URL inputs default outputDir to cwd and require outputName', async () => {
     const fakePagx = makeFakePagx();
     const cwd = process.cwd();

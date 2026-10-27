@@ -7,22 +7,18 @@ const { pathToFileURL } = require('url');
 const { launchBrowser } = require('../dist/lib/browser-engine');
 const { runScenario } = require('../dist/lib/interaction');
 jest.setTimeout(60000);
-const capture = { type: 'capture', name: 'done' };
+// Capturing also starts the mirror browser. Use the production capture budget;
+// action timeout regressions below still exercise their explicit short deadlines.
+const capture = { type: 'capture', name: 'done', timeoutMs: 15000 };
 
 describe.each(['puppeteer', 'playwright'])('%s interaction regressions', engine => {
-  let handle, previousExecutable;
+  let handle;
   beforeAll(async () => {
-    previousExecutable = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
-    // Both source and static-copy browsers must use the same Chromium build.
-    process.env.PLAYWRIGHT_EXECUTABLE_PATH = require('puppeteer').executablePath();
+    // Each driver uses its supported browser build for both source and mirror.
     handle = await launchBrowser({ engine });
   });
   afterAll(async () => {
-    try { if (handle) await handle.browser.close(); }
-    finally {
-      if (previousExecutable === undefined) delete process.env.PLAYWRIGHT_EXECUTABLE_PATH;
-      else process.env.PLAYWRIGHT_EXECUTABLE_PATH = previousExecutable;
-    }
+    if (handle) await handle.browser.close();
   });
   const run = async (html, steps, options = {}) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'interaction-actions-'));

@@ -3,6 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
 const { createRequire } = require('module');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
@@ -59,6 +60,10 @@ const run = (args, extraEnv = {}) => exec(process.execPath, [path.join(packageDi
 
 packagedTest('packed files, runtime dependencies and native version pass release checks', () => {
   expect(() => checkCapturePackage(packageDir)).not.toThrow();
+  for (const file of ['html-snapshot/import-adapter.js', 'html-snapshot/dist/lib/import-adapter.js',
+    'html-snapshot/launch-import.js']) {
+    expect(fs.existsSync(path.join(packageDir, file))).toBe(false);
+  }
 });
 
 packagedTest('help, dry-run and invalid scenario do not initialize an empty browser cache', async () => {
@@ -73,6 +78,12 @@ packagedTest('help, dry-run and invalid scenario do not initialize an empty brow
   expect(snapshot.stdout).toContain('Usage: html-snapshot');
   expect(fs.existsSync(emptyCache)).toBe(false);
   expect(fs.existsSync(path.join(dir, 'dry-output'))).toBe(false);
+  const colliding = path.join(dir, 'colliding');
+  fs.mkdirSync(colliding);
+  for (const name of ['page.htm', 'page.html']) fs.writeFileSync(path.join(colliding, name), '<html/>');
+  await expect(run(['capture', '--batch', colliding], empty))
+    .rejects.toMatchObject({ code: 2, stderr: expect.stringContaining('output name collision') });
+  expect(fs.existsSync(emptyCache)).toBe(false);
 });
 
 packagedTest('missing browser returns an actionable failure without enabling auto-install', async () => {
@@ -92,6 +103,31 @@ packagedTest.each(['puppeteer', 'playwright'])('installed capture uses the exter
   expect(manifest.preview.status).toBe('complete');
   expect(fs.existsSync(path.join(out, manifest.preview.pages[0].file))).toBe(true);
   expect(fs.readFileSync(path.join(out, 'page.advanced.pagx'), 'utf8')).toContain('Result: PAGX');
+});
+
+packagedTest.each(['puppeteer', 'playwright'])('installed %s batch isolates page storage and produces a preview', async engine => {
+  const input = path.join(dir, `${engine}-batch-input`), out = path.join(dir, `${engine}-batch-output`);
+  fs.mkdirSync(input);
+  const server = http.createServer((_, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.end('<!doctype html><body><div id="state"></div><script>' +
+      'document.querySelector("#state").textContent=localStorage.getItem("seen")||"Fresh context";' +
+      'localStorage.setItem("seen","Leaked context");</script></body>');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/`;
+    // Both inputs navigate to the same origin, where a shared context would leak storage.
+    for (const name of ['a', 'b']) fs.writeFileSync(path.join(input, `${name}.html`),
+      `<!doctype html><script>location.replace(${JSON.stringify(url)})</script>`);
+    await run(['capture', '--batch', input, '--output-root', out, '--preview', '--browser-engine', engine]);
+    for (const name of ['a', 'b']) {
+      const xml = fs.readFileSync(path.join(out, `${name}.pagx`), 'utf8');
+      expect(xml).toContain('Fresh context');
+      expect(xml).not.toContain('Leaked context');
+    }
+    expect(fs.existsSync(path.join(out, 'preview/sheet-001.png'))).toBe(true);
+  } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
 packagedTest('bundled import retains single-checkpoint HTML stdout bridging', async () => {

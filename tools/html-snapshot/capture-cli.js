@@ -7,13 +7,13 @@
 const fs = require('fs');
 const path = require('path');
 const { defaultPagxBin, runHtmlToPagx, isHttpUrl } = require('./dist/lib/pipeline');
-const { runBatch } = require('./dist/lib/batch');
+const { collectBatchInputs, runBatch } = require('./dist/lib/batch');
 const { runScenarioToPagx } = require('./dist/lib/scenario-pipeline');
 const { generateContactSheet, validateContactSheetColumns, validatePreviewOptions } = require('./dist/lib/contact-sheet');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE, checkBrowserRuntime } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
 const { parseCookie, parseHeader } = require('./dist/lib/cli');
-const { parseScenario, selectCheckpoint } = require('./dist/lib/interaction');
+const { parseScenario, selectCheckpoint, validateScenarioCaptureOptions } = require('./dist/lib/interaction');
 const { withCliLifecycle } = require('./dist/lib/cli-lifecycle');
 
 class CaptureCliError extends Error {
@@ -295,10 +295,7 @@ function parseCaptureArgs(argv) {
   if (opts.checkpoint && !opts.scenario) failArg('--checkpoint requires --scenario');
   try { validatePreviewOptions(opts); } catch (error) { failArg(error.message); }
   if (opts.scenario) {
-    for (const flag of ['--batch', '--capture-animations', '--scroll-reveal', '--viewport-width',
-      '--viewport-height', '--wait-ms', '--selector']) {
-      if (argv.includes(flag)) failArg(`${flag} cannot be combined with --scenario; configure the scenario instead`);
-    }
+    try { validateScenarioCaptureOptions(opts); } catch (error) { failArg(error.message); }
   }
   if (opts.batchDir) {
     // Batch mode owns the input slot — accepting a positional `input` here
@@ -341,6 +338,8 @@ function validateCaptureOptions(opts) {
     if (!fs.existsSync(opts.batchDir) || !fs.statSync(opts.batchDir).isDirectory()) {
       throw new CaptureCliError(`input directory not found: ${opts.batchDir}`, 1);
     }
+    try { collectBatchInputs(opts.batchDir, opts.outputRoot); }
+    catch (error) { failArg(error.message); }
   } else if (isHttpUrl(opts.input)) {
     if (!opts.outputName) failArg('--output-name <name> is required when input is a URL');
   } else if (!fs.existsSync(opts.input) || !fs.statSync(opts.input).isFile()) {
@@ -351,6 +350,12 @@ function validateCaptureOptions(opts) {
   }
   for (const value of opts.cookies) parseCookie('--cookie', value, failArg);
   for (const value of opts.headers) parseHeader('--header', value, failArg);
+  const output = opts.outputRoot || opts.outputDir;
+  if (output) {
+    let parent = path.resolve(output);
+    while (!fs.existsSync(parent) && path.dirname(parent) !== parent) parent = path.dirname(parent);
+    if (!fs.statSync(parent).isDirectory()) failArg(`output parent is not a directory: ${parent}`);
+  }
   if (opts.scenario) {
     let scenario;
     try { scenario = parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8'))); }

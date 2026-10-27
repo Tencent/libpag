@@ -19,6 +19,7 @@ import { generateContactSheet, validatePreviewOptions, type ContactSheetItem, ty
 import { launchBrowser, type EngineWrapper } from './browser-engine';
 import { runSnapshot } from './snapshot-runner';
 import { errMessage } from './common';
+import { parseCookie, parseHeader } from './cli';
 import {
   PipelineStepError,
   runHtmlToPagx,
@@ -30,11 +31,12 @@ import {
 
 // Walk `root` recursively and collect every regular file whose name ends
 // with `.html` or `.htm`, dropping `.subset.html` / `.subset.htm` outputs.
-export function collectHtmlInputs(root: string): string[] {
+export function collectHtmlInputs(root: string, excludedDirectory?: string): string[] {
   const out: string[] = [];
   const stack: string[] = [root];
   while (stack.length > 0) {
     const dir = stack.pop()!;
+    if (dir === excludedDirectory) continue;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -79,6 +81,22 @@ function basenameStem(file: string): string {
   return stem;
 }
 
+/** Validate batch destinations before browser installation or output creation. */
+export function collectBatchInputs(root: string, outputRoot = ''): string[] {
+  const inputDir = path.resolve(root);
+  const output = outputRoot ? path.resolve(outputRoot) : '';
+  const files = collectHtmlInputs(inputDir, output && output !== inputDir ? output : undefined);
+  const destinations = new Set<string>();
+  for (const file of files) {
+    const target = path.join(resolveOutputDir(file, inputDir, output), `${basenameStem(file)}.pagx`);
+    const key = process.platform === 'win32' || process.platform === 'darwin'
+      ? target.normalize('NFC').toLowerCase() : target;
+    if (destinations.has(key)) throw new Error(`batch output name collision: ${target}`);
+    destinations.add(key);
+  }
+  return files;
+}
+
 // Build the in-process snapshot adapter. The returned function has the
 // same `(snapshotArgs) => SpawnCaptureResult` shape as
 // `pipeline.forkSnapshotCli`, but instead of forking `snapshot.js` it calls
@@ -93,21 +111,12 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
       : pathToFileURL(path.resolve(snapshotArgs.input)).href;
     const stderrChunks: string[] = [];
     const log = (msg: string) => { stderrChunks.push(`html-snapshot: ${msg}`); };
+    const fail = (message: string): never => { throw new Error(message); };
+    const cookieParams = (snapshotArgs.cookies || []).map(value => parseCookie('--cookie', value, fail));
+    const headerPairs = (snapshotArgs.headers || []).map(value => parseHeader('--header', value, fail));
     const { engine, browser } = engineHandle;
     const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
     try {
-      const cookieParams = (snapshotArgs.cookies || []).map((c) => {
-        const eq = c.indexOf('=');
-        return eq > 0
-          ? { name: c.slice(0, eq), value: c.slice(eq + 1) }
-          : { name: c, value: '' };
-      });
-      const headerPairs: Array<[string, string]> = (snapshotArgs.headers || []).map((h) => {
-        const colon = h.indexOf(':');
-        return colon > 0
-          ? [h.slice(0, colon).trim(), h.slice(colon + 1).trim()] as [string, string]
-          : [h, ''] as [string, string];
-      });
       const result = await runSnapshot({ engine, browser: context }, targetUrl, {
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
@@ -190,14 +199,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   let outputRoot = opts.outputRoot || '';
   if (outputRoot) outputRoot = path.resolve(outputRoot);
 
-  const files = collectHtmlInputs(inputDir);
-  const destinations = new Set<string>();
-  for (const file of files) {
-    const target = path.join(resolveOutputDir(file, inputDir, outputRoot), `${basenameStem(file)}.pagx`);
-    const key = process.platform === 'win32' || process.platform === 'darwin' ? target.normalize('NFC').toLowerCase() : target;
-    if (destinations.has(key)) throw new Error(`batch output name collision: ${target}`);
-    destinations.add(key);
-  }
+  const files = collectBatchInputs(inputDir, outputRoot);
   const total = files.length;
   if (total === 0) {
     log(`No non-subset HTML files found under: ${inputDir}`);

@@ -7,7 +7,7 @@ import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { launchBrowser, type EngineName } from './browser-engine';
 import { parseCookie, parseHeader } from './cli';
-import { parseScenario, selectCheckpoint, runScenario, type Checkpoint } from './interaction';
+import { parseScenario, selectCheckpoint, runScenario, validateScenarioCaptureOptions, type Checkpoint } from './interaction';
 import { runHtmlToPagx, isHttpUrl, type RunHtmlToPagxOptions, type RunHtmlToPagxResult } from './pipeline';
 import { throwIfCancelled } from './cli-lifecycle';
 import { writeFileAtomic } from './atomic-write';
@@ -40,6 +40,7 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
   if (!opts.input || !opts.scenario) throw new Error('input and scenario are required');
   throwIfCancelled();
   validatePreviewOptions(opts);
+  validateScenarioCaptureOptions(opts);
   const scenario = parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8')));
   if (opts.checkpoint) selectCheckpoint(scenario, opts.checkpoint);
   const isUrl = isHttpUrl(opts.input);

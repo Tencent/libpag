@@ -1459,6 +1459,27 @@ CLI_TEST(PAGXCliTest, ImportFile_SvgExtensionInferred) {
   ASSERT_NE(result.document, nullptr);
 }
 
+CLI_TEST(PAGXCliTest, ImportFile_RejectsScenarioConflictsBeforeCapture) {
+  auto input = TempDir() + "/scenario_validation.html";
+  std::ofstream(input) << "<html><body>validation</body></html>";
+  pagx::cli::ImportFormatOptions options = {};
+  options.checkpoint = "ready";
+  auto result = pagx::cli::ImportFile(input, "html", options);
+  EXPECT_NE(result.error.find("--checkpoint requires --scenario"), std::string::npos);
+  EXPECT_EQ(result.document, nullptr);
+
+  options.scenario = TempDir() + "/missing-scenario.json";
+  options.captureAnimations = true;
+  result = pagx::cli::ImportFile(input, "html", options);
+  EXPECT_NE(result.error.find("cannot be combined with --capture-animations"), std::string::npos);
+  EXPECT_EQ(result.document, nullptr);
+
+  options.captureAnimations = false;
+  result = pagx::cli::ImportFile(input, "svg", options);
+  EXPECT_NE(result.error.find("--scenario requires HTML"), std::string::npos);
+  EXPECT_EQ(result.document, nullptr);
+}
+
 // `htm` / `xhtml` extensions normalise to `html`. With the snapshot pre-pass disabled the file is
 // imported directly, so a flat inline-styled document round-trips without invoking Node.
 CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {

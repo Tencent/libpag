@@ -248,6 +248,8 @@ Batch sheets are written under `<output-root>/preview/` (or `<input-dir>/preview
 without an output root). Batch previews include only inputs successfully converted
 in this run; skipped or failed inputs are excluded. An entirely skipped batch creates
 no preview. Batches reuse the browser process with a separate context for each input.
+The batch scan excludes its nested output root and prepared subset files. Inputs
+whose output names collide are rejected before browser setup, including in dry-run.
 Preview is opt-in and incompatible with `--no-render` and `--no-resolve`.
 `--preview-columns` requires `--preview` and accepts
 integers from 1 to 32 (up to that many columns per page). By default, the layout chooses
@@ -298,6 +300,9 @@ session closes, so conversion time does not delay later interaction steps. If a 
 interaction fails, already saved checkpoints are still converted and listed, while
 the job remains failed. Actions are never replayed to recover earlier checkpoints.
 Preview failure preserves completed per-checkpoint outputs and exits nonzero.
+Font fallbacks for a checkpoint or batch input come from that capture's face list;
+ordinary CLI snapshots use a per-run font manifest. Shared font caches never add
+unrelated faces to these conversions.
 On POSIX, SIGINT/SIGTERM cancel the active CLI, close its browser sessions and native
 children, stop further conversions, and return 130/143. Interrupted scenario runs record failure when cleanup
 can finish; abrupt termination such as SIGKILL can leave `running` in the manifest.

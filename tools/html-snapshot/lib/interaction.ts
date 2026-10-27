@@ -45,6 +45,22 @@ export interface Scenario {
 
 export interface Checkpoint extends CurrentStateResult { name: string }
 
+type ScenarioCaptureOptions = Partial<Record<'batchDir' | 'captureAnimations' | 'scrollReveal' |
+  'viewportWidth' | 'viewportHeight' | 'waitMs' | 'selector', unknown>>;
+
+/** A scenario owns its actions, viewport and readiness across all export entry points. */
+export function validateScenarioCaptureOptions(options: ScenarioCaptureOptions): void {
+  const flags = { batchDir: '--batch', captureAnimations: '--capture-animations',
+    scrollReveal: '--scroll-reveal', viewportWidth: '--viewport-width',
+    viewportHeight: '--viewport-height', waitMs: '--wait-ms', selector: '--selector' };
+  for (const key of Object.keys(flags) as Array<keyof typeof flags>) {
+    const value = options[key];
+    if (value !== undefined && value !== false && value !== '') {
+      throw new Error(`${flags[key]} cannot be combined with --scenario; configure the scenario instead`);
+    }
+  }
+}
+
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   return value as Record<string, unknown>;

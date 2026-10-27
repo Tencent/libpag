@@ -109,6 +109,8 @@ test('a failed repeated preview replaces the old success status and keeps state 
 test.each([
   { preview: true, doRender: false }, { preview: true, doResolve: false },
   { previewColumns: 2 }, { preview: true, previewColumns: 0 },
+  { captureAnimations: true }, { scrollReveal: true }, { viewportWidth: 800 },
+  { viewportHeight: 600 }, { waitMs: 0 }, { selector: '#app' }, { outputName: '../outside' },
 ])('programmatic invalid options fail before browser launch: %j', async invalid => {
   await expect(runScenarioToPagx({ ...options, ...invalid })).rejects.toThrow();
   expect(launchBrowser).not.toHaveBeenCalled();

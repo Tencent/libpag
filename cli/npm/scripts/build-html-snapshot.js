@@ -94,7 +94,7 @@ function main() {
 
   // 2. Reset the generated parts of DEST while preserving the maintained
   //    launch.js source file.
-  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'ensure-built.js', 'capture.js', 'capture-cli.js', 'package.json']) {
+  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'ensure-built.js', 'capture.js', 'capture-cli.js', 'import-adapter.js', 'package.json']) {
     fs.rmSync(path.join(DEST_DIR, entry), { recursive: true, force: true });
   }
   fs.mkdirSync(DEST_DIR, { recursive: true });

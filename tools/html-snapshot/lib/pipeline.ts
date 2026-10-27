@@ -434,24 +434,25 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   fs.mkdirSync(outputDir, { recursive: true });
   outputDir = path.resolve(outputDir);
 
+  const doResolve = opts.doResolve !== false;
+  const doRender = opts.doRender !== false && doResolve;
+  const embedFonts = !!opts.embedFonts;
+  const downloadFonts = !!opts.downloadFonts || embedFonts;
+  const downloadImages = !!opts.downloadImages;
+
   // When the user opts out of keeping the subset HTML on disk, redirect it to
   // a self-cleaning temp dir; pagx import still needs a file to read.
   let subsetHtml: string;
-  let tempDir = '';
+  const tempDir = opts.keepSubsetHtml === false || downloadFonts
+    ? fs.mkdtempSync(path.join(os.tmpdir(), 'html2pagx-')) : '';
+  const fontManifest = downloadFonts ? path.join(tempDir, 'fonts.txt') : '';
   if (opts.keepSubsetHtml === false) {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'html2pagx-'));
     subsetHtml = path.join(tempDir, `${baseName}.subset.html`);
   } else {
     subsetHtml = path.join(outputDir, `${baseName}.subset.html`);
   }
   const pagxFile = path.join(outputDir, `${baseName}.pagx`);
   const pngFile = path.join(outputDir, `${baseName}.png`);
-
-  const doResolve = opts.doResolve !== false;
-  const doRender = opts.doRender !== false && doResolve;
-  const embedFonts = !!opts.embedFonts;
-  const downloadFonts = !!opts.downloadFonts || embedFonts;
-  const downloadImages = !!opts.downloadImages;
 
   let fontDir = opts.fontDir || '';
   if (downloadFonts && !fontDir) {
@@ -490,6 +491,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       selector: opts.selector,
       downloadFonts,
       fontDir,
+      fontManifest,
       downloadImages,
       imageDir,
       extraArgs: opts.snapshotExtraArgs,
@@ -498,7 +500,9 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
 
     let fonts: string[] = [];
     if (downloadFonts) {
-      fonts = opts.fontFiles ?? snapshotResult.fontFiles ?? collectFontFallbacks({ fontDir });
+      fonts = opts.fontFiles ?? snapshotResult.fontFiles ??
+        (fontManifest && fs.existsSync(fontManifest) ? readFontManifest({ manifestPath: fontManifest })
+          : collectFontFallbacks({ fontDir }));
       if (fonts.length === 0) {
         log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
       }

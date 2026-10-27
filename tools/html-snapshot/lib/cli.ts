@@ -56,7 +56,7 @@ export function parseCookie(flagName: string, value: string | undefined, fail: F
     fail(`'${flagName}' requires a 'name=value' argument`);
   }
   const eq = value.indexOf('=');
-  if (eq <= 0) {
+  if (eq <= 0 || /[\r\n\0]/.test(value)) {
     fail(`'${flagName}' expects 'name=value', got '${value}'`);
   }
   return { name: value.slice(0, eq), value: value.slice(eq + 1) };
@@ -77,6 +77,9 @@ export function parseHeader(flagName: string, value: string | undefined, fail: F
   const val = value.slice(colon + 1).trim();
   if (!key) {
     fail(`'${flagName}' has empty header name in '${value}'`);
+  }
+  if (!/^[!#$%&'*+.^_`|~\w-]+$/.test(key) || /[\r\n\0]/.test(value)) {
+    fail(`'${flagName}' expects a valid HTTP header name and single-line value`);
   }
   return [key, val];
 }
