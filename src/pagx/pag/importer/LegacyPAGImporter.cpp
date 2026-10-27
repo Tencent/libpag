@@ -172,6 +172,49 @@ Color ConvertColor(const pag::Color& color) {
   return {color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, 1.0f, ColorSpace::SRGB};
 }
 
+// Converts a legacy layer blend mode to the PAGX equivalent. The first sixteen values share
+// the legacy order; the legacy Add mode maps to PlusLighter (linear dodge, matching
+// TGFXCast.cpp).
+BlendMode ConvertBlendMode(pag::BlendMode mode) {
+  switch (mode) {
+    case pag::BlendMode::Multiply:
+      return BlendMode::Multiply;
+    case pag::BlendMode::Screen:
+      return BlendMode::Screen;
+    case pag::BlendMode::Overlay:
+      return BlendMode::Overlay;
+    case pag::BlendMode::Darken:
+      return BlendMode::Darken;
+    case pag::BlendMode::Lighten:
+      return BlendMode::Lighten;
+    case pag::BlendMode::ColorDodge:
+      return BlendMode::ColorDodge;
+    case pag::BlendMode::ColorBurn:
+      return BlendMode::ColorBurn;
+    case pag::BlendMode::HardLight:
+      return BlendMode::HardLight;
+    case pag::BlendMode::SoftLight:
+      return BlendMode::SoftLight;
+    case pag::BlendMode::Difference:
+      return BlendMode::Difference;
+    case pag::BlendMode::Exclusion:
+      return BlendMode::Exclusion;
+    case pag::BlendMode::Hue:
+      return BlendMode::Hue;
+    case pag::BlendMode::Saturation:
+      return BlendMode::Saturation;
+    case pag::BlendMode::Color:
+      return BlendMode::Color;
+    case pag::BlendMode::Luminosity:
+      return BlendMode::Luminosity;
+    case pag::BlendMode::Add:
+      return BlendMode::PlusLighter;
+    case pag::BlendMode::Normal:
+      break;
+  }
+  return BlendMode::Normal;
+}
+
 // Shape element conversion (skeleton scope): Rectangle / Ellipse / Polystar / Path geometry
 // and solid Fill / Stroke painters with static values. Trim paths, merge paths, and gradient
 // painters report an issue and are skipped until their phase-3 tasks.
@@ -552,6 +595,11 @@ Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* l
     auto* rect = state->document->makeNode<Rectangle>();
     rect->size.width = composition->width;
     rect->size.height = composition->height;
+    // Center the rectangle on the composition so it covers [0, width] x [0, height]; the
+    // default position (0, 0) would leave the geometry centered on the origin and only the
+    // bottom-right quadrant of the composition would be covered.
+    rect->position.x = composition->width / 2.0f;
+    rect->position.y = composition->height / 2.0f;
     layer->contents.push_back(rect);
     auto* fill = state->document->makeNode<Fill>();
     auto* pattern = state->document->makeNode<ImagePattern>();
@@ -590,13 +638,13 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
         legacy->frameRate > 0 ? static_cast<float>(legacy->audioStartTime) / legacy->frameRate
                               : 0.0f;
   }
-  // Composition-scoped animations (spec 5.4) auto-play in the instance; the migrated
-  // keyframe animation is attached here (or stays absent for fully static compositions).
-  auto animIt = state->compositionAnimations.find(legacy);
-  if (animIt != state->compositionAnimations.end()) {
-    composition->animations.push_back(animIt->second);
-  }
-  for (auto* legacyLayer : legacy->layers) {
+  // Legacy files follow the AE stacking convention (the first layer in the list is the
+  // topmost), while PAGX paints layers in document order (the first layer is the bottom,
+  // matching CSS). Push the converted layers in reverse so the visual stacking is preserved.
+  // topmost), while PAGX paints layers in document order (the first layer is the bottom,
+  // matching CSS). Push the converted layers in reverse so the visual stacking is preserved.
+  for (auto it = legacy->layers.rbegin(); it != legacy->layers.rend(); ++it) {
+    auto* legacyLayer = *it;
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
     if (child != nullptr) {
       composition->layers.push_back(child);
@@ -604,6 +652,14 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
       auto* animation = EnsureCompositionAnimation(state, legacy);
       MigrateLayerAnimation(state, legacyLayer, animation, legacy->frameRate);
     }
+  }
+  // Composition-scoped animations (spec 5.4) auto-play in the instance. The attachment runs
+  // AFTER the layer loop: EnsureCompositionAnimation creates the animation lazily while the
+  // layers convert, so looking it up before the loop would always miss it and the runtime
+  // would never spawn the composition timeline.
+  auto animIt = state->compositionAnimations.find(legacy);
+  if (animIt != state->compositionAnimations.end()) {
+    composition->animations.push_back(animIt->second);
   }
   // The wrapper layer is stored on the composition through the caller's layer conversion;
   // the composition itself only holds the width/height for now, layers attach via Layer.
@@ -650,6 +706,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       Composition* composition = nullptr;
       if (legacy->composition != nullptr) {
@@ -686,6 +743,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       auto* rect = state->document->makeNode<Rectangle>();
       rect->size = {static_cast<float>(legacy->width), static_cast<float>(legacy->height)};
@@ -704,6 +762,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       for (auto* element : legacy->contents) {
         ConvertShapeElement(state, element, &layer->contents, legacyLayer->startTime);
@@ -727,6 +786,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       auto textDocument = legacyText->getTextDocument();
       if (textDocument != nullptr) {
@@ -766,6 +826,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       auto* layer = state->document->makeNode<Layer>(LegacyLayerTargetId(legacyLayer));
       layer->name = legacyLayer->name;
       layer->visible = legacyLayer->isActive;
+      layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       // The layer mirrors the image bounds so the layout system derives its size from the
       // content instead of a default box (a default-sized layer clips its pattern fill).
       auto imageBounds = legacyImage->getBounds();
@@ -773,6 +834,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       layer->height = imageBounds.bottom - imageBounds.top;
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
       if (legacyImage->imageBytes != nullptr && legacyImage->imageBytes->fileBytes != nullptr) {
+        auto* imageBytes = legacyImage->imageBytes;
         auto bounds = legacyImage->getBounds();
         auto* rect = state->document->makeNode<Rectangle>();
         rect->size.width = bounds.right - bounds.left;
@@ -784,10 +846,30 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         auto* pattern = state->document->makeNode<ImagePattern>(
             "pag-editable-image-" + std::to_string(state->imageIdCounter++));
         auto* image = state->document->makeNode<Image>();
-        image->data = Data::MakeWithCopy(legacyImage->imageBytes->fileBytes->data(),
-                                         legacyImage->imageBytes->fileBytes->length());
+        image->data =
+            Data::MakeWithCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
         pattern->image = image;
-        pattern->scaleMode = ScaleMode::Stretch;
+        // Legacy image bytes store the original image cropped to the anchor and scaled by
+        // scaleFactor; the legacy renderer maps stored pixels with
+        // translate(-anchor) * scale(1 / scaleFactor) (ImageContentCache.cpp). Mirror that
+        // mapping on the pattern matrix and disable per-geometry fitting so the bitmap lands
+        // exactly where the legacy renderer put it; the default Decal tile mode keeps the
+        // stripped transparent border empty. Files without the metadata (width == 0, V1)
+        // keep stretching the bitmap over the bounds.
+        if (imageBytes->width > 0 && imageBytes->height > 0) {
+          auto scaleFactor = imageBytes->scaleFactor > 0.0f ? imageBytes->scaleFactor : 1.0f;
+          if (imageBytes->anchorX != 0 || imageBytes->anchorY != 0 || scaleFactor != 1.0f) {
+            pattern->scaleMode = ScaleMode::None;
+            pattern->matrix.a = 1.0f / scaleFactor;
+            pattern->matrix.d = 1.0f / scaleFactor;
+            pattern->matrix.tx = -static_cast<float>(imageBytes->anchorX) / scaleFactor;
+            pattern->matrix.ty = -static_cast<float>(imageBytes->anchorY) / scaleFactor;
+          } else {
+            pattern->scaleMode = ScaleMode::Stretch;
+          }
+        } else {
+          pattern->scaleMode = ScaleMode::Stretch;
+        }
         fill->color = pattern;
         layer->contents.push_back(fill);
         state->convertedImages.push_back({legacyImage, pattern, state->currentComposition});

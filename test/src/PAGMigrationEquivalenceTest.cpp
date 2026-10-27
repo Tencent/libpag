@@ -101,9 +101,13 @@ bool RenderLegacyFrame(PAGPlayer* player, const std::shared_ptr<PAGSurface>& sur
 }
 
 bool RenderMigratedFrame(pagx::PAGScene* scene, const std::shared_ptr<pagx::PAGSurface>& surface,
-                         pagx::PAGAnimation* animation, double frameSeconds, int width, int height,
-                         std::vector<uint8_t>* pixels) {
-  animation->setCurrentTime(static_cast<int64_t>(frameSeconds * 1000000.0));
+                         pagx::PAGAnimation* animation, int64_t deltaMicroseconds, int width,
+                         int height, std::vector<uint8_t>* pixels) {
+  // The default timeline is a top-level animation (the scene's auto-play pass skips it), so it
+  // advances explicitly; scene->advanceAndApply drives the composition-scoped animations and
+  // applies every channel — a plain setCurrentTime + draw never applies anything.
+  animation->advanceAndApply(deltaMicroseconds);
+  scene->advanceAndApply(deltaMicroseconds);
   pixels->assign(static_cast<size_t>(width) * height * 4, 0);
   if (!scene->draw(surface)) {
     return false;
@@ -167,46 +171,52 @@ void CompareSample(const std::string& path, SampleResult* result) {
     result->error = "scene failed";
     return;
   }
-auto migratedSurface = pagx::PAGSurface::MakeOffscreen(width, height);
-if (migratedSurface == nullptr) {
-  result->error = "migrated surface failed";
-  return;
-}
-auto timeline = scene->getDefaultTimeline();
-auto animation = std::dynamic_pointer_cast<pagx::PAGAnimation>(timeline);
-if (animation == nullptr) {
-  result->error = "no default timeline";
-  return;
-}
+  auto migratedSurface = pagx::PAGSurface::MakeOffscreen(width, height);
+  if (migratedSurface == nullptr) {
+    result->error = "migrated surface failed";
+    return;
+  }
+  auto timeline = scene->getDefaultTimeline();
+  auto animation = std::dynamic_pointer_cast<pagx::PAGAnimation>(timeline);
+  if (animation == nullptr) {
+    result->error = "no default timeline";
+    return;
+  }
 
-auto totalFrames = static_cast<int>(pagFile->duration());
-auto frameRate = pagFile->frameRate() > 0 ? pagFile->frameRate() : 30.0f;
-// Evenly sample at most kMaxFramesPerSample frames across the duration (always including the
-// first and the last).
-int step = totalFrames > kMaxFramesPerSample ? totalFrames / kMaxFramesPerSample : 1;
+  // PAGFile::duration() returns microseconds; convert to frames on the file's frame rate.
+  auto frameRate = pagFile->frameRate() > 0 ? pagFile->frameRate() : 30.0f;
+  auto totalFrames =
+      static_cast<int>(llround(static_cast<double>(pagFile->duration()) * frameRate / 1000000.0));
+  // Evenly sample at most kMaxFramesPerSample frames across the duration (always including the
+  // first and the last).
+  int step = totalFrames > kMaxFramesPerSample ? totalFrames / kMaxFramesPerSample : 1;
 
-std::vector<uint8_t> legacyPixels;
-std::vector<uint8_t> migratedPixels;
-for (int frame = 0; frame < totalFrames; frame += step) {
-  player->setProgress(frameRate > 0 ? static_cast<double>(frame) / totalFrames : 0.0);
-  if (!RenderLegacyFrame(player.get(), legacySurface, width, height, &legacyPixels)) {
-    continue;
+  std::vector<uint8_t> legacyPixels;
+  std::vector<uint8_t> migratedPixels;
+  int64_t migratedClockUs = 0;
+  for (int frame = 0; frame < totalFrames; frame += step) {
+    player->setProgress(totalFrames > 0 ? static_cast<double>(frame) / totalFrames : 0.0);
+    if (!RenderLegacyFrame(player.get(), legacySurface, width, height, &legacyPixels)) {
+      continue;
+    }
+    auto frameSeconds = static_cast<double>(frame) / frameRate;
+    auto frameUs = static_cast<int64_t>(frameSeconds * 1000000.0);
+    auto deltaUs = frameUs - migratedClockUs;
+    migratedClockUs = frameUs;
+    if (!RenderMigratedFrame(scene.get(), migratedSurface, animation.get(), deltaUs, width, height,
+                             &migratedPixels)) {
+      continue;
+    }
+    result->framesCompared++;
+    auto diff = DiffPercent(legacyPixels, migratedPixels);
+    if (diff == 0.0) {
+      result->framesPassed++;
+    } else if (result->firstDiff.empty()) {
+      char buffer[64] = {};
+      snprintf(buffer, sizeof(buffer), "frame=%d diff=%.2f%%", frame, diff);
+      result->firstDiff = buffer;
+    }
   }
-  auto frameSeconds = static_cast<double>(frame) / frameRate;
-  if (!RenderMigratedFrame(scene.get(), migratedSurface, animation.get(), frameSeconds, width,
-                           height, &migratedPixels)) {
-    continue;
-  }
-  result->framesCompared++;
-  auto diff = DiffPercent(legacyPixels, migratedPixels);
-  if (diff == 0.0) {
-    result->framesPassed++;
-  } else if (result->firstDiff.empty()) {
-    char buffer[64] = {};
-    snprintf(buffer, sizeof(buffer), "frame=%d diff=%.2f%%", frame, diff);
-    result->firstDiff = buffer;
-  }
-}
 }
 
 }  // namespace

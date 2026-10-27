@@ -235,6 +235,15 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
   }
   auto* channel = document->makeNode<TypedChannel<bool>>();
   channel->name = "visible";
+  // A delayed in point means the layer is hidden before it: without this leading key the
+  // Hold evaluation clamps to the first keyframe and the layer leaks visible from time 0.
+  if (legacyLayer->startTime > 0) {
+    Keyframe<bool> off = {};
+    off.time = 0;
+    off.value = false;
+    off.interpolation = KeyframeInterpolationType::Hold;
+    channel->keyframes.push_back(off);
+  }
   Keyframe<bool> on = {};
   on.time = legacyLayer->startTime;
   on.value = true;
