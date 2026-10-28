@@ -2,7 +2,7 @@
 <!-- Tests: a visible channel with hold keys hides the layer, shows it between frame 30 and 60, then
      hides it again.
      Target: Layer  Channel: visible  Type: bool
-     Expect: gap
+     Expect: supported
      Ref: test/src/PAGXRuntimeTest.cpp:807 -->
 <pagx width="320" height="200">
   <Resources>

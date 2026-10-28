@@ -295,6 +295,15 @@ void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
   }
 }
 
+bool EvalBoolChannel(const Channel* ch, Frame frame, bool fallback) {
+  if (ch == nullptr) {
+    return fallback;
+  }
+  KeyValue value = ch->evaluateAt(frame);
+  const auto* result = std::get_if<bool>(&value);
+  return result != nullptr ? *result : fallback;
+}
+
 float EvalFloatChannel(const Channel* ch, Frame frame, float fallback) {
   if (ch == nullptr) {
     return fallback;
@@ -598,6 +607,7 @@ enum class TargetChannelRole {
   LayerX,
   LayerY,
   LayerMatrix,
+  LayerVisibility,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -635,6 +645,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "x", TargetChannelRole::LayerX},
     {NodeType::Layer, "y", TargetChannelRole::LayerY},
     {NodeType::Layer, "matrix", TargetChannelRole::LayerMatrix},
+    {NodeType::Layer, "visible", TargetChannelRole::LayerVisibility},
     {NodeType::Layer, "rotation", TargetChannelRole::Rotation},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
@@ -716,6 +727,7 @@ struct BundleChannelSet {
   const Channel* xCh = nullptr;
   const Channel* yCh = nullptr;
   const Channel* matrixCh = nullptr;
+  const Channel* visibleCh = nullptr;
   const Channel* rotCh = nullptr;
   const Channel* scaleXCh = nullptr;
   const Channel* scaleYCh = nullptr;
@@ -788,6 +800,12 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerMatrix:
       out.matrixCh = ch;
+      return true;
+    case TargetChannelRole::LayerVisibility:
+      if (ch->valueType() != ChannelValueType::Bool) {
+        return false;
+      }
+      out.visibleCh = ch;
       return true;
     case TargetChannelRole::GroupPosX:
       out.posXCh = ch;
@@ -1187,6 +1205,12 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     float a = EvalFloatChannel(chSet.alphaCh, t, 1.0f);
     AppendCssDecl(decls, "opacity", CssFloatToString(a));
   }
+  if (chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
+      bundle.primaryHost->nodeType() == NodeType::Layer) {
+    bool visible =
+        EvalBoolChannel(chSet.visibleCh, t, static_cast<const Layer*>(bundle.primaryHost)->visible);
+    AppendCssDecl(decls, "visibility", visible ? "visible" : "hidden");
+  }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitPaintCssAtFrame(chSet, tagName, t, decls);
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
@@ -1403,11 +1427,17 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
         }
         _ctx.animatedElementIds[layer] = layer->id;
         for (auto* ch : obj->channels) {
-          if (ch != nullptr && LookupChannelRole(nType, ch->name) == TargetChannelRole::Opacity &&
-              !layer->groupOpacity) {
+          if (ch == nullptr) {
+            continue;
+          }
+          auto role = LookupChannelRole(nType, ch->name);
+          if (role == TargetChannelRole::LayerVisibility &&
+              ch->valueType() == ChannelValueType::Bool) {
+            _ctx.animatedVisibleLayers.insert(layer);
+          }
+          if (role == TargetChannelRole::Opacity && !layer->groupOpacity) {
             _restoredGroupOpacity.emplace_back(layer, layer->groupOpacity);
             layer->groupOpacity = true;
-            break;
           }
         }
       } else if (nType == NodeType::Group || nType == NodeType::TextBox) {
@@ -1472,6 +1502,7 @@ HTMLAnimationSession::~HTMLAnimationSession() {
     kv.first->groupOpacity = kv.second;
   }
   _ctx.animatedElementIds.clear();
+  _ctx.animatedVisibleLayers.clear();
   _ctx.animatedDomIdUseCount.clear();
 }
 
