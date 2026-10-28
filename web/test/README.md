@@ -54,6 +54,7 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 |---|---|
 | `MultiThreadCase.cpp`, `PAGANRRegressionTest.cpp`, `PAGDiskCacheTest.cpp` | require pthreads (single-threaded build) / MEMFS disk-cache semantics |
 | `PAGVideoSequenceTest.cpp`, `VideoSequenceFallbackTest.cpp` | require the ffavc software decoder, which has no wasm build |
+| `AsyncDecodeTest.cpp` | asserts sequence/image cache counts driven by the native 500ms prefetch window; the web build prefetches the whole timeline (`RenderCache::prepareLayers`), so the counts permanently differ |
 | `PAGXSVGTest.cpp` | the `resources/apitest/SVG` corpus is 492MB; not preloaded |
 | `PAGXCliTest.cpp` | CLI sources are not compiled into the web test |
 | `PAGXHTMLImporterTest.cpp` | uses `dynamic_cast`; RTTI cannot be enabled because tgfx's embind typeinfo is no-rtti. Covered natively |

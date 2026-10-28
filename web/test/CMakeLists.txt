@@ -61,6 +61,10 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGANRRegressionTest\\.cpp$")       # pt
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGDiskCacheTest\\.cpp$")           # pthreads + MEMFS disk cache
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGVideoSequenceTest\\.cpp$")       # needs wasm ffavc
 list(FILTER TEST_SOURCES EXCLUDE REGEX "VideoSequenceFallbackTest\\.cpp$")  # needs wasm ffavc
+# The suite asserts sequence/image cache counts driven by the native 500ms prefetch window
+# (DECODING_VISIBLE_DISTANCE); the web build prefetches the whole timeline in
+# RenderCache::prepareLayers(), so the counts permanently differ from the native semantics.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "AsyncDecodeTest\\.cpp$")            # web full-timeline prefetch
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXSVGTest\\.cpp$")                # 492MB SVG corpus
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
 # The legacy HTML-importer suite uses dynamic_cast. RTTI cannot be enabled to accommodate it:
@@ -202,6 +206,12 @@ target_compile_definitions(pag-test PRIVATE
 
 target_link_options(pag-test PRIVATE
         -lembind
+        # emcc picks the cached libembind variation from the link line: without -fno-rtti here
+        # USE_RTTI defaults to true, so bind.cpp gets linked with RTTI while our translation
+        # units are compiled no-rtti. The two sides then key registered types differently
+        # (&typeid(T) vs CanonicalizedID<T>::c) and every emval crossing (e.g. HardwareDecoder's
+        # call<val>) fails with "unknown type". Mirrors tgfx's web/test link options.
+        -fno-rtti
         -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
         -sWASM=1
         ${WEB_GRAPHICS_LINK_OPTIONS}
@@ -232,7 +242,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 else ()
     target_compile_options(pag-test PRIVATE -Oz)
-    target_link_options(pag-test PRIVATE -Oz)
+    target_link_options(pag-test PRIVATE -Oz --profiling-funcs)
 endif ()
 
 target_include_directories(pag-test PRIVATE
