@@ -1103,7 +1103,7 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
     if (resolved.empty()) continue;
     if (firstFamily) text->fontFamily = resolved;
     firstFamily = false;
-    auto typeface = SystemFonts::MatchTypeface(resolved, request);
+    auto typeface = SystemFonts::ResolveTypeface(resolved, text->fontStyle);
     if (typeface != nullptr) {
       text->fontFamily = typeface->fontFamily();
       text->fontStyle = typeface->fontStyle();
@@ -2478,7 +2478,6 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
       {"font-size", &InheritedStyle::fontSize},
       {"font-weight", &InheritedStyle::fontWeight},
       {"font-style", &InheritedStyle::fontStyle},
-      {"font-stretch", &InheritedStyle::fontStretch},
       {"letter-spacing", &InheritedStyle::letterSpacing},
       {"text-anchor", &InheritedStyle::textAnchor},
   };

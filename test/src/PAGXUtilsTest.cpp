@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
-#include <limits>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
@@ -42,37 +40,11 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
-#include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
-
-PAGX_TEST(PAGXUtilsTest, DecimalGeometryRoundTripsFloatBits) {
-  std::vector<float> values = {3372.84375f,
-                               31.34375f,
-                               0.1f,
-                               -0.00001f,
-                               1e-30f,
-                               std::numeric_limits<float>::denorm_min(),
-                               std::numeric_limits<float>::max()};
-  uint32_t bits = 123456789;
-  for (int i = 0; i < 4096; i++) {
-    bits = bits * 1664525u + 1013904223u;
-    float value;
-    memcpy(&value, &bits, sizeof(value));
-    if (std::isfinite(value)) values.push_back(value);
-  }
-  for (float value : values) {
-    auto text = pagx::FloatToString(value);
-    EXPECT_EQ(text.find_first_of("eE"), std::string::npos) << text;
-    char* end = nullptr;
-    float parsed = strtof(text.c_str(), &end);
-    EXPECT_EQ(parsed, value) << text;
-    EXPECT_EQ(*end, '\0');
-  }
-}
 
 // ---------------------------------------------------------------------------
 // CollectFillStroke

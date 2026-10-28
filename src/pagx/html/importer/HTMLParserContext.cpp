@@ -22,7 +22,6 @@
 #include <cmath>
 #include <utility>
 #include "pagx/FontConfig.h"
-#include "pagx/LayoutContext.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
@@ -120,8 +119,8 @@ bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::st
 }
 
 void HTMLParserContext::ResolveFontFaceNamesThunk(void* userData, std::string& family,
-                                                  std::string& style, const CSSFontStyle& request) {
-  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style, request);
+                                                  std::string& style) {
+  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style);
 }
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
@@ -201,8 +200,7 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   return available;
 }
 
-void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style,
-                                             const CSSFontStyle& request) {
+void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style) {
   if (family.empty()) {
     return;
   }
@@ -226,15 +224,7 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   std::string resolvedFamily = family;
   std::string resolvedStyle = style;
-  if (_document && _document->fontConfig().containsFamily(family)) {
-    // Return the registration key, not the physical font's name: aliases are document-local.
-    LayoutContext context(&_document->fontConfig());
-    context.matchTypeface(family, request, &resolvedStyle);
-    _fontFaceNameCache.emplace(cacheKey, std::make_pair(family, resolvedStyle));
-    style = std::move(resolvedStyle);
-    return;
-  }
-  auto typeface = SystemFonts::MatchTypeface(family, request);
+  auto typeface = SystemFonts::ResolveTypeface(family, style);
   // A family mismatch means the platform substituted a different face, so the authored name is
   // kept instead of baking the substitution into the exported document.
   if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
@@ -397,7 +387,6 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     return nullptr;
   }
   if (bodyLayer) {
-    bodyLayer->layoutRounding = LayoutRounding::None;
     _document->layers.push_back(bodyLayer);
   }
   finishImageLayouts();

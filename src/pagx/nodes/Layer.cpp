@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include "pagx/LayoutContext.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Alignment.h"
@@ -55,44 +54,35 @@ static bool HasExplicitMainSize(bool horizontal, const Layer* child) {
 
 // Returns the target main-axis size computed from explicit dimensions: percentage resolves against
 // containerMain; otherwise falls back to the absolute width/height. Returns NAN when neither is set.
-static float ComputeExplicitMainSize(bool horizontal, const Layer* child, float containerMain,
-                                     LayoutContext* context) {
-  auto roundSize = [context](float value) {
-    return context ? context->roundLayoutSize(value) : std::ceil(value);
-  };
+static float ComputeExplicitMainSize(bool horizontal, const Layer* child, float containerMain) {
   if (horizontal) {
     if (!std::isnan(child->percentWidth)) {
-      return roundSize(containerMain * child->percentWidth / 100.0f);
+      return std::ceil(containerMain * child->percentWidth / 100.0f);
     }
     return child->width;
   }
   if (!std::isnan(child->percentHeight)) {
-    return roundSize(containerMain * child->percentHeight / 100.0f);
+    return std::ceil(containerMain * child->percentHeight / 100.0f);
   }
   return child->height;
 }
 
 // Returns the target cross-axis size computed from explicit dimensions: percentage resolves against
 // containerCross; otherwise falls back to the absolute width/height. Returns NAN when neither is set.
-static float ComputeExplicitCrossSize(bool horizontal, const Layer* child, float containerCross,
-                                      LayoutContext* context) {
-  auto roundSize = [context](float value) {
-    return context ? context->roundLayoutSize(value) : std::ceil(value);
-  };
+static float ComputeExplicitCrossSize(bool horizontal, const Layer* child, float containerCross) {
   if (horizontal) {
     if (!std::isnan(child->percentHeight)) {
-      return roundSize(containerCross * child->percentHeight / 100.0f);
+      return std::ceil(containerCross * child->percentHeight / 100.0f);
     }
     return child->height;
   }
   if (!std::isnan(child->percentWidth)) {
-    return roundSize(containerCross * child->percentWidth / 100.0f);
+    return std::ceil(containerCross * child->percentWidth / 100.0f);
   }
   return child->width;
 }
 
 void Layer::updateSize(LayoutContext* context) {
-  ScopedLayoutRounding rounding(context, layoutRounding);
   for (auto* element : contents) {
     auto* node = LayoutNode::AsLayoutNode(element);
     if (node) {
@@ -297,21 +287,11 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
 }
 
 void Layer::updateScrollRect() {
-  if (hasLayoutScrollRect && hasScrollRect && scrollRect == layoutScrollRect) {
-    hasScrollRect = false;
-  }
-  hasLayoutScrollRect = false;
   if (!clipToBounds || hasScrollRect || std::isnan(layoutWidth) || std::isnan(layoutHeight)) {
     return;
   }
   scrollRect = Rect::MakeXYWH(0, 0, layoutWidth, layoutHeight);
   hasScrollRect = true;
-  layoutScrollRect = scrollRect;
-  hasLayoutScrollRect = true;
-}
-
-bool Layer::hasExplicitScrollRect() const {
-  return hasScrollRect && (!hasLayoutScrollRect || scrollRect != layoutScrollRect);
 }
 
 Point Layer::renderPosition() const {
@@ -320,7 +300,6 @@ Point Layer::renderPosition() const {
 }
 
 void Layer::updateLayout(LayoutContext* context) {
-  ScopedLayoutRounding rounding(context, layoutRounding);
   // Flex container layout: arrange flex children.
   if (layout != LayoutMode::None && !children.empty()) {
     performContainerLayout(context);
@@ -383,7 +362,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
     auto* child = children[idx];
 
     // Cross-axis: explicit percentage/absolute size takes priority over stretch alignment.
-    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize, context);
+    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize);
     float crossTarget = !std::isnan(explicitCross)
                             ? explicitCross
                             : ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
@@ -395,7 +374,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
       childMainSizes[idx] = 0;
     } else {
       // Non-flex: main-axis from explicit size (percentage/absolute) or NaN for child-sizing.
-      float explicitMain = ComputeExplicitMainSize(horizontal, child, availableMain, context);
+      float explicitMain = ComputeExplicitMainSize(horizontal, child, availableMain);
       float targetW = horizontal ? explicitMain : crossTarget;
       float targetH = horizontal ? crossTarget : explicitMain;
       child->setLayoutSize(context, targetW, targetH);
@@ -414,18 +393,9 @@ void Layer::performContainerLayout(LayoutContext* context) {
   float totalFlexSpace = availableMain - nonFlexTotal - totalGap;
   if (!flexIndices.empty() && totalFlexSpace > 0 && totalFlex > 0) {
     float roundOff = 0;
-    double allocated = 0;
     for (auto idx : flexIndices) {
       float rawSize = totalFlexSpace * children[idx]->flex / totalFlex;
-      float roundedSize;
-      if (context && context->layoutRounding == LayoutRounding::None) {
-        // Give the final item the residual so floating-point division does not lose space.
-        roundedSize =
-            idx == flexIndices.back() ? static_cast<float>(totalFlexSpace - allocated) : rawSize;
-        allocated += roundedSize;
-      } else {
-        roundedSize = std::round(rawSize + roundOff);
-      }
+      float roundedSize = std::round(rawSize + roundOff);
       roundOff += rawSize - roundedSize;
       childMainSizes[idx] = roundedSize;
     }
@@ -434,7 +404,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
   // setLayoutSize for flex children: main-axis forced, cross-axis from explicit/stretch.
   for (auto idx : flexIndices) {
     auto* child = children[idx];
-    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize, context);
+    float explicitCross = ComputeExplicitCrossSize(horizontal, child, alignCrossSize);
     float crossTarget = !std::isnan(explicitCross)
                             ? explicitCross
                             : ComputeCrossTarget(alignment, horizontal, child, alignCrossSize);
@@ -506,9 +476,7 @@ void Layer::performContainerLayout(LayoutContext* context) {
 
     float posX = horizontal ? mainOffset : crossPos;
     float posY = horizontal ? crossPos : mainOffset;
-    child->setLayoutPosition(context,
-                             context ? context->roundLayoutPosition(posX) : std::round(posX),
-                             context ? context->roundLayoutPosition(posY) : std::round(posY));
+    child->setLayoutPosition(context, std::round(posX), std::round(posY));
 
     mainOffset += childMain;
     if (arrangement == Arrangement::SpaceBetween || arrangement == Arrangement::SpaceEvenly ||

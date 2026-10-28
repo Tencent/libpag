@@ -289,11 +289,10 @@ PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalTex
   for (const auto& spacing : {"", "nan", "1px", "1e100", "1e-100"}) {
     SCOPED_TRACE(spacing);
     ParserInput input;
-    auto node =
-        ParseNode(std::string("<span data-pagx-text=\"AB\" data-pagx-inline-positions=\"bad\" ") +
-                  "data-pagx-letter-spacing=\"" + spacing +
-                  "\" data-pagx-faux-bold=\"true\" "
-                  "data-pagx-faux-italic=\"no\">ignored glyphs</span>");
+    auto node = ParseNode(std::string("<span data-pagx-text=\"AB\" ") +
+                          "data-pagx-letter-spacing=\"" + spacing +
+                          "\" data-pagx-faux-bold=\"true\" "
+                          "data-pagx-faux-italic=\"no\">ignored glyphs</span>");
     ASSERT_NE(node, nullptr);
     pagx::HTMLInheritedStyle inherited;
     inherited.letterSpacing = "3px";
@@ -306,7 +305,6 @@ PAG_TEST(PAGXHTMLParserTest, InvalidTextMetadataPreservesCSSValuesAndOriginalTex
     EXPECT_FLOAT_EQ(text->letterSpacing, 3);
     EXPECT_FALSE(text->fauxBold);
     EXPECT_FALSE(text->fauxItalic);
-    EXPECT_TRUE(input.warned("invalid data-pagx-inline-positions"));
     EXPECT_TRUE(input.warned("invalid data-pagx-letter-spacing"));
     EXPECT_TRUE(input.warned("invalid data-pagx-faux-bold"));
     EXPECT_TRUE(input.warned("invalid data-pagx-faux-italic"));
@@ -422,27 +420,6 @@ PAG_TEST(PAGXHTMLParserTest, TransformerKeepsKeyframesAfterExistingHeadMetadata)
   ASSERT_NE(style, nullptr);
   ASSERT_NE(style->getFirstChild(), nullptr);
   EXPECT_NE(style->getFirstChild()->name.find("@keyframes fade"), std::string::npos);
-}
-
-PAG_TEST(PAGXHTMLParserTest, RelativeFontWeightsResolveAgainstTheParentComputedWeight) {
-  struct Case {
-    double parent;
-    double bolder;
-    double lighter;
-  };
-  for (const auto& test : {Case{50, 400, 50}, Case{300, 400, 100}, Case{400, 700, 100},
-                           Case{600, 900, 400}, Case{800, 900, 700}, Case{950, 950, 700}}) {
-    SCOPED_TRACE(test.parent);
-    ParserInput input;
-    pagx::HTMLInheritedStyle parent;
-    parent.fontRequest.weight = test.parent;
-    auto bolder = ParseNode("<span style=\"font-weight:bolder\"/>");
-    auto lighter = ParseNode("<span style=\"font-weight:lighter\"/>");
-    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(bolder, parent).fontRequest.weight,
-                     test.bolder);
-    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(lighter, parent).fontRequest.weight,
-                     test.lighter);
-  }
 }
 
 PAG_TEST(PAGXHTMLParserTest, InvalidVisualPropertiesUseDocumentedFallbacks) {

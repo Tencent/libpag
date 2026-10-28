@@ -81,7 +81,6 @@ class HTMLTextFragmentBuilder {
     bool fauxItalic = false;
     float fontSize = HTML_DEFAULT_FONT_SIZE;
     float letterSpacing = 0.0f;
-    std::vector<float> inlinePositions = {};
     Color color = {0, 0, 0, 1, ColorSpace::SRGB};
     std::string textDecoration = {};
     // CSS `-webkit-text-stroke` resolved into a stroke width (px) and colour. `strokeWidth` is

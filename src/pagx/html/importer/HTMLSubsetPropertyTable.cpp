@@ -47,6 +47,10 @@ bool ParseLengthComponent(const std::string& trimmed, float& outNumber, std::str
   return true;
 }
 
+std::string FormatNumber(float v) {
+  return FormatRoundedNumber(v);
+}
+
 std::string DropProperty(const std::string& propertyName, const std::string& value,
                          const std::string& reason, HTMLTransformContext& diagnostics) {
   diagnostics.warn("subset:unsupported-property",
@@ -468,7 +472,6 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"font-size", PropAction::Transform, &ResolveLength, nullptr},
     {"font-weight", PropAction::Keep, nullptr, nullptr},
     {"font-style", PropAction::Keep, nullptr, nullptr},
-    {"font-stretch", PropAction::Keep, nullptr, nullptr},
     {"letter-spacing", PropAction::Transform, &ResolveLength, nullptr},
     {"line-height", PropAction::Transform, &PassThrough, nullptr},  // px / unitless both accepted
     {"text-align", PropAction::Keep, nullptr, nullptr},
@@ -539,6 +542,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"word-break", PropAction::Drop, nullptr, "is not in the subset"},
     {"overflow-wrap", PropAction::Drop, nullptr, "is not in the subset"},
     {"font-variant", PropAction::Drop, nullptr, "is not in the subset"},
+    {"font-stretch", PropAction::Drop, nullptr, "is not in the subset"},
     {"font", PropAction::Drop, nullptr, "use the longhand properties instead"},
     {"grid-template-columns", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},
     {"grid-template-rows", PropAction::Drop, nullptr, "use 'display: flex' instead of grid"},

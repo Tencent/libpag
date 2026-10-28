@@ -5,23 +5,16 @@ absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
 fed directly to `pagx import --html-source snapshot --format html`.
 
-Measured geometry retains fractional CSS pixels through snapshot and PAGX serialization. HTML
-import uses `layoutRounding="none"` on the body Layer so nested positions and percentage backgrounds
-remain aligned. Only the final raster canvas extent is rounded outward to integer pixels.
-Snapshot, baseline screenshots and viewport checks share the same body-based canvas measurement,
-including the body's offset from the document origin. Collapsed trailing margins outside the body
-remain outside this capture; a small fixed canvas is not expanded to the viewport's minimum height.
-
 Text capture uses Chromium layout text fragments for source boundaries and effective styles
 (including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
 This preserves drop caps, columns, and overlapping line boxes without relying on global
-Y ordering. Justified runs carry `data-pagx-inline-positions`; the PAGX importer applies
-them after shaping, preserving ligatures and combining clusters. The browser-only bundle
-accepts the same metadata through `HtmlSnapshot.installTextLayout(data)` from
+Y ordering. The browser-only bundle accepts the same metadata through
+`HtmlSnapshot.installTextLayout(data)` from
 `lib/text-layout.ts`; without a provider, it uses DOM fragment measurements.
 First letters originating in generated content/shadow trees without a DOM Range are
-diagnosed. Length-changing text transforms use measured source fragments and natural
-cluster spacing when the browser cannot expose individual output-character positions.
+diagnosed. Length-changing text transforms use measured source fragments to preserve
+the transformed text without duplicating or truncating it. Text is emitted per line
+with natural glyph spacing; browser justification and extra word spacing are not retained.
 
 Form text is captured from Chromium's UA layout: live values, placeholder styles,
 password masks and textarea line breaks remain editable text. Password DOM values

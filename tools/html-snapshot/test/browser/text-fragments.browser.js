@@ -47,7 +47,6 @@ describe('browser text fragments', () => {
             source:node.nodeValue.slice(item.start,item.end),
             left:item.rect.left, top:item.rect.top, width:item.rect.width, height:item.rect.height,
             size:style.getPropertyValue('font-size'), color:style.getPropertyValue('color'),
-            positions:measureTextInlinePositions(node,item,style,item.text,axis !== 'y'),
           });
         }
       }
@@ -116,25 +115,20 @@ describe('browser text fragments', () => {
     }
   }
 
-  it('measures justification as scalar positions, including the final line', async () => {
+  it('preserves justified line fragments without character-position metadata', async () => {
     await load(`<p id="host">${prose}</p>`, '#host{text-align:justify}');
     const parts = await fragments();
-    for (const part of parts) {
-      assert.equal(part.positions.length, Array.from(part.text).length);
-      assert.equal(part.positions[0], 0);
-    }
-    assert.ok(parts[0].positions[1] > 18);
+    assert.ok(parts.length > 1);
+    assert.equal(parts.map((p) => p.text).join(''), prose);
     assert.ok(parts.at(-1).width < 240);
-    assert.equal(parts.at(-1).positions[1], 18);
     const snapshot = await page.evaluate(takeSnapshot);
-    assert.match(snapshot.html, /data-pagx-inline-positions=/);
+    assert.doesNotMatch(snapshot.html, /data-pagx-inline-positions=/);
   });
 
-  it('keeps RTL scalar positions in logical text order', async () => {
+  it('keeps RTL fragments in logical text order', async () => {
     await load('<p id="host">שלום עולם שלום עולם שלום עולם</p>', '#host{direction:rtl;text-align:justify}');
     const parts = await fragments();
     assert.ok(parts.every((p) => !p.missing));
-    assert.ok(parts[0].positions[0] > parts[0].positions[1]);
     assert.equal(parts.map((p) => p.text).join('').replace(/\s/g, ''),
       'שלום עולם שלום עולם שלום עולם'.replace(/\s/g, ''));
   });
@@ -144,7 +138,6 @@ describe('browser text fragments', () => {
     const parts = await fragments();
     assert.ok(parts.every((p) => !p.missing));
     assert.match(parts.map((p) => p.text).join(''), /^SSTRASSE/);
-    assert.deepEqual(parts[0].positions, []);
   });
 
   it('preserves whitespace at inline style seams exactly once', async () => {

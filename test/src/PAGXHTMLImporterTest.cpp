@@ -1936,54 +1936,6 @@ PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   EXPECT_FALSE(hasTextBox);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, InlinePositionsUseUnicodeScalarsAndRoundTrip) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:40px">
-      <span data-pagx-inline-positions="0, 30, 70" style="white-space:nowrap">A😀中</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->inlinePositions, (std::vector<float>{0, 30, 70}));
-  auto xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("inlinePositions=\"0,30,70\""), std::string::npos);
-  auto restored = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(restored, nullptr);
-  EXPECT_TRUE(restored->errors.empty());
-  auto* restoredText = FindElementOfType<pagx::Text>(restored->layers.front()->children.front());
-  ASSERT_NE(restoredText, nullptr);
-  EXPECT_EQ(restoredText->inlinePositions, text->inlinePositions);
-}
-
-PAG_TEST(PAGXHTMLImporterTest, InvalidInlinePositionsHaveADiagnosticAndUseNormalLayout) {
-  for (const auto* value : {"0,30", "0,30,70,90", "0,nan,70", "0,30junk,70", "0,,70", "0,30,70,"}) {
-    auto doc = ParseFromString(
-        std::string(
-            "<html><body style=\"width:200px;height:40px\"><span data-pagx-inline-positions=\"") +
-        value + "\">A😀中</span></body></html>");
-    ASSERT_NE(doc, nullptr);
-    auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-    ASSERT_NE(text, nullptr);
-    EXPECT_TRUE(text->inlinePositions.empty()) << value;
-    EXPECT_TRUE(HasDiagnosticContaining(doc, "invalid data-pagx-inline-positions")) << value;
-  }
-}
-
-PAG_TEST(PAGXHTMLImporterTest, SemanticTextHostRestoresInlinePositions) {
-  auto doc = ParseFromString(R"HTML(
-    <html><body style="width:200px;height:40px">
-      <span data-pagx-text="A😀中" data-pagx-inline-positions="0,30,70"
-            data-pagx-font-family="Arial" data-pagx-font-style="Regular">ignored</span>
-    </body></html>
-  )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
-  ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->text, "A😀中");
-  EXPECT_EQ(text->inlinePositions, (std::vector<float>{0, 30, 70}));
-}
-
 PAG_TEST(PAGXHTMLImporterTest, WebkitTextStrokeProducesTextStroke) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -4187,9 +4139,10 @@ PAG_TEST(PAGXHTMLImporterTest, CSSWeightUsesAvailableRegisteredFace) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // There is only a Regular face. The CSS request for Medium resolves to it without synthesis.
+  // Medium stays a real-face style label so font lookup can select it precisely. The importer does
+  // not bake a faux flag when that face is unavailable.
   EXPECT_EQ(text->fontFamily, "HTML Medium Test");
-  EXPECT_EQ(text->fontStyle, "Regular");
+  EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
 }
@@ -14919,37 +14872,6 @@ PAG_TEST(PAGXHTMLBackgroundLayoutTest, ConicDualStopsUnitsPhaseAndFixup) {
                                        width, height);
   ASSERT_NE(gradient, nullptr);
   EXPECT_TRUE(ColorNear(gradient->colorStops.front()->color, pagx::Color{.5f, 0, .5f, 1}));
-}
-
-PAG_TEST(PAGXHTMLImporterTest, FractionalBoxesKeepBorderGeometryAfterRoundTripAndResize) {
-  auto doc = pagx::HTMLImporter::ParseString(R"HTML(<html><body style="width:1400px;height:4108px">
-    <div id="article" style="position:absolute;left:340px;top:703.796875px;width:720px;height:3404.1875px">
-      <div id="tags" style="position:absolute;left:0;top:3372.84375px;width:720px;height:31.34375px;display:flex;gap:8px">
-        <div id="badge" style="width:85.8125px;height:31.34375px;border:1px solid black;border-radius:999px"></div>
-      </div>
-    </div>
-  </body></html>)HTML");
-  ASSERT_NE(doc, nullptr);
-  ASSERT_EQ(doc->layers.size(), 1u);
-  EXPECT_EQ(doc->layers[0]->layoutRounding, pagx::LayoutRounding::None);
-  auto copy = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
-  ASSERT_NE(copy, nullptr);
-  copy->applyLayout();
-  auto* article = copy->findNode<pagx::Layer>("article");
-  auto* tags = copy->findNode<pagx::Layer>("tags");
-  auto* badge = copy->findNode<pagx::Layer>("badge");
-  ASSERT_NE(article, nullptr);
-  ASSERT_NE(tags, nullptr);
-  ASSERT_NE(badge, nullptr);
-  ASSERT_FALSE(badge->contents.empty());
-  auto* rect = dynamic_cast<pagx::Rectangle*>(badge->contents.front());
-  ASSERT_NE(rect, nullptr);
-  EXPECT_FLOAT_EQ(rect->layoutHeight, badge->layoutHeight);
-  EXPECT_FLOAT_EQ(article->layoutY + tags->layoutY + badge->layoutY + rect->layoutHeight,
-                  4107.984375f);
-  badge->height = 28.125f;
-  copy->applyLayout();
-  EXPECT_FLOAT_EQ(rect->layoutHeight, 28.125f);
 }
 
 }  // namespace pag

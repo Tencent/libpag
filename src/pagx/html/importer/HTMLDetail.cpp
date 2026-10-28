@@ -26,7 +26,6 @@
 #include <utility>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/utils/CSSFontStyle.h"
-#include "pagx/utils/StringParser.h"
 
 namespace pagx::html {
 
@@ -755,16 +754,27 @@ std::string CollapseHTMLWhitespace(const std::string& raw, bool trimLeading, boo
   return normalized;
 }
 
-std::string FormatNumber(float v) {
-  return FloatToString(v);
+std::string FormatRoundedNumber(float v) {
+  if (std::isfinite(v)) {
+    float rounded = std::round(v * 1000.0f) / 1000.0f;
+    if (rounded == std::floor(rounded) && std::fabs(rounded) < 1e9f) {
+      std::ostringstream oss;
+      oss << static_cast<long long>(rounded);
+      return oss.str();
+    }
+  }
+  std::ostringstream oss;
+  oss.precision(6);
+  oss << v;
+  return oss.str();
 }
 
 std::string EmitPx(float px) {
-  return FormatNumber(px) + "px";
+  return FormatRoundedNumber(px) + "px";
 }
 
 std::string EmitPercent(float pct) {
-  return FormatNumber(pct) + "%";
+  return FormatRoundedNumber(pct) + "%";
 }
 
 std::string EmitPaddingShorthand(float top, float right, float bottom, float left) {
