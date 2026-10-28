@@ -79,6 +79,10 @@ bool IsAEWindowActive() {
   return [frontApp.bundleIdentifier containsString:@"com.adobe.AfterEffects"];
 }
 
+void AttachWindowToAEMainWindow(QWindow*) {
+  // macOS has no explicit window ownership between the plugin windows and the host application.
+}
+
 std::string GetQmlPath() {
   Dl_info info;
   if (dladdr((void*)GetQmlPath, &info) && info.dli_fname) {

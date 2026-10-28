@@ -18,7 +18,6 @@
 
 #include "WindowManager.h"
 #include <QApplication>
-#include <QEventLoop>
 #include <QFile>
 #include <QQuickStyle>
 #include <QTranslator>
@@ -53,7 +52,7 @@ void WindowManager::showExportPanelWindow() {
     exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
   }
   exportPanelWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -62,7 +61,7 @@ void WindowManager::showPAGConfigWindow() {
     configWindow = std::make_unique<ConfigWindow>(app.get());
   }
   configWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -72,7 +71,7 @@ void WindowManager::showExportPreviewWindow() {
     previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
   }
   previewWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showExportWindow() {
@@ -81,7 +80,7 @@ void WindowManager::showExportWindow() {
     exportWindow = std::make_unique<ExportWindow>(app.get());
   }
   exportWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
@@ -167,6 +166,20 @@ void WindowManager::init() {
 
   AlertInfoManager::GetInstance().warningList.clear();
   AlertInfoManager::GetInstance().saveWarnings.clear();
+}
+
+void WindowManager::runEventLoopIfNeeded() {
+  // Re-entered menu clicks while a plugin window is already open must not stack nested exec()
+  // loops, because closing the last window only quits the innermost loop and the leaked layers
+  // would keep the After Effects main thread inside the plugin forever. The "_eventLoopRunning"
+  // property is shared with PAGViewerInstallModel::showInstallDialog() for the same purpose.
+  auto coreApp = QCoreApplication::instance();
+  if (coreApp == nullptr || coreApp->property("_eventLoopRunning").toBool()) {
+    return;
+  }
+  coreApp->setProperty("_eventLoopRunning", true);
+  app->exec();
+  coreApp->setProperty("_eventLoopRunning", false);
 }
 
 }  // namespace exporter

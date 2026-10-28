@@ -33,7 +33,7 @@ bool AlertWindow::showWarnings(const std::vector<AlertInfo>& infos) {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  window->show();
+  BaseWindow::show();
   wait();
 
   return continue_;
@@ -49,7 +49,7 @@ bool AlertWindow::showErrors(const std::vector<AlertInfo>& infos, const QString&
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  window->show();
+  BaseWindow::show();
   wait();
 
   return false;
