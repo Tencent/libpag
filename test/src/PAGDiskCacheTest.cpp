@@ -120,8 +120,8 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     // Reload the fixture into the already-live singleton, not just its on-disk files.
-    diskCache->fileIDCount = 1;
-    diskCache->maxDiskSize = 1073741824;
+    diskCache->fileIDCount = DiskCache::InitialFileID;
+    diskCache->maxDiskSize = cleanup.originalMaxDiskSize;
     ASSERT_TRUE(diskCache->readConfig());
   }
   worker->waitAll();
