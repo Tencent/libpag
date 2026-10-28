@@ -3941,6 +3941,48 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
 // A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
 // keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
 // an animation that would play empty stops.
+CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  const char* cases[] = {
+      "timing/05_offset_positive_once.pagx", "timing/06_offset_positive_loop.pagx",
+      "timing/07_offset_negative_once.pagx", "timing/08_offset_ping_pong.pagx",
+  };
+  for (const auto* name : cases) {
+    auto html = LoadAndConvert(
+        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
+    ASSERT_FALSE(html.empty()) << name;
+    EXPECT_NE(html.find("@keyframes"), std::string::npos) << name;
+    EXPECT_NE(html.find("animation:"), std::string::npos) << name;
+  }
+  auto negative =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/timing/07_offset_negative_once.pagx"),
+                     opts);
+  EXPECT_NE(negative.find("-0.1667s"), std::string::npos);
+  auto negativeRule = KeyframesRuleNamed(
+      negative, AnimationNameOfTag(FindTagContaining(negative, "id=\"cardColor\"")));
+  EXPECT_NE(negativeRule.find("75% { background-color: #0000FF;"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute(
+          "resources/pagx_to_html/animations/timing/09_offset_shared_animation.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@keyframes"), std::string::npos);
+  auto slotA = FindTagContaining(html, "id=\"cardChild\"");
+  auto slotB = FindTagContaining(html, "id=\"cardChild__1\"");
+  ASSERT_FALSE(slotA.empty());
+  ASSERT_FALSE(slotB.empty());
+  EXPECT_NE(slotA.find("animation:"), std::string::npos);
+  EXPECT_NE(slotB.find("animation:"), std::string::npos);
+  EXPECT_NE(slotB.find("0.5s"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",

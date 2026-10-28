@@ -2634,7 +2634,12 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   }
 
   out.openTag("div");
-  if (!layer->id.empty()) {
+  // A Composition may be mounted more than once: each animated child Layer needs its own DOM id
+  // and timing even though all instances share the same source Layer node.
+  auto animatedId = _ctx->animationScope != 0 ? _ctx->claimAnimatedDomId({layer}) : std::string{};
+  if (!animatedId.empty()) {
+    out.addAttr("id", animatedId);
+  } else if (!layer->id.empty()) {
     out.addAttr("id", layer->id);
   }
   if (!layer->name.empty()) {
@@ -2971,7 +2976,12 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
   writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
   if (layer->composition) {
+    auto parentScope = _ctx->animationScope;
+    auto scope = _ctx->nextAnimationScope++;
+    _ctx->animationInstances.push_back({layer->composition, layer, scope, parentScope});
+    _ctx->animationScope = scope;
     writeComposition(out, layer->composition, contentAlpha, childDistribute);
+    _ctx->animationScope = parentScope;
   }
 
   // Restore childLayerOffset before each child writeLayer call: the offset is consumed (cleared)
