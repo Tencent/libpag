@@ -130,6 +130,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
    * callers must advance the scene (or its timelines) beforehand.
+   * This method manages the surface device's context lock internally. Callers must not already
+   * hold that lock; use pagx::Record() from pagx/tgfx.h to render with an explicitly locked context.
    * @param surface    the destination surface.
    * @param autoClear  if true (the default), the surface is cleared to transparent before drawing.
    *                   Set to false to overlay the scene content on top of the existing surface

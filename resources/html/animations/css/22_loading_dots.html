@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Loading spinner dots</title>
+    <style>
+      @keyframes dotPulse {
+        0%, 100% { opacity: 0.2; transform: translateY(0px); }
+        50%      { opacity: 1; transform: translateY(-12px); }
+      }
+    </style>
+  </head>
+  <body style="width: 200px; height: 100px; background-color: #0F172A;">
+    <div id="d1"
+         style="position: absolute; left: 60px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px;
+                background-color: #38BDF8;
+                animation: dotPulse 1s ease-in-out 0s infinite;"></div>
+    <div id="d2"
+         style="position: absolute; left: 92px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px;
+                background-color: #38BDF8;
+                animation: dotPulse 1s ease-in-out 0.15s infinite;"></div>
+    <div id="d3"
+         style="position: absolute; left: 124px; top: 44px;
+                width: 16px; height: 16px; border-radius: 8px;
+                background-color: #38BDF8;
+                animation: dotPulse 1s ease-in-out 0.3s infinite;"></div>
+  </body>
+</html>

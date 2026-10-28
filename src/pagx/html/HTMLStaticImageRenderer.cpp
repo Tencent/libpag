@@ -28,11 +28,11 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -124,37 +124,30 @@ std::shared_ptr<tgfx::Data> RenderTileToPng(PAGXDocument* doc, int cssWidth, int
   }
   doc->applyLayout();
 
-  auto device = tgfx::GLDevice::Make();
-  if (!device) {
+  pag::DeviceLockScope deviceLock;
+  if (!deviceLock) {
     return nullptr;
   }
-  auto context = device->lockContext();
-  if (!context) {
-    return nullptr;
-  }
+  auto context = deviceLock.context();
 
   int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * rasterScale));
   int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * rasterScale));
 
   auto layer = LayerBuilder::Build(doc);
   if (!layer) {
-    device->unlock();
     return nullptr;
   }
   layer->setMatrix(tgfx::Matrix::MakeScale(rasterScale));
 
   auto surface = tgfx::Surface::Make(context, pxWidth, pxHeight);
   if (!surface) {
-    device->unlock();
     return nullptr;
   }
   tgfx::DisplayList displayList;
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
 
-  auto data = EncodeSurfaceAsPng(surface.get(), pxWidth, pxHeight);
-  device->unlock();
-  return data;
+  return EncodeSurfaceAsPng(surface.get(), pxWidth, pxHeight);
 }
 
 // Configures the shared portion of the minimal document for a rectangle or ellipse tile. The

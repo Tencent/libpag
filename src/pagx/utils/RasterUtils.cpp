@@ -19,9 +19,11 @@
 #include "pagx/utils/RasterUtils.h"
 #include <cmath>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
@@ -31,7 +33,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -67,8 +68,19 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
   if (width <= 0 || height <= 0 || pixelScale <= 0.0f) {
     return nullptr;
   }
-  int pixelWidth = static_cast<int>(std::ceil(static_cast<float>(width) * pixelScale));
-  int pixelHeight = static_cast<int>(std::ceil(static_cast<float>(height) * pixelScale));
+  // Compute in double and cap the pixel dimensions: an extreme transform (e.g. a 1e7 scale) would
+  // otherwise overflow the int conversion or attempt a boundless allocation. The caller's vector
+  // fallback keeps the layer vector output.
+  double pixelWidthD = std::ceil(static_cast<double>(width) * pixelScale);
+  double pixelHeightD = std::ceil(static_cast<double>(height) * pixelScale);
+  constexpr double MAX_BAKE_PIXELS_PER_SIDE = 8192.0;
+  if (pixelWidthD > MAX_BAKE_PIXELS_PER_SIDE || pixelHeightD > MAX_BAKE_PIXELS_PER_SIDE) {
+    LOGE("RasterUtils: bake size %.0fx%.0f exceeds the %d px limit, keeping vector output.",
+         pixelWidthD, pixelHeightD, static_cast<int>(MAX_BAKE_PIXELS_PER_SIDE));
+    return nullptr;
+  }
+  int pixelWidth = static_cast<int>(pixelWidthD);
+  int pixelHeight = static_cast<int>(pixelHeightD);
   if (pixelWidth <= 0 || pixelHeight <= 0) {
     return nullptr;
   }
@@ -84,29 +96,53 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
 
 namespace {
 
-// Draws `targetLayer` (and only that layer) into the off-screen canvas, with
-// the global bounds origin mapped to (0,0) so the emitted PNG is tightly
-// cropped. Used for mask / scrollRect bakes where the layer's visual result
-// does not depend on the backdrop.
-//
-// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own
-// scrollRect (see Layer.h doc on draw()) — only children's scrollRects are
-// honoured during the recursive walk. Without this drawer applying the clip
-// itself the baked PNG would contain the target's full unclipped content. The
-// scrollRect lives in layer-local coordinates, so we clip after concatenating
-// the layer's relative matrix while the canvas is still in layer-local space.
+// Inserts a content-free parent in the exporter-owned tree so normal child compositing applies
+// the target's transform, alpha, mask and scrollRect exactly once. The original tree is restored
+// before returning to the exporter.
+class RasterLayerParent {
+ public:
+  explicit RasterLayerParent(const std::shared_ptr<tgfx::Layer>& target)
+      : target(target), parent(target->parent()), wrapper(tgfx::Layer::Make()) {
+    if (parent != nullptr) {
+      parent->replaceChild(target, wrapper);
+    }
+    wrapper->addChild(target);
+  }
+
+  ~RasterLayerParent() {
+    if (parent != nullptr) {
+      parent->replaceChild(wrapper, target);
+    } else {
+      target->removeFromParent();
+    }
+  }
+
+  std::shared_ptr<tgfx::Layer> layer() const {
+    return wrapper;
+  }
+
+ private:
+  std::shared_ptr<tgfx::Layer> target;
+  tgfx::Layer* parent = nullptr;
+  std::shared_ptr<tgfx::Layer> wrapper;
+};
+
 struct MaskedLayerDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Rect& globalBounds;
+  const tgfx::Layer* coordinateSpace;
+  const tgfx::Rect& bounds;
+
   void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-globalBounds.left, -globalBounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(root.get()));
-    auto scrollRect = targetLayer->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
+    canvas->translate(-bounds.left, -bounds.top);
+    if (targetLayer == root) {
+      root->draw(canvas);
+      return;
     }
-    targetLayer->draw(canvas);
+    RasterLayerParent parent(targetLayer);
+    auto wrapper = parent.layer();
+    canvas->concat(wrapper->getRelativeMatrix(coordinateSpace));
+    wrapper->draw(canvas);
   }
 };
 
@@ -210,29 +246,44 @@ struct TiledPatternDrawer {
 
 }  // namespace
 
-GPUContext::~GPUContext() {
-  _device = nullptr;
-}
+GPUContext::~GPUContext() = default;
 
 tgfx::Context* GPUContext::lockContext() {
-  if (!_device) {
-    _device = tgfx::GLDevice::Make();
-    if (!_device) {
+  // Cache the device across sequential rasterizations so creating a new GL context for each
+  // asset does not repeatedly discard the shader and resource caches.
+  if (_device == nullptr) {
+    _device = pag::Devices::MakeDefault();
+    if (_device == nullptr) {
       return nullptr;
     }
   }
-  return _device->lockContext();
+  auto scope = std::make_unique<pag::DeviceLockScope>(_device);
+  if (!*scope) {
+    return nullptr;
+  }
+  auto* context = scope->context();
+  _lockStack.push_back(std::move(scope));
+  return context;
 }
 
 void GPUContext::unlock() {
-  if (_device) {
-    _device->unlock();
+  if (!_lockStack.empty()) {
+    _lockStack.pop_back();
   }
 }
 
 tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer>& targetLayer,
                                                const tgfx::Layer* coordinateSpace) {
   auto bounds = targetLayer->getBounds(coordinateSpace, true);
+  // A huge or non-finite extent (e.g. from an extreme matrix3D scale) would overflow the int
+  // conversions below; reject it before any of that, so the callers keep the vector output.
+  constexpr float MAX_BAKE_LOGICAL_DIMENSION = 1.0e8f;
+  if (!std::isfinite(bounds.width()) || !std::isfinite(bounds.height()) ||
+      bounds.width() > MAX_BAKE_LOGICAL_DIMENSION || bounds.height() > MAX_BAKE_LOGICAL_DIMENSION) {
+    LOGE("RasterUtils: bake bounds %.0fx%.0f are not renderable, keeping vector output.",
+         static_cast<double>(bounds.width()), static_cast<double>(bounds.height()));
+    return tgfx::Rect::MakeEmpty();
+  }
   auto scrollRect = targetLayer->scrollRect();
   if (!scrollRect.isEmpty()) {
     // getRelativeMatrix already folds in scrollRect's preTranslate (see tgfx
@@ -270,45 +321,10 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(globalBounds.width()));
   int height = static_cast<int>(ceilf(globalBounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawer{root, targetLayer, globalBounds});
+                            MaskedLayerDrawer{root, targetLayer, root.get(), globalBounds});
   gpu->unlock();
   return result;
 }
-
-namespace {
-
-// Draws `targetLayer` (and only that layer) into the off-screen canvas using the supplied
-// coordinate space rather than the document root. The bounds origin is mapped to (0,0) so the
-// PNG is tightly cropped and can be placed at `bounds.left/top` inside any container whose
-// transform chain matches `coordinateSpace`. Used by the SVG path where the enclosing `<g>`
-// already carries the parent transform.
-//
-// Note: tgfx's Layer::draw deliberately does NOT apply the target layer's own scrollRect (see
-// Layer.h doc on draw()) — only children's scrollRects are honoured during the recursive walk.
-// This drawer applies the clip itself so the baked PNG honours the scrollRect window even when
-// the visual content overflows it (e.g. a layer with both a scrollRect and SVG-unsupported
-// features such as TextPath / TextModifier / Conic / Diamond gradient that triggers the SVG
-// rasterize fallback). Without this clip the PNG would contain out-of-window pixels and the
-// SVG `<image>` placement at `bounds` would still leak them since `writeLayer` returns early
-// after a successful rasterize and skips the enclosing scrollRect `<g>` wrapper. The scrollRect
-// lives in layer-local coordinates, so we clip after concatenating the layer's relative matrix
-// while the canvas is still in layer-local space.
-struct MaskedLayerDrawerInSpace {
-  const std::shared_ptr<tgfx::Layer>& targetLayer;
-  const tgfx::Layer* coordinateSpace;
-  const tgfx::Rect& bounds;
-  void operator()(tgfx::Canvas* canvas) const {
-    canvas->translate(-bounds.left, -bounds.top);
-    canvas->concat(targetLayer->getRelativeMatrix(coordinateSpace));
-    auto scrollRect = targetLayer->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      canvas->clipRect(scrollRect, targetLayer->allowsEdgeAntialiasing());
-    }
-    targetLayer->draw(canvas);
-  }
-};
-
-}  // namespace
 
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
                                               const std::shared_ptr<tgfx::Layer>& root,
@@ -327,7 +343,7 @@ std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,
   int width = static_cast<int>(ceilf(bounds.width()));
   int height = static_cast<int>(ceilf(bounds.height()));
   auto result = RenderToPNG(context, width, height, pixelScale,
-                            MaskedLayerDrawerInSpace{targetLayer, coordinateSpace, bounds});
+                            MaskedLayerDrawer{root, targetLayer, coordinateSpace, bounds});
   gpu->unlock();
   return result;
 }

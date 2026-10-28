@@ -21,9 +21,9 @@
 #include "base/utils/UniqueID.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
@@ -61,15 +61,26 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = tgfx::GLDevice::CurrentNativeHandle();
-  if (context == nullptr) {
-    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
+  auto tgfxTexture = ToTGFX(texture);
+  if (!tgfxTexture.isValid()) {
+    LOGE("PAGImage.FromTexture() The texture is invalid.");
+    return nullptr;
+  }
+  if (!Devices::SupportsBackend(tgfxTexture.backend())) {
+    // A texture of another GPU backend can never be sampled by this build's context. Reject it
+    // here instead of returning an image that silently draws blank forever.
+    LOGE(
+        "PAGImage.FromTexture() The texture belongs to a different GPU backend than the current "
+        "libpag build.");
     return nullptr;
   }
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), ToTGFX(texture), ToTGFX(origin));
+  // With a valid texture of the matching backend, Picture::MakeFrom() can only fail when the
+  // owning device identity could not be captured, which GL requires a current GPU context on the
+  // calling thread for (the native handle is used for the later share-compatibility check).
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), tgfxTexture, ToTGFX(origin));
   if (!picture) {
-    LOGE("PAGImage.MakeFrom() The texture is invalid.");
+    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
     return nullptr;
   }
   pagImage->graphic = picture;

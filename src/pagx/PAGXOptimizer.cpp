@@ -42,6 +42,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/VerifyUtils.h"
 
 namespace pagx {
@@ -79,8 +80,10 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
 Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
                              const std::unordered_set<std::string>& animatedTargets);
 
-bool TryConvertRectMaskToScrollRect(Layer* layer);
-bool RectMaskToScrollRectInLayer(Layer* layer);
+bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
+                                    const std::vector<Layer*>& siblings);
+bool RectMaskToScrollRectInLayer(Layer* layer, const Layer* parent,
+                                 const std::vector<Layer*>& siblings);
 
 bool ColorSourcesEqual(const ColorSource* a, const ColorSource* b);
 bool FillsEqual(const Fill* a, const Fill* b);
@@ -185,6 +188,33 @@ bool LayoutNodeHasConstraints(const LayoutNode* node) {
     return false;
   }
   return node->hasConstraints();
+}
+
+// Returns true when the node's size or position resolves against its container's dimensions:
+// opposite-edge / center constraints and percent sizes do, while left / top do not.
+bool LayoutNodeDependsOnContainerSize(const LayoutNode* node) {
+  if (node == nullptr) {
+    return false;
+  }
+  return !std::isnan(node->right) || !std::isnan(node->bottom) || !std::isnan(node->centerX) ||
+         !std::isnan(node->centerY) || !std::isnan(node->percentWidth) ||
+         !std::isnan(node->percentHeight);
+}
+
+// Returns true when any content element or child layer depends on the owner's dimensions, in which
+// case pinning the owner's frame would move or resize it.
+bool HasSizeDependentContent(const Layer* layer) {
+  for (auto* element : layer->contents) {
+    if (LayoutNodeDependsOnContainerSize(LayoutNode::AsLayoutNode(element))) {
+      return true;
+    }
+  }
+  for (auto* child : layer->children) {
+    if (LayoutNodeDependsOnContainerSize(child)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool ElementHasConstraints(Element* element) {
@@ -477,7 +507,8 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
 // when the layer doesn't already declare a frame.
 // ----------------------------------------------------------------------------
 
-bool TryConvertRectMaskToScrollRect(Layer* layer) {
+bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
+                                    const std::vector<Layer*>& siblings) {
   if (layer->mask == nullptr) {
     return false;
   }
@@ -488,13 +519,31 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   auto* m = layer->mask;
+  if (!m->children.empty() || m->composition != nullptr) {
+    return false;
+  }
+  // Layout has not run yet. Keep masks whose relative placement can be changed by container
+  // layout or padding, and only rewrite masks in the same parent space or directly inside the owner.
+  if (parent != nullptr && (parent->layout != LayoutMode::None || !parent->padding.isZero())) {
+    return false;
+  }
+  if (layer->layout != LayoutMode::None || !layer->padding.isZero() ||
+      m->layout != LayoutMode::None || !m->padding.isZero() || LayoutNodeHasConstraints(m)) {
+    return false;
+  }
+  bool sharesParent = std::find(siblings.begin(), siblings.end(), m) != siblings.end();
+  bool isChild =
+      std::find(layer->children.begin(), layer->children.end(), m) != layer->children.end();
+  if (!sharesParent && !isChild) {
+    return false;
+  }
   if (m->x != 0 || m->y != 0) {
     return false;
   }
   if (!m->matrix.isIdentity()) {
     return false;
   }
-  if (!m->matrix3D.isIdentity()) {
+  if (HasLayer3DTransform(m)) {
     return false;
   }
   if (m->alpha != 1.0f) {
@@ -551,51 +600,70 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
       return false;
     }
   }
-  // tgfx's scrollRect uses (x,y) as a scroll offset (the rect's top-left maps to the layer's
-  // local (0,0)). To preserve the original positioning we have to translate the layer by the
-  // same (left, top) — which we can only do safely when the user layer has no rotation/scale
-  // (any 2x2 distortion would warp that compensation vector), no 3D matrix, and no
-  // constraint-based positioning (where x/y are inputs to the layout solver rather than the
-  // final translation). A pure-translation matrix is fine: it commutes with the layer-local
-  // pre-translation the scrollRect introduces, so adding (left, top) to layer.x/y produces
-  // the same parent-space final transform whether the matrix translates first or not. This
-  // matters after a PAGX -> SVG -> PAGX round trip, which re-imports the translation we
-  // previously baked into x/y as a 2D matrix attribute.
-  if (layer->matrix.a != 1.0f || layer->matrix.b != 0.0f || layer->matrix.c != 0.0f ||
-      layer->matrix.d != 1.0f) {
+  // The mask is evaluated in the owner's parent space, so a mask whose layer sits at the origin
+  // clips the rect exactly where it is authored. scrollRect, however, clips in the owner's own
+  // space, which only matches when the owner carries no translation of its own. Anything that
+  // moves the owner (x / y, a matrix, z, a 3D transform, a transform component or a layout
+  // position) shifts the window in owner-local space and would need the rect to be compensated,
+  // so those layers keep their mask.
+  if (layer->x != 0.0f || layer->y != 0.0f || !layer->matrix.isIdentity()) {
     return false;
   }
-  if (!layer->matrix3D.isIdentity()) {
+  if (HasLayer3DTransform(layer)) {
     return false;
   }
   if (LayoutNodeHasConstraints(layer)) {
     return false;
   }
-  // If the layer already declares an explicit frame size, leave it alone — overwriting an
-  // author-supplied width/height could change layout semantics for downstream consumers.
-  if (!std::isnan(layer->width) || !std::isnan(layer->height)) {
+  // A mask layer may legally keep the default visible=true (the attribute is ignored while it is
+  // referenced as a mask), but once the reference is detached the layer renders as regular
+  // content. Only rewrite masks that are already hidden.
+  if (m->visible) {
     return false;
   }
-  float left = rect->position.x - rect->size.width * 0.5f;
-  float top = rect->position.y - rect->size.height * 0.5f;
-  layer->scrollRect = {left, top, rect->size.width, rect->size.height};
+  // If the layer already declares an explicit frame size, leave it alone — overwriting an
+  // author-supplied width/height could change layout semantics for downstream consumers. Pinning
+  // the frame below would also move or resize contents whose layout depends on the owner's size.
+  if (!std::isnan(layer->width) || !std::isnan(layer->height) || HasSizeDependentContent(layer)) {
+    return false;
+  }
+  // Read the measured geometry the renderer uses (Rectangle::onMeasure): authored width/height
+  // override the intrinsic size, and position is the center, with a NaN axis meaning the top-left
+  // sits at the origin on that axis.
+  float w = std::isnan(rect->width) ? rect->size.width : rect->width;
+  float h = std::isnan(rect->height) ? rect->size.height : rect->height;
+  if (!std::isfinite(w) || !std::isfinite(h) || w <= 0.0f || h <= 0.0f) {
+    return false;
+  }
+  if (!std::isnan(rect->position.x) && !std::isfinite(rect->position.x)) {
+    return false;
+  }
+  if (!std::isnan(rect->position.y) && !std::isfinite(rect->position.y)) {
+    return false;
+  }
+  float left = std::isnan(rect->position.x) ? 0.0f : rect->position.x - w * 0.5f;
+  float top = std::isnan(rect->position.y) ? 0.0f : rect->position.y - h * 0.5f;
+  layer->scrollRect = {left, top, w, h};
   layer->hasScrollRect = true;
-  layer->x += left;
-  layer->y += top;
+  // scrollRect shifts the contents by (-left, -top); translating the owner by the same amount
+  // keeps them where they were while the window moves to the rect.
+  layer->x = left;
+  layer->y = top;
   // The displayed area collapses to exactly the scrollRect's size after this rewrite. Pin the
   // layer's frame to those dimensions so layoutBounds() reflects the visible region instead of
   // the (much larger) un-clipped child extent — otherwise verify's child-exceeds-parent check
   // (which only suppresses on the parent's clip, not the child's) would fire false positives.
-  layer->width = rect->size.width;
-  layer->height = rect->size.height;
+  layer->width = w;
+  layer->height = h;
   layer->mask = nullptr;
   return true;
 }
 
-bool RectMaskToScrollRectInLayer(Layer* layer) {
-  bool changed = TryConvertRectMaskToScrollRect(layer);
+bool RectMaskToScrollRectInLayer(Layer* layer, const Layer* parent,
+                                 const std::vector<Layer*>& siblings) {
+  bool changed = TryConvertRectMaskToScrollRect(layer, parent, siblings);
   for (auto* child : layer->children) {
-    changed |= RectMaskToScrollRectInLayer(child);
+    changed |= RectMaskToScrollRectInLayer(child, layer, layer->children);
   }
   return changed;
 }
@@ -1296,10 +1364,11 @@ bool AxisFills(float childSize, float parentSize, float childPercent) {
 }
 
 bool ChildFillsParent(const Layer* parent, const Layer* child) {
-  if (child->x != 0.0f || child->y != 0.0f) {
+  if (child->x != 0.0f || child->y != 0.0f || child->z != 0.0f) {
     return false;
   }
-  if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity()) {
+  if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity() ||
+      HasLayerTransformComponents(child)) {
     return false;
   }
   if (!IsZeroOrUnset(child->left) || !IsZeroOrUnset(child->top)) {
@@ -1324,7 +1393,7 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
 // a container layout would reposition child layers, and the child keeps none after the merge.
 bool ChildHasNoPaintAffectingEffect(const Layer* child) {
   return child->visible && child->alpha == 1.0f && child->blendMode == BlendMode::Normal &&
-         child->matrix3D.isIdentity() && !child->preserve3D && child->antiAlias &&
+         !HasLayer3DTransform(child) && !child->preserve3D && child->antiAlias &&
          child->groupOpacity && child->passThroughBackground && !child->hasScrollRect &&
          !child->clipToBounds && child->mask == nullptr && child->composition == nullptr &&
          child->compositionFilePath.empty() && child->externalDoc == nullptr &&
@@ -1751,7 +1820,7 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
     if (options.rectMaskToScrollRect) {
       bool rmChanged = false;
       for (auto* layer : layers) {
-        rmChanged |= RectMaskToScrollRectInLayer(layer);
+        rmChanged |= RectMaskToScrollRectInLayer(layer, nullptr, layers);
       }
       if (rmChanged) {
         RecomputeMaskRefs(doc, maskRefs);

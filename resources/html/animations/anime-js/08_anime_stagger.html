@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>anime.js - stagger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #1E1B4B; position: relative; margin: 0;">
+    <div class="bar"
+         style="position: absolute; left: 40px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #C084FC;"></div>
+    <div class="bar"
+         style="position: absolute; left: 100px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #E879F9;"></div>
+    <div class="bar"
+         style="position: absolute; left: 160px; top: 90px;
+                width: 28px; height: 50px; border-radius: 6px; background-color: #F0ABFC;"></div>
+    <script>
+      // anime.stagger：对一组元素施加错峰延迟，每个元素得到各自时间线
+      anime({
+        targets: ".bar",
+        translateY: -30,
+        duration: 600,
+        easing: "easeInOutSine",
+        delay: anime.stagger(200),
+        direction: "alternate",
+        loop: true
+      });
+    </script>
+  </body>
+</html>

@@ -40,4 +40,20 @@ a project with webp encoding support, please run the following command:
 ./gen_ios -DPAG_USE_WEBP_ENCODE=ON
 ```
 
+### Selecting the Metal backend
+
+By default the generated project uses the OpenGL backend. To build with the Metal backend instead,
+pass `-DPAG_USE_METAL=ON`:
+
+```
+./gen_ios -DPAG_USE_METAL=ON
+./gen_simulator -DPAG_USE_METAL=ON
+```
+
+The Metal backend requires iOS 15 or later and is arm64-only. The deployment target of the
+generated libpag project is raised to 15.0 automatically when Metal is selected, so no extra
+flags are needed. The simulator build therefore only works on Apple Silicon Macs. Note that the
+PAGViewer demo target keeps its default deployment target — bump it to 15.0 in Xcode if you plan
+to run the demo with Metal on devices older than iOS 15.
+
 At last, launch XCode and open the ios/PAGViewer.xcworkspace. You'll be ready to go!

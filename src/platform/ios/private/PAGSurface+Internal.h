@@ -2,32 +2,36 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGSurfaceImpl.h"
-#include "pag/pag.h"
+#import <Foundation/Foundation.h>
 #import "platform/ios/PAGSurface.h"
+
+@class PAGSurfaceImpl;
+
+// Shares the backing implementation with the Cocoa bridge without exposing it in public headers.
+// Keep this header free of C++ includes because PAGSurface.m is pure Objective-C; C++ accessors
+// are declared separately in PAGSurfaceImpl+Internal.h.
+@interface PAGSurface ()
+
+@property(nonatomic, strong) PAGSurfaceImpl* surface;
+
+@end
 
 @interface PAGSurface (Internal)
 
 - (id)impl;
-
-@end
-
-@interface PAGSurfaceImpl (Internal)
-
-- (std::shared_ptr<pag::PAGSurface>)pagSurface;
 
 @end
