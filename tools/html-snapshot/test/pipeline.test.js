@@ -216,8 +216,8 @@ describe('runPagxImportToFile', () => {
   test('rejects when required fields are missing', async () => {
     await expect(runPagxImportToFile({})).rejects.toThrow(/pagxBin is required/);
     await expect(runPagxImportToFile({ pagxBin: '/p' }))
-      .rejects.toThrow(/subsetHtml is required/);
-    await expect(runPagxImportToFile({ pagxBin: '/p', subsetHtml: 'h' }))
+      .rejects.toThrow(/input is required/);
+    await expect(runPagxImportToFile({ pagxBin: '/p', input: 'h' }))
       .rejects.toThrow(/pagxFile is required/);
   });
 
@@ -233,7 +233,7 @@ describe('runPagxImportToFile', () => {
     const logs = [];
     const r = await runPagxImportToFile({
       pagxBin: wrapper,
-      subsetHtml: '/in.html',
+      input: '/in.html',
       pagxFile: '/out.pagx',
       log: (m) => logs.push(m),
     });
@@ -246,7 +246,6 @@ describe('runPagxImportToFile', () => {
       '--input', '/in.html',
       '--output', '/out.pagx',
       '--format', 'html',
-      '--no-resolve',
       '--html-no-snapshot',
     ]);
     // The subset is already rendered, so the importer's own snapshot is disabled.
@@ -403,7 +402,7 @@ describe('runHtmlToPagx — orchestrator', () => {
     })).rejects.toThrow(/outputName is required/);
   });
 
-  test('runs snapshot → import → resolve → render against fakes', async () => {
+  test('runs snapshot → import (including resolve) → render against fakes', async () => {
     // Stage a placeholder input so the existence check passes.
     const inputHtml = path.join(dir, 'page.html');
     fs.writeFileSync(inputHtml, '<html></html>');
@@ -520,11 +519,10 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(fs.existsSync(result.pagx)).toBe(true);
   });
 
-  test('skips render when doRender=false but resolve still runs', async () => {
+  test('skips render and performs one native import when doRender=false', async () => {
     const inputHtml = path.join(dir, 'p.html');
     fs.writeFileSync(inputHtml, '<html></html>');
     const fakePagx = makeFakePagx({ allowRender: false });
-    let resolveCalls = 0;
     // Parse argv on every invocation to count the resolve runs.
     const argvLog = path.join(dir, 'pagx.argv');
     const wrapper = makeArgvCapturingScript({ argvPath: argvLog });
@@ -541,8 +539,8 @@ describe('runHtmlToPagx — orchestrator', () => {
     });
     expect(result.png).toBeNull();
     expect(fs.existsSync(result.pagx)).toBe(true);
-    resolveCalls = fakePagx.callsByCmd.resolve;
-    expect(resolveCalls).toBeGreaterThanOrEqual(1);
+    expect(fakePagx.callsByCmd.import).toBe(1);
+    expect(fakePagx.callsByCmd.resolve).toBe(0);
   });
 
   test('throws when pagx import succeeds but the .pagx file is not on disk', async () => {

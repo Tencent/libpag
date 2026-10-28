@@ -354,8 +354,9 @@ async function processCase(entry, outDir, opts, browser) {
   // 3. import
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
     const r = await runPagxImportToFile({
+      resolve: false,
       pagxBin: opts.pagxBin,
-      subsetHtml,
+      input: subsetHtml,
       pagxFile: subsetPagx,
       stderrPath: importStderr,
     });

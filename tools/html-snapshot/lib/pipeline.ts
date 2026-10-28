@@ -210,30 +210,31 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
   pagxBin?: string;
-  subsetHtml?: string;
+  input?: string;
+  format?: 'html' | 'svg';
   pagxFile?: string;
+  resolve?: boolean;
+  imageStorage?: 'external' | 'embed';
+  imageBaseDir?: string;
+  svgOptions?: string[];
+  verbose?: boolean;
   log?: (line: string) => void;
 }
 
-// Step 2 — run `pagx import --format html --input <subset> --output <pagx>`.
-export async function runPagxImportToFile(
-  opts: RunPagxImportToFileOptions = {},
-): Promise<SpawnCaptureResult> {
-  const { pagxBin, subsetHtml, pagxFile, stderrPath, log, timeoutMs } = opts;
+// A leaf conversion: never forwards browser, batch or artifact orchestration options.
+export async function runPagxImportToFile(opts: RunPagxImportToFileOptions = {}): Promise<SpawnCaptureResult> {
+  const { pagxBin, input, pagxFile, stderrPath, log, timeoutMs, format = 'html' } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
-  if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
+  if (!input) throw new Error('runPagxImportToFile: input is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
-  // `--no-resolve`: `pagx import` resolves import directives by default now, but this pipeline
-  // has its own dedicated resolve step (runPagxResolve) that owns diagnostics, progress logging,
-  // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
-  const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
-    '--no-resolve', '--html-no-snapshot'];
-  // Flex inference is always on inside the importer now. The subset is already rendered, so
-  // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
-  const result = await spawnCapture(pagxBin, args, {
-    stderrPath,
-    timeoutMs,
-  });
+  const args = ['import', '--input', input, '--output', pagxFile, '--format', format];
+  if (format === 'html') args.push('--html-no-snapshot');
+  if (opts.resolve === false) args.push('--no-resolve');
+  if (opts.imageStorage) args.push('--images', opts.imageStorage);
+  if (opts.imageBaseDir) args.push('--image-base-dir', opts.imageBaseDir);
+  if (opts.verbose) args.push('--verbose');
+  if (opts.svgOptions) args.push(...opts.svgOptions);
+  const result = await spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
     if (filtered) log(filtered);
@@ -360,6 +361,11 @@ export interface RunHtmlToPagxOptions {
   checkpoint?: string;
   outputDir?: string;
   outputName?: string;
+  outputFile?: string;
+  format?: 'html' | 'svg';
+  htmlNoSnapshot?: boolean;
+  svgOptions?: string[];
+  verbose?: boolean;
   scale?: number;
   doResolve?: boolean;
   doRender?: boolean;
@@ -397,10 +403,31 @@ export interface RunHtmlToPagxResult {
   fonts: string[];
 }
 
-// End-to-end orchestrator. Runs snapshot → import → optional resolve →
-// optional font embed → optional render. Throws `PipelineStepError` on the
-// first non-zero step so the html2pagx CLI can print a uniform
-// `html2pagx: <step> failed` message and exit 1.
+// Snapshot acquisition and native conversion share the same artifact finalizer.
+export async function convertToArtifacts(opts: RunHtmlToPagxOptions, input: string,
+    fonts: string[] = []): Promise<Omit<RunHtmlToPagxResult, 'subsetHtml'>> {
+  const pagxBin = opts.pagxBin || defaultPagxBin();
+  const pagxFile = path.resolve(opts.outputFile || path.join(opts.outputDir!, `${opts.outputName}.pagx`));
+  await fs.promises.mkdir(path.dirname(pagxFile), { recursive: true });
+  const result = await runPagxImportToFile({
+    pagxBin, input, pagxFile, format: opts.format || 'html', resolve: opts.doResolve,
+    imageStorage: opts.pagxImages || 'external',
+    imageBaseDir: opts.pagxImageBaseDir || (isHttpUrl(opts.input!) ? '' : path.dirname(path.resolve(opts.input!))),
+    svgOptions: opts.svgOptions, verbose: opts.verbose,
+  });
+  assertStepOk('pagx import', result);
+  if (!fs.existsSync(pagxFile)) throw new PipelineStepError('pagx import produced no output', { step: 'pagx import' });
+  if (opts.embedFonts) assertStepOk('pagx embed', await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts }));
+  let png: string | null = null;
+  if (opts.doRender !== false && opts.doResolve !== false) {
+    png = path.join(path.dirname(pagxFile), `${path.parse(pagxFile).name}.png`);
+    assertStepOk('pagx render', await runPagxRender({ pagxBin, pagxFile, output: png,
+      scale: opts.scale || 1, fontFallbacks: fonts }));
+  }
+  opts.log?.(`[done] ${png || pagxFile}`);
+  return { pagx: pagxFile, png, fonts };
+}
+
 export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
   throwIfCancelled();
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
@@ -412,6 +439,10 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   const inputIsUrl = isHttpUrl(opts.input);
   let outputDir = opts.outputDir || '';
   let baseName = opts.outputName || '';
+  if (opts.outputFile) {
+    outputDir = path.dirname(path.resolve(opts.outputFile));
+    baseName = path.parse(opts.outputFile).name;
+  }
 
   if (inputIsUrl) {
     if (!baseName) {
@@ -433,8 +464,6 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   fs.mkdirSync(outputDir, { recursive: true });
   outputDir = path.resolve(outputDir);
 
-  const doResolve = opts.doResolve !== false;
-  const doRender = opts.doRender !== false && doResolve;
   const embedFonts = !!opts.embedFonts;
   const downloadFonts = !!opts.downloadFonts || embedFonts;
   const downloadImages = !!opts.downloadImages;
@@ -443,15 +472,13 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   // a self-cleaning temp dir; pagx import still needs a file to read.
   let subsetHtml: string;
   const tempDir = opts.keepSubsetHtml === false || downloadFonts
-    ? fs.mkdtempSync(path.join(os.tmpdir(), 'html2pagx-')) : '';
+    ? fs.mkdtempSync(path.join(os.tmpdir(), 'pagx-import-')) : '';
   const fontManifest = downloadFonts ? path.join(tempDir, 'fonts.txt') : '';
   if (opts.keepSubsetHtml === false) {
     subsetHtml = path.join(tempDir, `${baseName}.subset.html`);
   } else {
     subsetHtml = path.join(outputDir, `${baseName}.subset.html`);
   }
-  const pagxFile = path.join(outputDir, `${baseName}.pagx`);
-  const pngFile = path.join(outputDir, `${baseName}.png`);
 
   let fontDir = opts.fontDir || '';
   if (downloadFonts && !fontDir) {
@@ -462,16 +489,12 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     imageDir = path.join(outputDir, `${baseName}.images`);
   }
 
-  let totalSteps = 2;
-  if (doResolve) totalSteps = 3;
-  if (doRender) totalSteps = 4;
-
   const snapshotImpl: SnapshotImpl = typeof opts.snapshotImpl === 'function'
     ? opts.snapshotImpl
     : (forkSnapshotCli as SnapshotImpl);
 
   try {
-    log(`[1/${totalSteps}] snapshot  ${opts.input}`);
+    log(`[snapshot] ${opts.input}`);
     const snapshotResult = await snapshotImpl({
       input: opts.input,
       scenario: opts.scenario,
@@ -503,71 +526,12 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
         (fontManifest && fs.existsSync(fontManifest) ? readFontManifest({ manifestPath: fontManifest })
           : collectFontFallbacks({ fontDir }));
       if (fonts.length === 0) {
-        log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
+        log(`pagx import: --html-download-fonts: no web fonts were captured in ${fontDir}`);
       }
     }
 
-    log(`[2/${totalSteps}] import    ${subsetHtml}`);
-    const importResult = await runPagxImportToFile({
-      pagxBin,
-      subsetHtml,
-      pagxFile,
-      log: (line: string) => process.stderr.write(line + '\n'),
-    });
-    if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
-      throw new PipelineStepError('pagx import failed', {
-        step: 'pagx import',
-        code: importResult.code,
-        stderr: importResult.stderr,
-      });
-    }
-
-    if (!doResolve) {
-      log(`[done] wrote ${pagxFile} (skipped resolve+render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts };
-    }
-
-    log(`[3/${totalSteps}] resolve   ${pagxFile}`);
-    // Image resources (both <img> and inline-SVG <image>) exist only after resolve, so the image
-    // storage mode is applied here. Relative paths in the subset resolve against the original input
-    // document's directory (the subset may live in a different output dir).
-    const pagxImageBaseDir = opts.pagxImageBaseDir
-      || (inputIsUrl ? '' : path.dirname(path.resolve(opts.input)));
-    const resolveResult = await runPagxResolve({
-      pagxBin,
-      pagxFile,
-      imageStorage: opts.pagxImages || 'external',
-      imageBaseDir: pagxImageBaseDir,
-    });
-    assertStepOk('pagx resolve', resolveResult);
-
-    // Downloaded faces are only one source of glyphs: the importer also records system font names
-    // on every Text, and `pagx embed` resolves those through the host font manager. Running the
-    // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
-    // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
-    if (embedFonts) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} downloaded font file(s))`);
-      const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
-      assertStepOk('pagx embed', embedResult);
-    }
-
-    if (!doRender) {
-      log(`[done] wrote ${pagxFile} (skipped render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts };
-    }
-
-    log(`[4/${totalSteps}] render    ${pagxFile}  ->  ${pngFile} (scale=${opts.scale || 1})`);
-    const renderResult = await runPagxRender({
-      pagxBin,
-      pagxFile,
-      output: pngFile,
-      scale: opts.scale || 1,
-      fontFallbacks: fonts,
-    });
-    assertStepOk('pagx render', renderResult);
-
-    log(`[done] ${pngFile}`);
-    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts };
+    const artifacts = await convertToArtifacts({ ...opts, outputDir, outputName: baseName }, subsetHtml, fonts);
+    return { subsetHtml, ...artifacts };
   } finally {
     if (tempDir) {
       try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_e) { /* ignore */ }

@@ -27,6 +27,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <locale>
+#include <map>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -381,171 +383,383 @@ ImportResult ImportString(const std::string& content, const std::string& format,
 // CLI entry point
 //--------------------------------------------------------------------------------------------------
 
+struct HTMLImportOptions {
+  bool noSnapshot = false;
+  bool keepSubset = false;
+  bool inlineIconFonts = true;
+  bool captureAnimations = false;
+  bool scrollReveal = false;
+  bool downloadFonts = false;
+  bool embedFonts = false;
+  bool downloadImages = false;
+  std::string scenario;
+  std::string checkpoint;
+  std::string browserEngine;
+  std::string fontDir;
+  std::string imageDir;
+  std::string selector;
+  std::string batchDir;
+  std::vector<std::string> cookies;
+  std::vector<std::string> headers;
+  double viewportWidth = -1;
+  double viewportHeight = -1;
+  double waitMs = -1;
+};
+
 struct ImportOptions {
-  std::string inputFile = {};
-  std::string outputFile = {};
-  std::string outputDir = {};
-  std::string outputName = {};
-  bool htmlNoSnapshot = false;
-  std::string format = {};
-  ImportFormatOptions formatOptions = {};
-  // Conversion warnings (e.g. flex inference fallbacks, unsupported constructs) are noisy and
-  // non-fatal. They are suppressed by default; `--verbose`/`-v` opts back in. Errors are always
-  // printed.
+  std::string inputFile;
+  std::string outputFile;
+  std::string outputDir;
+  std::string outputName;
+  std::string format;
+  ImportFormatOptions formatOptions;
+  HTMLImportOptions html;
   bool verbose = false;
-  // Some importers (notably HTML) leave `import` directives behind for external SVG `<img>`
-  // references and inline `<svg>` elements. These are expanded into native PAGX nodes in the
-  // same pass by default so the output is fully flattened; `--no-resolve` keeps the directives.
   bool resolve = true;
-  // How image resources are stored in the exported PAGX. Defaults to writing image files next to
-  // the output (External); `--images embed` inlines them as base64 data URIs instead.
+  bool render = false;
+  bool preview = false;
+  bool dryRun = false;
+  bool skipExisting = false;
+  double renderScale = 1;
+  double previewColumns = -1;
   ImageStorageMode imageStorage = ImageStorageMode::External;
-  // Directory used to resolve relative image `source` paths to real files. Defaults to the input
-  // file's directory. Only meaningful for local (non-URL) inputs.
-  std::string imageBaseDir = {};
+  std::string imageBaseDir;
 };
 
 static void PrintUsage() {
-  std::cout
-      << "Usage: pagx import [input] [options]\n"
-      << "\n"
-      << "Import a file from another format and convert it to PAGX.\n"
-      << "\n"
-      << "Options:\n"
-      << "  --input <file|url>             Input file or URL to import (required)\n"
-      << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
-      << "  --format <format>              Force input format (svg, html)\n"
-      << "  --output-dir <dir>             Write artifacts to a directory (exclusive with -o)\n"
-      << "  --output-name <name>           Base name with --output-dir (required for URLs)\n"
-      << "  --html-no-snapshot             Import a prepared local HTML subset directly\n"
-      << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
-      << "                                 <svg>) instead of expanding them into native nodes\n"
-      << "  --images <mode>                How image resources are stored: 'external' (default;\n"
-      << "                                 write image files next to the output PAGX and keep the\n"
-      << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
-      << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
-      << "                                 (default: the input file's directory)\n"
-      << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
-      << "\n"
-      << "SVG options:\n"
-      << "  --svg-no-expand-use            Do not expand <use> references\n"
-      << "  --svg-flatten-transforms       Flatten nested transforms into single matrices\n"
-      << "  --svg-preserve-unknown         Preserve unsupported SVG elements as Unknown nodes\n"
-      << "\n"
-      << "Examples:\n"
-      << "  pagx import --input icon.svg                      # SVG to icon.pagx\n"
-      << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
-      << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
-      << "  pagx import --input page.html --no-resolve        # keep import directives\n"
-      << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
+  std::cout << R"(Usage: pagx import [input] [options]
+
+Import SVG or HTML into PAGX. HTML pages and URLs are rendered in a browser;
+interaction scenarios export independent static checkpoints in one session.
+
+Input and output:
+  --input <file|url>             Alternative to a single positional input
+  -o, --output <file>            One PAGX file (default: beside local input)
+  --output-dir <dir>             Artifact directory; required for multiple results
+  --output-name <name>           Base name with --output-dir; required for URLs
+  --format <svg|html>            Force input format (otherwise inferred)
+  --images <external|embed>      Image storage (default: external)
+  --image-base-dir <dir>         Base directory for relative image resources
+  --no-resolve                  Keep import directives; incompatible with rendering
+  --verbose, -v                 Print conversion warnings
+
+Artifacts (SVG and HTML):
+  --render                      Render each imported PAGX to PNG
+  --render-scale <number>       Positive PNG scale (default: 1; requires rendering)
+  --preview                     Render PNGs and assemble contact sheets
+  --preview-columns <1..32>     Columns in contact sheets; requires --preview
+
+HTML options:
+  --html-scenario <file.json>    Replay and export all named capture steps
+  --html-checkpoint <name>       Export only this state, replaying preceding actions
+  --html-browser-engine <name>   puppeteer or playwright (env: HTML_SNAPSHOT_BROWSER)
+  --html-no-snapshot             Convert a prepared local subset without a browser
+  --html-keep-subset             Keep intermediate <name>.subset.html files
+  --html-capture-animations      Capture page animations (default: static frame)
+  --html-viewport-width <px>     Browser viewport width (positive integer)
+  --html-viewport-height <px>    Browser viewport height (positive integer)
+  --html-wait-ms <ms>            Additional readiness delay (nonnegative integer)
+  --html-selector <css>          Wait for a selector before capture
+  --html-scroll-reveal           Scroll to reveal lazy content before capture
+  --html-no-inline-icon-fonts    Disable icon-font glyph conversion to SVG
+  --html-download-fonts         Download web fonts for native font fallbacks
+  --html-embed-fonts            Embed fonts; implies --html-download-fonts
+  --html-font-dir <dir>          Downloaded font directory
+  --html-download-images        Download page images instead of snapshot inlining
+  --html-image-dir <dir>         Downloaded image directory
+  --html-cookie <name=value>     URL cookie (repeatable)
+  --html-header <Key: Value>     URL request header (repeatable)
+  --html-batch <dir>             Recursively import HTML files; requires --output-dir
+  --skip-existing               Batch: skip complete sets of requested artifacts
+  --dry-run                     Batch: list work without creating outputs or a browser
+
+SVG options (also apply to nested SVG imports):
+  --svg-no-expand-use            Do not expand <use> references
+  --svg-flatten-transforms       Flatten nested transforms
+  --svg-preserve-unknown         Preserve unsupported SVG elements
+
+Examples:
+  pagx import icon.svg -o icon.pagx --preview
+  pagx import page.html --html-scenario states.json --output-dir out --preview
+  pagx import page.html --html-scenario states.json --html-checkpoint ready -o ready.pagx
+  pagx import https://example.com --output-dir out --output-name demo
+  pagx import --html-batch pages --output-dir out --preview
+)";
+}
+
+static int ImportArgumentError(const std::string& message) {
+  std::cerr << "pagx import: error: " << message << "\n";
+  return 2;
 }
 
 static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
-  int i = 1;
-  while (i < argc) {
+  auto& o = *options;
+  auto& h = o.html;
+  std::map<std::string, std::string*> strings = {{"--input", &o.inputFile},
+                                                 {"--output", &o.outputFile},
+                                                 {"-o", &o.outputFile},
+                                                 {"--output-dir", &o.outputDir},
+                                                 {"--output-name", &o.outputName},
+                                                 {"--format", &o.format},
+                                                 {"--image-base-dir", &o.imageBaseDir},
+                                                 {"--html-scenario", &h.scenario},
+                                                 {"--html-checkpoint", &h.checkpoint},
+                                                 {"--html-browser-engine", &h.browserEngine},
+                                                 {"--html-font-dir", &h.fontDir},
+                                                 {"--html-image-dir", &h.imageDir},
+                                                 {"--html-selector", &h.selector},
+                                                 {"--html-batch", &h.batchDir}};
+  std::map<std::string, bool*> switches = {
+      {"--verbose", &o.verbose},
+      {"-v", &o.verbose},
+      {"--render", &o.render},
+      {"--preview", &o.preview},
+      {"--dry-run", &o.dryRun},
+      {"--skip-existing", &o.skipExisting},
+      {"--html-no-snapshot", &h.noSnapshot},
+      {"--html-keep-subset", &h.keepSubset},
+      {"--html-capture-animations", &h.captureAnimations},
+      {"--html-scroll-reveal", &h.scrollReveal},
+      {"--html-download-fonts", &h.downloadFonts},
+      {"--html-embed-fonts", &h.embedFonts},
+      {"--html-download-images", &h.downloadImages},
+      {"--svg-flatten-transforms", &o.formatOptions.svgFlattenTransforms},
+      {"--svg-preserve-unknown", &o.formatOptions.svgPreserveUnknown}};
+  std::map<std::string, double*> numbers = {{"--render-scale", &o.renderScale},
+                                            {"--preview-columns", &o.previewColumns},
+                                            {"--html-viewport-width", &h.viewportWidth},
+                                            {"--html-viewport-height", &h.viewportHeight},
+                                            {"--html-wait-ms", &h.waitMs}};
+  bool htmlOptions = false;
+  bool snapshotOptions = false;
+  bool scaleSpecified = false;
+  bool positionalOnly = false;
+  for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
-    if (arg == "--input" && i + 1 < argc) {
-      if (!options->inputFile.empty()) {
-        std::cerr << "pagx import: error: only one input may be specified\n";
-        return 1;
-      }
-      options->inputFile = argv[++i];
-    } else if ((arg == "--output" || arg == "-o") && i + 1 < argc) {
-      options->outputFile = argv[++i];
-    } else if (arg == "--format" && i + 1 < argc) {
-      options->format = argv[++i];
-    } else if (arg == "--no-resolve") {
-      options->resolve = false;
-    } else if (arg == "--html-no-snapshot") {
-      options->htmlNoSnapshot = true;
-    } else if (arg == "--output-dir" || arg == "--output-name") {
-      if (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-') {
-        std::cerr << "pagx import: error: " << arg << " requires a value\n";
-        return 1;
-      }
-      auto value = std::string(argv[++i]);
-      if (arg == "--output-dir") options->outputDir = value;
-      else
-        options->outputName = value;
-    } else if (arg == "--images" && i + 1 < argc) {
-      std::string mode = argv[++i];
-      if (!ParseImageStorageMode(mode, &options->imageStorage)) {
-        std::cerr << "pagx import: error: invalid --images value '" << mode
-                  << "' (expected 'external' or 'embed')\n";
-        return 1;
-      }
-    } else if (arg == "--image-base-dir" && i + 1 < argc) {
-      options->imageBaseDir = argv[++i];
-    } else if (arg == "--verbose" || arg == "-v") {
-      options->verbose = true;
-    } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
-               arg == "--svg-preserve-unknown") {
-      // Handled by ParseFormatOptions below.
-    } else if (arg == "--help" || arg == "-h") {
+    if (!positionalOnly && arg == "--") {
+      positionalOnly = true;
+      continue;
+    }
+    if (!positionalOnly && (arg == "--help" || arg == "-h")) {
       PrintUsage();
       return -1;
-    } else if (arg[0] == '-') {
-      std::cerr << "pagx import: error: unknown option '" << arg << "'\n";
-      return 1;
-    } else if (options->inputFile.empty()) {
-      options->inputFile = arg;
-    } else {
-      std::cerr << "pagx import: error: unexpected argument '" << arg << "'\n";
-      return 1;
     }
-    i++;
-  }
-
-  if (options->inputFile.empty()) {
-    std::cerr << "pagx import: error: missing --input\n";
-    return 1;
-  }
-
-  options->format = NormalizeFormat(options->format, IsHttpUrl(options->inputFile)
-                                                         ? "html"
-                                                         : GetFileExtension(options->inputFile));
-  if (options->htmlNoSnapshot && (options->format != "html" || IsHttpUrl(options->inputFile))) {
-    std::cerr << "pagx import: error: --html-no-snapshot requires local HTML\n";
-    return 1;
-  }
-  if ((!options->outputFile.empty() && !options->outputDir.empty()) ||
-      (!options->outputName.empty() && options->outputDir.empty())) {
-    std::cerr << "pagx import: error: use --output or --output-dir [--output-name], exclusively\n";
-    return 1;
-  }
-  if (!options->outputName.empty() &&
-      (options->outputName == "." || options->outputName == ".." ||
-       options->outputName.find_first_of("/\\") != std::string::npos)) {
-    std::cerr << "pagx import: error: --output-name must be a filename, not a path\n";
-    return 1;
-  }
-  if (!options->outputDir.empty()) {
-    if (options->outputName.empty()) {
-      if (IsHttpUrl(options->inputFile)) {
-        std::cerr << "pagx import: error: URL directory output requires --output-name\n";
-        return 1;
+    if (positionalOnly || arg.empty() || arg[0] != '-') {
+      if (arg.empty()) return ImportArgumentError("input must not be empty");
+      if (!o.inputFile.empty()) return ImportArgumentError("only one input may be specified");
+      o.inputFile = arg;
+      continue;
+    }
+    if (arg.rfind("--html-", 0) == 0) {
+      htmlOptions = true;
+      snapshotOptions |= arg != "--html-no-snapshot";
+    }
+    auto flag = switches.find(arg);
+    if (flag != switches.end()) {
+      *flag->second = true;
+      continue;
+    }
+    if (arg == "--no-resolve") {
+      o.resolve = false;
+      continue;
+    }
+    if (arg == "--svg-no-expand-use") {
+      o.formatOptions.svgExpandUse = false;
+      continue;
+    }
+    if (arg == "--html-no-inline-icon-fonts") {
+      h.inlineIconFonts = false;
+      continue;
+    }
+    auto str = strings.find(arg);
+    auto num = numbers.find(arg);
+    if (str == strings.end() && num == numbers.end() && arg != "--images" &&
+        arg != "--html-cookie" && arg != "--html-header") {
+      return ImportArgumentError("unknown option '" + arg + "'");
+    }
+    if (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-') {
+      return ImportArgumentError(arg + " requires a value");
+    }
+    std::string value = argv[++i];
+    if (str != strings.end()) {
+      if (arg == "--input" && !o.inputFile.empty()) {
+        return ImportArgumentError("only one input may be specified");
       }
-      options->outputName = std::filesystem::u8path(options->inputFile).stem().u8string();
-    }
-    options->outputFile = (std::filesystem::u8path(options->outputDir) /
-                           std::filesystem::u8path(options->outputName + ".pagx"))
-                              .u8string();
+      *str->second = value;
+    } else if (num != numbers.end()) {
+      double parsed = 0;
+      try {
+        size_t consumed = 0;
+        parsed = std::stod(value, &consumed);
+        if (consumed != value.size() || !std::isfinite(parsed)) throw std::invalid_argument("");
+      } catch (const std::exception&) {
+        return ImportArgumentError(arg + " requires a finite number");
+      }
+      if (arg == "--render-scale") {
+        if (parsed <= 0) return ImportArgumentError(arg + " must be positive");
+        scaleSpecified = true;
+      } else if (std::floor(parsed) != parsed || parsed < (arg == "--html-wait-ms" ? 0 : 1) ||
+                 parsed > (arg == "--preview-columns" ? 32 : 2147483647)) {
+        return ImportArgumentError(arg + " is outside the supported integer range");
+      }
+      *num->second = parsed;
+    } else if (arg == "--images") {
+      if (!ParseImageStorageMode(value, &o.imageStorage)) {
+        return ImportArgumentError("invalid --images value '" + value +
+                                   "' (expected external or embed)");
+      }
+    } else if (arg == "--html-cookie")
+      h.cookies.push_back(value);
+    else
+      h.headers.push_back(value);
   }
-  if (options->outputFile.empty()) {
-    if (IsHttpUrl(options->inputFile)) {
-      std::cerr << "pagx import: error: URL input requires --output or --output-dir\n";
-      return 1;
-    }
-    options->outputFile = ReplaceExtension(options->inputFile, "pagx");
+  if (o.inputFile.empty() && h.batchDir.empty()) return ImportArgumentError("missing input");
+  if (!h.batchDir.empty() &&
+      (!o.inputFile.empty() || !o.outputFile.empty() || !o.outputName.empty())) {
+    return ImportArgumentError(
+        "--html-batch cannot be combined with an input, --output or --output-name");
   }
-
-  ParseFormatOptions(argc, argv, &options->formatOptions);
+  if ((!o.outputFile.empty() && !o.outputDir.empty()) ||
+      (!o.outputName.empty() && o.outputDir.empty())) {
+    return ImportArgumentError("use --output or --output-dir [--output-name], exclusively");
+  }
+  if (!h.batchDir.empty() && o.outputDir.empty())
+    return ImportArgumentError("--html-batch requires --output-dir");
+  if (h.batchDir.empty() && (o.dryRun || o.skipExisting))
+    return ImportArgumentError("--dry-run and --skip-existing require --html-batch");
+  o.format = NormalizeFormat(o.format, !h.batchDir.empty() || IsHttpUrl(o.inputFile)
+                                           ? "html"
+                                           : GetFileExtension(o.inputFile));
+  if (o.format != "html" && o.format != "svg")
+    return ImportArgumentError("unsupported format '" + o.format + "'");
+  if (htmlOptions && o.format != "html")
+    return ImportArgumentError("--html-* options require HTML input");
+  if (IsHttpUrl(o.inputFile) && (o.format != "html" || h.noSnapshot))
+    return ImportArgumentError("URL inputs require HTML browser snapshotting");
+  if (h.noSnapshot && snapshotOptions)
+    return ImportArgumentError("--html-no-snapshot cannot be combined with HTML capture options");
+  if (!h.checkpoint.empty() && h.scenario.empty())
+    return ImportArgumentError("--html-checkpoint requires --html-scenario");
+  if (!h.scenario.empty() &&
+      (!h.batchDir.empty() || h.captureAnimations || h.scrollReveal || h.viewportWidth >= 0 ||
+       h.viewportHeight >= 0 || h.waitMs >= 0 || !h.selector.empty())) {
+    return ImportArgumentError(
+        "--html-scenario owns viewport and readiness; cannot combine with batch, animation, "
+        "viewport, wait, selector or scroll-reveal options");
+  }
+  if (!h.browserEngine.empty() && h.browserEngine != "puppeteer" && h.browserEngine != "playwright")
+    return ImportArgumentError("unsupported --html-browser-engine");
+  if ((!h.cookies.empty() || !h.headers.empty()) && !IsHttpUrl(o.inputFile))
+    return ImportArgumentError("HTML cookies/headers require a URL input");
+  h.downloadFonts |= h.embedFonts;
+  if (!h.fontDir.empty() && !h.downloadFonts)
+    return ImportArgumentError(
+        "--html-font-dir requires --html-download-fonts or --html-embed-fonts");
+  if (!h.imageDir.empty() && !h.downloadImages)
+    return ImportArgumentError("--html-image-dir requires --html-download-images");
+  o.render |= o.preview;
+  if (o.render && !o.resolve)
+    return ImportArgumentError("rendering and --preview cannot be combined with --no-resolve");
+  if (o.previewColumns >= 0 && !o.preview)
+    return ImportArgumentError("--preview-columns requires --preview");
+  if (scaleSpecified && !o.render)
+    return ImportArgumentError("--render-scale requires --render or --preview");
+  if (!o.outputName.empty() && (o.outputName == "." || o.outputName == ".." ||
+                                o.outputName.find_first_of("/\\") != std::string::npos))
+    return ImportArgumentError("--output-name must be a filename, not a path");
+  if (IsHttpUrl(o.inputFile) && o.outputFile.empty() &&
+      (o.outputDir.empty() || o.outputName.empty()))
+    return ImportArgumentError("URL input requires --output or --output-dir with --output-name");
+  // Scenarios determine cardinality and checkpoint names in the HTML runtime before any side effects.
+  if (h.scenario.empty() && h.batchDir.empty() && o.outputFile.empty()) {
+    if (o.outputDir.empty()) o.outputFile = ReplaceExtension(o.inputFile, "pagx");
+    else {
+      if (o.outputName.empty())
+        o.outputName = std::filesystem::u8path(o.inputFile).stem().u8string();
+      o.outputFile =
+          (std::filesystem::u8path(o.outputDir) / std::filesystem::u8path(o.outputName + ".pagx"))
+              .u8string();
+    }
+  }
   std::error_code ec;
-  if (std::filesystem::is_directory(std::filesystem::u8path(options->outputFile), ec)) {
-    std::cerr << "pagx import: error: --output must name a file, not a directory\n";
-    return 1;
-  }
+  if (!o.outputFile.empty() &&
+      std::filesystem::is_directory(std::filesystem::u8path(o.outputFile), ec))
+    return ImportArgumentError("--output must name a file, not a directory");
+  if (!o.outputFile.empty() && !IsHttpUrl(o.inputFile) &&
+      std::filesystem::absolute(std::filesystem::u8path(o.inputFile)).lexically_normal() ==
+          std::filesystem::absolute(std::filesystem::u8path(o.outputFile)).lexically_normal())
+    return ImportArgumentError("output must differ from input");
   return 0;
+}
+
+// Only normalized fields cross the process boundary. The Node runtime has no public CLI parser.
+static std::string ImportRequest(const ImportOptions& o, const std::string& executable) {
+  std::ostringstream json;
+  json.imbue(std::locale::classic());
+  json << "{\"version\":1";
+  auto str = [&](const char* key, const std::string& value) {
+    json << ",\"" << key << "\":\"" << EscapeJson(value) << "\"";
+  };
+  auto flag = [&](const char* key, bool value) {
+    json << ",\"" << key << "\":" << (value ? "true" : "false");
+  };
+  auto number = [&](const char* key, double value) {
+    if (value >= 0) json << ",\"" << key << "\":" << value;
+  };
+  auto array = [&](const char* key, const std::vector<std::string>& values) {
+    json << ",\"" << key << "\":[";
+    bool first = true;
+    for (const auto& value : values) {
+      if (!first) json << ',';
+      json << '"' << EscapeJson(value) << '"';
+      first = false;
+    }
+    json << ']';
+  };
+  str("pagxBin", executable);
+  str("input", o.inputFile);
+  str("format", o.format);
+  str("outputFile", o.outputFile);
+  str("outputDir", o.outputDir);
+  str("outputName", o.outputName);
+  str("pagxImages", o.imageStorage == ImageStorageMode::Embed ? "embed" : "external");
+  str("pagxImageBaseDir", o.imageBaseDir);
+  flag("doResolve", o.resolve);
+  flag("doRender", o.render);
+  flag("verbose", o.verbose);
+  flag("preview", o.preview);
+  flag("dryRun", o.dryRun);
+  flag("skipExisting", o.skipExisting);
+  number("scale", o.renderScale);
+  number("previewColumns", o.previewColumns);
+  const auto& h = o.html;
+  str("scenario", h.scenario);
+  str("checkpoint", h.checkpoint);
+  str("batchDir", h.batchDir);
+  str("browserEngine", h.browserEngine);
+  str("fontDir", h.fontDir);
+  str("imageDir", h.imageDir);
+  str("selector", h.selector);
+  flag("htmlNoSnapshot", h.noSnapshot);
+  flag("keepSubsetHtml", h.keepSubset);
+  flag("inlineIconFonts", h.inlineIconFonts);
+  flag("captureAnimations", h.captureAnimations);
+  flag("scrollReveal", h.scrollReveal);
+  flag("downloadFonts", h.downloadFonts);
+  flag("embedFonts", h.embedFonts);
+  flag("downloadImages", h.downloadImages);
+  number("viewportWidth", h.viewportWidth);
+  number("viewportHeight", h.viewportHeight);
+  number("waitMs", h.waitMs);
+  array("cookies", h.cookies);
+  array("headers", h.headers);
+  std::vector<std::string> svg;
+  if (!o.formatOptions.svgExpandUse) svg.emplace_back("--svg-no-expand-use");
+  if (o.formatOptions.svgFlattenTransforms) svg.emplace_back("--svg-flatten-transforms");
+  if (o.formatOptions.svgPreserveUnknown) svg.emplace_back("--svg-preserve-unknown");
+  array("svgOptions", svg);
+  json << '}';
+  return json.str();
 }
 
 int RunImport(int argc, char* argv[]) {
@@ -555,8 +769,23 @@ int RunImport(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
+  if ((options.format == "html" && !options.html.noSnapshot) || options.render) {
+    auto script = ResolveHTMLTool("PAGX_IMPORT_BIN", "launch-import.js", "import.js");
+    if (script.empty()) {
+      std::cerr << "pagx import: runtime not found; install the complete @libpag/pagx package "
+                   "or set PAGX_IMPORT_BIN\n";
+      return 1;
+    }
+    auto executable = CurrentExecutablePath();
+    if (executable.empty()) {
+      std::cerr << "pagx import: cannot locate the invoking native binary\n";
+      return 1;
+    }
+    return RunNodeTool(script, {"--request", ImportRequest(options, executable)});
+  }
+
   auto result = ImportFile(options.inputFile, options.format, options.formatOptions, NAN, NAN,
-                           options.htmlNoSnapshot ? HTMLSource::Subset : HTMLSource::Page);
+                           options.html.noSnapshot ? HTMLSource::Subset : HTMLSource::Page);
   if (!result.error.empty()) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;

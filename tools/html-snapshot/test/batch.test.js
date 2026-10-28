@@ -22,6 +22,16 @@ function touch(rel) {
   return full;
 }
 
+async function materializeResult(run, opts) {
+  const result = await run(opts);
+  result.pagx ||= path.join(opts.outputDir, `${opts.outputName}.pagx`);
+  result.subsetHtml ||= path.join(opts.outputDir, `${opts.outputName}.subset.html`);
+  for (const file of [result.pagx, result.subsetHtml]) {
+    if (!fs.existsSync(file)) fs.writeFileSync(file, '<document/>');
+  }
+  return result;
+}
+
 describe('collectHtmlInputs', () => {
   test('returns [] for an empty directory', () => {
     expect(collectHtmlInputs(dir)).toEqual([]);
@@ -131,7 +141,7 @@ describe('runBatch — dryRun', () => {
     expect(output).toContain(path.relative(dir, b));
   });
 
-  test('skipExisting marks pre-existing .pagx targets as skipped', async () => {
+  test('skipExisting does not treat a lone PAGX as complete', async () => {
     touch('a.html');
     touch('b.html');
     // Pre-stage `a.pagx` next to its sibling so the skipExisting check fires.
@@ -143,8 +153,8 @@ describe('runBatch — dryRun', () => {
       dryRun: true,
       skipExisting: true,
     }));
-    expect(result).toEqual({ processed: 1, skipped: 1, failed: 0, total: 2 });
-    expect(output).toMatch(/\[1\/2\] skip      a\.html/);
+    expect(result).toEqual({ processed: 2, skipped: 0, failed: 0, total: 2 });
+    expect(output).toMatch(/\[1\/2\] would process a\.html/);
     expect(output).toMatch(/\[2\/2\] would process b\.html/);
   });
 
@@ -205,7 +215,7 @@ describe('runBatch — live execution (mocked engine + pipeline)', () => {
       const real = jest.requireActual('../dist/lib/pipeline');
       return {
         ...real,
-        runHtmlToPagx: runHtmlToPagx || (async () => ({ subsetHtml: '', pagx: '', png: null, fonts: [] })),
+        runHtmlToPagx: opts => materializeResult(runHtmlToPagx || (async () => ({ subsetHtml: '', pagx: '', png: null, fonts: [] })), opts),
       };
     });
     return require('../dist/lib/batch');
@@ -243,7 +253,7 @@ describe('runBatch — live execution (mocked engine + pipeline)', () => {
     expect(seen).toHaveLength(2);
   });
 
-  test('skipExisting marks pre-existing .pagx targets without invoking the pipeline', async () => {
+  test('skipExisting uses complete results and invalidates missing artifacts', async () => {
     touch('a.html');
     touch('b.html');
     fs.writeFileSync(path.join(dir, 'a.pagx'), '');
@@ -251,6 +261,9 @@ describe('runBatch — live execution (mocked engine + pipeline)', () => {
     const { runBatch: liveRun } = loadBatchWith({
       runHtmlToPagx: async () => { pipelineCalls++; return { subsetHtml: '', pagx: '', png: null, fonts: [] }; },
     });
+    await withCapturedIO(() => liveRun({ inputDir: dir, pagxBin: '/p', scriptDir: dir, skipExisting: true }));
+    fs.unlinkSync(path.join(dir, 'b.pagx'));
+    pipelineCalls = 0;
     const { result, stdout } = await withCapturedIO(() => liveRun({
       inputDir: dir,
       pagxBin: '/p',
@@ -342,7 +355,7 @@ describe('runBatch — in-process snapshot adapter', () => {
     });
     jest.doMock('../dist/lib/pipeline', () => {
       const real = jest.requireActual('../dist/lib/pipeline');
-      return { ...real, runHtmlToPagx };
+      return { ...real, runHtmlToPagx: opts => materializeResult(runHtmlToPagx, opts) };
     });
     return require('../dist/lib/batch');
   }

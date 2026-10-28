@@ -147,6 +147,9 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
 }
 
 export interface RunBatchOptions {
+  svgOptions?: string[];
+  verbose?: boolean;
+  pagxImageBaseDir?: string;
   log?: (line: string) => void;
   inputDir: string;
   scriptDir: string;
@@ -186,6 +189,45 @@ export interface RunBatchResult {
   preview?: ContactSheetResult;
 }
 
+// A PAGX alone does not establish that a previous run produced the requested PNG, fonts
+// or subset. Cache only complete results with the same source, native binary and options.
+function batchSignature(opts: RunBatchOptions, input: string): string {
+  const stamp = (file: string | undefined) => {
+    const stat = file ? fs.statSync(file, { throwIfNoEntry: false }) : undefined;
+    return stat ? [stat.size, stat.mtimeMs] : null;
+  };
+  const { log: _log, dryRun: _dryRun, skipExisting: _skip, preview: _preview,
+    previewColumns: _columns, ...settings } = opts;
+  return JSON.stringify({ input: path.resolve(input), source: stamp(input), binary: stamp(opts.pagxBin), settings });
+}
+
+type ArtifactStamp = { file: string; size: number; mtimeMs: number };
+function artifactStamps(files: string[]): ArtifactStamp[] {
+  return [...new Set(files)].map(file => {
+    const stat = fs.statSync(file);
+    if (!stat.isFile()) throw new Error(`artifact is not a file: ${file}`);
+    return { file, size: stat.size, mtimeMs: stat.mtimeMs };
+  });
+}
+function completeBatchResult(record: string, signature: string): boolean {
+  try {
+    const data = JSON.parse(fs.readFileSync(record, 'utf8'));
+    return data.status === 'complete' && data.signature === signature && data.artifacts.length > 0 &&
+      data.artifacts.every((item: ArtifactStamp) => {
+        const stat = fs.statSync(item.file, { throwIfNoEntry: false });
+        return stat?.isFile() && stat.size === item.size && stat.mtimeMs === item.mtimeMs;
+      });
+  } catch (_) { return false; }
+}
+function pagxResourceFiles(pagx: string): string[] {
+  const xml = fs.readFileSync(pagx, 'utf8');
+  const entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  return [...xml.matchAll(/\bsource="([^"]+)"/g)].map(match => match[1]
+    .replace(/&(amp|lt|gt|quot|apos);/g, (_, name: string) => entities[name]))
+    .filter(source => source && !/^(data:|https?:)/i.test(source))
+    .map(source => path.resolve(path.dirname(pagx), source));
+}
+
 // Run the batch.
 export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   throwIfCancelled();
@@ -217,7 +259,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       const stem = basenameStem(file);
       const target = path.join(outDir, `${stem}.pagx`);
       const index = idx + 1;
-      if (opts.skipExisting && fs.existsSync(target)) {
+      if (opts.skipExisting && completeBatchResult(path.join(outDir, `${stem}.import.json`), batchSignature(opts, file))) {
         log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         return;
@@ -246,9 +288,10 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       const index = i + 1;
       const outDir = resolveOutputDir(file, inputDir, outputRoot);
       const stem = basenameStem(file);
-      const pagxTarget = path.join(outDir, `${stem}.pagx`);
+      const record = path.join(outDir, `${stem}.import.json`);
+      const signature = batchSignature(opts, file);
 
-      if (opts.skipExisting && fs.existsSync(pagxTarget)) {
+      if (opts.skipExisting && completeBatchResult(record, signature)) {
         log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         continue;
@@ -258,6 +301,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       log(`[${index}/${total}] process   ${rel}`);
 
       try {
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'running', signature }), { reuseExisting: false });
         const result = await runHtmlToPagx({
           input: file,
           outputDir: outDir,
@@ -274,6 +318,9 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           downloadImages: opts.downloadImages,
           imageDir: opts.imageDir,
           pagxImages: opts.pagxImages,
+          pagxImageBaseDir: opts.pagxImageBaseDir,
+          svgOptions: opts.svgOptions,
+          verbose: opts.verbose,
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
           captureAnimations: opts.captureAnimations,
@@ -291,8 +338,15 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           if (!result.png) throw new Error(`preview requires a rendered PNG for ${rel}`);
           previewItems.push({ name: rel.split(path.sep).join('/'), png: result.png });
         }
+        const files = [result.pagx, ...result.fonts, ...pagxResourceFiles(result.pagx)];
+        if (result.png) files.push(result.png);
+        if (opts.keepSubsetHtml !== false) files.push(result.subsetHtml);
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'complete', signature,
+          artifacts: artifactStamps(files) }), { reuseExisting: false });
         processed++;
       } catch (err) {
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'failed', signature,
+          error: errMessage(err) }), { reuseExisting: false });
         throwIfCancelled();
         failed++;
         const msg = err instanceof PipelineStepError

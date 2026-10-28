@@ -34,6 +34,8 @@ beforeEach(() => {
     const subsetHtml = path.join(opts.outputDir, `${opts.outputName}.subset.html`);
     const captured = await opts.snapshotImpl({ input: opts.input, output: subsetHtml, captureAnimations: opts.captureAnimations });
     if (captured.code) throw new Error(captured.stderr);
+    fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.pagx`), '<pagx/>');
+    fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.png`), 'PNG');
     return { subsetHtml, pagx: path.join(opts.outputDir, `${opts.outputName}.pagx`),
       png: path.join(opts.outputDir, `${opts.outputName}.png`), fonts: captured.fontFiles };
   });
@@ -53,7 +55,9 @@ test.each(['puppeteer', 'playwright'])('%s batches isolate inputs and close ever
     expect(handle.browser).toBe(contexts.at(-1));
     expect(url).toBe(pathToFileURL(path.join(dir, contexts.length === 1 ? 'a.html' : 'b.html')).href);
     expect(opts.reducedMotion).toBe(false);
-    return { html: url, fonts: [{ path: `/fonts/${contexts.length}.ttf` }] };
+    const font = path.join(dir, `${contexts.length}.ttf`);
+    fs.writeFileSync(font, 'font');
+    return { html: url, fonts: [{ path: font }] };
   });
   expect(await runBatch({ ...options, captureAnimations: true })).toEqual({ total: 2, processed: 2, skipped: 0, failed: 0 });
   expect(contexts).toHaveLength(2);
@@ -80,8 +84,10 @@ test('cancellation closes the active context without converting later inputs', a
 });
 
 test('preview contains only newly completed inputs, in order, after browser shutdown', async () => {
-  fs.writeFileSync(path.join(dir, 'a.pagx'), 'old');
-  fs.writeFileSync(path.join(dir, 'a.png'), 'old');
+  await runBatch({ ...options, preview: true, previewColumns: 2 });
+  fs.unlinkSync(path.join(dir, 'b.pagx'));
+  browser.close.mockClear();
+  generateContactSheet.mockClear();
   fs.writeFileSync(path.join(dir, 'c.html'), '<html/>');
   fs.writeFileSync(path.join(dir, 'd.html'), '<html/>');
   runSnapshot.mockRejectedValueOnce(new Error('b failed'));
@@ -97,7 +103,8 @@ test('preview contains only newly completed inputs, in order, after browser shut
 });
 
 test('an entirely skipped batch never previews files from an earlier run', async () => {
-  for (const name of ['a', 'b']) fs.writeFileSync(path.join(dir, `${name}.pagx`), 'old');
+  await runBatch({ ...options, preview: true });
+  generateContactSheet.mockClear();
   expect(await runBatch({ ...options, skipExisting: true, preview: true })).toMatchObject({ skipped: 2, preview: { pages: [] } });
   expect(generateContactSheet).not.toHaveBeenCalled();
 });

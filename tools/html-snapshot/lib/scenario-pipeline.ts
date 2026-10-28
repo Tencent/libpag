@@ -44,10 +44,10 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
   const scenario = parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8')));
   if (opts.checkpoint) selectCheckpoint(scenario, opts.checkpoint);
   const isUrl = isHttpUrl(opts.input);
-  if (isUrl && !opts.outputName) throw new Error('--output-name is required for URL input');
+  if (isUrl && !opts.outputName && !opts.outputFile) throw new Error('--output-name is required for URL input');
   if (!isUrl && (opts.cookies?.length || opts.headers?.length)) throw new Error('cookies/headers require a URL input');
-  const outputDir = path.resolve(opts.outputDir || (isUrl ? process.cwd() : path.dirname(opts.input)));
-  const base = opts.outputName || path.basename(opts.input, path.extname(opts.input));
+  const outputDir = path.resolve(opts.outputFile ? path.dirname(opts.outputFile) : opts.outputDir || (isUrl ? process.cwd() : path.dirname(opts.input)));
+  const base = opts.outputFile ? path.parse(opts.outputFile).name : opts.outputName || path.basename(opts.input, path.extname(opts.input));
   if (base === '.' || base === '..' || /[\\/\0]/.test(base)) throw new Error('--output-name must be a filename, not a path');
   const fontDir = path.resolve(opts.fontDir || path.join(outputDir, `${base}.fonts`));
   const imageDir = path.resolve(opts.imageDir || path.join(outputDir, `${base}.images`));
