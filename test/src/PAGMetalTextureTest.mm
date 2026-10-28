@@ -33,6 +33,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
+#include "utils/MetalTestSupport.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -361,7 +362,7 @@ PAG_TEST(PAGMetalAtlasTest, ResetRemovesPreviousTextHistory) {
   std::vector<uint8_t> expected;
   for (int warmupCount : {0, 1, 3, 7, 15}) {
     SCOPED_TRACE(warmupCount);
-    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
+    ASSERT_TRUE(ResetMetalAtlasForComparison());
     {
       DeviceLockScope scope(device);
       ASSERT_TRUE(static_cast<bool>(scope));
@@ -374,7 +375,7 @@ PAG_TEST(PAGMetalAtlasTest, ResetRemovesPreviousTextHistory) {
         scope.context()->flushAndSubmit(true);
       }
     }
-    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
+    ASSERT_TRUE(ResetMetalAtlasForComparison());
     std::vector<uint8_t> pixels(info.byteSize());
     {
       DeviceLockScope scope(device);

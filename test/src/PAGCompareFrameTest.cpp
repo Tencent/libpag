@@ -31,6 +31,9 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
+#if defined(TGFX_USE_METAL)
+#include "utils/MetalTestSupport.h"
+#endif
 
 namespace pag {
 using namespace tgfx;
@@ -153,15 +156,15 @@ static void CompareFileFrames(const std::string& pagPath) {
  */
 PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
-  if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
-    // Metal deduplicates devices by native GPU, so worker threads share one glyph atlas. Keep
-    // pixel comparisons independent of interleaving; concurrency is covered by separate tests.
-    for (const auto& file : files) {
-      ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
-      CompareFileFrames(file);
-    }
-    return;
+#if defined(TGFX_USE_METAL)
+  // Metal workers share one glyph atlas; interleaving can change Linear-sampled text pixels.
+  // Keep independent baseline files serial and clear atlas history before each file.
+  for (const auto& file : files) {
+    ASSERT_TRUE(ResetMetalAtlasForComparison());
+    CompareFileFrames(file);
   }
+  return;
+#endif
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {

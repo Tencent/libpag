@@ -18,11 +18,6 @@
 
 #include "DevicePool.h"
 #include "rendering/gpu/Devices.h"
-#if defined(TGFX_USE_METAL)
-#include "base/utils/Log.h"
-#include "core/AtlasManager.h"
-#include "tgfx/gpu/Context.h"
-#endif
 
 namespace pag {
 thread_local std::shared_ptr<tgfx::Device> cachedDevice = nullptr;
@@ -34,21 +29,5 @@ std::shared_ptr<tgfx::Device> DevicePool::Make() {
     cachedDevice = device;
   }
   return device;
-}
-
-bool DevicePool::ResetAtlasForComparison() {
-#if defined(TGFX_USE_METAL)
-  DeviceLockScope scope(Devices::MakeDefault());
-  if (!scope) {
-    LOGE("ResetAtlasForComparison: failed to create or lock the Metal device.");
-    return false;
-  }
-  auto context = scope.context();
-  context->flushAndSubmit(true);
-  // Test-only workaround matching tgfx's ContextScope: Linear glyph sampling can change pixels
-  // with atlas placement. Clear history for independent baselines, not for reuse behavior tests.
-  context->atlasManager()->releaseAll();
-#endif
-  return true;
 }
 }  // namespace pag
