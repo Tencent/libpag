@@ -4041,6 +4041,102 @@ CLI_TEST(PAGXHtmlTest, AnimationVisibleRetainsInitiallyHiddenLayerContents) {
   EXPECT_EQ(staticHtml.find("background-color:#2563EB"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, AnimationGeometryCorpus) {
+  struct GeometryCase {
+    const char* file;
+    const char* target;
+    const char* first;
+    const char* last;
+  };
+  const GeometryCase cases[] = {
+      {"01_rectangle_size_width", "growRect", "left: 120px; width: 80px",
+       "left: 40px; width: 240px"},
+      {"02_rectangle_roundness", "roundRect", "border-radius: 0px", "border-radius: 60px"},
+      {"03_ellipse_size_width", "growEllipse", "left: 120px; width: 80px",
+       "left: 40px; width: 240px"},
+  };
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const auto& geometry : cases) {
+    std::string path = "resources/pagx_to_html/animations/geometry/";
+    path += geometry.file;
+    path += ".pagx";
+    auto html = LoadAndConvert(ProjectPath::Absolute(path), options);
+    ASSERT_FALSE(html.empty()) << geometry.file;
+    std::string marker = std::string("id=\"") + geometry.target + "\"";
+    auto tag = FindTagContaining(html, marker);
+    ASSERT_FALSE(tag.empty()) << geometry.file;
+    EXPECT_EQ(tag.rfind("<div", 0), 0u) << geometry.file;
+    EXPECT_NE(tag.find("animation:"), std::string::npos) << geometry.file;
+    EXPECT_NE(KeyframeStopOf(html, marker, "0%").find(geometry.first), std::string::npos)
+        << geometry.file;
+    EXPECT_NE(KeyframeStopOf(html, marker, "100%").find(geometry.last), std::string::npos)
+        << geometry.file;
+
+    options.exportAnimations = false;
+    auto withoutAnimation = LoadAndConvert(ProjectPath::Absolute(path), options);
+    EXPECT_EQ(withoutAnimation.find("@keyframes"), std::string::npos) << geometry.file;
+    EXPECT_EQ(withoutAnimation.find("animation:"), std::string::npos) << geometry.file;
+    options.exportAnimations = true;
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGeometryWidthSvgDoesNotClip) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Rectangle id="outlinedRect" position="160,100" size="80,120"/>
+      <Stroke color="#2563EB" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="60" frameRate="60" loop="once">
+        <Object target="outlinedRect">
+          <Channel name="size.width" type="float">
+            <Key time="0" value="80" interpolation="linear"/>
+            <Key time="60" value="240"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"outlinedRect\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.rfind("<rect", 0), 0u);
+  EXPECT_NE(tag.find("animation:"), std::string::npos);
+  EXPECT_NE(EnclosingSvgTag(html, "id=\"outlinedRect\"").find("overflow:visible"),
+            std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"outlinedRect\"", "100%").find("x: 40px; width: 240px"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationTrimPathEndCorpus) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/geometry/04_trim_path_end.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto pathTag = FindTagContaining(html, "id=\"trimPath\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_EQ(pathTag.rfind("<path", 0), 0u);
+  EXPECT_NE(pathTag.find("pathLength=\"1\""), std::string::npos);
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"trimPath\"", "0%").find("stroke-dasharray: 1 0"),
+            std::string::npos);
+  auto last = KeyframeStopOf(html, "id=\"trimPath\"", "100%");
+  EXPECT_NE(last.find("stroke-dasharray: 0 1"), std::string::npos) << last;
+  EXPECT_NE(last.find("visibility: hidden"), std::string::npos) << last;
+  options.exportAnimations = false;
+  auto withoutAnimation = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/geometry/04_trim_path_end.pagx"),
+      options);
+  EXPECT_EQ(withoutAnimation.find("@keyframes"), std::string::npos);
+  EXPECT_EQ(withoutAnimation.find("pathLength=\"1\""), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",

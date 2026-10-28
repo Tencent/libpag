@@ -2072,7 +2072,7 @@ void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& ge
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
-    std::string geoAnimId = _ctx->claimAnimatedDomId({stroke, fill, g.element});
+    std::string geoAnimId = _ctx->claimAnimatedDomId({stroke, fill, trim, g.element});
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
       if (!geoAnimId.empty()) {
