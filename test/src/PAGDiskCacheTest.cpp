@@ -86,308 +86,397 @@ namespace pag {
 //  std::filesystem::remove_all(cacheDir);
 //}
 
-/**
- * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
- */
-PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ASSERT_FALSE(cacheDir.empty());
-  auto diskCache = DiskCache::GetInstance();
+namespace {
+static constexpr size_t InitialSequenceDiskSize = 568915u;
+
+static void ClearDiskCacheAndWait() {
   auto worker = DiskIOWorker::GetInstance();
   worker->waitAll();
+  PAGDiskCache::RemoveAll();
+  worker->waitAll();
+}
+
+class ScopedDiskCacheCleanup {
+ public:
+  const size_t originalMaxDiskSize;
+
+  ScopedDiskCacheCleanup() : originalMaxDiskSize(PAGDiskCache::MaxDiskSize()) {
+  }
+
+  ScopedDiskCacheCleanup(const ScopedDiskCacheCleanup&) = delete;
+  ScopedDiskCacheCleanup& operator=(const ScopedDiskCacheCleanup&) = delete;
+
+  ~ScopedDiskCacheCleanup() {
+    DiskIOWorker::GetInstance()->waitAll();
+    PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
+    ClearDiskCacheAndWait();
+  }
+};
+
+static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSize,
+                                  const std::string& fixturePath = {}) {
+  ASSERT_FALSE(cacheDir.empty());
+  auto diskCache = DiskCache::GetInstance();
+  DiskIOWorker::GetInstance()->waitAll();
   {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     ASSERT_TRUE(diskCache->openedFiles.empty());
     ASSERT_EQ(diskCache->getCacheDir(), cacheDir);
   }
-  struct CacheCleanup {
-    size_t originalMaxDiskSize;
-    ~CacheCleanup() {
-      auto worker = DiskIOWorker::GetInstance();
-      worker->waitAll();
-      PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
-      worker->waitAll();
-      PAGDiskCache::RemoveAll();
-      worker->waitAll();
-    }
-  } cleanup{PAGDiskCache::MaxDiskSize()};
-  PAGDiskCache::RemoveAll();
-  worker->waitAll();
+  ClearDiskCacheAndWait();
+  if (fixturePath.empty()) {
+    return;
+  }
   std::filesystem::remove_all(cacheDir);
   std::filesystem::create_directories(cacheDir);
-  std::filesystem::copy(ProjectPath::Absolute("resources/disk/libpag"), cacheDir,
-                        std::filesystem::copy_options::recursive);
+  std::filesystem::copy(fixturePath, cacheDir, std::filesystem::copy_options::recursive);
   {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     // Reload the fixture into the already-live singleton, not just its on-disk files.
     diskCache->fileIDCount = DiskCache::InitialFileID;
-    diskCache->maxDiskSize = cleanup.originalMaxDiskSize;
+    diskCache->maxDiskSize = maxDiskSize;
     ASSERT_TRUE(diskCache->readConfig());
   }
-  worker->waitAll();
-  auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
-  ASSERT_TRUE(pagFile != nullptr);
-  auto info =
-      tgfx::ImageInfo::Make(pagFile->width(), pagFile->height(), tgfx::ColorType::RGBA_8888);
-  auto sequenceFile =
-      DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", info, 30, pagFile->frameRate());
-  ASSERT_TRUE(sequenceFile != nullptr);
-  EXPECT_EQ(sequenceFile->width(), pagFile->width());
-  EXPECT_EQ(sequenceFile->height(), pagFile->height());
-  EXPECT_EQ(sequenceFile->numFrames(), 30u);
-  EXPECT_EQ(sequenceFile->frameRate(), pagFile->frameRate());
-  EXPECT_FALSE(sequenceFile->isComplete());
-  EXPECT_EQ(sequenceFile->cachedFrames, 11);
-  EXPECT_EQ(sequenceFile->diskCache, diskCache);
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions during readConfig()
+  DiskIOWorker::GetInstance()->waitAll();
+}
+
+struct SequenceFileState {
+  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::shared_ptr<PAGSurface> pagSurface = nullptr;
+  tgfx::Bitmap bitmap = {};
+  tgfx::Pixmap pixmap = {};
+  std::shared_ptr<BitmapBuffer> buffer = nullptr;
+  std::shared_ptr<SequenceFile> sequenceFile = nullptr;
+  size_t halfSequenceFileSize = 0;
+};
+
+static void ResizeSequenceBitmap(SequenceFileState& state, int width, int height) {
+  state.pixmap.reset();
+  ASSERT_TRUE(state.bitmap.allocPixels(width, height, false, false));
+  state.pixmap.reset(state.bitmap);
+  state.buffer = BitmapBuffer::Wrap(state.pixmap.info(), state.pixmap.writablePixels());
+}
+
+static void CheckSequenceFileMetadata(SequenceFileState& state, const std::string& cacheDir) {
+  state.pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
+  ASSERT_TRUE(state.pagFile != nullptr);
+  auto info = tgfx::ImageInfo::Make(state.pagFile->width(), state.pagFile->height(),
+                                    tgfx::ColorType::RGBA_8888);
+  state.sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", info, 30,
+                                               state.pagFile->frameRate());
+  ASSERT_TRUE(state.sequenceFile != nullptr);
+  EXPECT_EQ(state.sequenceFile->width(), state.pagFile->width());
+  EXPECT_EQ(state.sequenceFile->height(), state.pagFile->height());
+  EXPECT_EQ(state.sequenceFile->numFrames(), 30u);
+  EXPECT_EQ(state.sequenceFile->frameRate(), state.pagFile->frameRate());
+  EXPECT_FALSE(state.sequenceFile->isComplete());
+  EXPECT_EQ(state.sequenceFile->cachedFrames, 11);
+  auto diskCache = DiskCache::GetInstance();
+  EXPECT_EQ(state.sequenceFile->diskCache, diskCache);
+  DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
   EXPECT_TRUE(diskCache->cachedFileInfos.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
-  const auto InitialDiskSize = 568915u;
-  EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
+  EXPECT_EQ(diskCache->totalDiskSize, InitialSequenceDiskSize);
+}
 
-  tgfx::Bitmap bitmap(pagFile->width(), pagFile->height(), false, false);
-  tgfx::Pixmap pixmap(bitmap);
-  auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
-  auto success = sequenceFile->readFrame(10, buffer);
+static void CheckSequenceFileReadAndWrite(SequenceFileState& state) {
+  ASSERT_NO_FATAL_FAILURE(
+      ResizeSequenceBitmap(state, state.pagFile->width(), state.pagFile->height()));
+  auto success = state.sequenceFile->readFrame(10, state.buffer);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_10"));
-  success = sequenceFile->readFrame(15, buffer);
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/SequenceFile_10"));
+  success = state.sequenceFile->readFrame(15, state.buffer);
   EXPECT_FALSE(success);
-  success = sequenceFile->readFrame(20, buffer);
+  success = state.sequenceFile->readFrame(20, state.buffer);
   EXPECT_FALSE(success);
 
-  auto pagPlayer = std::make_shared<PAGPlayer>();
-  pagPlayer->setComposition(pagFile);
-  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
-  pagPlayer->setSurface(pagSurface);
-  auto initialFileSize = sequenceFile->fileSize();
+  state.pagPlayer = std::make_shared<PAGPlayer>();
+  state.pagPlayer->setComposition(state.pagFile);
+  state.pagSurface = OffscreenSurface::Make(state.pagFile->width(), state.pagFile->height());
+  state.pagPlayer->setSurface(state.pagSurface);
+  auto initialFileSize = state.sequenceFile->fileSize();
+  auto diskCache = DiskCache::GetInstance();
   for (auto i = 0; i < 30; i++) {
-    pagPlayer->flush();
-    success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
-                                     pixmap.writablePixels(), pixmap.rowBytes());
+    state.pagPlayer->flush();
+    success = state.pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                           state.pixmap.writablePixels(), state.pixmap.rowBytes());
     ASSERT_TRUE(success);
-    success = sequenceFile->writeFrame(i, buffer);
+    success = state.sequenceFile->writeFrame(i, state.buffer);
     if (i < 11) {
       EXPECT_FALSE(success);
-      EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
+      EXPECT_EQ(diskCache->totalDiskSize, InitialSequenceDiskSize);
     }
-    pagPlayer->nextFrame();
+    state.pagPlayer->nextFrame();
   }
-  EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize + sequenceFile->fileSize() - initialFileSize);
-  EXPECT_TRUE(sequenceFile->isComplete());
-  EXPECT_TRUE(sequenceFile->encoder == nullptr);
-  success = sequenceFile->readFrame(15, buffer);
+  EXPECT_EQ(diskCache->totalDiskSize,
+            InitialSequenceDiskSize + state.sequenceFile->fileSize() - initialFileSize);
+  EXPECT_TRUE(state.sequenceFile->isComplete());
+  EXPECT_TRUE(state.sequenceFile->encoder == nullptr);
+  success = state.sequenceFile->readFrame(15, state.buffer);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_15"));
-  success = sequenceFile->readFrame(30, buffer);
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/SequenceFile_15"));
+  success = state.sequenceFile->readFrame(30, state.buffer);
   EXPECT_FALSE(success);
+}
 
-  info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
-  pixmap.reset();
-  bitmap.allocPixels(info.width(), info.height(), false, false);
-  pixmap.reset(bitmap);
-  buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
-  auto halfSequenceFile =
-      DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30, pagFile->frameRate());
+static void CheckHalfResolutionSequence(SequenceFileState& state) {
+  auto info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
+  ASSERT_NO_FATAL_FAILURE(ResizeSequenceBitmap(state, info.width(), info.height()));
+  auto halfSequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30,
+                                                  state.pagFile->frameRate());
   ASSERT_TRUE(halfSequenceFile != nullptr);
   EXPECT_EQ(halfSequenceFile->width(), 360);
   EXPECT_EQ(halfSequenceFile->height(), 640);
   EXPECT_EQ(halfSequenceFile->numFrames(), 30u);
-  EXPECT_EQ(halfSequenceFile->frameRate(), pagFile->frameRate());
+  EXPECT_EQ(halfSequenceFile->frameRate(), state.pagFile->frameRate());
   EXPECT_TRUE(halfSequenceFile->isComplete());
-  success = halfSequenceFile->readFrame(20, buffer);
+  auto success = halfSequenceFile->readFrame(20, state.buffer);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_20"));
-  const auto halfSequenceFileSize = halfSequenceFile->fileSize();
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/SequenceFile_20"));
+  state.halfSequenceFileSize = halfSequenceFile->fileSize();
   halfSequenceFile = nullptr;
+}
 
-  info = tgfx::ImageInfo::Make(540, 960, tgfx::ColorType::RGBA_8888);
-  pagSurface = OffscreenSurface::Make(info.width(), info.height());
-  pagPlayer->setSurface(pagSurface);
-  pixmap.reset();
-  bitmap.allocPixels(info.width(), info.height(), false, false);
-  pixmap.reset(bitmap);
-  buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
-
+static void CheckSequenceFileEviction(SequenceFileState& state, const std::string& cacheDir) {
+  auto info = tgfx::ImageInfo::Make(540, 960, tgfx::ColorType::RGBA_8888);
+  state.pagSurface = OffscreenSurface::Make(info.width(), info.height());
+  state.pagPlayer->setSurface(state.pagSurface);
+  ASSERT_NO_FATAL_FAILURE(ResizeSequenceBitmap(state, info.width(), info.height()));
+  auto diskCache = DiskCache::GetInstance();
   const auto lastTotalDiskSize = diskCache->totalDiskSize;
-
   PAGDiskCache::SetMaxDiskSize(1500000u);
   EXPECT_EQ(PAGDiskCache::MaxDiskSize(), 1500000u);
-  sequenceFile =
-      DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30, pagFile->frameRate());
-  pagPlayer->setProgress(0);
+  state.sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30,
+                                               state.pagFile->frameRate());
+  state.pagPlayer->setProgress(0);
   for (auto i = 0; i < 30; i++) {
-    pagPlayer->flush();
-    success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
-                                     pixmap.writablePixels(), pixmap.rowBytes());
+    state.pagPlayer->flush();
+    auto success =
+        state.pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                     state.pixmap.writablePixels(), state.pixmap.rowBytes());
     ASSERT_TRUE(success);
-    sequenceFile->writeFrame(i, buffer);
-    pagPlayer->nextFrame();
+    state.sequenceFile->writeFrame(i, state.buffer);
+    state.pagPlayer->nextFrame();
   }
-  success = sequenceFile->readFrame(22, buffer);
+  auto success = state.sequenceFile->readFrame(22, state.buffer);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions from checkDiskSpace()
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/SequenceFile_22"));
+  DiskIOWorker::GetInstance()->waitAll();
   EXPECT_EQ(diskCache->totalDiskSize,
-            lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
+            lastTotalDiskSize + state.sequenceFile->fileSize() - state.halfSequenceFileSize);
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   PAGDiskCache::SetMaxDiskSize(0);
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
-  EXPECT_EQ(diskCache->totalDiskSize, sequenceFile->fileSize());
+  DiskIOWorker::GetInstance()->waitAll();
+  EXPECT_EQ(diskCache->totalDiskSize, state.sequenceFile->fileSize());
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-
-  auto sequenceFile2 =
-      DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30, pagFile->frameRate());
-  EXPECT_EQ(sequenceFile2, sequenceFile);
-  auto sequenceFile3 = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30,
-                                               pagFile->frameRate() * 0.5f);
-  EXPECT_NE(sequenceFile3, sequenceFile);
-  EXPECT_EQ(diskCache->totalDiskSize, 0u);
-  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/5.bin"));
-  sequenceFile = nullptr;
-  sequenceFile2 = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
-  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
 
-PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
-  pag::PAGDiskCache::RemoveAll();
-  auto cacheDir = Platform::Current()->getCacheDir();
+static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
+                                             const std::string& cacheDir) {
+  auto info = tgfx::ImageInfo::Make(540, 960, tgfx::ColorType::RGBA_8888);
+  auto sequenceFile2 = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30,
+                                               state.pagFile->frameRate());
+  EXPECT_EQ(sequenceFile2, state.sequenceFile);
+  auto sequenceFile3 = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30,
+                                               state.pagFile->frameRate() * 0.5f);
+  EXPECT_NE(sequenceFile3, state.sequenceFile);
+  EXPECT_EQ(DiskCache::GetInstance()->totalDiskSize, 0u);
+  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
+  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/5.bin"));
+  state.sequenceFile = nullptr;
+  sequenceFile2 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
+  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
+}
+}  // namespace
 
-  auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
-  ASSERT_TRUE(pagFile != nullptr);
-  auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
-  ASSERT_TRUE(decoder != nullptr);
-  EXPECT_EQ(decoder->width(), pagFile->width() / 2);
-  EXPECT_EQ(decoder->height(), pagFile->height() / 2);
-  EXPECT_EQ(decoder->numFrames(), 95);
-  EXPECT_EQ(decoder->frameRate(), 24.0f);
-  pagFile = nullptr;
-  tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
-  tgfx::Pixmap pixmap(bitmap);
-  for (int i = 0; i < decoder->numFrames(); i++) {
-    auto success = decoder->readFrame(i, pixmap.writablePixels(), pixmap.rowBytes());
+/**
+ * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
+ */
+PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  ScopedDiskCacheCleanup cleanup;
+  ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize,
+                                                ProjectPath::Absolute("resources/disk/libpag")));
+  SequenceFileState state;
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFileMetadata(state, cacheDir));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReadAndWrite(state));
+  ASSERT_NO_FATAL_FAILURE(CheckHalfResolutionSequence(state));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFileEviction(state, cacheDir));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReuseAndRelease(state, cacheDir));
+}
+
+namespace {
+struct DecoderCacheState {
+  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> pagFile2 = nullptr;
+  std::shared_ptr<PAGComposition> composition = nullptr;
+  std::shared_ptr<PAGDecoder> decoder = nullptr;
+  std::shared_ptr<PAGDecoder> decoder2 = nullptr;
+  std::shared_ptr<PAGDecoder> decoder3 = nullptr;
+  std::shared_ptr<PAGDecoder> decoder4 = nullptr;
+  std::shared_ptr<PAGDecoder> decoder5 = nullptr;
+  tgfx::Bitmap bitmap = {};
+  tgfx::Pixmap pixmap = {};
+};
+
+static void CheckDecoderFrameCache(DecoderCacheState& state) {
+  state.pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
+  ASSERT_TRUE(state.pagFile != nullptr);
+  state.decoder = PAGDecoder::MakeFrom(state.pagFile, 30, 0.5f);
+  ASSERT_TRUE(state.decoder != nullptr);
+  EXPECT_EQ(state.decoder->width(), state.pagFile->width() / 2);
+  EXPECT_EQ(state.decoder->height(), state.pagFile->height() / 2);
+  EXPECT_EQ(state.decoder->numFrames(), 95);
+  EXPECT_EQ(state.decoder->frameRate(), 24.0f);
+  state.pagFile = nullptr;
+  ASSERT_TRUE(
+      state.bitmap.allocPixels(state.decoder->width(), state.decoder->height(), false, false));
+  state.pixmap.reset(state.bitmap);
+  for (int i = 0; i < state.decoder->numFrames(); i++) {
+    auto success =
+        state.decoder->readFrame(i, state.pixmap.writablePixels(), state.pixmap.rowBytes());
     EXPECT_TRUE(success);
   }
-  EXPECT_TRUE(decoder->sequenceFile->isComplete());
-  EXPECT_TRUE(decoder->sequenceFile != nullptr);
-  EXPECT_TRUE(decoder->reader == nullptr);
-  EXPECT_TRUE(decoder->getComposition() == nullptr);
-  auto success = decoder->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(state.decoder->sequenceFile->isComplete());
+  EXPECT_TRUE(state.decoder->sequenceFile != nullptr);
+  EXPECT_TRUE(state.decoder->reader == nullptr);
+  EXPECT_TRUE(state.decoder->getComposition() == nullptr);
+  auto success =
+      state.decoder->readFrame(50, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_50"));
-  auto decoder2 = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
-  EXPECT_TRUE(decoder2 == nullptr);
-  pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
-  decoder2 = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
-  ASSERT_TRUE(decoder2 != nullptr);
-  success = decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/decoder_frame_50"));
+}
+
+static void CheckDecoderReuseAndFormats(DecoderCacheState& state) {
+  state.decoder2 = PAGDecoder::MakeFrom(state.pagFile, 30, 0.5f);
+  EXPECT_TRUE(state.decoder2 == nullptr);
+  state.pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
+  state.decoder2 = PAGDecoder::MakeFrom(state.pagFile, 30, 0.5f);
+  ASSERT_TRUE(state.decoder2 != nullptr);
+  auto success =
+      state.decoder2->readFrame(50, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-  EXPECT_EQ(decoder->sequenceFile, decoder2->sequenceFile);
-  EXPECT_TRUE(decoder2->reader == nullptr);
-  EXPECT_TRUE(decoder2->getComposition() != nullptr);
+  EXPECT_EQ(state.decoder->sequenceFile, state.decoder2->sequenceFile);
+  EXPECT_TRUE(state.decoder2->reader == nullptr);
+  EXPECT_TRUE(state.decoder2->getComposition() != nullptr);
+  success = state.decoder2->readFrame(50, state.pixmap.writablePixels(), state.pixmap.rowBytes(),
+                                      ColorType::BGRA_8888);
+  EXPECT_FALSE(success);
+  success = state.decoder2->readFrame(50, state.pixmap.writablePixels(), state.pixmap.rowBytes(),
+                                      ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  EXPECT_FALSE(success);
   success =
-      decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes(), ColorType::BGRA_8888);
+      state.decoder2->readFrame(50, state.pixmap.writablePixels(), state.pixmap.rowBytes() - 1);
   EXPECT_FALSE(success);
-  success = decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes(),
-                                ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  success = state.decoder2->readFrame(-1, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_FALSE(success);
-  success = decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes() - 1);
-  EXPECT_FALSE(success);
-  success = decoder2->readFrame(-1, pixmap.writablePixels(), pixmap.rowBytes());
-  EXPECT_FALSE(success);
-  success = decoder2->readFrame(120, pixmap.writablePixels(), pixmap.rowBytes());
+  success = state.decoder2->readFrame(120, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_FALSE(success);
 
-  auto decoder3 = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
-  EXPECT_TRUE(decoder3 != nullptr);
-  EXPECT_TRUE(decoder3->getComposition() != nullptr);
-  EXPECT_TRUE(decoder2->getComposition() == nullptr);
-  success = decoder3->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes(), ColorType::BGRA_8888,
-                                AlphaType::Unpremultiplied);
+  state.decoder3 = PAGDecoder::MakeFrom(state.pagFile, 30, 0.5f);
+  EXPECT_TRUE(state.decoder3 != nullptr);
+  EXPECT_TRUE(state.decoder3->getComposition() != nullptr);
+  EXPECT_TRUE(state.decoder2->getComposition() == nullptr);
+  success = state.decoder3->readFrame(0, state.pixmap.writablePixels(), state.pixmap.rowBytes(),
+                                      ColorType::BGRA_8888, AlphaType::Unpremultiplied);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(decoder3->getComposition() != nullptr);
-  auto info = tgfx::ImageInfo::Make(pixmap.width(), pixmap.height(), tgfx::ColorType::BGRA_8888,
-                                    tgfx::AlphaType::Unpremultiplied);
-  EXPECT_TRUE(
-      Baseline::Compare(tgfx::Pixmap(info, pixmap.pixels()), "PAGDiskCacheTest/decoder_frame_0"));
-  EXPECT_NE(decoder->sequenceFile, decoder3->sequenceFile);
-  EXPECT_TRUE(decoder3->reader != nullptr);
-  EXPECT_TRUE(decoder3->getComposition() != nullptr);
+  EXPECT_TRUE(state.decoder3->getComposition() != nullptr);
+  auto info = tgfx::ImageInfo::Make(state.pixmap.width(), state.pixmap.height(),
+                                    tgfx::ColorType::BGRA_8888, tgfx::AlphaType::Unpremultiplied);
+  EXPECT_TRUE(Baseline::Compare(tgfx::Pixmap(info, state.pixmap.pixels()),
+                                "PAGDiskCacheTest/decoder_frame_0"));
+  EXPECT_NE(state.decoder->sequenceFile, state.decoder3->sequenceFile);
+  EXPECT_TRUE(state.decoder3->reader != nullptr);
+  EXPECT_TRUE(state.decoder3->getComposition() != nullptr);
+}
 
-  auto pagFile2 = LoadPAGFile("resources/apitest/ZC2.pag");
-  ASSERT_TRUE(pagFile2 != nullptr);
-  auto composition = PAGComposition::Make(pagFile2->width(), pagFile2->height());
-  composition->addLayer(pagFile2);
-  composition->addLayer(pagFile);
-  success = decoder3->readFrame(1, pixmap.writablePixels(), pixmap.rowBytes(), ColorType::BGRA_8888,
-                                AlphaType::Unpremultiplied);
+static void CheckDecoderCompositionChanges(DecoderCacheState& state) {
+  state.pagFile2 = LoadPAGFile("resources/apitest/ZC2.pag");
+  ASSERT_TRUE(state.pagFile2 != nullptr);
+  state.composition = PAGComposition::Make(state.pagFile2->width(), state.pagFile2->height());
+  state.composition->addLayer(state.pagFile2);
+  state.composition->addLayer(state.pagFile);
+  auto success =
+      state.decoder3->readFrame(1, state.pixmap.writablePixels(), state.pixmap.rowBytes(),
+                                ColorType::BGRA_8888, AlphaType::Unpremultiplied);
   EXPECT_FALSE(success);
-  auto decoder4 = PAGDecoder::MakeFrom(composition);
-  ASSERT_TRUE(decoder4 != nullptr);
-  EXPECT_EQ(decoder4->height(), pagFile2->height());
-  EXPECT_EQ(decoder4->width(), pagFile2->width());
-  EXPECT_EQ(decoder4->numFrames(), 119);
-  EXPECT_EQ(decoder4->frameRate(), 30.0f);
-  pixmap.reset();
-  bitmap.allocPixels(pagFile2->width(), pagFile2->height(), false, false);
-  pixmap.reset(bitmap);
-  success = decoder4->readFrame(15, pixmap.writablePixels(), pixmap.rowBytes());
+  state.decoder4 = PAGDecoder::MakeFrom(state.composition);
+  ASSERT_TRUE(state.decoder4 != nullptr);
+  EXPECT_EQ(state.decoder4->height(), state.pagFile2->height());
+  EXPECT_EQ(state.decoder4->width(), state.pagFile2->width());
+  EXPECT_EQ(state.decoder4->numFrames(), 119);
+  EXPECT_EQ(state.decoder4->frameRate(), 30.0f);
+  state.pixmap.reset();
+  ASSERT_TRUE(
+      state.bitmap.allocPixels(state.pagFile2->width(), state.pagFile2->height(), false, false));
+  state.pixmap.reset(state.bitmap);
+  success = state.decoder4->readFrame(15, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_15"));
-  composition->removeLayerAt(1);
-  EXPECT_EQ(decoder4->numFrames(), 30);
-  EXPECT_EQ(decoder4->frameRate(), 24.0f);
-  success = decoder4->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/decoder_frame_15"));
+  state.composition->removeLayerAt(1);
+  EXPECT_EQ(state.decoder4->numFrames(), 30);
+  EXPECT_EQ(state.decoder4->frameRate(), 24.0f);
+  success = state.decoder4->readFrame(12, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_12"));
+  EXPECT_TRUE(Baseline::Compare(state.pixmap, "PAGDiskCacheTest/decoder_frame_12"));
 
-  auto decoder5 = PAGDecoder::MakeFrom(composition);
-  EXPECT_TRUE(decoder5 != nullptr);
-  success = decoder4->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
+  state.decoder5 = PAGDecoder::MakeFrom(state.composition);
+  EXPECT_TRUE(state.decoder5 != nullptr);
+  success = state.decoder4->readFrame(12, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-  success = decoder4->readFrame(13, pixmap.writablePixels(), pixmap.rowBytes());
+  success = state.decoder4->readFrame(13, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_FALSE(success);
-  success = decoder5->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
+  success = state.decoder5->readFrame(12, state.pixmap.writablePixels(), state.pixmap.rowBytes());
   EXPECT_TRUE(success);
-
-  auto decoder6 = PAGDecoder::MakeFrom(pagFile2, 0, 0.5f);
+  auto decoder6 = PAGDecoder::MakeFrom(state.pagFile2, 0, 0.5f);
   EXPECT_TRUE(decoder6 == nullptr);
-
-  auto decoder7 = PAGDecoder::MakeFrom(pagFile2, 20, 0.f);
+  auto decoder7 = PAGDecoder::MakeFrom(state.pagFile2, 20, 0.f);
   EXPECT_TRUE(decoder7 == nullptr);
+}
 
+static void CheckDecoderFileLifetimes(DecoderCacheState& state, const std::string& cacheDir) {
   DiskIOWorker::GetInstance()->waitAll();
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
-  decoder = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
+  state.decoder = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount);
-  decoder2 = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
+  state.decoder2 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
-  decoder3 = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
+  state.decoder3 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 1);
-  decoder4 = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
+  state.decoder4 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 2);
-  decoder5 = nullptr;
-  DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
+  state.decoder5 = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 3);
+}
+}  // namespace
 
-  pag::PAGDiskCache::RemoveAll();
+PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  ScopedDiskCacheCleanup cleanup;
+  ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
+  DecoderCacheState state;
+  ASSERT_NO_FATAL_FAILURE(CheckDecoderFrameCache(state));
+  ASSERT_NO_FATAL_FAILURE(CheckDecoderReuseAndFormats(state));
+  ASSERT_NO_FATAL_FAILURE(CheckDecoderCompositionChanges(state));
+  ASSERT_NO_FATAL_FAILURE(CheckDecoderFileLifetimes(state, cacheDir));
 }
 
 /**
