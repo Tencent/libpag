@@ -7767,12 +7767,15 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimelin
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><head><style>
       @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+      @keyframes unsupported { from { width: 10px; } to { width: 20px; } }
     </style></head>
     <body style="width:200px;height:100px">
+      <div id="discarded" style="width:10px;height:10px;
+                                 animation:unsupported 1s -5s infinite"></div>
       <div id="early" style="width:10px;height:10px;background-color:#000;
                              animation:fade 1s linear -0.5s infinite both"></div>
       <div id="middle" style="width:10px;height:10px;background-color:#000;
-                              animation:fade 1s linear infinite both"></div>
+                              animation:fade 1s linear infinite none"></div>
       <svg width="80" height="80" viewBox="0 0 80 80">
         <circle id="late" cx="40" cy="40" r="30" fill="#000"
                 style="animation:fade 1s linear 0.25s infinite both"/>
@@ -7790,7 +7793,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimelin
         << "Unexpected diagnostic: " << msg;
   }
   EXPECT_EQ(shiftedWarnings, 1u);
-  EXPECT_EQ(replayedWarnings, 1u);
+  EXPECT_EQ(replayedWarnings, 2u);
   ASSERT_EQ(doc->animations.size(), 1u);
   auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
@@ -7807,8 +7810,11 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimelin
   ASSERT_EQ(early->keyframes.size(), 2u);
   EXPECT_EQ(early->keyframes.front().time, 0);
   EXPECT_EQ(early->keyframes.back().time, 60);
-  ASSERT_EQ(middle->keyframes.size(), 2u);
-  EXPECT_EQ(middle->keyframes.front().time, 30);
+  ASSERT_EQ(middle->keyframes.size(), 3u);
+  EXPECT_EQ(middle->keyframes.front().time, 0);
+  EXPECT_FLOAT_EQ(middle->keyframes.front().value, 1.0f);
+  EXPECT_EQ(middle->keyframes[1].time, 30);
+  EXPECT_FLOAT_EQ(middle->keyframes[1].value, 0.0f);
   EXPECT_EQ(middle->keyframes.back().time, 90);
   ASSERT_EQ(late->keyframes.size(), 2u);
   EXPECT_EQ(late->keyframes.front().time, 45);
@@ -7841,9 +7847,9 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOnceNegativeDelayPreservesSharedEndAndTr
       @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
     </style></head>
     <body style="width:100px;height:100px">
-      <div id="early" style="width:10px;height:10px;background-color:#000;
+      <div id="early" style="width:10px;height:10px;background-color:#000;opacity:0.25;
                              animation:fade 1s linear -0.5s"></div>
-      <div id="late" style="width:10px;height:10px;background-color:#000;
+      <div id="late" style="width:10px;height:10px;background-color:#000;opacity:0.25;
                             animation:fade 0.5s linear"></div>
     </body></html>
   )HTML",
@@ -7864,10 +7870,47 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOnceNegativeDelayPreservesSharedEndAndTr
   EXPECT_EQ(early->keyframes.front().time, 0);
   EXPECT_EQ(early->keyframes[1].time, 60);
   EXPECT_EQ(early->keyframes.back().time, 61);
+  EXPECT_FLOAT_EQ(early->keyframes.back().value, 0.25f);
   EXPECT_EQ(late->keyframes.front().time, 0);
   EXPECT_EQ(late->keyframes[1].time, 30);
   EXPECT_EQ(late->keyframes[2].time, 60);
   EXPECT_EQ(late->keyframes.back().time, 61);
+  EXPECT_FLOAT_EQ(late->keyframes.back().value, 0.25f);
+
+  EXPECT_FLOAT_EQ(std::get<float>(early->evaluateAt(pagx::Frame{60})), 1.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(late->evaluateAt(pagx::Frame{60})), 1.0f);
+  EXPECT_FLOAT_EQ(std::get<float>(early->evaluateAt(pagx::Frame{61})), 0.25f);
+  EXPECT_FLOAT_EQ(std::get<float>(late->evaluateAt(pagx::Frame{61})), 0.25f);
+}
+
+// A discarded negative-delay animation must not move the playable sibling's origin. The
+// temporary pre-scan origin is corrected only after the builder has emitted playable objects.
+PAG_TEST(PAGXHTMLImporterTest, AnimationDiscardedNegativeDelayDoesNotShiftPlayableGroup) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes unsupported { from { width: 10px; } to { width: 20px; } }
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="discarded" style="width:10px;height:10px;animation:unsupported 1s -5s infinite"></div>
+      <div id="kept" style="width:10px;height:10px;animation:fade 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(animation->duration, 60);
+  EXPECT_EQ(FindObjectByTarget(animation, "discarded"), nullptr);
+  auto* alpha =
+      FindTypedChannelOnTarget<float>(animation, "kept", "alpha", pagx::ChannelValueType::Float);
+  ASSERT_NE(alpha, nullptr);
+  ASSERT_EQ(alpha->keyframes.size(), 2u);
+  EXPECT_EQ(alpha->keyframes.front().time, 0);
+  EXPECT_EQ(alpha->keyframes.back().time, 60);
+  EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {

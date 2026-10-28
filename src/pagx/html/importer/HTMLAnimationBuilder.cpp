@@ -987,6 +987,7 @@ HTMLAnimationBuilder::HTMLAnimationBuilder(HTMLDiagnosticSink& sink, HTMLValuePa
 void HTMLAnimationBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
   _coalescingLengths.clear();
+  _originalDelays.clear();
   _groupStarts.clear();
 }
 
@@ -1039,6 +1040,56 @@ void HTMLAnimationBuilder::prepareTiming(const std::unordered_map<std::string, s
   }
 }
 
+template <typename T>
+static void CorrectGroupOrigin(TypedChannel<T>* channel, Frame excessShift) {
+  auto& keys = channel->keyframes;
+  if (keys.empty()) return;
+  // A baseline hold inserted at frame 0 must remain at the playback origin. Every authored key
+  // starts at or after excessShift; if its new time becomes 0, the baseline is no longer needed.
+  bool hasLeadingBaseline = keys.size() > 1 && keys.front().time == 0 && excessShift > 0;
+  for (size_t index = hasLeadingBaseline ? 1 : 0; index < keys.size(); index++) {
+    keys[index].time -= excessShift;
+  }
+  if (hasLeadingBaseline && keys[1].time == 0) {
+    keys.erase(keys.begin());
+  }
+}
+
+void HTMLAnimationBuilder::finalizeTiming() {
+  // The provisional group origin can include a discarded animation (unsupported properties,
+  // invalid values or missing SVG targets). Only emitted animations may move the final origin.
+  std::map<std::pair<LoopMode, Frame>, Frame> emittedStarts;
+  for (auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+    auto* animation = static_cast<Animation*>(node);
+    auto delay = _originalDelays.find(animation);
+    if (delay == _originalDelays.end()) continue;
+    auto key = std::make_pair(animation->loop, coalescingLength(animation));
+    emittedStarts[key] = std::min(emittedStarts[key], delay->second);
+  }
+  for (auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+    auto* animation = static_cast<Animation*>(node);
+    auto delay = _originalDelays.find(animation);
+    if (delay == _originalDelays.end()) continue;
+    auto key = std::make_pair(animation->loop, coalescingLength(animation));
+    Frame excessShift = emittedStarts.at(key) - _groupStarts.at(key);
+    if (excessShift == 0) continue;
+    animation->duration -= excessShift;
+    for (auto* object : animation->objects) {
+      for (auto* channel : object->channels) {
+        if (channel->valueType() == ChannelValueType::Float) {
+          CorrectGroupOrigin(static_cast<TypedChannel<float>*>(channel), excessShift);
+        } else if (channel->valueType() == ChannelValueType::Color) {
+          CorrectGroupOrigin(static_cast<TypedChannel<Color>*>(channel), excessShift);
+        } else if (channel->valueType() == ChannelValueType::Matrix) {
+          CorrectGroupOrigin(static_cast<TypedChannel<Matrix>*>(channel), excessShift);
+        }
+      }
+    }
+  }
+}
+
 Frame HTMLAnimationBuilder::coalescingLength(const Animation* animation) const {
   auto it = _coalescingLengths.find(animation);
   return it != _coalescingLengths.end() ? it->second : animation->duration;
@@ -1078,15 +1129,16 @@ void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loo
 
 void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDelayFrames) {
   _document->animations.push_back(animation);
+  _originalDelays[animation] = originalDelayFrames;
   if (originalDelayFrames < 0) {
     _diagnostics.warn(
         "html: negative animation-delay shifts the imported timeline; playback begins before "
         "CSS t=0 [subset:animation-timeline-shifted]");
   }
-  if (animation->loop != LoopMode::Once && originalDelayFrames > 0) {
+  if (animation->loop != LoopMode::Once && originalDelayFrames != 0) {
     _diagnostics.warn(
-        "html: animation-delay on an infinite animation is replayed as a pause on every cycle "
-        "instead of only before the first iteration [subset:animation-delay-replayed]");
+        "html: animation-delay on an infinite animation changes the repeated playback window "
+        "instead of affecting only initial playback [subset:animation-delay-replayed]");
   }
 }
 

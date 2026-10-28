@@ -513,7 +513,8 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   `alternate` 无法表达，被降级为 `once` 并告警 `subset:animation-finite-count`）；`reverse` /
   `alternate-reverse` 会同时反转关键帧顺序与缓动（`ease-in` 变 `ease-out`，step 的 jump 互换）；
   `normal` 保持原序。
-- `animation-delay`：分组时保留延迟的正负号。如果组内最早的延迟为负，导入器将整组关键帧和播放终点
+- `animation-delay`：对可播放动画分组时保留延迟的正负号；不支持的动画不会移动时间轴。如果组内最早的
+  延迟为负，导入器将整组关键帧和播放终点
   同时向后平移，使最早的关键帧从第 0 帧开始；不会产生负 keytime，也不会截断关键帧。PAGX 的播放窗口
   始终从第 0 帧开始，此时 HTML 的 `t=0` 位于 PAGX 时间轴的后方（距离第 0 帧的帧数等于最早负延迟的
   绝对值），所以默认播放会包含 HTML 负时间段，而不是从浏览器的初始画面开始，并给出
@@ -521,8 +522,9 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   区间依次是 0–60、30–90、45–105，`Animation.duration=105`，HTML 的 `t=0` 对应 PAGX 第 30 帧。
   `once` 动画若采用 `none` / `backwards` 填充，还会在平移后活动区间末尾多留一帧以显示基线值。
   - **循环动画（有意的取舍）。** CSS 只在第一次迭代前应用延迟，之后无缝循环；PAGX 的 `Animation`
-    每次重复整个 `[0, duration]` 窗口，因此导入器在每个周期都把延迟作为停顿重放，并告警
-    `subset:animation-delay-replayed`。无缝循环需要在 PAGX 模型中引入"仅首轮"的起始偏移，或把关键帧
+    每次重复整个 `[0, duration]` 窗口，因此非零延迟会改变循环播放，并告警
+    `subset:animation-delay-replayed`。正延迟使每轮出现停顿；负延迟可能只改变起始相位而不增加停顿。
+    无缝循环需要在 PAGX 模型中引入"仅首轮"的起始偏移，或把关键帧
     按延迟做相位旋转并在周期接缝处拆分；两者都被否决，以保证导入后的关键帧仍是 CSS `@keyframes` 的
     简单平移，方便动画师在画布上编辑。
   - **错峰分组。** 循环周期与循环模式相同的循环动画共用一个 `Animation`，时长覆盖统一平移后最晚的
@@ -592,6 +594,6 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | `subset:animation-filter-approximated` | 动画 `brightness()` 被映射为 opacity，大于 1 的值会被钳制 |
 | `subset:animation-unknown-keyframes` | `animation` 引用了未定义的 `@keyframes` 名称；该动画被丢弃 |
 | `subset:animation-finite-count` | `animation-iteration-count` 是有限值 > 1；被强制为 `once` |
-| `subset:animation-delay-replayed` | 无限循环动画带有正的 `animation-delay`；延迟在每个周期都作为停顿重放，而不是只在第一次迭代前生效 |
+| `subset:animation-delay-replayed` | 无限循环动画带有非零 `animation-delay`；PAGX 重复转换后的整个播放窗口，而非仅在首轮应用延迟 |
 | `subset:animation-timeline-shifted` | 负的 `animation-delay` 将组内时间原点移到 CSS `t=0` 之前；PAGX 默认从负时间段开始播放 |
 | `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |

@@ -357,8 +357,9 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
-  // Plan a shared nonnegative origin before generating keyframes or fill-mode baselines. SVG
-  // shapes and ordinary elements can belong to the same timing group.
+  // Plan a provisional nonnegative origin before generating keyframes or fill-mode baselines. SVG
+  // shapes and ordinary elements can belong to the same timing group. Discarded candidates may
+  // affect this origin; finalizeTiming corrects it after the playable objects have been emitted.
   for (auto& entry : _pendingAnimations) {
     _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.first), false);
   }
@@ -379,6 +380,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
                                               shape.rotationTargetId, shape.fillTargetId,
                                               shape.strokeTargetId, shape.dashScale);
   }
+  _animationBuilder->finalizeTiming();
   coalesceAnimations();
   buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();

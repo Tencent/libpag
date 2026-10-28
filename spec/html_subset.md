@@ -565,8 +565,9 @@ timeline emit a channel.
   infinite** (finite `alternate` cannot be expressed and is downgraded to `once` with
   `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
   and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
-- `animation-delay`: delays keep their signed value when grouping animations. If a group's
-  earliest delay is negative, the importer shifts every member's keyframes and the group's
+- `animation-delay`: delays keep their signed value when grouping playable animations; unsupported
+  animations do not move the timeline. If a group's earliest delay is negative, the importer shifts
+  every member's keyframes and the group's
   playback end forward by the same amount until the earliest keyframe starts at frame 0. No
   negative keytimes are emitted and no keyframe is truncated. The PAGX playback window always
   begins at frame 0; HTML `t=0` then lies *after* PAGX frame 0 (by the magnitude of the earliest
@@ -578,8 +579,9 @@ timeline emit a channel.
   one frame past the shifted active end to sample the trailing baseline.
   - **Looping animations (deliberate trade-off).** CSS applies the delay to the first iteration
     only and then loops seamlessly. A PAGX `Animation` repeats its whole `[0, duration]` window,
-    so the importer replays the delay as a pause on every pass and warns with
-    `subset:animation-delay-replayed`. Seamless looping would require either a first-iteration
+    so a nonzero delay changes repeated playback and warns with
+    `subset:animation-delay-replayed`. Positive delays create pauses on every pass; a negative
+    delay may change the starting phase without adding a pause. Seamless looping would require either a first-iteration
     offset in the PAGX model or keyframes rotated by the delay and split at the cycle seam; both
     are rejected so the imported keyframes stay a plain, editable offset of the CSS `@keyframes`.
   - **Staggered groups.** Looping animations with the same cycle length and loop mode share one
@@ -657,6 +659,6 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | `subset:animation-filter-approximated` | animated `brightness()` is mapped to opacity and values above 1 are clamped |
 | `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
 | `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
-| `subset:animation-delay-replayed` | an infinite animation has a positive `animation-delay`; the delay is replayed as a pause on every cycle instead of only before the first iteration |
+| `subset:animation-delay-replayed` | an infinite animation has a nonzero `animation-delay`; PAGX repeats the converted playback window instead of applying the delay only to initial playback |
 | `subset:animation-timeline-shifted` | a negative `animation-delay` moved the group's origin before CSS `t=0`; PAGX playback starts with the pre-roll |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |
