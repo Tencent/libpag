@@ -23,7 +23,7 @@
 #include "shapes/Fill.h"
 #include "shapes/Gradient.h"
 #include "shapes/MergePaths.h"
-#include "shapes/PolyStar.h"
+#include "shapes/PolyStarTag.h"
 #include "shapes/Rectangle.h"
 #include "shapes/Repeater.h"
 #include "shapes/RoundCorners.h"

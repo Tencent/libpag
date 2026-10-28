@@ -122,7 +122,7 @@ if [ "$BACKEND" = "webgpu" ]; then
     CMAKE_ARGS="$CMAKE_ARGS -DPAG_USE_WEBGPU=ON"
 fi
 
-emcmake cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release $CMAKE_ARGS $SKIP_IMAGES_FLAG
+emcmake cmake -G Ninja -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release $CMAKE_ARGS $SKIP_IMAGES_FLAG
 cmake --build "$BUILD_DIR" -- -j 8
 npm run "copy:${BACKEND}"
 

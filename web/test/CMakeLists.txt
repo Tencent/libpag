@@ -107,6 +107,13 @@ set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
 
 add_executable(pag-test ${TEST_SOURCES})
 
+# minizip's zip.c (compiled into the pag library) and unzip.c (test sources) reference zlib
+# symbols. Native lanes resolve them transitively through ffavc's dynamic-library dependency
+# chain; the web build has no ffavc, so link the zlib static library from tgfx's vendor system.
+add_vendor_target(zlib-vendor STATIC_VENDORS zlib CONFIG_DIR ${TGFX_DIR})
+find_vendor_libraries(zlib-vendor STATIC ZLIB_STATIC_LIBS)
+add_dependencies(pag-test zlib-vendor)
+
 # Generate the HEAD file with the current commit hash for baseline versioning.
 execute_process(COMMAND git rev-parse --short HEAD
         WORKING_DIRECTORY ${ROOT}
@@ -190,7 +197,6 @@ target_compile_definitions(pag-test PRIVATE
 
 target_link_options(pag-test PRIVATE
         -lembind
-        -fno-rtti
         -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
         -sWASM=1
         ${WEB_GRAPHICS_LINK_OPTIONS}
@@ -247,6 +253,7 @@ target_include_directories(pag-test SYSTEM PRIVATE
 
 target_link_libraries(pag-test
         pag
+        ${ZLIB_STATIC_LIBS}
 )
 
 # libxml2 headers require the static-linkage declaration; the generated pagx_xsd.h lives in the
