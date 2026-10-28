@@ -3650,6 +3650,93 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
   return end == std::string::npos ? "" : rule.substr(start + 1, end - start - 1);
 }
 
+// Repeated timestamps encode an instantaneous jump: the first key is the value just before the
+// boundary, and the last one is the value from that frame onward. The preceding ramp must still
+// reach the first key instead of fading across the entire previous interval.
+// A zero horizontal scale makes matrix(0,0,0,1,...) singular. Browsers cannot interpolate
+// between that matrix and an invertible one, while PAGX interpolates decomposed components.
+CLI_TEST(PAGXHtmlTest, AnimationSingularMatrixProgressBarInterpolates) {
+  const char* xml = R"(<pagx width="320" height="100">
+    <Layer id="progress" x="0" y="10" width="280" height="8">
+      <Rectangle position="140,4" size="280,8"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="120" frameRate="60" loop="once">
+        <Object target="progress">
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="0,0,0,1,280,0" interpolation="linear"/>
+            <Key time="120" value="1,0,0,1,0,0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto rule =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"progress\"")));
+  EXPECT_NE(rule.find("translate(280px, 0px)"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("scale(0, 1)"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("scale(1, 1)"), std::string::npos) << rule;
+  EXPECT_EQ(rule.find("matrix(0,0,0,1,280,0)"), std::string::npos) << rule;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationDuplicateAlphaKeysPreserveInstantSceneSwitches) {
+  const char* xml = R"(<pagx width="100" height="100">
+    <Layer id="scene" width="100" height="100">
+      <Rectangle width="100" height="100"/>
+      <Fill color="#050507"/>
+    </Layer>
+    <Animations>
+      <Animation id="switch" duration="1260" frameRate="60" loop="loop">
+        <Object target="scene">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1"/>
+            <Key time="236" value="1"/>
+            <Key time="236" value="0"/>
+            <Key time="1235" value="0"/>
+            <Key time="1235" value="1"/>
+            <Key time="1260" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"scene\"")));
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("18.7302% { opacity: 0;"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("98.0159% { opacity: 1;"), std::string::npos) << rule;
+  // Both pre-jump stops must retain the outgoing value instead of interpolating toward the
+  // post-jump value over hundreds of frames.
+  EXPECT_NE(rule.find("opacity: 1; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+  EXPECT_NE(rule.find("opacity: 0; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationDuplicateAlphaKeysKeepPrecedingRamp) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/boundary/04_duplicate_key_time.pagx"),
+                     options);
+  ASSERT_FALSE(html.empty());
+  auto rule =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"dupKeyBox\"")));
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("opacity: 0.8; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+  EXPECT_NE(rule.find("50% { opacity: 1;"), std::string::npos) << rule;
+}
+
 // The effective painter opacity in PAGX is the color alpha multiplied by the painter alpha. Each
 // keyframe stop replaces the element's static paint, so it must carry that product, taking the
 // static value for whichever factor is not animated.
