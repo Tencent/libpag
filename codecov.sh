@@ -1,9 +1,9 @@
 #!/bin/bash
-cd "$(dirname "$0")" || exit 1
+cd $(dirname $0)
 
-if [[ $(uname) == 'Darwin' ]]; then
-  if ! command -v gcovr >/dev/null 2>&1; then
-    if ! command -v brew >/dev/null 2>&1; then
+if [[ `uname` == 'Darwin' ]]; then
+  if [ ! $(which gcovr) ]; then
+    if [ ! $(which brew) ]; then
       echo "Homebrew not found. Trying to install..."
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
@@ -12,8 +12,8 @@ if [[ $(uname) == 'Darwin' ]]; then
   fi
 fi
 
-mkdir -p result || exit 1
-# Optional gcovr arguments can select a single instrumented build directory and add reports:
-# ./codecov.sh build --json result/coverage.json --html-details result/coverage.html
-exec gcovr -r . -f='src/' -f='include/' --xml-pretty \
-  --merge-mode-functions=merge-use-line-min -o ./result/coverage.xml "$@"
+mkdir -p result
+gcovr -r . -f='src/' -f='include/' --xml-pretty --merge-mode-functions=merge-use-line-min -o ./result/coverage.xml
+if test $? -ne 0; then
+   exit 1
+fi
