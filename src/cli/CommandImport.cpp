@@ -31,9 +31,9 @@
 #include <string>
 #include <system_error>
 #include "cli/CliUtils.h"
-#include "cli/NodeTool.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
+#include "cli/NodeTool.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -161,8 +161,8 @@ struct SnapshotResult {
 
 #ifdef _WIN32
 static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& inputPath,
-                                   const ImportFormatOptions& options, std::string& html, int& exitCode,
-                                   std::string& error) {
+                                   const ImportFormatOptions& options, std::string& html,
+                                   int& exitCode, std::string& error) {
   std::wstring node = UTF8ToWide(NodeExecutablePath());
   std::wstring wideBin = UTF8ToWide(bin);
   std::wstring wideInput = UTF8ToWide(inputPath);
@@ -234,7 +234,7 @@ static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& in
 // snapshot.js routes progress and browser errors to stderr, which remains connected to the
 // parent's stderr on both the POSIX popen path and the Windows CreateProcessW path.
 static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
-                                       const ImportFormatOptions& options) {
+                                      const ImportFormatOptions& options) {
   SnapshotResult result;
   auto bin = ResolveHTMLTool("PAGX_HTML_SNAPSHOT_BIN", "launch.js", "snapshot.js");
   if (bin.empty()) {
@@ -245,8 +245,7 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
   }
 #ifdef _WIN32
   int exitCode = 1;
-  if (!RunHTMLSnapshotProcess(bin, inputPath, options, result.html, exitCode,
-                              result.error)) {
+  if (!RunHTMLSnapshotProcess(bin, inputPath, options, result.html, exitCode, result.error)) {
     return result;
   }
   if (exitCode != 0) {
@@ -361,8 +360,9 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
   }
   if (!formatOptions.scenario.empty() &&
       (effectiveFormat != "html" || !snapshotEnabled || formatOptions.captureAnimations)) {
-    result.error = "--scenario requires HTML with the snapshot pre-pass enabled and cannot be "
-                   "combined with --capture-animations";
+    result.error =
+        "--scenario requires HTML with the snapshot pre-pass enabled and cannot be "
+        "combined with --capture-animations";
     return result;
   }
   if (isUrl && !snapshotEnabled) {
@@ -463,7 +463,8 @@ static void PrintUsage() {
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
       << "  --scenario <file.json>         Replay an HTML interaction scenario\n"
-      << "  --checkpoint <name>            Select its static state (required for multiple captures)\n"
+      << "  --checkpoint <name>            Select its static state (required for multiple "
+         "captures)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
       << "                                 <svg>) instead of expanding them into native nodes\n"
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
@@ -511,7 +512,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       }
       auto value = std::string(argv[++i]);
       if (arg == "--scenario") options->formatOptions.scenario = value;
-      else options->formatOptions.checkpoint = value;
+      else
+        options->formatOptions.checkpoint = value;
     } else if (arg == "--images" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseImageStorageMode(mode, &options->imageStorage)) {

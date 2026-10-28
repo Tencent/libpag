@@ -2152,7 +2152,8 @@ PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotKeepsMeasuredAbsoluteLayout) 
 
   auto captured = ParseFromString(
       "<html><body data-pagx-capture-mode=\"current-state\" "
-      "style=\"width:400px;height:300px\">" + content);
+      "style=\"width:400px;height:300px\">" +
+      content);
   ASSERT_NE(captured, nullptr);
   auto* body = captured->layers.front();
   auto* row = body->children.front();
