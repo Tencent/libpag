@@ -23,13 +23,6 @@
 
 namespace pagx {
 
-// Converts a CSS font-weight token to a numeric weight in the OpenType 1-1000 range: the keywords
-// `normal` (400), `bold` (700), `bolder` (700) and `lighter` (300), or a number clamped to that
-// range. Unrecognised input reports 400 so an unknown value collapses to Regular. Callers that need
-// the numeric weight behind a CSS request use this rather than re-parsing the string, so the value
-// matches the face `ResolveFontStyleSynthesis` names.
-int CssFontWeightToNumeric(const std::string& cssFontWeight);
-
 enum class CSSFontSlant { Normal, Italic, Oblique };
 
 // A CSS request is distinct from an exact platform face name. Keep numeric values intact;

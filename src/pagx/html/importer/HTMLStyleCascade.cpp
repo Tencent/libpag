@@ -427,7 +427,10 @@ void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
   // so its names are the answer here too. Comparing the request rather than the style label keeps a
   // child that changes only the weight from inheriting the face its parent selected.
   if (out.primaryFontFamily == parent.primaryFontFamily &&
-      out.fontStyleName == parent.fontStyleName) {
+      out.fontRequest.weight == parent.fontRequest.weight &&
+      out.fontRequest.width == parent.fontRequest.width &&
+      out.fontRequest.slant == parent.fontRequest.slant) {
+    out.fontStyleName = parent.fontStyleName;
     return;
   }
   _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName,

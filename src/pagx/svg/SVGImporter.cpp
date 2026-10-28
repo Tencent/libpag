@@ -1032,14 +1032,13 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) 
 }
 static bool SameTextStyle(const InheritedStyle& a, const InheritedStyle& b) {
   return a.color == b.color && a.fontFamily == b.fontFamily && a.fontSize == b.fontSize &&
-         a.fontWeight == b.fontWeight && a.fontStyle == b.fontStyle &&
-         a.fontStretch == b.fontStretch && a.letterSpacing == b.letterSpacing &&
-         a.textAnchor == b.textAnchor && a.fill == b.fill && a.stroke == b.stroke &&
-         a.fillOpacity == b.fillOpacity && a.strokeOpacity == b.strokeOpacity &&
-         a.strokeWidth == b.strokeWidth && a.strokeDasharray == b.strokeDasharray &&
-         a.strokeDashoffset == b.strokeDashoffset && a.strokeLinecap == b.strokeLinecap &&
-         a.strokeLinejoin == b.strokeLinejoin && a.strokeMiterlimit == b.strokeMiterlimit &&
-         a.fillRule == b.fillRule;
+         a.fontWeight == b.fontWeight && a.fontStyle == b.fontStyle && a.fontStretch == b.fontStretch &&
+         a.letterSpacing == b.letterSpacing && a.textAnchor == b.textAnchor && a.fill == b.fill &&
+         a.stroke == b.stroke && a.fillOpacity == b.fillOpacity &&
+         a.strokeOpacity == b.strokeOpacity && a.strokeWidth == b.strokeWidth &&
+         a.strokeDasharray == b.strokeDasharray && a.strokeDashoffset == b.strokeDashoffset &&
+         a.strokeLinecap == b.strokeLinecap && a.strokeLinejoin == b.strokeLinejoin &&
+         a.strokeMiterlimit == b.strokeMiterlimit && a.fillRule == b.fillRule;
 }
 
 void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element, SVGTextRun& pending,
@@ -1091,8 +1090,7 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
   text->baseline = TextBaseline::Alphabetic;
   text->fontSize = run.style.fontSize.empty() ? DEFAULT_FONT_SIZE
                                               : parseLength(run.style.fontSize, _viewBoxHeight);
-  auto request =
-      ParseCSSFontStyle(run.style.fontWeight, run.style.fontStyle, run.style.fontStretch);
+  auto request = ParseCSSFontStyle(run.style.fontWeight, run.style.fontStyle, run.style.fontStretch);
   text->fontStyle = FontStyleRequestName(request);
   text->fauxItalic = request.slant != CSSFontSlant::Normal;
   auto families =
@@ -1103,7 +1101,7 @@ Text* SVGParserContext::makeTextRun(const SVGTextRun& run) {
     if (resolved.empty()) continue;
     if (firstFamily) text->fontFamily = resolved;
     firstFamily = false;
-    auto typeface = SystemFonts::ResolveTypeface(resolved, text->fontStyle);
+    auto typeface = SystemFonts::MatchTypeface(resolved, request);
     if (typeface != nullptr) {
       text->fontFamily = typeface->fontFamily();
       text->fontStyle = typeface->fontStyle();
@@ -2478,6 +2476,7 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
       {"font-size", &InheritedStyle::fontSize},
       {"font-weight", &InheritedStyle::fontWeight},
       {"font-style", &InheritedStyle::fontStyle},
+      {"font-stretch", &InheritedStyle::fontStretch},
       {"letter-spacing", &InheritedStyle::letterSpacing},
       {"text-anchor", &InheritedStyle::textAnchor},
   };

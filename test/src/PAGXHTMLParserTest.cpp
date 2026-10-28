@@ -422,6 +422,27 @@ PAG_TEST(PAGXHTMLParserTest, TransformerKeepsKeyframesAfterExistingHeadMetadata)
   EXPECT_NE(style->getFirstChild()->name.find("@keyframes fade"), std::string::npos);
 }
 
+PAG_TEST(PAGXHTMLParserTest, RelativeFontWeightsResolveAgainstTheParentComputedWeight) {
+  struct Case {
+    double parent;
+    double bolder;
+    double lighter;
+  };
+  for (const auto& test : {Case{50, 400, 50}, Case{300, 400, 100}, Case{400, 700, 100},
+                           Case{600, 900, 400}, Case{800, 900, 700}, Case{950, 950, 700}}) {
+    SCOPED_TRACE(test.parent);
+    ParserInput input;
+    pagx::HTMLInheritedStyle parent;
+    parent.fontRequest.weight = test.parent;
+    auto bolder = ParseNode("<span style=\"font-weight:bolder\"/>");
+    auto lighter = ParseNode("<span style=\"font-weight:lighter\"/>");
+    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(bolder, parent).fontRequest.weight,
+                     test.bolder);
+    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(lighter, parent).fontRequest.weight,
+                     test.lighter);
+  }
+}
+
 PAG_TEST(PAGXHTMLParserTest, InvalidVisualPropertiesUseDocumentedFallbacks) {
   ParserInput input;
   auto node = ParseNode(

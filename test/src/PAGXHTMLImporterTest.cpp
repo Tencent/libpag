@@ -4139,10 +4139,9 @@ PAG_TEST(PAGXHTMLImporterTest, CSSWeightUsesAvailableRegisteredFace) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Medium stays a real-face style label so font lookup can select it precisely. The importer does
-  // not bake a faux flag when that face is unavailable.
+  // There is only a Regular face. The CSS request for Medium resolves to it without synthesis.
   EXPECT_EQ(text->fontFamily, "HTML Medium Test");
-  EXPECT_EQ(text->fontStyle, "Medium");
+  EXPECT_EQ(text->fontStyle, "Regular");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
 }
