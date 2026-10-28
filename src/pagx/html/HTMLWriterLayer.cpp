@@ -384,7 +384,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   auto savedPendingSVGDraws = std::move(_pendingSVGDraws);
   bool savedCoalesceSVGDraws = _coalesceSVGDraws;
   _pendingSVGDraws.clear();
-  _coalesceSVGDraws = true;
+  // Group SVG draws only when exporting animations. Static documents must retain their original
+  // per-draw viewBoxes: sharing one SVG changes clipping and gradient/stroke rasterization.
+  _coalesceSVGDraws = !_ctx->animatedElementIds.empty();
   ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
   float roundCornerRadius = 0.0f;

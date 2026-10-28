@@ -4735,13 +4735,23 @@ CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
         <Path data="M2 8.5C7.66601 3.43217 16.334 3.43217 22 8.5"/>
         <Path data="M5.5 12.5C9.22606 9.31296 14.7739 9.31296 18.5 12.5"/>
         <Path data="M9 16.5C10.7726 15.1705 13.2274 15.1705 15 16.5"/>
-        <Stroke color="#60A5FA" width="2" cap="round"/>
+        <Stroke id="wavesStroke" color="#60A5FA" width="2" cap="round"/>
       </Group>
       <Group>
         <Ellipse position="12,20" size="3.2,3.2"/>
         <Fill color="#60A5FA"/>
       </Group>
     </Layer>
+    <Animations>
+      <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
+        <Object target="wavesStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="2" interpolation="linear"/>
+            <Key time="60" value="3"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
   </pagx>)";
 
   auto html = LoadXMLAndConvert(xml);
@@ -4758,6 +4768,12 @@ CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
   ASSERT_NE(firstSvg, std::string::npos);
   EXPECT_EQ(html.find("<svg", firstSvg + 4), std::string::npos);
   EXPECT_NE(html.find("viewBox=\"0 1 24 21\""), std::string::npos);
+
+  pagx::HTMLExportOptions staticOptions;
+  staticOptions.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, staticOptions);
+  EXPECT_EQ(CountOccurrences(staticHtml, "<svg"), 2u);
+  EXPECT_EQ(staticHtml.find("@keyframes"), std::string::npos);
 }
 
 }  // namespace pag
