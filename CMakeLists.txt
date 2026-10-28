@@ -53,6 +53,7 @@ option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
 option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
 option(PAG_BUILD_HTML "Enable HTML import support" OFF)
 option(PAG_BUILD_PPT "Enable PPT export support" OFF)
+option(PAG_WEB_ENABLE_RTTI "Build the web library with RTTI for the web test harness" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -560,7 +561,13 @@ if (WEB)
     # GPUDrawable reuses tgfx's ReadCanvasSize() from WebJSBindings.h, which tgfx keeps in its
     # internal src tree instead of the public include directory.
     list(APPEND PAG_INCLUDES ${TGFX_DIR}/src)
-    list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    # The web test harness compiles legacy test sources that use dynamic_cast. RTTI must cover
+    # the whole library, otherwise objects created by no-RTTI code get vtables without typeinfo
+    # and dynamic_cast crashes at runtime instead of failing to compile.
+    if (NOT PAG_WEB_ENABLE_RTTI)
+        list(APPEND PAG_COMPILE_OPTIONS -fno-rtti)
+    endif ()
+    list(APPEND PAG_COMPILE_OPTIONS -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
     find_library(UIKit_LIBS UIKit REQUIRED)

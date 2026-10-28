@@ -16,6 +16,9 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 # The root CMakeLists must not create native test targets that cannot compile for Emscripten.
 set(PAG_BUILD_TESTS OFF)
+# Legacy test sources (PAGXHTMLImporterTest) use dynamic_cast: compile the whole library with
+# RTTI so objects created by library code carry complete typeinfo (see the root CMakeLists).
+set(PAG_WEB_ENABLE_RTTI ON)
 # Mirror the native test configuration: the pagx suites need the extended formats.
 set(PAG_BUILD_PAGX ON)
 set(PAG_BUILD_SVG ON)
@@ -57,9 +60,6 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGVideoSequenceTest\\.cpp$")       # ne
 list(FILTER TEST_SOURCES EXCLUDE REGEX "VideoSequenceFallbackTest\\.cpp$")  # needs wasm ffavc
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXSVGTest\\.cpp$")                # 492MB SVG corpus
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
-# The legacy HTML-importer suite uses dynamic_cast, which cannot compile (let alone link)
-# against the no-RTTI web library build; its logic is covered by the native lanes.
-list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXHTMLImporterTest\\.cpp$")       # dynamic_cast vs -fno-rtti
 
 # Exclude hidden files (e.g., .DS_Store).
 foreach (FILE_PATH ${TEST_SOURCES})
@@ -141,7 +141,6 @@ foreach (fixture ${APITEST_TOP_LEVEL})
 endforeach ()
 
 target_compile_options(pag-test PRIVATE
-        -fno-rtti
         -fno-exceptions
         -fno-access-control
         -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
@@ -228,6 +227,7 @@ target_include_directories(pag-test SYSTEM PRIVATE
         ${MINIZIP_DIR}
         ${WOFF2_DIR}/include
         ${BROTLI_DIR}/c/include
+        ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY}
 )
 
 target_link_libraries(pag-test

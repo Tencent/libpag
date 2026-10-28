@@ -56,7 +56,6 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 | `PAGVideoSequenceTest.cpp`, `VideoSequenceFallbackTest.cpp` | require the ffavc software decoder, which has no wasm build |
 | `PAGXSVGTest.cpp` | the `resources/apitest/SVG` corpus is 492MB; not preloaded |
 | `PAGXCliTest.cpp` | CLI sources are not compiled into the web test |
-| `PAGXHTMLImporterTest.cpp` | legacy suite uses `dynamic_cast`, incompatible with the no-RTTI web library build; covered natively |
 | `*.mm` (Metal/Cocoa) | platform tests never compile under Emscripten |
 
 Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
@@ -64,6 +63,9 @@ Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
 
 ## Known limitations
 
+- The web test build enables RTTI (`PAG_WEB_ENABLE_RTTI`) for the whole library: the legacy
+  `PAGXHTMLImporterTest` suite uses `dynamic_cast`, which requires typeinfo on objects created
+  by library code. This only affects the test binary; the product web build stays no-RTTI.
 - Video-sequence decoding is unavailable (no wasm ffavc), so PAG files containing
   video sequences render those layers empty.
 - `resources/apitest/SVG` is never preloaded; the SVG import code is still compiled in.
