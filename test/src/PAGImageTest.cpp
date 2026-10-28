@@ -45,7 +45,7 @@ PAG_TEST(PAGImageTest, contentDuration) {
 /**
  * 用例描述: PAGImage解码等功能
  */
-PAG_TEST(PAGImageTest, image) {
+PAG_PIXEL_TEST(PAGImageTest, image) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -121,7 +121,7 @@ PAG_TEST(PAGImageTest, image2) {
 /**
  * 用例描述: 带旋转图片PAGImage解码等功能
  */
-PAG_TEST(PAGImageTest, image3) {
+PAG_PIXEL_TEST(PAGImageTest, image3) {
   auto pagImage = MakePAGImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(pagImage != nullptr);
   EXPECT_EQ(pagImage->width(), 3024);
@@ -142,7 +142,7 @@ PAG_TEST(PAGImageTest, image3) {
 /**
  * 用例描述: texture 的 target 是 GL_TEXTURE_RECTANGLE，origin 是 BottomLeft，当作遮罩绘制。
  */
-PAG_TEST(PAGImageTest, BottomLeftMask) {
+PAG_PIXEL_TEST(PAGImageTest, BottomLeftMask) {
   int width = 110;
   int height = 110;
   auto device = DevicePool::Make();

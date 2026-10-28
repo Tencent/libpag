@@ -32,7 +32,7 @@ using nlohmann::json;
 /**
  * 用例描述: 字体相关功能测试
  */
-PAG_TEST(PAGFontTest, TestFont) {
+PAG_PIXEL_TEST(PAGFontTest, TestFont) {
   ScopedFontRegistration registration(
       PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
                             "TTTGBMedium", "Regular"));

@@ -32,7 +32,7 @@ using nlohmann::json;
 /**
  * 用例描述: PAGImageLayer 图层基础边缘 Case 测试
  */
-PAG_TEST(PAGImageLayerTest, imageBasetTest) {
+PAG_PIXEL_TEST(PAGImageLayerTest, imageBasetTest) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -57,7 +57,7 @@ PAG_TEST(PAGImageLayerTest, imageBasetTest) {
 /**
  * 用例描述: PAGImageLayer多线程替换测试
  */
-PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
+PAG_PIXEL_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -147,7 +147,7 @@ PAG_TEST(PAGImageLayerTest, getBoundsTest) {
 /**
  * 用例描述: PAGImageLayer setImage接口 测试
  */
-PAG_TEST(PAGImageLayerTest, setImage) {
+PAG_PIXEL_TEST(PAGImageLayerTest, setImage) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/filter/fastblur.pag");
   auto image = MakePAGImage("resources/apitest/imageReplacement.png");

@@ -38,7 +38,7 @@ using namespace tgfx;
  * 用例描述: 测试基础混合模式
  * Backend-agnostic: only touches OffscreenSurface + Baseline::Compare, no GL/Metal specifics.
  */
-PAG_TEST(PAGBlendTest, Blend) {
+PAG_PIXEL_TEST(PAGBlendTest, Blend) {
   auto files = GetAllPAGFiles("resources/blend");
   auto pagSurface = OffscreenSurface::Make(400, 400);
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -90,7 +90,7 @@ tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width
 /**
  * 用例描述: 使用blend时，如果当前的frameBuffer是BottomLeft的，复制逻辑验证
  */
-PAG_TEST(PAGBlendTest, CopyDstTexture) {
+PAG_PIXEL_TEST(PAGBlendTest, CopyDstTexture) {
   auto width = 400;
   auto height = 400;
   auto device = DevicePool::Make();
@@ -118,7 +118,7 @@ PAG_TEST(PAGBlendTest, CopyDstTexture) {
 /**
  * 用例描述: 替换的texture是BottomLeft，renderTarget是TopLeft
  */
-PAG_TEST(PAGBlendTest, TextureBottomLeft) {
+PAG_PIXEL_TEST(PAGBlendTest, TextureBottomLeft) {
   auto width = 720;
   auto height = 1280;
   auto device = DevicePool::Make();
@@ -152,7 +152,7 @@ PAG_TEST(PAGBlendTest, TextureBottomLeft) {
 /**
  * 用例描述: 替换的texture和renderTarget都是BottomLeft
  */
-PAG_TEST(PAGBlendTest, BothBottomLeft) {
+PAG_PIXEL_TEST(PAGBlendTest, BothBottomLeft) {
   auto width = 720;
   auto height = 1280;
   auto device = DevicePool::Make();

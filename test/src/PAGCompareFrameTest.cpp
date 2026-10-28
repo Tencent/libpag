@@ -151,7 +151,7 @@ static void CompareFileFrames(const std::string& pagPath) {
 /**
  * 用例描述: 校验 compare 文件夹中各个文件渲染结果
  */
-PAG_TEST(PAGFrameCompareTest, RenderFiles) {
+PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
   if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
     // Metal deduplicates devices by native GPU, so worker threads share one glyph atlas. Keep

@@ -89,7 +89,7 @@ namespace pag {
 /**
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
-PAG_TEST(PAGDiskCacheTest, SequenceFile) {
+PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   auto cacheDir = Platform::Current()->getCacheDir();
   ASSERT_FALSE(cacheDir.empty());
   auto diskCache = DiskCache::GetInstance();
@@ -256,7 +256,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
 
-PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
+PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
   pag::PAGDiskCache::RemoveAll();
   auto cacheDir = Platform::Current()->getCacheDir();
 
@@ -442,7 +442,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
 }
 #endif  // TGFX_USE_OPENGL
 
-PAG_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
+PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(pagFile != nullptr);

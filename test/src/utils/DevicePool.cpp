@@ -19,6 +19,7 @@
 #include "DevicePool.h"
 #include "rendering/gpu/Devices.h"
 #if defined(TGFX_USE_METAL)
+#include "base/utils/Log.h"
 #include "core/AtlasManager.h"
 #include "tgfx/gpu/Context.h"
 #endif
@@ -39,11 +40,13 @@ bool DevicePool::ResetAtlasForComparison() {
 #if defined(TGFX_USE_METAL)
   DeviceLockScope scope(Devices::MakeDefault());
   if (!scope) {
+    LOGE("ResetAtlasForComparison: failed to create or lock the Metal device.");
     return false;
   }
   auto context = scope.context();
   context->flushAndSubmit(true);
-  // Like tgfx's ContextScope, keep atlas placement independent of earlier pixel comparisons.
+  // Test-only workaround matching tgfx's ContextScope: Linear glyph sampling can change pixels
+  // with atlas placement. Clear history for independent baselines, not for reuse behavior tests.
   context->atlasManager()->releaseAll();
 #endif
   return true;

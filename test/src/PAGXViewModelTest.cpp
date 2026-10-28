@@ -2855,7 +2855,7 @@ PAGX_TEST(PAGXViewModelTest, TextBoxChildReshapeFromViewModel) {
 
 // Baseline: a ViewModel string property drives a standalone Text's content; after the value is set
 // and the scene is drawn, the rendered pixels must match the accepted baseline for the new text.
-PAGX_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
+PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
   auto doc = pagx::PAGXDocument::Make(240, 120);
   auto* schema = doc->makeNode<pagx::ViewModel>("TextVM");
   auto* prop = doc->makeNode<pagx::ViewModelProperty>();
@@ -2904,7 +2904,7 @@ PAGX_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
 // Baseline: a document Animation drives a standalone Text's content channel with a Hold keyframe;
 // after advancing past the keyframe and drawing, the rendered pixels must match the accepted
 // baseline for the animated text.
-PAGX_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
+PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
   auto doc = pagx::PAGXDocument::Make(240, 120);
   auto* layer = doc->makeNode<pagx::Layer>("textLayer");
   layer->width = 240;
