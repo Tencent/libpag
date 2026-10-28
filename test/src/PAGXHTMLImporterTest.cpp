@@ -2164,6 +2164,67 @@ PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotKeepsMeasuredAbsoluteLayout) 
   EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, CaptureModeOnlyRecognizesCurrentStateOnBody) {
+  struct Case {
+    std::string bodyAttributes;
+    std::string rowAttributes;
+    pagx::LayoutMode expectedLayout;
+  };
+  const std::vector<Case> cases = {
+      {"data-pagx-capture-mode=\"current-state\"", "", pagx::LayoutMode::None},
+      {"data-pagx-capture-mode=\"legacy\"", "", pagx::LayoutMode::Horizontal},
+      {"data-pagx-capture-mode=\"\"", "", pagx::LayoutMode::Horizontal},
+      {"data-pagx-capture-mode=\"Current-State\"", "", pagx::LayoutMode::Horizontal},
+      {"", "data-pagx-capture-mode=\"current-state\"", pagx::LayoutMode::Horizontal},
+      {"", "", pagx::LayoutMode::Horizontal},
+  };
+  for (const auto& item : cases) {
+    SCOPED_TRACE(item.bodyAttributes + " / " + item.rowAttributes);
+    auto document = ParseFromString(
+        "<html data-pagx-capture-mode=\"current-state\">"
+        "<head data-pagx-capture-mode=\"current-state\"></head><body " +
+        item.bodyAttributes + " style=\"width:400px;height:300px\"><div id=\"row\" " +
+        item.rowAttributes +
+        " style=\"position:absolute;left:20px;top:30px;width:220px;height:40px\">"
+        "<div style=\"position:absolute;left:0px;top:0px;width:100px;height:40px\"></div>"
+        "<div style=\"position:absolute;left:120px;top:0px;width:100px;height:40px\"></div>"
+        "</div></body></html>");
+    ASSERT_NE(document, nullptr);
+    ASSERT_EQ(document->layers.size(), 1u);
+    auto* body = document->layers.front();
+    ASSERT_EQ(body->children.size(), 1u);
+    auto* row = body->children.front();
+    EXPECT_EQ(row->layout, item.expectedLayout);
+    EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+    EXPECT_EQ(row->customData.count("pagx-capture-mode"), 0u);
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotPreservesAuthoredFlexAndUserData) {
+  auto document = ParseFromString(R"HTML(
+    <html><head></head><body data-before="first" data-pagx-capture-mode="current-state"
+        data-after="last" style="width:400px;height:300px">
+      <div id="row" data-pagx-capture-mode="current-state" data-action="select"
+          style="display:flex;flex-direction:row;gap:20px;width:220px;height:40px">
+        <div style="width:100px;height:40px;background:red"></div>
+        <div style="width:100px;height:40px;background:blue"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(document, nullptr);
+  ASSERT_EQ(document->layers.size(), 1u);
+  auto* body = document->layers.front();
+  EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+  EXPECT_EQ(body->customData.at("before"), "first");
+  EXPECT_EQ(body->customData.at("after"), "last");
+  ASSERT_EQ(body->children.size(), 1u);
+  auto* row = body->children.front();
+  EXPECT_EQ(row->layout, pagx::LayoutMode::Horizontal);
+  ASSERT_EQ(row->children.size(), 2u);
+  EXPECT_EQ(row->customData.count("pagx-capture-mode"), 0u);
+  EXPECT_EQ(row->customData.at("action"), "select");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:1120px;height:80px">
