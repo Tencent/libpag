@@ -33,7 +33,8 @@ case "$BACKEND_ARG" in
     export PAG_WEB_BASELINE_INVOKED=1
     SKIP_FLAG=""
     if [ "$SKIP_IMAGES" -eq 1 ]; then SKIP_FLAG="--skip-images"; fi
-    exec "$WORKSPACE/web/test/update_web_baseline.sh" "${BACKEND_ARG#USE_}" "$SKIP_FLAG"
+    WEB_BACKEND=$(echo "${BACKEND_ARG#USE_}" | tr '[:upper:]' '[:lower:]')
+    exec "$WORKSPACE/web/test/update_web_baseline.sh" "$WEB_BACKEND" "$SKIP_FLAG"
     ;;
 esac
 
