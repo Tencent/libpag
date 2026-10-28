@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include "pag/defines.h"
 #include "pag/types.h"
 
 namespace tgfx {
@@ -49,17 +48,18 @@ enum class ReadbackStatus {
 };
 
 /**
- * An asynchronous pixel readback session created by PAGSurface::asyncReadPixels(). The pixel data
- * may not be available immediately after creation, because it can involve asynchronous GPU
- * processing: on WebGPU the data arrives through an asynchronous GPU buffer mapping, and even on
- * OpenGL readiness is fence-based, meaning it arrives only after the GPU drains previously queued
- * work. Poll isReady() until it returns true, then call readPixels() to copy the pixels out.
- * The session holds GPU resources until it is destroyed, so do not keep it alive longer than
- * needed.
+ * An asynchronous pixel readback session created by AsyncReadPixels(). This type is internal to
+ * libpag: it is consumed by the Web bindings and tests only, so it is not part of the public
+ * header set.
  */
-class PAG_API PAGSurfaceReadback {
+class PAGSurfaceReadback {
  public:
   ~PAGSurfaceReadback();
+
+  // The session wraps a single lockable GPU readback; copying would let two wrappers unlock the
+  // same session, so copying is disabled.
+  PAGSurfaceReadback(const PAGSurfaceReadback&) = delete;
+  PAGSurfaceReadback& operator=(const PAGSurfaceReadback&) = delete;
 
   /**
    * Returns the width in pixels of the readback data.
@@ -88,10 +88,6 @@ class PAG_API PAGSurfaceReadback {
    * Copies the readback pixels to dstPixels with the specified color type, alpha type and row
    * bytes. Returns false without copying if the pixel data is not ready yet. dstPixels must have
    * room for at least height() * dstRowBytes bytes. Returns true if the pixels are copied.
-   * @param colorType Describes how to interpret the components of a pixel.
-   * @param alphaType Describes how to interpret the alpha component of a pixel.
-   * @param dstPixels The destination pixel buffer to copy into.
-   * @param dstRowBytes The number of bytes between subsequent rows of dstPixels.
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
@@ -103,7 +99,19 @@ class PAG_API PAGSurfaceReadback {
   std::shared_ptr<tgfx::SurfaceReadback> readback = nullptr;
   bool flipY = false;
 
-  friend class PAGSurface;
+  friend std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface);
 };
+
+/**
+ * Starts an asynchronous readback of the entire surface content and returns a session object.
+ * Unlike PAGSurface::readPixels(), this function never blocks the calling thread waiting for the
+ * GPU: poll PAGSurfaceReadback::isReady() until it returns true, then copy the pixels out with
+ * PAGSurfaceReadback::readPixels(). On the WebGPU backend, where synchronous GPU readback is
+ * unsupported, this is the only way to read pixels. The returned session keeps the PAGSurface
+ * alive. Returns nullptr if the readback could not be started, which is always the case for
+ * canvas-backed surfaces (e.g. created from a web canvas): their frames can only be read back
+ * between drawing and presentation, which the PAGPlayer::flush() flow does not expose.
+ */
+std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface);
 
 }  // namespace pag

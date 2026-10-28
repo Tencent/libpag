@@ -19,6 +19,7 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
 #include "rendering/gpu/Devices.h"
@@ -276,39 +277,40 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   return result;
 }
 
-std::shared_ptr<PAGSurfaceReadback> PAGSurface::asyncReadPixels() {
-  LockGuard autoLock(rootLocker);
-  auto context = lockContext();
+std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface) {
+  LockGuard autoLock(surface->rootLocker);
+  auto context = surface->lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  auto surface = drawable->getSurface(context, true);
-  if (surface == nullptr) {
-    unlockContext();
+  auto tgfxSurface = surface->drawable->getSurface(context, true);
+  if (tgfxSurface == nullptr) {
+    surface->unlockContext();
     return nullptr;
   }
-  auto readback = surface->asyncReadPixels(tgfx::Rect::MakeWH(surface->width(), surface->height()));
+  auto readback =
+      tgfxSurface->asyncReadPixels(tgfx::Rect::MakeWH(tgfxSurface->width(), tgfxSurface->height()));
   if (readback == nullptr) {
     LOGE(
-        "PAGSurface::asyncReadPixels() The surface does not support readback. Canvas-backed "
+        "AsyncReadPixels() The surface does not support readback. Canvas-backed "
         "surfaces can only be read between drawing and presentation, which the PAGPlayer::flush() "
         "flow does not expose.");
-    unlockContext();
+    surface->unlockContext();
     return nullptr;
   }
   context->flushAndSubmit();
   auto buffer = readback->getGPUBuffer(context);
   if (buffer == nullptr) {
-    unlockContext();
+    surface->unlockContext();
     return nullptr;
   }
   // WebGPU does not start the buffer mapping on its own; without this call isReady() would stay
   // false forever. On backends with blocking readback this is a no-op.
   buffer->requestMapAsync();
-  auto flipY = surface->origin() == tgfx::ImageOrigin::BottomLeft;
-  unlockContext();
+  auto flipY = tgfxSurface->origin() == tgfx::ImageOrigin::BottomLeft;
+  surface->unlockContext();
   return std::shared_ptr<PAGSurfaceReadback>(
-      new PAGSurfaceReadback(shared_from_this(), std::move(readback), flipY));
+      new PAGSurfaceReadback(std::move(surface), std::move(readback), flipY));
 }
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,

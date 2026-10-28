@@ -24,7 +24,7 @@ let readbackUnsupportedWarned = false;
 let readPixelsUnsupportedWarned = false;
 
 // Values must stay in sync with the declaration order of the pag::ReadbackStatus enum in
-// include/pag/pag.h.
+// src/rendering/PAGSurfaceReadback.h.
 const READBACK_STATUS_READY = 0;
 const READBACK_STATUS_PENDING = 1;
 const READBACK_STATUS_FAILED = 2;
@@ -200,7 +200,7 @@ export class PAGSurface {
       );
       return null;
     }
-    const session = this.wasmIns._readPixelsAsync();
+    const session = PAGModule._AsyncReadPixels(this.wasmIns);
     if (!session) {
       if (this.isCanvasBacked && !readbackUnsupportedWarned) {
         readbackUnsupportedWarned = true;

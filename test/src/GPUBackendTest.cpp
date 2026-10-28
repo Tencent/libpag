@@ -189,12 +189,11 @@ PAG_TEST(TGFXCastTest, ForeignMetalTexturePreservesBackendTag) {
 }
 
 /**
- * 用例描述: WebGPU 后端纹理/渲染目标在 pag 与 tgfx 之间的往返转换（纯逻辑，无需 GPU 设备）
+ * 用例描述: WebGPU 后端纹理在 pag 与 tgfx 之间的往返转换（纯逻辑，无需 GPU 设备）
  */
 PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
   WebGPUTextureInfo webGPUInfo = {};
   webGPUInfo.texture = reinterpret_cast<void*>(3);
-  webGPUInfo.textureView = reinterpret_cast<void*>(4);
   webGPUInfo.format = 5;
   BackendTexture texture(webGPUInfo, 640, 360);
   EXPECT_TRUE(texture.isValid());
@@ -209,7 +208,6 @@ PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
   WebGPUTextureInfo readBack = {};
   ASSERT_TRUE(copy.getWebGPUTextureInfo(&readBack));
   EXPECT_EQ(readBack.texture, webGPUInfo.texture);
-  EXPECT_EQ(readBack.textureView, webGPUInfo.textureView);
   EXPECT_EQ(readBack.format, 5u);
 
   // ToTGFX carries the WebGPU variant through, including the explicit format.
@@ -219,19 +217,12 @@ PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
   tgfx::WebGPUTextureInfo tgfxInfo = {};
   ASSERT_TRUE(tgfxTexture.getWebGPUTextureInfo(&tgfxInfo));
   EXPECT_EQ(tgfxInfo.texture, webGPUInfo.texture);
-  EXPECT_EQ(tgfxInfo.textureView, webGPUInfo.textureView);
   EXPECT_EQ(tgfxInfo.format, 5u);
 
   // A zero format means unspecified WGPUTextureFormat and must be rejected.
   WebGPUTextureInfo noFormat = webGPUInfo;
   noFormat.format = 0;
   EXPECT_FALSE(ToTGFX(BackendTexture(noFormat, 640, 360)).isValid());
-
-  // Render targets share the same conversion path.
-  BackendRenderTarget renderTarget(webGPUInfo, 640, 360);
-  auto tgfxTarget = ToTGFX(renderTarget);
-  ASSERT_TRUE(tgfxTarget.isValid());
-  EXPECT_EQ(tgfxTarget.backend(), tgfx::Backend::WebGPU);
 }
 
 }  // namespace pag

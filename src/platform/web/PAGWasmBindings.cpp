@@ -27,6 +27,7 @@
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
@@ -408,7 +409,7 @@ static void BindPAGSurfaceReadback() {
   class_<PAGSurfaceReadback>("_PAGSurfaceReadback")
       .smart_ptr<std::shared_ptr<PAGSurfaceReadback>>("_PAGSurfaceReadback")
       .function("_status", optional_override([](PAGSurfaceReadback& session) {
-                  // The int value must stay in sync with the declaration order of the pag
+                  // The int value must stay in sync with the declaration order of the
                   // ReadbackStatus enum: 0 = Ready, 1 = Pending, 2 = Failed.
                   return static_cast<int>(session.status());
                 }))
@@ -428,6 +429,7 @@ static void BindPAGSurfaceReadback() {
                   }
                   return val::null();
                 }));
+  function("_AsyncReadPixels", &AsyncReadPixels);
 }
 
 static void BindPAGSurface() {
@@ -477,8 +479,7 @@ static void BindPAGSurface() {
                     return CopyToNewUint8Array(uint8Array.get(), dataSize);
                   }
                   return val::null();
-                }))
-      .function("_readPixelsAsync", &PAGSurface::asyncReadPixels);
+                }));
 }
 
 static void BindPAGImage() {
@@ -792,8 +793,6 @@ bool PAGBindInit() {
   BindPAGTextLayer();
   BindPAGComposition();
   BindPAGFile();
-  // BindPAGSurfaceReadback must run before BindPAGSurface because _PAGSurface._readPixelsAsync
-  // returns the readback type.
   BindPAGSurfaceReadback();
   BindPAGSurface();
   BindPAGImage();

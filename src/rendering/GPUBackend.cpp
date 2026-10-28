@@ -110,10 +110,6 @@ BackendRenderTarget::BackendRenderTarget(const VkImageInfo& vkInfo, int width, i
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
 
-BackendRenderTarget::BackendRenderTarget(const WebGPUTextureInfo& webGPUInfo, int width, int height)
-    : _backend(Backend::WEBGPU), _width(width), _height(height), webGPUInfo(webGPUInfo) {
-}
-
 BackendRenderTarget::BackendRenderTarget(const BackendRenderTarget& that) {
   *this = that;
 }
@@ -135,9 +131,6 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
-      break;
-    case Backend::WEBGPU:
-      webGPUInfo = that.webGPUInfo;
       break;
     default:
       break;
@@ -166,14 +159,6 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
     return false;
   }
   *vkImageInfo = vkInfo;
-  return true;
-}
-
-bool BackendRenderTarget::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
-  if (!isValid() || _backend != Backend::WEBGPU) {
-    return false;
-  }
-  *webGPUTextureInfo = webGPUInfo;
   return true;
 }
 

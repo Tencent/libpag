@@ -67,6 +67,11 @@ export interface PAG extends EmscriptenModule {
     _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
     _FromRenderTarget: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
+  /**
+   * Starts an async readback on a PAGSurface wasm instance and returns a _PAGSurfaceReadback
+   * session, or null when the surface does not support readback.
+   */
+  _AsyncReadPixels: (surface: any) => any;
   _PAGComposition: {
     _Make: (width: number, height: number) => any;
   };

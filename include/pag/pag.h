@@ -24,14 +24,12 @@
 #include <unordered_map>
 #include "pag/decoder.h"
 #include "pag/gpu.h"
-#include "pag/surface-readback.h"
 #include "pag/types.h"
 
 namespace tgfx {
 struct Rect;
 class Context;
 class Surface;
-class SurfaceReadback;
 class ImageInfo;
 class Device;
 }  // namespace tgfx
@@ -41,6 +39,8 @@ class Composition;
 class Recorder;
 
 class RenderCache;
+
+class PAGSurfaceReadback;
 
 class Drawable;
 
@@ -1181,19 +1181,15 @@ class Composition;
 
 class PAGPlayer;
 
-class PAGSurface;
-
 /**
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
- * including readPixels(), asyncReadPixels(), clearAll(), freeCache(), updateSize(), and
- * getHardwareBuffer().
+ * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
  *
  * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
- * by std::shared_ptr: asyncReadPixels() captures shared_from_this() to keep the surface alive
- * while the GPU readback is in flight.
+ * by std::shared_ptr.
  */
-class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
+class PAG_API PAGSurface {
  public:
   /**
    *  Creates a new PAGSurface from specified Drawable, Returns nullptr if drawable is nullptr.
@@ -1272,18 +1268,6 @@ class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
-  /**
-   * Starts an asynchronous readback of the entire surface content and returns a session object.
-   * Unlike readPixels(), this method never blocks the calling thread waiting for the GPU: poll
-   * PAGSurfaceReadback::isReady() until it returns true, then copy the pixels out with
-   * PAGSurfaceReadback::readPixels(). On the WebGPU backend, where synchronous GPU readback is
-   * unsupported, this is the only way to read pixels. The returned session keeps this PAGSurface
-   * alive. Returns nullptr if the readback could not be started, which is always the case for
-   * canvas-backed surfaces (e.g. created from a web canvas): their frames can only be read back
-   * between drawing and presentation, which the PAGPlayer::flush() flow does not expose.
-   */
-  std::shared_ptr<PAGSurfaceReadback> asyncReadPixels();
-
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);
 
@@ -1319,6 +1303,8 @@ class PAG_API PAGSurface : public std::enable_shared_from_this<PAGSurface> {
   friend class PAGSurfaceExt;
 
   friend class PAGSurfaceReadback;
+
+  friend std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface);
 };
 
 class FileReporter;

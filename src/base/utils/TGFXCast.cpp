@@ -42,7 +42,6 @@ static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
 static tgfx::WebGPUTextureInfo ToTGFX(const WebGPUTextureInfo& info) {
   tgfx::WebGPUTextureInfo result = {};
   result.texture = info.texture;
-  result.textureView = info.textureView;
   result.format = info.format;
   return result;
 }
@@ -52,7 +51,6 @@ static tgfx::WebGPUTextureInfo ToTGFX(const WebGPUTextureInfo& info) {
 static WebGPUTextureInfo ToPAG(const tgfx::WebGPUTextureInfo& info) {
   WebGPUTextureInfo result = {};
   result.texture = const_cast<void*>(info.texture);
-  result.textureView = const_cast<void*>(info.textureView);
   result.format = info.format;
   return result;
 }
@@ -270,15 +268,8 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
-    case Backend::WEBGPU: {
-      WebGPUTextureInfo webGPUInfo = {};
-      if (!renderTarget.getWebGPUTextureInfo(&webGPUInfo) || webGPUInfo.format == 0) {
-        return {};
-      }
-      return tgfx::BackendRenderTarget(ToTGFX(webGPUInfo), renderTarget.width(),
-                                       renderTarget.height());
-    }
     case Backend::VULKAN:
+    case Backend::WEBGPU:
     case Backend::MOCK:
     default:
       return {};

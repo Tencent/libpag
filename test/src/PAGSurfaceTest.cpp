@@ -19,6 +19,7 @@
 #include <chrono>
 #include <thread>
 #include "base/utils/Log.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/drawables/TextureDrawable.h"
 #include "utils/TestUtils.h"
 
@@ -314,7 +315,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   EXPECT_EQ(readback->width(), pagFile->width());
   EXPECT_EQ(readback->height(), pagFile->height());
@@ -347,7 +348,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   const auto width = readback->width();
   const auto height = readback->height();
@@ -390,7 +391,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsOutlivesSurface) {
     pagPlayer->setSurface(pagSurface);
     pagPlayer->setProgress(0.5);
     ASSERT_TRUE(pagPlayer->flush());
-    readback = pagSurface->asyncReadPixels();
+    readback = AsyncReadPixels(pagSurface);
     ASSERT_TRUE(readback != nullptr);
   }
 
@@ -417,7 +418,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadbackStatus) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   auto status = readback->status();
   EXPECT_TRUE(status == ReadbackStatus::Ready || status == ReadbackStatus::Pending);
