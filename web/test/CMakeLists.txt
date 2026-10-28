@@ -34,6 +34,14 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./libpag)
 
 set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
+# The root CMakeLists resolves TGFX_DIR inside its own (child) directory scope, so it never
+# propagates back here. Resolve it again for this scope, honoring a user-provided cache value.
+if (NOT TGFX_DIR)
+    set(TGFX_DIR ${ROOT}/third_party/tgfx)
+else ()
+    get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+endif ()
+
 # Collect test sources (reuse the existing native tests).
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${ROOT}/test/src/*.*)
 
@@ -105,9 +113,10 @@ if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
         "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${PAG_BACKEND_NAME}/version.json"
     )
 else ()
+    string(TOUPPER "${PAG_BACKEND_NAME}" BACKEND_ARG_NAME)
     message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
         "Screenshot tests will pass without actual comparison. "
-        "Run './update_baseline.sh USE_${PAG_BACKEND_NAME}' from project root first.")
+        "Run './update_baseline.sh USE_${BACKEND_ARG_NAME}' from project root first.")
 endif ()
 
 # Preload test resources. The whole-dataset directories mirror the native runs; the apitest
