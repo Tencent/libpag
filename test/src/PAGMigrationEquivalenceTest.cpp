@@ -195,12 +195,24 @@ void CompareSample(const std::string& path, SampleResult* result) {
   std::vector<uint8_t> migratedPixels;
   int64_t migratedClockUs = 0;
   for (int frame = 0; frame < totalFrames; frame += step) {
-    player->setProgress(totalFrames > 0 ? static_cast<double>(frame) / totalFrames : 0.0);
+    // Aim the legacy player at the CENTER of the frame's time span: the legacy player floors
+    // sub-frame times, so a time landing an epsilon below the boundary renders the previous
+    // frame, while the migrated pipeline evaluates channels continuously. The progress is
+    // derived from the true duration (not the rounded totalFrames) so the centering stays
+    // inside the frame period regardless of duration rounding.
+    player->setProgress(pagFile->duration() > 0
+                            ? ((static_cast<double>(frame) + 0.5) * 1000000.0 / frameRate) /
+                                  static_cast<double>(pagFile->duration())
+                            : 0.0);
     if (!RenderLegacyFrame(player.get(), legacySurface, width, height, &legacyPixels)) {
       continue;
     }
     auto frameSeconds = static_cast<double>(frame) / frameRate;
-    auto frameUs = static_cast<int64_t>(frameSeconds * 1000000.0);
+    // Ceil the migrated time ABOVE the frame boundary: frame-quantized subsystems (sequence
+    // players) floor sub-frame times, so a time an epsilon below the boundary lands on the
+    // previous frame, while continuous channel evaluation at boundary+tiny is still the frame's
+    // value. Together with the centered legacy progress both pipelines render frame N.
+    auto frameUs = static_cast<int64_t>(ceil(frameSeconds * 1000000.0));
     auto deltaUs = frameUs - migratedClockUs;
     migratedClockUs = frameUs;
     if (!RenderMigratedFrame(scene.get(), migratedSurface, animation.get(), deltaUs, width, height,
