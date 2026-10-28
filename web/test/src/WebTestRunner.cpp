@@ -20,8 +20,33 @@
 #include <string>
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
+#if defined(__EMSCRIPTEN__) && !defined(TGFX_USE_WEBGPU)
+#include <emscripten/html5_webgl.h>
+#endif
 
 static bool initialized = false;
+
+// The WebGL backend's Devices::MakeDefault() falls back to GLDevice::Current(), which requires a
+// WebGL context to already be created and current. tgfx's own web tests set this up through their
+// JS bindings module; the test runner has no bindings, so create the context here on the hidden
+// #pag-test-canvas element before any test touches a device.
+static void initGLContext() {
+#if defined(__EMSCRIPTEN__) && !defined(TGFX_USE_WEBGPU)
+  static bool glReady = false;
+  if (glReady) {
+    return;
+  }
+  glReady = true;
+  EmscriptenWebGLContextAttributes attrs = {};
+  emscripten_webgl_init_context_attributes(&attrs);
+  attrs.majorVersion = 2;
+  auto context = emscripten_webgl_create_context("#pag-test-canvas", &attrs);
+  if (context == 0) {
+    return;
+  }
+  emscripten_webgl_make_context_current(context);
+#endif
+}
 
 // Asyncify (WebGPU only) rewrites the whole wasm binary at link time and can corrupt the
 // execution state of code that busy-waits on the main thread. Tests incompatible with
@@ -47,12 +72,14 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
+  initGLContext();
   initTests();
   return RUN_ALL_TESTS();
 }
 
 EMSCRIPTEN_KEEPALIVE
 int RunTest(const char* filter) {
+  initGLContext();
   initTests();
   if (filter != nullptr && filter[0] != '\0') {
     if (excludeFilter[0] != '\0') {

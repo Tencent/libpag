@@ -80,12 +80,20 @@
             }
         }
 
+        let module = null;
         try {
-            const module = await PAGTest(moduleOptions);
+            module = await PAGTest(moduleOptions);
             // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
             // both the Asyncify and non-Asyncify cases.
             const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
             console.log('All tests finished with exit code:', result);
+        } catch (e) {
+            console.error('Test execution failed:', e);
+            console.log('All tests finished with exit code: 1');
+        }
+        // Always export the outputs, even when the test run crashed mid-way: the harness needs
+        // the artifacts (screenshots, partial md5) to diagnose the failure.
+        if (module) {
             await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
             await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
             // Pack md5.json and version.json from baseline-out as cache-web.zip for reuse.
@@ -114,9 +122,6 @@
             } catch (e) {
                 console.warn('Failed to create cache-web.zip:', e);
             }
-        } catch (e) {
-            console.error('Test execution failed:', e);
-            console.log('All tests finished with exit code: 1');
         }
     </script>
 </body>

@@ -180,6 +180,9 @@ if (PAG_USE_WEBGPU)
             -sASYNCIFY_STACK_SIZE=262144
             "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
     )
+    # The WebTestRunner GL-context guard branches on the backend macro, which the root project
+    # only defines for the pag library target, not for the test sources.
+    target_compile_definitions(pag-test PRIVATE TGFX_USE_WEBGPU)
     target_compile_definitions(pag-test PRIVATE PAG_USE_ASYNCIFY)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
     set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','WebGPU']")
@@ -188,7 +191,6 @@ else ()
     set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
     set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL']")
 endif ()
-
 target_compile_definitions(pag-test PRIVATE
         PAG_BACKEND_NAME="${PAG_BACKEND_NAME}"
         $<$<BOOL:${PAG_UPDATE_BASELINE}>:UPDATE_BASELINE>
