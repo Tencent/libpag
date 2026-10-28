@@ -3,7 +3,7 @@
 Use a scenario when the desired visual is a state reached by clicking, typing, hovering, focusing
 or scrolling. A version-1 scenario runs on one isolated page session and exports named checkpoints
 as independent **static** PAGX documents. It does not export event handlers or an interactive app.
-For playable motion, use [Animation](animation.md); `--scenario` and `--capture-animations` are
+For playable motion, use [Animation](animation.md); `--html-scenario` and `--html-capture-animations` are
 mutually exclusive.
 
 ## Write a scenario
@@ -36,9 +36,9 @@ Save as `states.json` and adapt the locators and conditions to the actual page. 
 pair; their checkpoint names are `initial` and `advanced`.
 
 Targets specify exactly one of `css`, `testId` or `role`. `testId` matches `data-testid`.
-`role` requires the Playwright driver (`--browser-engine playwright` on `capture`) and can have
-an exact accessible `name`. Single-file `import` has no browser-engine flag; select its driver
-with `HTML_SNAPSHOT_BROWSER=playwright` in the environment instead. An optional `frame` CSS selector
+`role` requires the Playwright driver (`--html-browser-engine playwright` on `pagx import`) and
+can have an exact accessible `name`. `HTML_SNAPSHOT_BROWSER=playwright` also selects that driver
+when no explicit flag is supplied. An optional `frame` CSS selector
 scopes a target to one iframe; capturing the frame still has the limitations below.
 
 | Step `type` | Fields and behavior |
@@ -66,29 +66,33 @@ continuous motion. The default viewport is 1400×900.
 
 ```bash
 # All checkpoints, PAGX renders, manifest and a static contact sheet.
-pagx capture app.html --scenario states.json -o out --preview
+pagx import app.html --html-scenario states.json --output-dir out --preview
 
 # One checkpoint as a single PAGX file; runs preceding steps and stops at this capture.
-pagx import --input app.html --scenario states.json --checkpoint filled --output filled.pagx
+pagx import app.html --html-scenario states.json --html-checkpoint filled -o filled.pagx
 
-# One checkpoint with capture's resource options and output set.
-pagx capture app.html --scenario states.json --checkpoint filled -o out --embed-fonts
+# One checkpoint with embedded fonts, a retained subset and a render.
+pagx import app.html --html-scenario states.json --html-checkpoint filled \
+  --output-dir out --html-embed-fonts --html-keep-subset --render
 ```
 
-`capture` without `--checkpoint` exports every capture, even when the scenario contains just one.
-Its `-o`/`--output-dir` is a directory; outputs use `<base>.<checkpoint>` names.
-For `import`, `--output` is a file and multiple capture steps require `--checkpoint`.
-URL inputs need `--output-name` with `capture`, or an explicit `--output` with `import`.
+Without `--html-checkpoint`, import exports all captures. Multiple results require `--output-dir`;
+directory exports use `<base>.<checkpoint>` names. `-o`/`--output` always names one exact file,
+whose stem is used for its sidecars without appending the checkpoint name. PNGs require
+`--render` or `--preview`; intermediate HTML requires `--html-keep-subset`.
+URL inputs need an explicit `--output`, or `--output-dir` with `--output-name`.
 See [Pipeline](pipeline.md#resources) for fonts and external images.
 
 All steps share one fresh page session. Checkpoints do not reload it, and selecting a checkpoint
 prevents later steps from running. The scenario owns viewport, waits and scroll behavior; it rejects
-`--viewport-*`, `--wait-ms`, `--selector`, `--scroll-reveal`, `--capture-animations` and `--batch`.
+`--html-viewport-*`, `--html-wait-ms`, `--html-selector`, `--html-scroll-reveal`,
+`--html-capture-animations`, `--html-batch` and `--html-no-snapshot`.
 Configure those state-selection needs inside the scenario. `--dry-run` is a batch-only option,
 not a scenario-validation mode.
 
-`capture` writes `<base>.captures.json`. Require exit code 0 and manifest `status: "complete"`
-before reporting a complete run. Capture warnings belong to each output. A later interaction
+Scenario import writes `<base>.captures.json`, including for an exact output file. Require exit
+code 0 and manifest `status: "complete"` before reporting a complete run. Capture warnings belong
+to each output. A later interaction
 failure can leave earlier checkpoints converted and listed while the run is `failed`. Identify
 those partial results explicitly; inspect the failed step before retrying because replay executes
 the source actions again. Native conversion runs after the source browser session closes, so

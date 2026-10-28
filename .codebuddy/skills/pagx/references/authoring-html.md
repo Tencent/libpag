@@ -11,7 +11,7 @@ to convert faithfully. The native input contract is [HTML subset](../spec/html_s
 - [ ] Give a new fixed-size design explicit `body` dimensions and `margin:0`; match the viewport.
 - [ ] Keep resources available to the browser and choose how required fonts/images will be delivered.
 - [ ] Use real text for copy and SVG/icon assets where vector icons are needed.
-- [ ] For motion, use supported channels and explicitly enable `--capture-animations`.
+- [ ] For motion, use supported channels and explicitly enable `--html-capture-animations`.
 - [ ] For a state reached through interaction, write a scenario with explicit readiness checks.
 
 ---
@@ -26,7 +26,7 @@ its layout:
 <body style="margin: 0; width: 1080px; height: 1440px;">
 ```
 
-- Match `pagx capture --viewport-width/--viewport-height` to those dimensions. In scenario
+- Match `pagx import --html-viewport-width/--html-viewport-height` to those dimensions. In scenario
   mode set `viewport` inside the scenario instead; those CLI viewport options are rejected.
 - Design at 1× (real pixels). For crisp previews, render the PNG at a higher scale instead of
   inflating the canvas.
@@ -43,7 +43,7 @@ HTTP origin. Preserve working source assets rather than rewriting them without n
 - **CSS**: inline styles or a `<style>` block make a new design easier to reproduce. Existing
   linked stylesheets and runtime CSS may also work through the browser pass.
 - **Fonts**: load the intended fonts before capture. A browser font is not automatically available
-  to native rendering. `pagx capture --embed-fonts` downloads and embeds the captured fonts when
+  to native rendering. `pagx import --html-embed-fonts` downloads and embeds the captured fonts when
   possible; inspect typography and warnings. For existing PAGX font handling use `pagx embed`
   with the correct document fonts/fallbacks, not the removed `pagx font embed` command.
 
@@ -92,13 +92,13 @@ boxes. Interaction-state snapshots retain their measured positions without flex 
 
 - Chart libraries that draw on `<canvas>` (ECharts, Chart.js, D3-canvas) are captured as a static
   bitmap, so charts survive as a picture. If the chart animates in, give the page enough settle time
-  with ordinary capture's `--wait-ms`/`--selector`, or a scenario `waitFor` condition.
+  with `--html-wait-ms`/`--html-selector`, or a scenario `waitFor` condition.
 - SVG-based charts (many D3 setups) convert as vectors, which is sharper — prefer them when
   available.
 
 ## 8. Animation and interaction states
 
-Ordinary capture is static unless `--capture-animations` is supplied. For a playable timeline,
+Ordinary capture is static unless `--html-capture-animations` is supplied. For a playable timeline,
 use supported CSS `@keyframes`, WAAPI, GSAP or anime.js motion that is still attached at capture
 time. [Animation](animation.md) defines supported channels and playback checks; read it before
 writing motion. Do not assume all CSS properties, canvas redraws or app events become animation.
@@ -161,7 +161,8 @@ JavaScript handlers in the PAGX. Keep essential content visible at the selected 
 Use the selected CLI build and a viewport matching the design:
 
 ```bash
-pagx capture page.html -o out --viewport-width 640 --viewport-height 400 --embed-fonts
+pagx import page.html --output-dir out --render \
+  --html-viewport-width 640 --html-viewport-height 400 --html-embed-fonts
 ```
 
 A simple `pagx import --input page.html --output page.pagx` is sufficient when default viewport

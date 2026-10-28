@@ -488,14 +488,15 @@ importer maps it onto the PAGX animation model (`<Animations>` + `Animation` / `
 
 ### 13.2 Channel mapping
 
-Only properties that map to a PAGX channel the runtime can actually play back are emitted.
+Only properties supported by the HTML animation importer are emitted; native PAGX animation
+supports additional channels that HTML capture does not generate.
 Everything else inside a `@keyframes` stop is warned and dropped
 (`subset:animation-unsupported-property`).
 
 | CSS animated property | PAGX channel | Target node | Value type |
 |-----------------------|--------------|-------------|------------|
 | `opacity` | `alpha` | the element's `Layer` | float |
-| `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
+| `transform` (pure translation, no static matrix) | `x` / `y` | the element's `Layer` | float |
 | `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
 | `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
@@ -505,8 +506,9 @@ Everything else inside a `@keyframes` stop is warned and dropped
 
 `transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
 compound chains — `translate[X|Y]` / `scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`). When
-*every* keyframe is a pure translation the animation uses the cheaper `x` / `y` channels (which stack
-on top of the layout-assigned position). As soon as any keyframe carries scale / rotate / skew (or a
+*every* keyframe is a pure translation and no static matrix owns the transform, the animation uses
+`x` / `y` channels (which stack on top of the layout-assigned position). If a static transform is
+present, full matrix samples replace it instead. As soon as any keyframe carries scale / rotate / skew (or a
 non-translation `matrix(...)`), the *full* affine is routed through a single `matrix` channel,
 pivoted around the element's `transform-origin` exactly like the static `transform` path
 (`T(cx,cy) · M · T(-cx,-cy)`), so static and animated transforms agree. 3D forms
@@ -515,9 +517,9 @@ pivoted around the element's `transform-origin` exactly like the static `transfo
 `padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped the same way.
 
 > Matrix-channel interpolation decomposes each keyframe into translation / scale / rotation / shear
-> and interpolates those components (`pagx/runtime/MatrixDecompose.h`); it cannot recover full turns
-> or rotations crossing ±180° between two adjacent keyframes, so very large per-segment rotations
-> take the short way around. Authoring intermediate `@keyframes` stops (the common case) avoids this.
+> and interpolates those components (`pagx/runtime/MatrixDecompose.h`). Rotation takes the shorter
+> path between endpoint matrices, so extra turns are lost. Add intermediate `@keyframes` stops
+> to keep each intended rotation segment below 180°.
 
 The animated element's `Layer` is given a generated `id` (prefix `anim`) when it has no author
 `id`, so the emitted `<Object target="…">` can reference it. `color` animation requires the
@@ -600,13 +602,15 @@ The example in §13.1 converts to:
 
 ### 13.5 Inline SVG shape animation
 
-Animations on inline `<svg>` shapes are lowered onto the per-shape painter nodes rather than the
-element `Layer`, unlocking icon and line-art motion:
+Animations on inline `<svg>` shapes target the shape's Layer, resolved Group or painter nodes,
+depending on the property:
 
 | SVG animated property | PAGX channel | Target node |
 |-----------------------|--------------|-------------|
 | `opacity` | `alpha` | the shape's `Layer` |
-| `transform` (pure translation only) | `x` / `y` | the shape's `Layer` |
+| `transform` (pure translation, no static matrix) | `x` / `y` | the shape's `Layer` |
+| `transform` (pure rotation, no static matrix, with a resolved rotation target) | `rotation` | the resolved `Group` |
+| `transform` (other supported 2D affine forms, or replacing a static matrix) | `matrix` | the shape's `Layer` |
 | `fill` | `color` | the shape's `Fill` |
 | `fill-opacity` | `alpha` | the shape's `Fill` |
 | `stroke` | `color` | the shape's `Stroke` |
@@ -615,8 +619,9 @@ element `Layer`, unlocking icon and line-art motion:
 
 `stroke-dashoffset` drives the path-trace **line-draw** idiom (`stroke-dasharray: 1;
 stroke-dashoffset: 1 → 0` with `pathLength="1"`); the captured author-space value is rescaled into
-user units exactly like the static dash import. A non-translation `transform` on an SVG shape has no
-`matrix` channel (unlike a regular HTML element) and is dropped with
+user units exactly like the static dash import. Matrix samples use the captured transform origin;
+a pre-existing static transform is replaced by full samples and supplies the fill-mode baseline.
+Invalid or unsupported 3D/perspective transforms drop the transform track with
 `subset:animation-unsupported-property`. Unlike regular elements, one inline-SVG shape may carry a
 **comma-separated `animation` list** — each entry becomes its own `Animation` (the line-draw + fill-in
 idiom `animation: draw 1s …, fill 0.4s …` is the common case).

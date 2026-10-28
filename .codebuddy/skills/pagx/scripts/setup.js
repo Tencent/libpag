@@ -10,7 +10,7 @@ const { spawnSync } = require('child_process');
 
 const usage = `Usage: node setup.js [options]
 
-Check a libpag checkout's native CLI and HTML capture runtime.
+Check a libpag checkout's native CLI and HTML import runtime.
 Normal setup rebuilds TypeScript; missing dependencies/browser are reported, not installed.
 
   --repo <dir>                 Explicit libpag checkout (otherwise locate from script/cwd)
@@ -120,9 +120,16 @@ function main() {
   say(`native CLI ${binary}`);
   say(run(binary, ['--version'], repo).trim());
   const help = run(binary, ['--help'], repo);
-  for (const command of ['import', 'capture', 'render', 'verify']) {
+  for (const command of ['import', 'render', 'verify']) {
     if (!new RegExp(`^\\s+${command}\\s`, 'm').test(help)) {
       fail(`native CLI does not advertise ${command}; rebuild a CLI supporting this HTML workflow`);
+    }
+  }
+  const importHelp = run(binary, ['import', '--help'], repo);
+  for (const flag of ['--output-dir', '--html-batch', '--html-browser-engine',
+    '--html-scenario', '--html-capture-animations', '--html-no-snapshot', '--dry-run']) {
+    if (!new RegExp(`^\\s+${flag}(?:\\s|$)`, 'm').test(importHelp)) {
+      fail(`native import does not advertise ${flag}; rebuild a CLI supporting unified import`);
     }
   }
 
@@ -144,8 +151,8 @@ function main() {
     run(process.execPath, [compiler, '-p', path.join(toolDir, 'tsconfig.json')], toolDir, true);
   }
   checkBuild(toolDir);
-  // Exercises the repository capture modules without starting a browser.
-  run(process.execPath, [path.join(toolDir, 'capture.js'), '--help'], toolDir);
+  // Load the repository orchestrator; import.js itself accepts internal requests, not CLI flags.
+  toolRequire('./dist/lib/import-request.js');
   const { checkBrowserRuntime } = toolRequire('./dist/lib/browser-engine.js');
   try {
     checkBrowserRuntime(options.engine);
@@ -156,8 +163,12 @@ function main() {
       ? 'PLAYWRIGHT_EXECUTABLE_PATH' : 'PUPPETEER_EXECUTABLE_PATH';
     fail(`${error.message}\nFrom ${toolDir}, run: ${command}\nIf ${override} is set, correct that path or unset it.`);
   }
-  // Also check that the native bridge can find its configured runtime and Node.
-  run(binary, ['capture', '--help'], repo);
+  // Exercise the actual native-to-Node bridge. The source directory normally has no HTML;
+  // even if it does, dry-run neither launches a browser nor creates any output files.
+  run(binary, ['import', '--html-batch', path.join(toolDir, 'lib'),
+    '--output-dir', path.join(toolDir, 'dist'), '--html-browser-engine', options.engine,
+    '--dry-run'], repo);
+  say('native import runtime reachable (batch dry-run passed)');
   say(`${options.engine} browser executable present (launch not tested)`);
   say('ready');
 }

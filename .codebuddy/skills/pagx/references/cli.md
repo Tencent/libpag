@@ -2,7 +2,7 @@
 
 Use the selected CLI build consistently for conversion and validation. Check its `--version`,
 `--help` and the needed subcommand's `--help`; version alone does not establish feature support.
-Most commands operate on PAGX files, while `import` and `capture` accept source files/URLs.
+Most commands operate on PAGX files; `import` accepts SVG/HTML sources, URLs and HTML batches.
 See [Environment selection](../SKILL.md#environment-and-command-selection) for repository versus
 installed usage. `preview` is provided by the npm launcher, not the standalone native binary.
 
@@ -15,8 +15,7 @@ installed usage. `preview` is provided by the npm launcher, not the standalone n
 - [pagx bounds](#pagx-bounds) — rendered pixel bounds of Layers
 - [pagx font](#pagx-font) — query font files, families and metrics
 - [pagx embed](#pagx-embed) — embed font glyphs and images
-- [pagx import](#pagx-import) — convert SVG/HTML to a single PAGX
-- [pagx capture](#pagx-capture) — HTML output sets, scenarios, batches and static previews
+- [pagx import](#pagx-import) — SVG/HTML conversion, scenarios, batches and optional artifacts
 - [pagx resolve](#pagx-resolve) — expand inline `<svg>` and `import` attributes
 - [pagx export](#pagx-export) — export PAGX to SVG/HTML/PPTX
 - [pagx preview](#pagx-preview) — live browser preview with hot reload
@@ -116,6 +115,7 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 pagx render --font CustomFont.ttf input.pagx
 pagx render --font a.ttf --fallback "PingFang SC" input.pagx
 pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
+pagx render --time 0.5 -o frame.png input.pagx   # evaluate animation at 0.5 seconds
 pagx render --id "btnLayer" input.pagx            # render only the Layer with id="btnLayer"
 pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Layer
 ```
@@ -125,6 +125,7 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `-o, --output <path>` | Output file path (default: input path with format extension) |
 | `--format png\|webp\|jpg` | Output format (default: png) |
 | `--scale <float>` | Scale factor (default: 1.0) |
+| `--time <seconds>` | Evaluate animation at a nonnegative finite playback time; incompatible with `--crop`, `--id` and `--xpath` |
 | `--crop <x,y,w,h>` | Crop region in document coordinates (relative to target Layer when `--id`/`--xpath` is set) |
 | `--id <id>` | Render only the Layer with the specified `id` attribute |
 | `--xpath <expr>` | Render only the Layer matched by XPath expression (must match exactly one) |
@@ -141,8 +142,13 @@ is rendered, cropped to that Layer's bounds.
 `"PingFang SC"` or `"Arial,Bold"`). Fallback fonts are tried in order when a character is
 not found in the primary font.
 
-Always output to the same directory as the input `.pagx` file. Do not commit rendered
-image files.
+Without `--time`, rendering uses the static document state. With it, top-level animations
+and timelines mounted on Composition instances are evaluated; mounted timelines honor
+`evaluationOffset` (in frames) and `playing="false"`. A paused timeline is evaluated at its
+initial playback position, including its offset. See [Animation](animation.md#previewing-the-motion).
+
+Choose output paths appropriate to the task. Keep temporary review images out of commits unless
+the user or repository workflow calls for them.
 
 ---
 
@@ -327,162 +333,122 @@ Image embedding inlines external file references (Image nodes with `filePath`) a
 
 ## pagx import
 
-Convert a file from another format to a standalone PAGX file. Two input formats are
-supported: **SVG** and **HTML** (a restricted HTML/CSS subset — see `spec/html_subset.md`).
-The format is inferred from the input file extension and can be forced with `--format`.
-The output is optimized via `PAGXOptimizer` (PathData is inlined rather than shared) so the
-result is close to hand-authored PAGX and can be polished further with the other CLI tools.
-
-Unsupported constructs are handled on a best-effort basis: offending elements/properties are
-skipped or downgraded and recorded as warnings. Conversion warnings are **suppressed by default**
-(they are noisy and non-fatal); pass `--verbose` / `-v` to print them to stderr. Errors are always
-printed regardless of `--verbose`.
-
-**Import directives are resolved by default.** The HTML importer represents external SVG
-`<img src="….svg">` and inline `<svg>…</svg>` as unresolved `import` directives on a Layer.
-`import` expands those into native PAGX nodes in the same pass, so the output is fully flattened
-and a separate `pagx resolve` is normally unnecessary. Pass `--no-resolve` to keep the directives
-in place (e.g. to preserve external references, or to resolve later with different options).
-If any directive fails to resolve, `pagx import` reports the error and exits non-zero **without
-writing the output file** — fix the source (or pass `--no-resolve` to import the directives
-unexpanded and resolve them later) and retry.
+Import SVG or HTML into PAGX. HTML files and URLs normally run through the browser snapshot
+runtime before native conversion. Prepared subset HTML can bypass the browser explicitly.
+Source format is inferred from the extension (URLs and batches use HTML), or set with `--format`.
+The native stage resolves import directives by default, optimizes the document and stores images.
+Use `-v` / `--verbose` to expose normally suppressed conversion warnings; errors are always reported.
 
 ```bash
-pagx import --input icon.svg                      # SVG to icon.pagx
-pagx import --input icon.svg --output out.pagx    # SVG to out.pagx
-pagx import --input layout.html                   # HTML to layout.pagx (import directives resolved)
-pagx import --input page.html --output card.pagx  # HTML to card.pagx
-pagx import --input page.html --no-resolve        # keep inline <svg>/import directives unexpanded
-pagx import --input page.html -v                  # print conversion warnings
+pagx import icon.svg -o icon.pagx
+pagx import page.html --output-dir out --render --html-keep-subset
+pagx import https://example.com/demo --output-dir out --output-name demo
+pagx import motion.html -o motion.pagx --html-capture-animations
+pagx import app.html --html-scenario states.json --output-dir out --preview
+pagx import app.html --html-scenario states.json --html-checkpoint filled -o filled.pagx
+pagx import --html-batch pages --output-dir out --dry-run
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--input <file\|url>` | Input file or URL to import (required) |
-| `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
-| `--format <format>` | Force input format (`svg` or `html`; default: inferred from the input file extension) |
-| `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
-| `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
-| `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
-| `--capture-animations` | HTML/URL only: explicitly capture supported motion; default is a static frame |
-| `--scenario <file.json>` | Replay an HTML interaction scenario with the browser pre-pass enabled |
-| `--checkpoint <name>` | Select a static scenario checkpoint; required when the scenario has multiple captures |
-| `--verbose, -v` | Print conversion warnings (suppressed by default) |
-
-### Image storage
-
-Controls how `<Image>` resources are stored in the output PAGX (`--images`, default `external`).
-The two modes are symmetric and **only ever touch local file references** — an image already
-carried as embedded bytes or a `data:` URI is left exactly as it is in either mode (inline content
-is never extracted to a file, and existing data URIs are never rewritten). Absolute paths and remote
-`http(s)://` URLs are also left untouched.
-
-- **`external` (default)** — images that reference a local file are copied next to the output
-  `.pagx` at their original relative path, and `source` keeps that relative name unchanged, so the
-  `.pagx` plus its sidecar image files form a portable folder. The authored relative path is
-  preserved even when writing to a different output directory (e.g. `assets/logo.png` stays
-  `assets/logo.png`).
-- **`embed`** — images that reference a local file are read and inlined as base64 `data:` URIs,
-  producing a single self-contained `.pagx`.
-
-`--image-base-dir` sets the directory that relative image paths are resolved against when locating
-the files on disk; it defaults to the input file's directory.
-
-```bash
-pagx import --input page.html --output card.pagx                 # external (default): sidecar images
-pagx import --input page.html --output card.pagx --images embed  # self-contained: base64 images
-```
-
-### SVG options
-
-| Option | Description |
-|--------|-------------|
-| `--svg-no-expand-use` | Do not expand `<use>` references |
-| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
-| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
-
-### HTML import behavior
-
-HTML files and URLs normally pass through the browser snapshot runtime, then native
-normalization/import and resolution. Ordinary snapshots may recover flex layout from measured
-boxes; interaction-state snapshots deliberately disable this inference. Unsupported constructs
-can produce warnings or capture errors, depending on the mode. Inspect the output and diagnostics.
-
-```bash
-pagx import --input app.html --output app.pagx
-pagx import --input https://example.com/demo --output demo.pagx
-pagx import --input motion.html --output motion.pagx --capture-animations
-pagx import --input app.html --scenario states.json --checkpoint filled --output filled.pagx
-```
-
-`--checkpoint` requires `--scenario`. Scenarios require HTML with the browser pre-pass enabled
-and reject `--capture-animations`. `import` always writes a single PAGX; use [capture](#pagx-capture)
-for all checkpoints, PNGs, custom viewport options or font downloading/embedding. For role locators,
-select Playwright through `HTML_SNAPSHOT_BROWSER` in the environment; `import` has no driver flag.
-
-Set `PAGX_HTML_SNAPSHOT=0` (also `false`/`no`/`off`) only when importing prepared subset HTML directly.
-This disables browser execution and rejects URL/scenario inputs. See [Pipeline](pipeline.md#manual-subset-import)
-for the manual workflow and [runtime setup](pipeline.md#setup) for Node, bundled/repository lookup
-and the `PAGX_HTML_SNAPSHOT_BIN` override.
-
----
-
-## pagx capture
-
-Capture a browser page as a full output set. The repository `html2pagx` entry shares the same
-options, validation and orchestration. The selected native `pagx capture` uses its own executable
-for native conversion/rendering unless `--pagx-bin` is explicitly supplied.
-
-```bash
-pagx capture page.html -o out
-pagx capture https://example.com/demo --output-name demo -o out
-pagx capture motion.html -o out --capture-animations
-pagx capture app.html --scenario states.json -o out --preview
-pagx capture --batch pages --output-root out --dry-run
-```
+### Input, output and artifacts
 
 | Option | Description |
 |---|---|
-| `<file-or-url>` or `--input <file-or-url>` | One HTML source; not used with `--batch` |
-| `-o, --output-dir <dir>` | Output directory, not a PAGX filename; defaults beside a local input or to cwd for URLs |
-| `--output-name <name>` | Output stem; required for URLs, rejected in batch mode |
-| `--viewport-width <px>`, `--viewport-height <px>` | Ordinary capture viewport, default 1400×900; scenario viewport belongs in the JSON |
-| `--wait-ms <ms>`, `--selector <css>` | Extra ordinary-page settle delay (default 800 ms) and selector wait |
-| `--capture-animations` | Opt into supported motion; disabled by default |
-| `--scroll-reveal` | Scroll an ordinary page before capture to trigger reveal/lazy content |
-| `--scenario <file.json>` | Export named static checkpoints from one interaction session |
-| `--checkpoint <name>` | With a scenario, run through/export only this checkpoint |
-| `--download-fonts` | Save used web fonts and register this capture's faces as native render fallbacks |
-| `--embed-fonts` | Download and embed captured font glyphs; implies `--download-fonts` |
-| `--font-dir <dir>` | Font download directory; default `<output-dir>/<base>.fonts` |
-| `--download-images`, `--image-dir <dir>` | Save fetched image bytes; default directory `<output-dir>/<base>.images` |
-| `--pagx-images external\|embed` | Native image storage mode; default external. This is `--images` on import/resolve |
-| `--scale <factor>` | Render PNG scale, default 1; positive and finite |
-| `--no-inline-icon-fonts` | Disable icon-webfont to SVG conversion |
-| `--no-render` | Skip the render stage |
-| `--no-resolve` | Skip resolution and rendering |
-| `--no-subset-html` | Do not retain the intermediate subset file |
-| `--preview` | Assemble this run's rendered PNGs into static contact sheets |
-| `--preview-columns <n>` | With preview, up to 1–32 columns; default automatic |
-| `--browser-engine puppeteer\|playwright` | Select the browser driver; flag overrides `HTML_SNAPSHOT_BROWSER`, default Puppeteer |
-| `--cookie <name=value>`, `--header <Key: Value>` | Repeatable, URL inputs only |
-| `--pagx-bin <path>` | Explicitly override the native binary used by the capture pipeline |
-| `--batch <dir>` | Recursively capture `.html`/`.htm` inputs, excluding prepared subsets and nested output roots |
-| `--output-root <dir>` | Batch-only mirrored output directory |
-| `--skip-existing` | Batch-only: skip existing PAGX targets |
-| `--dry-run` | Batch-only: list inputs without launching a browser or creating outputs |
+| `<file-or-url>` or `--input <file-or-url>` | One SVG/HTML source; choose one form, and omit it in batch mode |
+| `-o, --output <file>` | Exact PAGX filename for one result; never an output directory |
+| `--output-dir <dir>` | Artifact directory; required for multiple results and batches; mutually exclusive with `--output` |
+| `--output-name <name>` | Base name with `--output-dir`; required for URL directory output; rejected in batch mode |
+| `--format svg\|html` | Force the source format |
+| `--images external\|embed` | Native image storage, default external; see below |
+| `--image-base-dir <dir>` | Source directory for relative image references; normally the local input's directory |
+| `--no-resolve` | Keep inline SVG/import directives; incompatible with `--render` and `--preview` |
+| `--render` | Add a PNG for each imported PAGX; off by default |
+| `--render-scale <factor>` | Positive, finite PNG scale, default 1; requires `--render` or `--preview` |
+| `--preview` | Enable PNG rendering and assemble static contact sheets |
+| `--preview-columns <n>` | With preview, 1–32 columns; default automatic |
+| `--verbose, -v` | Print conversion warnings |
 
-Scenario mode rejects ordinary viewport/wait/selector flags, scroll-reveal, animation capture
-and batch mode; use scenario fields and steps instead. Preview requires resolve and render;
-`--preview-columns` requires preview. Batch mode rejects a single input, `--output-name` and
-`--output-dir`. Unknown capture options are errors.
+Local single-result imports default beside the input. Ordinary directory output uses
+`<base>.pagx`; scenario directory output uses `<base>.<checkpoint>.pagx`.
+An exact output filename supplies the stem for its sidecars. URLs require `--output`, or
+`--output-dir` plus `--output-name`. Multiple selected checkpoints require `--output-dir`;
+select one with `--html-checkpoint` when an exact file is needed.
 
-Ordinary output is `<base>.subset.html`, `.pagx`, `.png`; scenario output uses
-`<base>.<checkpoint>` and adds `<base>.captures.json`. Preview paths and partial-failure handling
-are documented in [Pipeline](pipeline.md#batch-conversion-and-static-previews) and
-[Interaction capture](interaction.md#export-and-review). A failed run may retain partial outputs;
-file existence alone is not success. Help, invalid arguments and batch dry-run do not launch a
-browser. Dry-run is not a scenario-validation mode.
+PNG rendering and subset retention are opt-in. Scenarios also write `<base>.captures.json`,
+including when one checkpoint is selected. Require exit code 0 and manifest `status: "complete"`
+before reporting a successful scenario. Failure may leave partial files; see
+[Interaction capture](interaction.md#export-and-review). Preview is a static overview, distinct
+from the live `pagx preview` command.
+
+### HTML options
+
+HTML-specific options use the `--html-` prefix on `pagx import`. The batch control flags
+`--skip-existing` and `--dry-run` are also listed here.
+
+| Option | Description |
+|---|---|
+| `--html-no-snapshot` | Import prepared local subset HTML without a browser; rejects other `--html-*` options and URL input |
+| `--html-keep-subset` | Retain `<stem>.subset.html` for debugging; off by default |
+| `--html-capture-animations` | Capture supported page motion; ordinary capture is static by default |
+| `--html-scenario <file.json>` | Replay an interaction scenario and export all named static checkpoints |
+| `--html-checkpoint <name>` | With a scenario, run through and export only this checkpoint |
+| `--html-browser-engine puppeteer\|playwright` | Overrides `HTML_SNAPSHOT_BROWSER`; default Puppeteer; role locators need Playwright |
+| `--html-viewport-width <px>`, `--html-viewport-height <px>` | Positive integer viewport dimensions; default 1400×900 |
+| `--html-wait-ms <ms>`, `--html-selector <css>` | Extra ordinary-page settle delay (default 800 ms) and selector wait |
+| `--html-scroll-reveal` | Scroll ordinary pages to trigger reveal/lazy content before capture |
+| `--html-download-fonts` | Save used web fonts and register this capture's faces as native render fallbacks |
+| `--html-embed-fonts` | Embed captured font glyphs; implies downloading |
+| `--html-font-dir <dir>` | Download directory; requires font download/embedding; defaults to `<base>.fonts` |
+| `--html-download-images` | Save captured image bytes instead of keeping them inline in the subset |
+| `--html-image-dir <dir>` | Download directory; requires `--html-download-images`; defaults to `<base>.images` |
+| `--html-no-inline-icon-fonts` | Disable icon-webfont to SVG conversion |
+| `--html-cookie <name=value>`, `--html-header <Key: Value>` | Repeatable, URL inputs only |
+| `--html-batch <dir>` | Recursively import `.html`/`.htm`; requires `--output-dir` |
+| `--skip-existing` | Batch-only: reuse complete matching artifact sets, not merely existing PAGX files |
+| `--dry-run` | Batch-only: list planned work without starting/installing a browser or creating outputs |
+
+Scenario mode owns viewport and readiness. It rejects the ordinary viewport, wait, selector,
+scroll-reveal, animation-capture and batch options; use scenario fields and steps instead.
+Batch mode rejects a single input, `--output` and `--output-name`. `--dry-run` is not a scenario
+validation mode. Unknown options are errors; legacy unprefixed HTML flags are not aliases.
+
+Ordinary snapshots may recover flex layout from measured boxes; interaction-state snapshots
+preserve measured positions without flex inference. HTML browser capabilities and the native
+subset contract differ: see [HTML subset](../spec/html_subset.md) and [Animation](animation.md).
+For resources, setup and runtime lookup (`PAGX_IMPORT_BIN`, `PAGX_NODE_BIN`), see
+[Pipeline](pipeline.md). `snapshot.js` remains a separate single-subset tool with its own options.
+
+### Image storage
+
+`--images` controls native storage of relative local image references. Existing embedded bytes,
+`data:` URIs, absolute paths and remote URLs are left as they are; neither mode guarantees that
+all resources in an arbitrary input become portable.
+
+- **`external` (default)** — copy relative local images beside the output while preserving their
+  relative paths, such as `assets/logo.png`. Deliver the PAGX and its required sidecars together.
+- **`embed`** — inline relative local image files as base64 data URIs.
+
+`--image-base-dir` changes where those relative files are read from. HTML image downloading is
+separate from native storage; use `--html-download-images` only when downloaded files are wanted.
+For portable captured text, use `--html-embed-fonts` and inspect typography and warnings.
+
+```bash
+pagx import page.html -o card.pagx --images embed --html-embed-fonts
+pagx import page.subset.html -o page.pagx --html-no-snapshot
+```
+
+### SVG options and resolution
+
+| Option | Description |
+|---|---|
+| `--svg-no-expand-use` | Do not expand SVG `<use>` references |
+| `--svg-flatten-transforms` | Flatten nested transforms into single matrices |
+| `--svg-preserve-unknown` | Preserve unsupported SVG elements as Unknown nodes |
+
+These options also apply to nested SVG imports. Inline SVG and external import directives are
+resolved by default. A failed resolution prevents that result's PAGX from being written;
+`--no-resolve` retains directives for later resolution. A larger scenario/batch may still retain
+other results or intermediate files. Plain SVG conversion and prepared-subset conversion run
+natively; requesting `--render` or `--preview` uses the Node artifact runtime too.
 
 ---
 

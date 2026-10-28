@@ -1,8 +1,8 @@
 # PAGX Attribute Reference
 
-Complete attribute defaults and enumeration values extracted from the PAGX specification
-(attribute tables in the main spec and Appendix B). Use this for quick lookup during
-generation.
+Attribute defaults and enumeration values for the nodes covered by this reference. Use this
+for quick lookup during generation; [Animation](animation.md#native-pagx-transform-animation)
+covers transform channel names and animation/data-binding boundaries.
 
 ---
 
@@ -28,7 +28,7 @@ they **must not** be omitted.
 
 ---
 
-## Complete Default Values by Element
+## Default Values by Element
 
 ### Layer
 
@@ -47,15 +47,15 @@ Basic container for content, child layers, styles, and filters.
 | `visible` | bool | true | Whether the layer is visible |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `blendMode` | BlendMode | normal | Blend mode for compositing |
-| `x` | float | 0 | X position (prefer constraint attribute `left`) |
-
-> `x`/`y` is generally unused — container layout and constraint attributes cover all
-> positioning needs. Arrange child Layers with container layout; position VectorElements
-> and `includeInLayout="false"` overlays with constraint attributes.
-
-| `y` | float | 0 | Y position (prefer constraint attribute `top`) |
+| `x` | float | 0 | Local X translation, added to the position assigned by layout |
+| `y` | float | 0 | Local Y translation, added to the position assigned by layout |
+| `z` | float | 0 | Local Z translation; does not affect automatic layout |
+| `rotationX`, `rotationY`, `rotationZ` | float | 0 | Rotation about each axis, in degrees |
+| `scaleX`, `scaleY`, `scaleZ` | float | 1 | Scale along each axis |
+| `skewX`, `skewY` | float | 0 | CSS-style skew angles in degrees, strictly between −90 and 90 |
+| `perspective` | float | 0 | Nonnegative perspective distance; 0 disables perspective |
 | `matrix` | Matrix | identity | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix3D | — | 3D transform (16 values, column-major) |
+| `matrix3D` | Matrix3D | identity | 3D transform (16 values, column-major); finite and invertible |
 | `preserve3D` | bool | false | Preserve 3D transform space for child layers |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Composite to offscreen buffer before applying alpha |
@@ -68,7 +68,9 @@ Basic container for content, child layers, styles, and filters.
 | `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
 | `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
 
-Layer also supports all constraint attributes. See §Constraint Attributes below.
+Layer also supports all constraint attributes. See §Constraint Attributes below. Use layout and
+constraints for arrangement; use local transforms for visual offsets and motion. Non-identity
+matrices override scalar transform attributes as described in [Layer transforms](guide.md#layer-transforms).
 
 ### Composition
 
@@ -79,8 +81,9 @@ Reusable layer subtree (similar to After Effects pre-comps). Its dimensions serv
 | `width` | float | (required) | Composition width |
 | `height` | float | (required) | Composition height |
 
-Composition contains child Layers. Its `width`×`height` serves as the constraint container
-for top-level Layers inside it (same role as `<pagx>` dimensions for document-level Layers).
+Composition contains Layers and may also contain `<Animations>` and `<DataBind>`. Its
+`width`×`height` serves as the constraint container for top-level Layers inside it (same role as
+`<pagx>` dimensions for document-level Layers).
 
 ### Group
 
@@ -90,10 +93,7 @@ VectorElement container with transform properties, creating isolated scopes for 
 |-----------|------|---------|-------------|
 | `padding` | Padding | 0 | Insets the constraint reference frame for child elements. CSS shorthand: `"20"`, `"10,20"`, `"10,20,10,20"` |
 | `anchor` | Point | 0,0 | Anchor point for transforms |
-| `position` | Point | 0,0 | Position in parent coordinate system (prefer constraint attributes) |
-
-> Prefer constraint attributes (`left`/`top`) over `position` for positioning.
-
+| `position` | Point | 0,0 | Position in parent coordinate system (prefer constraints for layout positioning) |
 | `rotation` | float | 0 | Rotation angle in degrees |
 | `scale` | Point | 1,1 | Scale factor "sx,sy" |
 | `skew` | float | 0 | Skew amount in degrees |

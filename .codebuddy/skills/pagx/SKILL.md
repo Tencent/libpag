@@ -15,9 +15,10 @@ format and structure when editing an existing artifact.
 | Task | Workflow |
 |---|---|
 | HTML file/URL to one static PAGX | `pagx import --input page.html --output page.pagx` |
-| HTML to PAGX plus PNG, downloaded/embedded resources, or batch outputs | `pagx capture page.html -o out`; see [Pipeline](references/pipeline.md) |
-| Playable HTML animation | Add `--capture-animations` to the supported import/capture command; read [Animation](references/animation.md) |
+| HTML to PAGX plus PNG, downloaded/embedded resources, or batch outputs | `pagx import page.html --output-dir out --render`; see [Pipeline](references/pipeline.md) |
+| Playable HTML animation | Add `--html-capture-animations` to `pagx import`; read [Animation](references/animation.md) |
 | A state reached by clicking, typing, hovering or scrolling | Read [Interaction capture](references/interaction.md); export static checkpoints using a scenario |
+| Native PAGX transform animation or data binding | Read [Native transforms](references/animation.md#native-pagx-transform-animation); HTML capture has a narrower supported property set |
 | Edit an existing PAGX | Follow [Update workflow](#update-workflow) |
 | Syntax or CLI question | Consult the relevant reference; no artifact or preview is required |
 
@@ -36,7 +37,7 @@ Read only the references relevant to the task.
 | [Attributes](references/attributes.md) | Attribute names, defaults, enums and required values |
 | [CLI](references/cli.md) | Command syntax, output paths, diagnostics and preview launchers |
 | [HTML authoring](references/authoring-html.md) | Before designing HTML for conversion |
-| [Animation](references/animation.md) | Before authoring or diagnosing playable HTML motion |
+| [Animation](references/animation.md) | HTML motion capture, native transform channels and timed rendering |
 | [Interaction capture](references/interaction.md) | Scenario actions, readiness, checkpoints and capture boundaries |
 | [Pipeline](references/pipeline.md) | Setup, resources, output sets, batch conversion and troubleshooting |
 | [HTML subset](spec/html_subset.md) | The native importer's input contract; browser preprocessing accepts a broader source HTML surface |
@@ -62,8 +63,9 @@ cmake --build cmake-build-debug --target pagx
 node .codebuddy/skills/pagx/scripts/setup.js --pagx-bin ./cmake-build-debug/pagx
 ```
 
-The setup script checks the native commands and dependencies, rebuilds the snapshot TypeScript,
-and checks the selected browser executable. `--check` performs the checks without rebuilding;
+The setup script checks native import capabilities and dependencies, rebuilds the snapshot
+TypeScript, checks the selected browser executable and exercises the import bridge with a batch
+dry-run. It does not launch the browser. `--check` performs the checks without rebuilding;
 `--browser-engine playwright` selects the optional driver. Missing prerequisites are reported with
 repair commands. See `node .codebuddy/skills/pagx/scripts/setup.js --help` for custom repo/build paths.
 On Windows the native executable is `pagx.exe`.
@@ -87,16 +89,19 @@ launcher. See [Live browser preview](#live-browser-preview) for the repository e
    pagx render page.pagx -o page.png
    ```
 
-   For a full output set or a custom viewport:
+   To retain a subset for debugging and render at a custom viewport:
 
    ```bash
-   pagx capture page.html -o out --viewport-width 1080 --viewport-height 1440
+   pagx import page.html --output-dir out --render --html-keep-subset \
+     --html-viewport-width 1080 --html-viewport-height 1440
    ```
 
-   Add `--capture-animations` when playable motion is requested. Use `--embed-fonts` and
-   `--pagx-images embed` on `capture` when the required resources must travel inside the file;
-   inspect the result rather than assuming every web font can be preserved. Single-file `import`
-   does not perform capture's font-download/embedding stage. See [Resources](references/pipeline.md#resources).
+   Add `--html-capture-animations` when playable motion is requested. Use `--html-embed-fonts`
+   and `--images embed` when the required resources must travel inside the file; inspect the
+   result rather than assuming every web font can be preserved. `-o` names one PAGX file;
+   `--output-dir` selects a directory and supports multiple scenario or batch results. Rendering
+   and subset retention are opt-in; `--preview` enables rendering plus static contact sheets.
+   See [Resources](references/pipeline.md#resources).
 4. Inspect the rendered output and conversion warnings. Correct the HTML and reconvert while HTML
    remains the source of truth. For precise PAGX-only edits, explicitly switch to the update
    workflow so later reconversion does not silently erase those edits.
