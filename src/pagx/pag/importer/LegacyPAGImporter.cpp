@@ -34,6 +34,7 @@
 #include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
@@ -82,6 +83,8 @@ void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frame
                                       PAGXDocument* document, AnimationObject* object);
 void MigrateLevelsIndividualEffectAnimation(pag::LevelsIndividualEffect* effect, float frameRate,
                                             PAGXDocument* document, AnimationObject* object);
+void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float frameRate,
+                                         PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -893,15 +896,43 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile and LevelsIndividual
-// effects map to their filter nodes (animated properties join the composition animation).
-// Other effect types report an issue until their phase-3 filters land.
+// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile, LevelsIndividual and
+// HueSaturation effects map to their filter nodes (animated properties join the composition
+// animation). Other effect types report an issue until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::LevelsIndividual) {
+    if (effect->type() == pag::EffectType::HueSaturation) {
+      auto* legacy = static_cast<pag::HueSaturationEffect*>(effect);
+      auto* hs = state->document->makeNode<HueSaturationFilter>("pag-legacy-huesat-" +
+                                                                std::to_string(legacy->uniqueID));
+      // The legacy stores per-channel-control slots but its renderer only consumes the
+      // selected slot, so the migration flattens to the selected values.
+      auto channelControl = static_cast<int>(legacy->channelControl);
+      if (channelControl >= 0 && channelControl < static_cast<int>(legacy->hue.size())) {
+        hs->hue = legacy->hue[channelControl];
+        hs->saturation = legacy->saturation[channelControl];
+        hs->lightness = legacy->lightness[channelControl];
+      }
+      hs->colorize = legacy->colorize;
+      hs->colorizeHue = PropertyValueAtStart(legacy->colorizeHue, legacyLayer->startTime, nullptr);
+      hs->colorizeSaturation =
+          PropertyValueAtStart(legacy->colorizeSaturation, legacyLayer->startTime, nullptr);
+      hs->colorizeLightness =
+          PropertyValueAtStart(legacy->colorizeLightness, legacyLayer->startTime, nullptr);
+      layer->filters.push_back(hs);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = hs->id;
+        MigrateHueSaturationEffectAnimation(legacy, state->currentFrameRate, state->document,
+                                            object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::LevelsIndividual) {
       auto* legacy = static_cast<pag::LevelsIndividualEffect*>(effect);
       auto* levels = state->document->makeNode<LevelsIndividualFilter>(
           "pag-legacy-levels-" + std::to_string(legacy->uniqueID));
@@ -1142,6 +1173,9 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
           layer->timeScale *= stretch;
         }
       }
+      // The legacy renderer applies layer effects to precompose layers the same way (e.g. a
+      // HueSaturation over a nested composition).
+      ConvertLayerEffects(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Solid: {
@@ -1220,6 +1254,9 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         layer->contents.push_back(textBox);
         state->convertedTexts.push_back({legacyText, text, state->currentComposition});
       }
+      // The legacy renderer applies layer effects to every layer type; text layers carry them
+      // the same way (the runtime applies node->filters uniformly in buildLayerInto).
+      ConvertLayerEffects(state, legacyLayer, layer);
       if (legacyLayer->masks.empty() == false) {
         state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
       }

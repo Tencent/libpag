@@ -41,6 +41,7 @@
 #include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
@@ -980,6 +981,18 @@ static std::vector<ChannelDef> BuildBulgeFilterFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildHueSaturationFilterFields() {
+  return {
+      FIELD_FLOAT(HueSaturationFilter, "hue", hue, Anim),
+      FIELD_FLOAT(HueSaturationFilter, "saturation", saturation, Anim),
+      FIELD_FLOAT(HueSaturationFilter, "lightness", lightness, Anim),
+      FIELD_BOOL(HueSaturationFilter, "colorize", colorize, NoFlags),
+      FIELD_FLOAT(HueSaturationFilter, "colorizeHue", colorizeHue, Anim),
+      FIELD_FLOAT(HueSaturationFilter, "colorizeSaturation", colorizeSaturation, Anim),
+      FIELD_FLOAT(HueSaturationFilter, "colorizeLightness", colorizeLightness, Anim),
+  };
+}
+
 static std::vector<ChannelDef> BuildGlowFilterFields() {
   return {
       FIELD_FLOAT(GlowFilter, "glowThreshold", glowThreshold, Anim),
@@ -1216,6 +1229,10 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::BulgeFilter: {
       static const std::vector<ChannelDef> table = BuildBulgeFilterFields();
+      return table;
+    }
+    case NodeType::HueSaturationFilter: {
+      static const std::vector<ChannelDef> table = BuildHueSaturationFilterFields();
       return table;
     }
     case NodeType::GlowFilter: {

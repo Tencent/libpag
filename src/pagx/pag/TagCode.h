@@ -118,6 +118,7 @@ enum class TagCode : uint16_t {
   DisplacementMapFilter = 584,
   RadialBlurFilter = 585,
   MosaicFilter = 586,
+  HueSaturationFilter = 589,
   // Composition audio track (spec 3.4): references an ImageTable audio entry.
   CompositionAudio = 588,
   // Phase three migration mask paths (spec 7.6).

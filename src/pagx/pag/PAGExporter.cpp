@@ -52,6 +52,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
@@ -2666,6 +2667,29 @@ void WriteRadialBlurFilterTag(pag::EncodeStream* stream, RadialBlurFilter* filte
 }
 
 // MosaicFilter tag (spec 7.5 #586).
+// HueSaturationFilter tag (spec 7.5 #589): attribute flags over the seven values.
+void WriteHueSaturationFilterTag(pag::EncodeStream* stream, HueSaturationFilter* filter,
+                                 EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->hue != 0.0f);
+  writer.writeFlag(filter->saturation != 0.0f);
+  writer.writeFlag(filter->lightness != 0.0f);
+  writer.writeFlag(filter->colorize);
+  writer.writeFlag(filter->colorizeHue != 0.0f);
+  writer.writeFlag(filter->colorizeSaturation != 0.0f);
+  writer.writeFlag(filter->colorizeLightness != 0.0f);
+  auto* v = writer.valueStream();
+  if (filter->hue != 0.0f) v->writeFloat(filter->hue);
+  if (filter->saturation != 0.0f) v->writeFloat(filter->saturation);
+  if (filter->lightness != 0.0f) v->writeFloat(filter->lightness);
+  if (filter->colorizeHue != 0.0f) v->writeFloat(filter->colorizeHue);
+  if (filter->colorizeSaturation != 0.0f) v->writeFloat(filter->colorizeSaturation);
+  if (filter->colorizeLightness != 0.0f) v->writeFloat(filter->colorizeLightness);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::HueSaturationFilter, static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
 void WriteMosaicFilterTag(pag::EncodeStream* stream, MosaicFilter* filter, EncodeState* state) {
   PAGAttributeBlockWriter writer(&state->streamContext);
   writer.writeFlag(filter->horizontalBlocks != 1.0f);
@@ -2767,6 +2791,9 @@ void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeS
       break;
     case NodeType::MosaicFilter:
       WriteMosaicFilterTag(stream, static_cast<MosaicFilter*>(filter), state);
+      break;
+    case NodeType::HueSaturationFilter:
+      WriteHueSaturationFilterTag(stream, static_cast<HueSaturationFilter*>(filter), state);
       break;
     default:
       break;

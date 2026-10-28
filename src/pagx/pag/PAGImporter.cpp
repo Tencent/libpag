@@ -50,6 +50,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
@@ -1643,6 +1644,25 @@ LayerFilter* ReadLayerFilterTag(
       if (hasAntialias) {
         filter->antialias = static_cast<RadialBlurAntialias>(tagStream->readUint8());
       }
+      return filter;
+    }
+    case TagCode::HueSaturationFilter: {
+      auto* filter = context->document->makeNode<HueSaturationFilter>();
+      PAGAttributeBlockReader reader(tagStream, 7);
+      bool hasHue = reader.flag(0);
+      bool hasSaturation = reader.flag(1);
+      bool hasLightness = reader.flag(2);
+      filter->colorize = reader.flag(3);
+      bool hasColorizeHue = reader.flag(4);
+      bool hasColorizeSaturation = reader.flag(5);
+      bool hasColorizeLightness = reader.flag(6);
+      tagStream->alignWithBytes();
+      if (hasHue) filter->hue = tagStream->readFloat();
+      if (hasSaturation) filter->saturation = tagStream->readFloat();
+      if (hasLightness) filter->lightness = tagStream->readFloat();
+      if (hasColorizeHue) filter->colorizeHue = tagStream->readFloat();
+      if (hasColorizeSaturation) filter->colorizeSaturation = tagStream->readFloat();
+      if (hasColorizeLightness) filter->colorizeLightness = tagStream->readFloat();
       return filter;
     }
     case TagCode::MosaicFilter: {

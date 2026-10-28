@@ -53,6 +53,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
@@ -226,6 +227,7 @@ static GlowFilter* ParseGlowFilter(const DOMNode* node, PAGXDocument* doc);
 static DisplacementMapFilter* ParseDisplacementMapFilter(const DOMNode* node, PAGXDocument* doc);
 static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument* doc);
 static MosaicFilter* ParseMosaicFilter(const DOMNode* node, PAGXDocument* doc);
+static HueSaturationFilter* ParseHueSaturationFilter(const DOMNode* node, PAGXDocument* doc);
 
 // A `mask="@id"` reference whose target Layer was not yet registered when the owning Layer was
 // parsed. A mask layer is commonly authored as a (later-parsed) descendant of the masked layer —
@@ -967,6 +969,9 @@ static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "RadialBlurFilter") {
     return ParseRadialBlurFilter(node, doc);
+  }
+  if (node->name == "HueSaturationFilter") {
+    return ParseHueSaturationFilter(node, doc);
   }
   if (node->name == "MosaicFilter") {
     return ParseMosaicFilter(node, doc);
@@ -2863,6 +2868,26 @@ static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument
   filter->center = GetPointAttribute(node, "center", Default<RadialBlurFilter>().center, doc);
   filter->mode = GET_ENUM(node, "mode", "spin", doc, RadialBlurMode);
   filter->antialias = GET_ENUM(node, "antialias", "low", doc, RadialBlurAntialias);
+  return filter;
+}
+
+static HueSaturationFilter* ParseHueSaturationFilter(const DOMNode* node, PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<HueSaturationFilter>(node, doc);
+  if (filter != nullptr) {
+    filter->hue = GetFloatAttribute(node, "hue", Default<HueSaturationFilter>().hue, doc);
+    filter->saturation =
+        GetFloatAttribute(node, "saturation", Default<HueSaturationFilter>().saturation, doc);
+    filter->lightness =
+        GetFloatAttribute(node, "lightness", Default<HueSaturationFilter>().lightness, doc);
+    filter->colorize =
+        GetBoolAttribute(node, "colorize", Default<HueSaturationFilter>().colorize, doc);
+    filter->colorizeHue =
+        GetFloatAttribute(node, "colorizeHue", Default<HueSaturationFilter>().colorizeHue, doc);
+    filter->colorizeSaturation = GetFloatAttribute(
+        node, "colorizeSaturation", Default<HueSaturationFilter>().colorizeSaturation, doc);
+    filter->colorizeLightness = GetFloatAttribute(
+        node, "colorizeLightness", Default<HueSaturationFilter>().colorizeLightness, doc);
+  }
   return filter;
 }
 

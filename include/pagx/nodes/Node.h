@@ -222,6 +222,10 @@ enum class NodeType {
    */
   MosaicFilter,
   /**
+   * A hue/saturation filter (spec 7.5).
+   */
+  HueSaturationFilter,
+  /**
    * A mask path entry in a layer's mask list (spec 7.6).
    */
   MaskPath,

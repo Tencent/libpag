@@ -42,6 +42,7 @@
 #include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
@@ -88,6 +89,7 @@
 #include "renderer/CornerPinLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/HueSaturationLayerFilter.h"
 #include "renderer/LevelsIndividualLayerFilter.h"
 #include "renderer/MosaicLayerFilter.h"
 #include "renderer/MotionTileLayerFilter.h"
@@ -3594,6 +3596,69 @@ class LayerBuilderContext {
     WriteCornerPinFilterCorner(object, value, mix, 3, false);
   }
 
+  static void WriteHueSaturationFilterValue(void* object, const KeyValue& value, float mix,
+                                            int field) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<HueSaturationLayerFilter*>(object);
+    switch (field) {
+      case 0:
+        filter->setHue(MixFloat(filter->hue(), *v, mix));
+        break;
+      case 1:
+        filter->setSaturation(MixFloat(filter->saturation(), *v, mix));
+        break;
+      case 2:
+        filter->setLightness(MixFloat(filter->lightness(), *v, mix));
+        break;
+      case 4:
+        filter->setColorizeHue(MixFloat(filter->colorizeHue(), *v, mix));
+        break;
+      case 5:
+        filter->setColorizeSaturation(MixFloat(filter->colorizeSaturation(), *v, mix));
+        break;
+      case 6:
+        filter->setColorizeLightness(MixFloat(filter->colorizeLightness(), *v, mix));
+        break;
+    }
+  }
+
+  static void WriteHueSaturationFilterHue(void* object, const KeyValue& value, float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 0);
+  }
+
+  static void WriteHueSaturationFilterSaturation(void* object, const KeyValue& value, float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 1);
+  }
+
+  static void WriteHueSaturationFilterLightness(void* object, const KeyValue& value, float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 2);
+  }
+
+  static void WriteHueSaturationFilterColorize(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<HueSaturationLayerFilter*>(object)->setColorize(*v);
+  }
+
+  static void WriteHueSaturationFilterColorizeHue(void* object, const KeyValue& value, float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 4);
+  }
+
+  static void WriteHueSaturationFilterColorizeSaturation(void* object, const KeyValue& value,
+                                                         float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 5);
+  }
+
+  static void WriteHueSaturationFilterColorizeLightness(void* object, const KeyValue& value,
+                                                        float mix) {
+    WriteHueSaturationFilterValue(object, value, mix, 6);
+  }
+
   static void WriteGlowFilterThreshold(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3619,6 +3684,30 @@ class LayerBuilderContext {
     }
     auto* filter = static_cast<GlowLayerFilter*>(object);
     filter->setGlowIntensity(MixFloat(filter->glowIntensity(), *v, mix));
+  }
+
+  void bindHueSaturationFilterChannels(const HueSaturationFilter* node) {
+    _result.binding.setAccessor(
+        node, "hue", WriteHueSaturationFilterHue,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::hue>);
+    _result.binding.setAccessor(
+        node, "saturation", WriteHueSaturationFilterSaturation,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::saturation>);
+    _result.binding.setAccessor(
+        node, "lightness", WriteHueSaturationFilterLightness,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::lightness>);
+    _result.binding.setAccessor(
+        node, "colorize", WriteHueSaturationFilterColorize,
+        ReadBoolean<HueSaturationLayerFilter, &HueSaturationLayerFilter::colorize>);
+    _result.binding.setAccessor(
+        node, "colorizeHue", WriteHueSaturationFilterColorizeHue,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::colorizeHue>);
+    _result.binding.setAccessor(
+        node, "colorizeSaturation", WriteHueSaturationFilterColorizeSaturation,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::colorizeSaturation>);
+    _result.binding.setAccessor(
+        node, "colorizeLightness", WriteHueSaturationFilterColorizeLightness,
+        ReadScalar<HueSaturationLayerFilter, &HueSaturationLayerFilter::colorizeLightness>);
   }
 
   void bindGlowFilterChannels(const GlowFilter* node) {
@@ -4156,6 +4245,15 @@ class LayerBuilderContext {
             tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
         _result.binding.set(filter, tgfxFilter);
         bindBlurFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::HueSaturationFilter: {
+        auto filter = static_cast<const HueSaturationFilter*>(node);
+        auto tgfxFilter = HueSaturationLayerFilter::Make(
+            filter->hue, filter->saturation, filter->lightness, filter->colorize,
+            filter->colorizeHue, filter->colorizeSaturation, filter->colorizeLightness);
+        _result.binding.set(filter, tgfxFilter);
+        bindHueSaturationFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::GlowFilter: {

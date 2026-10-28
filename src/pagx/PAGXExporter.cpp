@@ -47,6 +47,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/HueSaturationFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
@@ -1692,6 +1693,24 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       if (filter->antialias != Default<RadialBlurFilter>().antialias) {
         xml.addAttribute("antialias", RadialBlurAntialiasToString(filter->antialias));
       }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::HueSaturationFilter: {
+      auto filter = static_cast<const HueSaturationFilter*>(node);
+      xml.openElement("HueSaturationFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("hue", filter->hue, Default<HueSaturationFilter>().hue);
+      xml.addAttribute("saturation", filter->saturation, Default<HueSaturationFilter>().saturation);
+      xml.addAttribute("lightness", filter->lightness, Default<HueSaturationFilter>().lightness);
+      xml.addAttribute("colorize", filter->colorize, Default<HueSaturationFilter>().colorize);
+      xml.addAttribute("colorizeHue", filter->colorizeHue,
+                       Default<HueSaturationFilter>().colorizeHue);
+      xml.addAttribute("colorizeSaturation", filter->colorizeSaturation,
+                       Default<HueSaturationFilter>().colorizeSaturation);
+      xml.addAttribute("colorizeLightness", filter->colorizeLightness,
+                       Default<HueSaturationFilter>().colorizeLightness);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
