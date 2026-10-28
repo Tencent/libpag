@@ -30,6 +30,7 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -80,6 +81,7 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/CornerPinLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/MosaicLayerFilter.h"
@@ -3212,6 +3214,65 @@ class LayerBuilderContext {
                                 ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessY>);
   }
 
+  static void WriteCornerPinFilterCorner(void* object, const KeyValue& value, float mix, int index,
+                                         bool isX) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<CornerPinLayerFilter*>(object);
+    auto x = filter->upperLeftX();
+    auto y = filter->upperLeftY();
+    if (index == 1) {
+      x = filter->upperRightX();
+      y = filter->upperRightY();
+    } else if (index == 2) {
+      x = filter->lowerLeftX();
+      y = filter->lowerLeftY();
+    } else if (index == 3) {
+      x = filter->lowerRightX();
+      y = filter->lowerRightY();
+    }
+    if (isX) {
+      x = MixFloat(x, *v, mix);
+    } else {
+      y = MixFloat(y, *v, mix);
+    }
+    filter->setCorner(index, x, y);
+  }
+
+  static void WriteCornerPinFilterUpperLeftX(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 0, true);
+  }
+
+  static void WriteCornerPinFilterUpperLeftY(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 0, false);
+  }
+
+  static void WriteCornerPinFilterUpperRightX(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 1, true);
+  }
+
+  static void WriteCornerPinFilterUpperRightY(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 1, false);
+  }
+
+  static void WriteCornerPinFilterLowerLeftX(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 2, true);
+  }
+
+  static void WriteCornerPinFilterLowerLeftY(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 2, false);
+  }
+
+  static void WriteCornerPinFilterLowerRightX(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 3, true);
+  }
+
+  static void WriteCornerPinFilterLowerRightY(void* object, const KeyValue& value, float mix) {
+    WriteCornerPinFilterCorner(object, value, mix, 3, false);
+  }
+
   static void WriteGlowFilterThreshold(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3318,6 +3379,33 @@ class LayerBuilderContext {
                                 ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerX>);
     _result.binding.setAccessor(node, "center.y", WriteRadialBlurFilterCenterY,
                                 ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerY>);
+  }
+
+  void bindCornerPinFilterChannels(const CornerPinFilter* node) {
+    _result.binding.setAccessor(
+        node, "upperLeft.x", WriteCornerPinFilterUpperLeftX,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::upperLeftX>);
+    _result.binding.setAccessor(
+        node, "upperLeft.y", WriteCornerPinFilterUpperLeftY,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::upperLeftY>);
+    _result.binding.setAccessor(
+        node, "upperRight.x", WriteCornerPinFilterUpperRightX,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::upperRightX>);
+    _result.binding.setAccessor(
+        node, "upperRight.y", WriteCornerPinFilterUpperRightY,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::upperRightY>);
+    _result.binding.setAccessor(
+        node, "lowerLeft.x", WriteCornerPinFilterLowerLeftX,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::lowerLeftX>);
+    _result.binding.setAccessor(
+        node, "lowerLeft.y", WriteCornerPinFilterLowerLeftY,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::lowerLeftY>);
+    _result.binding.setAccessor(
+        node, "lowerRight.x", WriteCornerPinFilterLowerRightX,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::lowerRightX>);
+    _result.binding.setAccessor(
+        node, "lowerRight.y", WriteCornerPinFilterLowerRightY,
+        ReadScalar<CornerPinLayerFilter, &CornerPinLayerFilter::lowerRightY>);
   }
 
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
@@ -3663,6 +3751,14 @@ class LayerBuilderContext {
         auto tgfxFilter = RadialBlurLayerFilter::Make(filter->amount, filter->center);
         _result.binding.set(filter, tgfxFilter);
         bindRadialBlurFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::CornerPinFilter: {
+        auto filter = static_cast<const CornerPinFilter*>(node);
+        auto tgfxFilter = CornerPinLayerFilter::Make(filter->upperLeft, filter->upperRight,
+                                                     filter->lowerLeft, filter->lowerRight);
+        _result.binding.set(filter, tgfxFilter);
+        bindCornerPinFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {

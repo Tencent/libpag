@@ -26,6 +26,7 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -70,6 +71,8 @@ void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
                                   PAGXDocument* document, AnimationObject* object);
 void MigrateRadialBlurEffectAnimation(pag::RadialBlurEffect* effect, float frameRate,
                                       PAGXDocument* document, AnimationObject* object);
+void MigrateCornerPinEffectAnimation(pag::CornerPinEffect* effect, float frameRate,
+                                     PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -881,15 +884,36 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), and the Glow, Mosaic and RadialBlur effects map to their filter nodes (animated
-// properties join the composition animation). Other effect types report an issue until
-// their phase-3 filters land.
+// mode), and the Glow, Mosaic, RadialBlur and CornerPin effects map to their filter nodes
+// (animated properties join the composition animation). Other effect types report an issue
+// until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::RadialBlur) {
+    if (effect->type() == pag::EffectType::CornerPin) {
+      auto* legacy = static_cast<pag::CornerPinEffect*>(effect);
+      auto* cornerPin = state->document->makeNode<CornerPinFilter>(
+          "pag-legacy-cornerpin-" + std::to_string(legacy->uniqueID));
+      auto upperLeft = PropertyValueAtStart(legacy->upperLeft, legacyLayer->startTime, nullptr);
+      auto upperRight = PropertyValueAtStart(legacy->upperRight, legacyLayer->startTime, nullptr);
+      auto lowerLeft = PropertyValueAtStart(legacy->lowerLeft, legacyLayer->startTime, nullptr);
+      auto lowerRight = PropertyValueAtStart(legacy->lowerRight, legacyLayer->startTime, nullptr);
+      cornerPin->upperLeft = {upperLeft.x, upperLeft.y};
+      cornerPin->upperRight = {upperRight.x, upperRight.y};
+      cornerPin->lowerLeft = {lowerLeft.x, lowerLeft.y};
+      cornerPin->lowerRight = {lowerRight.x, lowerRight.y};
+      layer->filters.push_back(cornerPin);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = cornerPin->id;
+        MigrateCornerPinEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::RadialBlur) {
       auto* legacy = static_cast<pag::RadialBlurEffect*>(effect);
       auto* radial = state->document->makeNode<RadialBlurFilter>("pag-legacy-radial-" +
                                                                  std::to_string(legacy->uniqueID));

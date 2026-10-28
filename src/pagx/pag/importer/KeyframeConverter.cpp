@@ -383,6 +383,27 @@ void MigrateRadialBlurEffectAnimation(pag::RadialBlurEffect* effect, float frame
   }
 }
 
+// CornerPin effect channels (spec 7.5): the four corners are SPATIAL point properties, so
+// they route through ConvertPointChannel's per-frame sampling (spatial bezier handles have no
+// PAGX equivalent). Legacy effect keyframes are composition-absolute, so raw keyframe times
+// carry over without a layer offset.
+void MigrateCornerPinEffectAnimation(pag::CornerPinEffect* effect, float frameRate,
+                                     PAGXDocument* document, AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<pag::Point>* cornerProperties[4] = {effect->upperLeft, effect->upperRight,
+                                                    effect->lowerLeft, effect->lowerRight};
+  const char* cornerNames[4] = {"upperLeft", "upperRight", "lowerLeft", "lowerRight"};
+  for (int i = 0; i < 4; i++) {
+    auto* legacy = cornerProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    ConvertPointChannel(legacy, cornerNames[i], true, frameRate, document, object);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
