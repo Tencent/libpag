@@ -56,6 +56,7 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 | `PAGVideoSequenceTest.cpp`, `VideoSequenceFallbackTest.cpp` | require the ffavc software decoder, which has no wasm build |
 | `PAGXSVGTest.cpp` | the `resources/apitest/SVG` corpus is 492MB; not preloaded |
 | `PAGXCliTest.cpp` | CLI sources are not compiled into the web test |
+| `PAGXHTMLImporterTest.cpp` | uses `dynamic_cast`; RTTI cannot be enabled because tgfx's embind typeinfo is no-rtti. Covered natively |
 | `*.mm` (Metal/Cocoa) | platform tests never compile under Emscripten |
 
 Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
@@ -63,9 +64,10 @@ Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
 
 ## Known limitations
 
-- The web test build enables RTTI (`PAG_WEB_ENABLE_RTTI`) for the whole library: the legacy
-  `PAGXHTMLImporterTest` suite uses `dynamic_cast`, which requires typeinfo on objects created
-  by library code. This only affects the test binary; the product web build stays no-RTTI.
+- RTTI stays off for the whole web build: tgfx's emscripten bindings rely on synthetic no-rtti
+  typeinfo, so enabling RTTI anywhere in the same embind registry breaks all JS-to-C++ calls
+  (BindingError: unknown type). This is why the dynamic_cast-based `PAGXHTMLImporterTest`
+  cannot run on the web.
 - Video-sequence decoding is unavailable (no wasm ffavc), so PAG files containing
   video sequences render those layers empty.
 - `resources/apitest/SVG` is never preloaded; the SVG import code is still compiled in.
