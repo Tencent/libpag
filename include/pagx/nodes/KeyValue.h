@@ -24,6 +24,7 @@
 #include <variant>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 
 namespace pagx {
 
@@ -35,7 +36,7 @@ class PAGImage;
  * ChannelValueType value.
  */
 using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix,
-                               std::shared_ptr<PAGImage>>;
+                              std::shared_ptr<PAGImage>, Matrix3D>;
 
 /**
  * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
@@ -50,6 +51,7 @@ enum class ChannelValueType : uint8_t {
   Color = 5,
   Matrix = 6,
   PAGImage = 7,
+  Matrix3D = 8,
 };
 
 }  // namespace pagx

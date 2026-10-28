@@ -626,12 +626,7 @@ void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, flo
   if (guard.overflowed()) {
     return;
   }
-  Matrix lm = layer->matrix;
-  auto position = layer->renderPosition();
-  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
-    lm = Matrix::Translate(position.x, position.y) * lm;
-  }
-  Matrix combined = parent * lm;
+  Matrix combined = parent * BuildLayerMatrix(layer);
   for (auto* e : layer->contents) {
     ExpandElementBounds(e, combined, minX, minY, maxX, maxY, 0);
   }
@@ -834,12 +829,7 @@ void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const M
   if (guard.overflowed()) {
     return;
   }
-  Matrix lm = layer->matrix;
-  auto position = layer->renderPosition();
-  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
-    lm = Matrix::Translate(position.x, position.y) * lm;
-  }
-  Matrix combined = parent * lm;
+  Matrix combined = parent * BuildLayerMatrix(layer);
   float layerAlpha = inheritedAlpha * layer->alpha;
   writeMaskElements(out, layer->contents, combined, type, layerAlpha, layerAlpha, "", gradientIndex,
                     0);
@@ -878,11 +868,7 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
   if (guard.overflowed()) {
     return;
   }
-  Matrix lm = layer->matrix;
-  if (layer->x != 0 || layer->y != 0) {
-    lm = Matrix::Translate(layer->x, layer->y) * lm;
-  }
-  Matrix combined = parent * lm;
+  Matrix combined = parent * BuildLayerMatrix(layer);
   std::string tr = combined.isIdentity() ? "" : MatrixToCSS(combined);
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Path) {

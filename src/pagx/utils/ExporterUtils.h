@@ -27,6 +27,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
 
@@ -74,6 +75,7 @@ std::string EscapeCssFontFamily(const std::string& family);
  */
 std::string EscapeCssFontFamily(const std::string& family);
 
+// Returns the Layer's transform projected to 2D, including the layout position.
 Matrix BuildLayerMatrix(const Layer* layer);
 
 Matrix BuildGroupMatrix(const Group* group);
