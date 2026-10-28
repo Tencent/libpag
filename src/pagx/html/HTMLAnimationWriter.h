@@ -36,9 +36,9 @@ class Path;
  * RAII session that manages PAGX-to-HTML keyframe animation export (`<Animation>` -> CSS
  * `@keyframes` + inline `animation` declarations).
  *
- * When `enabled` is false or the document contains no playable `<Animation>` nodes, the session is
- * a pure no-op (`isActive() == false`) and leaves `HTMLWriterContext` and `PAGXDocument`
- * completely untouched.
+ * When `enabled` is false or neither the document nor a reachable Composition contains playable
+ * `<Animation>` nodes, the session is a pure no-op (`isActive() == false`) and leaves
+ * `HTMLWriterContext` and `PAGXDocument` completely untouched.
  */
 class HTMLAnimationSession {
  public:
