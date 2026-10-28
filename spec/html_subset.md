@@ -202,10 +202,6 @@ Disallowed (warning + skip): `flex-wrap`, `flex-grow`, `flex-basis`
 
 ### 4.2 Sizing
 
-The body Layer uses `layoutRounding="none"`, inherited by its descendants. Constraint and Flex
-layout preserve fractional CSS pixel positions and sizes, including percentage-based backgrounds
-and borders when a container is resized. PAGX serialization preserves the resulting float values.
-
 | CSS | PAGX |
 |-----|------|
 | `width: N px` / `height: N px` | `width="N"` / `height="N"` |
@@ -322,13 +318,6 @@ leaf whose box paints a background/border/shadow, a leaf anchored against its fa
 (`right` / `bottom`), or a flex-grow child.
 
 ### 4.6 Custom Data
-
-`data-pagx-inline-positions` on a single-style text leaf supplies comma-separated physical
-inline positions in pixels, one per Unicode scalar of the emitted text. It becomes
-`Text.inlinePositions`, preserving browser justification/word spacing after shaping whole
-clusters. It is intended for a single pre-laid-out line/column; it suppresses rewrapping and
-additional justification. Invalid counts, non-finite values, newlines/tabs, and mixed-style
-hosts produce a diagnostic and use normal layout.
 
 Attributes prefixed `data-*` are preserved on the produced PAGX node as `data-*` custom
 attributes (matches PAGX `data-*` convention in `spec/pagx_spec.md` §2.3). The HTML
