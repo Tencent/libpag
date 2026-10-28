@@ -2,7 +2,7 @@
 <!-- Tests: TrimPath end shrinks from the whole outline to nothing, revealing the stroke
      progressively along the path.
      Target: TrimPath  Channel: end  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
