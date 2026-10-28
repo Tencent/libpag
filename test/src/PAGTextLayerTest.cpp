@@ -126,6 +126,8 @@ PAG_TEST(PAGTextLayerTest, multiThreadModify) {
   ASSERT_NE(layer, nullptr) << "not get a textLayer" << std::endl;
   auto textLayer = std::static_pointer_cast<pag::PAGTextLayer>(layer);
 
+#if !defined(__EMSCRIPTEN__)
+  // Concurrency is unavailable in the single-threaded web build; skip the racing section.
   // 多线程替换文本
   std::thread thread1([textLayer, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
@@ -146,6 +148,7 @@ PAG_TEST(PAGTextLayerTest, multiThreadModify) {
 
   thread1.join();
   thread2.join();
+#endif
   textLayer->setText("替换文本666666");
   TestPAGPlayer->flush();
 }

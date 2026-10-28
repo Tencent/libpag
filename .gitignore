@@ -125,3 +125,12 @@ cli/npm/preview
 
 # Local-only helper scripts (not part of the project)
 pagx/wechat/script/copy-to-cocraft.js
+
+# libpag web test (Emscripten harness) build artifacts
+web/test/node_modules/
+web/test/build-webgl/
+web/test/build-webgpu/
+web/test/.downloads/
+web/test/pag-test.js
+web/test/pag-test.wasm
+web/test/pag-test.data

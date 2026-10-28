@@ -153,6 +153,15 @@ static void CompareFileFrames(const std::string& pagPath) {
  */
 PAG_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
+#if defined(__EMSCRIPTEN__)
+  // The single-threaded web build has no pthreads: run the corpus serially like the Metal path
+  // below, so pixel comparisons stay independent of interleaving.
+  for (const auto& file : files) {
+    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
+    CompareFileFrames(file);
+  }
+  return;
+#endif
   if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
     // Metal deduplicates devices by native GPU, so worker threads share one glyph atlas. Keep
     // pixel comparisons independent of interleaving; concurrency is covered by separate tests.

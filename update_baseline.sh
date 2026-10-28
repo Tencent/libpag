@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Refresh the selected backend's local baseline cache from origin/main.
-# Usage: ./update_baseline.sh [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL] [--skip-images]
+# Usage: ./update_baseline.sh [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_WEBGL|USE_WEBGPU] [--skip-images]
 # Screenshot outputs and version metadata remain shared, so run backends sequentially.
 
 set -euo pipefail
@@ -12,7 +12,7 @@ SKIP_IMAGES=0
 for arg in "$@"; do
   case "$arg" in
     --skip-images) SKIP_IMAGES=1 ;;
-    USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL)
+    USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_WEBGL|USE_WEBGPU)
       if [ -n "$BACKEND_ARG" ]; then
         echo "Error: specify only one backend." >&2
         exit 1
@@ -20,12 +20,22 @@ for arg in "$@"; do
       BACKEND_ARG="$arg"
       ;;
     -h|--help)
-      echo "Usage: $0 [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL] [--skip-images]"
+      echo "Usage: $0 [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_WEBGL|USE_WEBGPU] [--skip-images]"
       exit 0
       ;;
     *) echo "Error: unknown argument '$arg'." >&2; exit 1 ;;
   esac
 done
+
+case "$BACKEND_ARG" in
+  USE_WEBGL|USE_WEBGPU)
+    # Web lanes run through the Emscripten harness in web/test.
+    export PAG_WEB_BASELINE_INVOKED=1
+    SKIP_FLAG=""
+    if [ "$SKIP_IMAGES" -eq 1 ]; then SKIP_FLAG="--skip-images"; fi
+    exec "$WORKSPACE/web/test/update_web_baseline.sh" "${BACKEND_ARG#USE_}" "$SKIP_FLAG"
+    ;;
+esac
 
 CMAKE_BACKEND_ARGS=(-DPAG_USE_METAL=OFF -DPAG_USE_OPENGL=ON -DPAG_USE_SWIFTSHADER=OFF)
 case "$BACKEND_ARG" in

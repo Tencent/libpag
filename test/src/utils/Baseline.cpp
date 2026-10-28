@@ -17,7 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Baseline.h"
+#if defined(__EMSCRIPTEN__)
+// CommonCrypto is Apple-only; under Emscripten reuse tgfx's portable MD5, which the web build
+// enables through TGFX_USE_FALLBACK_MD5.
+#include "core/utils/MD5.h"
+#else
 #include <CommonCrypto/CommonCrypto.h>
+#endif
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -116,11 +122,19 @@ bool Baseline::compare(const Bitmap& bitmap, const std::string& key) {
 }
 
 std::string DumpMD5(const void* bytes, size_t size) {
+#if defined(__EMSCRIPTEN__)
+  auto digestArray = tgfx::MD5::Calculate(bytes, size);
+  unsigned char digest[16];
+  for (size_t i = 0; i < 16; ++i) {
+    digest[i] = digestArray[i];
+  }
+#else
   unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   CC_MD5(bytes, static_cast<int>(size), digest);
 #pragma clang diagnostic pop
+#endif
   char buffer[33];
   char* position = buffer;
   for (unsigned char i : digest) {

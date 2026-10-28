@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>libpag Web Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+            integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+            crossorigin="anonymous"></script>
+</head>
+<body>
+    <canvas id="pag-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
+    <script type="module">
+        import PAGTest from './pag-test.js';
+
+        function collectFiles(fs, dir) {
+            const files = [];
+            for (const name of fs.readdir(dir)) {
+                if (name === '.' || name === '..') continue;
+                const fullPath = dir + '/' + name;
+                const stat = fs.stat(fullPath);
+                if (fs.isDir(stat.mode)) {
+                    files.push(...collectFiles(fs, fullPath));
+                } else {
+                    files.push(fullPath);
+                }
+            }
+            return files;
+        }
+
+        async function downloadOutputDir(fs, dir, zipName) {
+            try {
+                fs.stat(dir);
+            } catch (e) {
+                console.warn(`No ${dir} directory found, skipping download.`);
+                return;
+            }
+            const files = collectFiles(fs, dir);
+            if (files.length === 0) {
+                console.warn(`No output files found in ${dir}.`);
+                return;
+            }
+            console.log(`Packing ${files.length} files from ${dir} into ${zipName}...`);
+            const zip = new JSZip();
+            const prefix = dir.endsWith('/') ? dir : dir + '/';
+            for (const filePath of files) {
+                const data = fs.readFile(filePath);
+                const relativePath = filePath.replace(prefix, '');
+                zip.file(relativePath, data);
+            }
+            const blob = await zip.generateAsync({type: 'blob'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = zipName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log(`Download started: ${zipName}`);
+        }
+
+        const moduleOptions = {
+            // The WebGL backend resolves its default GL context through this canvas.
+            canvas: document.getElementById('pag-test-canvas'),
+        };
+        // Initialize a WebGPU device if available. The WebGPU backend reads it through
+        // Module.preinitializedWebGPUDevice (see pag::Devices::MakeDefault); the WebGL
+        // backend simply ignores it.
+        if (navigator.gpu) {
+            try {
+                const adapter = await navigator.gpu.requestAdapter();
+                if (adapter) {
+                    const device = await adapter.requestDevice();
+                    if (device) {
+                        moduleOptions.preinitializedWebGPUDevice = device;
+                    }
+                }
+            } catch (e) {
+                console.warn('WebGPU initialization failed:', e);
+            }
+        }
+
+        try {
+            const module = await PAGTest(moduleOptions);
+            // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
+            // both the Asyncify and non-Asyncify cases.
+            const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
+            console.log('All tests finished with exit code:', result);
+            await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
+            await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
+            // Pack md5.json and version.json from baseline-out as cache-web.zip for reuse.
+            // run_test.js extracts this zip into test/baseline/.cache/{backend}/.
+            try {
+                const cacheZip = new JSZip();
+                const baselineOut = '/test/baseline-out';
+                for (const name of ['md5.json', 'version.json']) {
+                    try {
+                        const data = module.FS.readFile(baselineOut + '/' + name);
+                        cacheZip.file(name, data);
+                    } catch (e) { /* file may not exist */ }
+                }
+                if (Object.keys(cacheZip.files).length > 0) {
+                    const blob = await cacheZip.generateAsync({type: 'blob'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'cache-web.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Download started: cache-web.zip');
+                }
+            } catch (e) {
+                console.warn('Failed to create cache-web.zip:', e);
+            }
+        } catch (e) {
+            console.error('Test execution failed:', e);
+            console.log('All tests finished with exit code: 1');
+        }
+    </script>
+</body>
+</html>

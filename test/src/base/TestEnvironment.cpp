@@ -17,16 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestEnvironment.h"
+#if !defined(__EMSCRIPTEN__)
 #include "ffavc.h"
+#endif
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
+#if !defined(__EMSCRIPTEN__)
 static void RegisterSoftwareDecoder() {
   auto factory = ffavc::DecoderFactory::GetHandle();
   PAGVideoDecoder::RegisterSoftwareDecoderFactory(
       reinterpret_cast<pag::SoftwareDecoderFactory*>(factory));
 }
+#endif
 
 void TestEnvironment::SetUp() {
   std::vector<std::string> fontPaths = {
@@ -34,7 +38,10 @@ void TestEnvironment::SetUp() {
       ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf")};
   std::vector<int> ttcIndices = {0, 0};
   PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+#if !defined(__EMSCRIPTEN__)
+  // The web build has no wasm ffavc; video-sequence decoding stays unavailable there.
   RegisterSoftwareDecoder();
+#endif
   Baseline::SetUp();
 }
 

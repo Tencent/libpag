@@ -69,6 +69,8 @@ PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
 
   TestPAGFile->setCurrentTime(3000000);
   TestPAGPlayer->flush();
+#if !defined(__EMSCRIPTEN__)
+  // Concurrency is unavailable in the single-threaded web build; skip the racing section.
   // 多线程同时替换图片
   std::thread thread1([imageLayer, image, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
@@ -93,6 +95,7 @@ PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
   thread1.join();
   thread2.join();
   thread3.join();
+#endif
 
   imageLayer->replaceImage(image);
   TestPAGPlayer->flush();

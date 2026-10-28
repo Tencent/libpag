@@ -21,9 +21,17 @@
 
 namespace pag {
 static std::string GetRootPath() {
+#if defined(__EMSCRIPTEN__)
+  // Under Emscripten, __FILE__ holds the build machine's path, which never exists in the
+  // browser's virtual filesystem. The web test build preloads resources at absolute paths
+  // mirroring the repository layout (/resources, /test, ...), so the virtual filesystem root
+  // is the repository root.
+  return "/";
+#else
   std::filesystem::path filePath = __FILE__;
   auto dir = filePath.parent_path().string();
   return std::filesystem::path(dir + "/../../..").lexically_normal();
+#endif
 }
 
 std::string ProjectPath::Absolute(const std::string& relativePath) {
