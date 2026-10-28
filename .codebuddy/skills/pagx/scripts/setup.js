@@ -1,120 +1,169 @@
 #!/usr/bin/env node
 'use strict';
-// One-time environment setup / health check for the pagx skill's HTML->PAGX workflow.
-//
-// Single cross-platform script (macOS / Linux / Windows). `node` is already a hard
-// prerequisite of the whole pipeline, so the setup itself runs on node too. Verifies
-// the tools the conversion needs and prepares the snapshot tool:
-//   1. node      - the runtime this script already runs on (version reported)
-//   2. pagx      - the CLI that imports/renders PAGX (installed via npm if missing)
-//   3. tools/html-snapshot - npm deps installed + TypeScript built (dist/)
-//   4. headless Chromium - bundled with puppeteer; reported (not auto-installed) if missing
-//
-// Idempotent: re-running only does work that is still needed. Prints "setup: ready"
-// on success. Run from anywhere inside the repository:
-//   node .codebuddy/skills/pagx/scripts/setup.js
+// Repository HTML workflow setup. Use the complete npm package outside a checkout.
+// --check is read-only; normal setup rebuilds the snapshot TypeScript before checking it.
 
 const fs = require('fs');
 const path = require('path');
+const { createRequire } = require('module');
 const { spawnSync } = require('child_process');
 
-function say(m) { process.stdout.write(`setup: ${m}\n`); }
-function warn(m) { process.stderr.write(`setup: WARNING: ${m}\n`); }
-function die(m) { process.stderr.write(`setup: ERROR: ${m}\n`); process.exit(1); }
+const usage = `Usage: node setup.js [options]
 
-// Run a command, inheriting stdio. `shell: true` lets `npm`/`pagx` resolve to their
-// platform-specific launchers (npm.cmd, pagx.cmd) on Windows without extra logic.
-function run(cmd, args, opts = {}) {
-  return spawnSync(cmd, args, { stdio: 'inherit', shell: true, ...opts });
-}
+Check a libpag checkout's native CLI and HTML capture runtime.
+Normal setup rebuilds TypeScript; missing dependencies/browser are reported, not installed.
 
-// Probe whether a command exists by running it quietly and inspecting the result.
-function commandExists(cmd, probeArgs = ['--version']) {
-  const r = spawnSync(cmd, probeArgs, { stdio: 'ignore', shell: true });
-  return r.status === 0;
-}
+  --repo <dir>                 Explicit libpag checkout (otherwise locate from script/cwd)
+  --pagx-bin <path>            Native binary (or PAGX_BIN; default: cmake-build-debug/pagx)
+  --browser-engine <name>      puppeteer or playwright (or HTML_SNAPSHOT_BROWSER)
+  --check                     Check without rebuilding or installing anything
+  -h, --help                  Show help
 
-// --- locate the repository root and the snapshot tool ---------------------
-let repoRoot = '';
-const git = spawnSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8', shell: true });
-if (git.status === 0 && git.stdout) repoRoot = git.stdout.trim();
-if (!repoRoot) {
-  // Fall back to walking up from this script to find tools/html-snapshot.
-  let d = __dirname;
-  while (path.dirname(d) !== d && !fs.existsSync(path.join(d, 'tools', 'html-snapshot'))) {
-    d = path.dirname(d);
+Build the native CLI first using your configured CMake build directory.
+This script does not install a global CLI or prepare the separate live-preview viewer.
+`;
+
+function say(message) { process.stdout.write(`setup: ${message}\n`); }
+function fail(message) { throw new Error(message); }
+
+function parseArgs(args) {
+  const options = { repo: '', binary: process.env.PAGX_BIN || '',
+    engine: process.env.HTML_SNAPSHOT_BROWSER || 'puppeteer', check: false };
+  const flags = { '--repo': 'repo', '--pagx-bin': 'binary', '--browser-engine': 'engine' };
+  for (let i = 0; i < args.length; i++) {
+    const flag = args[i];
+    if (flag === '--help' || flag === '-h') return null;
+    if (flag === '--check') { options.check = true; continue; }
+    if (!Object.hasOwn(flags, flag)) fail(`unknown option: ${flag}`);
+    const key = flags[flag];
+    const value = args[++i];
+    if (!value || value.startsWith('-')) fail(`${flag} requires a value`);
+    options[key] = value;
   }
-  repoRoot = d;
+  if (!['puppeteer', 'playwright'].includes(options.engine)) {
+    fail('--browser-engine must be puppeteer or playwright');
+  }
+  return options;
 }
-const toolDir = path.join(repoRoot, 'tools', 'html-snapshot');
 
-// --- node -----------------------------------------------------------------
-// This script is running under node, so node is present by definition.
-say(`node ${process.version}`);
+function isFile(file) {
+  try { return fs.statSync(file).isFile(); } catch { return false; }
+}
 
-// --- pagx -----------------------------------------------------------------
-if (!commandExists('pagx', ['-v'])) {
-  say('pagx not found; installing @libpag/pagx globally via npm...');
-  const r = run('npm', ['install', '-g', '@libpag/pagx']);
-  if (r.status !== 0) {
-    die('failed to install pagx. Install it manually: npm install -g @libpag/pagx');
+function isRepo(dir) {
+  return isFile(path.join(dir, 'tools/html-snapshot/package.json')) &&
+    isFile(path.join(dir, 'src/cli/main.cpp'));
+}
+
+function findRepo(start) {
+  let dir = path.resolve(start);
+  while (true) {
+    if (isRepo(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return '';
+    dir = parent;
   }
 }
-const pagxVer = spawnSync('pagx', ['-v'], { encoding: 'utf8', shell: true });
-let pagxVerStr = '';
-if (pagxVer.status === 0 && pagxVer.stdout) {
-  const tokens = pagxVer.stdout.trim().split(/\s+/);
-  pagxVerStr = tokens[tokens.length - 1];
-}
-say(`pagx ${pagxVerStr}`);
 
-// --- no repository: the snapshot tool is bundled inside @libpag/pagx -------
-// When tools/html-snapshot is absent (a user who only `npm install`-ed the
-// package), there is nothing to build here: `pagx` carries the snapshot tool
-// and installs the headless browser lazily on first use.
-if (!fs.existsSync(toolDir)) {
-  say('tools/html-snapshot not present; using the snapshot tool bundled in @libpag/pagx');
-  say('the headless browser installs automatically on the first conversion (~150 MB, one-time)');
+function run(binary, args, cwd, inherit = false) {
+  const result = spawnSync(binary, args, {
+    cwd, encoding: 'utf8', stdio: inherit ? 'inherit' : 'pipe',
+    env: { ...process.env, PAGX_NODE_BIN: process.env.PAGX_NODE_BIN || process.execPath },
+  });
+  if (result.error) fail(`cannot run ${binary}: ${result.error.message}`);
+  if (result.status !== 0) {
+    if (!inherit && result.stderr) process.stderr.write(result.stderr);
+    fail(`${path.basename(binary)} ${args.join(' ')} failed (${result.signal || result.status})`);
+  }
+  return result.stdout || '';
+}
+
+function collectSources(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(dir, entry.name);
+    return entry.isDirectory() ? collectSources(file) : (entry.name.endsWith('.ts') ? [file] : []);
+  });
+}
+
+function checkBuild(toolDir) {
+  const sources = collectSources(path.join(toolDir, 'lib'));
+  let oldestOutput = Infinity;
+  for (const source of sources.filter(file => !file.endsWith('.d.ts'))) {
+    const relative = path.relative(toolDir, source).replace(/\.ts$/, '.js');
+    const output = path.join(toolDir, 'dist', relative);
+    if (!isFile(output) || fs.statSync(source).mtimeMs > fs.statSync(output).mtimeMs) {
+      fail(`snapshot build missing or stale: ${relative}; rerun setup without --check`);
+    }
+    oldestOutput = Math.min(oldestOutput, fs.statSync(output).mtimeMs);
+  }
+  for (const source of [path.join(toolDir, 'tsconfig.json'),
+    ...sources.filter(file => file.endsWith('.d.ts'))]) {
+    if (fs.statSync(source).mtimeMs > oldestOutput) {
+      fail('snapshot configuration/types changed; rerun setup without --check');
+    }
+  }
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  if (!options) { process.stdout.write(usage); return; }
+  const repo = options.repo ? path.resolve(options.repo) : findRepo(__dirname) || findRepo(process.cwd());
+  if (!repo || !isRepo(repo)) {
+    fail('libpag checkout not found; pass --repo <dir>. Installed @libpag/pagx users do not need this repository setup script.');
+  }
+  const binary = options.binary ? path.resolve(options.binary) :
+    path.join(repo, 'cmake-build-debug', process.platform === 'win32' ? 'pagx.exe' : 'pagx');
+  if (!isFile(binary)) {
+    fail(`native CLI not found: ${binary}; build pagx and pass its path with --pagx-bin`);
+  }
+  say(`node ${process.version}`);
+  say(`native CLI ${binary}`);
+  say(run(binary, ['--version'], repo).trim());
+  const help = run(binary, ['--help'], repo);
+  for (const command of ['import', 'capture', 'render', 'verify']) {
+    if (!new RegExp(`^\\s+${command}\\s`, 'm').test(help)) {
+      fail(`native CLI does not advertise ${command}; rebuild a CLI supporting this HTML workflow`);
+    }
+  }
+
+  const toolDir = path.join(repo, 'tools/html-snapshot');
+  const toolRequire = createRequire(path.join(toolDir, 'package.json'));
+  const pkg = toolRequire('./package.json');
+  let compiler;
+  try {
+    for (const dependency of Object.keys(pkg.dependencies || {})) {
+      if (!['puppeteer', 'playwright'].includes(dependency)) toolRequire.resolve(dependency);
+    }
+    toolRequire.resolve(options.engine);
+    if (!options.check) compiler = toolRequire.resolve('typescript/bin/tsc');
+  } catch (error) {
+    fail(`snapshot dependencies unavailable: ${error.message}\nRun npm install in ${toolDir}; include development dependencies and the selected browser driver.`);
+  }
+  if (!options.check) {
+    say('building snapshot TypeScript');
+    run(process.execPath, [compiler, '-p', path.join(toolDir, 'tsconfig.json')], toolDir, true);
+  }
+  checkBuild(toolDir);
+  // Exercises the repository capture modules without starting a browser.
+  run(process.execPath, [path.join(toolDir, 'capture.js'), '--help'], toolDir);
+  const { checkBrowserRuntime } = toolRequire('./dist/lib/browser-engine.js');
+  try {
+    checkBrowserRuntime(options.engine);
+  } catch (error) {
+    const command = options.engine === 'playwright'
+      ? 'npx playwright install chromium' : 'npx puppeteer browsers install chrome';
+    const override = options.engine === 'playwright'
+      ? 'PLAYWRIGHT_EXECUTABLE_PATH' : 'PUPPETEER_EXECUTABLE_PATH';
+    fail(`${error.message}\nFrom ${toolDir}, run: ${command}\nIf ${override} is set, correct that path or unset it.`);
+  }
+  // Also check that the native bridge can find its configured runtime and Node.
+  run(binary, ['capture', '--help'], repo);
+  say(`${options.engine} browser executable present (launch not tested)`);
   say('ready');
-  process.exit(0);
 }
 
-// --- snapshot tool: dependencies ------------------------------------------
-if (!fs.existsSync(path.join(toolDir, 'node_modules'))) {
-  say('installing snapshot tool dependencies (this downloads a Chromium build, ~150 MB)...');
-  const r = run('npm', ['install'], { cwd: toolDir });
-  if (r.status !== 0) die('npm install failed in tools/html-snapshot');
-} else {
-  say('snapshot tool dependencies present');
+try { main(); }
+catch (error) {
+  process.stderr.write(`setup: ERROR: ${error.message}\n`);
+  process.exitCode = 1;
 }
-
-// --- snapshot tool: build (html2pagx requires dist/) ----------------------
-if (!fs.existsSync(path.join(toolDir, 'dist', 'lib'))) {
-  say('building snapshot tool (tsc)...');
-  const r = run('npm', ['run', 'build'], { cwd: toolDir });
-  if (r.status !== 0) die('npm run build failed in tools/html-snapshot');
-} else {
-  say('snapshot tool already built');
-}
-
-// --- headless Chromium ----------------------------------------------------
-const home = process.env.HOME || process.env.USERPROFILE || '';
-const cacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(home, '.cache', 'puppeteer');
-const chromeDir = path.join(cacheDir, 'chrome');
-let chromePresent = false;
-try {
-  chromePresent = fs.existsSync(chromeDir) && fs.readdirSync(chromeDir).length > 0;
-} catch (_e) {
-  chromePresent = false;
-}
-if (chromePresent) {
-  say('headless Chromium present');
-} else {
-  warn(`headless Chromium is missing from ${chromeDir}`);
-  warn('install it with:');
-  warn(`  PUPPETEER_CACHE_DIR="${cacheDir}" npx --prefix "${toolDir}" puppeteer browsers install chrome`);
-  warn('then re-run this script.');
-  process.exit(1);
-}
-
-say('ready');

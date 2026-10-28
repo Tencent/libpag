@@ -1,10 +1,20 @@
 # Animation: making the PAGX move
 
-The converter does not just flatten a still frame — it also captures the page's **motion** and
-bakes it into the `.pagx` as a real PAGX animation timeline. Capture is **automatic** (on by
-default in both the in-repo `html2pagx` path and the npm `pagx import` path); no flag is needed.
-This reference covers what gets captured, which channels play back, how to author HTML that
-animates faithfully, how to preview the motion, and how to read the warnings.
+HTML conversion is **static by default**. Enable `--capture-animations` to capture supported
+page motion as a PAGX animation timeline:
+
+```bash
+pagx import --input motion.html --output motion.pagx --capture-animations
+# Full output set; add resource options when needed:
+pagx capture motion.html -o out --capture-animations
+```
+
+The repository's `html2pagx` and `snapshot.js` use the same opt-in flag. Check the selected
+executable's command help before using it. For click/hover/scroll states, see
+[Interaction capture](interaction.md): scenarios export static checkpoints and cannot be combined
+with `--capture-animations`.
+
+This reference covers supported motion, authoring, playback checks and warnings.
 
 ## Table of contents
 
@@ -22,7 +32,7 @@ animates faithfully, how to preview the motion, and how to read the warnings.
 
 The snapshot reads animations from every common source and normalizes them into one canonical form
 (CSS `@keyframes` + an `animation` shorthand) that the importer maps onto the PAGX animation model.
-Sources captured automatically:
+With animation capture enabled, supported sources include:
 
 - **CSS `@keyframes` + `animation`** — plain stylesheet animations (the most reliable source).
 - **Web Animations API (WAAPI)** — `element.animate(...)`, and libraries built on it such as
@@ -56,7 +66,7 @@ A `box-shadow` that only appears in an animated state (e.g. a `.on` class toggle
 timeline) is folded into the drop-shadow filter channel automatically, so a pulsing glow animates
 even when authored as `box-shadow`.
 
-**Not playable** (silently flattened to the static frame): any **layout** property (`width`,
+**Not playable** (dropped with animation diagnostics): **layout** properties (`width`,
 `height`, `margin`, `padding`, `gap`, `flex`, `top`/`left`, …) and **3D transforms**
 (`matrix3d`, `rotate3d`, `perspective`). Everything in the table above — including scale, rotate,
 and skew — now plays back; earlier versions dropped non-translation transforms, so do not assume a
@@ -98,8 +108,9 @@ Add these on top of the static rules in `authoring-html.md`:
 - **Keep animated properties inside the playable set above.** Layout properties and 3D transforms
   become static. Re-express a size change as `scale`, a 3D flip as a 2D `rotate`/`scaleX`.
 - **Auto-play on load.** Hover-, scroll-, or click-triggered animations have not fired when the
-  snapshot is taken (no interaction occurs). Use `animation` that starts immediately, or — for
-  scroll-revealed sections — convert with `--scroll-reveal` so they trigger. Do not rely on `:hover`.
+  ordinary snapshot is taken. Use motion that starts on load, or capture with `--scroll-reveal`
+  for scroll-revealed content. A scenario can capture a triggered static state, but does not
+  record its interaction as a playable animation.
 - **Make looping motion `infinite`** so it is captured reliably and so the PAGX loops (a finite
   count > 1 is downgraded to play once — see below).
 - **To animate color, give the element a solid `background-color` (or text `color`).** Without a
@@ -170,7 +181,8 @@ How CSS animation timing maps onto PAGX (full detail in `spec/html_subset.md` §
 
 ## Warnings and troubleshooting
 
-`pagx import` prints `subset:animation-*` diagnostics; they are informational, not failures:
+`pagx import -v` exposes `subset:animation-*` conversion warnings. Review lost or approximated
+motion; these warnings are distinct from command failures and `pagx verify` diagnostics:
 
 | Symptom / warning | Cause / fix |
 |-------------------|-------------|
@@ -178,8 +190,8 @@ How CSS animation timing maps onto PAGX (full detail in `spec/html_subset.md` §
 | `subset:animation-multiple` | A regular element had several comma-separated animations (or timing functions); only the first was kept. Split into separate elements, or use an inline SVG shape (which supports a list). |
 | `subset:animation-finite-count` | A finite repeat count > 1 (or a finite `alternate`, or count `0`) was downgraded / suppressed. Use `infinite` to loop. |
 | `subset:animation-unknown-keyframes` | The `animation` referenced a `@keyframes` name that no longer exists; the animation was dropped. |
-| The element does not move in the preview | The animation was hover/scroll/click-triggered (never fired — make it auto-play or use `--scroll-reveal`), already finished before the snapshot (use `infinite`), or only animated a non-playable property. |
+| The element does not move in the preview | First check `--capture-animations` and render different `--time` values. Then check whether the animation was never triggered, already finished/detached, or used an unsupported property. |
 | A rotate/scale "takes the short way" or snaps | Matrix interpolation cannot cross ±180° or a full turn in one segment; add intermediate `@keyframes` stops (`0% / 50% / 100%`). |
 | Color animation does nothing | The element paints no solid `color` / `background-color`; add one. |
 | A `clip-path` reveal is dropped | The keyframes animate between different shape functions (e.g. `circle()` → `polygon()`); CSS only interpolates matching shapes. Keep every stop the same function with the same point count. |
-| Want a purely static `.pagx` | Capture cannot be disabled from `html2pagx` today; remove the `animation` declarations from the HTML, or run `pagx import` on a static subset HTML with no `@keyframes`. |
+| Want a static page capture | Omit `--capture-animations` on ordinary HTML capture/import. No source animation removal is needed. Direct import of an already prepared subset can still contain authored `@keyframes`. |

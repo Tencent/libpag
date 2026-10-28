@@ -1,9 +1,10 @@
 # CLI Reference
 
-The `pagx` command-line tool provides utilities for working with PAGX files. All commands
-operate on local `.pagx` files. Ensure `pagx` is installed before first use (see the
-setup script in `SKILL.md`). Run `pagx --version` (or `pagx -v`) to check the installed version,
-and `pagx <command> --help` for per-command usage.
+Use the selected CLI build consistently for conversion and validation. Check its `--version`,
+`--help` and the needed subcommand's `--help`; version alone does not establish feature support.
+Most commands operate on PAGX files, while `import` and `capture` accept source files/URLs.
+See [Environment selection](../SKILL.md#environment-and-command-selection) for repository versus
+installed usage. `preview` is provided by the npm launcher, not the standalone native binary.
 
 ## Table of contents
 
@@ -12,8 +13,10 @@ and `pagx <command> --help` for per-command usage.
 - [pagx format](#pagx-format) — pretty-print a PAGX file
 - [pagx layout](#pagx-layout) — layout-engine bounds as XML
 - [pagx bounds](#pagx-bounds) — rendered pixel bounds of Layers
-- [pagx font](#pagx-font) — `info` (query metrics) and `embed` (embed into PAGX)
-- [pagx import](#pagx-import) — convert SVG/HTML to PAGX
+- [pagx font](#pagx-font) — query font files, families and metrics
+- [pagx embed](#pagx-embed) — embed font glyphs and images
+- [pagx import](#pagx-import) — convert SVG/HTML to a single PAGX
+- [pagx capture](#pagx-capture) — HTML output sets, scenarios, batches and static previews
 - [pagx resolve](#pagx-resolve) — expand inline `<svg>` and `import` attributes
 - [pagx export](#pagx-export) — export PAGX to SVG/HTML/PPTX
 - [pagx preview](#pagx-preview) — live browser preview with hot reload
@@ -361,6 +364,9 @@ pagx import --input page.html -v                  # print conversion warnings
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
 | `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+| `--capture-animations` | HTML/URL only: explicitly capture supported motion; default is a static frame |
+| `--scenario <file.json>` | Replay an HTML interaction scenario with the browser pre-pass enabled |
+| `--checkpoint <name>` | Select a static scenario checkpoint; required when the scenario has multiple captures |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### Image storage
@@ -397,39 +403,86 @@ pagx import --input page.html --output card.pagx --images embed  # self-containe
 
 ### HTML import behavior
 
-HTML import behavior is fixed in code (there are no `--html-*` flags). Every HTML input is:
-
-- **rendered through `tools/html-snapshot/snapshot.js`** (a headless browser) first, so
-  JS/React/Tailwind-driven pages are flattened into a static, absolute-positioned HTML subset
-  the importer understands;
-- **normalized** by the subset normalizer, which resolves the `<style>` cascade into inline
-  styles, drops disallowed properties, and prunes unsupported elements;
-- **flex-recovered** via flex inference (on by default), which recovers `display:flex` semantics
-  from the absolute-positioned snapshot output;
-- sized from the `<body>` intrinsic/declared size (preferred over any caller-provided target);
-- imported non-strictly — unsupported constructs become warnings, not hard errors.
-
-The snapshot step requires `node` on `PATH` and a `snapshot.js` install. The script is located
-in this order:
-
-1. relative `tools/html-snapshot/snapshot.js` from the current directory
-2. `PAGX_HTML_SNAPSHOT_BIN` environment variable
-3. Upward search from the current directory for `tools/html-snapshot/snapshot.js` (up to 8
-   parent levels)
-
-URL inputs (`http://` / `https://`) are imported the same way (the snapshot renderer fetches
-the page) and require an explicit `--output`.
-
-**Disabling the snapshot pre-pass.** Set `PAGX_HTML_SNAPSHOT=0` (also accepts
-`false`/`no`/`off`) to skip the browser step and import the HTML file directly — useful when the
-input is *already* a flat, subset-compliant snapshot (this is what the `html2pagx` tooling sets,
-since it renders the snapshot itself). With the pre-pass disabled, URL inputs are rejected (the
-importer cannot fetch them).
+HTML files and URLs normally pass through the browser snapshot runtime, then native
+normalization/import and resolution. Ordinary snapshots may recover flex layout from measured
+boxes; interaction-state snapshots deliberately disable this inference. Unsupported constructs
+can produce warnings or capture errors, depending on the mode. Inspect the output and diagnostics.
 
 ```bash
-pagx import --input app.html                                        # React/Tailwind page
-pagx import --input https://example.com/demo --output demo.pagx     # URL input
+pagx import --input app.html --output app.pagx
+pagx import --input https://example.com/demo --output demo.pagx
+pagx import --input motion.html --output motion.pagx --capture-animations
+pagx import --input app.html --scenario states.json --checkpoint filled --output filled.pagx
 ```
+
+`--checkpoint` requires `--scenario`. Scenarios require HTML with the browser pre-pass enabled
+and reject `--capture-animations`. `import` always writes a single PAGX; use [capture](#pagx-capture)
+for all checkpoints, PNGs, custom viewport options or font downloading/embedding. For role locators,
+select Playwright through `HTML_SNAPSHOT_BROWSER` in the environment; `import` has no driver flag.
+
+Set `PAGX_HTML_SNAPSHOT=0` (also `false`/`no`/`off`) only when importing prepared subset HTML directly.
+This disables browser execution and rejects URL/scenario inputs. See [Pipeline](pipeline.md#manual-subset-import)
+for the manual workflow and [runtime setup](pipeline.md#setup) for Node, bundled/repository lookup
+and the `PAGX_HTML_SNAPSHOT_BIN` override.
+
+---
+
+## pagx capture
+
+Capture a browser page as a full output set. The repository `html2pagx` entry shares the same
+options, validation and orchestration. The selected native `pagx capture` uses its own executable
+for native conversion/rendering unless `--pagx-bin` is explicitly supplied.
+
+```bash
+pagx capture page.html -o out
+pagx capture https://example.com/demo --output-name demo -o out
+pagx capture motion.html -o out --capture-animations
+pagx capture app.html --scenario states.json -o out --preview
+pagx capture --batch pages --output-root out --dry-run
+```
+
+| Option | Description |
+|---|---|
+| `<file-or-url>` or `--input <file-or-url>` | One HTML source; not used with `--batch` |
+| `-o, --output-dir <dir>` | Output directory, not a PAGX filename; defaults beside a local input or to cwd for URLs |
+| `--output-name <name>` | Output stem; required for URLs, rejected in batch mode |
+| `--viewport-width <px>`, `--viewport-height <px>` | Ordinary capture viewport, default 1400×900; scenario viewport belongs in the JSON |
+| `--wait-ms <ms>`, `--selector <css>` | Extra ordinary-page settle delay (default 800 ms) and selector wait |
+| `--capture-animations` | Opt into supported motion; disabled by default |
+| `--scroll-reveal` | Scroll an ordinary page before capture to trigger reveal/lazy content |
+| `--scenario <file.json>` | Export named static checkpoints from one interaction session |
+| `--checkpoint <name>` | With a scenario, run through/export only this checkpoint |
+| `--download-fonts` | Save used web fonts and register this capture's faces as native render fallbacks |
+| `--embed-fonts` | Download and embed captured font glyphs; implies `--download-fonts` |
+| `--font-dir <dir>` | Font download directory; default `<output-dir>/<base>.fonts` |
+| `--download-images`, `--image-dir <dir>` | Save fetched image bytes; default directory `<output-dir>/<base>.images` |
+| `--pagx-images external\|embed` | Native image storage mode; default external. This is `--images` on import/resolve |
+| `--scale <factor>` | Render PNG scale, default 1; positive and finite |
+| `--no-inline-icon-fonts` | Disable icon-webfont to SVG conversion |
+| `--no-render` | Skip the render stage |
+| `--no-resolve` | Skip resolution and rendering |
+| `--no-subset-html` | Do not retain the intermediate subset file |
+| `--preview` | Assemble this run's rendered PNGs into static contact sheets |
+| `--preview-columns <n>` | With preview, up to 1–32 columns; default automatic |
+| `--browser-engine puppeteer\|playwright` | Select the browser driver; flag overrides `HTML_SNAPSHOT_BROWSER`, default Puppeteer |
+| `--cookie <name=value>`, `--header <Key: Value>` | Repeatable, URL inputs only |
+| `--pagx-bin <path>` | Explicitly override the native binary used by the capture pipeline |
+| `--batch <dir>` | Recursively capture `.html`/`.htm` inputs, excluding prepared subsets and nested output roots |
+| `--output-root <dir>` | Batch-only mirrored output directory |
+| `--skip-existing` | Batch-only: skip existing PAGX targets |
+| `--dry-run` | Batch-only: list inputs without launching a browser or creating outputs |
+
+Scenario mode rejects ordinary viewport/wait/selector flags, scroll-reveal, animation capture
+and batch mode; use scenario fields and steps instead. Preview requires resolve and render;
+`--preview-columns` requires preview. Batch mode rejects a single input, `--output-name` and
+`--output-dir`. Unknown capture options are errors.
+
+Ordinary output is `<base>.subset.html`, `.pagx`, `.png`; scenario output uses
+`<base>.<checkpoint>` and adds `<base>.captures.json`. Preview paths and partial-failure handling
+are documented in [Pipeline](pipeline.md#batch-conversion-and-static-previews) and
+[Interaction capture](interaction.md#export-and-review). A failed run may retain partial outputs;
+file existence alone is not success. Help, invalid arguments and batch dry-run do not launch a
+browser. Dry-run is not a scenario-validation mode.
 
 ---
 
@@ -446,7 +499,7 @@ PAGX files that reference external SVG or embed inline `<svg>`, or for PAGX prod
 `pagx import --no-resolve`. It is idempotent — running it on an already-resolved file is a no-op.
 
 Most other commands require a fully-resolved file: `render`, `layout`, `bounds`, `export`, and
-`font embed` error out on any remaining `import` directive or inline `<svg>`. Run `pagx resolve`
+`embed` error out on any remaining `import` directive or inline `<svg>`. Run `pagx resolve`
 (or `pagx import` without `--no-resolve`, or `pagx verify`, which resolves first) before them.
 
 ```bash
@@ -510,11 +563,15 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 
 ## pagx preview
 
-Launch a live, interactive browser preview of a PAGX file with hot reload. Unlike `pagx render`
-(a one-shot PNG screenshot for QA), `pagx preview` starts a local HTTP server that renders the
-PAGX in a browser tab and watches the file — saving the `.pagx` (or the source HTML in the
-HTML→PAGX workflow) reloads the open tab automatically. Use it to let the user see and interact
-with the finished design; use `pagx render` for pixel-level QA comparisons.
+The complete npm package exposes a live browser viewer with hot reload. A standalone native
+`pagx` has no `preview` command. A prepared repository preview can instead be launched with
+`node /absolute/path/libpag/playground/pagx-preview/src/cli.js <file>`; follow that directory's
+README for dependencies and viewer artifacts. Use the same entry point with `stop` for cleanup.
+
+The viewer watches the PAGX file. Saving source HTML alone does not update it; reconvert the HTML
+first. Static PNGs/contact sheets are separate review artifacts, and viewing a captured checkpoint
+does not restore the original webpage's event handlers. See [Preview delivery](../SKILL.md#live-browser-preview)
+for when to launch and what to give the user.
 
 ```bash
 pagx preview input.pagx                # background daemon, prints URL, returns prompt
@@ -553,6 +610,6 @@ pagx preview --log                     # print the daemon log file
 - **Session reuse.** A second `pagx preview another.pagx` reuses the already-running daemon,
   opens a new session for the new file, and prints its URL. Each file gets its own session and
   is cleaned up independently when its tab disconnects.
-- **Lifecycle.** The daemon stays up until explicitly stopped with `pagx preview stop` or the
-  machine reboots. Always run `pagx preview stop` when done to free the port and process.
+- **Lifecycle.** Reuse the server while iterating. Stop it through the chosen launcher when the
+  requested preview work is finished, unless the user wants it left running.
 
