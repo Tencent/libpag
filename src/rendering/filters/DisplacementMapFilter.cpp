@@ -222,7 +222,7 @@ static bool IsRGB(DisplacementMapSource sel) {
          sel == DisplacementMapSource::Blue;
 }
 
-struct DisplacementMapUniforms {
+struct alignas(16) DisplacementMapUniforms {
   float flags[4] = {};
   float inputMatrix[16] = {};
   float mapMatrix[16] = {};
@@ -232,6 +232,9 @@ struct DisplacementMapUniforms {
   float inputSize[2] = {};
   float effectOpacity = 0.0f;
 };
+
+static_assert(sizeof(DisplacementMapUniforms) == 304,
+              "FilterUniforms must match the std140 layout.");
 
 static void Matrix3x3ToMat4(const std::array<float, 9>& m3, float* m4) {
   // Convert 3x3 matrix to 4x4 matrix (column-major for std140)

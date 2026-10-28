@@ -33,8 +33,9 @@ using nlohmann::json;
  * 用例描述: 字体相关功能测试
  */
 PAG_TEST(PAGFontTest, TestFont) {
-  PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
-                        "TTTGBMedium", "Regular");
+  ScopedFontRegistration registration(
+      PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
+                            "TTTGBMedium", "Regular"));
   auto TestPAGFile = LoadPAGFile("resources/apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(TestPAGFile->width(), TestPAGFile->height());

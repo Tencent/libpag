@@ -47,7 +47,7 @@ struct RenderCost {
   std::string performance;
 };
 
-static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
+static void CompareFileFrames(const std::string& pagPath) {
   Clock fileClock = {};
   auto fileName = pagPath.substr(pagPath.rfind('/') + 1, pagPath.size());
   auto pagFile = PAGFile::Load(pagPath);
@@ -146,7 +146,6 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
       "====================================== %s : %.2fs "
       "======================================\n",
       fileName.c_str(), cost);
-  semaphore->signal();
 }
 
 /**
@@ -154,11 +153,23 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
  */
 PAG_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
+  if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
+    // Metal deduplicates devices by native GPU, so worker threads share one glyph atlas. Keep
+    // pixel comparisons independent of interleaving; concurrency is covered by separate tests.
+    for (const auto& file : files) {
+      ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
+      CompareFileFrames(file);
+    }
+    return;
+  }
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {
     semaphore.wait();
-    threads.emplace_back(CompareFileFrames, &semaphore, file);
+    threads.emplace_back([&semaphore, file] {
+      CompareFileFrames(file);
+      semaphore.signal();
+    });
   }
   for (auto& thread : threads) {
     thread.join();
