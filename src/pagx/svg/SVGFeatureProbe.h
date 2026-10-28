@@ -39,12 +39,16 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
+  // Perspective and shared 3D depth compositing require rasterization of the entire layer subtree.
+  bool hasPerspectiveTransform = false;
+  bool hasPreserve3D = false;
 
   /**
    * Returns true when at least one feature is present.
    */
   bool needsRasterization() const {
-    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient;
+    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient ||
+           hasPerspectiveTransform || hasPreserve3D;
   }
 };
 

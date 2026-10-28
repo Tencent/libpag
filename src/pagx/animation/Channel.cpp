@@ -70,6 +70,11 @@ ChannelValueType TypedChannel<Matrix>::valueType() const {
   return ChannelValueType::Matrix;
 }
 
+template <>
+ChannelValueType TypedChannel<Matrix3D>::valueType() const {
+  return ChannelValueType::Matrix3D;
+}
+
 // Explicit instantiations for every keyframe-animatable alternative of KeyValue (PAGImage is
 // excluded — it is not interpolated).
 template class TypedChannel<float>;
@@ -79,5 +84,6 @@ template class TypedChannel<std::string>;
 template class TypedChannel<ImageRef>;
 template class TypedChannel<Color>;
 template class TypedChannel<Matrix>;
+template class TypedChannel<Matrix3D>;
 
 }  // namespace pagx
