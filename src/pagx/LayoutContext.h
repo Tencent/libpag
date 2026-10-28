@@ -24,6 +24,7 @@
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace tgfx {
 class Typeface;

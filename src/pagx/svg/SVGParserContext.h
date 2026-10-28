@@ -94,6 +94,7 @@ struct InheritedStyle {
   std::string fontSize = {};       // Empty means not set.
   std::string fontWeight = {};     // Empty means not set.
   std::string fontStyle = {};      // Empty means not set (normal/italic/oblique).
+  std::string fontStretch = {};    // Empty means normal width.
   std::string letterSpacing = {};  // Empty means not set.
   std::string textAnchor = {};     // Empty means not set (start/middle/end).
 };
