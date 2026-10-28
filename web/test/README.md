@@ -56,6 +56,7 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 | `PAGVideoSequenceTest.cpp`, `VideoSequenceFallbackTest.cpp` | require the ffavc software decoder, which has no wasm build |
 | `PAGXSVGTest.cpp` | the `resources/apitest/SVG` corpus is 492MB; not preloaded |
 | `PAGXCliTest.cpp` | CLI sources are not compiled into the web test |
+| `PAGXHTMLImporterTest.cpp` | legacy suite uses `dynamic_cast`, incompatible with the no-RTTI web library build; covered natively |
 | `*.mm` (Metal/Cocoa) | platform tests never compile under Emscripten |
 
 Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through

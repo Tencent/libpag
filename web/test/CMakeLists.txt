@@ -57,6 +57,9 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGVideoSequenceTest\\.cpp$")       # ne
 list(FILTER TEST_SOURCES EXCLUDE REGEX "VideoSequenceFallbackTest\\.cpp$")  # needs wasm ffavc
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXSVGTest\\.cpp$")                # 492MB SVG corpus
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
+# The legacy HTML-importer suite uses dynamic_cast, which cannot compile (let alone link)
+# against the no-RTTI web library build; its logic is covered by the native lanes.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXHTMLImporterTest\\.cpp$")       # dynamic_cast vs -fno-rtti
 
 # Exclude hidden files (e.g., .DS_Store).
 foreach (FILE_PATH ${TEST_SOURCES})
