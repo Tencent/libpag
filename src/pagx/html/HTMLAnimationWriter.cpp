@@ -31,14 +31,17 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -608,6 +611,9 @@ enum class TargetChannelRole {
   LayerY,
   LayerMatrix,
   LayerVisibility,
+  GeometryWidth,
+  RectangleRoundness,
+  TrimEnd,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -649,6 +655,12 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "rotation", TargetChannelRole::Rotation},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
+
+    // Shape geometry channels
+    {NodeType::Rectangle, "size.width", TargetChannelRole::GeometryWidth},
+    {NodeType::Rectangle, "roundness", TargetChannelRole::RectangleRoundness},
+    {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
+    {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
 
     // Group & TextBox channels
     {NodeType::Group, "alpha", TargetChannelRole::Opacity},
@@ -728,6 +740,10 @@ struct BundleChannelSet {
   const Channel* yCh = nullptr;
   const Channel* matrixCh = nullptr;
   const Channel* visibleCh = nullptr;
+  const Channel* geometryWidthCh = nullptr;
+  const Channel* roundnessCh = nullptr;
+  const Channel* trimEndCh = nullptr;
+  const TrimPath* trimTarget = nullptr;
   const Channel* rotCh = nullptr;
   const Channel* scaleXCh = nullptr;
   const Channel* scaleYCh = nullptr;
@@ -807,6 +823,23 @@ bool BindChannelToBundleSet(
       }
       out.visibleCh = ch;
       return true;
+    case TargetChannelRole::GeometryWidth:
+      out.geometryWidthCh = ch;
+      return true;
+    case TargetChannelRole::RectangleRoundness:
+      out.roundnessCh = ch;
+      return true;
+    case TargetChannelRole::TrimEnd: {
+      auto* trim = static_cast<const TrimPath*>(objTarget);
+      // A CSS dash animation models a separate trim on a single path. Multi-path continuous
+      // trims redistribute length across paths and require different per-path stop values.
+      if (trim->type != TrimType::Separate || trim->start != 0.0f || trim->offset != 0.0f) {
+        return false;
+      }
+      out.trimEndCh = ch;
+      out.trimTarget = trim;
+      return true;
+    }
     case TargetChannelRole::GroupPosX:
       out.posXCh = ch;
       return true;
@@ -1197,6 +1230,49 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
   }
 }
 
+void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
+                            const std::string& tagName, Frame t, std::string& decls) {
+  if (bundle.primaryHost == nullptr) {
+    return;
+  }
+  auto type = bundle.primaryHost->nodeType();
+  if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
+    return;
+  }
+  Point center = {};
+  float staticWidth = 0.0f;
+  if (type == NodeType::Rectangle) {
+    auto* rect = static_cast<const Rectangle*>(bundle.primaryHost);
+    center = rect->renderPosition();
+    staticWidth = rect->renderSize().width;
+    if (chSet.roundnessCh != nullptr) {
+      float roundness = EvalFloatChannel(chSet.roundnessCh, t, rect->roundness);
+      if (tagName == "rect") {
+        AppendCssDecl(decls, "rx", CssFloatToString(roundness) + "px");
+        AppendCssDecl(decls, "ry", CssFloatToString(roundness) + "px");
+      } else {
+        AppendCssDecl(decls, "border-radius", CssFloatToString(roundness) + "px");
+      }
+    }
+  } else {
+    auto* ellipse = static_cast<const Ellipse*>(bundle.primaryHost);
+    center = ellipse->renderPosition();
+    staticWidth = ellipse->renderSize().width;
+  }
+  if (chSet.geometryWidthCh != nullptr) {
+    float width = EvalFloatChannel(chSet.geometryWidthCh, t, staticWidth);
+    if (tagName == "ellipse") {
+      AppendCssDecl(decls, "rx", CssFloatToString(width * 0.5f) + "px");
+    } else {
+      // PAGX sizes shapes around their center. The CSS div/rect has a top-left origin, so the
+      // left/x coordinate must move by half of the width delta to keep that center fixed.
+      AppendCssDecl(decls, tagName == "rect" ? "x" : "left",
+                    CssFloatToString(center.x - width * 0.5f) + "px");
+      AppendCssDecl(decls, "width", CssFloatToString(width) + "px");
+    }
+  }
+}
+
 std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
                                      const BundleTimingInfo& timing, const std::string& tagName,
                                      Frame t, bool& needsZeroOrigin) {
@@ -1212,6 +1288,16 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "visibility", visible ? "visible" : "hidden");
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
+  EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls);
+  if (chSet.trimEndCh != nullptr && chSet.trimTarget != nullptr) {
+    float end = EvalFloatChannel(chSet.trimEndCh, t, chSet.trimTarget->end);
+    float visibleLength = std::clamp(end, 0.0f, 1.0f);
+    AppendCssDecl(decls, "stroke-dasharray",
+                  CssFloatToString(visibleLength) + " " + CssFloatToString(1.0f - visibleLength));
+    // A zero-length dash still paints a dot with round caps. CSS visibility stays visible until
+    // the end of a visible-to-hidden transition, so only the empty end frame is suppressed.
+    AppendCssDecl(decls, "visibility", visibleLength == 0.0f ? "hidden" : "visible");
+  }
   EmitPaintCssAtFrame(chSet, tagName, t, decls);
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
 
@@ -1300,7 +1386,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     if (nType == NodeType::Layer) {
       domId = targetNode->id;
     } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Fill ||
-               nType == NodeType::Stroke) {
+               nType == NodeType::Stroke || nType == NodeType::Rectangle ||
+               nType == NodeType::Ellipse) {
       auto it = ctx.animatedElementIds.find(targetNode);
       if (it != ctx.animatedElementIds.end()) {
         domId = it->second;
@@ -1313,6 +1400,11 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         if (idIt != ctx.animatedElementIds.end()) {
           domId = idIt->second;
         }
+      }
+    } else if (nType == NodeType::TrimPath) {
+      auto idIt = ctx.animatedElementIds.find(targetNode);
+      if (idIt != ctx.animatedElementIds.end()) {
+        domId = idIt->second;
       }
     } else if (nType == NodeType::BlurFilter || nType == NodeType::DropShadowFilter) {
       auto fIt = filterToLayer.find(static_cast<const LayerFilter*>(targetNode));
@@ -1438,6 +1530,30 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
           if (role == TargetChannelRole::Opacity && !layer->groupOpacity) {
             _restoredGroupOpacity.emplace_back(layer, layer->groupOpacity);
             layer->groupOpacity = true;
+          }
+        }
+      } else if (nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
+        bool hasGeometryChannel = false;
+        for (auto* channel : obj->channels) {
+          if (channel != nullptr &&
+              LookupChannelRole(nType, channel->name) != TargetChannelRole::Unknown) {
+            hasGeometryChannel = true;
+            break;
+          }
+        }
+        if (hasGeometryChannel) {
+          _ctx.animatedElementIds[targetNode] =
+              targetNode->id.empty() ? _ctx.nextId("animGeo") : targetNode->id;
+        }
+      } else if (nType == NodeType::TrimPath) {
+        auto* trim = static_cast<const TrimPath*>(targetNode);
+        if (trim->type == TrimType::Separate && trim->start == 0.0f && trim->offset == 0.0f) {
+          for (auto* channel : obj->channels) {
+            if (channel != nullptr &&
+                LookupChannelRole(nType, channel->name) == TargetChannelRole::TrimEnd) {
+              _ctx.animatedElementIds[trim] = trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
+              break;
+            }
           }
         }
       } else if (nType == NodeType::Group || nType == NodeType::TextBox) {
@@ -1630,9 +1746,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           elementNeedsZeroOrigin[element.id] = true;
         }
       }
-      // Of the paint written onto SVG shapes, only the stroke width changes the painted extent;
-      // color, opacity and dash offset stay inside the viewport sized for the static paint.
-      if (chSet.strokeWidthCh != nullptr) {
+      // Stroke width and shape width can expand SVG paint beyond its static viewBox. Other paint
+      // channels (color, opacity, dash offset) do not change the viewport-sized extent.
+      if (chSet.strokeWidthCh != nullptr || chSet.geometryWidthCh != nullptr) {
         for (const auto& element : elements) {
           elementLiftsSvgClip[element.id] = true;
         }

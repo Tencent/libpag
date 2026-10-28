@@ -1939,7 +1939,8 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!trim) {
     return;
   }
-  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset)) {
+  bool animatedEnd = _ctx->animatedElementIds.find(trim) != _ctx->animatedElementIds.end();
+  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset) && !animatedEnd) {
     return;
   }
   builder.addAttr("pathLength", "1");
