@@ -10,7 +10,8 @@ const { layoutContactSheet, generateContactSheet } = require('../dist/lib/contac
 
 let dir, render;
 function png(file, width, height) {
-  fs.writeFileSync(file, PNG.sync.write(new PNG({ width, height })));
+  // Blank fixtures need no adaptive filter search, which is costly in Jest's VM.
+  fs.writeFileSync(file, PNG.sync.write(new PNG({ width, height }), { filterType: 0 }));
   return file;
 }
 function image(name, width, height) { return { name, png: `${name}.png`, width, height }; }
@@ -86,7 +87,7 @@ test('uses supplied files and real PNG dimensions, escapes labels, and renders a
   expect(render.mock.calls[0][0].scale).toBe(1);
   expect(fs.readFileSync(input)).toEqual(before);
   expect(fs.readdirSync(dir).some(file => file.startsWith('.tmp-'))).toBe(false);
-}, 15000); // Full decoding of a 2x phone PNG can exceed Jest's 5s default on busy CI workers.
+});
 
 test.each(['missing', 'signature', 'crc', 'truncated', 'huge'])('rejects %s PNG before calling the renderer', async kind => {
   const input = path.join(dir, 'bad.png');

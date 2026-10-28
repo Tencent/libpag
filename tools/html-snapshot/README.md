@@ -727,6 +727,10 @@ npm test             # run the suite
 npm run test:coverage # run with a coverage report (written to coverage/)
 ```
 
+Jest runs at most two workers by default because browser-backed tests can start
+both source and mirror browsers. This keeps parallel browser load from causing
+timeouts. Override the limit with `npm test -- --maxWorkers=N` when needed.
+
 The pure browser-side code (`lib/browser-snapshot.js`) and the modules that
 only orchestrate a live browser (`lib/page-loader.js`, `lib/snapshot-runner.js`)
 are excluded from the coverage target — they are exercised end-to-end by the

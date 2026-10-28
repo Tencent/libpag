@@ -19,6 +19,7 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "maxWorkers": 2,
     "testMatch": [
       "<rootDir>/test/**/*.test.js"
     ],
