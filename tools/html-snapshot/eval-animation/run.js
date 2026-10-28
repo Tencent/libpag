@@ -1100,6 +1100,22 @@ function ssimClass(v) {
 function writeIndexHtml(rows, outDir, label) {
   const s = summarize(rows);
   const pagxSource = rows.some((r) => r && r.source === 'pagx');
+  // PAGX reports are shared as a single file. Keep every sampled PNG once in the page and
+  // resolve both the player and its frame strips against this map rather than sibling folders.
+  const frameSources = {};
+  if (pagxSource) {
+    for (const row of rows) {
+      if (row.error || row.frames <= 0) continue;
+      for (const sub of ['baseline', 'render', 'diff']) {
+        for (let i = 0; i < row.frames; i++) {
+          const frame = `frame-${String(i).padStart(3, '0')}.png`;
+          const key = `${encodeURIComponent(row.name)}/${sub}/${frame}`;
+          frameSources[key] = `data:image/png;base64,${fs.readFileSync(path.join(outDir, row.name, sub, frame)).toString('base64')}`;
+        }
+      }
+    }
+  }
+  const frameUrl = (key) => pagxSource ? frameSources[key] : key;
   const baselineCaption = pagxSource ? 'pagx render (reference)' : 'baseline';
   const renderCaption = pagxSource ? 'exported.html (browser)' : 'pagx';
 
@@ -1122,14 +1138,14 @@ function writeIndexHtml(rows, outDir, label) {
       // Dynamic playback: one larger frame per channel that the JS swaps in time. The static strips
       // stay below it (collapsed by default) for frame-by-frame inspection.
       const rtFigures = r.roundtrip ? `
-      <figure><figcaption>exported.html (browser)</figcaption><img class="play-img" data-sub="exported-browser" src="${dir}/exported-browser/frame-000.png"/></figure>
-      <figure><figcaption>roundtrip.pagx</figcaption><img class="play-img" data-sub="roundtrip-render" src="${dir}/roundtrip-render/frame-000.png"/></figure>` : '';
+      <figure><figcaption>exported.html (browser)</figcaption><img class="play-img" data-sub="exported-browser" src="${frameUrl(`${dir}/exported-browser/frame-000.png`)}"/></figure>
+      <figure><figcaption>roundtrip.pagx</figcaption><img class="play-img" data-sub="roundtrip-render" src="${frameUrl(`${dir}/roundtrip-render/frame-000.png`)}"/></figure>` : '';
       const player = `
   <div class="player" data-case="${ci}">
     <div class="stage">
-      <figure><figcaption>${baselineCaption}</figcaption><img class="play-img" data-sub="baseline" src="${dir}/baseline/frame-000.png"/></figure>
-      <figure><figcaption>${renderCaption}</figcaption><img class="play-img" data-sub="render" src="${dir}/render/frame-000.png"/></figure>${rtFigures}
-      <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${dir}/diff/frame-000.png"/></figure>
+      <figure><figcaption>${baselineCaption}</figcaption><img class="play-img" data-sub="baseline" src="${frameUrl(`${dir}/baseline/frame-000.png`)}"/></figure>
+      <figure><figcaption>${renderCaption}</figcaption><img class="play-img" data-sub="render" src="${frameUrl(`${dir}/render/frame-000.png`)}"/></figure>${rtFigures}
+      <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${frameUrl(`${dir}/diff/frame-000.png`)}"/></figure>
     </div>
     <div class="controls">
       <button class="play-btn" type="button">▶ Play</button>
@@ -1163,7 +1179,12 @@ function writeIndexHtml(rows, outDir, label) {
       for (let i = 0; i < r.frames; i++) {
         const idx = String(i).padStart(3, '0');
         let imgs = '';
-        for (const [sub] of subs) imgs += `<img src="${dir}/${sub}/frame-${idx}.png" loading="lazy"/>`;
+        for (const [sub] of subs) {
+          const key = `${dir}/${sub}/frame-${idx}.png`;
+          imgs += pagxSource
+            ? `<img data-frame-key="${key}" loading="lazy"/>`
+            : `<img src="${key}" loading="lazy"/>`;
+        }
         cells += `<div class="frame-cell" data-frame="${i}"><span class="frame-no">${i + 1}</span>${imgs}</div>`;
       }
       const labels = '<span class="lbl-spacer"></span>' + subs.map(([, l]) => `<span class="strip-label">${l}</span>`).join('');
@@ -1266,6 +1287,23 @@ function writeIndexHtml(rows, outDir, label) {
 ${cards}
 <script>
 const CASES = ${JSON.stringify(playerData)};
+const FRAME_SOURCES = ${JSON.stringify(frameSources)};
+function frameUrl(key) { return FRAME_SOURCES[key] || key; }
+// Defer decoding the static frame strips until they are brought into view.
+const frameObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries, observer) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const image = entry.target;
+        image.src = frameUrl(image.dataset.frameKey);
+        observer.unobserve(image);
+      }
+    }, { rootMargin: '300px' })
+  : null;
+for (const image of document.querySelectorAll('img[data-frame-key]')) {
+  if (frameObserver) frameObserver.observe(image);
+  else image.src = frameUrl(image.dataset.frameKey);
+}
 
 // One flip-book player per case. Frames are sparse samples taken at CASES[i].times (seconds) on the
 // captured timeline. Playback runs on a bounded wall-clock loop (this.playbackMs) and maps back onto
@@ -1378,7 +1416,7 @@ class Player {
     const idx = String(this.frame).padStart(3, '0');
     for (const img of this.imgs) {
       const sub = img.getAttribute('data-sub');
-      img.src = this.data.dir + '/' + sub + '/frame-' + idx + '.png';
+      img.src = frameUrl(this.data.dir + '/' + sub + '/frame-' + idx + '.png');
     }
     this.scrub.value = String(this.frame);
     let suffix;
