@@ -296,11 +296,15 @@ describe('launchBrowser — package loading & options', () => {
   // the stub instead of the real puppeteer / playwright install.
   function loadWithMock(pkg, mockFactory) {
     jest.resetModules();
-    jest.doMock(pkg, mockFactory, { virtual: true });
+    // These are installed packages. A virtual mock has a different module ID
+    // after another suite resolves the real driver in Jest's shared resolver.
+    jest.doMock(pkg, mockFactory);
     return require('../dist/lib/browser-engine');
   }
 
   afterEach(() => {
+    jest.dontMock('puppeteer');
+    jest.dontMock('playwright');
     jest.resetModules();
   });
 

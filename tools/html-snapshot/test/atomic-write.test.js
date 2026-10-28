@@ -78,6 +78,17 @@ describe('writeFileAtomic', () => {
     expect(stragglers).toEqual([]);
   });
 
+  test('a named checkpoint output must not silently retain old content on rename failure',async()=>{
+    const target=path.join(dir,'checkpoint.html');fs.writeFileSync(target,'OLD');
+    const realRename=fsp.rename;
+    fsp.rename=async()=>{throw new Error('EACCES')};
+    try {
+      await expect(writeFileAtomic(target,'NEW',{reuseExisting:false})).rejects.toThrow('EACCES');
+    } finally {fsp.rename=realRename;}
+    expect(fs.readFileSync(target,'utf8')).toBe('OLD');
+    expect(fs.readdirSync(dir)).toEqual(['checkpoint.html']);
+  });
+
   test('uses a per-call temp suffix so concurrent writers do not collide', async () => {
     const target = path.join(dir, 'concurrent.bin');
     // Race two writers at the same target. Both must eventually resolve; the

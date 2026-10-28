@@ -1,20 +1,16 @@
-// Recursive batch driver for `html2pagx`. Replaces the old
-// `batch-html2pagx.sh` bash wrapper. The bash wrapper forked a fresh
-// `node html2pagx` per file, which meant Chromium was launched once per
-// HTML — the dominant cost on small inputs.
-//
-// This implementation launches one browser, then loops over the matched
-// files calling `runHtmlToPagx({ snapshotImpl: in-process })`. The
-// in-process snapshot reuses that single browser via the same
-// `lib/snapshot-runner.ts` path that `server.js` uses for its long-lived
-// HTTP service.
+// Recursive HTML import: one browser with an isolated context per source file.
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
+import { throwIfCancelled } from './cli-lifecycle';
+import { writeFileAtomic } from './atomic-write';
+import { generateContactSheet, validatePreviewOptions, type ContactSheetItem, type ContactSheetResult } from './contact-sheet';
 
 import { launchBrowser, type EngineWrapper } from './browser-engine';
 import { runSnapshot } from './snapshot-runner';
 import { errMessage } from './common';
+import { parseCookie, parseHeader } from './cli';
 import {
   PipelineStepError,
   runHtmlToPagx,
@@ -26,11 +22,12 @@ import {
 
 // Walk `root` recursively and collect every regular file whose name ends
 // with `.html` or `.htm`, dropping `.subset.html` / `.subset.htm` outputs.
-export function collectHtmlInputs(root: string): string[] {
+export function collectHtmlInputs(root: string, excludedDirectory?: string): string[] {
   const out: string[] = [];
   const stack: string[] = [root];
   while (stack.length > 0) {
     const dir = stack.pop()!;
+    if (dir === excludedDirectory) continue;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -75,6 +72,22 @@ function basenameStem(file: string): string {
   return stem;
 }
 
+/** Validate batch destinations before browser installation or output creation. */
+export function collectBatchInputs(root: string, outputRoot = ''): string[] {
+  const inputDir = path.resolve(root);
+  const output = outputRoot ? path.resolve(outputRoot) : '';
+  const files = collectHtmlInputs(inputDir, output && output !== inputDir ? output : undefined);
+  const destinations = new Set<string>();
+  for (const file of files) {
+    const target = path.join(resolveOutputDir(file, inputDir, output), `${basenameStem(file)}.pagx`);
+    const key = process.platform === 'win32' || process.platform === 'darwin'
+      ? target.normalize('NFC').toLowerCase() : target;
+    if (destinations.has(key)) throw new Error(`batch output name collision: ${target}`);
+    destinations.add(key);
+  }
+  return files;
+}
+
 // Build the in-process snapshot adapter. The returned function has the
 // same `(snapshotArgs) => SpawnCaptureResult` shape as
 // `pipeline.forkSnapshotCli`, but instead of forking `snapshot.js` it calls
@@ -86,23 +99,16 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
     const startedAt = Date.now();
     const targetUrl = isHttpUrl(snapshotArgs.input)
       ? snapshotArgs.input
-      : `file://${path.resolve(snapshotArgs.input)}`;
+      : pathToFileURL(path.resolve(snapshotArgs.input)).href;
     const stderrChunks: string[] = [];
     const log = (msg: string) => { stderrChunks.push(`html-snapshot: ${msg}`); };
+    const fail = (message: string): never => { throw new Error(message); };
+    const cookieParams = (snapshotArgs.cookies || []).map(value => parseCookie('--cookie', value, fail));
+    const headerPairs = (snapshotArgs.headers || []).map(value => parseHeader('--header', value, fail));
+    const { engine, browser } = engineHandle;
+    const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
     try {
-      const cookieParams = (snapshotArgs.cookies || []).map((c) => {
-        const eq = c.indexOf('=');
-        return eq > 0
-          ? { name: c.slice(0, eq), value: c.slice(eq + 1) }
-          : { name: c, value: '' };
-      });
-      const headerPairs: Array<[string, string]> = (snapshotArgs.headers || []).map((h) => {
-        const colon = h.indexOf(':');
-        return colon > 0
-          ? [h.slice(0, colon).trim(), h.slice(colon + 1).trim()] as [string, string]
-          : [h, ''] as [string, string];
-      });
-      const result = await runSnapshot(engineHandle, targetUrl, {
+      const result = await runSnapshot({ engine, browser: context }, targetUrl, {
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
         waitMs: snapshotArgs.waitMs,
@@ -111,6 +117,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         headers: headerPairs,
         inlineIconFonts: snapshotArgs.inlineIconFonts,
         captureAnimations: snapshotArgs.captureAnimations,
+        reducedMotion: !snapshotArgs.captureAnimations,
         scrollReveal: snapshotArgs.scrollReveal,
         downloadFonts: snapshotArgs.downloadFonts,
         fontDir: snapshotArgs.fontDir,
@@ -118,18 +125,23 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         imageDir: snapshotArgs.imageDir,
         log,
       });
-      fs.writeFileSync(snapshotArgs.output, result.html, 'utf8');
+      await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false });
       const stderr = stderrChunks.join('\n');
       if (stderr) process.stderr.write(stderr + '\n');
-      return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '' };
+      return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '',
+        fontFiles: (result.fonts || []).map(font => font.path) };
     } catch (err) {
       const stderr = stderrChunks.concat([errMessage(err)]).join('\n');
       return { code: 1, durationMs: Date.now() - startedAt, stdout: '', stderr };
-    }
+    } finally { await context.close(); }
   };
 }
 
 export interface RunBatchOptions {
+  svgOptions?: string[];
+  verbose?: boolean;
+  pagxImageBaseDir?: string;
+  log?: (line: string) => void;
   inputDir: string;
   scriptDir: string;
   pagxBin?: string;
@@ -156,6 +168,8 @@ export interface RunBatchOptions {
   viewportHeight?: number;
   waitMs?: number;
   selector?: string;
+  preview?: boolean;
+  previewColumns?: number;
 }
 
 export interface RunBatchResult {
@@ -163,28 +177,68 @@ export interface RunBatchResult {
   skipped: number;
   failed: number;
   total: number;
+  preview?: ContactSheetResult;
+}
+
+// A PAGX alone does not establish that a previous run produced the requested PNG, fonts
+// or subset. Cache only complete results with the same source, native binary and options.
+function batchSignature(opts: RunBatchOptions, input: string): string {
+  const stamp = (file: string | undefined) => {
+    const stat = file ? fs.statSync(file, { throwIfNoEntry: false }) : undefined;
+    return stat ? [stat.size, stat.mtimeMs] : null;
+  };
+  const { log: _log, dryRun: _dryRun, skipExisting: _skip, preview: _preview,
+    previewColumns: _columns, ...settings } = opts;
+  return JSON.stringify({ input: path.resolve(input), source: stamp(input), binary: stamp(opts.pagxBin), settings });
+}
+
+type ArtifactStamp = { file: string; size: number; mtimeMs: number };
+function artifactStamps(files: string[]): ArtifactStamp[] {
+  return [...new Set(files)].map(file => {
+    const stat = fs.statSync(file);
+    if (!stat.isFile()) throw new Error(`artifact is not a file: ${file}`);
+    return { file, size: stat.size, mtimeMs: stat.mtimeMs };
+  });
+}
+function completeBatchResult(record: string, signature: string): boolean {
+  try {
+    const data = JSON.parse(fs.readFileSync(record, 'utf8'));
+    return data.status === 'complete' && data.signature === signature && data.artifacts.length > 0 &&
+      data.artifacts.every((item: ArtifactStamp) => {
+        const stat = fs.statSync(item.file, { throwIfNoEntry: false });
+        return stat?.isFile() && stat.size === item.size && stat.mtimeMs === item.mtimeMs;
+      });
+  } catch (_) { return false; }
+}
+function pagxResourceFiles(pagx: string): string[] {
+  const xml = fs.readFileSync(pagx, 'utf8');
+  const entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  return [...xml.matchAll(/\bsource="([^"]+)"/g)].map(match => match[1]
+    .replace(/&(amp|lt|gt|quot|apos);/g, (_, name: string) => entities[name]))
+    .filter(source => source && !/^(data:|https?:)/i.test(source))
+    .map(source => path.resolve(path.dirname(pagx), source));
 }
 
 // Run the batch.
 export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
+  throwIfCancelled();
+  validatePreviewOptions(opts);
+  const log = opts.log || ((line: string) => process.stdout.write(line + '\n'));
   const inputDir = opts.inputDir ? path.resolve(opts.inputDir) : '';
   if (!inputDir) throw new Error('runBatch: inputDir is required');
   if (!fs.existsSync(inputDir) || !fs.statSync(inputDir).isDirectory()) {
     throw new Error(`runBatch: input directory not found: ${inputDir}`);
   }
   let outputRoot = opts.outputRoot || '';
-  if (outputRoot) {
-    fs.mkdirSync(outputRoot, { recursive: true });
-    outputRoot = path.resolve(outputRoot);
-  }
+  if (outputRoot) outputRoot = path.resolve(outputRoot);
 
-  const files = collectHtmlInputs(inputDir);
+  const files = collectBatchInputs(inputDir, outputRoot);
   const total = files.length;
   if (total === 0) {
-    process.stdout.write(`No non-subset HTML files found under: ${inputDir}\n`);
+    log(`No non-subset HTML files found under: ${inputDir}`);
     return { processed: 0, skipped: 0, failed: 0, total: 0 };
   }
-  process.stdout.write(`Found ${total} non-subset HTML files under: ${inputDir}\n`);
+  log(`Found ${total} non-subset HTML files under: ${inputDir}`);
 
   // Dry run never opens the browser.
   if (opts.dryRun) {
@@ -196,15 +250,15 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       const stem = basenameStem(file);
       const target = path.join(outDir, `${stem}.pagx`);
       const index = idx + 1;
-      if (opts.skipExisting && fs.existsSync(target)) {
-        process.stdout.write(`[${index}/${total}] skip      ${rel}\n`);
+      if (opts.skipExisting && completeBatchResult(path.join(outDir, `${stem}.import.json`), batchSignature(opts, file))) {
+        log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         return;
       }
-      process.stdout.write(`[${index}/${total}] would process ${rel}\n`);
+      log(`[${index}/${total}] would process ${rel}`);
       processed++;
     });
-    process.stdout.write(`Summary: processed=${processed} skipped=${skipped} failed=0 total=${total}\n`);
+    log(`Summary: processed=${processed} skipped=${skipped} failed=0 total=${total}`);
     return { processed, skipped, failed: 0, total };
   }
 
@@ -215,27 +269,31 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   let processed = 0;
   let skipped = 0;
   let failed = 0;
+  const previewItems: ContactSheetItem[] = [];
 
   try {
     for (let i = 0; i < total; i++) {
+      throwIfCancelled();
       const file = files[i];
       const rel = path.relative(inputDir, file);
       const index = i + 1;
       const outDir = resolveOutputDir(file, inputDir, outputRoot);
       const stem = basenameStem(file);
-      const pagxTarget = path.join(outDir, `${stem}.pagx`);
+      const record = path.join(outDir, `${stem}.import.json`);
+      const signature = batchSignature(opts, file);
 
-      if (opts.skipExisting && fs.existsSync(pagxTarget)) {
-        process.stdout.write(`[${index}/${total}] skip      ${rel}\n`);
+      if (opts.skipExisting && completeBatchResult(record, signature)) {
+        log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         continue;
       }
 
       fs.mkdirSync(outDir, { recursive: true });
-      process.stdout.write(`[${index}/${total}] process   ${rel}\n`);
+      log(`[${index}/${total}] process   ${rel}`);
 
       try {
-        await runHtmlToPagx({
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'running', signature }), { reuseExisting: false });
+        const result = await runHtmlToPagx({
           input: file,
           outputDir: outDir,
           outputName: stem,
@@ -251,6 +309,9 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           downloadImages: opts.downloadImages,
           imageDir: opts.imageDir,
           pagxImages: opts.pagxImages,
+          pagxImageBaseDir: opts.pagxImageBaseDir,
+          svgOptions: opts.svgOptions,
+          verbose: opts.verbose,
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
           captureAnimations: opts.captureAnimations,
@@ -261,11 +322,23 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           viewportHeight: opts.viewportHeight,
           waitMs: opts.waitMs,
           selector: opts.selector,
-          log: (line: string) => process.stdout.write(line + '\n'),
+          log,
           snapshotImpl,
         });
+        if (opts.preview) {
+          if (!result.png) throw new Error(`preview requires a rendered PNG for ${rel}`);
+          previewItems.push({ name: rel.split(path.sep).join('/'), png: result.png });
+        }
+        const files = [result.pagx, ...result.fonts, ...pagxResourceFiles(result.pagx)];
+        if (result.png) files.push(result.png);
+        if (opts.keepSubsetHtml !== false) files.push(result.subsetHtml);
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'complete', signature,
+          artifacts: artifactStamps(files) }), { reuseExisting: false });
         processed++;
       } catch (err) {
+        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'failed', signature,
+          error: errMessage(err) }), { reuseExisting: false });
+        throwIfCancelled();
         failed++;
         const msg = err instanceof PipelineStepError
           ? `${err.step} failed`
@@ -281,6 +354,15 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
     }
   }
 
-  process.stdout.write(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}\n`);
-  return { processed, skipped, failed, total };
+  throwIfCancelled();
+  let preview: ContactSheetResult | undefined;
+  if (opts.preview) {
+    preview = previewItems.length ? await generateContactSheet(previewItems, {
+      outputDir: path.join(outputRoot || inputDir, 'preview'), columns: opts.previewColumns,
+      pagxBin: opts.pagxBin, log,
+    }) : { pages: [] };
+    for (const page of preview.pages) log(`[done] ${page.file}`);
+  }
+  log(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}`);
+  return { processed, skipped, failed, total, ...(preview ? { preview } : {}) };
 }

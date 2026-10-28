@@ -6,7 +6,7 @@
 // intermediate flat HTML.
 //
 // The on-disk pipeline (snapshot.js → pagx import → resolve → render) used by
-// the html2pagx CLI and eval/run.js lives in `lib/pipeline.ts`; that module
+// the pagx import CLI and eval/run.js lives in `lib/pipeline.ts`; that module
 // also exposes a `filterKnownWarnings` helper that mirrors what we do here
 // for stderr cleanup, so the two stay aligned.
 //
@@ -27,7 +27,7 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 
-// Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
+// Recover the `<repo-root>/cmake-build-debug/pagx` path the way pagx import
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
 // canonical local-dev location. We don't verify the file exists here —
 // servers may legitimately boot without a pagx build (PAGX-format requests
@@ -82,17 +82,16 @@ function spawnPagxImport(
       // `pagx import` resolves import directives by default; the server returns the raw imported
       // PAGX and leaves resolution to the caller (see the response comment in server.js), so opt
       // out here to preserve that contract and avoid work the caller may not want.
-      '--no-resolve',
+      '--no-resolve', '--html-no-snapshot',
     ];
     // Flex inference is always on inside the importer now, so there is no flag
     // to pass. We feed it the already-rendered subset HTML, so disable the
-    // importer's own snapshot pre-pass (PAGX_HTML_SNAPSHOT=0) — otherwise it
+    // importer's own snapshot pre-pass (--html-no-snapshot) — otherwise it
     // would render our flat subset in a second browser pass.
     const child = spawn(pagxBin, args, {
       // stdin: not needed (input is a file path); stdout/stderr piped so we
       // can capture pagx's diagnostics for forwarding into our own log.
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
     });
 
     const stderrChunks: Buffer[] = [];

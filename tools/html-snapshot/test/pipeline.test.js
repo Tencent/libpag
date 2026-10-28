@@ -34,18 +34,13 @@ afterEach(() => {
 // `stdout` / `stderr` accept either a single string (emitted verbatim with
 // `printf '%s'`) or an array of strings (joined with newlines so `\n` works
 // without relying on shell-specific escape handling).
-function makeArgvCapturingScript({ exitCode = 0, stdout = '', stderr = '', argvPath, envPath, sleepMs }) {
+function makeArgvCapturingScript({ exitCode = 0, stdout = '', stderr = '', argvPath, sleepMs }) {
   const wrapper = path.join(dir, `wrap-${Math.random().toString(36).slice(2)}.sh`);
   const lines = ['#!/bin/sh'];
   if (argvPath) {
     // Redirect a printf'd argv list into the capture file. Each arg is
     // followed by a NUL byte so empty strings round-trip cleanly.
     lines.push(`printf '%s\\0' "$@" > ${JSON.stringify(argvPath)}`);
-  }
-  if (envPath) {
-    // Capture the importer-snapshot toggle so tests can assert the child saw
-    // PAGX_HTML_SNAPSHOT=0 (set by runPagxImportToFile to skip re-snapshotting).
-    lines.push(`printf '%s' "$PAGX_HTML_SNAPSHOT" > ${JSON.stringify(envPath)}`);
   }
   const emit = (payload, redirect) => {
     if (!payload) return;
@@ -233,17 +228,15 @@ describe('runPagxImportToFile', () => {
   test('rejects when required fields are missing', async () => {
     await expect(runPagxImportToFile({})).rejects.toThrow(/pagxBin is required/);
     await expect(runPagxImportToFile({ pagxBin: '/p' }))
-      .rejects.toThrow(/subsetHtml is required/);
-    await expect(runPagxImportToFile({ pagxBin: '/p', subsetHtml: 'h' }))
+      .rejects.toThrow(/input is required/);
+    await expect(runPagxImportToFile({ pagxBin: '/p', input: 'h' }))
       .rejects.toThrow(/pagxFile is required/);
   });
 
-  test('disables the importer snapshot via env and routes filtered stderr to log', async () => {
+  test('disables the importer snapshot explicitly and routes filtered stderr to log', async () => {
     const argvPath = path.join(dir, 'argv.bin');
-    const envPath = path.join(dir, 'env.bin');
     const wrapper = makeArgvCapturingScript({
       argvPath,
-      envPath,
       stderr: [
         'warning: html: position: absolute on text leaf',
         'real warning: keep me',
@@ -252,7 +245,7 @@ describe('runPagxImportToFile', () => {
     const logs = [];
     const r = await runPagxImportToFile({
       pagxBin: wrapper,
-      subsetHtml: '/in.html',
+      input: '/in.html',
       pagxFile: '/out.pagx',
       log: (m) => logs.push(m),
     });
@@ -265,10 +258,10 @@ describe('runPagxImportToFile', () => {
       '--input', '/in.html',
       '--output', '/out.pagx',
       '--format', 'html',
-      '--no-resolve',
+      '--html-no-snapshot',
     ]);
     // The subset is already rendered, so the importer's own snapshot is disabled.
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('0');
+    expect(readArgv(argvPath)).toContain('--html-no-snapshot');
     const joined = logs.join('\n');
     expect(joined).toMatch(/real warning: keep me/);
     expect(joined).not.toMatch(/position: absolute on text leaf/);
@@ -446,7 +439,7 @@ describe('runHtmlToPagx — orchestrator', () => {
     })).rejects.toThrow(/outputName is required/);
   });
 
-  test('runs snapshot → import → resolve → render against fakes', async () => {
+  test('runs snapshot → import (including resolve) → render against fakes', async () => {
     // Stage a placeholder input so the existence check passes.
     const inputHtml = path.join(dir, 'page.html');
     fs.writeFileSync(inputHtml, '<html></html>');
@@ -563,11 +556,10 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(fs.existsSync(result.pagx)).toBe(true);
   });
 
-  test('skips render when doRender=false but resolve still runs', async () => {
+  test('skips render and performs one native import when doRender=false', async () => {
     const inputHtml = path.join(dir, 'p.html');
     fs.writeFileSync(inputHtml, '<html></html>');
     const fakePagx = makeFakePagx({ allowRender: false });
-    let resolveCalls = 0;
     // Parse argv on every invocation to count the resolve runs.
     const argvLog = path.join(dir, 'pagx.argv');
     const wrapper = makeArgvCapturingScript({ argvPath: argvLog });
@@ -584,8 +576,8 @@ describe('runHtmlToPagx — orchestrator', () => {
     });
     expect(result.png).toBeNull();
     expect(fs.existsSync(result.pagx)).toBe(true);
-    resolveCalls = fakePagx.callsByCmd.resolve;
-    expect(resolveCalls).toBeGreaterThanOrEqual(1);
+    expect(fakePagx.callsByCmd.import).toBe(1);
+    expect(fakePagx.callsByCmd.resolve).toBe(0);
   });
 
   test('throws when pagx import succeeds but the .pagx file is not on disk', async () => {
@@ -683,6 +675,26 @@ describe('runHtmlToPagx — orchestrator', () => {
     expect(fs.existsSync(result.subsetHtml)).toBe(false);
     // The pagx file itself stays put under the requested outputDir.
     expect(fs.existsSync(result.pagx)).toBe(true);
+  });
+
+  test.each(['manifest', 'in-process'])('%s font lists exclude stale shared-cache faces', async mode => {
+    const input = path.join(dir, 'fonts.html'), fontDir = path.join(dir, 'shared-fonts');
+    fs.writeFileSync(input, '<html/>');
+    fs.mkdirSync(fontDir);
+    fs.writeFileSync(path.join(fontDir, 'stale.ttf'), 'old font');
+    let manifest;
+    const result = await runHtmlToPagx({ input, fontDir, downloadFonts: true,
+      outputDir: path.join(dir, 'out'), pagxBin: makeFakePagx().path, scriptDir: dir, doResolve: false,
+      snapshotImpl: async args => {
+        manifest = args.fontManifest;
+        fs.writeFileSync(args.output, '<html/>');
+        if (mode === 'manifest') fs.writeFileSync(manifest, '');
+        return { code: 0, durationMs: 0, stdout: '', stderr: '', ...(mode === 'in-process' ? { fontFiles: [] } : {}) };
+      },
+    });
+    expect(result.fonts).toEqual([]);
+    expect(fs.existsSync(manifest)).toBe(false);
+    expect(fs.readFileSync(path.join(fontDir, 'stale.ttf'), 'utf8')).toBe('old font');
   });
 
   test('URL inputs default outputDir to cwd and require outputName', async () => {

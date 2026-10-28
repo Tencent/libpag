@@ -16,8 +16,13 @@ function compiledSources(directory) {
 
 module.exports = {
   testEnvironment: 'node',
+  maxWorkers: 2,
   testMatch: ['<rootDir>/test/**/*.test.js'],
   transformIgnorePatterns: ['/node_modules/(?!(pixelmatch)/)'],
+  transform: {
+    '[/\\\\]node_modules[/\\\\]pixelmatch[/\\\\].*\\.js$': 'babel-jest',
+  },
+  coverageProvider: 'v8',
   collectCoverageFrom: [
     ...compiledSources('lib'),
     'bench/report-utils.js',

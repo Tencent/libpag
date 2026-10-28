@@ -48,11 +48,11 @@ describe('CSS background layout agrees with Chromium', { skip: !fs.existsSync(bi
       const input = path.join(dir, `${kind}.html`), output = path.join(dir, `${kind}.pagx`);
       fs.writeFileSync(input, source);
       for (const args of [
-        ['import', '--input', input, '--output', output, '--format', 'html'],
+        ['import', '--input', input, '--output', output, '--format', 'html', '--html-no-snapshot'],
         ['render', output, '-o', path.join(dir, `${kind}.png`), '--scale', String(scale)],
       ]) {
         const result = spawnSync(binary, args, {
-          env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' }, encoding: 'utf8',
+          encoding: 'utf8',
         });
         assert.equal(result.status, 0, `${name}/${kind}: ${result.stderr}; ${dir}`);
       }

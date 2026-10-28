@@ -259,7 +259,18 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
   // through `_diagnostics` so they end up on PAGXDocument::errors once the document exists.
   if (_options.autoNormalize) {
-    auto report = HTMLSubsetTransformer::Transform(root, DeriveTransformerOptions(_options));
+    auto transformOptions = DeriveTransformerOptions(_options);
+    // Current-state snapshots already contain measured positions. Inferring responsive flex
+    // from them can move scrolled/fixed/overlapping content away from the captured state.
+    for (auto node = root->getFirstChild(); node; node = node->getNextSibling()) {
+      if (node->name != "body") continue;
+      for (const auto& attr : node->attributes) {
+        if (attr.name == "data-pagx-capture-mode" && attr.value == "current-state") {
+          transformOptions.inferFlexFromAbsolute = false;
+        }
+      }
+    }
+    auto report = HTMLSubsetTransformer::Transform(root, transformOptions);
     for (auto& diag : report.diagnostics) {
       std::string formatted = diag.message;
       if (!diag.code.empty()) {

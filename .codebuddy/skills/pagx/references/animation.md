@@ -1,10 +1,21 @@
-# Animation: making the PAGX move
+# Animation: HTML capture and native PAGX transforms
 
-The converter does not just flatten a still frame — it also captures the page's **motion** and
-bakes it into the `.pagx` as a real PAGX animation timeline. Capture is **automatic** (on by
-default in both the in-repo `html2pagx` path and the npm `pagx import` path); no flag is needed.
-This reference covers what gets captured, which channels play back, how to author HTML that
-animates faithfully, how to preview the motion, and how to read the warnings.
+HTML conversion is **static by default**. Enable `--html-capture-animations` to capture supported
+page motion as a PAGX animation timeline:
+
+```bash
+pagx import --input motion.html --output motion.pagx --html-capture-animations
+# Also render a PNG; add resource/subset options when needed:
+pagx import motion.html --output-dir out --render --html-capture-animations
+```
+
+The separate repository `snapshot.js` tool uses `--capture-animations` instead. Check the
+selected executable's command help before using it. For click/hover/scroll states, see
+[Interaction capture](interaction.md): scenarios export static checkpoints and cannot be combined
+with `--html-capture-animations`.
+
+The HTML sections below describe the capture pipeline, not every native PAGX animation
+capability. For direct XML editing, see [Native transforms](#native-pagx-transform-animation).
 
 ## Table of contents
 
@@ -15,14 +26,15 @@ animates faithfully, how to preview the motion, and how to read the warnings.
 - [Previewing the motion](#previewing-the-motion)
 - [Timing, looping, and fill mode](#timing-looping-and-fill-mode)
 - [Warnings and troubleshooting](#warnings-and-troubleshooting)
+- [Native PAGX transform animation](#native-pagx-transform-animation)
 
 ---
 
 ## What can be captured
 
-The snapshot reads animations from every common source and normalizes them into one canonical form
+The snapshot reads supported animation sources and normalizes them into one canonical form
 (CSS `@keyframes` + an `animation` shorthand) that the importer maps onto the PAGX animation model.
-Sources captured automatically:
+With animation capture enabled, supported sources include:
 
 - **CSS `@keyframes` + `animation`** — plain stylesheet animations (the most reliable source).
 - **Web Animations API (WAAPI)** — `element.animate(...)`, and libraries built on it such as
@@ -33,56 +45,61 @@ Sources captured automatically:
 Only animations that are **running or attached at snapshot time** are seen. Looping / infinite
 animations (the common case for ambient motion, loaders, marquees) are captured most reliably. A
 one-shot entrance that has already finished and been released by the browser may not be captured —
-prefer `iteration-count: infinite` (or `loop: true`) while designing, or an animation that is still
-attached when the page settles.
+capture it while still attached, and use fill/settle timing appropriate to the intended motion.
+Use infinite looping only when repetition is part of the requested result.
 
 ## What actually plays back
 
-The PAGX runtime animates a fixed set of channels. The converter keeps every property below and
-**drops the rest** (with a `subset:animation-unsupported-property` warning):
+The HTML converter maps supported CSS properties to PAGX channels. Unsupported animated
+properties are dropped with a `subset:animation-unsupported-property` warning:
 
 | CSS property you animate | PAGX channel | Notes |
 |--------------------------|--------------|-------|
 | `opacity` | layer `alpha` | fades |
-| `transform: translateX/Y/translate(...)` | layer `x` / `y` | slides / position moves (stacks on top of layout) |
+| `transform: translateX/Y/translate(...)` | layer `x` / `y`, or `matrix` | local translation on top of layout; a static transform requires full matrix samples so the animation can replace it |
 | `transform: scale / rotate / skew / matrix(...)` | layer `matrix` | zoom, spin, shear — pivots around `transform-origin` |
 | `color` | fill `color` | needs a solid text `color` fill present |
 | `background-color` | fill `color` | needs a solid `background-color` present |
 | `filter: drop-shadow(...)` | drop-shadow filter | animated glow / shadow; each shadow in the chain is kept |
 | `filter: blur(...)` | blur filter | animated blur radius |
+| `filter: brightness(...)` | generated layer `alpha` | approximate dimming; values above 1 are clamped, with a diagnostic |
 | `clip-path: inset/circle/ellipse/polygon/path(...)` | contour-mask morph | wipes / reveals / iris — all keyframes must share the same shape |
 
 A `box-shadow` that only appears in an animated state (e.g. a `.on` class toggled over the
 timeline) is folded into the drop-shadow filter channel automatically, so a pulsing glow animates
 even when authored as `box-shadow`.
 
-**Not playable** (silently flattened to the static frame): any **layout** property (`width`,
+**Not captured as playable HTML motion**: **layout** properties (`width`,
 `height`, `margin`, `padding`, `gap`, `flex`, `top`/`left`, …) and **3D transforms**
-(`matrix3d`, `rotate3d`, `perspective`). Everything in the table above — including scale, rotate,
-and skew — now plays back; earlier versions dropped non-translation transforms, so do not assume a
-"zoom" or "spin" will go static.
+(`matrix3d`, `rotate3d`, `perspective`). The browser capture may retain only translation from a
+computed 3D matrix, and native subset import rejects 3D transform keyframes. Native PAGX supports
+3D animation independently; that does not make arbitrary HTML 3D motion importable.
 
 > A `transform` chain that mixes translate with scale/rotate/skew is kept whole and routed through
 > the `matrix` channel (not split). The matrix channel pivots around the element's
 > `transform-origin` exactly like a static transform, so animated and static transforms agree.
-> One caveat: matrix interpolation cannot recover a full turn or a rotation crossing ±180° between
-> two adjacent keyframes (it takes the short way around). Author intermediate `@keyframes` stops
-> (e.g. `0% / 50% / 100%`) for large spins — the usual case already does this.
+> Matrix interpolation takes the shorter rotation path and cannot recover extra turns from two
+> endpoint matrices. Author intermediate `@keyframes` stops
+> (e.g. quarter-turn stops for a full spin) to keep each rotation segment below 180°.
 
 Color pulses work only when the element actually paints a solid `color` / `background-color`; with
 no solid fill there is no `color` channel to drive.
 
 ## Animating inline SVG
 
-Inline `<svg>` shapes get their own painter channels, which unlock icon and line-art motion:
+Inline `<svg>` shapes use Layer, Group and painter channels for icon and line-art motion:
 
 | SVG property you animate | Effect |
 |--------------------------|--------|
 | `opacity` | shape fades |
-| `transform` (**translate only**) | shape slides — scale/rotate on an SVG shape is dropped |
+| `transform` (supported 2D forms) | translation uses `x`/`y` when no static transform is present; a pure rotation may use the resolved Group's `rotation`; other affine transforms use the shape Layer's `matrix` |
 | `fill` / `fill-opacity` | fill color / fill alpha |
 | `stroke` / `stroke-opacity` | stroke color / stroke alpha |
 | `stroke-dashoffset` | the path-trace **line-draw** idiom (`stroke-dasharray:1; stroke-dashoffset:1→0` with `pathLength="1"`) |
+
+A pre-existing static shape transform makes the animation use full matrix samples to replace
+that transform; the original static transform supplies the fill-mode baseline. 3D/perspective
+keyframes are still unsupported.
 
 A single SVG shape may carry a comma-separated `animation` list (e.g. draw the outline, then fade
 the fill in): `animation: draw 1s linear forwards, fill 0.4s ease 1s forwards`. Each entry becomes
@@ -95,36 +112,37 @@ Add these on top of the static rules in `authoring-html.md`:
 
 - **Author with `@keyframes` + `animation`** for the most predictable result. GSAP / anime.js /
   WAAPI also work, but the declarative CSS form captures its easing exactly.
-- **Keep animated properties inside the playable set above.** Layout properties and 3D transforms
-  become static. Re-express a size change as `scale`, a 3D flip as a 2D `rotate`/`scaleX`.
+- **Keep HTML animation within the supported set above.** If the requested motion requires
+  unsupported properties, use a suitable native PAGX implementation or explain the approximation.
+  A 2D substitute for a 3D flip changes the result and should match the user's intent.
 - **Auto-play on load.** Hover-, scroll-, or click-triggered animations have not fired when the
-  snapshot is taken (no interaction occurs). Use `animation` that starts immediately, or — for
-  scroll-revealed sections — convert with `--scroll-reveal` so they trigger. Do not rely on `:hover`.
-- **Make looping motion `infinite`** so it is captured reliably and so the PAGX loops (a finite
-  count > 1 is downgraded to play once — see below).
+  ordinary snapshot is taken. Use motion that starts on load, or capture with `--html-scroll-reveal`
+  for scroll-revealed content. A scenario can capture a triggered static state, but does not
+  record its interaction as a playable animation.
+- **Use `infinite` for intentionally looping motion.** Preserve one-shot motion when requested;
+  finite repeat counts above 1 are downgraded to play once (see below).
 - **To animate color, give the element a solid `background-color` (or text `color`).** Without a
   solid fill there is no `color` channel to drive.
 - **Set `transform-origin`** on anything you scale/rotate/skew so the pivot matches your intent
   (defaults to the box center).
 
-Example of a clean, fully-captured animation using several channels:
+A minimal HTML rotation example with intermediate stops and no external assets:
 
 ```html
 <head>
   <style>
-    @keyframes floatIn  { 0% { opacity:0; transform:translateY(24px);} 100% { opacity:1; transform:translateY(0);} }
-    @keyframes spin      { to { transform: rotate(360deg); } }
-    @keyframes pulse     { 0%,100% { background-color:#6366F1;} 50% { background-color:#8B5CF6;} }
-    @keyframes glow      { 0%,100% { filter: drop-shadow(0 0 4px #6366F1);} 50% { filter: drop-shadow(0 0 24px #8B5CF6);} }
-    @keyframes iris      { 0% { clip-path: circle(0%);} 100% { clip-path: circle(75%);} }
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      25%  { transform: rotate(90deg); }
+      50%  { transform: rotate(180deg); }
+      75%  { transform: rotate(270deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
-<body style="margin:0; width:640px; height:400px;">
-  <h1  style="animation: floatIn 1.2s ease-out infinite alternate;">Hello</h1>
-  <div style="transform-origin:center; animation: spin 4s linear infinite;">◆</div>
-  <div style="background-color:#6366F1; animation: pulse 2s linear infinite;">Badge</div>
-  <div style="background:#111; animation: glow 1.5s ease-in-out infinite;">Glow</div>
-  <div style="background:#0af; animation: iris 1s ease-out infinite;">Reveal</div>
+<body style="margin:0; width:640px; height:400px; background:#f3f4f6;">
+  <div style="position:absolute; left:280px; top:180px; width:80px; height:40px;
+              background:#2456bc; transform-origin:center; animation:spin 4s linear infinite;"></div>
 </body>
 ```
 
@@ -140,9 +158,13 @@ pagx render <name>.pagx -o frame_05.png --time 0.5
 pagx render <name>.pagx -o frame_10.png --time 1.0
 ```
 
-Pick times that span one loop period (the longest `delay + duration` across the page's animations).
-Looping animations realign every period, so one period is enough to see the whole motion. `--time`
-cannot be combined with `--crop`, `--id`, or `--xpath`.
+Pick times covering each animation's delay, active interval and boundary behavior. Different
+loop durations need not realign at the longest duration; an alternate loop also includes its
+return leg. `--time` cannot be combined with `--crop`, `--id`, or `--xpath`.
+
+Timed rendering also drives timelines mounted on Composition instances, honoring each slot's
+`evaluationOffset` (in frames) and `playing` state. Paused slots do not advance with the requested
+time. Compare both active and paused instances when diagnosing reused animated components.
 
 Show the user the frame sequence (or assemble them into a GIF/contact sheet) so they can confirm the
 motion, not just the still design.
@@ -170,16 +192,72 @@ How CSS animation timing maps onto PAGX (full detail in `spec/html_subset.md` §
 
 ## Warnings and troubleshooting
 
-`pagx import` prints `subset:animation-*` diagnostics; they are informational, not failures:
+`pagx import -v` exposes `subset:animation-*` conversion warnings. Review lost or approximated
+motion; these warnings are distinct from command failures and `pagx verify` diagnostics:
 
 | Symptom / warning | Cause / fix |
 |-------------------|-------------|
-| `subset:animation-unsupported-property` | An animated property has no runtime channel — a layout property (`width`, `height`, `margin`, …), a 3D transform (`matrix3d`/`rotate3d`/`perspective`), a `color` animation with no solid fill, or an inline-SVG `transform` that is not a pure translate. Re-express it or accept it as static. |
+| `subset:animation-unsupported-property` | The HTML importer cannot map the property — for example a layout property, a 3D transform, color with no solid fill, or an invalid SVG transform. Use a supported representation or report the lost motion. |
 | `subset:animation-multiple` | A regular element had several comma-separated animations (or timing functions); only the first was kept. Split into separate elements, or use an inline SVG shape (which supports a list). |
 | `subset:animation-finite-count` | A finite repeat count > 1 (or a finite `alternate`, or count `0`) was downgraded / suppressed. Use `infinite` to loop. |
 | `subset:animation-unknown-keyframes` | The `animation` referenced a `@keyframes` name that no longer exists; the animation was dropped. |
-| The element does not move in the preview | The animation was hover/scroll/click-triggered (never fired — make it auto-play or use `--scroll-reveal`), already finished before the snapshot (use `infinite`), or only animated a non-playable property. |
-| A rotate/scale "takes the short way" or snaps | Matrix interpolation cannot cross ±180° or a full turn in one segment; add intermediate `@keyframes` stops (`0% / 50% / 100%`). |
+| The element does not move in the preview | First check `--html-capture-animations` and render different `--time` values. Then check whether the animation was never triggered, already finished/detached, or used an unsupported property. |
+| A rotate/scale "takes the short way" or snaps | Matrix interpolation loses full turns and chooses the shorter rotation path; add stops so each intended rotation segment is below 180°. |
 | Color animation does nothing | The element paints no solid `color` / `background-color`; add one. |
 | A `clip-path` reveal is dropped | The keyframes animate between different shape functions (e.g. `circle()` → `polygon()`); CSS only interpolates matching shapes. Keep every stop the same function with the same point count. |
-| Want a purely static `.pagx` | Capture cannot be disabled from `html2pagx` today; remove the `animation` declarations from the HTML, or run `pagx import` on a static subset HTML with no `@keyframes`. |
+| Want a static page capture | Omit `--html-capture-animations` on ordinary HTML capture/import. No source animation removal is needed. Direct import of an already prepared subset can still contain authored `@keyframes`. |
+
+## Native PAGX transform animation
+
+Use this section when authoring or editing PAGX XML directly. These native channels are broader
+than the HTML capture set. Static attributes and channel names differ:
+
+| Static Layer attributes | Animation / DataBind channel names | Value type |
+|---|---|---|
+| `x`, `y`, `z` | `x`, `y`, `z` | `float` |
+| `rotationX`, `rotationY`, `rotationZ` | `rotation.x`, `rotation.y`, `rotation.z` | `float`, degrees |
+| `scaleX`, `scaleY`, `scaleZ` | `scale.x`, `scale.y`, `scale.z` | `float` |
+| `skewX`, `skewY` | `skew.x`, `skew.y` | `float`, degrees strictly between −90 and 90 |
+| `perspective` | `perspective` | `float`, nonnegative distance; 0 disables perspective |
+| `matrix` | `matrix` | `matrix`; animation only |
+| `matrix3D` | `matrix3D` | `matrix3D`; animation only |
+
+Scalar translation and component channels support animation and DataBind. Full `matrix` and
+`matrix3D` channels cannot be data-bound. Use the channel name (for example `rotation.z`), not
+the static attribute name (`rotationZ`), in `<Channel name="...">` or `<DataBind channel="...">`.
+See [Layer transforms](guide.md#layer-transforms) for layout composition and static precedence.
+
+For a layer with `id="card"`, a native full-turn animation can use an unwrapped scalar angle:
+
+```xml
+<Animations>
+  <Animation id="spin" duration="120" frameRate="60" loop="loop">
+    <Object target="card">
+      <Channel name="rotation.z" type="float">
+        <Key time="0" value="0" interpolation="linear"/>
+        <Key time="120" value="360"/>
+      </Channel>
+    </Object>
+  </Animation>
+</Animations>
+```
+
+Place `<Animations>` in the document or Composition containing the target. Composition animations
+must be activated on the referencing Layer through `<Timelines><Animation ref="@spin"/></Timelines>`.
+Key times and duration are frames; `pagx render --time` takes seconds.
+
+Component channels retain authored angles while driven as components, allowing full turns and
+scales passing through zero. Matrix writes replace the corresponding transform, after which a
+component write first needs a valid decomposition. Avoid competing matrix and scalar channels
+when a single representation expresses the intended motion. A non-identity static `matrix`
+suppresses `x`/`y` and component writes; a non-identity static `matrix3D` also suppresses `z` and
+`matrix` writes. Remove a conflicting static matrix or animate its matching matrix channel.
+
+`matrix3D` values contain 16 column-major numbers. Authored matrices and keyframes must be finite
+and invertible; use explicit `type="matrix3D"` for clarity. Interpolation normally decomposes the
+matrix and uses quaternion rotation interpolation, with element-wise interpolation as a fallback.
+Matrix endpoints alone cannot preserve extra full turns. Intermediate poses can be singular:
+a collapsed content plane has no drawable area, and component access requiring decomposition can
+fail until a decomposable matrix is restored. Component writes with invalid skew or negative
+perspective are rejected. Inspect timed renders when mixing transform representations or crossing
+degenerate poses.

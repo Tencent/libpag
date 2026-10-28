@@ -26,9 +26,10 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 ```
 
 - `width`, `height` are **required**.
-- **`<pagx>` direct children: ONLY `<Layer>` and `<Resources>`** — no other elements.
+- `<pagx>` accepts `<Layer>`, `<Resources>`, `<Animations>` and `<DataBind>` as direct children.
   VectorElements must be inside a `<Layer>`. `<Group>` as a direct child causes a parse error.
-- `<Composition>` has the same rule — top-level children must be `<Layer>` only.
+- `<Composition>` accepts `<Layer>`, `<Animations>` and `<DataBind>`; shared resources belong in
+  the document's `<Resources>`.
 - Layers render in document order: earlier = below, later = above.
 - `<Resources>` may appear anywhere; parsers support forward references.
 
@@ -39,6 +40,35 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 - **Canvas clipping**: the `<pagx>` `width`/`height` define the rendering boundary — any
   content extending beyond it is clipped. Allow margin for drop shadows, blurs, and
   stroke half-widths that fall outside their geometry.
+
+## Layer Transforms
+
+Layout and local transforms serve different purposes. Layout/constraints assign a Layer's
+position and size; authored `x`/`y` add a local translation to that position instead of being
+replaced. The final transform is `T(layoutPosition) * local`. Rotation, scale, skew, perspective
+and `z` affect rendering without rearranging siblings or changing the parent layout.
+
+Without a non-identity matrix, the local transform combines perspective, translation, rotation,
+skew and scale as `P * T * R * K * S` (column vectors), with `R = Rz * Ry * Rx`.
+Scalar attributes are `x`/`y`/`z`, `rotationX/Y/Z`, `scaleX/Y/Z`, `skewX/Y` and `perspective`.
+Layer transforms act around the local origin; use a positioned parent/child structure to place
+a pivot when needed. These are Layer attributes; Group has its own `anchor`/`position`/
+`rotation`/`scale` model.
+
+- A non-identity `matrix` overrides `x`/`y` and the rotation/scale/skew/perspective components;
+  `z` still applies.
+- A non-identity `matrix3D` overrides `matrix` and all scalar transform components, including `z`.
+- `matrix3D` has 16 column-major values and must be finite and invertible when authored.
+  `preserve3D="true"` preserves child transforms in a shared 3D space; the default flattens them
+  into the parent's plane.
+- Skew angles must be strictly between −90° and 90°; perspective distance must be nonnegative
+  (0 means none). Invalid static components can fall back to translation only; correct them
+  instead of relying on that fallback.
+
+Use [Attributes](attributes.md#layer) for defaults and
+[Native transform animation](animation.md#native-pagx-transform-animation) for channel names,
+DataBind support and matrix/scalar precedence during playback. Native 3D animation support does
+not imply that the HTML importer captures CSS 3D animation.
 
 ## Color Formats
 
@@ -60,6 +90,7 @@ Spec rules, techniques, and common pitfalls for writing correct PAGX files.
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
 | **Import Directives** | `<svg>` (inline SVG), `import` attribute |
+| **Animation and Binding** | `Animations`, `Animation`, `Object`, `Channel`, `Key`, `Timelines`, `DataBind` |
 
 ### Containment Hierarchy
 
@@ -70,8 +101,11 @@ pagx (required: width, height)
 │   ├── <svg>* (import directive)
 │   ├── LayerStyles* (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle)
 │   ├── LayerFilters* (BlurFilter, DropShadowFilter, ...)
+│   ├── Timelines? (activate animations/state machines on a referenced Composition)
 │   └── Layer* (child layers, recursive)
 │
+├── Animations? (animation/state-machine definitions)
+├── DataBind*
 └── Resources (optional)
     ├── Image, PathData, SolidColor
     ├── LinearGradient/RadialGradient/ConicGradient/DiamondGradient → ColorStop*

@@ -2200,6 +2200,92 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
 // the middle dot as a 14px gap, but those widths represent source `width:auto` rather than authored
 // constraints. The internal intrinsic-width marker clears them only after inference, leaving both
 // the row and its editable text children content-sized in PAGX.
+PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotKeepsMeasuredAbsoluteLayout) {
+  const std::string content = R"HTML(
+    <div id="row" style="position:absolute;left:20px;top:30px;width:220px;height:40px">
+      <div style="position:absolute;left:0px;top:0px;width:100px;height:40px;background:red"></div>
+      <div style="position:absolute;left:120px;top:0px;width:100px;height:40px;background:blue"></div>
+    </div></body></html>
+  )HTML";
+  auto legacy = ParseFromString("<html><body style=\"width:400px;height:300px\">" + content);
+  ASSERT_NE(legacy, nullptr);
+  EXPECT_EQ(legacy->layers.front()->children.front()->layout, pagx::LayoutMode::Horizontal);
+
+  auto captured = ParseFromString(
+      "<html><body data-pagx-capture-mode=\"current-state\" "
+      "style=\"width:400px;height:300px\">" +
+      content);
+  ASSERT_NE(captured, nullptr);
+  auto* body = captured->layers.front();
+  auto* row = body->children.front();
+  EXPECT_EQ(row->layout, pagx::LayoutMode::None);
+  ASSERT_EQ(row->children.size(), 2u);
+  EXPECT_FLOAT_EQ(row->children[1]->left, 120.0f);
+  EXPECT_FLOAT_EQ(row->children[1]->width, 100.0f);
+  EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, CaptureModeOnlyRecognizesCurrentStateOnBody) {
+  struct Case {
+    std::string bodyAttributes;
+    std::string rowAttributes;
+    pagx::LayoutMode expectedLayout;
+  };
+  const std::vector<Case> cases = {
+      {"data-pagx-capture-mode=\"current-state\"", "", pagx::LayoutMode::None},
+      {"data-pagx-capture-mode=\"legacy\"", "", pagx::LayoutMode::Horizontal},
+      {"data-pagx-capture-mode=\"\"", "", pagx::LayoutMode::Horizontal},
+      {"data-pagx-capture-mode=\"Current-State\"", "", pagx::LayoutMode::Horizontal},
+      {"", "data-pagx-capture-mode=\"current-state\"", pagx::LayoutMode::Horizontal},
+      {"", "", pagx::LayoutMode::Horizontal},
+  };
+  for (const auto& item : cases) {
+    SCOPED_TRACE(item.bodyAttributes + " / " + item.rowAttributes);
+    auto document = ParseFromString(
+        "<html data-pagx-capture-mode=\"current-state\">"
+        "<head data-pagx-capture-mode=\"current-state\"></head><body " +
+        item.bodyAttributes + " style=\"width:400px;height:300px\"><div id=\"row\" " +
+        item.rowAttributes +
+        " style=\"position:absolute;left:20px;top:30px;width:220px;height:40px\">"
+        "<div style=\"position:absolute;left:0px;top:0px;width:100px;height:40px\"></div>"
+        "<div style=\"position:absolute;left:120px;top:0px;width:100px;height:40px\"></div>"
+        "</div></body></html>");
+    ASSERT_NE(document, nullptr);
+    ASSERT_EQ(document->layers.size(), 1u);
+    auto* body = document->layers.front();
+    ASSERT_EQ(body->children.size(), 1u);
+    auto* row = body->children.front();
+    EXPECT_EQ(row->layout, item.expectedLayout);
+    EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+    EXPECT_EQ(row->customData.count("pagx-capture-mode"), 0u);
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotPreservesAuthoredFlexAndUserData) {
+  auto document = ParseFromString(R"HTML(
+    <html><head></head><body data-before="first" data-pagx-capture-mode="current-state"
+        data-after="last" style="width:400px;height:300px">
+      <div id="row" data-pagx-capture-mode="current-state" data-action="select"
+          style="display:flex;flex-direction:row;gap:20px;width:220px;height:40px">
+        <div style="width:100px;height:40px;background:red"></div>
+        <div style="width:100px;height:40px;background:blue"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(document, nullptr);
+  ASSERT_EQ(document->layers.size(), 1u);
+  auto* body = document->layers.front();
+  EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+  EXPECT_EQ(body->customData.at("before"), "first");
+  EXPECT_EQ(body->customData.at("after"), "last");
+  ASSERT_EQ(body->children.size(), 1u);
+  auto* row = body->children.front();
+  EXPECT_EQ(row->layout, pagx::LayoutMode::Horizontal);
+  ASSERT_EQ(row->children.size(), 2u);
+  EXPECT_EQ(row->customData.count("pagx-capture-mode"), 0u);
+  EXPECT_EQ(row->customData.at("action"), "select");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:1120px;height:80px">
@@ -10256,7 +10342,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferencePreservesExplicitPaintOrder
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceRecoversNestedPaddingUnderStretchParent) {
-  // Regression for the snapshot.js → pagx import pipeline (`html2pagx`). The body has a
+  // Regression for the snapshot.js → pagx import pipeline (`pagx import`). The body has a
   // column-stretch flex layout (children span the full body width), so the outer pass
   // erases each child's `width: 320px`. The inner child is itself a row container whose
   // own children stop short of both edges (`left:14..286`), and its row padding must be

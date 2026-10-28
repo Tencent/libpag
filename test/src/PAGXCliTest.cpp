@@ -1562,9 +1562,39 @@ CLI_TEST(PAGXCliTest, Import_SvgOptions) {
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, Import_UnexpectedArgument) {
+CLI_TEST(PAGXCliTest, Import_MissingPositionalFile) {
   auto ret = CallRun(pagx::cli::RunImport, {"import", "somefile.svg"});
   EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_PositionalAndDirectoryOutput) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "positional.svg");
+  auto dir = TempDir() + "/import-directory";
+  EXPECT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "--output-dir", dir, "--output-name", "renamed"}),
+            0);
+  EXPECT_TRUE(std::filesystem::is_regular_file(dir + "/renamed.pagx"));
+  EXPECT_NE(CallRun(pagx::cli::RunImport, {"import", svgPath, "--input", svgPath}), 0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "-o", dir + "/a.pagx", "--output-dir", dir}),
+            0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "--output-dir", dir, "--output-name", "../outside"}),
+            0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport, {"import", svgPath, "--html-no-snapshot"}), 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_SubsetResolvesNestedSvg) {
+  auto input = TempDir() + "/subset.html";
+  std::ofstream(input) << "<html><body style=\"width:20px;height:20px\"><svg width=\"20\" "
+                          "height=\"20\"><rect width=\"20\" height=\"20\" fill=\"red\"/>"
+                          "</svg></body></html>";
+  auto output = TempDir() + "/subset.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", input, "--html-no-snapshot", "-o", output}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("<Rectangle"), std::string::npos);
+  EXPECT_EQ(xml.find("import="), std::string::npos);
 }
 
 //==============================================================================
@@ -1636,15 +1666,7 @@ CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
     out << "<html><body style=\"width:20px;height:20px\"><div "
            "style=\"width:20px;height:20px;background:#0F0\"></div></body></html>";
   }
-  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
-  std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "0", 1);
-  auto result = pagx::cli::ImportFile(htmPath, "", {});
-  if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
+  auto result = pagx::cli::ImportFile(htmPath, "", {}, NAN, NAN, pagx::cli::HTMLSource::Subset);
   EXPECT_TRUE(result.error.empty());
   ASSERT_NE(result.document, nullptr);
 }
@@ -1657,18 +1679,10 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
     std::ofstream out(htmlPath);
     out << "<html><body style=\"width:20px;height:20px\"></body></html>";
   }
-  const char* previousEnabled = std::getenv("PAGX_HTML_SNAPSHOT");
   const char* previousBin = std::getenv("PAGX_HTML_SNAPSHOT_BIN");
-  std::string savedEnabled = previousEnabled ? previousEnabled : "";
   std::string savedBin = previousBin ? previousBin : "";
-  setenv("PAGX_HTML_SNAPSHOT", "1", 1);
   setenv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js", 1);
   auto result = pagx::cli::ImportFile(htmlPath, "", {});
-  if (previousEnabled) {
-    setenv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
   if (previousBin) {
     setenv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str(), 1);
   } else {
@@ -1681,15 +1695,8 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
 // A URL input while the snapshot pre-pass is disabled is rejected: the importers cannot fetch
 // http(s) themselves.
 CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
-  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
-  std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "off", 1);
-  auto result = pagx::cli::ImportFile("https://example.com/demo", "", {});
-  if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
+  auto result = pagx::cli::ImportFile("https://example.com/demo", "", {}, NAN, NAN,
+                                      pagx::cli::HTMLSource::Subset);
   EXPECT_FALSE(result.error.empty());
   EXPECT_EQ(result.document, nullptr);
 }

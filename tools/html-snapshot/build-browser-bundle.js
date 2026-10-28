@@ -38,6 +38,7 @@ const {
   browserApplyIconFontSvgs,
   ICON_FONT_HELPERS_SRC,
 } = require('./dist/lib/icon-font');
+const { collectCurrentState } = require('./dist/lib/current-state');
 
 // Public API exposed by the browser bundle, in the order their source code
 // appears in factoryBody and their entries appear in the returned object.
@@ -51,6 +52,7 @@ const {
 const BROWSER_EXPORTS = [
   { name: 'installTextLayout',     fn: installTextLayout },
   { name: 'installControlPaints',   fn: installControlPaints },
+  { name: 'collectCurrentState',    fn: collectCurrentState },
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
@@ -107,6 +109,8 @@ ${BROWSER_EXPORTS.map((e) => e.fn.toString()).join('\n\n')}
 
 return {
   installTextLayout: installTextLayout,
+  installControlPaints: installControlPaints,
+  collectCurrentState: collectCurrentState,
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,

@@ -15,7 +15,7 @@ markup routinely goes beyond it. Cases are therefore split into two tiers:
 
 | Tier | Entry point | Expectation | How it is checked |
 |------|-------------|-------------|-------------------|
-| `subset`   | `HTMLImporter` directly (`PAGX_HTML_SNAPSHOT=0 pagx import`) | Faithful, near-lossless mapping | `pagx import` + `pagx verify`; asserted diagnostics match `expected_warnings` |
+| `subset`   | `HTMLImporter` directly (`pagx import --html-no-snapshot`) | Faithful, near-lossless mapping | `pagx import` + `pagx verify`; asserted diagnostics match `expected_warnings` |
 | `snapshot` | `snapshot.js` → import → render (real Chromium) | Graceful degradation / visual fidelity | `tools/html-snapshot/eval` SSIM + pixel diff |
 
 `subset` cases must import with **only** the warning codes listed in
@@ -55,7 +55,7 @@ corpus currently holds **187 cases** across 20 categories (167 `subset` +
 Tier 1 (subset, direct importer — no browser needed):
 
 ```bash
-PAGX_HTML_SNAPSHOT=0 ./build/pagx import \
+./build/pagx import --html-no-snapshot \
   --input resources/html/cases/05-flexbox/gap__single.html \
   --output /tmp/out.pagx -v      # -v prints subset:* warnings
 ./build/pagx verify --input /tmp/out.pagx
