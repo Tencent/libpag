@@ -24,7 +24,9 @@ set(PAG_BUILD_PAGX ON)
 set(PAG_BUILD_SVG ON)
 set(PAG_BUILD_HTML ON)
 set(PAG_BUILD_PPT ON)
-set(PAG_BUILD_CLI OFF)
+# The test suites call into CLI entry points (RunVerify, image storage helpers), which also
+# pulls in the libxml2 vendor and the generated pagx_xsd.h header from the root's CLI block.
+set(PAG_BUILD_CLI ON)
 # Web platform only enables WEBP decode by default. Enable encode for baseline image generation.
 set(TGFX_USE_WEBP_ENCODE ON)
 set(TGFX_USE_JPEG_ENCODE ON)
@@ -34,6 +36,10 @@ set(TGFX_USE_JPEG_ENCODE ON)
 # prevents it from running again inside the root CMakeLists.
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./libpag)
+
+# The pagx-cli executable itself has no meaning in the browser; only its sources are reused
+# by the test binary. Keep it out of the default build so `cmake --build` stays lean.
+set_target_properties(pagx-cli PROPERTIES EXCLUDE_FROM_ALL YES)
 
 set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
@@ -76,6 +82,19 @@ endif ()
 file(GLOB WEB_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 list(APPEND TEST_SOURCES ${WEB_TEST_SOURCES})
 
+# CLI implementation sources, mirroring the native test build (the suites reference
+# pagx::cli entry points; main.cpp is replaced by WebTestRunner.cpp).
+file(GLOB CLI_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/cli/*.cpp)
+list(FILTER CLI_SOURCES EXCLUDE REGEX "main\\.cpp$")
+list(APPEND TEST_SOURCES ${CLI_SOURCES})
+
+# The vendor's prebuilt gtest static library is compiled with -fno-rtti and therefore lacks
+# the typeinfo the RTTI-enabled test translation units reference. Compile gtest from source
+# instead so the typeinfo symbols exist in the same build.
+set(GTEST_SRC_DIR ${TGFX_DIR}/third_party/googletest/googletest)
+list(APPEND TEST_SOURCES ${GTEST_SRC_DIR}/src/gtest-all.cc)
+set_source_files_properties(${GTEST_SRC_DIR}/src/gtest-all.cc PROPERTIES COMPILE_OPTIONS "-w")
+
 # Test-only archive decoders, mirroring the native test build so that archive-producing suites
 # validate the central directory, entry data, and CRCs by actually extracting.
 set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
@@ -87,11 +106,6 @@ set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-w")
 
 add_executable(pag-test ${TEST_SOURCES})
-
-# Build Google Test.
-add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
-find_vendor_libraries(test-vendor STATIC TEST_VENDOR_LIBS)
-add_dependencies(pag-test test-vendor)
 
 # Generate the HEAD file with the current commit hash for baseline versioning.
 execute_process(COMMAND git rev-parse --short HEAD
@@ -228,9 +242,16 @@ target_include_directories(pag-test SYSTEM PRIVATE
         ${WOFF2_DIR}/include
         ${BROTLI_DIR}/c/include
         ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY}
+        ${ROOT}/third_party/out/libxml2/${INCLUDE_ENTRY}  # CLI XSD validation (libxml2)
 )
 
 target_link_libraries(pag-test
         pag
-        ${TEST_VENDOR_LIBS}
+)
+
+# libxml2 headers require the static-linkage declaration; the generated pagx_xsd.h lives in the
+# root project's binary directory (build-<backend>/libpag/generated).
+target_compile_definitions(pag-test PRIVATE LIBXML_STATIC)
+target_include_directories(pag-test PRIVATE
+        ${CMAKE_BINARY_DIR}/libpag/generated
 )
