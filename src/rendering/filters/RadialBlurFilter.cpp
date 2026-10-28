@@ -79,7 +79,7 @@ std::string RadialBlurFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> RadialBlurFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void RadialBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG opacity - alpha channel</title>
+    <style>
+      @keyframes fade {
+        0%   { opacity: 0.15; }
+        100% { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <!-- 内联 SVG 星形 (§7 verbatim)，宿主 Layer 的 opacity → alpha 通道 (§13.2) -->
+    <div id="star"
+         style="position: absolute; left: 84px; top: 44px; width: 72px; height: 72px;
+                animation: fade 1.6s linear infinite alternate;">
+      <svg width="72" height="72" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.8L12 17.8 5.9 20.4l1.4-6.8L2.2 9l6.9-.7z"
+              fill="#FBBF24"/>
+      </svg>
+    </div>
+  </body>
+</html>

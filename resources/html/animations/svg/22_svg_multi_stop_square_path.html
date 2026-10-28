@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>multi-stop keyframes</title>
+    <style>
+      @keyframes square {
+        0%   { transform: translate(0px, 0px); }
+        25%  { transform: translate(120px, 0px); }
+        50%  { transform: translate(120px, 90px); }
+        75%  { transform: translate(0px, 90px); }
+        100% { transform: translate(0px, 0px); }
+      }
+    </style>
+  </head>
+  <body style="width: 220px; height: 200px; background-color: #022C22;">
+    <!-- §13.1: 多关键帧 0/25/50/75/100% 分段行进（绕方形路径） -->
+    <div id="dot"
+         style="position: absolute; left: 30px; top: 30px; width: 36px; height: 36px;
+                animation: square 3s linear infinite;">
+      <svg width="36" height="36" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="9" fill="#2DD4BF"/>
+      </svg>
+    </div>
+  </body>
+</html>

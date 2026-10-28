@@ -586,7 +586,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
-Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (`matrix`/`matrix3D`) are applied on top of the computed layout results — they do not participate in layout calculations and do not affect sibling or parent node positions.
+Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (`matrix`/`matrix3D`/`z` and the rotation/scale/skew/perspective components) are applied on top of the computed layout results — they do not participate in layout calculations and do not affect sibling or parent node positions. A Layer's authored `x`/`y` are also part of its local transform: when constraint or container layout generates a position for the Layer, that position is applied outside the local transform (`T(layoutPosition) * local`), so the authored `x`/`y` add to it instead of being replaced (see §5.2 Transform Attribute Priority).
 
 ### 4.2 Container Layout
 
@@ -681,7 +681,7 @@ Child Layers with `visible="false"` are not rendered but still participate in la
 
 #### Leaving the Layout Flow
 
-When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all child Layer positions are determined by the layout engine by default. Setting `includeInLayout="false"` on a child Layer removes it from the layout flow — it does not participate in arrangement, occupies no space, and does not affect container measurement, but remains visible and can use constraint attributes (`left`/`top`) for positioning. This is useful for placing decorations, backgrounds, or badges inside a layout container without affecting the arrangement of other children. Child Layers that have left the layout flow can always use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), regardless of the parent container's `layout` mode.
+When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all child Layer positions are determined by the layout engine by default; a child's authored `x`/`y` are added on top of the position the layout engine assigns. Setting `includeInLayout="false"` on a child Layer removes it from the layout flow — it does not participate in arrangement, occupies no space, and does not affect container measurement, but remains visible and can use constraint attributes (`left`/`top`) for positioning. This is useful for placing decorations, backgrounds, or badges inside a layout container without affecting the arrangement of other children. Child Layers that have left the layout flow can always use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), regardless of the parent container's `layout` mode.
 
 ```xml
 <Layer width="400" height="300" layout="vertical" gap="12">
@@ -846,7 +846,7 @@ The vertical axis follows the same pattern.
 
 #### Child Layer Constraint Positioning
 
-Child Layer constraint attributes override the child Layer's `x`/`y`. Activation conditions:
+Child Layer constraint attributes determine the child Layer's layout position. The position is applied outside the child's local transform (`T(layoutPosition) * local`), so the child's authored `x`/`y` add to it rather than being replaced. Activation conditions:
 
 1. **Parent Layer has no container layout**: `layout` is `none` (default), or
 2. **Child Layer leaves the layout flow**: `includeInLayout="false"`
@@ -955,8 +955,18 @@ Layer child elements are automatically categorized into five collections by type
 | `blendMode` | BlendMode | normal | Blend mode |
 | `x` | float | 0 | X position (prefer constraint attribute `left`) |
 | `y` | float | 0 | Y position (prefer constraint attribute `top`) |
+| `z` | float | 0 | Z translation; affects rendering depth only, not automatic layout |
+| `rotationX` | float | 0 | Rotation around the X axis in degrees |
+| `rotationY` | float | 0 | Rotation around the Y axis in degrees |
+| `rotationZ` | float | 0 | Rotation around the Z axis in degrees |
+| `scaleX` | float | 1 | Scale along the X axis |
+| `scaleY` | float | 1 | Scale along the Y axis |
+| `scaleZ` | float | 1 | Scale along the Z axis |
+| `skewX` | float | 0 | Horizontal skew angle in degrees like CSS `skewX()`, within (-90, 90) |
+| `skewY` | float | 0 | Vertical skew angle in degrees like CSS `skewY()`, within (-90, 90) |
+| `perspective` | float | 0 | Perspective viewing distance `d`; 0 means none, negative values are invalid |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
+| `matrix3D` | Matrix3D | identity matrix | 3D transform (16 values, column-major); must be finite and invertible |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Group opacity |
@@ -976,10 +986,16 @@ Layer child elements are automatically categorized into five collections by type
 
 **preserve3D**: When `false` (default), child layers with 3D transforms are flattened into the parent's 2D plane before compositing. When `true`, child layers retain their 3D positions and are rendered in a shared 3D space, enabling depth-based intersections and correct z-ordering among siblings. Similar to CSS `transform-style: preserve-3d`.
 
-**Transform Attribute Priority**: `x`/`y`, `matrix`, and `matrix3D` have an override relationship:
-- Only `x`/`y` set: Uses `x`/`y` for translation
-- `matrix` set: `matrix` overrides `x`/`y` values
-- `matrix3D` set: `matrix3D` overrides both `matrix` and `x`/`y` values
+**Transform Attribute Priority**: `x`/`y`/`z`, the transform components (`rotationX`/`rotationY`/`rotationZ`, `scaleX`/`scaleY`/`scaleZ`, `skewX`/`skewY`, `perspective`), `matrix`, and `matrix3D` form the layer's local transform and have an override relationship:
+- No `matrix`/`matrix3D` set: the local transform is composed as `P * T * R * K * S` for column vectors, with perspective `P` (projection row `[0, 0, -1/d, 1]`), translation `T(x, y, z)`, rotation `R = Rz * Ry * Rx`, skew `K` (the CSS `skew(skewX, skewY)` shear `[[1, tan(skewX)], [tan(skewY), 1]]`), and scale `S`
+- `matrix` set: `matrix` overrides `x`/`y` and the transform components; `z` still applies
+- `matrix3D` set: `matrix3D` overrides `matrix`, `x`/`y`/`z`, and the transform components
+
+A skew of ±90° or a negative `perspective` cannot be composed; the transform components are then ignored and only `x`/`y`/`z` apply.
+
+The position generated by constraint or container layout is applied outside the local transform: `T(layoutPosition) * local`.
+
+**Transform animation**: The Layer keeps one current local transform shared by its `x`/`y`/`z`, transform component, `matrix`, and `matrix3D` channels. Each animation write (and each data-bound `x`/`y`/`z` or component write, since a full `matrix` / `matrix3D` cannot be data-bound) mixes only the part it drives into the current value (`current = mix(current, value, weight)`); everything no source drives keeps its current value. `x`/`y`/`z` drive the translation, each component channel drives its own component, and `matrix3D` drives the whole matrix. Component values are kept as written while no matrix is written, so a scale can animate from 0 and a rotation beyond 180° keeps its value; after a `matrix` or `matrix3D` write, the next component write first decomposes the matrix into components (rotation then uses the equivalent Euler angles with the smaller X and Z rotation, and the shear becomes `skewX` with `skewY` 0), and it is rejected if the matrix cannot be decomposed, carries perspective other than a Z-axis distance, or carries a shear involving Z. `matrix` mixes the whole local transform toward the 2D matrix carrying the current Z translation, so at full weight it replaces everything except the Z translation and resets any 3D rotation, scale, skew, or perspective written earlier. Within one animation the priority above applies to the channels it contains, independent of channel order. A non-identity static `matrix` ignores `x`/`y` and component writes, and a non-identity static `matrix3D` ignores `x`/`y`/`z`, component, and `matrix` writes. When the local transform has perspective, an `x`/`y`/`z` write replaces the translation of the decomposed transform, so the translation stays inside the projection; the write is rejected if the transform cannot be decomposed. A finite singular pose is still published. A degenerate projection of the content plane has no drawable area, but a singular 4×4 matrix can still have a non-degenerate planar projection (for example, zero Z scale). Component reads and writes that require decomposition fail while a matrix pose is singular; a later decomposable matrix write restores them.
 
 **MaskType**:
 
@@ -2330,8 +2346,9 @@ The `type` attribute specifies the value type this channel carries. The schema e
 | `image` | Image resource reference |
 | `color` | Color value (RGBA) |
 | `matrix` | 2D transform matrix |
+| `matrix3D` | 4×4 transform matrix (16 values, column-major); keyframes must be finite and invertible |
 
-If `type` is omitted, it is inferred from the first `<Key>` value (color → bool → image → int → float → string).
+If `type` is omitted, it is inferred from the first `<Key>` value (color → bool → image → 16-number `matrix3D` → int → float → string).
 
 ```xml
 <Channel name="alpha" type="float">
@@ -2342,7 +2359,7 @@ If `type` is omitted, it is inferred from the first `<Key>` value (color → boo
 
 #### 8.1.4 Keyframes (Key)
 
-A keyframe holds a property value at a specific time, together with how it transitions to the next keyframe and optional bezier control handles. Supported value types are `float`, `bool`, `int`, `string`, `image`, `color`, and `matrix`.
+A keyframe holds a property value at a specific time, together with how it transitions to the next keyframe and optional bezier control handles. Supported value types are `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, and `matrix3D`.
 
 **Frame**: `Frame` is a frame index. `ZeroFrame = 0` is the first frame of any animation.
 
@@ -2956,7 +2973,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | Enum | Values |
 |------|--------|
 | **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold` |
-| **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix` |
+| **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, `matrix3D` |
 | **TimelineType** | `animation`, `stateMachine` |
 
 ### State Machine Related
@@ -3028,8 +3045,17 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `alpha` | number | Opacity |
 | `visible` | boolean | Visibility toggle |
 | `blendMode` | enum | Blend mode |
-| `x` ^Layout^ | float | Top-left X position |
-| `y` ^Layout^ | float | Top-left Y position |
+| `x` ^Layout^ | float | Local X translation |
+| `y` ^Layout^ | float | Local Y translation |
+| `z` | float | Local Z translation |
+| `matrix` | matrix | 2D local transform; animation-only |
+| `matrix3D` | matrix3D | 4×4 local transform; animation-only. Keyframes must be invertible; interpolates by decomposition with quaternion slerp, falling back to element-wise interpolation. Finite singular poses are still published; content with a degenerate planar projection has no drawable area |
+| `rotation.x` / `rotation.y` / `rotation.z` | float | Rotation in degrees (`rotationX`/`rotationY`/`rotationZ`) |
+| `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
+| `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |
+| `perspective` | float | Perspective distance (`perspective`); 0 means none |
+
+The rotation/scale/skew/perspective channels drive the Layer transform components described in §5.2 and can be animated and data-bound like `x`/`y`/`z`. A write that would compose a skew of ±90° or a negative `perspective` is rejected.
 
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 

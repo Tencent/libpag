@@ -51,8 +51,8 @@ inline constexpr bool HasFlag(ChannelFlags value, ChannelFlags flag) {
 // Function that reads, writes, or resets one node channel. At most one of getOut / setIn is
 // non-null: getOut for a read (copies the field into *getOut), setIn for a write (validates and
 // copies into the field), and both null for a reset (copies the corresponding field of a
-// default-constructed node back into the field). Returns false on a type mismatch or an invalid
-// enum string.
+// default-constructed node back into the field). Returns false on a type mismatch, an invalid enum
+// string, or a Matrix3D value that is not finite and invertible.
 using ChannelAccessor = bool (*)(Node* node, KeyValue* getOut, const KeyValue* setIn);
 
 // One reflective channel of a node type, addressed by channel name.

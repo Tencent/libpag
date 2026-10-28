@@ -24,6 +24,7 @@
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
@@ -80,6 +81,11 @@ inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double
   Matrix result = {};
   RecomposeAffine(mixed, &result.a, &result.b, &result.c, &result.d, &result.tx, &result.ty);
   return result;
+}
+
+template <>
+inline Matrix3D LerpKeyframeValue<Matrix3D>(const Matrix3D& a, const Matrix3D& b, double t) {
+  return LerpMatrix3D(a, b, t);
 }
 
 // Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.

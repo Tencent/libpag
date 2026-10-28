@@ -9,18 +9,20 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayerImpl+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
+
+#include "platform/cocoa/private/PAGSurfaceFactory.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -32,9 +34,8 @@
   CVPixelBufferRef pixelBuffer;
 }
 
-+ (PAGSurfaceImpl*)FromView:(NSView*)view {
-  auto drawable = pag::GPUDrawable::FromView(view);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
++ (PAGSurfaceImpl*)FromHost:(id)host {
+  auto surface = pag::cocoa::MakeSurfaceFromHost(host);
   if (surface == nullptr) {
     return nil;
   }
@@ -97,10 +98,14 @@
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
-  if (!status) {
-    LOGE("ReadPixels failed!");
-  }
   CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
+  if (!status) {
+    // The buffer was never written, so handing it back would look like a successful snapshot of
+    // a blank frame. Return nil as the iOS implementation does; PixelBufferUtil::Make()
+    // autoreleases the buffer, so dropping the reference is enough.
+    LOGE("ReadPixels failed!");
+    return nil;
+  }
   return hardwareBuffer;
 }
 

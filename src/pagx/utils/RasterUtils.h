@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -34,7 +36,11 @@ class ImagePattern;
 
 /**
  * Manages a lazily-created GPU device and context for off-screen rendering.
- * Reuse a single instance across multiple render calls to avoid repeated GL context creation.
+ * Reuse a single instance across multiple render calls to avoid repeated GL context creation
+ * (each Devices::MakeDefault() on the GL backend builds a brand-new GL context, which would make
+ * per-pattern bakes in SVG/PPT export repeatedly recompile shaders).
+ * The context lock is non-recursive: lockContext()/unlock() pairs must not nest, and callers
+ * must not already hold the device's context lock.
  */
 class GPUContext {
  public:
@@ -48,7 +54,8 @@ class GPUContext {
   void unlock();
 
  private:
-  std::shared_ptr<tgfx::Device> _device = nullptr;
+  std::shared_ptr<tgfx::Device> _device = {};
+  std::vector<std::unique_ptr<pag::DeviceLockScope>> _lockStack = {};
 };
 
 /**
@@ -78,9 +85,9 @@ tgfx::Rect ComputeRasterizedLayerBoundsInSpace(const std::shared_ptr<tgfx::Layer
  * ratio of the desired output pixel density to the layer's logical coordinate space (e.g. 2.0 for
  * 2x density). The encoded PNG has dimensions ceil(logicalSize * pixelScale); callers keep using
  * the logical bounds when placing the PNG so that consumers scale it back up on display.
- * If the layer has its own scrollRect, the output is clipped to and sized by the scrollRect's
- * visible window in `root`'s coordinates (since tgfx's Layer::draw deliberately skips applying
- * the layer's own scrollRect).
+ * The target is composited through a temporary parent in the exporter-owned tree, applying its
+ * matrix, alpha, mask and scrollRect once. The original parent and child order are restored.
+ * A scrollRect clips and sizes the output to its visible window in `root`'s coordinates.
  * Returns nullptr if the layer has zero bounds or rasterization fails.
  */
 std::shared_ptr<tgfx::Data> RenderMaskedLayer(GPUContext* gpu,

@@ -121,7 +121,6 @@ class SVGParserContext {
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
-  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element, const InheritedStyle& parentStyle,
                         int depth = 0);
@@ -190,7 +189,6 @@ class SVGParserContext {
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
 
-  Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
   void parseGradientStops(const std::shared_ptr<DOMNode>& element,

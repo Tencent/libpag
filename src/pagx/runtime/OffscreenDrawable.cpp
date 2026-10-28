@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/runtime/OffscreenDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pagx {
 
@@ -25,7 +25,7 @@ std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto device = tgfx::GLDevice::Make();
+  auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
     return nullptr;
   }
@@ -34,11 +34,7 @@ std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)
-    : _width(width), _height(height), _device(std::move(device)) {
-}
-
-std::shared_ptr<tgfx::Device> OffscreenDrawable::getDevice() {
-  return _device;
+    : Drawable(std::move(device), nullptr), _width(width), _height(height) {
 }
 
 std::shared_ptr<tgfx::Surface> OffscreenDrawable::getSurface(tgfx::Context* context) {

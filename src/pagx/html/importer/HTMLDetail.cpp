@@ -96,7 +96,10 @@ std::vector<std::pair<std::string, std::string>> ParseStyleDeclarations(const st
   std::vector<std::pair<std::string, std::string>> out;
   size_t pos = 0;
   while (pos < style.size()) {
-    while (pos < style.size() && std::isspace(static_cast<unsigned char>(style[pos]))) {
+    // Skip the separator of an empty declaration too: rule bodies collected from a <style> element
+    // may join with a semicolon that follows one the previous body already ended with.
+    while (pos < style.size() &&
+           (std::isspace(static_cast<unsigned char>(style[pos])) || style[pos] == ';')) {
       ++pos;
     }
     if (pos + 1 < style.size() && style[pos] == '/' && style[pos + 1] == '*') {

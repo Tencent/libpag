@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - ease (power easing -> bezier)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 110px; background-color: #18181B; position: relative; margin: 0;">
+    <div id="r"
+         style="position: absolute; left: 16px; top: 35px;
+                width: 40px; height: 40px; border-radius: 20px;
+                background-color: #F472B6;"></div>
+    <script>
+      // power2.inOut 缓动；采样后归一化为关键帧，timing 由采样曲线体现
+      gsap.to("#r", {
+        x: 180,
+        duration: 1.6,
+        ease: "power2.inOut",
+        repeat: -1,
+        yoyo: true
+      });
+    </script>
+  </body>
+</html>

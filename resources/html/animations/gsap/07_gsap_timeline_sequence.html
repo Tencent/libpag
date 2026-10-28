@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP - timeline sequence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body style="width: 280px; height: 160px; background-color: #1A1A2E; position: relative; margin: 0;">
+    <div id="t1"
+         style="position: absolute; left: 24px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px;
+                background-color: #F87171;"></div>
+    <div id="t2"
+         style="position: absolute; left: 116px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px;
+                background-color: #FBBF24;"></div>
+    <div id="t3"
+         style="position: absolute; left: 208px; top: 56px;
+                width: 48px; height: 48px; border-radius: 8px;
+                background-color: #34D399;"></div>
+    <script>
+      // gsap.timeline：顺序编排多段动画，整体在 globalTimeline 上被采样
+      const tl = gsap.timeline({ repeat: -1, yoyo: true });
+      tl.to("#t1", { y: -40, duration: 0.5, ease: "none" })
+        .to("#t2", { y: -40, duration: 0.5, ease: "none" })
+        .to("#t3", { y: -40, duration: 0.5, ease: "none" });
+    </script>
+  </body>
+</html>

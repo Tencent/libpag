@@ -63,6 +63,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTransformParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
@@ -630,10 +631,76 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmptyDocument) {
 }
 
 /**
+ * Test SVG import: transform from a <style> class rule is applied to the imported layer matrix,
+ * whether the <style> sits under the root or inside a root-level <defs>, and the inline style
+ * overrides the class rule.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<style>.moved{transform:translate(10px,20px)}.shifted{transform:translate(1px,1px)}"
+      ".first{opacity:0.5;}.second{transform:translate(15px,25px);}</style>"
+      "<rect id=\"classOnly\" class=\"moved\" width=\"10\" height=\"10\"/>"
+      "<rect id=\"twoClasses\" class=\"first second\" width=\"10\" height=\"10\"/>"
+      "<rect id=\"inlineWins\" class=\"moved\" width=\"10\" height=\"10\" "
+      "style=\"transform:translate(30px,40px)\"/>"
+      "<defs><style>.deep{transform:translate(5px,6px)}</style></defs>"
+      "<rect id=\"defsClass\" class=\"deep\" width=\"10\" height=\"10\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  // SVG import assigns layer ids without registering them in the document node map, so find the
+  // layers directly.
+  pagx::Layer* classOnly = nullptr;
+  pagx::Layer* inlineWins = nullptr;
+  pagx::Layer* defsClass = nullptr;
+  pagx::Layer* twoClasses = nullptr;
+  for (auto* layer : doc->layers) {
+    if (layer->id == "classOnly") {
+      classOnly = layer;
+    } else if (layer->id == "inlineWins") {
+      inlineWins = layer;
+    } else if (layer->id == "defsClass") {
+      defsClass = layer;
+    } else if (layer->id == "twoClasses") {
+      twoClasses = layer;
+    }
+  }
+  ASSERT_NE(classOnly, nullptr);
+  ASSERT_NE(inlineWins, nullptr);
+  ASSERT_NE(defsClass, nullptr);
+  ASSERT_NE(twoClasses, nullptr);
+  EXPECT_FLOAT_EQ(classOnly->matrix.tx, 10);
+  EXPECT_FLOAT_EQ(classOnly->matrix.ty, 20);
+  EXPECT_FLOAT_EQ(inlineWins->matrix.tx, 30);
+  EXPECT_FLOAT_EQ(inlineWins->matrix.ty, 40);
+  EXPECT_FLOAT_EQ(defsClass->matrix.tx, 5);
+  EXPECT_FLOAT_EQ(defsClass->matrix.ty, 6);
+  // The first rule ends with a semicolon, so joining the two class bodies must not produce an empty
+  // declaration that swallows the second class' transform.
+  EXPECT_FLOAT_EQ(twoClasses->matrix.tx, 15);
+  EXPECT_FLOAT_EQ(twoClasses->matrix.ty, 25);
+  EXPECT_FLOAT_EQ(twoClasses->alpha, 0.5f);
+}
+
+/**
  * Test SVG import: a zero-size SVG that only hosts <defs> (a common hidden
  * container in snapshotted HTML) is legal and must import to a valid empty
  * document rather than failing the parse.
  */
+// CSS angles carry a deg suffix, and skipping it must not drop the following transform function.
+PAGX_TEST(PAGXSVGTest, SVGImport_DegreeUnitKeepsFollowingTransform) {
+  auto matrix = pagx::MatrixFromSVGTransform("rotate(45deg) translate(10px,5px)");
+  EXPECT_NEAR(matrix.a, 0.70710678f, 1.0e-5f);
+  EXPECT_NEAR(matrix.b, 0.70710678f, 1.0e-5f);
+  // The translation is rotated by the preceding rotate: 10*cos(45) - 5*sin(45) and
+  // 10*sin(45) + 5*cos(45).
+  EXPECT_NEAR(matrix.tx, 3.5355339f, 1.0e-5f);
+  EXPECT_NEAR(matrix.ty, 10.606602f, 1.0e-5f);
+  auto skewed = pagx::MatrixFromSVGTransform("skewX(30deg)");
+  EXPECT_NEAR(skewed.c, 0.57735027f, 1.0e-5f);
+}
+
 PAGX_TEST(PAGXSVGTest, SVGImport_ZeroSizeDefsOnly) {
   std::string svg =
       "<svg width=\"0\" height=\"0\"><defs><path id=\"p0\" d=\"M0 0L10 0L5 8Z\"/>"

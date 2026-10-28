@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>GSAP Toast Notifications</title>
+  </head>
+  <body style="width: 800px; height: 600px; background-color: #F1F5F9; font-family: Arial;">
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 16px; width: 100%; height: 100%; padding: 40px;">
+
+      <div class="toast" style="display: flex; flex-direction: row; align-items: center; gap: 14px; width: 360px; padding: 18px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 12px 30px #0F172A1F; opacity: 0;">
+        <div style="width: 40px; height: 40px; border-radius: 20px; background-color: #DCFCE7;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+          <p style="font-size: 15px; font-weight: bold; color: #166534;">Payment received</p>
+          <p style="font-size: 13px; color: #64748B;">$248.00 from Acme Inc.</p>
+        </div>
+      </div>
+
+      <div class="toast" style="display: flex; flex-direction: row; align-items: center; gap: 14px; width: 360px; padding: 18px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 12px 30px #0F172A1F; opacity: 0;">
+        <div style="width: 40px; height: 40px; border-radius: 20px; background-color: #DBEAFE;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+          <p style="font-size: 15px; font-weight: bold; color: #1E40AF;">New comment</p>
+          <p style="font-size: 13px; color: #64748B;">Mia replied to your thread.</p>
+        </div>
+      </div>
+
+      <div class="toast" style="display: flex; flex-direction: row; align-items: center; gap: 14px; width: 360px; padding: 18px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 12px 30px #0F172A1F; opacity: 0;">
+        <div style="width: 40px; height: 40px; border-radius: 20px; background-color: #FEF3C7;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+          <p style="font-size: 15px; font-weight: bold; color: #92400E;">Storage almost full</p>
+          <p style="font-size: 13px; color: #64748B;">92% of 100GB used.</p>
+        </div>
+      </div>
+
+      <div class="toast" style="display: flex; flex-direction: row; align-items: center; gap: 14px; width: 360px; padding: 18px; border-radius: 16px; background-color: #FFFFFF; box-shadow: 0 12px 30px #0F172A1F; opacity: 0;">
+        <div style="width: 40px; height: 40px; border-radius: 20px; background-color: #EDE9FE;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+          <p style="font-size: 15px; font-weight: bold; color: #5B21B6;">Backup complete</p>
+          <p style="font-size: 13px; color: #64748B;">All files are safely synced.</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+      gsap.fromTo('.toast',
+        { opacity: 0, x: 420 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          stagger: 0.25,
+          repeat: -1,
+          repeatDelay: 1.2,
+          yoyo: true
+        }
+      );
+    </script>
+  </body>
+</html>

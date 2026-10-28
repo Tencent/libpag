@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SVG timing - ease-in-out</title>
+    <style>
+      @keyframes swing {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(150px); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 120px; background-color: #1F2937;">
+    <!-- timing-function: ease-in-out → bezier (§13.3)，两端慢、中间快 -->
+    <div id="gem"
+         style="position: absolute; left: 24px; top: 38px; width: 44px; height: 44px;
+                animation: swing 1.5s ease-in-out infinite alternate;">
+      <svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 3h12l4 6-10 12L2 9z" fill="#A78BFA"/>
+        <path d="M2 9h20M9 3L6 9l6 12M15 3l3 6-6 12" fill="none"
+              stroke="#1F2937" stroke-width="0.8"/>
+      </svg>
+    </div>
+  </body>
+</html>

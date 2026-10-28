@@ -154,7 +154,11 @@ class HTMLParserContext {
   // painter ids from it, and a `PendingSvgShapeAnimation` is queued targeting those derived ids.
   // `stroke-dashoffset` scaling (real path length / author `pathLength`) is resolved here where the
   // geometry `d` is available, mirroring the static dash scaling in the SVG importer.
-  void collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node);
+  // classRules is the document's SVG class rule table (see CollectSvgClassRules); it supplies the
+  // baseline transform for animated shapes so it matches the matrix the SVG importer resolves.
+  void collectInlineSvgShapeAnimations(
+      const std::shared_ptr<DOMNode>& node,
+      const std::unordered_map<std::string, std::string>& classRules);
 
   // Reserves the element's `id` on the allocator, then records the element when it carries an
   // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
