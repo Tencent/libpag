@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <iomanip>
 #include <set>
 #include <sstream>
 #include "base/utils/MathUtil.h"
@@ -42,6 +43,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -340,6 +342,32 @@ std::string FormatMatrixCss(const Matrix& m) {
   return "matrix(" + CssFloatToString(m.a) + "," + CssFloatToString(m.b) + "," +
          CssFloatToString(m.c) + "," + CssFloatToString(m.d) + "," + CssFloatToString(m.tx) + "," +
          CssFloatToString(m.ty) + ")";
+}
+
+// CSS interpolates matrix() by decomposition, but refuses to interpolate when either endpoint is
+// singular (e.g. a progress bar whose initial scaleX is zero). Express the same runtime components
+// as separate CSS functions so each factor, including a zero scale, interpolates continuously.
+std::string FormatDecomposedMatrixCss(const Matrix& matrix) {
+  auto components = DecomposeAffine(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
+  static constexpr float RadiansToDegrees = 57.29577951308232f;
+  return "translate(" + CssFloatToString(components.translateX) + "px, " +
+         CssFloatToString(components.translateY) + "px) rotate(" +
+         CssFloatToString(components.rotation * RadiansToDegrees) + "deg) skewX(" +
+         CssFloatToString(components.skew * RadiansToDegrees) + "deg) scale(" +
+         CssFloatToString(components.scaleX) + ", " + CssFloatToString(components.scaleY) + ")";
+}
+
+bool HasSingularMatrixKey(const Channel* channel) {
+  if (channel == nullptr || channel->valueType() != ChannelValueType::Matrix) {
+    return false;
+  }
+  for (const auto& key : static_cast<const TypedChannel<Matrix>*>(channel)->keyframes) {
+    const auto& matrix = key.value;
+    if (FloatNearlyZero(matrix.a * matrix.d - matrix.b * matrix.c)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string FormatPercent(Frame time, Frame duration) {
@@ -1032,7 +1060,9 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     std::string matrixPart = {};
     if (chSet.matrixCh != nullptr) {
       Matrix staticMatrix = hostLayer != nullptr ? hostLayer->matrix : Matrix::Identity();
-      matrixPart = FormatMatrixCss(EvalMatrixChannel(chSet.matrixCh, t, staticMatrix));
+      auto matrix = EvalMatrixChannel(chSet.matrixCh, t, staticMatrix);
+      matrixPart = HasSingularMatrixKey(chSet.matrixCh) ? FormatDecomposedMatrixCss(matrix)
+                                                        : FormatMatrixCss(matrix);
     } else if (hostLayer != nullptr) {
       matrixPart = LayerTransformCSS(hostLayer);
     }
@@ -1277,10 +1307,11 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
 
 std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
                                      const BundleTimingInfo& timing, const std::string& tagName,
-                                     Frame t, bool& needsZeroOrigin) {
+                                     Frame t, bool& needsZeroOrigin,
+                                     const float* alphaOverride = nullptr) {
   std::string decls;
   if (chSet.alphaCh != nullptr) {
-    float a = EvalFloatChannel(chSet.alphaCh, t, 1.0f);
+    float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
     AppendCssDecl(decls, "opacity", CssFloatToString(a));
   }
   if (chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
@@ -1457,6 +1488,34 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
   stopTimes.insert(timing.bundleShiftFrames);
   stopTimes.insert(timing.bundleShiftFrames + timing.effectiveDuration);
   for (Frame t : stopTimes) {
+    if (chSet.alphaCh != nullptr && chSet.alphaCh->valueType() == ChannelValueType::Float &&
+        t > timing.bundleShiftFrames && timing.effectiveDuration > 0) {
+      const auto& keys = static_cast<const TypedChannel<float>*>(chSet.alphaCh)->keyframes;
+      auto first =
+          std::find_if(keys.begin(), keys.end(), [t](const auto& key) { return key.time == t; });
+      if (first != keys.end()) {
+        auto last = first;
+        while (last != keys.end() && last->time == t) {
+          ++last;
+        }
+        if (last - first > 1 && !FloatNearlyZero(first->value - (last - 1)->value)) {
+          // PAGX uses the first duplicate as the value approached from the left and the last
+          // duplicate at t. CSS merges equal-offset stops, so insert one just before t: preserve
+          // the preceding ramp, then make the tiny final interval a discrete jump.
+          auto previousTime = *std::prev(stopTimes.find(t));
+          double delta = std::min(0.01, static_cast<double>(t - previousTime) * 0.25);
+          double percent = (static_cast<double>(t - timing.bundleShiftFrames) - delta) * 100.0 /
+                           static_cast<double>(timing.effectiveDuration);
+          std::ostringstream offset;
+          offset << std::fixed << std::setprecision(8) << percent << '%';
+          float beforeJump = first->value;
+          auto beforeDecls = EvaluateKeyframeCssDecls(bundle, chSet, timing, tagName, t,
+                                                      outNeedsZeroOrigin, &beforeJump);
+          AppendCssDecl(beforeDecls, "animation-timing-function", "steps(1, end)");
+          stops += "  " + offset.str() + " { " + beforeDecls + "; }\n";
+        }
+      }
+    }
     std::string decls =
         EvaluateKeyframeCssDecls(bundle, chSet, timing, tagName, t, outNeedsZeroOrigin);
     Frame relTime = (t >= timing.bundleShiftFrames) ? (t - timing.bundleShiftFrames) : 0;
