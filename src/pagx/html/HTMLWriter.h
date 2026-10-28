@@ -286,6 +286,22 @@ class HTMLWriterContext {
   // `animation` declarations. Empty when no animations are exported.
   std::unordered_map<const Node*, std::string> animatedElementIds = {};
 
+  struct AnimationInstance {
+    const Composition* composition = nullptr;
+    const Layer* slot = nullptr;
+    size_t scope = 0;
+    size_t parentScope = 0;
+  };
+  struct AnimatedDomTag {
+    const Node* node = nullptr;
+    size_t scope = 0;
+    std::string id = {};
+  };
+  size_t animationScope = 0;
+  size_t nextAnimationScope = 1;
+  std::vector<AnimationInstance> animationInstances = {};
+  std::vector<AnimatedDomTag> animatedDomTags = {};
+
   // Number of tags already emitted for each animated base id.
   std::unordered_map<std::string, size_t> animatedDomIdUseCount = {};
 
@@ -310,7 +326,9 @@ class HTMLWriterContext {
         continue;
       }
       size_t index = animatedDomIdUseCount[it->second]++;
-      return index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      auto id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      animatedDomTags.push_back({node, animationScope, id});
+      return id;
     }
     return {};
   }

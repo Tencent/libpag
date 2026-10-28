@@ -19,6 +19,7 @@
 #include "pagx/html/HTMLAnimationWriter.h"
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <set>
 #include <sstream>
 #include "base/utils/MathUtil.h"
@@ -70,16 +71,37 @@ Node* ResolveTargetNode(PAGXDocument& doc, const std::string& target) {
   return nullptr;
 }
 
-bool HasPlayableAnimations(const PAGXDocument& doc) {
-  for (auto* node : doc.animations) {
-    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+std::vector<const Animation*> CollectPlayableAnimations(const PAGXDocument& doc) {
+  std::vector<const Animation*> result = {};
+  std::unordered_set<const Animation*> seen = {};
+  auto collect = [&](const std::vector<Node*>& nodes) {
+    for (auto* node : nodes) {
+      if (node == nullptr || node->nodeType() != NodeType::Animation) {
+        continue;
+      }
       auto* anim = static_cast<const Animation*>(node);
-      if (anim->duration > 0 && anim->frameRate > 0.0f && !anim->objects.empty()) {
-        return true;
+      if (anim->duration > 0 && anim->frameRate > 0.0f && !anim->objects.empty() &&
+          seen.insert(anim).second) {
+        result.push_back(anim);
       }
     }
-  }
-  return false;
+  };
+  collect(doc.animations);
+  std::unordered_set<const Composition*> visited = {};
+  std::function<void(const std::vector<Layer*>&)> visitLayers = [&](const auto& layers) {
+    for (auto* layer : layers) {
+      if (layer == nullptr) {
+        continue;
+      }
+      if (layer->composition != nullptr && visited.insert(layer->composition).second) {
+        collect(layer->composition->animations);
+        visitLayers(layer->composition->layers);
+      }
+      visitLayers(layer->children);
+    }
+  };
+  visitLayers(doc.layers);
+  return result;
 }
 
 void IndexElements(const std::vector<Element*>& elements,
@@ -1195,13 +1217,26 @@ std::string MakeSafeKeyframesName(const std::string& domId, int animIndex) {
 }
 
 std::string BuildAnimationShorthand(const Animation* anim, const std::string& kfName,
-                                    const BundleTimingInfo& timing, int64_t evalOffsetFrames) {
+                                    const BundleTimingInfo& timing, int64_t evalOffsetFrames,
+                                    bool compositionMount = false) {
   float durationSec = static_cast<float>(timing.effectiveDuration) / anim->frameRate;
   std::string timingStr = timing.uniformEasing ? timing.commonEasing.toCss() : "linear";
   std::string shorthand = kfName + " " + CssFloatToString(durationSec) + "s " + timingStr;
 
   int64_t totalDelayFrames = evalOffsetFrames + static_cast<int64_t>(timing.bundleShiftFrames);
-  if (totalDelayFrames > 0) {
+  if (compositionMount && anim->loop != LoopMode::Once) {
+    // PAGX folds (elapsed - offset) into the playback period from t=0, even for positive
+    // offsets. A negative CSS delay starts at that same phase instead of freezing during a
+    // positive CSS delay. PingPong's period includes the backward leg.
+    int64_t period =
+        static_cast<int64_t>(anim->duration) * (anim->loop == LoopMode::PingPong ? 2 : 1);
+    if (period > 0) {
+      int64_t offset = totalDelayFrames % period;
+      int64_t phase = ((period - offset) % period + period) % period;
+      totalDelayFrames = -phase;
+    }
+  }
+  if (totalDelayFrames != 0) {
     float delaySec = static_cast<float>(totalDelayFrames) / anim->frameRate;
     shorthand += " " + CssFloatToString(delaySec) + "s";
   }
@@ -1339,18 +1374,18 @@ std::vector<BundleElement> FindBundleElements(const std::string& bodyHtml,
 
 HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext& ctx, bool enabled)
     : _doc(doc), _ctx(ctx) {
-  if (!enabled || !HasPlayableAnimations(doc)) {
+  if (!enabled) {
+    return;
+  }
+  auto animations = CollectPlayableAnimations(doc);
+  if (animations.empty()) {
     return;
   }
   _active = true;
 
   IndexLayerTree(doc.layers, _solidToPainter, _filterToLayer, _maskPathToLayer);
 
-  for (auto* animNode : doc.animations) {
-    if (animNode == nullptr || animNode->nodeType() != NodeType::Animation) {
-      continue;
-    }
-    auto* anim = static_cast<Animation*>(animNode);
+  for (auto* anim : animations) {
     for (auto* obj : anim->objects) {
       if (obj == nullptr || obj->channels.empty()) {
         continue;
@@ -1366,6 +1401,7 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
           _restoredNodeIds.emplace_back(layer, layer->id);
           layer->id = _ctx.nextId("animL");
         }
+        _ctx.animatedElementIds[layer] = layer->id;
         for (auto* ch : obj->channels) {
           if (ch != nullptr && LookupChannelRole(nType, ch->name) == TargetChannelRole::Opacity &&
               !layer->groupOpacity) {
@@ -1454,29 +1490,69 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   std::unordered_map<std::string, std::vector<std::string>> elementAnimDecls = {};
   std::unordered_map<std::string, bool> elementNeedsZeroOrigin = {};
   std::unordered_map<std::string, bool> elementLiftsSvgClip = {};
+  std::unordered_map<std::string, std::vector<bool>> elementPlayStates = {};
 
-  for (auto* animNode : _doc.animations) {
-    if (animNode == nullptr || animNode->nodeType() != NodeType::Animation) {
+  struct AnimationMount {
+    const Animation* animation = nullptr;
+    size_t scope = 0;
+    int64_t offset = 0;
+    bool playing = true;
+  };
+  std::vector<AnimationMount> mounts = {};
+  for (auto* node : _doc.animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) {
       continue;
     }
-    auto* anim = static_cast<const Animation*>(animNode);
+    auto* anim = static_cast<const Animation*>(node);
+    int64_t offset = 0;
+    auto it = timelineOffsets.find(anim->id);
+    if (it != timelineOffsets.end()) {
+      offset = it->second;
+    }
+    mounts.push_back({anim, 0, offset, true});
+  }
+  // Each Composition slot creates a distinct timeline. Preserve its scope, offset and play state
+  // instead of collapsing mounts by Animation id: siblings can share the same source Composition.
+  for (const auto& instance : _ctx.animationInstances) {
+    for (const auto& driver : instance.slot->timelines) {
+      if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
+        continue;
+      }
+      auto* timeline = static_cast<const AnimationTimeline*>(driver.get());
+      for (auto* node : instance.composition->animations) {
+        if (node != nullptr && node->nodeType() == NodeType::Animation &&
+            static_cast<const Animation*>(node)->id == StripAtPrefix(timeline->animationId)) {
+          mounts.push_back({static_cast<const Animation*>(node), instance.scope,
+                            timeline->evaluationOffset, timeline->playing});
+          break;
+        }
+      }
+    }
+  }
+
+  for (const auto& mount : mounts) {
+    const auto* anim = mount.animation;
     if (anim->duration <= 0 || anim->frameRate <= 0.0f || anim->objects.empty()) {
       continue;
     }
-
-    int64_t evalOffsetFrames = 0;
-    if (!anim->id.empty()) {
-      auto offIt = timelineOffsets.find(anim->id);
-      if (offIt != timelineOffsets.end()) {
-        evalOffsetFrames = offIt->second;
-      }
-    }
-
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
-
     for (const auto& bundle : bundles) {
-      auto elements = FindBundleElements(bodyHtml, bundle.domId);
+      auto elements = mount.scope == 0 ? FindBundleElements(bodyHtml, bundle.domId)
+                                       : std::vector<BundleElement>{};
+      if (mount.scope != 0) {
+        for (const auto& tag : _ctx.animatedDomTags) {
+          if (tag.scope != mount.scope || tag.node != bundle.primaryHost) {
+            continue;
+          }
+          size_t start = 0;
+          size_t end = 0;
+          std::string tagName = {};
+          if (FindElementOpeningTagById(bodyHtml, tag.id, start, end, tagName)) {
+            elements.push_back({tag.id, tagName});
+          }
+        }
+      }
       if (elements.empty()) {
         continue;
       }
@@ -1484,7 +1560,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       if (chSet.keyTimes.empty()) {
         continue;
       }
-      BundleTimingInfo timing = ComputeBundleTiming(anim, evalOffsetFrames, chSet);
+      BundleTimingInfo timing = ComputeBundleTiming(anim, mount.offset, chSet);
 
       // One animated node can render into tags of different kinds (a Fill painting both a box and
       // a text span), and paint channels map to a different CSS property per kind. Keyframes are
@@ -1515,7 +1591,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           elementIdOrder.push_back(element.id);
         }
         elementAnimDecls[element.id].push_back(
-            BuildAnimationShorthand(anim, nameIt->second, timing, evalOffsetFrames));
+            BuildAnimationShorthand(anim, nameIt->second, timing, mount.offset, mount.scope != 0));
+        elementPlayStates[element.id].push_back(mount.playing);
       }
       if (needsZeroOrigin) {
         for (const auto& element : elements) {
@@ -1540,6 +1617,16 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         combined += ", ";
       }
       combined += decls[i];
+    }
+    const auto& playStates = elementPlayStates[elementId];
+    if (std::find(playStates.begin(), playStates.end(), false) != playStates.end()) {
+      combined += ";animation-play-state:";
+      for (size_t i = 0; i < playStates.size(); ++i) {
+        if (i > 0) {
+          combined += ", ";
+        }
+        combined += playStates[i] ? "running" : "paused";
+      }
     }
     WeaveStyleIntoElementById(bodyHtml, elementId, combined, elementNeedsZeroOrigin[elementId],
                               elementLiftsSvgClip[elementId]);
