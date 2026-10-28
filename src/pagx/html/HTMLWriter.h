@@ -285,6 +285,8 @@ class HTMLWriterContext {
   // should be emitted on its corresponding HTML/SVG tag so the post-weaving pass can attach
   // `animation` declarations. Empty when no animations are exported.
   std::unordered_map<const Node*, std::string> animatedElementIds = {};
+  // Initially hidden Layers need their contents emitted when a visible channel may show them later.
+  std::unordered_set<const Layer*> animatedVisibleLayers = {};
 
   struct AnimationInstance {
     const Composition* composition = nullptr;

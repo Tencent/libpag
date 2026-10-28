@@ -2047,7 +2047,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
   // caller's offsets at destruction regardless of how writeLayer returns.
   RepeaterOffsetGuard offsetGuard(_ctx);
-  if (!layer->visible) {
+  if (!layer->visible && _ctx->animatedVisibleLayers.count(layer) == 0) {
     out.openTag("div");
     out.addAttr("style", "display:none");
     if (!layer->id.empty()) {
@@ -2633,6 +2633,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  if (!layer->visible) {
+    // Keep the contents of an initially hidden animated Layer so a later visible key can reveal it.
+    if (!style.empty()) {
+      style += ';';
+    }
+    style += "visibility:hidden";
+  }
   out.openTag("div");
   // A Composition may be mounted more than once: each animated child Layer needs its own DOM id
   // and timing even though all instances share the same source Layer node.

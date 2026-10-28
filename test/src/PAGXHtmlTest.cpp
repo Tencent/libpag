@@ -3945,8 +3945,10 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
   const char* cases[] = {
-      "timing/05_offset_positive_once.pagx", "timing/06_offset_positive_loop.pagx",
-      "timing/07_offset_negative_once.pagx", "timing/08_offset_ping_pong.pagx",
+      "timing/05_offset_positive_once.pagx",
+      "timing/06_offset_positive_loop.pagx",
+      "timing/07_offset_negative_once.pagx",
+      "timing/08_offset_ping_pong.pagx",
   };
   for (const auto* name : cases) {
     auto html = LoadAndConvert(
@@ -3981,6 +3983,62 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
   EXPECT_NE(slotA.find("animation:"), std::string::npos);
   EXPECT_NE(slotB.find("animation:"), std::string::npos);
   EXPECT_NE(slotB.find("0.5s"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationCompositionLayerVisibleWindow) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/layer/06_visible.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tag = FindTagContaining(html, "id=\"visChild\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "0%"),
+            "  0% { visibility: hidden; animation-timing-function: steps(1, end); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "50%"),
+            "  50% { visibility: visible; animation-timing-function: steps(1, end); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "100%"), "  100% { visibility: hidden; }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationVisibleRetainsInitiallyHiddenLayerContents) {
+  const char* xml = R"(<pagx width="200" height="120">
+    <Layer id="hiddenBox" visible="false" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="reveal" duration="60" frameRate="60" loop="once">
+        <Object target="hiddenBox">
+          <Channel name="visible" type="bool">
+            <Key time="0" value="false" interpolation="hold"/>
+            <Key time="30" value="true" interpolation="hold"/>
+            <Key time="60" value="true" interpolation="hold"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"hiddenBox\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("visibility:hidden"), std::string::npos) << tag;
+  EXPECT_EQ(tag.find("display:none"), std::string::npos) << tag;
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  EXPECT_NE(html.find("background-color:#2563EB"), std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"hiddenBox\"", "50%").find("visibility: visible"),
+            std::string::npos);
+
+  opts.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(staticHtml.empty());
+  auto staticTag = FindTagContaining(staticHtml, "id=\"hiddenBox\"");
+  EXPECT_NE(staticTag.find("display:none"), std::string::npos);
+  EXPECT_EQ(staticHtml.find("background-color:#2563EB"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
@@ -4068,12 +4126,12 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerAlphaLinear) {
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
-  const char* visibleChannel = R"(
-        <Channel name="visible" type="bool">
-          <Key time="0" value="true" interpolation="hold"/>
-          <Key time="20" value="false" interpolation="hold"/>
-          <Key time="40" value="true" interpolation="hold"/>
-          <Key time="60" value="true"/>
+  const char* blendChannel = R"(
+        <Channel name="blendMode" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="20" value="1" interpolation="hold"/>
+          <Key time="40" value="0" interpolation="hold"/>
+          <Key time="60" value="0"/>
         </Channel>)";
   std::string xml = std::string(R"(<pagx width="320" height="200">
     <Layer id="mixSlide" x="40" y="60" width="80" height="80">
@@ -4087,12 +4145,12 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
             <Key time="0" value="40" interpolation="bezier" bezierOut="0.42,0" bezierIn="0.58,1"/>
             <Key time="60" value="200"/>
           </Channel>)") +
-                    visibleChannel + R"(
+                    blendChannel + R"(
         </Object>
       </Animation>
     </Animations>
   </pagx>)";
-  ExpectUnsupportedChannelIgnored(xml, visibleChannel, "id=\"mixSlide\"");
+  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixSlide\"");
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
