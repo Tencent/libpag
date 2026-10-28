@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: a negative evaluationOffset skips the animation ahead so the color is already red at the
-     first frames of the mount.
+<!-- Tests: a negative evaluationOffset skips the green opening and starts red, then the later key
+     changes to blue during playback.
      Target: SolidColor  Channel: color  Type: color
      Expect: supported
      Ref: test/src/PAGXRuntimeTest.cpp:735 -->
@@ -19,6 +19,7 @@
             <Channel name="color" type="color">
               <Key time="0" value="#00FF00" interpolation="hold"/>
               <Key time="10" value="#FF0000" interpolation="hold"/>
+              <Key time="15" value="#0000FF" interpolation="hold"/>
             </Channel>
           </Object>
         </Animation>
