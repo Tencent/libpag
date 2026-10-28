@@ -272,6 +272,29 @@ void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameR
   }
 }
 
+// Glow effect channels (spec 7.5): threshold/radius/intensity are plain float channels on the
+// GlowFilter node. Legacy effect keyframes are composition-absolute (FrameCache evaluates at
+// contentFrame + startTime), so the raw keyframe times carry over without a layer offset.
+void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDocument* document,
+                                AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<float>* properties[3] = {effect->glowThreshold, effect->glowRadius,
+                                         effect->glowIntensity};
+  const char* channelNames[3] = {"glowThreshold", "glowRadius", "glowIntensity"};
+  for (size_t i = 0; i < 3; i++) {
+    auto* legacy = properties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = channelNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,

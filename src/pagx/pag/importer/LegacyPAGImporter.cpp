@@ -29,6 +29,7 @@
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -61,6 +62,8 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
                             AnimationObject* object);
 void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameRate,
                                     PAGXDocument* document, AnimationObject* object);
+void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDocument* document,
+                                AnimationObject* object);
 
 namespace {
 
@@ -869,13 +872,33 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode). Other effect types report an issue until their phase-3 filters land.
+// mode) and the Glow effect maps to GlowFilter (threshold/radius/intensity carry over 1:1,
+// animated properties join the composition animation). Other effect types report an issue
+// until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::FastBlur) {
+    if (effect->type() == pag::EffectType::Glow) {
+      auto* legacy = static_cast<pag::GlowEffect*>(effect);
+      auto* glow = state->document->makeNode<GlowFilter>("pag-legacy-glow-" +
+                                                         std::to_string(legacy->uniqueID));
+      glow->glowThreshold =
+          PropertyValueAtStart(legacy->glowThreshold, legacyLayer->startTime, nullptr);
+      glow->glowRadius = PropertyValueAtStart(legacy->glowRadius, legacyLayer->startTime, nullptr);
+      glow->glowIntensity =
+          PropertyValueAtStart(legacy->glowIntensity, legacyLayer->startTime, nullptr);
+      layer->filters.push_back(glow);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = glow->id;
+        MigrateGlowEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::FastBlur) {
       auto* legacy = static_cast<pag::FastBlurEffect*>(effect);
       auto* blur = state->document->makeNode<BlurFilter>();
       auto blurriness = PropertyValueAtStart(legacy->blurriness, legacyLayer->startTime, nullptr);

@@ -39,6 +39,14 @@ struct FilterResources {
   virtual ~FilterResources() = default;
 };
 
+// Self-owned resource slot for cache-less RuntimeFilters (the PAGX layer-filter path has no
+// pag::RenderCache). Held through a shared_ptr so the const onDraw() path can populate it
+// without a mutable member.
+struct OwnedFilterResources {
+  std::unique_ptr<FilterResources> resources = nullptr;
+  tgfx::GPU* gpu = nullptr;
+};
+
 class RenderCache;
 
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
@@ -48,7 +56,8 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
   explicit RuntimeFilter(RenderCache* cache,
                          const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
-      : RuntimeEffect(extraInputs), cache(cache) {
+      : RuntimeEffect(extraInputs), cache(cache),
+        ownedFilterResources(std::make_shared<OwnedFilterResources>()) {
   }
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect, tgfx::MapDirection) const override {
@@ -62,6 +71,7 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
 
  protected:
   RenderCache* cache = nullptr;
+  std::shared_ptr<OwnedFilterResources> ownedFilterResources = nullptr;
 
   virtual ID filterType() const = 0;
 

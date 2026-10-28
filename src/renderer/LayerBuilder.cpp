@@ -37,6 +37,7 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlassStyle.h"
+#include "pagx/nodes/GlowFilter.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -77,6 +78,7 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
@@ -3206,6 +3208,42 @@ class LayerBuilderContext {
                                 ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessY>);
   }
 
+  static void WriteGlowFilterThreshold(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GlowLayerFilter*>(object);
+    filter->setGlowThreshold(MixFloat(filter->glowThreshold(), *v, mix));
+  }
+
+  static void WriteGlowFilterRadius(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GlowLayerFilter*>(object);
+    filter->setGlowRadius(MixFloat(filter->glowRadius(), *v, mix));
+  }
+
+  static void WriteGlowFilterIntensity(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GlowLayerFilter*>(object);
+    filter->setGlowIntensity(MixFloat(filter->glowIntensity(), *v, mix));
+  }
+
+  void bindGlowFilterChannels(const GlowFilter* node) {
+    _result.binding.setAccessor(node, "glowThreshold", WriteGlowFilterThreshold,
+                                ReadScalar<GlowLayerFilter, &GlowLayerFilter::glowThreshold>);
+    _result.binding.setAccessor(node, "glowRadius", WriteGlowFilterRadius,
+                                ReadScalar<GlowLayerFilter, &GlowLayerFilter::glowRadius>);
+    _result.binding.setAccessor(node, "glowIntensity", WriteGlowFilterIntensity,
+                                ReadScalar<GlowLayerFilter, &GlowLayerFilter::glowIntensity>);
+  }
+
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3526,6 +3564,14 @@ class LayerBuilderContext {
             tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
         _result.binding.set(filter, tgfxFilter);
         bindBlurFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::GlowFilter: {
+        auto filter = static_cast<const GlowFilter*>(node);
+        auto tgfxFilter =
+            GlowLayerFilter::Make(filter->glowThreshold, filter->glowRadius, filter->glowIntensity);
+        _result.binding.set(filter, tgfxFilter);
+        bindGlowFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {

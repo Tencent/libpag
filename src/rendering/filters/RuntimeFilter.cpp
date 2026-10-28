@@ -171,6 +171,24 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::getPipeline(tgfx::GPU* gpu)
 
 FilterResources* RuntimeFilter::getFilterResources(tgfx::GPU* gpu) const {
   auto type = filterType();
+  if (cache == nullptr) {
+    // Cache-less fallback (PAGX layer filters): own the resources on this effect. The slot is
+    // rebuilt when the GPU changes so a destroyed context never leaves a stale pipeline bound.
+    if (ownedFilterResources->resources == nullptr || ownedFilterResources->gpu != gpu) {
+      auto resources = onCreateFilterResources();
+      resources->pipeline = createPipeline(gpu);
+      if (resources->pipeline == nullptr) {
+        return nullptr;
+      }
+      tgfx::SamplerDescriptor samplerDesc(tgfx::AddressMode::ClampToEdge,
+                                          tgfx::AddressMode::ClampToEdge, tgfx::FilterMode::Linear,
+                                          tgfx::FilterMode::Linear, tgfx::MipmapMode::None);
+      resources->sampler = gpu->createSampler(samplerDesc);
+      ownedFilterResources->resources = std::move(resources);
+      ownedFilterResources->gpu = gpu;
+    }
+    return ownedFilterResources->resources.get();
+  }
   auto resources = cache->findFilterResources(type);
   if (resources == nullptr) {
     auto pipeline = createPipeline(gpu);
