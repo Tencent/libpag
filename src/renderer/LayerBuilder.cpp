@@ -47,10 +47,11 @@
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
-#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
@@ -87,6 +88,7 @@
 #include "renderer/CornerPinLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/LevelsIndividualLayerFilter.h"
 #include "renderer/MosaicLayerFilter.h"
 #include "renderer/MotionTileLayerFilter.h"
 #include "renderer/RadialBlurLayerFilter.h"
@@ -3218,6 +3220,188 @@ class LayerBuilderContext {
                                 ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessY>);
   }
 
+  static void WriteLevelsIndividualInputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setInputBlack(MixFloat(filter->inputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualInputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setInputWhite(MixFloat(filter->inputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGamma(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGamma(MixFloat(filter->gamma(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualOutputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setOutputBlack(MixFloat(filter->outputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualOutputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setOutputWhite(MixFloat(filter->outputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualRedInputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setRedInputBlack(MixFloat(filter->redInputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualRedInputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setRedInputWhite(MixFloat(filter->redInputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualRedGamma(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setRedGamma(MixFloat(filter->redGamma(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualRedOutputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setRedOutputBlack(MixFloat(filter->redOutputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualRedOutputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setRedOutputWhite(MixFloat(filter->redOutputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGreenInputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGreenInputBlack(MixFloat(filter->greenInputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGreenInputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGreenInputWhite(MixFloat(filter->greenInputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGreenGamma(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGreenGamma(MixFloat(filter->greenGamma(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGreenOutputBlack(void* object, const KeyValue& value,
+                                                    float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGreenOutputBlack(MixFloat(filter->greenOutputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualGreenOutputWhite(void* object, const KeyValue& value,
+                                                    float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setGreenOutputWhite(MixFloat(filter->greenOutputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualBlueInputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setBlueInputBlack(MixFloat(filter->blueInputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualBlueInputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setBlueInputWhite(MixFloat(filter->blueInputWhite(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualBlueGamma(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setBlueGamma(MixFloat(filter->blueGamma(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualBlueOutputBlack(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setBlueOutputBlack(MixFloat(filter->blueOutputBlack(), *v, mix));
+  }
+
+  static void WriteLevelsIndividualBlueOutputWhite(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<LevelsIndividualLayerFilter*>(object);
+    filter->setBlueOutputWhite(MixFloat(filter->blueOutputWhite(), *v, mix));
+  }
+
   static void WriteMotionTileFilterCenterX(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3518,6 +3702,69 @@ class LayerBuilderContext {
                                 ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerY>);
   }
 
+  void bindLevelsIndividualFilterChannels(const LevelsIndividualFilter* node) {
+    _result.binding.setAccessor(
+        node, "inputBlack", WriteLevelsIndividualInputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::inputBlack>);
+    _result.binding.setAccessor(
+        node, "inputWhite", WriteLevelsIndividualInputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::inputWhite>);
+    _result.binding.setAccessor(
+        node, "gamma", WriteLevelsIndividualGamma,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::gamma>);
+    _result.binding.setAccessor(
+        node, "outputBlack", WriteLevelsIndividualOutputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::outputBlack>);
+    _result.binding.setAccessor(
+        node, "outputWhite", WriteLevelsIndividualOutputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::outputWhite>);
+    _result.binding.setAccessor(
+        node, "redInputBlack", WriteLevelsIndividualRedInputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::redInputBlack>);
+    _result.binding.setAccessor(
+        node, "redInputWhite", WriteLevelsIndividualRedInputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::redInputWhite>);
+    _result.binding.setAccessor(
+        node, "redGamma", WriteLevelsIndividualRedGamma,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::redGamma>);
+    _result.binding.setAccessor(
+        node, "redOutputBlack", WriteLevelsIndividualRedOutputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::redOutputBlack>);
+    _result.binding.setAccessor(
+        node, "redOutputWhite", WriteLevelsIndividualRedOutputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::redOutputWhite>);
+    _result.binding.setAccessor(
+        node, "greenInputBlack", WriteLevelsIndividualGreenInputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::greenInputBlack>);
+    _result.binding.setAccessor(
+        node, "greenInputWhite", WriteLevelsIndividualGreenInputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::greenInputWhite>);
+    _result.binding.setAccessor(
+        node, "greenGamma", WriteLevelsIndividualGreenGamma,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::greenGamma>);
+    _result.binding.setAccessor(
+        node, "greenOutputBlack", WriteLevelsIndividualGreenOutputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::greenOutputBlack>);
+    _result.binding.setAccessor(
+        node, "greenOutputWhite", WriteLevelsIndividualGreenOutputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::greenOutputWhite>);
+    _result.binding.setAccessor(
+        node, "blueInputBlack", WriteLevelsIndividualBlueInputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::blueInputBlack>);
+    _result.binding.setAccessor(
+        node, "blueInputWhite", WriteLevelsIndividualBlueInputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::blueInputWhite>);
+    _result.binding.setAccessor(
+        node, "blueGamma", WriteLevelsIndividualBlueGamma,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::blueGamma>);
+    _result.binding.setAccessor(
+        node, "blueOutputBlack", WriteLevelsIndividualBlueOutputBlack,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::blueOutputBlack>);
+    _result.binding.setAccessor(
+        node, "blueOutputWhite", WriteLevelsIndividualBlueOutputWhite,
+        ReadScalar<LevelsIndividualLayerFilter, &LevelsIndividualLayerFilter::blueOutputWhite>);
+  }
+
   void bindMotionTileFilterChannels(const MotionTileFilter* node) {
     _result.binding.setAccessor(
         node, "tileCenter.x", WriteMotionTileFilterCenterX,
@@ -3525,8 +3772,9 @@ class LayerBuilderContext {
     _result.binding.setAccessor(
         node, "tileCenter.y", WriteMotionTileFilterCenterY,
         ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileCenterY>);
-    _result.binding.setAccessor(node, "tileWidth", WriteMotionTileFilterTileWidth,
-                                ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileWidth>);
+    _result.binding.setAccessor(
+        node, "tileWidth", WriteMotionTileFilterTileWidth,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileWidth>);
     _result.binding.setAccessor(
         node, "tileHeight", WriteMotionTileFilterTileHeight,
         ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileHeight>);
@@ -3941,6 +4189,19 @@ class LayerBuilderContext {
         bindCornerPinFilterChannels(filter);
         return tgfxFilter;
       }
+      case NodeType::LevelsIndividualFilter: {
+        auto filter = static_cast<const LevelsIndividualFilter*>(node);
+        auto tgfxFilter = LevelsIndividualLayerFilter::Make(
+            filter->inputBlack, filter->inputWhite, filter->gamma, filter->outputBlack,
+            filter->outputWhite, filter->redInputBlack, filter->redInputWhite, filter->redGamma,
+            filter->redOutputBlack, filter->redOutputWhite, filter->greenInputBlack,
+            filter->greenInputWhite, filter->greenGamma, filter->greenOutputBlack,
+            filter->greenOutputWhite, filter->blueInputBlack, filter->blueInputWhite,
+            filter->blueGamma, filter->blueOutputBlack, filter->blueOutputWhite);
+        _result.binding.set(filter, tgfxFilter);
+        bindLevelsIndividualFilterChannels(filter);
+        return tgfxFilter;
+      }
       case NodeType::BulgeFilter: {
         auto filter = static_cast<const BulgeFilter*>(node);
         auto tgfxFilter =
@@ -3952,11 +4213,9 @@ class LayerBuilderContext {
       }
       case NodeType::MotionTileFilter: {
         auto filter = static_cast<const MotionTileFilter*>(node);
-        auto tgfxFilter =
-            MotionTileLayerFilter::Make(filter->tileCenter, filter->tileWidth, filter->tileHeight,
-                                        filter->outputWidth, filter->outputHeight,
-                                        filter->mirrorEdges, filter->phase,
-                                        filter->horizontalPhaseShift);
+        auto tgfxFilter = MotionTileLayerFilter::Make(
+            filter->tileCenter, filter->tileWidth, filter->tileHeight, filter->outputWidth,
+            filter->outputHeight, filter->mirrorEdges, filter->phase, filter->horizontalPhaseShift);
         _result.binding.set(filter, tgfxFilter);
         bindMotionTileFilterChannels(filter);
         return tgfxFilter;

@@ -496,6 +496,39 @@ void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frame
   }
 }
 
+// LevelsIndividual effect channels (spec 7.5): twenty plain float channels covering the
+// global/red/green/blue level values. Legacy effect keyframes are composition-absolute, so raw
+// keyframe times carry over without a layer offset.
+void MigrateLevelsIndividualEffectAnimation(pag::LevelsIndividualEffect* effect, float frameRate,
+                                            PAGXDocument* document, AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<float>* properties[20] = {
+      effect->inputBlack,      effect->inputWhite,       effect->gamma,
+      effect->outputBlack,     effect->outputWhite,      effect->redInputBlack,
+      effect->redInputWhite,   effect->redGamma,         effect->redOutputBlack,
+      effect->redOutputWhite,  effect->greenInputBlack,  effect->greenInputWhite,
+      effect->greenGamma,      effect->greenOutputBlack, effect->greenOutputWhite,
+      effect->blueInputBlack,  effect->blueInputWhite,   effect->blueGamma,
+      effect->blueOutputBlack, effect->blueOutputWhite};
+  const char* channelNames[20] = {
+      "inputBlack",      "inputWhite",      "gamma",      "outputBlack",      "outputWhite",
+      "redInputBlack",   "redInputWhite",   "redGamma",   "redOutputBlack",   "redOutputWhite",
+      "greenInputBlack", "greenInputWhite", "greenGamma", "greenOutputBlack", "greenOutputWhite",
+      "blueInputBlack",  "blueInputWhite",  "blueGamma",  "blueOutputBlack",  "blueOutputWhite"};
+  for (int i = 0; i < 20; i++) {
+    auto* legacy = properties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = channelNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,

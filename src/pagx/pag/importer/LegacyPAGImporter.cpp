@@ -37,6 +37,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
@@ -79,6 +80,8 @@ void MigrateBulgeEffectAnimation(pag::BulgeEffect* effect, float frameRate, PAGX
                                  AnimationObject* object);
 void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frameRate,
                                       PAGXDocument* document, AnimationObject* object);
+void MigrateLevelsIndividualEffectAnimation(pag::LevelsIndividualEffect* effect, float frameRate,
+                                            PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -890,15 +893,66 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge and MotionTile effects map to
-// their filter nodes (animated properties join the composition animation). Other effect types
-// report an issue until their phase-3 filters land.
+// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile and LevelsIndividual
+// effects map to their filter nodes (animated properties join the composition animation).
+// Other effect types report an issue until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::MotionTile) {
+    if (effect->type() == pag::EffectType::LevelsIndividual) {
+      auto* legacy = static_cast<pag::LevelsIndividualEffect*>(effect);
+      auto* levels = state->document->makeNode<LevelsIndividualFilter>(
+          "pag-legacy-levels-" + std::to_string(legacy->uniqueID));
+      levels->inputBlack =
+          PropertyValueAtStart(legacy->inputBlack, legacyLayer->startTime, nullptr);
+      levels->inputWhite =
+          PropertyValueAtStart(legacy->inputWhite, legacyLayer->startTime, nullptr);
+      levels->gamma = PropertyValueAtStart(legacy->gamma, legacyLayer->startTime, nullptr);
+      levels->outputBlack =
+          PropertyValueAtStart(legacy->outputBlack, legacyLayer->startTime, nullptr);
+      levels->outputWhite =
+          PropertyValueAtStart(legacy->outputWhite, legacyLayer->startTime, nullptr);
+      levels->redInputBlack =
+          PropertyValueAtStart(legacy->redInputBlack, legacyLayer->startTime, nullptr);
+      levels->redInputWhite =
+          PropertyValueAtStart(legacy->redInputWhite, legacyLayer->startTime, nullptr);
+      levels->redGamma = PropertyValueAtStart(legacy->redGamma, legacyLayer->startTime, nullptr);
+      levels->redOutputBlack =
+          PropertyValueAtStart(legacy->redOutputBlack, legacyLayer->startTime, nullptr);
+      levels->redOutputWhite =
+          PropertyValueAtStart(legacy->redOutputWhite, legacyLayer->startTime, nullptr);
+      levels->greenInputBlack =
+          PropertyValueAtStart(legacy->greenInputBlack, legacyLayer->startTime, nullptr);
+      levels->greenInputWhite =
+          PropertyValueAtStart(legacy->greenInputWhite, legacyLayer->startTime, nullptr);
+      levels->greenGamma =
+          PropertyValueAtStart(legacy->greenGamma, legacyLayer->startTime, nullptr);
+      levels->greenOutputBlack =
+          PropertyValueAtStart(legacy->greenOutputBlack, legacyLayer->startTime, nullptr);
+      levels->greenOutputWhite =
+          PropertyValueAtStart(legacy->greenOutputWhite, legacyLayer->startTime, nullptr);
+      levels->blueInputBlack =
+          PropertyValueAtStart(legacy->blueInputBlack, legacyLayer->startTime, nullptr);
+      levels->blueInputWhite =
+          PropertyValueAtStart(legacy->blueInputWhite, legacyLayer->startTime, nullptr);
+      levels->blueGamma = PropertyValueAtStart(legacy->blueGamma, legacyLayer->startTime, nullptr);
+      levels->blueOutputBlack =
+          PropertyValueAtStart(legacy->blueOutputBlack, legacyLayer->startTime, nullptr);
+      levels->blueOutputWhite =
+          PropertyValueAtStart(legacy->blueOutputWhite, legacyLayer->startTime, nullptr);
+      layer->filters.push_back(levels);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = levels->id;
+        MigrateLevelsIndividualEffectAnimation(legacy, state->currentFrameRate, state->document,
+                                               object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::MotionTile) {
       auto* legacy = static_cast<pag::MotionTileEffect*>(effect);
       auto* tile = state->document->makeNode<MotionTileFilter>("pag-legacy-motiontile-" +
                                                                std::to_string(legacy->uniqueID));
