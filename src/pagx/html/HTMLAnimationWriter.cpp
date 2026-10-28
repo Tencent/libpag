@@ -293,7 +293,9 @@ void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<ImageRef>*>(ch)->keyframes,
                                     timesOut, easingOut);
       break;
+    case ChannelValueType::Matrix3D:
     case ChannelValueType::PAGImage:
+      // Neither channel value type currently maps to a CSS animation channel.
       break;
   }
 }
