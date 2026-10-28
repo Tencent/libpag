@@ -74,6 +74,9 @@ tgfx::Color ToTGFX(const Color& color);
 
 tgfx::Matrix ToTGFX(const Matrix& matrix);
 
+// Converts a tgfx affine matrix back to a pagx Matrix, the inverse of ToTGFX(const Matrix&).
+Matrix FromTGFX(const tgfx::Matrix& matrix);
+
 tgfx::Rect ToTGFX(const Rect& rect);
 
 Rect FromTGFX(const tgfx::Rect& rect);

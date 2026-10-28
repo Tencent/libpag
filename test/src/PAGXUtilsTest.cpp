@@ -20,6 +20,9 @@
 #include <cstring>
 #include <fstream>
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/SVGExporter.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/Fill.h"
@@ -29,22 +32,356 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Surface.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
+
+PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
+  auto doc = pagx::PAGXDocument::Make(240, 240);
+  auto* ancestor = doc->makeNode<pagx::Layer>();
+  ancestor->x = 10;
+  ancestor->y = 10;
+  doc->layers.push_back(ancestor);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->x = 20;
+  layer->y = 30;
+  layer->perspective = 500;
+  layer->preserve3D = true;
+  layer->alpha = 0.5f;
+  ancestor->children.push_back(layer);
+  auto* child = doc->makeNode<pagx::Layer>();
+  child->z = 200;
+  layer->children.push_back(child);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 0, 0, 1};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = color;
+  child->contents = {rect, fill};
+  doc->applyLayout();
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  auto target = build.getLayer(layer);
+  ASSERT_NE(target, nullptr);
+  auto* parent = target->parent();
+  auto index = parent->getChildIndex(target);
+  auto bounds = pagx::ComputeRasterizedLayerBounds(build.root, target);
+  pagx::GPUContext gpu;
+  auto data = pagx::RenderMaskedLayer(&gpu, build.root, target, 1);
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(target->parent(), parent);
+  EXPECT_EQ(parent->getChildIndex(target), index);
+  auto codec = tgfx::ImageCodec::MakeFrom(data);
+  ASSERT_NE(codec, nullptr);
+  tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
+  tgfx::Pixmap pixmap(actual);
+  ASSERT_TRUE(codec->readPixels(pixmap.info(), pixmap.writablePixels()));
+  {
+    // RenderMaskedLayer locks its own device; reference draws must not span rasterization calls.
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    auto expected = tgfx::Surface::Make(deviceLock.context(), codec->width(), codec->height());
+    ASSERT_NE(expected, nullptr);
+    expected->getCanvas()->translate(-bounds.left, -bounds.top);
+    build.root->draw(expected->getCanvas());
+    tgfx::Bitmap reference(codec->width(), codec->height(), false, false);
+    tgfx::Pixmap referencePixels(reference);
+    ASSERT_TRUE(expected->readPixels(referencePixels.info(), referencePixels.writablePixels()));
+    EXPECT_EQ(referencePixels.info().byteSize(), pixmap.info().byteSize());
+    EXPECT_EQ(std::memcmp(referencePixels.pixels(), pixmap.pixels(), pixmap.info().byteSize()), 0);
+    EXPECT_NEAR(pixmap.getColor(80, 80).alpha, 0.5f, 0.01f);
+  }
+
+  auto localBounds = pagx::ComputeRasterizedLayerBoundsInSpace(target, parent);
+  auto localData = pagx::RenderMaskedLayer(&gpu, build.root, target, parent, 1);
+  ASSERT_NE(localData, nullptr);
+  auto localCodec = tgfx::ImageCodec::MakeFrom(localData);
+  ASSERT_NE(localCodec, nullptr);
+  tgfx::Bitmap localBitmap(localCodec->width(), localCodec->height(), false, false);
+  tgfx::Pixmap localPixels(localBitmap);
+  ASSERT_TRUE(localCodec->readPixels(localPixels.info(), localPixels.writablePixels()));
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto localReference =
+      tgfx::Surface::Make(deviceLock.context(), localCodec->width(), localCodec->height());
+  ASSERT_NE(localReference, nullptr);
+  localReference->getCanvas()->translate(-localBounds.left, -localBounds.top);
+  parent->draw(localReference->getCanvas());
+  tgfx::Bitmap localExpected(localCodec->width(), localCodec->height(), false, false);
+  tgfx::Pixmap localExpectedPixels(localExpected);
+  ASSERT_TRUE(
+      localReference->readPixels(localExpectedPixels.info(), localExpectedPixels.writablePixels()));
+  EXPECT_EQ(std::memcmp(localPixels.pixels(), localExpectedPixels.pixels(),
+                        localPixels.info().byteSize()),
+            0);
+  EXPECT_EQ(target->parent(), parent);
+  EXPECT_EQ(parent->getChildIndex(target), index);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
+  const std::string xml =
+      "<pagx width=\"100\" height=\"100\"><Layer preserve3D=\"true\">"
+      "<Layer z=\"100\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#FF0000\"/></Layer>"
+      "<Layer><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#0000FF\"/></Layer></Layer></pagx>";
+  auto original = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(original, nullptr);
+  auto features = pagx::ProbeLayerFeaturesForSVG(original->layers[0]);
+  EXPECT_TRUE(features.hasPreserve3D);
+  EXPECT_FALSE(features.hasPerspectiveTransform);
+  EXPECT_TRUE(features.needsRasterization());
+  auto svg = pagx::SVGExporter::ToSVG(*original);
+  ASSERT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  auto imported = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(imported, nullptr);
+  imported->applyLayout();
+  auto originalRoot = pagx::LayerBuilder::Build(original.get());
+  auto importedRoot = pagx::LayerBuilder::Build(imported.get());
+  ASSERT_NE(originalRoot, nullptr);
+  ASSERT_NE(importedRoot, nullptr);
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto reference = tgfx::Surface::Make(context, 100, 100);
+  auto actual = tgfx::Surface::Make(context, 100, 100);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(actual, nullptr);
+  originalRoot->draw(reference->getCanvas());
+  importedRoot->draw(actual->getCanvas());
+  EXPECT_FLOAT_EQ(reference->getColor(50, 50).red, 1);
+  EXPECT_FLOAT_EQ(actual->getColor(50, 50).red, 1);
+  EXPECT_FLOAT_EQ(actual->getColor(50, 50).blue, 0);
+}
+
+PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
+  const std::string xml =
+      "<pagx width=\"240\" height=\"240\">"
+      "<Layer x=\"20\" y=\"30\" alpha=\"0.5\" perspective=\"500\" preserve3D=\"true\">"
+      "<Layer z=\"200\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#FF0000\"/></Layer></Layer></pagx>";
+  auto original = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(original, nullptr);
+  auto svg = pagx::SVGExporter::ToSVG(*original);
+  ASSERT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+  auto imported = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(imported, nullptr);
+  imported->applyLayout();
+  auto originalRoot = pagx::LayerBuilder::Build(original.get());
+  auto importedRoot = pagx::LayerBuilder::Build(imported.get());
+  ASSERT_NE(originalRoot, nullptr);
+  ASSERT_NE(importedRoot, nullptr);
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto reference = tgfx::Surface::Make(context, 240, 240);
+  auto actual = tgfx::Surface::Make(context, 240, 240);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(actual, nullptr);
+  originalRoot->draw(reference->getCanvas());
+  importedRoot->draw(actual->getCanvas());
+  EXPECT_NEAR(reference->getColor(190, 200).alpha, 0.5f, 0.01f);
+  EXPECT_NEAR(actual->getColor(190, 200).alpha, reference->getColor(190, 200).alpha, 0.01f);
+  EXPECT_FLOAT_EQ(reference->getColor(210, 230).alpha, 0);
+  EXPECT_FLOAT_EQ(actual->getColor(210, 230).alpha, 0);
+}
+
+PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
+  const std::string xml =
+      "<pagx width=\"100\" height=\"100\">"
+      "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "<Fill color=\"#FFFFFF\"/></Layer>"
+      "<Layer id=\"L\" x=\"20\" alpha=\"0.5\" mask=\"@m\" scrollRect=\"0,0,60,60\">"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+      "</Layer></pagx>";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("L"));
+  auto target = build.getLayer(layer);
+  ASSERT_NE(target, nullptr);
+  auto bounds = pagx::ComputeRasterizedLayerBounds(build.root, target);
+  pagx::GPUContext gpu;
+  auto data = pagx::RenderMaskedLayer(&gpu, build.root, target, 1);
+  ASSERT_NE(data, nullptr);
+  auto codec = tgfx::ImageCodec::MakeFrom(data);
+  ASSERT_NE(codec, nullptr);
+  tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
+  tgfx::Pixmap actualPixels(actual);
+  ASSERT_TRUE(codec->readPixels(actualPixels.info(), actualPixels.writablePixels()));
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto expected = tgfx::Surface::Make(deviceLock.context(), codec->width(), codec->height());
+  ASSERT_NE(expected, nullptr);
+  expected->getCanvas()->translate(-bounds.left, -bounds.top);
+  build.root->draw(expected->getCanvas());
+  tgfx::Bitmap reference(codec->width(), codec->height(), false, false);
+  tgfx::Pixmap referencePixels(reference);
+  ASSERT_TRUE(expected->readPixels(referencePixels.info(), referencePixels.writablePixels()));
+  EXPECT_EQ(
+      std::memcmp(actualPixels.pixels(), referencePixels.pixels(), actualPixels.info().byteSize()),
+      0);
+}
+
+PAGX_TEST(PAGXUtilsTest, Matrix3DReflectionMidpointRemainsContinuous) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  pagx::Matrix3DComponents firstComponents = {};
+  firstComponents.rotation[2] = 20;
+  firstComponents.scale[1] = 2;
+  firstComponents.translate[0] = 150;
+  firstComponents.translate[1] = 100;
+  pagx::Matrix3DComponents secondComponents = firstComponents;
+  secondComponents.rotation[2] = 110;
+  secondComponents.scale[0] = -1;
+  secondComponents.scale[1] = 3;
+  pagx::Matrix3D first = {};
+  pagx::Matrix3D second = {};
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(firstComponents, &first));
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(secondComponents, &second));
+  auto before = pagx::LerpMatrix3D(first, second, 0.499999);
+  auto midpoint = pagx::LerpMatrix3D(first, second, 0.5);
+  auto after = pagx::LerpMatrix3D(first, second, 0.500001);
+  EXPECT_FALSE(pagx::IsInvertibleMatrix3D(midpoint));
+  EXPECT_TRUE(pagx::IsFiniteMatrix3D(midpoint));
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_NEAR(midpoint.values[i], (before.values[i] + after.values[i]) * 0.5f, 0.0001f);
+  }
+
+  auto doc = pagx::PAGXDocument::Make(300, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {25, 25};
+  rect->size = {50, 50};
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 0, 0, 1};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = color;
+  layer->contents = {rect, fill};
+  doc->applyLayout();
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", midpoint, 1));
+  // Whether a singular matrix draws anything is up to the backend (Metal draws nothing while
+  // SwiftShader rasterizes the degenerate quad), so only check the draw does not crash.
+  auto surface = tgfx::Surface::Make(context, 300, 300);
+  ASSERT_NE(surface, nullptr);
+  build.root->draw(surface->getCanvas());
+  tgfx::Bitmap pixels(300, 300, false, false);
+  tgfx::Pixmap pixmap(pixels);
+  EXPECT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
+}
+
+PAGX_TEST(PAGXUtilsTest, MatrixWriteKeepsNormalizedZ) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  const std::string xml =
+      "<pagx width=\"160\" height=\"160\">"
+      "<Layer perspective=\"500\" preserve3D=\"true\"><Layer id=\"L\">"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+      "</Layer></Layer></pagx>";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("L"));
+  ASSERT_NE(layer, nullptr);
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  pagx::Matrix3D pose = {};
+  for (int i = 0; i < 16; ++i) {
+    pose.values[i] *= 2;
+  }
+  pose.values[14] = 60;
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", pose, 1));
+  pagx::KeyValue z;
+  ASSERT_TRUE(build.binding.read(layer, "z", &z));
+  EXPECT_FLOAT_EQ(std::get<float>(z), 30);
+  auto reference = tgfx::Surface::Make(context, 160, 160);
+  ASSERT_NE(reference, nullptr);
+  build.root->draw(reference->getCanvas());
+  ASSERT_TRUE(build.binding.apply(layer, "matrix", pagx::Matrix::Identity(), 1));
+  ASSERT_TRUE(build.binding.read(layer, "z", &z));
+  EXPECT_FLOAT_EQ(std::get<float>(z), 30);
+  auto actual = tgfx::Surface::Make(context, 160, 160);
+  ASSERT_NE(actual, nullptr);
+  build.root->draw(actual->getCanvas());
+  tgfx::Bitmap referenceBitmap(160, 160, false, false);
+  tgfx::Bitmap actualBitmap(160, 160, false, false);
+  tgfx::Pixmap referencePixels(referenceBitmap);
+  tgfx::Pixmap actualPixels(actualBitmap);
+  ASSERT_TRUE(reference->readPixels(referencePixels.info(), referencePixels.writablePixels()));
+  ASSERT_TRUE(actual->readPixels(actualPixels.info(), actualPixels.writablePixels()));
+  EXPECT_EQ(std::memcmp(referencePixels.pixels(), actualPixels.pixels(),
+                        referencePixels.info().byteSize()),
+            0);
+}
+
+PAGX_TEST(PAGXUtilsTest, SingularZScaleKeepsPlanarPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {100, 100};
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 0, 0, 1};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = color;
+  layer->contents = {rect, fill};
+  doc->applyLayout();
+  auto build = pagx::LayerBuilder::BuildWithMap(doc.get());
+  ASSERT_NE(build.root, nullptr);
+  pagx::Matrix3D first = {};
+  pagx::Matrix3D second = {};
+  second.values[10] = -1;
+  auto pose = pagx::LerpMatrix3D(first, second, 0.5);
+  EXPECT_FALSE(pagx::IsInvertibleMatrix3D(pose));
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", pose, 1));
+  auto surface = tgfx::Surface::Make(context, 100, 100);
+  ASSERT_NE(surface, nullptr);
+  build.root->draw(surface->getCanvas());
+  EXPECT_FLOAT_EQ(surface->getColor(50, 50).alpha, 1);
+  pose.values[0] = 0;
+  ASSERT_TRUE(build.binding.apply(layer, "matrix3D", pose, 1));
+  surface->getCanvas()->clear();
+  build.root->draw(surface->getCanvas());
+  EXPECT_FLOAT_EQ(surface->getColor(50, 50).alpha, 0);
+}
 
 // ---------------------------------------------------------------------------
 // CollectFillStroke
@@ -126,19 +463,90 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithPosition) {
   EXPECT_FLOAT_EQ(m.ty, 20.0f);
 }
 
-PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithMatrixAndPosition) {
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_AddsAuthoredPositionToGeneratedLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 20;
+  layer->y = 10;
+  layer->setLayoutPosition(nullptr, 100, 30);
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.tx, 120);
+  EXPECT_FLOAT_EQ(m.ty, 40);
+}
+
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_MatrixOverridesAuthoredPositionButKeepsLayoutPosition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
-  layer->matrix = pagx::Matrix::Scale(2.0f, 3.0f);
+  layer->matrix = pagx::Matrix::Translate(3.0f, 4.0f) * pagx::Matrix::Scale(2.0f, 3.0f);
   layer->x = 5.0f;
   layer->y = 7.0f;
-  layer->updateSize(nullptr);
+  auto authoredMatrix = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(authoredMatrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.d, 3.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.tx, 3.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.ty, 4.0f);
+
+  layer->setLayoutPosition(nullptr, 11.0f, 13.0f);
+  auto generatedPositionMatrix = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.d, 3.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.tx, 14.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.ty, 17.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_TransformComponents) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 10;
+  layer->y = 20;
+  layer->rotationZ = 90;
+  layer->scaleX = 2;
+  layer->setLayoutPosition(nullptr, 30, 40);
   auto m = pagx::BuildLayerMatrix(layer);
-  auto expected = pagx::Matrix::Translate(5.0f, 7.0f) * pagx::Matrix::Scale(2.0f, 3.0f);
-  EXPECT_FLOAT_EQ(m.a, expected.a);
-  EXPECT_FLOAT_EQ(m.d, expected.d);
-  EXPECT_FLOAT_EQ(m.tx, expected.tx);
-  EXPECT_FLOAT_EQ(m.ty, expected.ty);
+  EXPECT_NEAR(m.a, 0, 1.0e-6f);
+  EXPECT_NEAR(m.b, 2, 1.0e-6f);
+  EXPECT_NEAR(m.c, -1, 1.0e-6f);
+  EXPECT_NEAR(m.d, 0, 1.0e-6f);
+  EXPECT_FLOAT_EQ(m.tx, 40);
+  EXPECT_FLOAT_EQ(m.ty, 60);
+  EXPECT_TRUE(pagx::HasLayerTransformComponents(layer));
+  layer->matrix = pagx::Matrix::Translate(5, 6);
+  m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 1);
+  EXPECT_FLOAT_EQ(m.tx, 35);
+}
+
+// P(500) * T(50, 0, -500) has the w row [0, 0, -1/500, 2], so points on the z=0 plane are divided
+// by the constant w = 2 before the layout position is added.
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_PerspectiveWithZDividesByW) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 50;
+  layer->z = -500;
+  layer->perspective = 500;
+  layer->setLayoutPosition(nullptr, 10, 20);
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 0.5f);
+  EXPECT_FLOAT_EQ(m.b, 0);
+  EXPECT_FLOAT_EQ(m.c, 0);
+  EXPECT_FLOAT_EQ(m.d, 0.5f);
+  EXPECT_FLOAT_EQ(m.tx, 35);
+  EXPECT_FLOAT_EQ(m.ty, 20);
+}
+
+// The renderer ignores a non-finite matrix, so the exporters must too instead of turning it into
+// a degenerate affine.
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_IgnoresNonFiniteMatrix) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 10;
+  layer->y = 20;
+  layer->matrix.a = std::nanf("");
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 1);
+  EXPECT_FLOAT_EQ(m.d, 1);
+  EXPECT_FLOAT_EQ(m.tx, 10);
+  EXPECT_FLOAT_EQ(m.ty, 20);
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
@@ -2035,10 +2443,14 @@ PAGX_TEST(PAGXUtilsTest, IterateUTF8Codepoints_TruncatedTrailingByteSkipped) {
 // BuildLayerMatrix — matrix3D path
 // ---------------------------------------------------------------------------
 
-PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_Matrix3DOverridesMatrix) {
+PAGX_TEST(PAGXUtilsTest,
+          BuildLayerMatrix_Matrix3DOverridesAuthoredTransformAndKeepsLayoutPosition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->matrix = pagx::Matrix::Scale(10.0f, 10.0f);
+  layer->x = 50.0f;
+  layer->y = 60.0f;
+  layer->setLayoutPosition(nullptr, 11.0f, 13.0f);
   // 2x scale on x, 3x scale on y, +5/+7 translation. Column-major layout:
   // values[0..3] = column 0, [4..7] = column 1, [12..15] = column 3.
   layer->matrix3D.values[0] = 2.0f;
@@ -2048,8 +2460,8 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_Matrix3DOverridesMatrix) {
   auto m = pagx::BuildLayerMatrix(layer);
   EXPECT_FLOAT_EQ(m.a, 2.0f);
   EXPECT_FLOAT_EQ(m.d, 3.0f);
-  EXPECT_FLOAT_EQ(m.tx, 5.0f);
-  EXPECT_FLOAT_EQ(m.ty, 7.0f);
+  EXPECT_FLOAT_EQ(m.tx, 16.0f);
+  EXPECT_FLOAT_EQ(m.ty, 20.0f);
 }
 
 // ---------------------------------------------------------------------------

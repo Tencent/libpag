@@ -62,16 +62,16 @@
       <Layer x="24" y="19" composition="@icon"/>
       <Layer x="108" y="19" composition="@icon"/>
       <Layer x="192" y="19" composition="@icon" alpha="0.6"/>
-      <Layer x="276" y="19" composition="@icon" matrix="0.8,0,0,0.8,0,0"/>
+      <Layer composition="@icon" matrix="0.8,0,0,0.8,276,19"/>
 
       <!-- Row of badge instances -->
       <Layer x="15" y="118" composition="@badge"/>
       <Layer x="85" y="118" composition="@badge"/>
       <Layer x="155" y="118" composition="@badge" alpha="0.7"/>
       <!-- Badge with rotation via matrix -->
-      <Layer x="225" y="118" composition="@badge" matrix="0.707,0.707,-0.707,0.707,0,0"/>
+      <Layer composition="@badge" matrix="0.707,0.707,-0.707,0.707,225,118"/>
       <!-- Larger scaled badge -->
-      <Layer x="280" y="108" composition="@badge" matrix="1.4,0,0,1.4,0,0"/>
+      <Layer composition="@badge" matrix="1.4,0,0,1.4,280,108"/>
     </Layer>
   </Layer>
 </pagx>
