@@ -20,7 +20,6 @@ declare global {
 
 let pagView: PAGView;
 let pagFile: PAGFile;
-let lastPagSource: File | ArrayBuffer | Blob;
 let cacheEnabled: boolean;
 let videoEnabled: boolean;
 let globalCacheScale: number;
@@ -274,60 +273,6 @@ if (typeof window !== 'undefined') {
           .catch((error) => console.error('makeSnapshot fail:', error));
     });
 
-    // readPixelsAsync（仅 WebGPU 构建）：把当前 PAGFile 渲染到宿主离屏 GPUTexture，走异步回读链路取像素
-    document.getElementById('btn-readPixelsAsync')?.addEventListener('click', async () => {
-      if (__PAG_DEMO_BACKEND__ !== 'webgpu') {
-        console.warn('readPixelsAsync 演示仅在 WebGPU 构建可用');
-        return;
-      }
-      if (!pagFile || !lastPagSource) {
-        console.warn('请先加载 PAG 文件');
-        return;
-      }
-      // 独立解码一份 PAGFile：PAGComposition 同一时刻只能归属一个 PAGPlayer，直接复用
-      // 播放中的 pagFile 会把它从 PAGView 的 player 抢走，导致画面清空
-      const offscreenFile = (await PAG.PAGFile.load(lastPagSource)) as PAGFile;
-      // lib.dom ~5.0 无 WebGPU 声明，宿主 device 与纹理用量枚举走结构化访问
-      const device = (PAG as any).preinitializedWebGPUDevice;
-      const textureUsage = (globalThis as any).GPUTextureUsage;
-      const width = offscreenFile.width();
-      const height = offscreenFile.height();
-      const texture = device.createTexture({
-        size: [width, height],
-        format: 'bgra8unorm',
-        usage: textureUsage.RENDER_ATTACHMENT | textureUsage.COPY_SRC,
-      });
-      const surface = PAG.PAGSurface.fromTexture(texture, width, height, false);
-      const player = PAG.PAGPlayer.create();
-      player.setComposition(offscreenFile);
-      player.setSurface(surface);
-      player.setProgress(0.5);
-      const flushed = await player.flush();
-      const pixels = await surface.readPixelsAsync(
-        types.ColorType.RGBA_8888,
-        types.AlphaType.Premultiplied,
-      );
-      console.log('readPixelsAsync flush:', flushed, 'pixels:', pixels);
-      if (pixels) {
-        let nonZeroBytes = 0;
-        for (let i = 0; i < pixels.length; i++) {
-          if (pixels[i] !== 0) nonZeroBytes++;
-        }
-        const centerIndex = (Math.floor(height / 2) * width + Math.floor(width / 2)) * 4;
-        const nonZeroPercent = ((nonZeroBytes / pixels.length) * 100).toFixed(2);
-        console.log(
-          `readPixelsAsync size: ${pixels.byteLength} bytes, non-zero: ${nonZeroPercent}%, ` +
-          `first pixel: [${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]}], ` +
-          `center pixel: [${pixels[centerIndex]}, ${pixels[centerIndex + 1]}, ` +
-          `${pixels[centerIndex + 2]}, ${pixels[centerIndex + 3]}]`,
-        );
-      }
-      player.destroy();
-      offscreenFile.destroy();
-      surface.destroy();
-      texture.destroy();
-    });
-
     // cacheScale
     globalCacheScale = 1;
     document.getElementById('btn-cacheScale')?.addEventListener('click', () => {
@@ -469,7 +414,6 @@ const swapLayer = (type: string) => {
 const createPAGView = async (file: File | ArrayBuffer | Blob) => {
   if (pagFile) pagFile.destroy();
   if (pagView) pagView.destroy();
-  lastPagSource = file;
   const decodeTime = performance.now();
   pagFile = (await PAG.PAGFile.load(file)) as PAGFile;
   document.getElementById('decode-time')!.innerText = `PAG File decode time: ${Math.floor(
