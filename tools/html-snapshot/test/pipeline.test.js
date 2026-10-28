@@ -34,18 +34,13 @@ afterEach(() => {
 // `stdout` / `stderr` accept either a single string (emitted verbatim with
 // `printf '%s'`) or an array of strings (joined with newlines so `\n` works
 // without relying on shell-specific escape handling).
-function makeArgvCapturingScript({ exitCode = 0, stdout = '', stderr = '', argvPath, envPath, sleepMs }) {
+function makeArgvCapturingScript({ exitCode = 0, stdout = '', stderr = '', argvPath, sleepMs }) {
   const wrapper = path.join(dir, `wrap-${Math.random().toString(36).slice(2)}.sh`);
   const lines = ['#!/bin/sh'];
   if (argvPath) {
     // Redirect a printf'd argv list into the capture file. Each arg is
     // followed by a NUL byte so empty strings round-trip cleanly.
     lines.push(`printf '%s\\0' "$@" > ${JSON.stringify(argvPath)}`);
-  }
-  if (envPath) {
-    // Capture the importer-snapshot toggle so tests can assert the child saw
-    // PAGX_HTML_SNAPSHOT=0 (set by runPagxImportToFile to skip re-snapshotting).
-    lines.push(`printf '%s' "$PAGX_HTML_SNAPSHOT" > ${JSON.stringify(envPath)}`);
   }
   const emit = (payload, redirect) => {
     if (!payload) return;
@@ -226,12 +221,10 @@ describe('runPagxImportToFile', () => {
       .rejects.toThrow(/pagxFile is required/);
   });
 
-  test('disables the importer snapshot via env and routes filtered stderr to log', async () => {
+  test('disables the importer snapshot explicitly and routes filtered stderr to log', async () => {
     const argvPath = path.join(dir, 'argv.bin');
-    const envPath = path.join(dir, 'env.bin');
     const wrapper = makeArgvCapturingScript({
       argvPath,
-      envPath,
       stderr: [
         'warning: html: position: absolute on text leaf',
         'real warning: keep me',
@@ -254,9 +247,10 @@ describe('runPagxImportToFile', () => {
       '--output', '/out.pagx',
       '--format', 'html',
       '--no-resolve',
+      '--html-no-snapshot',
     ]);
     // The subset is already rendered, so the importer's own snapshot is disabled.
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('0');
+    expect(readArgv(argvPath)).toContain('--html-no-snapshot');
     const joined = logs.join('\n');
     expect(joined).toMatch(/real warning: keep me/);
     expect(joined).not.toMatch(/position: absolute on text leaf/);

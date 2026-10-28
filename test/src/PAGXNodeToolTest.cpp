@@ -328,29 +328,6 @@ TEST_F(PAGXNodeToolTest, CaptureReportsNodeLaunchFailure) {
   EXPECT_NE(error.str().find("PAGX_NODE_BIN"), std::string::npos);
 }
 
-TEST_F(PAGXNodeToolTest, ScenarioAndCheckpointRequireNonemptyValues) {
-  for (const std::string option : {"--scenario", "--checkpoint"}) {
-    for (const auto& tail : std::vector<std::vector<std::string>>{{}, {""}, {"--help"}}) {
-      SCOPED_TRACE(option);
-      auto args = std::vector<std::string>{"import", "--input", "page.html", option};
-      args.insert(args.end(), tail.begin(), tail.end());
-      CaptureError error;
-      EXPECT_EQ(CallRun(pagx::cli::RunImport, args), 1);
-      EXPECT_NE(error.str().find(option + " requires a value"), std::string::npos);
-    }
-  }
-}
-
-TEST_F(PAGXNodeToolTest, ScenarioRequiresEnabledSnapshotPrepass) {
-  ScopedEnvironment enabled("PAGX_HTML_SNAPSHOT", "OFF");
-  pagx::cli::ImportFormatOptions options = {};
-  options.scenario = "states.json";
-  auto result = pagx::cli::ImportFile("page.html", "html", options);
-  EXPECT_EQ(result.document, nullptr);
-  EXPECT_NE(result.error.find("--scenario requires HTML with the snapshot pre-pass enabled"),
-            std::string::npos);
-}
-
 #ifndef _WIN32
 TEST_F(PAGXNodeToolTest, DeletedWorkingDirectoryReturnsEmpty) {
   ScopedEnvironment configured("PAGX_TEST_HTML_TOOL", nullptr);
@@ -427,52 +404,14 @@ TEST_F(PAGXNodeToolTest, CaptureWithNoOptionsStillPassesInvokingBinary) {
             (std::vector<std::string>{"--pagx-bin", pagx::cli::CurrentExecutablePath()}));
 }
 
-TEST_F(PAGXNodeToolTest, ImportScenarioForwardsQuotedArgumentsAndConsumesSnapshot) {
+TEST_F(PAGXNodeToolTest, SingleDocumentSnapshotPreservesQuotedArguments) {
   auto recorded = (root / "args").u8string();
   ScopedEnvironment output("PAGX_TEST_ARGUMENTS", recorded.c_str());
   ScopedEnvironment node("PAGX_NODE_BIN", "/bin/sh");
-  ScopedEnvironment enabled("PAGX_HTML_SNAPSHOT", "1");
-  auto script = WriteRuntime(SnapshotOutput());
-  ScopedEnvironment configured("PAGX_HTML_SNAPSHOT_BIN", script.c_str());
-  auto input = (root / fs::u8path("页面 'quoted' $input.html")).u8string();
-  auto scenario = (root / fs::u8path("步骤 'quoted' $scenario.json")).u8string();
-  const std::string checkpoint = "已就绪 'quoted' $(false)";
-  auto destination = (root / "result.pagx").u8string();
-  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", input, "-o", destination,
-                                           "--scenario", scenario, "--checkpoint", checkpoint}),
-            0);
-  EXPECT_EQ(ReadArguments(recorded),
-            (std::vector<std::string>{input, "-o", "-", "--scenario", scenario, "--checkpoint",
-                                      checkpoint}));
-  auto document = pagx::PAGXImporter::FromFile(destination);
-  ASSERT_NE(document, nullptr);
-  EXPECT_FLOAT_EQ(document->width, 321);
-  EXPECT_FLOAT_EQ(document->height, 123);
-  EXPECT_NE(document->findNode("snapshot"), nullptr);
-}
-
-TEST_F(PAGXNodeToolTest, ImportScenarioWithoutCheckpointAndAnimationFlagAreIndependent) {
-  auto recorded = (root / "args").u8string();
-  ScopedEnvironment output("PAGX_TEST_ARGUMENTS", recorded.c_str());
-  ScopedEnvironment node("PAGX_NODE_BIN", "/bin/sh");
-  ScopedEnvironment enabled("PAGX_HTML_SNAPSHOT", "1");
   auto script = WriteRuntime(SnapshotOutput());
   ScopedEnvironment configured("PAGX_HTML_SNAPSHOT_BIN", script.c_str());
   const std::string input = "HTTPS://example.invalid/page?a=1&b='two'";
-  pagx::cli::ImportFormatOptions options = {};
-  options.scenario = "states.json";
-  auto result = pagx::cli::ImportFile(input, "", options);
-  ASSERT_NE(result.document, nullptr) << result.error;
-  EXPECT_EQ(ReadArguments(recorded),
-            (std::vector<std::string>{input, "-o", "-", "--scenario", "states.json"}));
-  options.scenario.clear();
-  options.captureAnimations = true;
-  result = pagx::cli::ImportFile(input, "", options);
-  ASSERT_NE(result.document, nullptr) << result.error;
-  EXPECT_EQ(ReadArguments(recorded),
-            (std::vector<std::string>{input, "-o", "-", "--capture-animations"}));
-  options.captureAnimations = false;
-  result = pagx::cli::ImportFile(input, "", options);
+  auto result = pagx::cli::ImportFile(input, "", {});
   ASSERT_NE(result.document, nullptr) << result.error;
   EXPECT_EQ(ReadArguments(recorded), (std::vector<std::string>{input, "-o", "-"}));
 }
@@ -481,7 +420,6 @@ TEST_F(PAGXNodeToolTest, ImportRejectsEmptyOutputAndPropagatesSnapshotFailure) {
   auto recorded = (root / "args").u8string();
   ScopedEnvironment output("PAGX_TEST_ARGUMENTS", recorded.c_str());
   ScopedEnvironment node("PAGX_NODE_BIN", "/bin/sh");
-  ScopedEnvironment enabled("PAGX_HTML_SNAPSHOT", "1");
   for (int exitCode : {0, 19, 127}) {
     SCOPED_TRACE(exitCode);
     auto script = WriteRuntime("exit " + std::to_string(exitCode) + "\n");

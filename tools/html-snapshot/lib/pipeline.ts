@@ -227,13 +227,12 @@ export async function runPagxImportToFile(
   // has its own dedicated resolve step (runPagxResolve) that owns diagnostics, progress logging,
   // and font-embed ordering. Opt out here so resolution happens exactly once, in that step.
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
-    '--no-resolve'];
+    '--no-resolve', '--html-no-snapshot'];
   // Flex inference is always on inside the importer now. The subset is already rendered, so
   // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
   const result = await spawnCapture(pagxBin, args, {
     stderrPath,
     timeoutMs,
-    env: { ...process.env, PAGX_HTML_SNAPSHOT: '0' },
   });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
