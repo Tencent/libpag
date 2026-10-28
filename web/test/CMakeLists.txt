@@ -155,7 +155,7 @@ endif ()
 # the HTML eval pipeline and stays preloaded because PAGX suites reference it.
 set(PRELOAD_RESOURCES "")
 foreach (resource_dir IN ITEMS pagx_to_html font filter timestretch text blend layout gradient
-        disk fuzz compare html svg)
+        disk fuzz compare html svg cli)
     list(APPEND PRELOAD_RESOURCES
         "SHELL:--preload-file ${ROOT}/resources/${resource_dir}@/resources/${resource_dir}")
 endforeach ()
@@ -163,6 +163,9 @@ endforeach ()
 # PAGFileTest.SetStartTime's assets/replacement.pag). Without it the loads return nullptr and the
 # tests crash on null-pointer calls instead of failing an assertion.
 list(APPEND PRELOAD_RESOURCES "SHELL:--preload-file ${ROOT}/assets@/assets")
+# PAGXTest.SpecSamples walks spec/samples with a directory_iterator (which aborts in
+# -fno-exceptions mode when the directory is missing).
+list(APPEND PRELOAD_RESOURCES "SHELL:--preload-file ${ROOT}/spec@/spec")
 file(GLOB APITEST_TOP_LEVEL ${ROOT}/resources/apitest/*)
 foreach (fixture ${APITEST_TOP_LEVEL})
     if (NOT IS_DIRECTORY ${fixture})
