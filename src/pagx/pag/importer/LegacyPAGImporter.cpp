@@ -23,6 +23,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -39,6 +40,7 @@
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -73,6 +75,10 @@ void MigrateRadialBlurEffectAnimation(pag::RadialBlurEffect* effect, float frame
                                       PAGXDocument* document, AnimationObject* object);
 void MigrateCornerPinEffectAnimation(pag::CornerPinEffect* effect, float frameRate,
                                      PAGXDocument* document, AnimationObject* object);
+void MigrateBulgeEffectAnimation(pag::BulgeEffect* effect, float frameRate, PAGXDocument* document,
+                                 AnimationObject* object);
+void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frameRate,
+                                      PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -884,15 +890,65 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), and the Glow, Mosaic, RadialBlur and CornerPin effects map to their filter nodes
-// (animated properties join the composition animation). Other effect types report an issue
-// until their phase-3 filters land.
+// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge and MotionTile effects map to
+// their filter nodes (animated properties join the composition animation). Other effect types
+// report an issue until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::CornerPin) {
+    if (effect->type() == pag::EffectType::MotionTile) {
+      auto* legacy = static_cast<pag::MotionTileEffect*>(effect);
+      auto* tile = state->document->makeNode<MotionTileFilter>("pag-legacy-motiontile-" +
+                                                               std::to_string(legacy->uniqueID));
+      auto center = PropertyValueAtStart(legacy->tileCenter, legacyLayer->startTime, nullptr);
+      tile->tileCenter = {center.x, center.y};
+      tile->tileWidth = PropertyValueAtStart(legacy->tileWidth, legacyLayer->startTime, nullptr);
+      tile->tileHeight = PropertyValueAtStart(legacy->tileHeight, legacyLayer->startTime, nullptr);
+      tile->outputWidth =
+          PropertyValueAtStart(legacy->outputWidth, legacyLayer->startTime, nullptr);
+      tile->outputHeight =
+          PropertyValueAtStart(legacy->outputHeight, legacyLayer->startTime, nullptr);
+      tile->mirrorEdges =
+          PropertyValueAtStart(legacy->mirrorEdges, legacyLayer->startTime, nullptr) != 0;
+      tile->phase = PropertyValueAtStart(legacy->phase, legacyLayer->startTime, nullptr);
+      tile->horizontalPhaseShift =
+          PropertyValueAtStart(legacy->horizontalPhaseShift, legacyLayer->startTime, nullptr) != 0;
+      layer->filters.push_back(tile);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = tile->id;
+        MigrateMotionTileEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::Bulge) {
+      auto* legacy = static_cast<pag::BulgeEffect*>(effect);
+      auto* bulge = state->document->makeNode<BulgeFilter>("pag-legacy-bulge-" +
+                                                           std::to_string(legacy->uniqueID));
+      bulge->horizontalRadius =
+          PropertyValueAtStart(legacy->horizontalRadius, legacyLayer->startTime, nullptr);
+      bulge->verticalRadius =
+          PropertyValueAtStart(legacy->verticalRadius, legacyLayer->startTime, nullptr);
+      auto center = PropertyValueAtStart(legacy->bulgeCenter, legacyLayer->startTime, nullptr);
+      bulge->bulgeCenter = {center.x, center.y};
+      bulge->bulgeHeight =
+          PropertyValueAtStart(legacy->bulgeHeight, legacyLayer->startTime, nullptr);
+      bulge->taperRadius =
+          PropertyValueAtStart(legacy->taperRadius, legacyLayer->startTime, nullptr);
+      bulge->pinning = PropertyValueAtStart(legacy->pinning, legacyLayer->startTime, nullptr) != 0;
+      layer->filters.push_back(bulge);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = bulge->id;
+        MigrateBulgeEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::CornerPin) {
       auto* legacy = static_cast<pag::CornerPinEffect*>(effect);
       auto* cornerPin = state->document->makeNode<CornerPinFilter>(
           "pag-legacy-cornerpin-" + std::to_string(legacy->uniqueID));

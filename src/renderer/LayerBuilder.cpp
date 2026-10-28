@@ -27,6 +27,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -48,6 +49,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MotionTileFilter.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
@@ -81,10 +83,12 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/BulgeLayerFilter.h"
 #include "renderer/CornerPinLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/MosaicLayerFilter.h"
+#include "renderer/MotionTileLayerFilter.h"
 #include "renderer/RadialBlurLayerFilter.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
@@ -3214,6 +3218,139 @@ class LayerBuilderContext {
                                 ReadScalar<tgfx::BlurFilter, &tgfx::BlurFilter::blurrinessY>);
   }
 
+  static void WriteMotionTileFilterCenterX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setTileCenter(MixFloat(filter->tileCenterX(), *v, mix), filter->tileCenterY());
+  }
+
+  static void WriteMotionTileFilterCenterY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setTileCenter(filter->tileCenterX(), MixFloat(filter->tileCenterY(), *v, mix));
+  }
+
+  static void WriteMotionTileFilterTileWidth(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setTileWidth(MixFloat(filter->tileWidth(), *v, mix));
+  }
+
+  static void WriteMotionTileFilterTileHeight(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setTileHeight(MixFloat(filter->tileHeight(), *v, mix));
+  }
+
+  static void WriteMotionTileFilterOutputWidth(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setOutputWidth(MixFloat(filter->outputWidth(), *v, mix));
+  }
+
+  static void WriteMotionTileFilterOutputHeight(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setOutputHeight(MixFloat(filter->outputHeight(), *v, mix));
+  }
+
+  static void WriteMotionTileFilterMirrorEdges(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<MotionTileLayerFilter*>(object)->setMirrorEdges(*v);
+  }
+
+  static void WriteMotionTileFilterHorizontalPhaseShift(void* object, const KeyValue& value,
+                                                        float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<MotionTileLayerFilter*>(object)->setHorizontalPhaseShift(*v);
+  }
+
+  static void WriteMotionTileFilterPhase(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MotionTileLayerFilter*>(object);
+    filter->setPhase(MixFloat(filter->phase(), *v, mix));
+  }
+
+  static void WriteBulgeFilterHorizontalRadius(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BulgeLayerFilter*>(object);
+    filter->setHorizontalRadius(MixFloat(filter->horizontalRadius(), *v, mix));
+  }
+
+  static void WriteBulgeFilterVerticalRadius(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BulgeLayerFilter*>(object);
+    filter->setVerticalRadius(MixFloat(filter->verticalRadius(), *v, mix));
+  }
+
+  static void WriteBulgeFilterCenterX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BulgeLayerFilter*>(object);
+    filter->setBulgeCenter(MixFloat(filter->bulgeCenterX(), *v, mix), filter->bulgeCenterY());
+  }
+
+  static void WriteBulgeFilterCenterY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BulgeLayerFilter*>(object);
+    filter->setBulgeCenter(filter->bulgeCenterX(), MixFloat(filter->bulgeCenterY(), *v, mix));
+  }
+
+  static void WriteBulgeFilterHeight(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BulgeLayerFilter*>(object);
+    filter->setBulgeHeight(MixFloat(filter->bulgeHeight(), *v, mix));
+  }
+
+  static void WriteBulgeFilterPinning(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<BulgeLayerFilter*>(object)->setPinning(*v);
+  }
+
   static void WriteCornerPinFilterCorner(void* object, const KeyValue& value, float mix, int index,
                                          bool isX) {
     auto* v = std::get_if<float>(&value);
@@ -3379,6 +3516,49 @@ class LayerBuilderContext {
                                 ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerX>);
     _result.binding.setAccessor(node, "center.y", WriteRadialBlurFilterCenterY,
                                 ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerY>);
+  }
+
+  void bindMotionTileFilterChannels(const MotionTileFilter* node) {
+    _result.binding.setAccessor(
+        node, "tileCenter.x", WriteMotionTileFilterCenterX,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileCenterX>);
+    _result.binding.setAccessor(
+        node, "tileCenter.y", WriteMotionTileFilterCenterY,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileCenterY>);
+    _result.binding.setAccessor(node, "tileWidth", WriteMotionTileFilterTileWidth,
+                                ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileWidth>);
+    _result.binding.setAccessor(
+        node, "tileHeight", WriteMotionTileFilterTileHeight,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::tileHeight>);
+    _result.binding.setAccessor(
+        node, "outputWidth", WriteMotionTileFilterOutputWidth,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::outputWidth>);
+    _result.binding.setAccessor(
+        node, "outputHeight", WriteMotionTileFilterOutputHeight,
+        ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::outputHeight>);
+    _result.binding.setAccessor(node, "phase", WriteMotionTileFilterPhase,
+                                ReadScalar<MotionTileLayerFilter, &MotionTileLayerFilter::phase>);
+    _result.binding.setAccessor(
+        node, "mirrorEdges", WriteMotionTileFilterMirrorEdges,
+        ReadBoolean<MotionTileLayerFilter, &MotionTileLayerFilter::mirrorEdges>);
+    _result.binding.setAccessor(
+        node, "horizontalPhaseShift", WriteMotionTileFilterHorizontalPhaseShift,
+        ReadBoolean<MotionTileLayerFilter, &MotionTileLayerFilter::horizontalPhaseShift>);
+  }
+
+  void bindBulgeFilterChannels(const BulgeFilter* node) {
+    _result.binding.setAccessor(node, "horizontalRadius", WriteBulgeFilterHorizontalRadius,
+                                ReadScalar<BulgeLayerFilter, &BulgeLayerFilter::horizontalRadius>);
+    _result.binding.setAccessor(node, "verticalRadius", WriteBulgeFilterVerticalRadius,
+                                ReadScalar<BulgeLayerFilter, &BulgeLayerFilter::verticalRadius>);
+    _result.binding.setAccessor(node, "bulgeCenter.x", WriteBulgeFilterCenterX,
+                                ReadScalar<BulgeLayerFilter, &BulgeLayerFilter::bulgeCenterX>);
+    _result.binding.setAccessor(node, "bulgeCenter.y", WriteBulgeFilterCenterY,
+                                ReadScalar<BulgeLayerFilter, &BulgeLayerFilter::bulgeCenterY>);
+    _result.binding.setAccessor(node, "bulgeHeight", WriteBulgeFilterHeight,
+                                ReadScalar<BulgeLayerFilter, &BulgeLayerFilter::bulgeHeight>);
+    _result.binding.setAccessor(node, "pinning", WriteBulgeFilterPinning,
+                                ReadBoolean<BulgeLayerFilter, &BulgeLayerFilter::pinning>);
   }
 
   void bindCornerPinFilterChannels(const CornerPinFilter* node) {
@@ -3759,6 +3939,26 @@ class LayerBuilderContext {
                                                      filter->lowerLeft, filter->lowerRight);
         _result.binding.set(filter, tgfxFilter);
         bindCornerPinFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::BulgeFilter: {
+        auto filter = static_cast<const BulgeFilter*>(node);
+        auto tgfxFilter =
+            BulgeLayerFilter::Make(filter->horizontalRadius, filter->verticalRadius,
+                                   filter->bulgeCenter, filter->bulgeHeight, filter->pinning);
+        _result.binding.set(filter, tgfxFilter);
+        bindBulgeFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::MotionTileFilter: {
+        auto filter = static_cast<const MotionTileFilter*>(node);
+        auto tgfxFilter =
+            MotionTileLayerFilter::Make(filter->tileCenter, filter->tileWidth, filter->tileHeight,
+                                        filter->outputWidth, filter->outputHeight,
+                                        filter->mirrorEdges, filter->phase,
+                                        filter->horizontalPhaseShift);
+        _result.binding.set(filter, tgfxFilter);
+        bindMotionTileFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {

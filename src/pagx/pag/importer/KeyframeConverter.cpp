@@ -404,6 +404,98 @@ void MigrateCornerPinEffectAnimation(pag::CornerPinEffect* effect, float frameRa
   }
 }
 
+// Bulge effect channels (spec 7.5): plain float channels for the radii/height/taper, a spatial
+// point channel for the center, and a Hold bool channel for pinning. The legacy renderer
+// ignores taperRadius (kept for data fidelity). Legacy effect keyframes are
+// composition-absolute, so raw keyframe times carry over without a layer offset.
+void MigrateBulgeEffectAnimation(pag::BulgeEffect* effect, float frameRate, PAGXDocument* document,
+                                 AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<float>* floatProperties[4] = {effect->horizontalRadius, effect->verticalRadius,
+                                              effect->bulgeHeight, effect->taperRadius};
+  const char* floatNames[4] = {"horizontalRadius", "verticalRadius", "bulgeHeight", "taperRadius"};
+  for (int i = 0; i < 4; i++) {
+    auto* legacy = floatProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = floatNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (effect->bulgeCenter != nullptr && effect->bulgeCenter->animatable()) {
+    ConvertPointChannel(effect->bulgeCenter, "bulgeCenter", true, frameRate, document, object);
+  }
+  if (effect->pinning != nullptr && effect->pinning->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<bool>*>(effect->pinning);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channel = document->makeNode<TypedChannel<bool>>();
+      channel->name = "pinning";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<bool> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = legacyKeyframe->startValue;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+}
+
+// MotionTile effect channels (spec 7.5): plain float channels for the sizes and phase, a
+// spatial point channel for the tile center, and Hold bool channels for the flags. Legacy
+// effect keyframes are composition-absolute, so raw keyframe times carry over without a layer
+// offset.
+void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frameRate,
+                                      PAGXDocument* document, AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<float>* floatProperties[5] = {effect->tileWidth, effect->tileHeight,
+                                              effect->outputWidth, effect->outputHeight,
+                                              effect->phase};
+  const char* floatNames[5] = {"tileWidth", "tileHeight", "outputWidth", "outputHeight", "phase"};
+  for (int i = 0; i < 5; i++) {
+    auto* legacy = floatProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = floatNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (effect->tileCenter != nullptr && effect->tileCenter->animatable()) {
+    ConvertPointChannel(effect->tileCenter, "tileCenter", true, frameRate, document, object);
+  }
+  pag::Property<bool>* boolProperties[2] = {effect->mirrorEdges, effect->horizontalPhaseShift};
+  const char* boolNames[2] = {"mirrorEdges", "horizontalPhaseShift"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = boolProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<bool>*>(legacy);
+    if (animatable == nullptr || animatable->keyframes.empty()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<bool>>();
+    channel->name = boolNames[i];
+    for (auto* legacyKeyframe : animatable->keyframes) {
+      Keyframe<bool> keyframe = {};
+      keyframe.time = legacyKeyframe->startTime;
+      keyframe.value = legacyKeyframe->startValue;
+      keyframe.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
