@@ -405,10 +405,8 @@ void HTMLParserContext::coalesceAnimations() {
   // origin to its first keyframe, and from its last keyframe to the shared end.
   std::vector<Node*> coalesced;
   coalesced.reserve(_document->animations.size());
-  // Parallel lists of the Animation* leaders held in `coalesced` and their grouping length (cycle
-  // for infinite animations, duration for Once), used to match subsequent animations by timing.
-  // Non-animation timelines (e.g. state machines) are passed through untouched and never
-  // participate in coalescing.
+  // Only `leaders` and `leaderLengths` have matching indices; `coalesced` can also contain
+  // non-animation timelines (e.g. state machines), which never participate in coalescing.
   std::vector<Animation*> leaders;
   std::vector<Frame> leaderLengths;
   for (auto* node : _document->animations) {

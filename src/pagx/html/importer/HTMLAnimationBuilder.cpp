@@ -1979,6 +1979,7 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   if (animation->objects.empty()) {
+    _coalescingLengths.erase(animation);
     return false;
   }
   addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
@@ -2354,7 +2355,10 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
 
-    if (animation->objects.empty()) continue;
+    if (animation->objects.empty()) {
+      _coalescingLengths.erase(animation);
+      continue;
+    }
     addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
     builtAny = true;
   }

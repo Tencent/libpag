@@ -23,6 +23,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include "base/PAGTest.h"
 #include "cli/CommandVerify.h"
@@ -342,6 +343,10 @@ inline pagx::TypedChannel<T>* FindTypedChannelOnTarget(pagx::Animation* anim,
                                                        const std::string& targetId,
                                                        const std::string& name,
                                                        pagx::ChannelValueType valueType) {
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, pagx::Matrix>);
+  constexpr auto expectedType =
+      std::is_same_v<T, float> ? pagx::ChannelValueType::Float : pagx::ChannelValueType::Matrix;
+  if (valueType != expectedType) return nullptr;
   auto* obj = FindObjectByTarget(anim, targetId);
   if (!obj) return nullptr;
   for (auto* ch : obj->channels) {
