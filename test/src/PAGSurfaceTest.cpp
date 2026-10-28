@@ -32,7 +32,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 
-#ifdef PAG_USE_SWIFTSHADER
+#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
 #else
 #ifndef GL_SILENCE_DEPRECATION

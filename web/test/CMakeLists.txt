@@ -214,6 +214,11 @@ target_include_directories(pag-test PRIVATE
         ${ROOT}/test/src                          # test utilities (utils/..., base/...)
         ${TGFX_DIR}/src                           # tgfx internal headers (core/utils/MD5.h, AtlasManager.h)
         ${TGFX_DIR}/include
+)
+# Third-party headers are SYSTEM includes: emscripten's clang enables -Wcharacter-conversion for
+# -Werror builds, and the vendored googletest triggers it (gtest-printers.h char16_t -> char32_t),
+# which would otherwise fail the build on third-party code we do not maintain.
+target_include_directories(pag-test SYSTEM PRIVATE
         ${TGFX_DIR}/third_party/googletest/googletest
         ${TGFX_DIR}/third_party/googletest/googletest/include
         ${TGFX_DIR}/third_party/json/include
