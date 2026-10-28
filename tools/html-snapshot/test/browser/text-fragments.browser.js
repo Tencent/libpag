@@ -100,6 +100,31 @@ describe('browser text fragments', () => {
   });
 
   for (const protocol of [true, false]) {
+    it(`keeps the final ellipsis and language on clamped lines (${protocol ? 'protocol' : 'DOM'})`, async () => {
+      await load(`<p id="host" lang="zh-CN">${prose}</p>`,
+        '#host{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}',
+        protocol);
+      const snapshot = await page.evaluate(takeSnapshot);
+      await page.setContent(snapshot.html);
+      const spans = await page.$$eval('span', elements => elements
+        .filter(element => element.textContent.trim())
+        .map(element => ({ text: element.textContent, lang: element.lang })));
+      assert.equal(spans.length, 2);
+      assert.ok(spans[1].text.endsWith('…'));
+      assert.ok(spans.every(span => span.lang === 'zh-CN'));
+      assert.doesNotMatch(snapshot.html, /data-pagx-inline-positions=/);
+    });
+
+    it(`does not append an ellipsis when clamped text fits (${protocol ? 'protocol' : 'DOM'})`, async () => {
+      await load('<p id="host">short text</p>',
+        '#host{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}',
+        protocol);
+      const snapshot = await page.evaluate(takeSnapshot);
+      await page.setContent(snapshot.html);
+      const text = await page.$eval('body', body => body.textContent.trim());
+      assert.equal(text, 'short text');
+    });
+
     for (const [name, css] of [
       ['columns', '#host{columns:2;column-gap:32px;width:400px}'],
       ['overlapping line boxes', '#host{line-height:8px}'],

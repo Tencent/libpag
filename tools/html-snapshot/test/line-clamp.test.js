@@ -56,6 +56,7 @@ describe('readLineClamp', () => {
   test('reads the authored count', () => {
     expect(readLineClamp(computedStub({ display: '-webkit-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': '2' }))).toBe(2);
     expect(readLineClamp(computedStub({ display: '-webkit-inline-box', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': ' 3 ' }))).toBe(3);
+    expect(readLineClamp(computedStub({ display: 'flow-root', '-webkit-box-orient': 'vertical', '-webkit-line-clamp': '2' }))).toBe(2);
   });
 
   test('ignores inactive legacy clamp and reads the standard property', () => {

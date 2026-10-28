@@ -20,9 +20,24 @@
 #include <cstring>
 #include <limits>
 #include "base/PAGTest.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pag {
+
+CLI_TEST(StringParserTest, DocumentDimensionsRoundTripWithoutPrecisionLoss) {
+  for (float value : {3372.84375f, 10000000.0f, 0.0000001f}) {
+    auto document = pagx::PAGXDocument::Make(value, 100);
+    auto xml = pagx::PAGXExporter::ToXML(*document);
+    auto restored = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(restored, nullptr);
+    EXPECT_EQ(restored->width, value) << xml;
+    EXPECT_EQ(xml.find("e+"), std::string::npos) << xml;
+    EXPECT_EQ(xml.find("e-"), std::string::npos) << xml;
+  }
+}
 
 CLI_TEST(StringParserTest, FloatToStringPreservesFiniteValuesWithoutExponentNotation) {
   // Sample every finite exponent and representative mantissas, including subnormals and the
