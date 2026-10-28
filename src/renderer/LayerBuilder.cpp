@@ -54,6 +54,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -82,6 +83,7 @@
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/MosaicLayerFilter.h"
+#include "renderer/RadialBlurLayerFilter.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -3282,6 +3284,42 @@ class LayerBuilderContext {
                                 ReadBoolean<MosaicLayerFilter, &MosaicLayerFilter::sharpColors>);
   }
 
+  static void WriteRadialBlurFilterAmount(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<RadialBlurLayerFilter*>(object);
+    filter->setAmount(MixFloat(filter->amount(), *v, mix));
+  }
+
+  static void WriteRadialBlurFilterCenterX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<RadialBlurLayerFilter*>(object);
+    filter->setCenter(MixFloat(filter->centerX(), *v, mix), filter->centerY());
+  }
+
+  static void WriteRadialBlurFilterCenterY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<RadialBlurLayerFilter*>(object);
+    filter->setCenter(filter->centerX(), MixFloat(filter->centerY(), *v, mix));
+  }
+
+  void bindRadialBlurFilterChannels(const RadialBlurFilter* node) {
+    _result.binding.setAccessor(node, "amount", WriteRadialBlurFilterAmount,
+                                ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::amount>);
+    _result.binding.setAccessor(node, "center.x", WriteRadialBlurFilterCenterX,
+                                ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerX>);
+    _result.binding.setAccessor(node, "center.y", WriteRadialBlurFilterCenterY,
+                                ReadScalar<RadialBlurLayerFilter, &RadialBlurLayerFilter::centerY>);
+  }
+
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3618,6 +3656,13 @@ class LayerBuilderContext {
                                                   filter->sharpColors);
         _result.binding.set(filter, tgfxFilter);
         bindMosaicFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::RadialBlurFilter: {
+        auto filter = static_cast<const RadialBlurFilter*>(node);
+        auto tgfxFilter = RadialBlurLayerFilter::Make(filter->amount, filter->center);
+        _result.binding.set(filter, tgfxFilter);
+        bindRadialBlurFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {

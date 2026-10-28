@@ -41,6 +41,7 @@
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
@@ -67,6 +68,8 @@ void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDo
                                 AnimationObject* object);
 void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
                                   PAGXDocument* document, AnimationObject* object);
+void MigrateRadialBlurEffectAnimation(pag::RadialBlurEffect* effect, float frameRate,
+                                      PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -781,6 +784,11 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
   auto* previousAnimation = state->currentAnimation;
   auto previousFrameRate = state->currentFrameRate;
   state->currentFrameRate = legacy->frameRate;
+  // The composition animation is ensured BEFORE the layer loop: layers convert their effects
+  // (filter channels) and shape groups (group transform channels) inside ConvertLayer, and a
+  // null currentAnimation there silently dropped the first layer's animated channels.
+  auto* animation = EnsureCompositionAnimation(state, legacy);
+  state->currentAnimation = animation;
   for (auto it = legacy->layers.rbegin(); it != legacy->layers.rend(); ++it) {
     auto* legacyLayer = *it;
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
@@ -788,8 +796,6 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
       composition->layers.push_back(child);
       // P3-5: migrate this layer's animated channels into the composition animation. Shape
       // groups converted inside the layer append their channels to the same animation.
-      auto* animation = EnsureCompositionAnimation(state, legacy);
-      state->currentAnimation = animation;
       MigrateLayerAnimation(state, legacyLayer, animation, legacy->frameRate);
     }
   }
@@ -875,15 +881,35 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), the Glow effect maps to GlowFilter and the Mosaic effect maps to MosaicFilter
-// (animated properties join the composition animation). Other effect types report an issue
-// until their phase-3 filters land.
+// mode), and the Glow, Mosaic and RadialBlur effects map to their filter nodes (animated
+// properties join the composition animation). Other effect types report an issue until
+// their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::Mosaic) {
+    if (effect->type() == pag::EffectType::RadialBlur) {
+      auto* legacy = static_cast<pag::RadialBlurEffect*>(effect);
+      auto* radial = state->document->makeNode<RadialBlurFilter>("pag-legacy-radial-" +
+                                                                 std::to_string(legacy->uniqueID));
+      radial->amount = PropertyValueAtStart(legacy->amount, legacyLayer->startTime, nullptr);
+      auto center = PropertyValueAtStart(legacy->center, legacyLayer->startTime, nullptr);
+      radial->center = {center.x, center.y};
+      radial->mode = static_cast<RadialBlurMode>(
+          PropertyValueAtStart(legacy->mode, legacyLayer->startTime, nullptr));
+      radial->antialias = static_cast<RadialBlurAntialias>(
+          PropertyValueAtStart(legacy->antialias, legacyLayer->startTime, nullptr));
+      layer->filters.push_back(radial);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = radial->id;
+        MigrateRadialBlurEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::Mosaic) {
       auto* legacy = static_cast<pag::MosaicEffect*>(effect);
       auto* mosaic = state->document->makeNode<MosaicFilter>("pag-legacy-mosaic-" +
                                                              std::to_string(legacy->uniqueID));

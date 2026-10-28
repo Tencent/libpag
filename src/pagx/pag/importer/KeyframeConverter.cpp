@@ -362,6 +362,27 @@ void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
   }
 }
 
+// RadialBlur effect channels (spec 7.5): amount is a plain float channel and the center is a
+// SPATIAL point property, so it routes through ConvertPointChannel's per-frame sampling
+// (spatial bezier handles have no PAGX equivalent). The mode/antialias enums carry no PAGX
+// animation channels and stay static. Legacy effect keyframes are composition-absolute, so
+// raw keyframe times carry over without a layer offset.
+void MigrateRadialBlurEffectAnimation(pag::RadialBlurEffect* effect, float frameRate,
+                                      PAGXDocument* document, AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  if (effect->amount != nullptr && effect->amount->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "amount";
+    ConvertFloatChannel(effect->amount, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  if (effect->center != nullptr && effect->center->animatable()) {
+    ConvertPointChannel(effect->center, "center", true, frameRate, document, object);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
