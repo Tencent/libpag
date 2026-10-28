@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MosaicFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -65,11 +66,16 @@ std::vector<tgfx::BindingEntry> MosaicFilter::uniformBlocks() const {
 void MosaicFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                     const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                     const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float horizontalBlocks = 0.0f;
     float verticalBlocks = 0.0f;
     int sharpColors = 0;
   };
+
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(), "Args must match the std140 layout.");
+  static_assert(offsetof(Uniforms, horizontalBlocks) == 0 &&
+                    offsetof(Uniforms, verticalBlocks) == 4 && offsetof(Uniforms, sharpColors) == 8,
+                "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.horizontalBlocks = horizontalBlocks;
