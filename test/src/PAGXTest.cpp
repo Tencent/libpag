@@ -15004,12 +15004,224 @@ static std::vector<std::shared_ptr<tgfx::Layer>> MakeThreeInnerShadowReferenceLa
   return layers;
 }
 
+// Closed-form region used by the spread oracle tests. Expected pixels come from geometry alone and
+// never from a TGFX render, so the checks hold the renderer to the spec instead of to itself. A zero
+// radius describes sharp corners measured with the Chebyshev distance, a positive radius describes a
+// rounded rect with Euclidean corners.
+struct SpreadOracleShape {
+  float left = 0.0f;
+  float top = 0.0f;
+  float right = 0.0f;
+  float bottom = 0.0f;
+  float radius = 0.0f;
+};
+
+struct SpreadOracleColor {
+  uint8_t red = 0;
+  uint8_t green = 0;
+  uint8_t blue = 0;
+  uint8_t alpha = 0;
+};
+
+struct SpreadImage {
+  int width = 0;
+  int height = 0;
+  std::vector<uint8_t> pixels = {};
+};
+
+// Pixel centers closer than SPREAD_ORACLE_MARGIN to an expected edge are left to anti-aliasing.
+static constexpr float SPREAD_ORACLE_MARGIN = 1.0f;
+static constexpr int SPREAD_ORACLE_TOLERANCE = 3;
+static constexpr SpreadOracleColor SPREAD_RED = {255, 0, 0, 255};
+static constexpr SpreadOracleColor SPREAD_BLUE = {0, 0, 255, 255};
+static constexpr SpreadOracleColor SPREAD_CLEAR = {0, 0, 0, 0};
+static constexpr SpreadOracleShape SPREAD_CANVAS = {0, 0, 200, 200, 0};
+
+// The 80x60 rounded rect (radius 10) centered in the 200x200 canvas, and the outline of its drop
+// shadow with offset (6, 10) and spread 12. The spread edges are exact. Corner rules are left to the
+// renderer, so the corners are only bounded between the concentric round outline (radius 10 + 12)
+// that must be covered and the sharp outline that must not be exceeded.
+static constexpr SpreadOracleShape SPREAD_CONTENT = {60, 70, 140, 130, 10};
+static constexpr SpreadOracleShape SPREAD_DROP_CORE = {54, 68, 158, 152, 22};
+static constexpr SpreadOracleShape SPREAD_DROP_HULL = {54, 68, 158, 152, 0};
+
+static SpreadOracleShape OutsetSpreadOracleShape(const SpreadOracleShape& shape, float distance,
+                                                 float radius) {
+  return {shape.left - distance, shape.top - distance, shape.right + distance,
+          shape.bottom + distance, radius};
+}
+
+static SpreadOracleShape ScaleSpreadOracleShape(const SpreadOracleShape& shape, float scale) {
+  return {shape.left * scale, shape.top * scale, shape.right * scale, shape.bottom * scale,
+          shape.radius * scale};
+}
+
+static float SpreadSignedDistance(const SpreadOracleShape& shape, float x, float y) {
+  auto halfWidth = (shape.right - shape.left) * 0.5f;
+  auto halfHeight = (shape.bottom - shape.top) * 0.5f;
+  auto distanceX = std::abs(x - shape.left - halfWidth) - halfWidth;
+  auto distanceY = std::abs(y - shape.top - halfHeight) - halfHeight;
+  if (shape.radius <= 0.0f) {
+    return std::max(distanceX, distanceY);
+  }
+  auto cornerX = distanceX + shape.radius;
+  auto cornerY = distanceY + shape.radius;
+  auto outside = std::hypot(std::max(cornerX, 0.0f), std::max(cornerY, 0.0f));
+  return outside + std::min(std::max(cornerX, cornerY), 0.0f) - shape.radius;
+}
+
+static size_t SpreadPixelOffset(const SpreadImage& image, int x, int y) {
+  return (static_cast<size_t>(y) * static_cast<size_t>(image.width) + static_cast<size_t>(x)) * 4;
+}
+
+static int SpreadPixelAlpha(const SpreadImage& image, int x, int y) {
+  return image.pixels[SpreadPixelOffset(image, x, y) + 3];
+}
+
+static std::string DescribeSpreadPixel(const SpreadImage& image, int x, int y) {
+  auto offset = SpreadPixelOffset(image, x, y);
+  return "(" + std::to_string(image.pixels[offset]) + ", " +
+         std::to_string(image.pixels[offset + 1]) + ", " +
+         std::to_string(image.pixels[offset + 2]) + ", " +
+         std::to_string(image.pixels[offset + 3]) + ")";
+}
+
+static bool SpreadPixelsMatch(const SpreadImage& actual, const SpreadImage& expected, int x,
+                              int y) {
+  auto offset = SpreadPixelOffset(actual, x, y);
+  for (size_t channel = 0; channel < 4; channel++) {
+    auto difference = static_cast<int>(actual.pixels[offset + channel]) -
+                      static_cast<int>(expected.pixels[offset + channel]);
+    if (std::abs(difference) > SPREAD_ORACLE_TOLERANCE) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static SpreadImage MakeSolidSpreadImage(int width, int height, const SpreadOracleColor& color) {
+  SpreadImage image = {width, height, {}};
+  image.pixels.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+  for (size_t index = 0; index < image.pixels.size(); index += 4) {
+    image.pixels[index] = color.red;
+    image.pixels[index + 1] = color.green;
+    image.pixels[index + 2] = color.blue;
+    image.pixels[index + 3] = color.alpha;
+  }
+  return image;
+}
+
+static std::string MakeSpreadXML(const std::string& layers) {
+  return R"(<pagx width="200" height="200">)" + layers + "</pagx>";
+}
+
+// Renders the XML with the test font registered as family "SpreadTest", so text never resolves to
+// a system font.
+static SpreadImage RenderSpreadImage(const std::string& xml, int width, int height,
+                                     float zoomScale) {
+  SpreadImage image = {};
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  if (doc == nullptr || !doc->errors.empty()) {
+    return image;
+  }
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "SpreadTest", "Regular");
+  doc->applyLayout(&fontConfig);
+  auto scene = pagx::PAGScene::Make(doc);
+  auto surface = pagx::PAGSurface::MakeOffscreen(width, height);
+  if (scene == nullptr || surface == nullptr) {
+    return image;
+  }
+  scene->getDisplayOptions()->setZoomScale(zoomScale);
+  if (!scene->draw(surface)) {
+    return image;
+  }
+  image.pixels = ReadPAGXSurfacePixels(surface);
+  image.width = width;
+  image.height = height;
+  return image;
+}
+
+// Returns the bounds of all pixels with non-zero alpha. The bounds are empty when nothing is drawn.
+static SpreadOracleShape FindSpreadInkBounds(const SpreadImage& image) {
+  auto left = image.width;
+  auto top = image.height;
+  auto right = 0;
+  auto bottom = 0;
+  for (int y = 0; y < image.height; y++) {
+    for (int x = 0; x < image.width; x++) {
+      if (SpreadPixelAlpha(image, x, y) == 0) {
+        continue;
+      }
+      left = std::min(left, x);
+      top = std::min(top, y);
+      right = std::max(right, x + 1);
+      bottom = std::max(bottom, y + 1);
+    }
+  }
+  return {static_cast<float>(left), static_cast<float>(top), static_cast<float>(right),
+          static_cast<float>(bottom), 0.0f};
+}
+
+// Expects every pixel whose center lies inside include and outside exclude by more than the
+// anti-aliasing margin to match the same pixel of expected. An empty region fails, so a check can
+// never pass vacuously.
+static void ExpectSpreadRegionMatches(const SpreadImage& actual, const SpreadImage& expected,
+                                      const SpreadOracleShape& include,
+                                      const SpreadOracleShape* exclude) {
+  ASSERT_EQ(actual.width, expected.width);
+  ASSERT_EQ(actual.height, expected.height);
+  ASSERT_EQ(actual.pixels.size(),
+            static_cast<size_t>(actual.width) * static_cast<size_t>(actual.height) * 4);
+  ASSERT_EQ(expected.pixels.size(), actual.pixels.size());
+  int checked = 0;
+  int mismatched = 0;
+  int firstX = -1;
+  int firstY = -1;
+  for (int y = 0; y < actual.height; y++) {
+    for (int x = 0; x < actual.width; x++) {
+      auto centerX = static_cast<float>(x) + 0.5f;
+      auto centerY = static_cast<float>(y) + 0.5f;
+      if (SpreadSignedDistance(include, centerX, centerY) >= -SPREAD_ORACLE_MARGIN) {
+        continue;
+      }
+      if (exclude != nullptr &&
+          SpreadSignedDistance(*exclude, centerX, centerY) <= SPREAD_ORACLE_MARGIN) {
+        continue;
+      }
+      checked++;
+      if (SpreadPixelsMatch(actual, expected, x, y)) {
+        continue;
+      }
+      if (mismatched == 0) {
+        firstX = x;
+        firstY = y;
+      }
+      mismatched++;
+    }
+  }
+  EXPECT_GT(checked, 0) << "the expected region is empty";
+  if (mismatched > 0) {
+    ADD_FAILURE() << mismatched << " of " << checked << " pixels mismatch, first at (" << firstX
+                  << ", " << firstY << "): actual " << DescribeSpreadPixel(actual, firstX, firstY)
+                  << ", expected " << DescribeSpreadPixel(expected, firstX, firstY);
+  }
+}
+
+static void ExpectSpreadRegionColor(const SpreadImage& actual, const SpreadOracleColor& color,
+                                    const SpreadOracleShape& include,
+                                    const SpreadOracleShape* exclude) {
+  auto expected = MakeSolidSpreadImage(actual.width, actual.height, color);
+  ExpectSpreadRegionMatches(actual, expected, include, exclude);
+}
+
 }  // namespace
 
 /**
  * Test case: spread defaults to zero on both shadow style node types, stays zero for a missing or
  * explicit zero XML attribute, is omitted from exported XML when zero, and a zero-spread render
- * matches an independent TGFX reference while a non-zero value visibly changes it.
+ * matches an independent TGFX reference.
  */
 PAGX_TEST(PAGXTest, ShadowSpreadDefaults) {
   auto doc = pagx::PAGXDocument::Make(160, 160);
@@ -15074,20 +15286,6 @@ PAGX_TEST(PAGXTest, ShadowSpreadDefaults) {
   }
   ASSERT_FALSE(referencePixels.empty());
   EXPECT_EQ(CountPixelDifferences(pagxPixels, referencePixels), 0);
-
-  auto spreadDoc = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_TRUE(spreadDoc != nullptr);
-  ASSERT_TRUE(spreadDoc->errors.empty());
-  auto* spreadDrop = spreadDoc->findNode<pagx::DropShadowStyle>("d");
-  ASSERT_TRUE(spreadDrop != nullptr);
-  spreadDrop->spread = 12.0f;
-  auto spreadScene = pagx::PAGScene::Make(spreadDoc);
-  ASSERT_TRUE(spreadScene != nullptr);
-  auto spreadSurface = pagx::PAGSurface::MakeOffscreen(160, 160);
-  ASSERT_TRUE(spreadSurface != nullptr);
-  ASSERT_TRUE(spreadScene->draw(spreadSurface));
-  EXPECT_GT(CountPixelDifferences(pagxPixels, ReadPAGXSurfacePixels(spreadSurface)), 0)
-      << "a non-zero spread must change the rendered image";
 }
 
 /**
@@ -15576,6 +15774,281 @@ PAGX_TEST(PAGXTest, ShadowSpreadThreeInnerShadows) {
     ASSERT_FALSE(zeroPixels.empty());
     EXPECT_GT(CountPixelDifferences(pixels, zeroPixels), 0);
   }
+}
+
+/**
+ * Test case: a positive drop shadow spread grows the shadow outline of a rounded rect by exactly the
+ * spread on every side. Every pixel is checked against closed-form geometry instead of a TGFX
+ * reference, so a clipped or misplaced shadow cannot pass. The same expectation holds when the
+ * layer is placed by layout, scaled by its matrix with halved geometry and spread, or rendered with
+ * a zoom scale. With blur the half-coverage crossing stays on the spread outline and the blur tail
+ * beyond it is kept, and a negative spread that consumes the geometry leaves no shadow.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadDropGeometry) {
+  const std::string positioned =
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  const std::string laidOut =
+      MakeSpreadXML(R"(<Layer left="60" top="70" width="80" height="60">)"
+                    R"(<Rectangle width="80" height="60" roundness="10"/><Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  const std::string scaled =
+      MakeSpreadXML(R"(<Layer matrix="2,0,0,2,0,0">)"
+                    R"(<Rectangle position="50,50" size="40,30" roundness="5"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="3" offsetY="5" spread="6" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  struct DropCase {
+    const char* name = nullptr;
+    std::string xml = "";
+    int surfaceSize = 0;
+    float zoomScale = 1.0f;
+  };
+  const DropCase cases[] = {{"position", positioned, 200, 1.0f},
+                            {"layout", laidOut, 200, 1.0f},
+                            {"layer matrix", scaled, 200, 1.0f},
+                            {"zoom", positioned, 400, 2.0f}};
+  for (const auto& dropCase : cases) {
+    SCOPED_TRACE(dropCase.name);
+    auto image = RenderSpreadImage(dropCase.xml, dropCase.surfaceSize, dropCase.surfaceSize,
+                                   dropCase.zoomScale);
+    ASSERT_FALSE(image.pixels.empty());
+    auto content = ScaleSpreadOracleShape(SPREAD_CONTENT, dropCase.zoomScale);
+    auto hull = ScaleSpreadOracleShape(SPREAD_DROP_HULL, dropCase.zoomScale);
+    ExpectSpreadRegionColor(image, SPREAD_RED, content, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_BLUE,
+                            ScaleSpreadOracleShape(SPREAD_DROP_CORE, dropCase.zoomScale), &content);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR,
+                            ScaleSpreadOracleShape(SPREAD_CANVAS, dropCase.zoomScale), &hull);
+  }
+
+  auto blurred = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle blurX="4" blurY="4" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)"),
+      200, 200, 1.0f);
+  ASSERT_FALSE(blurred.pixels.empty());
+  // Each probe samples the middle of one side of the spread outline (48, 58, 152, 142) 1.5px inside,
+  // 1.5px outside and 4.5px outside. A straight blurred edge crosses half coverage exactly on the
+  // outline, and the tail beyond the outline must not be clipped.
+  struct EdgeProbe {
+    int insideX = 0;
+    int insideY = 0;
+    int outsideX = 0;
+    int outsideY = 0;
+    int tailX = 0;
+    int tailY = 0;
+  };
+  const EdgeProbe probes[] = {{150, 100, 153, 100, 156, 100},
+                              {49, 100, 46, 100, 43, 100},
+                              {100, 140, 100, 143, 100, 146},
+                              {100, 59, 100, 56, 100, 53}};
+  for (const auto& probe : probes) {
+    EXPECT_GT(SpreadPixelAlpha(blurred, probe.insideX, probe.insideY), 128);
+    EXPECT_LT(SpreadPixelAlpha(blurred, probe.outsideX, probe.outsideY), 128);
+    EXPECT_GT(SpreadPixelAlpha(blurred, probe.tailX, probe.tailY), 0);
+  }
+
+  auto collapsed = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetY="10" spread="-30" color="#0000FF"/></Layer>)"),
+      200, 200, 1.0f);
+  auto plain = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/></Layer>)"),
+      200, 200, 1.0f);
+  ASSERT_FALSE(collapsed.pixels.empty());
+  ASSERT_FALSE(plain.pixels.empty());
+  EXPECT_EQ(CountPixelDifferences(collapsed.pixels, plain.pixels), 0);
+}
+
+/**
+ * Test case: with showBehindLayer disabled the layer contour erases the spread shadow under the
+ * semi-transparent content, so the content area matches a render without styles while the spread
+ * ring outside the content keeps the shadow color. With showBehindLayer enabled the content area
+ * shows the content composited over the shadow instead.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadShowBehindLayer) {
+  const std::string content =
+      R"(<Rectangle position="100,100" size="80,60" roundness="10"/><Fill color="#FF000080"/>)";
+  auto hidden = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + content +
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF")"
+                    R"( showBehindLayer="false"/></Layer>)"),
+      200, 200, 1.0f);
+  auto shown = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + content +
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)"),
+      200, 200, 1.0f);
+  auto plain = RenderSpreadImage(MakeSpreadXML("<Layer>" + content + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(hidden.pixels.empty());
+  ASSERT_FALSE(shown.pixels.empty());
+  ASSERT_FALSE(plain.pixels.empty());
+  ExpectSpreadRegionMatches(hidden, plain, SPREAD_CONTENT, nullptr);
+  ExpectSpreadRegionColor(hidden, SPREAD_BLUE, SPREAD_DROP_CORE, &SPREAD_CONTENT);
+  ExpectSpreadRegionColor(hidden, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_DROP_HULL);
+  const SpreadOracleColor contentOverShadow = {128, 0, 127, 255};
+  ExpectSpreadRegionColor(shown, contentOverShadow, SPREAD_CONTENT, nullptr);
+}
+
+/**
+ * Test case: a positive inner shadow spread contracts the occluder by the spread, so the shadow band
+ * inside a rounded rect is exactly the spread wide, moves with the offset and leaves an exact core
+ * of content color. Once the spread reaches half of the shorter side the occluder collapses and the
+ * shadow covers the whole content regardless of offset and blur, without leaking outside it.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadInnerGeometry) {
+  const std::string content =
+      R"(<Rectangle position="100,100" size="80,60" roundness="10"/><Fill color="#FF0000"/>)";
+  // Each occluder is the content inset by the spread with its corner radius reduced by the same
+  // amount and floored at zero, then moved by the offset.
+  struct BandCase {
+    const char* style = nullptr;
+    SpreadOracleShape occluder = {};
+  };
+  const BandCase bandCases[] = {
+      {R"(<InnerShadowStyle spread="8" color="#0000FF"/>)", {68, 78, 132, 122, 2}},
+      {R"(<InnerShadowStyle offsetY="6" spread="8" color="#0000FF"/>)", {68, 84, 132, 128, 2}},
+      {R"(<InnerShadowStyle spread="28" color="#0000FF"/>)", {88, 98, 112, 102, 0}},
+  };
+  for (const auto& bandCase : bandCases) {
+    SCOPED_TRACE(bandCase.style);
+    auto image = RenderSpreadImage(MakeSpreadXML("<Layer>" + content + bandCase.style + "</Layer>"),
+                                   200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    ExpectSpreadRegionColor(image, SPREAD_BLUE, SPREAD_CONTENT, &bandCase.occluder);
+    ExpectSpreadRegionColor(image, SPREAD_RED, bandCase.occluder, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_CONTENT);
+  }
+
+  const char* collapsedStyles[] = {
+      R"(<InnerShadowStyle spread="30" color="#0000FF"/>)",
+      R"(<InnerShadowStyle offsetX="20" offsetY="20" blurX="4" blurY="4" spread="45")"
+      R"( color="#0000FF"/>)",
+  };
+  for (const auto* style : collapsedStyles) {
+    SCOPED_TRACE(style);
+    auto image =
+        RenderSpreadImage(MakeSpreadXML("<Layer>" + content + style + "</Layer>"), 200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    ExpectSpreadRegionColor(image, SPREAD_BLUE, SPREAD_CONTENT, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_CONTENT);
+  }
+}
+
+/**
+ * Test case: the approximation paths documented for spread, checked against closed-form footprints.
+ * The content shares the shadow color, so each expected footprint is one uniform region. A
+ * stroke-only outline widens the stroke band by the spread on both sides for every alignment and
+ * keeps the inner hole clear, a fill with a stroke spreads the outer stroke edge, an irregular path
+ * spreads its bounding rect, multiple geometries spread their union bounds including the gap
+ * between them, and a single text element spreads the bounds of its glyphs. Several text elements
+ * must cover at least the spread glyph bounds.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadApproximations) {
+  const SpreadOracleShape outline = {60, 70, 140, 130, 0};
+  struct StrokeCase {
+    const char* align = nullptr;
+    float innerEdge = 0.0f;
+    float outerEdge = 0.0f;
+  };
+  const StrokeCase strokeCases[] = {{"center", -2, 2}, {"inside", -4, 0}, {"outside", 0, 4}};
+  for (const auto& strokeCase : strokeCases) {
+    SCOPED_TRACE(strokeCase.align);
+    auto image = RenderSpreadImage(
+        MakeSpreadXML(std::string(R"(<Layer><Rectangle position="100,100" size="80,60"/>)") +
+                      R"(<Stroke color="#0000FF" width="4" align=")" + strokeCase.align +
+                      R"("/><DropShadowStyle spread="6" color="#0000FF"/></Layer>)"),
+        200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    auto hole = OutsetSpreadOracleShape(outline, strokeCase.innerEdge - 6, 0);
+    auto hull = OutsetSpreadOracleShape(outline, strokeCase.outerEdge + 6, 0);
+    ExpectSpreadRegionColor(image, SPREAD_BLUE,
+                            OutsetSpreadOracleShape(outline, strokeCase.outerEdge + 6, 6), &hole);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, hole, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &hull);
+  }
+
+  struct FootprintCase {
+    const char* name = nullptr;
+    const char* contents = nullptr;
+    SpreadOracleShape bounds = {};
+    float spread = 0.0f;
+  };
+  const FootprintCase footprintCases[] = {
+      {"fill and stroke",
+       R"(<Rectangle position="100,100" size="80,60"/><Fill color="#0000FF"/>)"
+       R"(<Stroke color="#0000FF" width="4"/><DropShadowStyle spread="6" color="#0000FF"/>)",
+       {58, 68, 142, 132, 0},
+       6},
+      {"irregular path",
+       R"(<Path data="M 60 140 L 100 60 L 140 140 Z"/><Fill color="#0000FF"/>)"
+       R"(<DropShadowStyle spread="8" color="#0000FF"/>)",
+       {60, 60, 140, 140, 0},
+       8},
+      {"multiple geometries",
+       R"(<Rectangle position="70,100" size="40,40"/>)"
+       R"(<Rectangle position="130,100" size="40,40"/><Fill color="#0000FF"/>)"
+       R"(<DropShadowStyle spread="8" color="#0000FF"/>)",
+       {50, 80, 150, 120, 0},
+       8},
+  };
+  for (const auto& footprintCase : footprintCases) {
+    SCOPED_TRACE(footprintCase.name);
+    auto image = RenderSpreadImage(
+        MakeSpreadXML(std::string("<Layer>") + footprintCase.contents + "</Layer>"), 200, 200,
+        1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    auto hull = OutsetSpreadOracleShape(footprintCase.bounds, footprintCase.spread, 0);
+    ExpectSpreadRegionColor(
+        image, SPREAD_BLUE,
+        OutsetSpreadOracleShape(footprintCase.bounds, footprintCase.spread, footprintCase.spread),
+        nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &hull);
+  }
+
+  // Glyph bounds are measured from pixels, so the text footprints are checked one pixel inside and
+  // outside the spread of 8.
+  const std::string textShadow = R"(<DropShadowStyle spread="8" color="#0000FF"/>)";
+  const std::string singleText =
+      R"(<Text text="Hg" position="60,80" fontFamily="SpreadTest" fontStyle="Regular")"
+      R"( fontSize="48"/><Fill color="#0000FF"/>)";
+  auto singleGlyphs =
+      RenderSpreadImage(MakeSpreadXML("<Layer>" + singleText + "</Layer>"), 200, 200, 1.0f);
+  auto singleShadow = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + singleText + textShadow + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(singleGlyphs.pixels.empty());
+  ASSERT_FALSE(singleShadow.pixels.empty());
+  auto singleInk = FindSpreadInkBounds(singleGlyphs);
+  ASSERT_LT(singleInk.left, singleInk.right);
+  auto singleHull = OutsetSpreadOracleShape(singleInk, 9, 0);
+  ExpectSpreadRegionColor(singleShadow, SPREAD_BLUE, OutsetSpreadOracleShape(singleInk, 7, 7),
+                          nullptr);
+  ExpectSpreadRegionColor(singleShadow, SPREAD_CLEAR, SPREAD_CANVAS, &singleHull);
+
+  const std::string multipleTexts =
+      R"(<Text text="H" position="60,80" fontFamily="SpreadTest" fontStyle="Regular")"
+      R"( fontSize="48"/><Text text="g" position="110,80" fontFamily="SpreadTest")"
+      R"( fontStyle="Regular" fontSize="48"/><Fill color="#0000FF"/>)";
+  auto multipleGlyphs =
+      RenderSpreadImage(MakeSpreadXML("<Layer>" + multipleTexts + "</Layer>"), 200, 200, 1.0f);
+  auto multipleShadow = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + multipleTexts + textShadow + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(multipleGlyphs.pixels.empty());
+  ASSERT_FALSE(multipleShadow.pixels.empty());
+  auto multipleInk = FindSpreadInkBounds(multipleGlyphs);
+  ASSERT_LT(multipleInk.left, multipleInk.right);
+  // Several text elements have no single outline, so the spread falls back to the content image
+  // bounds. TGFX derives those bounds for text from the font bounding boxes, which reach far beyond
+  // the glyphs, so only the lower bound is checked until the fallback uses tight glyph bounds.
+  ExpectSpreadRegionColor(multipleShadow, SPREAD_BLUE, OutsetSpreadOracleShape(multipleInk, 7, 7),
+                          nullptr);
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
