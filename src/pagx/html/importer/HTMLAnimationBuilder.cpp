@@ -986,6 +986,8 @@ HTMLAnimationBuilder::HTMLAnimationBuilder(HTMLDiagnosticSink& sink, HTMLValuePa
 
 void HTMLAnimationBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+  _coalescingLengths.clear();
+  _groupStarts.clear();
 }
 
 void HTMLAnimationBuilder::setKeyframes(
@@ -993,30 +995,75 @@ void HTMLAnimationBuilder::setKeyframes(
   _keyframes = keyframes;
 }
 
-Frame HTMLAnimationBuilder::loopCycleFrames(const Animation* animation) const {
-  auto it = _loopCycleFrames.find(animation);
-  return it != _loopCycleFrames.end() ? it->second : 0;
+static LoopMode AnimationLoopMode(const AnimationSpec& spec) {
+  if (!spec.iterationInfinite) return LoopMode::Once;
+  return spec.direction == "alternate" || spec.direction == "alternate-reverse" ? LoopMode::PingPong
+                                                                                : LoopMode::Loop;
 }
 
-long long HTMLAnimationBuilder::resolveDelayFrames(float delaySeconds) {
-  if (delaySeconds < 0.0f) {
-    _diagnostics.warn(
-        "html: negative animation-delay is not supported; clamped to 0 "
-        "[subset:animation-unsupported-property]");
-    return 0;
+static bool AnimationNeedsTrailingBaseline(const AnimationSpec& spec) {
+  return !spec.iterationInfinite && (spec.fillMode == "none" || spec.fillMode == "backwards");
+}
+
+static Frame AnimationGroupingLength(LoopMode loop, Frame cycle, Frame delay, bool trailing) {
+  return loop == LoopMode::Once ? cycle + delay + (trailing ? 1 : 0) : cycle;
+}
+
+void HTMLAnimationBuilder::prepareTiming(const std::unordered_map<std::string, std::string>& style,
+                                         bool inlineSvg) {
+  auto shorthand = style.find("animation");
+  std::vector<std::string> entries;
+  if (inlineSvg && shorthand != style.end()) {
+    entries = SplitTopLevelCommas(shorthand->second);
   }
-  return std::llround(delaySeconds * kFrameRate);
+  if (entries.empty()) {
+    entries.push_back(shorthand != style.end() ? shorthand->second : std::string());
+  }
+  for (const auto& entry : entries) {
+    AnimationSpec spec = {};
+    bool multiple = false;
+    ParseAnimationShorthand(entry, spec, multiple);
+    if (entries.size() == 1) ApplyAnimationLonghands(style, spec, multiple);
+    if (spec.durationSeconds <= 0 || spec.name.empty() || _keyframes->count(spec.name) == 0 ||
+        (!spec.iterationInfinite && spec.iterationCount <= 0)) {
+      continue;
+    }
+    Frame cycle = std::llround(spec.durationSeconds * kFrameRate);
+    Frame delay = std::llround(spec.delaySeconds * kFrameRate);
+    auto loop = AnimationLoopMode(spec);
+    Frame length =
+        AnimationGroupingLength(loop, cycle, delay, AnimationNeedsTrailingBaseline(spec));
+    auto key = std::make_pair(loop, length);
+    // The default zero preserves the HTML origin when every member's delay is positive.
+    _groupStarts[key] = std::min(_groupStarts[key], delay);
+  }
+}
+
+Frame HTMLAnimationBuilder::coalescingLength(const Animation* animation) const {
+  auto it = _coalescingLengths.find(animation);
+  return it != _coalescingLengths.end() ? it->second : animation->duration;
+}
+
+Frame HTMLAnimationBuilder::resolveDelayFrames(float delaySeconds, Frame durationFrames,
+                                               LoopMode loopMode, bool needsTrailingBaseline) {
+  Frame delay = std::llround(delaySeconds * kFrameRate);
+  Frame length = AnimationGroupingLength(loopMode, durationFrames, delay, needsTrailingBaseline);
+  auto it = _groupStarts.find(std::make_pair(loopMode, length));
+  Frame start = it != _groupStarts.end() ? it->second : std::min<Frame>(0, delay);
+  return delay - start;
 }
 
 void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loopMode,
-                                              long long durationFrames, long long delayFrames,
-                                              bool needsTrailingBaseline) {
+                                              Frame durationFrames, Frame delayFrames,
+                                              bool needsTrailingBaseline,
+                                              Frame originalDelayFrames) {
   animation->frameRate = kFrameRate;
   animation->loop = loopMode;
-  // Keyframes are shifted by delayFrames, so the playback window (which always starts at frame 0)
-  // must end at `delay + duration` for every loop mode; a shorter window wraps before the delayed
-  // keyframes finish. Once extends by one more frame when fill-mode requires a trailing baseline
-  // sample, because LoopMode::Once clamps currentTime to `animation->duration` once playback ends.
+  // The group origin is the earliest negative delay (or CSS t=0 when every delay is nonnegative).
+  // Shift keyframes and the playback end by the same amount, so the window starts at frame 0 and
+  // covers each member's last keyframe. A shorter window wraps before delayed keyframes finish.
+  // Once extends by one more frame when fill-mode requires a trailing baseline sample because
+  // LoopMode::Once clamps currentTime to `animation->duration` after playback ends.
   //
   // Deliberate trade-off for Loop / PingPong: CSS delays only the first iteration and then loops
   // seamlessly, but a PAGX Animation repeats its whole [0, duration] window, so the delay is
@@ -1024,18 +1071,19 @@ void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loo
   // in the PAGX model or keyframes rotated by the delay and split at the cycle seam. Both were
   // rejected: the imported keyframes must stay a plain, readable offset of the CSS @keyframes that
   // animators can edit on the canvas. A visible pause is acceptable there; truncation is not.
-  bool loopOnce = (loopMode == LoopMode::Once);
-  animation->duration =
-      static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
-  if (!loopOnce) {
-    _loopCycleFrames[animation] = static_cast<Frame>(durationFrames);
-  }
+  animation->duration = durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0);
+  _coalescingLengths[animation] =
+      AnimationGroupingLength(loopMode, durationFrames, originalDelayFrames, needsTrailingBaseline);
 }
 
-void HTMLAnimationBuilder::addAnimation(Animation* animation) {
+void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDelayFrames) {
   _document->animations.push_back(animation);
-  auto it = _loopCycleFrames.find(animation);
-  if (it != _loopCycleFrames.end() && animation->duration > it->second) {
+  if (originalDelayFrames < 0) {
+    _diagnostics.warn(
+        "html: negative animation-delay shifts the imported timeline; playback begins before "
+        "CSS t=0 [subset:animation-timeline-shifted]");
+  }
+  if (animation->loop != LoopMode::Once && originalDelayFrames > 0) {
     _diagnostics.warn(
         "html: animation-delay on an infinite animation is replayed as a pause on every cycle "
         "instead of only before the first iteration [subset:animation-delay-replayed]");
@@ -1131,7 +1179,9 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
-  long long delayFrames = resolveDelayFrames(spec.delaySeconds);
+  long long delayFrames =
+      resolveDelayFrames(spec.delaySeconds, durationFrames, AnimationLoopMode(spec),
+                         AnimationNeedsTrailingBaseline(spec));
 
   // Per-channel keyframe collection.
   std::vector<Keyframe<float>> alphaKeys;
@@ -1506,7 +1556,8 @@ bool HTMLAnimationBuilder::buildForElement(
       loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
 
   auto* animation = _document->makeNode<Animation>(layer->id + "_anim");
-  setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline);
+  setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline,
+                     std::llround(spec.delaySeconds * kFrameRate));
   if (!spec.iterationInfinite && spec.iterationCount != 1.0f) {
     std::ostringstream count;
     count << spec.iterationCount;
@@ -1878,7 +1929,7 @@ bool HTMLAnimationBuilder::buildForElement(
   if (animation->objects.empty()) {
     return false;
   }
-  addAnimation(animation);
+  addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
   return true;
 }
 
@@ -1953,7 +2004,9 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
 
     long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
-    long long delayFrames = resolveDelayFrames(spec.delaySeconds);
+    long long delayFrames =
+        resolveDelayFrames(spec.delaySeconds, durationFrames, AnimationLoopMode(spec),
+                           AnimationNeedsTrailingBaseline(spec));
 
     std::vector<Keyframe<Color>> fillColorKeys;
     std::vector<Keyframe<float>> fillAlphaKeys;
@@ -2145,7 +2198,8 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
                              : (!fillTargetId.empty() ? fillTargetId : shapeTargetId);
     std::string animId = idBase + "_" + spec.name + "_anim";
     auto* animation = _document->makeNode<Animation>(animId);
-    setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline);
+    setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline,
+                       std::llround(spec.delaySeconds * kFrameRate));
 
     // Layer-space channels (opacity / translate) target the shape's own `Layer`.
     if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty() || !matrixKeys.empty()) {
@@ -2249,7 +2303,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
 
     if (animation->objects.empty()) continue;
-    addAnimation(animation);
+    addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
     builtAny = true;
   }
   return builtAny;

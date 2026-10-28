@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include "pagx/nodes/Animation.h"
 
 namespace pagx {
@@ -88,27 +90,26 @@ class HTMLAnimationBuilder {
                               const std::string& fillTargetId, const std::string& strokeTargetId,
                               float dashScale);
 
-  /**
-   * Returns the CSS cycle length in frames (the `animation-duration`, excluding the delay) of an
-   * infinite (Loop / PingPong) animation emitted by this builder, or 0 for a finite (Once)
-   * animation or one this builder did not emit. Infinite animations end at `delay + cycle`, so the
-   * cycle cannot be recovered from `Animation::duration`; animation coalescing groups infinite
-   * animations by this value instead.
-   */
-  Frame loopCycleFrames(const Animation* animation) const;
+  /** Collects group start times before either animation build pass, including SVG animation lists. */
+  void prepareTiming(const std::unordered_map<std::string, std::string>& style, bool inlineSvg);
+
+  /** Returns the original grouping length, before the timeline is shifted to remove negative times. */
+  Frame coalescingLength(const Animation* animation) const;
 
  private:
-  long long resolveDelayFrames(float delaySeconds);
-  void setAnimationTiming(Animation* animation, LoopMode loopMode, long long durationFrames,
-                          long long delayFrames, bool needsTrailingBaseline);
-  void addAnimation(Animation* animation);
+  Frame resolveDelayFrames(float delaySeconds, Frame durationFrames, LoopMode loopMode,
+                           bool needsTrailingBaseline);
+  void setAnimationTiming(Animation* animation, LoopMode loopMode, Frame durationFrames,
+                          Frame delayFrames, bool needsTrailingBaseline, Frame originalDelayFrames);
+  void addAnimation(Animation* animation, Frame originalDelayFrames);
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
   const std::unordered_map<std::string, html::CssKeyframesRule>* _keyframes = nullptr;
-  std::unordered_map<const Animation*, Frame> _loopCycleFrames = {};
+  std::unordered_map<const Animation*, Frame> _coalescingLengths;
+  std::map<std::pair<LoopMode, Frame>, Frame> _groupStarts;
 };
 
 }  // namespace pagx

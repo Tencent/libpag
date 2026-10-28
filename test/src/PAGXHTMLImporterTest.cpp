@@ -7759,10 +7759,9 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgInfiniteDelayExtendsSharedDuration) {
   EXPECT_EQ(lastKeyTimes[1], 90);
 }
 
-// A negative animation-delay on an infinite animation is clamped to 0 with a warning on both the
-// element and the inline-SVG paths, so the duration stays at the plain cycle and no
-// replayed-delay warning is raised.
-PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayClampsAndWarnsOnBothPaths) {
+// The earliest negative delay sets frame 0 for the whole infinite-loop group, including inline
+// SVG shapes. CSS time 0 is at frame 30, and all original keyframe intervals remain intact.
+PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimeline) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -7770,39 +7769,105 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayClampsAndWarnsOnBot
       @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
     </style></head>
     <body style="width:200px;height:100px">
-      <div id="d" style="width:10px;height:10px;background-color:#000;
-                         animation:fade 1s linear -0.5s infinite"></div>
+      <div id="early" style="width:10px;height:10px;background-color:#000;
+                             animation:fade 1s linear -0.5s infinite both"></div>
+      <div id="middle" style="width:10px;height:10px;background-color:#000;
+                              animation:fade 1s linear infinite both"></div>
       <svg width="80" height="80" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="30" fill="#000"
-                style="animation:fade 1s linear -0.5s infinite"/>
+        <circle id="late" cx="40" cy="40" r="30" fill="#000"
+                style="animation:fade 1s linear 0.25s infinite both"/>
       </svg>
     </body></html>
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  size_t negativeWarnings = 0;
+  size_t shiftedWarnings = 0;
+  size_t replayedWarnings = 0;
   for (const auto& msg : doc->errors) {
-    if (msg.find("negative animation-delay") != std::string::npos) negativeWarnings++;
-    EXPECT_EQ(msg.find("subset:animation-delay-replayed"), std::string::npos)
+    if (msg.find("subset:animation-timeline-shifted") != std::string::npos) shiftedWarnings++;
+    if (msg.find("subset:animation-delay-replayed") != std::string::npos) replayedWarnings++;
+    EXPECT_EQ(msg.find("negative animation-delay is not supported"), std::string::npos)
         << "Unexpected diagnostic: " << msg;
   }
-  EXPECT_EQ(negativeWarnings, 2u);
-
+  EXPECT_EQ(shiftedWarnings, 1u);
+  EXPECT_EQ(replayedWarnings, 1u);
   ASSERT_EQ(doc->animations.size(), 1u);
   auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
-  EXPECT_EQ(anim->duration, 60);
-  ASSERT_EQ(anim->objects.size(), 2u);
-  for (auto* obj : anim->objects) {
-    ASSERT_NE(obj, nullptr);
-    ASSERT_FALSE(obj->channels.empty());
-    auto* ch = obj->channels.front();
-    ASSERT_EQ(ch->valueType(), pagx::ChannelValueType::Float);
-    auto* alpha = static_cast<pagx::TypedChannel<float>*>(ch);
-    ASSERT_EQ(alpha->keyframes.size(), 2u);
-    EXPECT_EQ(alpha->keyframes.front().time, 0);
-    EXPECT_EQ(alpha->keyframes.back().time, 60);
-  }
+  EXPECT_EQ(anim->duration, 105);
+  auto* early =
+      FindTypedChannelOnTarget<float>(anim, "early", "alpha", pagx::ChannelValueType::Float);
+  auto* middle =
+      FindTypedChannelOnTarget<float>(anim, "middle", "alpha", pagx::ChannelValueType::Float);
+  auto* late =
+      FindTypedChannelOnTarget<float>(anim, "late", "alpha", pagx::ChannelValueType::Float);
+  ASSERT_NE(early, nullptr);
+  ASSERT_NE(middle, nullptr);
+  ASSERT_NE(late, nullptr);
+  ASSERT_EQ(early->keyframes.size(), 2u);
+  EXPECT_EQ(early->keyframes.front().time, 0);
+  EXPECT_EQ(early->keyframes.back().time, 60);
+  ASSERT_EQ(middle->keyframes.size(), 2u);
+  EXPECT_EQ(middle->keyframes.front().time, 30);
+  EXPECT_EQ(middle->keyframes.back().time, 90);
+  ASSERT_EQ(late->keyframes.size(), 2u);
+  EXPECT_EQ(late->keyframes.front().time, 45);
+  EXPECT_EQ(late->keyframes.back().time, 105);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_NE(scene, nullptr);
+  auto timeline = scene->getDefaultTimeline();
+  ASSERT_NE(timeline, nullptr);
+  auto* binding = scene->rootComposition()->binding.get();
+  ASSERT_NE(binding, nullptr);
+  auto earlyLayer = binding->get<tgfx::Layer>(reloaded->findNode<pagx::Layer>("early"));
+  auto middleLayer = binding->get<tgfx::Layer>(reloaded->findNode<pagx::Layer>("middle"));
+  ASSERT_NE(earlyLayer, nullptr);
+  ASSERT_NE(middleLayer, nullptr);
+  timeline->advanceAndApply(500'000);
+  EXPECT_NEAR(earlyLayer->alpha(), 0.5f, 1e-2f);
+  EXPECT_NEAR(middleLayer->alpha(), 0.0f, 1e-2f);
+}
+
+// Once animations with the same original end can share a window even when only one starts at a
+// negative CSS time. The trailing baseline remains one frame after the shifted active end.
+PAG_TEST(PAGXHTMLImporterTest, AnimationOnceNegativeDelayPreservesSharedEndAndTrailingFill) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="early" style="width:10px;height:10px;background-color:#000;
+                             animation:fade 1s linear -0.5s"></div>
+      <div id="late" style="width:10px;height:10px;background-color:#000;
+                            animation:fade 0.5s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Once);
+  EXPECT_EQ(anim->duration, 61);
+  auto* early =
+      FindTypedChannelOnTarget<float>(anim, "early", "alpha", pagx::ChannelValueType::Float);
+  auto* late =
+      FindTypedChannelOnTarget<float>(anim, "late", "alpha", pagx::ChannelValueType::Float);
+  ASSERT_NE(early, nullptr);
+  ASSERT_NE(late, nullptr);
+  ASSERT_GE(early->keyframes.size(), 3u);
+  ASSERT_GE(late->keyframes.size(), 4u);
+  EXPECT_EQ(early->keyframes.front().time, 0);
+  EXPECT_EQ(early->keyframes[1].time, 60);
+  EXPECT_EQ(early->keyframes.back().time, 61);
+  EXPECT_EQ(late->keyframes.front().time, 0);
+  EXPECT_EQ(late->keyframes[1].time, 30);
+  EXPECT_EQ(late->keyframes[2].time, 60);
+  EXPECT_EQ(late->keyframes.back().time, 61);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {

@@ -357,6 +357,14 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  // Plan a shared nonnegative origin before generating keyframes or fill-mode baselines. SVG
+  // shapes and ordinary elements can belong to the same timing group.
+  for (auto& entry : _pendingAnimations) {
+    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.first), false);
+  }
+  for (auto& shape : _pendingSvgShapeAnimations) {
+    _animationBuilder->prepareTiming(shape.style, true);
+  }
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
@@ -388,11 +396,11 @@ void HTMLParserContext::coalesceAnimations() {
   // it animates hundreds of elements. Order is preserved so the resulting `<Animations>` block
   // still follows document order.
   //
-  // Once animations group by (duration, frameRate, loop). Infinite (Loop / PingPong) animations
-  // group by (cycle, frameRate, loop) instead: their duration is `delay + cycle`, so staggered
-  // siblings with different delays share one timeline whose duration is the latest end among them.
-  // Each member then pauses for its own delay at the head and up to the shared end at the tail,
-  // which keeps the stagger aligned on every pass.
+  // Once animations group by their original (unshifted) end time, frame rate and loop mode.
+  // Infinite (Loop / PingPong) animations group by (cycle, frameRate, loop). Negative delays shift
+  // the origin of each group before emission, so matching members have the same frame 0; the
+  // merged duration is the latest shifted end among them. Each member pauses from the shared
+  // origin to its first keyframe, and from its last keyframe to the shared end.
   std::vector<Node*> coalesced;
   coalesced.reserve(_document->animations.size());
   // Parallel lists of the Animation* leaders held in `coalesced` and their grouping length (cycle
@@ -410,13 +418,7 @@ void HTMLParserContext::coalesceAnimations() {
       continue;
     }
     auto* anim = static_cast<Animation*>(node);
-    Frame length = anim->duration;
-    if (anim->loop != LoopMode::Once) {
-      Frame cycle = _animationBuilder->loopCycleFrames(anim);
-      if (cycle > 0) {
-        length = cycle;
-      }
-    }
+    Frame length = _animationBuilder->coalescingLength(anim);
     Animation* group = nullptr;
     for (size_t index = 0; index < leaders.size(); index++) {
       auto* leader = leaders[index];

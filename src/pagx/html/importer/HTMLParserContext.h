@@ -252,18 +252,20 @@ class HTMLParserContext {
   // element (each driving a single element's channels), so a page that animates many siblings
   // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
   // A single timeline is easier to read, edit, and drive, so animations that share the same timing
-  // are merged into one `Animation` (their objects concatenated): Once animations by `duration` /
-  // `frameRate` / `loop`; infinite animations by CSS cycle length / `frameRate` / `loop`.
+  // are merged into one `Animation` (their objects concatenated): Once animations by original
+  // (unshifted) end time / `frameRate` / `loop`; infinite animations by CSS cycle length /
+  // `frameRate` / `loop`. Negative delays shift the entire group's origin to its earliest start,
+  // so no keyframe has a negative time; the merged duration is the latest shifted end.
   //
   // For infinite animations the merge is not just structural: it decides each member's period.
-  // The merged duration is the latest `delay + cycle` in the group, and all members share one
-  // playhead, so every member pauses for its own delay at the head and for `maxDelay - delay` at
-  // the tail of every pass (a still share of `maxDelay / (maxDelay + cycle)` per member, including
-  // members without a delay). This deliberately keeps a staggered group aligned on every pass at
-  // the cost of a longer period than CSS; splitting members into separate Animations would keep
-  // undelayed members seamless but let the stagger drift apart over time. Animations with
-  // different cycle lengths or loop behaviour stay in separate `Animation` nodes. Runs after both
-  // animation build passes.
+  // With all delays nonnegative, the merged duration is `maxDelay + cycle`; every member pauses for
+  // its own delay at the head and for `maxDelay - delay` at the tail of every pass (a still share of
+  // `maxDelay / (maxDelay + cycle)`, including members without a delay). A negative minimum delay
+  // instead makes the shared duration `maxDelay - minDelay + cycle`, with each member's leading
+  // pause measured from `minDelay`. This keeps the stagger aligned on every pass at the cost of a
+  // longer period than CSS; splitting members would let the stagger drift apart over time.
+  // Animations with different cycle lengths or loop behaviour stay in separate `Animation` nodes.
+  // Runs after both animation build passes.
   void coalesceAnimations();
 
   // Wraps multiple independent top-level animations in one parallel StateMachine so hosts that

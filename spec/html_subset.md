@@ -565,9 +565,17 @@ timeline emit a channel.
   infinite** (finite `alternate` cannot be expressed and is downgraded to `once` with
   `subset:animation-finite-count`); `reverse` / `alternate-reverse` reverse both the keyframe order
   and the easing (`ease-in` becomes `ease-out`, step jumps swap); `normal` keeps source order.
-- `animation-delay`: positive delays shift every keyframe time forward; negative delays warn and
-  are clamped to 0. `Animation.duration` is the end of the playback window (which always starts at
-  frame 0), so it covers at least `delay + duration` and delayed keyframes are never truncated.
+- `animation-delay`: delays keep their signed value when grouping animations. If a group's
+  earliest delay is negative, the importer shifts every member's keyframes and the group's
+  playback end forward by the same amount until the earliest keyframe starts at frame 0. No
+  negative keytimes are emitted and no keyframe is truncated. The PAGX playback window always
+  begins at frame 0; HTML `t=0` then lies *after* PAGX frame 0 (by the magnitude of the earliest
+  negative delay), so default playback includes the original HTML negative-time segment rather
+  than starting on the browser's initial frame. This is reported as
+  `subset:animation-timeline-shifted`. For example, a 60-frame cycle with delays -30, 0 and 15
+  becomes keyframe intervals 0–60, 30–90 and 45–105; `Animation.duration` is 105 and HTML
+  `t=0` corresponds to PAGX frame 30. `once` animations with `none` / `backwards` fill extend
+  one frame past the shifted active end to sample the trailing baseline.
   - **Looping animations (deliberate trade-off).** CSS applies the delay to the first iteration
     only and then loops seamlessly. A PAGX `Animation` repeats its whole `[0, duration]` window,
     so the importer replays the delay as a pause on every pass and warns with
@@ -575,13 +583,13 @@ timeline emit a channel.
     offset in the PAGX model or keyframes rotated by the delay and split at the cycle seam; both
     are rejected so the imported keyframes stay a plain, editable offset of the CSS `@keyframes`.
   - **Staggered groups.** Looping animations with the same cycle length and loop mode share one
-    `Animation` whose duration is the latest `delay + duration` among them, so the stagger stays
-    aligned on every pass. All members share one playhead, which has these visible consequences:
-    - every member pauses for its own delay at the head and for `maxDelay - delay` at the tail of
-      every pass, so each member is still for `maxDelay / (maxDelay + duration)` of the period —
-      including members without a delay;
-    - the period grows from `duration` to `maxDelay + duration` (`pingPong` round trips become
-      `2 × (maxDelay + duration)`), slower than the browser;
+    `Animation` whose duration reaches the latest keyframe after the shared time shift, so the
+    stagger stays aligned on every pass. Let `start = min(0, minDelay)`. The shared period is
+    `duration + maxDelay - start` (`pingPong` round trips take twice as long). Each member pauses
+    for `delay - start` at the head and `maxDelay - delay` at the tail: every member is still for
+    `maxDelay - start` frames per pass, including members without a delay. With only nonnegative
+    delays, this reduces to a still share of `maxDelay / (maxDelay + duration)` and a period of
+    `maxDelay + duration`, slower than the browser;
     - at the window ends (the `pingPong` turning points and the loop seam) all members reach
       their extreme values at the same time, so the stagger collapses there.
     - Example: four bars with a `1.1s` (66-frame) `alternate` cycle staggered by `0.15s` (9
@@ -650,4 +658,5 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
 | `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
 | `subset:animation-delay-replayed` | an infinite animation has a positive `animation-delay`; the delay is replayed as a pause on every cycle instead of only before the first iteration |
+| `subset:animation-timeline-shifted` | a negative `animation-delay` moved the group's origin before CSS `t=0`; PAGX playback starts with the pre-roll |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |
