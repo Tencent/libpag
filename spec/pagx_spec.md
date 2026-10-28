@@ -1039,7 +1039,22 @@ Draws a drop shadow **below** the layer. Computes shadow shape based on opaque l
 
 **spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. Spread applies to the shadow geometry before offsetting, blurring and clipping, so a positive value can extend the shadow beyond the layer bounds. The default `spread="0"` keeps the plain raster path, so documents that omit the attribute render unchanged.
 
-**Approximation**: Rectangles, rounded rectangles and ellipses use the renderer's basic-shape spread rules; their behavior depends on the renderer version. Irregular closed paths and a single `Text` element use their bounding rect; for text this is the bounding rect of the glyph outlines. Content without a single contour (several `Text` elements, text combined with other geometry, multiple distinct geometries, groups containing only child layers) uses the content image bounds; for text these bounds come from the renderer's conservative glyph bounds, typically the font bounding box, and can extend well beyond the visible glyphs. Stroke outlines follow the renderer's stroke-spread rules. Exact morphological spreading of arbitrary paths is not guaranteed; a negative spread large enough to consume the geometry removes the shadow.
+**Spread geometry**: the shadow shape is rebuilt from the content outline rather than morphed point by point. All distances are layer-local. When a single outline is available (one geometry carrying one fill and/or one stroke):
+
+- **Rectangle**: the rectangle outset by `spread` on all four sides; corners stay sharp.
+- **Rounded rectangle**: the bounds outset by `spread`, and every non-zero corner radius becomes `max(0, radius + spread)` per axis, so the corners stay concentric with the outset bounds and a sharp corner stays sharp.
+- **Ellipse**: the same rule applied with radii equal to half the width and half the height, so each semi-axis becomes `max(0, semiAxis + spread)`.
+- **Stroke without fill**: the shadow shape is the stroke band of width `width + 2 × spread`, centered on the centerline that `align` defines — the outline itself for `center`, the outline displaced outward by `width / 2` for `outside`, and inward by `width / 2` for `inside`. When the band's inner edge collapses, the band becomes solid out to its outer edge.
+- **Fill with stroke**: the fill outline is first outset by `spread` plus the stroke's outward extent — `width / 2` for `center`, `width` for `outside`, 0 for `inside` — then the rules above apply.
+- **Collapse**: when the resulting shape has zero or negative width or height, the shadow is not drawn; for a stroke this happens at `width + 2 × spread ≤ 0`. `InnerShadowStyle` fills the whole content area instead (§5.3.3).
+
+Content without a single outline is spread from a substitute rectangle:
+
+- **Irregular closed path** (star, freeform outline): its bounding rectangle with sharp corners, first outset by the stroke's outward extent when the path is stroked. Strokes are treated as fills here, so the shadow is rectangular rather than a morphological offset of the outline.
+- **Single `Text` element**: the bounds of the rendered glyphs.
+- **Content without a single outline** (several geometries, several `Text` elements, text combined with other geometry, a group that only contains child layers): the content image bounds. For text these bounds come from conservative glyph metrics, typically the font bounding box, and can extend well beyond the visible glyphs.
+
+The rules above are the normative behavior of this version: they state exactly how each kind of content is converted into the shadow shape, and do not promise morphological spreading of arbitrary outlines.
 
 #### 5.3.2 BackgroundBlurStyle
 
@@ -1076,7 +1091,7 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 4. Apply Gaussian blur `(blurX, blurY)` to the occluder
 5. Fill the region inside the content but outside the blurred occluder with `color`
 
-**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. The value is passed through unchanged: the renderer derives the occluder direction internally, so documents never negate it. The default `spread="0"` keeps the plain raster path. A positive spread large enough to collapse the occluder makes the shadow cover the entire content area. Shape approximation and stroke handling follow §5.3.1.
+**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. The value is passed through unchanged: the renderer derives the occluder direction internally, so documents never negate it. The default `spread="0"` keeps the plain raster path. A positive spread large enough to collapse the occluder makes the shadow cover the entire content area. The occluder is derived with the §5.3.1 geometry rules using the opposite sign: a positive `spread` contracts the shape that §5.3.1 would expand by the same amount, so bounds and stroke bands shrink and corner radii decrease, floored at 0.
 
 **Example**:
 
