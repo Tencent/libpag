@@ -62,6 +62,13 @@
         const moduleOptions = {
             // The WebGL backend resolves its default GL context through this canvas.
             canvas: document.getElementById('pag-test-canvas'),
+            // Minimal stand-in for the tgfx JS SDK object (web/src/tgfx.ts) that the wasm side
+            // reads through Module.tgfx. The test runner embeds no SDK; Chrome natively supports
+            // WebP, so answering true keeps tgfx's pure-C++ image header parsing fully working
+            // (e.g. tgfx::WebImageInfo::GetSize used by the pagx HTML exporter).
+            tgfx: {
+                hasWebpSupport: () => true,
+            },
         };
         // Initialize a WebGPU device if available. The WebGPU backend reads it through
         // Module.preinitializedWebGPUDevice (see pag::Devices::MakeDefault); the WebGL
@@ -88,7 +95,7 @@
             const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
             console.log('All tests finished with exit code:', result);
         } catch (e) {
-            console.error('Test execution failed:', e);
+            console.error('Test execution failed:', e && e.stack ? e.stack : e);
             console.log('All tests finished with exit code: 1');
         }
         // Always export the outputs, even when the test run crashed mid-way: the harness needs
