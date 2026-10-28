@@ -47,6 +47,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
@@ -80,6 +81,7 @@
 #include "pagx/utils/TextUtils.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/MosaicLayerFilter.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -3244,6 +3246,42 @@ class LayerBuilderContext {
                                 ReadScalar<GlowLayerFilter, &GlowLayerFilter::glowIntensity>);
   }
 
+  static void WriteMosaicFilterHorizontalBlocks(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MosaicLayerFilter*>(object);
+    filter->setHorizontalBlocks(MixFloat(filter->horizontalBlocks(), *v, mix));
+  }
+
+  static void WriteMosaicFilterVerticalBlocks(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<MosaicLayerFilter*>(object);
+    filter->setVerticalBlocks(MixFloat(filter->verticalBlocks(), *v, mix));
+  }
+
+  static void WriteMosaicFilterSharpColors(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<MosaicLayerFilter*>(object)->setSharpColors(*v);
+  }
+
+  void bindMosaicFilterChannels(const MosaicFilter* node) {
+    _result.binding.setAccessor(
+        node, "horizontalBlocks", WriteMosaicFilterHorizontalBlocks,
+        ReadScalar<MosaicLayerFilter, &MosaicLayerFilter::horizontalBlocks>);
+    _result.binding.setAccessor(node, "verticalBlocks", WriteMosaicFilterVerticalBlocks,
+                                ReadScalar<MosaicLayerFilter, &MosaicLayerFilter::verticalBlocks>);
+    _result.binding.setAccessor(node, "sharpColors", WriteMosaicFilterSharpColors,
+                                ReadBoolean<MosaicLayerFilter, &MosaicLayerFilter::sharpColors>);
+  }
+
   static void WriteDropShadowFilterOffsetX(void* object, const KeyValue& value, float mix) {
     auto* v = std::get_if<float>(&value);
     if (v == nullptr) {
@@ -3572,6 +3610,14 @@ class LayerBuilderContext {
             GlowLayerFilter::Make(filter->glowThreshold, filter->glowRadius, filter->glowIntensity);
         _result.binding.set(filter, tgfxFilter);
         bindGlowFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::MosaicFilter: {
+        auto filter = static_cast<const MosaicFilter*>(node);
+        auto tgfxFilter = MosaicLayerFilter::Make(filter->horizontalBlocks, filter->verticalBlocks,
+                                                  filter->sharpColors);
+        _result.binding.set(filter, tgfxFilter);
+        bindMosaicFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::DropShadowFilter: {

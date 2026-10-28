@@ -37,6 +37,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -64,6 +65,8 @@ void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameR
                                     PAGXDocument* document, AnimationObject* object);
 void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDocument* document,
                                 AnimationObject* object);
+void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -872,15 +875,34 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode) and the Glow effect maps to GlowFilter (threshold/radius/intensity carry over 1:1,
-// animated properties join the composition animation). Other effect types report an issue
+// mode), the Glow effect maps to GlowFilter and the Mosaic effect maps to MosaicFilter
+// (animated properties join the composition animation). Other effect types report an issue
 // until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::Glow) {
+    if (effect->type() == pag::EffectType::Mosaic) {
+      auto* legacy = static_cast<pag::MosaicEffect*>(effect);
+      auto* mosaic = state->document->makeNode<MosaicFilter>("pag-legacy-mosaic-" +
+                                                             std::to_string(legacy->uniqueID));
+      mosaic->horizontalBlocks = static_cast<float>(
+          PropertyValueAtStart(legacy->horizontalBlocks, legacyLayer->startTime, nullptr));
+      mosaic->verticalBlocks = static_cast<float>(
+          PropertyValueAtStart(legacy->verticalBlocks, legacyLayer->startTime, nullptr));
+      mosaic->sharpColors =
+          PropertyValueAtStart(legacy->sharpColors, legacyLayer->startTime, nullptr) != 0;
+      layer->filters.push_back(mosaic);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = mosaic->id;
+        MigrateMosaicEffectAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::Glow) {
       auto* legacy = static_cast<pag::GlowEffect*>(effect);
       auto* glow = state->document->makeNode<GlowFilter>("pag-legacy-glow-" +
                                                          std::to_string(legacy->uniqueID));

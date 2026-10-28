@@ -295,6 +295,73 @@ void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDo
   }
 }
 
+// Mosaic effect channels (spec 7.5): the block counts are uint16 legacy properties but float
+// PAGX channels, so the keyframes convert value-by-value (interpolation and bezier eases carry
+// over, and the final segment endpoint is appended like ConvertFloatChannel does). sharpColors
+// animates as a Hold bool channel. Legacy effect keyframes are composition-absolute, so raw
+// keyframe times carry over without a layer offset.
+static void ConvertMosaicBlockChannel(pag::Property<uint16_t>* legacy,
+                                      TypedChannel<float>* channel) {
+  auto* animatable = dynamic_cast<pag::AnimatableProperty<uint16_t>*>(legacy);
+  if (animatable == nullptr) {
+    return;
+  }
+  for (auto* legacyKeyframe : animatable->keyframes) {
+    Keyframe<float> keyframe = {};
+    keyframe.time = legacyKeyframe->startTime;
+    keyframe.value = static_cast<float>(legacyKeyframe->startValue);
+    keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    channel->keyframes.push_back(keyframe);
+  }
+  if (!animatable->keyframes.empty()) {
+    auto* last = animatable->keyframes.back();
+    if (last->endTime > last->startTime) {
+      Keyframe<float> keyframe = {};
+      keyframe.time = last->endTime;
+      keyframe.value = static_cast<float>(last->endValue);
+      keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      channel->keyframes.push_back(keyframe);
+    }
+  }
+}
+
+void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object) {
+  (void)frameRate;
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<uint16_t>* blockProperties[2] = {effect->horizontalBlocks, effect->verticalBlocks};
+  const char* blockChannelNames[2] = {"horizontalBlocks", "verticalBlocks"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = blockProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = blockChannelNames[i];
+    ConvertMosaicBlockChannel(legacy, channel);
+    object->channels.push_back(channel);
+  }
+  if (effect->sharpColors != nullptr && effect->sharpColors->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<bool>*>(effect->sharpColors);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channel = document->makeNode<TypedChannel<bool>>();
+      channel->name = "sharpColors";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<bool> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = legacyKeyframe->startValue;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
