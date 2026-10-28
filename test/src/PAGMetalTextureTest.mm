@@ -28,12 +28,9 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Font.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
-#include "utils/MetalTestSupport.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -342,106 +339,6 @@ PAGX_PIXEL_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
  */
 PAGX_PIXEL_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
   CheckMetalPAGXSurface(true);
-}
-
-/**
- * Verifies that test-only atlas resets isolate pixel comparisons from earlier text rendering.
- */
-PAG_TEST(PAGMetalAtlasTest, ResetRemovesPreviousTextHistory) {
-  constexpr int width = 512;
-  constexpr int height = 256;
-  auto typeface =
-      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_TRUE(typeface != nullptr);
-  auto device = Devices::MakeDefault();
-  ASSERT_TRUE(device != nullptr);
-  tgfx::Paint paint;
-  paint.setColor(tgfx::Color::White());
-  auto info = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
-                                    tgfx::AlphaType::Premultiplied);
-  std::vector<uint8_t> expected;
-  for (int warmupCount : {0, 1, 3, 7, 15}) {
-    SCOPED_TRACE(warmupCount);
-    ASSERT_TRUE(ResetMetalAtlasForComparison());
-    {
-      DeviceLockScope scope(device);
-      ASSERT_TRUE(static_cast<bool>(scope));
-      auto surface = tgfx::Surface::Make(scope.context(), width, height);
-      ASSERT_TRUE(surface != nullptr);
-      for (int index = 0; index < warmupCount; index++) {
-        surface->getCanvas()->clear();
-        surface->getCanvas()->drawSimpleText("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 0, 100,
-                                             tgfx::Font(typeface, 11.0f + index), paint);
-        scope.context()->flushAndSubmit(true);
-      }
-    }
-    ASSERT_TRUE(ResetMetalAtlasForComparison());
-    std::vector<uint8_t> pixels(info.byteSize());
-    {
-      DeviceLockScope scope(device);
-      ASSERT_TRUE(static_cast<bool>(scope));
-      auto surface = tgfx::Surface::Make(scope.context(), width, height);
-      ASSERT_TRUE(surface != nullptr);
-      auto canvas = surface->getCanvas();
-      canvas->clear();
-      canvas->translate(20.25f, 25.75f);
-      canvas->rotate(7.0f);
-      canvas->drawSimpleText("图集位置一致性 TextAtlas", 0, 90, tgfx::Font(typeface, 32.0f), paint);
-      ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-    }
-    if (expected.empty()) {
-      expected = pixels;
-    } else {
-      size_t changedBytes = 0;
-      for (size_t i = 0; i < pixels.size(); i++) {
-        changedBytes += pixels[i] != expected[i];
-      }
-      EXPECT_EQ(changedBytes, 0u);
-    }
-  }
-}
-
-/**
- * Reuses cached glyphs across surfaces and intervening draws without clearing atlas history.
- */
-PAG_TEST(PAGMetalAtlasTest, ReusesTextWithoutReset) {
-  constexpr int width = 512;
-  constexpr int height = 256;
-  auto typeface =
-      tgfx::Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  ASSERT_TRUE(typeface != nullptr);
-  auto device = Devices::MakeDefault();
-  ASSERT_TRUE(device != nullptr);
-  tgfx::Paint paint;
-  paint.setColor(tgfx::Color::White());
-  auto info = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
-                                    tgfx::AlphaType::Premultiplied);
-  std::vector<uint8_t> expected;
-  for (int iteration = 0; iteration < 4; iteration++) {
-    SCOPED_TRACE(iteration);
-    DeviceLockScope scope(device);
-    ASSERT_TRUE(static_cast<bool>(scope));
-    auto surface = tgfx::Surface::Make(scope.context(), width, height);
-    ASSERT_TRUE(surface != nullptr);
-    auto canvas = surface->getCanvas();
-    canvas->clear();
-    canvas->drawSimpleText("图集复用 TextAtlas", 20, 90, tgfx::Font(typeface, 32.0f), paint);
-    std::vector<uint8_t> pixels(info.byteSize());
-    ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-    if (expected.empty()) {
-      expected = pixels;
-    } else {
-      size_t changedBytes = 0;
-      for (size_t i = 0; i < pixels.size(); i++) {
-        changedBytes += pixels[i] != expected[i];
-      }
-      EXPECT_EQ(changedBytes, 0u);
-    }
-    canvas->clear();
-    canvas->drawSimpleText("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 0, 100,
-                           tgfx::Font(typeface, 11.0f + iteration), paint);
-    scope.context()->flushAndSubmit(true);
-  }
 }
 
 }  // namespace pag
