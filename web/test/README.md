@@ -15,6 +15,15 @@ MD5 cache are exported from the virtual filesystem through CDP downloads.
   cd web/test && npm install
   ```
 
+- The tgfx JS bindings (built once; the wasm side reads browser-only capabilities through
+  `Module.tgfx` / `Module.ScalerContext`, injected by these bindings at page load):
+
+  ```bash
+  cd third_party/tgfx/web && npm install && npm run build:tgfx
+  ```
+
+  The `copy:*` scripts pick up `tgfx.esm.js` from there automatically.
+
 ## Usage
 
 ```bash

@@ -11,6 +11,7 @@
     <canvas id="pag-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
     <script type="module">
         import PAGTest from './pag-test.js';
+        import { TGFXBind } from './tgfx.esm.js';
 
         function collectFiles(fs, dir) {
             const files = [];
@@ -62,13 +63,6 @@
         const moduleOptions = {
             // The WebGL backend resolves its default GL context through this canvas.
             canvas: document.getElementById('pag-test-canvas'),
-            // Minimal stand-in for the tgfx JS SDK object (web/src/tgfx.ts) that the wasm side
-            // reads through Module.tgfx. The test runner embeds no SDK; Chrome natively supports
-            // WebP, so answering true keeps tgfx's pure-C++ image header parsing fully working
-            // (e.g. tgfx::WebImageInfo::GetSize used by the pagx HTML exporter).
-            tgfx: {
-                hasWebpSupport: () => true,
-            },
         };
         // Initialize a WebGPU device if available. The WebGPU backend reads it through
         // Module.preinitializedWebGPUDevice (see pag::Devices::MakeDefault); the WebGL
@@ -90,6 +84,11 @@
         let module = null;
         try {
             module = await PAGTest(moduleOptions);
+            // The wasm side reads browser-only capabilities (Module.tgfx, Module.ScalerContext,
+            // Module.PathRasterizer, ...) through JS bindings injected by the tgfx web SDK.
+            // The test runner embeds no SDK, so bind the real ones built from
+            // third_party/tgfx/web (npm run build:tgfx), following tgfx's own web test harness.
+            TGFXBind(module);
             // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
             // both the Asyncify and non-Asyncify cases.
             const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
