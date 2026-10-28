@@ -155,7 +155,7 @@ endif ()
 # the HTML eval pipeline and stays preloaded because PAGX suites reference it.
 set(PRELOAD_RESOURCES "")
 foreach (resource_dir IN ITEMS pagx_to_html font filter timestretch text blend layout gradient
-        disk fuzz compare html)
+        disk fuzz compare html svg)
     list(APPEND PRELOAD_RESOURCES
         "SHELL:--preload-file ${ROOT}/resources/${resource_dir}@/resources/${resource_dir}")
 endforeach ()
