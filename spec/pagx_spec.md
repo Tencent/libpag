@@ -1056,6 +1056,8 @@ Content without a single outline is spread from a substitute rectangle:
 
 The rules above are the normative behavior of this version: they state exactly how each kind of content is converted into the shadow shape, and do not promise morphological spreading of arbitrary outlines.
 
+**Compatibility**: `spread` defaults to 0, so documents written before this attribute keep their appearance. A reader that predates it may ignore `spread` or reject such documents, and will not show the spread effect. In the C++ API the field is a new member of `DropShadowStyle` and `InnerShadowStyle`, so code built against an older header must be rebuilt.
+
 #### 5.3.2 BackgroundBlurStyle
 
 Applies blur effect to layer background **below** the layer. Computes effect based on **layer background**, using opaque layer content as mask for clipping.
@@ -1103,8 +1105,6 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
   <InnerShadowStyle id="inner" offsetY="8" blurX="4" blurY="4" spread="-6" color="#282828"/>
 </Layer>
 ```
-
-**Compatibility**: `spread` defaults to 0, so documents written before this attribute keep their appearance. A reader that predates it may ignore `spread` or reject such documents, and will not show the spread effect. In the C++ API the field is a new member of the two public style classes, so code built against an older header must be rebuilt.
 
 #### 5.3.4 NoiseStyle
 
