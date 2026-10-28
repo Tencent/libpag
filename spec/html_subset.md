@@ -591,7 +591,9 @@ timeline emit a channel.
     for `delay - start` at the head and `maxDelay - delay` at the tail: every member is still for
     `maxDelay - start` frames per pass, including members without a delay. With only nonnegative
     delays, this reduces to a still share of `maxDelay / (maxDelay + duration)` and a period of
-    `maxDelay + duration`, slower than the browser;
+    `maxDelay + duration`, slower than the browser. The original CSS cycle is used only while
+    grouping during import; the exported `Animation.duration` includes the delay and group shift,
+    so downstream consumers cannot recover the original CSS cycle from that value alone;
     - at the window ends (the `pingPong` turning points and the loop seam) all members reach
       their extreme values at the same time, so the stagger collapses there.
     - Example: four bars with a `1.1s` (66-frame) `alternate` cycle staggered by `0.15s` (9

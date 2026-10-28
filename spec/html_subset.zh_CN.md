@@ -532,7 +532,8 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
     `duration + maxDelay - start`（`pingPong` 的一个来回是它的两倍）。每个成员在每轮开头停顿
     `delay - start`，结尾停顿 `maxDelay - delay`；包含零延迟成员在内，每个成员每轮都会静止
     `maxDelay - start` 帧。若全部延迟非负，静止占比即 `maxDelay / (maxDelay + duration)`，周期为
-    `maxDelay + duration`，比浏览器慢；
+    `maxDelay + duration`，比浏览器慢。原始 CSS 周期只在导入分组时使用；导出的
+    `Animation.duration` 已包含延迟和组内平移，下游不能仅凭这个值反推原始 CSS 周期；
     - 在窗口两端（`pingPong` 的折返点与循环接缝处），所有成员同时到达极值，错峰在这些位置消失。
     - 示例：四根周期为 `1.1s`（66 帧）、`alternate`、依次错开 `0.15s`（9 帧）的条形共用
       `duration="93"`。没有延迟的那根每个周期在末值停住 27 帧；一个来回需要 186 帧，浏览器中为 132 帧。
