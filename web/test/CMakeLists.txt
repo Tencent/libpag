@@ -21,6 +21,10 @@ set(PAG_BUILD_PAGX ON)
 set(PAG_BUILD_SVG ON)
 set(PAG_BUILD_HTML ON)
 set(PAG_BUILD_PPT ON)
+# Mirror the native test builds (root CMakeLists enables FreeType with PAG_BUILD_TESTS): the text
+# suites load .otf fixtures through tgfx::Typeface::MakeFromPath, which is a nullptr stub on web
+# unless the embedded FreeType backend is compiled in (tgfx WebTypeface.cpp).
+set(PAG_USE_FREETYPE ON)
 # The test suites call into CLI entry points (RunVerify, image storage helpers), which also
 # pulls in the libxml2 vendor and the generated pagx_xsd.h header from the root's CLI block.
 set(PAG_BUILD_CLI ON)
