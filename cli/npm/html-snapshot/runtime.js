@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Tencent. Licensed under the Apache License, Version 2.0.
 'use strict';
 
-// Shared lazy bootstrap for snapshot (single HTML stdout) and capture (artifact set).
+// Shared lazy bootstrap for snapshot (single HTML stdout) and import (artifact set).
 // Runtime validation happens before any install, browser launch, or cache mutation.
 const fs = require('fs');
 const os = require('os');
@@ -108,19 +108,22 @@ function validateSnapshot(args) {
 async function launchBundled(kind, args = process.argv.slice(2)) {
   try {
     let opts;
-    if (kind === 'capture') {
-      const cli = require('./capture-cli');
-      opts = cli.parseCaptureArgs(args);
-      if (!opts) { process.stdout.write(cli.captureUsage('pagx capture') + '\n'); return 0; }
-      cli.validateCaptureOptions(opts);
-      if (!opts.dryRun) cli.preflightPagxBin(opts);
-    } else {
+    let needsBrowser = true;
+    if (kind === 'import') {
+      const runtime = require('./dist/lib/import-request');
+      opts = runtime.validateImportRequest(runtime.readImportRequest(args));
+      runtime.preflightImport(opts);
+      needsBrowser = runtime.importNeedsBrowser(opts);
+    } else if (kind === 'snapshot') {
       opts = validateSnapshot(args);
+    } else {
+      throw new Error('unsupported HTML runtime operation');
     }
-    const env = opts.dryRun ? process.env : await prepareBrowser(opts.browserEngine);
-    return await runProcess(process.execPath, [path.join(HERE, kind === 'capture' ? 'capture.js' : 'snapshot.js'), ...args], { env });
+    const env = needsBrowser ? await prepareBrowser(opts.browserEngine) : process.env;
+    return await runProcess(process.execPath, [path.join(HERE, kind === 'import' ? 'import.js' : 'snapshot.js'), ...args], { env });
   } catch (error) {
-    log(error.message);
+    const message = kind === 'import' ? require('./dist/lib/import-request').importErrorMessage(error) : error.message;
+    log(message);
     return error.exitCode || (error.code === 2 ? 2 : 1);
   }
 }

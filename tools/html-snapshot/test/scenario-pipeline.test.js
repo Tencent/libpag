@@ -4,7 +4,6 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
 jest.mock('../dist/lib/browser-engine', () => ({ launchBrowser: jest.fn() }));
 jest.mock('../dist/lib/interaction', () => ({ ...jest.requireActual('../dist/lib/interaction'), runScenario: jest.fn() }));
 jest.mock('../dist/lib/pipeline', () => ({ ...jest.requireActual('../dist/lib/pipeline'), runHtmlToPagx: jest.fn() }));
@@ -114,18 +113,6 @@ test.each([
 ])('programmatic invalid options fail before browser launch: %j', async invalid => {
   await expect(runScenarioToPagx({ ...options, ...invalid })).rejects.toThrow();
   expect(launchBrowser).not.toHaveBeenCalled();
-});
-
-test.each([
-  ['missing.html', '--scenario', 'missing.json', '--preview', '--no-render'],
-  ['missing.html', '--scenario', 'missing.json', '--no-resolve', '--preview'],
-  ['missing.html', '--scenario', 'missing.json', '--preview-columns', '4'],
-  ...['0', '-1', '1.5', 'NaN', 'Infinity', '33', ''].map(value => ['missing.html', '--scenario', 'missing.json', '--preview', '--preview-columns', value]),
-])('CLI rejects invalid preview arguments before input/browser preflight: %j', (...args) => {
-  const result = spawnSync(process.execPath, [path.resolve(__dirname, '../html2pagx'), ...args], { encoding: 'utf8' });
-  expect(result.status).toBe(2);
-  expect(result.stderr).toMatch(/preview/);
-  expect(result.stderr).not.toMatch(/input not found|browser|Chrome is missing/);
 });
 
 test('a later interaction failure still converts saved checkpoints after closing the browser', async () => {

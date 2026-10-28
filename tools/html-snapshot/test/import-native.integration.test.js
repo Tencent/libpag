@@ -14,7 +14,7 @@ const nativeTest = fs.existsSync(pagx) ? test : test.skip;
 const fixture = path.join(__dirname, 'fixtures/interaction.html');
 const scenario = path.join(__dirname, 'fixtures/interaction.scenario.json');
 let dir;
-beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "capture 中文 ' & ")); });
+beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "import 中文 ' & ")); });
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 jest.setTimeout(60000);
 const run = (args, env = {}) => exec(pagx, args, { cwd: dir, timeout: 50000, maxBuffer: 8 * 1024 * 1024,
@@ -23,13 +23,33 @@ const run = (args, env = {}) => exec(pagx, args, { cwd: dir, timeout: 50000, max
 nativeTest('native bridge preserves arguments, child exit code, and the invoking binary', async () => {
   const bridge = path.join(dir, 'bridge 中文.js');
   fs.writeFileSync(bridge, 'process.stdout.write(JSON.stringify(process.argv.slice(2))); process.exit(7);');
-  const args = ['import', 'page 中文.html', '--html-scenario', "states ' & $x.json", '--output-dir', 'out space', '--preview'];
+  const args = ['import', 'page 中文.html', '--html-scenario', "states ' & $x.json", '--output-dir', 'out space',
+    '--preview', '--render-scale', '1.234567891234567'];
   const error = await run(args, { PAGX_IMPORT_BIN: bridge, PAGX_BIN: '/wrong/version' }).catch(e => e);
   expect(error.code).toBe(7);
   const forwarded = JSON.parse(error.stdout);
   expect(forwarded[0]).toBe('--request');
   expect(JSON.parse(forwarded[1])).toMatchObject({ pagxBin: fs.realpathSync(pagx),
-    input: 'page 中文.html', scenario: "states ' & $x.json", outputDir: 'out space', preview: true });
+    input: 'page 中文.html', scenario: "states ' & $x.json", outputDir: 'out space', preview: true,
+    scale: 1.234567891234567 });
+});
+
+nativeTest('output aliases never overwrite the source', async () => {
+  const source = path.join(dir, 'source.svg');
+  const content = '<svg width="16" height="12"><rect width="16" height="12"/></svg>';
+  fs.writeFileSync(source, content);
+  const aliases = [path.join(dir, 'hardlink.pagx')];
+  fs.linkSync(source, aliases[0]);
+  if (process.platform !== 'win32') {
+    aliases.push(path.join(dir, 'symlink.pagx'));
+    fs.symlinkSync(source, aliases[1]);
+  }
+  for (const output of aliases) {
+    await expect(run(['import', source, '-o', output])).rejects.toMatchObject({
+      code: 2, stderr: expect.stringContaining('output must differ from input'),
+    });
+    expect(fs.readFileSync(source, 'utf8')).toBe(content);
+  }
 });
 
 nativeTest('explicit missing runtime and node overrides fail without falling back', async () => {

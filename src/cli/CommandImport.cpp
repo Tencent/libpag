@@ -22,11 +22,14 @@
 #else
 #include <sys/wait.h>
 #endif
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <map>
 #include <sstream>
@@ -433,50 +436,50 @@ Import SVG or HTML into PAGX. HTML pages and URLs are rendered in a browser;
 interaction scenarios export independent static checkpoints in one session.
 
 Input and output:
-  --input <file|url>             Alternative to a single positional input
-  -o, --output <file>            One PAGX file (default: beside local input)
-  --output-dir <dir>             Artifact directory; required for multiple results
-  --output-name <name>           Base name with --output-dir; required for URLs
-  --format <svg|html>            Force input format (otherwise inferred)
-  --images <external|embed>      Image storage (default: external)
-  --image-base-dir <dir>         Base directory for relative image resources
-  --no-resolve                  Keep import directives; incompatible with rendering
-  --verbose, -v                 Print conversion warnings
+  --input <file|url>              Alternative to a single positional input
+  -o, --output <file>             One PAGX file (default: beside local input)
+  --output-dir <dir>              Artifact directory; required for multiple results
+  --output-name <name>            Base name with --output-dir; required for URLs
+  --format <svg|html>             Force input format (otherwise inferred)
+  --images <external|embed>       Image storage (default: external)
+  --image-base-dir <dir>          Base directory for relative image resources
+  --no-resolve                    Keep import directives; incompatible with rendering
+  --verbose, -v                   Print conversion warnings
 
 Artifacts (SVG and HTML):
-  --render                      Render each imported PAGX to PNG
-  --render-scale <number>       Positive PNG scale (default: 1; requires rendering)
-  --preview                     Render PNGs and assemble contact sheets
-  --preview-columns <1..32>     Columns in contact sheets; requires --preview
+  --render                        Render each imported PAGX to PNG
+  --render-scale <number>         Positive PNG scale (default: 1; requires rendering)
+  --preview                       Render PNGs and assemble contact sheets
+  --preview-columns <1..32>       Columns in contact sheets; requires --preview
 
 HTML options:
-  --html-scenario <file.json>    Replay and export all named capture steps
-  --html-checkpoint <name>       Export only this state, replaying preceding actions
-  --html-browser-engine <name>   puppeteer or playwright (env: HTML_SNAPSHOT_BROWSER)
-  --html-no-snapshot             Convert a prepared local subset without a browser
-  --html-keep-subset             Keep intermediate <name>.subset.html files
-  --html-capture-animations      Capture page animations (default: static frame)
-  --html-viewport-width <px>     Browser viewport width (positive integer)
-  --html-viewport-height <px>    Browser viewport height (positive integer)
-  --html-wait-ms <ms>            Additional readiness delay (nonnegative integer)
-  --html-selector <css>          Wait for a selector before capture
-  --html-scroll-reveal           Scroll to reveal lazy content before capture
-  --html-no-inline-icon-fonts    Disable icon-font glyph conversion to SVG
-  --html-download-fonts         Download web fonts for native font fallbacks
-  --html-embed-fonts            Embed fonts; implies --html-download-fonts
-  --html-font-dir <dir>          Downloaded font directory
-  --html-download-images        Download page images instead of snapshot inlining
-  --html-image-dir <dir>         Downloaded image directory
-  --html-cookie <name=value>     URL cookie (repeatable)
-  --html-header <Key: Value>     URL request header (repeatable)
-  --html-batch <dir>             Recursively import HTML files; requires --output-dir
-  --skip-existing               Batch: skip complete sets of requested artifacts
-  --dry-run                     Batch: list work without creating outputs or a browser
+  --html-scenario <file.json>     Replay and export all named capture steps
+  --html-checkpoint <name>        Export only this state, replaying preceding actions
+  --html-browser-engine <name>    puppeteer or playwright (env: HTML_SNAPSHOT_BROWSER)
+  --html-no-snapshot              Convert a prepared local subset without a browser
+  --html-keep-subset              Keep intermediate <name>.subset.html files
+  --html-capture-animations       Capture page animations (default: static frame)
+  --html-viewport-width <px>      Browser viewport width (positive integer)
+  --html-viewport-height <px>     Browser viewport height (positive integer)
+  --html-wait-ms <ms>             Additional readiness delay (nonnegative integer)
+  --html-selector <css>           Wait for a selector before capture
+  --html-scroll-reveal            Scroll to reveal lazy content before capture
+  --html-no-inline-icon-fonts     Disable icon-font glyph conversion to SVG
+  --html-download-fonts           Download web fonts for native font fallbacks
+  --html-embed-fonts              Embed fonts; implies --html-download-fonts
+  --html-font-dir <dir>           Downloaded font directory
+  --html-download-images          Download page images instead of snapshot inlining
+  --html-image-dir <dir>          Downloaded image directory
+  --html-cookie <name=value>      URL cookie (repeatable)
+  --html-header <Key: Value>      URL request header (repeatable)
+  --html-batch <dir>              Recursively import HTML files; requires --output-dir
+  --skip-existing                 Batch: skip complete sets of requested artifacts
+  --dry-run                       Batch: list work without creating outputs or a browser
 
 SVG options (also apply to nested SVG imports):
-  --svg-no-expand-use            Do not expand <use> references
-  --svg-flatten-transforms       Flatten nested transforms
-  --svg-preserve-unknown         Preserve unsupported SVG elements
+  --svg-no-expand-use             Do not expand <use> references
+  --svg-flatten-transforms        Flatten nested transforms
+  --svg-preserve-unknown          Preserve unsupported SVG elements
 
 Examples:
   pagx import icon.svg -o icon.pagx --preview
@@ -685,10 +688,15 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   if (!o.outputFile.empty() &&
       std::filesystem::is_directory(std::filesystem::u8path(o.outputFile), ec))
     return ImportArgumentError("--output must name a file, not a directory");
-  if (!o.outputFile.empty() && !IsHttpUrl(o.inputFile) &&
-      std::filesystem::absolute(std::filesystem::u8path(o.inputFile)).lexically_normal() ==
-          std::filesystem::absolute(std::filesystem::u8path(o.outputFile)).lexically_normal())
-    return ImportArgumentError("output must differ from input");
+  if (!o.outputFile.empty() && !IsHttpUrl(o.inputFile)) {
+    const auto input = std::filesystem::u8path(o.inputFile);
+    const auto output = std::filesystem::u8path(o.outputFile);
+    if (std::filesystem::absolute(input).lexically_normal() ==
+            std::filesystem::absolute(output).lexically_normal() ||
+        std::filesystem::equivalent(input, output, ec)) {
+      return ImportArgumentError("output must differ from input");
+    }
+  }
   return 0;
 }
 
@@ -696,6 +704,7 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
 static std::string ImportRequest(const ImportOptions& o, const std::string& executable) {
   std::ostringstream json;
   json.imbue(std::locale::classic());
+  json << std::setprecision(std::numeric_limits<double>::max_digits10);
   json << "{\"version\":1";
   auto str = [&](const char* key, const std::string& value) {
     json << ",\"" << key << "\":\"" << EscapeJson(value) << "\"";

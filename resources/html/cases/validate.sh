@@ -31,7 +31,7 @@ while IFS= read -r line; do
   file="$CASES/$rel.html"
   if [ ! -f "$file" ]; then echo "MISSING  $id"; fail=$((fail+1)); continue; fi
 
-  out="$(PAGX_HTML_SNAPSHOT=0 "$PAGX" import --input "$file" --output "$TMP/o.pagx" -v 2>&1 | grep -v gcda)"
+  out="$("$PAGX" import --html-no-snapshot --input "$file" --output "$TMP/o.pagx" -v 2>&1 | grep -v gcda)"
   if printf '%s' "$out" | grep -q 'error:'; then echo "IMPORTERR $id"; fail=$((fail+1)); continue; fi
   if ! "$PAGX" verify --skip-render --skip-layout "$TMP/o.pagx" >/dev/null 2>&1; then
     if [ "$known_diag" -eq 1 ]; then echo "XFAIL    $id  (known verify diagnostic)"; xfail=$((xfail+1)); continue; fi

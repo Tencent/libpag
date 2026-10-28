@@ -1,20 +1,4 @@
-// Shared pipeline orchestration for the html → PAGX flow.
-//
-// Two entry points consume this module:
-//   - `tools/html-snapshot/html2pagx` — the user-facing single-file CLI
-//     (run snapshot.js → pagx import → resolve → optional font embed → render
-//     for one HTML document or URL).
-//   - `tools/html-snapshot/eval/run.js` — the corpus evaluator (same pipeline
-//     per case, plus baseline rendering, pixel/flex metrics, shared font/image
-//     caches, and concurrency).
-//
-// Before this module existed, both entry points reimplemented the same five
-// shell-outs side by side; eval/run.js even had `Mirrors html2pagx` comments
-// scattered through it. The duplication forced every behaviour change into
-// two places. This file consolidates those shell-outs so the shared pipeline
-// has exactly one implementation, and each entry point is left only with the
-// code that is genuinely its own (eval-specific reports + caches + pool;
-// html2pagx-specific argument parsing + preflight + progress prints).
+// Shared HTML acquisition and native artifact pipeline for pagx import and evaluators.
 
 import * as fs from 'fs';
 import * as os from 'os';
@@ -28,7 +12,7 @@ import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
-// html2pagx CLI can print a clean `html2pagx: <step> failed` message and
+// import runtime can print a clean `pagx import: <step> failed` message and
 // surface the underlying tool's diagnostics. Inherits `{ code, stderr }`
 // field initialisation from `ChildProcessError`; only the `step` label and
 // `name` are specific to this subclass.
@@ -431,7 +415,6 @@ export async function convertToArtifacts(opts: RunHtmlToPagxOptions, input: stri
 export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
   throwIfCancelled();
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
-  const pagxBin = opts.pagxBin || defaultPagxBin();
   const scriptDir = opts.scriptDir;
   if (!scriptDir) throw new Error('runHtmlToPagx: scriptDir is required');
   if (!opts.input) throw new Error('runHtmlToPagx: input is required');

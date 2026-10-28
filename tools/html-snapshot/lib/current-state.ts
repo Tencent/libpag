@@ -285,7 +285,7 @@ export async function renderCapturedPage(
     }, options.extent || 'viewport');
     snapshot.html = snapshot.html.replace(/ data-pagx-capture-id="\d+"/g, '');
     return { ...snapshot, warnings: captured.webFonts?.length ? [
-      'Web fonts require native font fallbacks; use html2pagx --embed-fonts for a portable PAGX file.',
+      'Web fonts require native font fallbacks; use pagx import --html-embed-fonts for a portable PAGX file.',
     ] : [], url: captured.url };
   } finally { await page.close(); }
 }

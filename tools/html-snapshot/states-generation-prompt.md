@@ -3,15 +3,15 @@
 用于以下命令，协议以本仓库 `tools/html-snapshot/lib/interaction.ts` 的 scenario version 1 为准：
 
 ```bash
-./cmake-build-debug/pagx capture page.html \
-  --scenario states.json --output-dir out --preview
+./cmake-build-debug/pagx import page.html \
+  --html-scenario states.json --output-dir out --html-keep-subset --preview
 ```
 
 `states.json` 描述在同一页面中依次执行的操作，以及何时导出静态状态。模型需要生成一条可以连续执行的路径。每个 `capture` 是一个导出检查点；它不会重置页面，也不会把网页的交互逻辑保存进 PAGX。
 
 ## 1. 使用方式
 
-将第 2 节代码块作为固定提示词，将第 3 节填好后的代码块作为本次输入。仅支持单条提示词时，按这个顺序拼接。模型的最终回复直接保存为 UTF-8 的 `states.json`，不要把本 Markdown 文件交给 `--scenario`。
+将第 2 节代码块作为固定提示词，将第 3 节填好后的代码块作为本次输入。仅支持单条提示词时，按这个顺序拼接。模型的最终回复直接保存为 UTF-8 的 `states.json`，不要把本 Markdown 文件交给 `--html-scenario`。
 
 调用前提供完整 HTML，以及影响交互的 CSS、JavaScript；也可以提供模型确实能够读取的本地文件路径。只有文件名、截图或缺少脚本的 DOM，通常不足以确认交互行为。外部脚本、运行时 DOM、测试数据和实际观测结果可以作为补充资料。
 
@@ -22,7 +22,7 @@
 ## 2. 固定提示词：直接复制
 
 ```text
-你负责根据提供的 HTML、相关 CSS/JavaScript，以及可用的运行时证据，生成 pagx capture --scenario 使用的 states.json。
+你负责根据提供的 HTML、相关 CSS/JavaScript，以及可用的运行时证据，生成 pagx import --html-scenario 使用的 states.json。
 
 目标：生成可连续执行、定位明确、等待条件可靠的交互序列，导出具有代表性的真实页面状态。优先保证协议合法、状态可达和视觉差异有意义，再扩大覆盖范围。
 
@@ -73,7 +73,7 @@ target 仅允许 css、testId、role、name、frame。
 1. css、testId、role 必须且只能出现一个，值为非空字符串。
 2. testId 匹配元素的 data-testid 属性，必须使用页面中真实存在的值。
 3. css 使用标准 CSS 选择器。优先真实稳定的 data-testid、唯一 id 或明确的属性组合，必要时加稳定父容器限定。不要直接用容易重复的 button、input、.item；只有证据证明唯一时才可使用。
-4. 默认 browser_engine=puppeteer，只能使用 css 或 testId。仅当 task_config 明确指定 playwright 且实际 CLI 也使用 --browser-engine playwright 时，才可使用 role。
+4. 默认 browser_engine=puppeteer，只能使用 css 或 testId。仅当 task_config 明确指定 playwright 且实际 CLI 也使用 --html-browser-engine playwright 时，才可使用 role。
 5. name 只允许和 role 一起使用，按完整可访问名称精确匹配，不是子串或正则表达式；没有证据时不要猜测可访问名称。
 6. frame 是可选的单个 iframe 的 CSS 选择器；它必须唯一定位该 iframe，target 的主定位器在该 frame 内解析。不要把 frame 写成数组，也不要假设支持多层 frame 路径。
 7. 不使用 XPath、text=、:contains()、:has-text()、getByRole(...)、nth、索引字段或坐标点击。只有 DOM 结构确实稳定且无更好定位时才考虑标准 CSS 的 :nth-child()。
@@ -174,7 +174,7 @@ additional_constraints: 无
 {{可选：相同环境下已验证的 DOM、操作结果、精确文本、就绪标记、滚动位置；没有写“无”}}
 </runtime_evidence>
 
-最终只输出符合协议的单一 JSON 对象，供 --scenario 直接读取。
+最终只输出符合协议的单一 JSON 对象，供 --html-scenario 直接读取。
 ```
 
 `capture_goal` 是覆盖优先级，不能替代页面证据。如果业务要求“指定状态必须全部覆盖”，调用方应额外核对检查点清单；输入不完整或目标与导出能力冲突时，应补充资料或调整任务后重新生成。不要把 `success/error` 包装对象写进 `states.json`，也不要把退回 `initial` 当作完整覆盖的证明。
@@ -253,11 +253,11 @@ console.log('scenario valid');
 NODE
 ```
 
-这一步不启动浏览器，也不验证选择器、交互可达性、等待结果或最终画面。`capture --dry-run` 只用于批量模式，不能用于 scenario。通过后再运行：
+这一步不启动浏览器，也不验证选择器、交互可达性、等待结果或最终画面。`import --dry-run` 只用于批量模式，不能用于 scenario。通过后再运行：
 
 ```bash
-./cmake-build-debug/pagx capture page.html \
-  --scenario states.json --output-dir out --preview
+./cmake-build-debug/pagx import page.html \
+  --html-scenario states.json --output-dir out --html-keep-subset --preview
 ```
 
 验证第 4 节的完整示例时，把 `page.html` 换成 `tools/html-snapshot/test/fixtures/interaction.html`。以 `page.html` 为输入时，输出包括各检查点的 `page.<name>.subset.html`、PAGX、PNG、`page.captures.json` 和 `page.preview/sheet-NNN.png`。检查退出码、manifest 顶层 `status`、`outputs` 中的检查点与警告，以及预览中是否确实出现预期状态；只有顶层 `status="complete"` 才表示整次任务完成。后续步骤失败时，已成功转换的检查点仍会保留在 `outputs` 中。
@@ -265,26 +265,26 @@ NODE
 需要排查单个检查点时可以运行：
 
 ```bash
-./cmake-build-debug/pagx capture page.html \
-  --scenario states.json --checkpoint search_results \
-  -o out --preview
+./cmake-build-debug/pagx import page.html \
+  --html-scenario states.json --html-checkpoint search_results \
+  --output-dir out --preview
 ```
 
-`--checkpoint` 仍会执行到达目标前的操作和等待，跳过前面的非目标捕获，并在目标捕获后停止。它不是从某个已保存状态直接开始；完整场景仍须单独验证。
+`--html-checkpoint` 仍会执行到达目标前的操作和等待，跳过前面的非目标捕获，并在目标捕获后停止。它不是从某个已保存状态直接开始；完整场景仍须单独验证。
 
 仅需单个 PAGX 文件时，可以沿用原生导入命令：
 
 ```bash
 ./cmake-build-debug/pagx import --input page.html \
-  --scenario states.json --checkpoint search_results \
+  --html-scenario states.json --html-checkpoint search_results \
   --output search_results.pagx
 ```
 
 注意事项：
 
-- 使用 `role` 时，生成配置与实际命令都必须选择 Playwright：追加 `--browser-engine playwright`。
-- scenario 自己管理视口、等待和捕获，不能同时使用 `--viewport-*`、`--wait-ms`、`--selector`、`--scroll-reveal`、`--capture-animations` 或 `--batch`。
-- `capture` 的 `-o` / `--output-dir` 始终表示输出目录；`import` 的 `--output` 表示单个 PAGX 文件，多检查点 scenario 必须指定 `--checkpoint`。
+- 使用 `role` 时，生成配置与实际命令都必须选择 Playwright：追加 `--html-browser-engine playwright`。
+- scenario 自己管理视口、等待和捕获，不能同时使用 `--html-viewport-*`、`--html-wait-ms`、`--html-selector`、`--html-scroll-reveal`、`--html-capture-animations` 或 `--html-batch`。
+- `import` 的 `-o` / `--output` 始终表示单个 PAGX 文件；`--output-dir` 表示产物目录。多检查点 scenario 使用目录输出，选择一个 checkpoint 后可以指定精确文件。
 - 重复运行会替换同名输出和 manifest；需要保留旧结果时使用新的目录。目录中可能存在旧检查点或旧预览，以本次 manifest 为准，不按目录内容推断本次成功结果。
 - 提示词、结构校验和实际运行验证分别解决不同问题。仅根据静态 HTML 无法保证外部资源、后台接口和浏览器运行条件都可用；位图兜底也不保证所有页面和错误都可恢复。
 
@@ -306,5 +306,5 @@ scenario 的字段和语义以实现为准，不照搬通用结构化输出示�
 - [current-state.ts](lib/current-state.ts)：静态状态捕获和位图兜底的限制。
 - [README.md](README.md)：CLI 用法、输出文件、预览和参数冲突。
 - [interaction.scenario.json](test/fixtures/interaction.scenario.json)：仓库原有交互示例。
-- [capture-cli.js](capture-cli.js)：捕获入口的参数、冲突校验和输出方式。
-- [CommandImport.cpp](../../src/cli/CommandImport.cpp)：原生单文件导入入口。
+- [import-request.ts](lib/import-request.ts)：运行前校验、输出规划和执行编排。
+- [CommandImport.cpp](../../src/cli/CommandImport.cpp)：统一原生导入入口及参数解析。

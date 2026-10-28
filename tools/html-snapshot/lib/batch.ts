@@ -1,13 +1,4 @@
-// Recursive batch driver for `html2pagx`. Replaces the old
-// `batch-html2pagx.sh` bash wrapper. The bash wrapper forked a fresh
-// `node html2pagx` per file, which meant Chromium was launched once per
-// HTML — the dominant cost on small inputs.
-//
-// This implementation launches one browser, then loops over the matched
-// files calling `runHtmlToPagx({ snapshotImpl: in-process })`. The
-// in-process snapshot reuses that single browser via the same
-// `lib/snapshot-runner.ts` path that `server.js` uses for its long-lived
-// HTTP service.
+// Recursive HTML import: one browser with an isolated context per source file.
 
 import * as fs from 'fs';
 import * as path from 'path';

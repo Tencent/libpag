@@ -173,7 +173,7 @@ export function selectCheckpoint(scenario: Scenario, checkpoint?: string): strin
     if (!names.includes(checkpoint)) throw new Error(`Unknown checkpoint '${checkpoint}'`);
     return checkpoint;
   }
-  if (names.length !== 1) throw new Error('Multiple checkpoints: select one with --checkpoint (HTTP: options.checkpoint), or use html2pagx for all states');
+  if (names.length !== 1) throw new Error('Multiple checkpoints: select one with --checkpoint (HTTP: options.checkpoint), or use pagx import --html-scenario with --output-dir for all states');
   return names[0];
 }
 

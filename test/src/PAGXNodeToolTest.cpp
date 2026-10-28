@@ -26,7 +26,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "cli/CommandCapture.h"
 #include "cli/CommandImport.h"
 #include "cli/NodeTool.h"
 #include "pagx/PAGXImporter.h"
@@ -308,22 +307,23 @@ TEST_F(PAGXNodeToolTest, CheckoutNextToExecutableWorksFromUnrelatedDirectory) {
             (checkout / "tools/html-snapshot/snapshot.js").u8string());
 }
 
-TEST_F(PAGXNodeToolTest, CaptureReportsMissingRuntime) {
+TEST_F(PAGXNodeToolTest, ImportReportsMissingRuntime) {
   auto missing = (root / "missing.js").u8string();
-  ScopedEnvironment configured("PAGX_HTML_CAPTURE_BIN", missing.c_str());
+  ScopedEnvironment configured("PAGX_IMPORT_BIN", missing.c_str());
   CaptureError error;
-  EXPECT_EQ(CallRun(pagx::cli::RunCapture, {"capture", "--help"}), 1);
-  EXPECT_NE(error.str().find("pagx capture: runtime not found"), std::string::npos);
-  EXPECT_NE(error.str().find("PAGX_HTML_CAPTURE_BIN"), std::string::npos);
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "page.html"}), 1);
+  EXPECT_NE(error.str().find("pagx import: runtime not found"), std::string::npos);
+  EXPECT_NE(error.str().find("PAGX_IMPORT_BIN"), std::string::npos);
 }
 
-TEST_F(PAGXNodeToolTest, CaptureReportsNodeLaunchFailure) {
-  auto script = WriteFile(root / "capture.js");
+TEST_F(PAGXNodeToolTest, ImportReportsNodeLaunchFailure) {
+  auto script = WriteFile(root / "import.js");
   auto missingNode = (root / "missing-node").u8string();
-  ScopedEnvironment configured("PAGX_HTML_CAPTURE_BIN", script.c_str());
+  ScopedEnvironment configured("PAGX_IMPORT_BIN", script.c_str());
   ScopedEnvironment node("PAGX_NODE_BIN", missingNode.c_str());
   CaptureError error;
-  EXPECT_EQ(CallRun(pagx::cli::RunCapture, {"capture", "--help", "--out", "space path"}), 1);
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "page.html", "--output-dir", "space path"}),
+            1);
   EXPECT_NE(error.str().find("pagx: failed to start Node"), std::string::npos);
   EXPECT_NE(error.str().find("PAGX_NODE_BIN"), std::string::npos);
 }
@@ -374,34 +374,41 @@ TEST_F(PAGXNodeToolTest, NodeAcceptsEmptyArgumentsAndPreservesSignalTermination)
   EXPECT_TRUE(ReadArguments(recorded).empty());
 }
 
-TEST_F(PAGXNodeToolTest, CapturePassesInvokingBinaryBeforeExplicitOverride) {
+TEST_F(PAGXNodeToolTest, ImportPassesNormalizedRequestAndInvokingBinary) {
   auto recorded = (root / "args").u8string();
   ScopedEnvironment output("PAGX_TEST_ARGUMENTS", recorded.c_str());
   ScopedEnvironment node("PAGX_NODE_BIN", "/bin/sh");
   ScopedEnvironment unrelatedBinary("PAGX_BIN", "/unrelated/pagx");
   auto script = WriteRuntime("exit 23\n");
-  ScopedEnvironment configured("PAGX_HTML_CAPTURE_BIN", script.c_str());
-  std::vector<std::string> args = {"capture", "页面 'one'.html", "--scenario", "states file.json",
-                                   "--out",   "输出 folder",     "--pagx-bin", "/explicit/pagx"};
-  auto expected = std::vector<std::string>{"--pagx-bin", pagx::cli::CurrentExecutablePath()};
-  expected.insert(expected.end(), args.begin() + 1, args.end());
-  auto status = RunChild([&] { return CallRun(pagx::cli::RunCapture, args); });
+  ScopedEnvironment configured("PAGX_IMPORT_BIN", script.c_str());
+  std::vector<std::string> args = {"import",           "页面 'one'.html", "--html-scenario",
+                                   "states file.json", "--output-dir",    "输出 folder",
+                                   "--preview",        "--images",        "embed"};
+  auto status = RunChild([&] { return CallRun(pagx::cli::RunImport, args); });
   ASSERT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 23);
-  EXPECT_EQ(ReadArguments(recorded), expected);
+  auto forwarded = ReadArguments(recorded);
+  ASSERT_EQ(forwarded.size(), 2u);
+  EXPECT_EQ(forwarded[0], "--request");
+  EXPECT_NE(forwarded[1].find("页面 'one'.html"), std::string::npos);
+  EXPECT_NE(forwarded[1].find(pagx::cli::CurrentExecutablePath()), std::string::npos);
+  EXPECT_EQ(forwarded[1].find("/unrelated/pagx"), std::string::npos);
+  EXPECT_NE(forwarded[1].find("\"pagxImages\":\"embed\""), std::string::npos);
+  EXPECT_NE(forwarded[1].find("\"doRender\":true"), std::string::npos);
 }
 
-TEST_F(PAGXNodeToolTest, CaptureWithNoOptionsStillPassesInvokingBinary) {
-  auto recorded = (root / "args").u8string();
-  ScopedEnvironment output("PAGX_TEST_ARGUMENTS", recorded.c_str());
-  ScopedEnvironment node("PAGX_NODE_BIN", "/bin/sh");
-  auto script = WriteRuntime("exit 0\n");
-  ScopedEnvironment configured("PAGX_HTML_CAPTURE_BIN", script.c_str());
-  auto status = RunChild([&] { return CallRun(pagx::cli::RunCapture, {"capture"}); });
-  ASSERT_TRUE(WIFEXITED(status));
-  EXPECT_EQ(WEXITSTATUS(status), 0);
-  EXPECT_EQ(ReadArguments(recorded),
-            (std::vector<std::string>{"--pagx-bin", pagx::cli::CurrentExecutablePath()}));
+TEST_F(PAGXNodeToolTest, InvalidImportArgumentsNeverStartNode) {
+  ScopedEnvironment node("PAGX_NODE_BIN", "/missing-node");
+  for (const auto& args : std::vector<std::vector<std::string>>{
+           {"import"},
+           {"import", "page.html", "--scenario", "states.json"},
+           {"import", "page.html", "--html-checkpoint", "ready"},
+           {"import", "page.html", "--preview", "--no-resolve"},
+           {"import", "page.svg", "--html-browser-engine", "puppeteer"}}) {
+    CaptureError error;
+    EXPECT_EQ(CallRun(pagx::cli::RunImport, args), 2);
+    EXPECT_EQ(error.str().find("start Node"), std::string::npos);
+  }
 }
 
 TEST_F(PAGXNodeToolTest, SingleDocumentSnapshotPreservesQuotedArguments) {

@@ -6,7 +6,7 @@
 // intermediate flat HTML.
 //
 // The on-disk pipeline (snapshot.js → pagx import → resolve → render) used by
-// the html2pagx CLI and eval/run.js lives in `lib/pipeline.ts`; that module
+// the pagx import CLI and eval/run.js lives in `lib/pipeline.ts`; that module
 // also exposes a `filterKnownWarnings` helper that mirrors what we do here
 // for stderr cleanup, so the two stay aligned.
 //
@@ -27,7 +27,7 @@ import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 
-// Recover the `<repo-root>/cmake-build-debug/pagx` path the way html2pagx
+// Recover the `<repo-root>/cmake-build-debug/pagx` path the way pagx import
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
 // canonical local-dev location. We don't verify the file exists here —
 // servers may legitimately boot without a pagx build (PAGX-format requests
