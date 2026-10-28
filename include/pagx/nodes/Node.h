@@ -226,6 +226,10 @@ enum class NodeType {
    */
   HueSaturationFilter,
   /**
+   * A brightness/contrast filter (spec 7.5).
+   */
+  BrightnessContrastFilter,
+  /**
    * A mask path entry in a layer's mask list (spec 7.6).
    */
   MaskPath,

@@ -29,6 +29,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -1644,6 +1645,17 @@ LayerFilter* ReadLayerFilterTag(
       if (hasAntialias) {
         filter->antialias = static_cast<RadialBlurAntialias>(tagStream->readUint8());
       }
+      return filter;
+    }
+    case TagCode::BrightnessContrastFilter: {
+      auto* filter = context->document->makeNode<BrightnessContrastFilter>();
+      PAGAttributeBlockReader reader(tagStream, 3);
+      bool hasBrightness = reader.flag(0);
+      bool hasContrast = reader.flag(1);
+      filter->useOldVersion = reader.flag(2);
+      tagStream->alignWithBytes();
+      if (hasBrightness) filter->brightness = tagStream->readFloat();
+      if (hasContrast) filter->contrast = tagStream->readFloat();
       return filter;
     }
     case TagCode::HueSaturationFilter: {

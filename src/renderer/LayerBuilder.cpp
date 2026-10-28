@@ -27,6 +27,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
@@ -85,6 +86,7 @@
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/TextUtils.h"
+#include "renderer/BrightnessContrastLayerFilter.h"
 #include "renderer/BulgeLayerFilter.h"
 #include "renderer/CornerPinLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
@@ -3596,6 +3598,26 @@ class LayerBuilderContext {
     WriteCornerPinFilterCorner(object, value, mix, 3, false);
   }
 
+  static void WriteBrightnessContrastFilterBrightness(void* object, const KeyValue& value,
+                                                      float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BrightnessContrastLayerFilter*>(object);
+    filter->setBrightness(MixFloat(filter->brightness(), *v, mix));
+  }
+
+  static void WriteBrightnessContrastFilterContrast(void* object, const KeyValue& value,
+                                                    float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<BrightnessContrastLayerFilter*>(object);
+    filter->setContrast(MixFloat(filter->contrast(), *v, mix));
+  }
+
   static void WriteHueSaturationFilterValue(void* object, const KeyValue& value, float mix,
                                             int field) {
     auto* v = std::get_if<float>(&value);
@@ -3684,6 +3706,15 @@ class LayerBuilderContext {
     }
     auto* filter = static_cast<GlowLayerFilter*>(object);
     filter->setGlowIntensity(MixFloat(filter->glowIntensity(), *v, mix));
+  }
+
+  void bindBrightnessContrastFilterChannels(const BrightnessContrastFilter* node) {
+    _result.binding.setAccessor(
+        node, "brightness", WriteBrightnessContrastFilterBrightness,
+        ReadScalar<BrightnessContrastLayerFilter, &BrightnessContrastLayerFilter::brightness>);
+    _result.binding.setAccessor(
+        node, "contrast", WriteBrightnessContrastFilterContrast,
+        ReadScalar<BrightnessContrastLayerFilter, &BrightnessContrastLayerFilter::contrast>);
   }
 
   void bindHueSaturationFilterChannels(const HueSaturationFilter* node) {
@@ -4245,6 +4276,13 @@ class LayerBuilderContext {
             tgfx::BlurFilter::Make(filter->blurX, filter->blurY, ToTGFX(filter->tileMode));
         _result.binding.set(filter, tgfxFilter);
         bindBlurFilterChannels(filter);
+        return tgfxFilter;
+      }
+      case NodeType::BrightnessContrastFilter: {
+        auto filter = static_cast<const BrightnessContrastFilter*>(node);
+        auto tgfxFilter = BrightnessContrastLayerFilter::Make(filter->brightness, filter->contrast);
+        _result.binding.set(filter, tgfxFilter);
+        bindBrightnessContrastFilterChannels(filter);
         return tgfxFilter;
       }
       case NodeType::HueSaturationFilter: {

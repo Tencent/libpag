@@ -32,6 +32,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -2667,6 +2668,22 @@ void WriteRadialBlurFilterTag(pag::EncodeStream* stream, RadialBlurFilter* filte
 }
 
 // MosaicFilter tag (spec 7.5 #586).
+// BrightnessContrastFilter tag (spec 7.5 #590): attribute flags over the three values.
+void WriteBrightnessContrastFilterTag(pag::EncodeStream* stream, BrightnessContrastFilter* filter,
+                                      EncodeState* state) {
+  PAGAttributeBlockWriter writer(&state->streamContext);
+  writer.writeFlag(filter->brightness != 0.0f);
+  writer.writeFlag(filter->contrast != 0.0f);
+  writer.writeFlag(filter->useOldVersion);
+  auto* v = writer.valueStream();
+  if (filter->brightness != 0.0f) v->writeFloat(filter->brightness);
+  if (filter->contrast != 0.0f) v->writeFloat(filter->contrast);
+  auto block = writer.release();
+  WritePAGTagHeader(stream, TagCode::BrightnessContrastFilter,
+                    static_cast<uint32_t>(block->length()));
+  stream->writeBytes(const_cast<uint8_t*>(block->data()), static_cast<uint32_t>(block->length()));
+}
+
 // HueSaturationFilter tag (spec 7.5 #589): attribute flags over the seven values.
 void WriteHueSaturationFilterTag(pag::EncodeStream* stream, HueSaturationFilter* filter,
                                  EncodeState* state) {
@@ -2794,6 +2811,10 @@ void WriteLayerFilterTag(pag::EncodeStream* stream, LayerFilter* filter, EncodeS
       break;
     case NodeType::HueSaturationFilter:
       WriteHueSaturationFilterTag(stream, static_cast<HueSaturationFilter*>(filter), state);
+      break;
+    case NodeType::BrightnessContrastFilter:
+      WriteBrightnessContrastFilterTag(stream, static_cast<BrightnessContrastFilter*>(filter),
+                                       state);
       break;
     default:
       break;

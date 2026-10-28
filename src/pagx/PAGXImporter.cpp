@@ -33,6 +33,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -227,6 +228,8 @@ static GlowFilter* ParseGlowFilter(const DOMNode* node, PAGXDocument* doc);
 static DisplacementMapFilter* ParseDisplacementMapFilter(const DOMNode* node, PAGXDocument* doc);
 static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument* doc);
 static MosaicFilter* ParseMosaicFilter(const DOMNode* node, PAGXDocument* doc);
+static BrightnessContrastFilter* ParseBrightnessContrastFilter(const DOMNode* node,
+                                                               PAGXDocument* doc);
 static HueSaturationFilter* ParseHueSaturationFilter(const DOMNode* node, PAGXDocument* doc);
 
 // A `mask="@id"` reference whose target Layer was not yet registered when the owning Layer was
@@ -969,6 +972,9 @@ static LayerFilter* ParseLayerFilter(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "RadialBlurFilter") {
     return ParseRadialBlurFilter(node, doc);
+  }
+  if (node->name == "BrightnessContrastFilter") {
+    return ParseBrightnessContrastFilter(node, doc);
   }
   if (node->name == "HueSaturationFilter") {
     return ParseHueSaturationFilter(node, doc);
@@ -2868,6 +2874,20 @@ static RadialBlurFilter* ParseRadialBlurFilter(const DOMNode* node, PAGXDocument
   filter->center = GetPointAttribute(node, "center", Default<RadialBlurFilter>().center, doc);
   filter->mode = GET_ENUM(node, "mode", "spin", doc, RadialBlurMode);
   filter->antialias = GET_ENUM(node, "antialias", "low", doc, RadialBlurAntialias);
+  return filter;
+}
+
+static BrightnessContrastFilter* ParseBrightnessContrastFilter(const DOMNode* node,
+                                                               PAGXDocument* doc) {
+  auto filter = makeNodeFromXML<BrightnessContrastFilter>(node, doc);
+  if (filter != nullptr) {
+    filter->brightness =
+        GetFloatAttribute(node, "brightness", Default<BrightnessContrastFilter>().brightness, doc);
+    filter->contrast =
+        GetFloatAttribute(node, "contrast", Default<BrightnessContrastFilter>().contrast, doc);
+    filter->useOldVersion = GetBoolAttribute(
+        node, "useOldVersion", Default<BrightnessContrastFilter>().useOldVersion, doc);
+  }
   return filter;
 }
 

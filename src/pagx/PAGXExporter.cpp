@@ -27,6 +27,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -1693,6 +1694,19 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       if (filter->antialias != Default<RadialBlurFilter>().antialias) {
         xml.addAttribute("antialias", RadialBlurAntialiasToString(filter->antialias));
       }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::BrightnessContrastFilter: {
+      auto filter = static_cast<const BrightnessContrastFilter*>(node);
+      xml.openElement("BrightnessContrastFilter");
+      xml.addAttribute("id", filter->id);
+      xml.addAttribute("brightness", filter->brightness,
+                       Default<BrightnessContrastFilter>().brightness);
+      xml.addAttribute("contrast", filter->contrast, Default<BrightnessContrastFilter>().contrast);
+      xml.addAttribute("useOldVersion", filter->useOldVersion,
+                       Default<BrightnessContrastFilter>().useOldVersion);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

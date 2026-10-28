@@ -23,6 +23,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorStop.h"
@@ -83,6 +84,9 @@ void MigrateMotionTileEffectAnimation(pag::MotionTileEffect* effect, float frame
                                       PAGXDocument* document, AnimationObject* object);
 void MigrateLevelsIndividualEffectAnimation(pag::LevelsIndividualEffect* effect, float frameRate,
                                             PAGXDocument* document, AnimationObject* object);
+void MigrateBrightnessContrastEffectAnimation(pag::BrightnessContrastEffect* effect,
+                                              float frameRate, PAGXDocument* document,
+                                              AnimationObject* object);
 void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float frameRate,
                                          PAGXDocument* document, AnimationObject* object);
 
@@ -896,15 +900,34 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
-// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile, LevelsIndividual and
-// HueSaturation effects map to their filter nodes (animated properties join the composition
-// animation). Other effect types report an issue until their phase-3 filters land.
+// mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile, LevelsIndividual,
+// HueSaturation and BrightnessContrast effects map to their filter nodes (animated properties
+// join the composition animation). Other effect types report an issue until their phase-3
+// filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::HueSaturation) {
+    if (effect->type() == pag::EffectType::BrightnessContrast) {
+      auto* legacy = static_cast<pag::BrightnessContrastEffect*>(effect);
+      auto* bc = state->document->makeNode<BrightnessContrastFilter>(
+          "pag-legacy-brightness-" + std::to_string(legacy->uniqueID));
+      bc->brightness = PropertyValueAtStart(legacy->brightness, legacyLayer->startTime, nullptr);
+      bc->contrast = PropertyValueAtStart(legacy->contrast, legacyLayer->startTime, nullptr);
+      bc->useOldVersion =
+          PropertyValueAtStart(legacy->useOldVersion, legacyLayer->startTime, nullptr) != 0;
+      layer->filters.push_back(bc);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = bc->id;
+        MigrateBrightnessContrastEffectAnimation(legacy, state->currentFrameRate, state->document,
+                                                 object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::HueSaturation) {
       auto* legacy = static_cast<pag::HueSaturationEffect*>(effect);
       auto* hs = state->document->makeNode<HueSaturationFilter>("pag-legacy-huesat-" +
                                                                 std::to_string(legacy->uniqueID));

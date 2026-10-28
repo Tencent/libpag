@@ -552,6 +552,30 @@ void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float
   }
 }
 
+// BrightnessContrast effect channels (spec 7.5): brightness and contrast animate as float
+// channels. The useOldVersion flag is data-only (the legacy renderer ignores it). Legacy
+// effect keyframes are composition-absolute, so raw keyframe times carry over without a layer
+// offset.
+void MigrateBrightnessContrastEffectAnimation(pag::BrightnessContrastEffect* effect,
+                                              float frameRate, PAGXDocument* document,
+                                              AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  pag::Property<float>* properties[2] = {effect->brightness, effect->contrast};
+  const char* channelNames[2] = {"brightness", "contrast"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = properties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = channelNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,

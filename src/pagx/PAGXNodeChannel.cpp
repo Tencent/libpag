@@ -26,6 +26,7 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/BrightnessContrastFilter.h"
 #include "pagx/nodes/BulgeFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
@@ -981,6 +982,14 @@ static std::vector<ChannelDef> BuildBulgeFilterFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildBrightnessContrastFilterFields() {
+  return {
+      FIELD_FLOAT(BrightnessContrastFilter, "brightness", brightness, Anim),
+      FIELD_FLOAT(BrightnessContrastFilter, "contrast", contrast, Anim),
+      FIELD_BOOL(BrightnessContrastFilter, "useOldVersion", useOldVersion, NoFlags),
+  };
+}
+
 static std::vector<ChannelDef> BuildHueSaturationFilterFields() {
   return {
       FIELD_FLOAT(HueSaturationFilter, "hue", hue, Anim),
@@ -1229,6 +1238,10 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::BulgeFilter: {
       static const std::vector<ChannelDef> table = BuildBulgeFilterFields();
+      return table;
+    }
+    case NodeType::BrightnessContrastFilter: {
+      static const std::vector<ChannelDef> table = BuildBrightnessContrastFilterFields();
       return table;
     }
     case NodeType::HueSaturationFilter: {
