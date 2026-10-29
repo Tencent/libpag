@@ -91,7 +91,12 @@
             TGFXBind(module);
             // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
             // both the Asyncify and non-Asyncify cases.
-            const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
+            // Support a gtest filter through the URL (e.g. index.html?filter=PAGTypefaceCacheTest.*)
+            // for fast single-suite iteration without rebuilding.
+            const filter = new URLSearchParams(window.location.search).get('filter');
+            const result = filter
+                ? await module.ccall('RunTest', 'number', ['string'], [filter], {async: true})
+                : await module.ccall('RunAllTests', 'number', [], [], {async: true});
             console.log('All tests finished with exit code:', result);
         } catch (e) {
             console.error('Test execution failed:', e && e.stack ? e.stack : e);
