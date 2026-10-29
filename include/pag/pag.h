@@ -1635,7 +1635,9 @@ class PAG_API PAGDecoder {
   /**
    * Reads pixels of the image frame at the given index into the specified memory address. Returns
    * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
-   * the same throughout every reading call. Otherwise, it may return false.
+   * the same throughout every reading call. Otherwise, it may return false. When a frame render
+   * fails, the decoder enters a cooldown and returns false immediately for any frame not yet
+   * cached on disk until the cooldown elapses, instead of re-rendering on every call.
    */
   bool readFrame(int index, void* pixels, size_t rowBytes,
                  ColorType colorType = ColorType::RGBA_8888,
@@ -1644,7 +1646,9 @@ class PAG_API PAGDecoder {
   /**
    * Reads pixels of the image frame at the given index into the specified HardwareBuffer. Returns
    * false if failed. Reading image frames into HardwareBuffer usually has better performance than
-   * reading into memory.
+   * reading into memory. When a frame render fails, the decoder enters a cooldown and returns false
+   * immediately for any frame not yet cached on disk until the cooldown elapses, instead of
+   * re-rendering on every call.
    */
   bool readFrame(int index, HardwareBufferRef hardwareBuffer);
 
