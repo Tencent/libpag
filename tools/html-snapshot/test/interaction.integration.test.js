@@ -95,6 +95,30 @@ nativeTest('selected checkpoint named preview is safe at scale 2 and on repeated
   expect([sheet.width,sheet.height]).toEqual([384,316]);
 });
 
+nativeTest('warnings preserve editable content and all checkpoints through native import', async () => {
+  const fixture = path.join(output, 'partial.html'), plan = path.join(output, 'partial.json');
+  fs.writeFileSync(fixture, `<!doctype html><body style="font:14px Arial">
+    <custom-box style="display:block">Retained content</custom-box>
+    <img id="broken" width="20" height="20" src="data:image/png;base64,invalid">
+    <button id="next" onclick="document.querySelector('#status').textContent='Updated'">Next</button>
+    <p id="status">Initial</p></body>`);
+  fs.writeFileSync(plan, JSON.stringify({ version: 1, viewport: { width: 320, height: 200 }, steps: [
+    { type: 'capture', name: 'initial' },
+    { type: 'click', target: { css: '#next' } },
+    { type: 'capture', name: 'updated' },
+  ] }));
+  await run(pagx, ['import', fixture, '--html-scenario', plan, '--output-dir', output, '--html-keep-subset']);
+  const manifest = JSON.parse(fs.readFileSync(path.join(output, 'partial.captures.json'), 'utf8'));
+  expect(manifest.status).toBe('complete');
+  expect(manifest.outputs.map(item => item.name)).toEqual(['initial', 'updated']);
+  for (const item of manifest.outputs) {
+    expect(item.warnings).toEqual(expect.arrayContaining([expect.stringContaining('img#broken')]));
+    expect(fs.readFileSync(item.subsetHtml, 'utf8')).not.toContain('base64,invalid');
+    expect(fs.readFileSync(item.pagx, 'utf8')).toContain('Retained content');
+  }
+  expect(fs.readFileSync(manifest.outputs[1].pagx, 'utf8')).toContain('Updated');
+});
+
 nativeTest('downloaded snapshot images resolve and render through the native pipeline',async()=>{
   const png=new PNG({width:10,height:10});
   for(let i=0;i<png.data.length;i+=4)png.data.set([255,0,0,255],i);
@@ -160,6 +184,14 @@ test('HTTP accepts a selected checkpoint and rejects ambiguous/invalid scenarios
     expect((await request({scenario:spec})).status).toBe(400);
     expect((await request({scenario:spec,checkpoint:'missing'})).status).toBe(400);
     expect((await request({scenario:spec,checkpoint:'advanced',captureAnimations:true})).status).toBe(400);
+    const partial = await fetch(origin+'/snapshot', { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({html:'<!doctype html><custom-box style="display:block">Kept</custom-box><img id="broken" width="10" height="10" src="data:image/png;base64,invalid">',
+        format:'html', options:{scenario:{version:1,steps:[{type:'capture',name:'partial'}]}}}) });
+    expect(partial.status).toBe(200);
+    const partialBody = await partial.json();
+    expect(partialBody.html).toContain('Kept');
+    expect(partialBody.warnings).toEqual(expect.arrayContaining([expect.stringContaining('img#broken')]));
+    expect(Number(partial.headers.get('X-Snapshot-Warnings'))).toBe(partialBody.warnings.length);
   } finally {
     const done = new Promise(resolve => child.once('exit',resolve));
     child.kill('SIGTERM'); await done;

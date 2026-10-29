@@ -4,8 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { launchBrowser } = require('../dist/lib/browser-engine');
-const { runScenario } = require('../dist/lib/interaction');
+const { launchBrowser, newPage } = require('../dist/lib/browser-engine');
+const { runScenario, waitForCaptureReady } = require('../dist/lib/interaction');
 jest.setTimeout(60000);
 // Capturing also starts the mirror browser. Use the production capture budget;
 // action timeout regressions below still exercise their explicit short deadlines.
@@ -80,6 +80,49 @@ describe.each(['puppeteer', 'playwright'])('%s interaction regressions', engine 
     await expect(run(html, [action, capture], { onCheckpoint })).rejects.toThrow(message);
     expect(onCheckpoint).not.toHaveBeenCalled();
     expect(contexts()).toBe(before);
+  });
+
+  test.each(['viewport', 'document'])('%s captures continue past missing images and embedded content', async extent => {
+    const results = await run(`<!doctype html><body style="font:12px Arial">
+      <custom-box style="display:block"><span>Retained child</span></custom-box>
+      <img id="broken" width="20" height="20" src="data:image/png;base64,invalid">
+      <iframe style="width:40px;height:30px" srcdoc="<p>Embedded</p>"></iframe>
+      <button id="next" onclick="document.querySelector('#status').textContent='Updated'">Next</button>
+      <p id="status">Initial</p>`, [
+      { ...capture, name: 'initial', extent },
+      { type: 'click', target: { css: '#next' } },
+      { type: 'waitFor', target: { css: '#status' }, text: 'Updated' },
+      { ...capture, name: 'updated', extent },
+    ]);
+    expect(results.map(result => result.name)).toEqual(['initial', 'updated']);
+    for (const result of results) {
+      expect(result.html).toContain('Retained child');
+      expect(result.html).not.toContain('base64,invalid');
+      expect(result.warnings).toEqual(expect.arrayContaining([
+        expect.stringContaining('img#broken'), expect.stringContaining('iframe'), expect.stringContaining('custom-box'),
+      ]));
+      expect(result.warnings.length).toBe(new Set(result.warnings).size);
+    }
+    expect(results[1].html).toContain('Updated');
+  });
+
+  test('image decode failures warn while decode and stability deadlines remain errors', async () => {
+    const page = await newPage(handle, { viewport: { width: 320, height: 200 } });
+    try {
+      await page.setContent('<!doctype html><img id="image" width="10" height="10">');
+      // Use a valid completed image, then exercise the browser decode failure path.
+      await page.evaluate(async () => {
+        const img = document.querySelector('#image');
+        img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+        await img.decode();
+        img.decode = () => Promise.reject(new DOMException('Unsupported bytes', 'EncodingError'));
+      });
+      expect(await waitForCaptureReady(page, 2000, 0)).toEqual(['img#image: image decode failed: Unsupported bytes']);
+      await page.evaluate(() => { document.querySelector('#image').decode = () => new Promise(() => {}); });
+      await expect(waitForCaptureReady(page, 100, 0)).rejects.toThrow('Image decode timed out');
+      await page.evaluate(() => { document.querySelector('#image').remove(); });
+      await expect(waitForCaptureReady(page, 100, 500)).rejects.toThrow('Capture readiness timed out');
+    } finally { await page.close(); }
   });
 
   test('consumer failures retain the checkpoint diagnostic and close the source context', async () => {

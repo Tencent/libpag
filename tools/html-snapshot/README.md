@@ -174,13 +174,13 @@ pass a reusable `mirror` engine handle from a **separate** browser process.
 
 Viewport capture preserves the current view. `extent: 'document'` captures the current
 materialized document without scrolling to load more content (maximum height 16384px;
-larger documents fail instead of truncating). Embedded frames, custom elements/shadow
-roots, native details/dialog/media elements, browser top-layer content and native non-text
-inputs currently report an error.
-`unsupported: 'rasterize'` explicitly allows a whole-viewport PNG fallback, reported in
-`warnings`; document capture does not use this fallback. Ordinary HTML/CSS retains the
-existing importer's rendering support and limitations. This API captures a static state;
-the caller decides when the application is ready.
+larger documents fail instead of truncating). Capture is best effort: runtime content that
+cannot be represented, native control/top-layer appearance limitations, and static-copy
+layout differences are reported in `warnings` while supported content is still exported.
+Embedded documents/media become inert layout placeholders; custom elements retain their
+light-DOM children. Neither extent uses a whole-page screenshot fallback. Ordinary HTML/CSS
+retains the existing importer's rendering support and limitations. This API captures a static
+state; the caller decides when the application is ready.
 
 The browser bundle also exports `collectCurrentState()` so a user-operated page can send
 its captured state to a Node host using `renderCapturedPage()`. The older `takeSnapshot()`
@@ -189,20 +189,22 @@ continues to use the original page-normalizing behavior.
 The collector freezes readable image/canvas pixels and uses captured response bytes for
 cross-origin images and CSS assets. Scenario execution attaches `StateResources` before
 navigation, retaining assets loaded after interactions and replacing earlier responses
-to the same URL. The isolated renderer rejects uncaptured external resources instead of
-refetching them with a different login session. SDK callers can attach
+to the same URL. Missing image/CSS resource references are omitted with warnings, and the
+isolated renderer blocks remaining external requests instead of refetching them with a
+different login session. SDK callers can attach
 `StateResources.onResponse` before navigation and pass `resources: await cache.snapshot(timeoutMs)`
 to `captureCurrentPage`; the browser-only collector accepts `{urls, stylesheets}` maps
-containing data URLs and captured CSS text. Missing resources can also trigger the explicit
-viewport raster fallback. Runtime `FontFace` objects without a readable CSS declaration
-require that fallback. Browser-only collection does not include a fallback screenshot.
+containing data URLs and captured CSS text. Unavailable font sources are removed while
+available alternatives are retained. Runtime `FontFace` objects without a captured CSS
+definition produce warnings and use font fallbacks. The version-1 browser payload retains
+its `unsupported` diagnostic list; `renderCapturedPage()` merges it into result warnings.
 
 Use `--download-fonts` for native render fallbacks, or `pagx import --html-embed-fonts` for portable
 PAGX fonts; structured snapshots warn when web fonts require this handling. `--download-images`
 writes captured image bytes to disk. These options also apply to scenario execution.
 The source application remains running during collection: `stableMs` detects visual
-settling, not a completed business transaction. For continuously moving pages, a raster
-fallback is sampled immediately after DOM collection and can represent an adjacent frame.
+settling, not a completed business transaction. Setting `stableMs: 0` allows a moving state
+to be sampled but does not freeze it or guarantee repeatable animation frames.
 The existing subset renderer's CSS/text/compositing limitations still apply; a structured
 capture does not guarantee pixel identity for arbitrary CSS or WebGL surfaces.
 
@@ -212,7 +214,8 @@ scenario contains a `steps` array and optional `viewport`, `timeoutMs` (default 
 `type`, `press`, `hover`, `focus`, `check`, `select`, `scroll`, `waitFor` and `capture`.
 Targets specify exactly one of `css`, `testId`, or `role` (with optional exact `name`;
 role locators require Playwright). An optional `frame` CSS selector scopes a target to
-one iframe. Capturing iframe content itself still requires the raster fallback.
+one iframe. Its embedded document is omitted during capture with a warning; targeting a
+frame does not extend the subset emitter's rendering capabilities.
 
 `waitFor` takes exactly one of `state` (`visible`, `hidden`, `attached`, `detached`),
 `attribute: {name, value}`, exact `text`, or exact `url` (relative URLs are allowed).
@@ -220,7 +223,8 @@ one iframe. Capturing iframe content itself still requires the raster fallback.
 value, while `type` sends individual keystrokes. `check` takes a boolean `value`;
 `select` takes an option value. `scroll` takes `x`/`y` and an optional target container.
 Every step can override `timeoutMs`. `capture` requires a unique filesystem-safe `name`
-and accepts `extent` and `unsupported` as above. Unknown fields are errors.
+and accepts `extent` as above. Unknown fields are errors. The old capture `unsupported`
+option has been removed; remove it from existing scenarios and SDK capture options.
 
 All steps share one page in a fresh isolated context. Captures never reload that page.
 The CLI and HTTP entry points dedicate a browser process to each active scenario so
@@ -228,9 +232,14 @@ concurrent sessions cannot change one another's window focus. SDK callers should
 use a dedicated source browser per concurrent scenario.
 Passing `options.checkpoint` runs only through the selected capture; otherwise results
 are returned in capture order. Business readiness belongs in explicit `waitFor` steps.
-Before capture the runner waits for visible images, fonts and stable visible geometry;
+Before capture the runner waits for visible images, fonts and stable visible geometry.
+Images that have already failed to load/decode produce warnings instead of aborting the
+scenario. Pending-resource, stability and explicit business-wait deadlines remain errors;
 set `stableMs: 0` when deliberately capturing continuous motion. Input actions are not
 replayed after a failed readiness condition. Errors include the failed step number.
+Warnings are retained per checkpoint in SDK/HTTP results and the export manifest, and
+printed by the CLI. A `complete` manifest confirms execution and output generation;
+consumers must inspect warnings when visual completeness matters.
 
 Use the checked-in `test/fixtures/interaction.scenario.json` with native import:
 
@@ -328,7 +337,7 @@ For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
 `checkpoint` and `warnings`; multiple captures require a checkpoint. Invalid scenario
 syntax, conflicting options and unknown checkpoints return HTTP 400 before execution.
-The result is an editable static state (or an explicitly requested raster fallback), not
+The result contains the supported editable static content and capture warnings, not
 the application's event handlers, component state or a replayable interaction runtime.
 
 ### Snapshot CLI

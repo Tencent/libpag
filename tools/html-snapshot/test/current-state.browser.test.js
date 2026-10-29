@@ -79,14 +79,13 @@ test('captures current values, hover, animation and scrolling without mutating t
   } finally { await page.close(); }
 });
 
-test('reports unsupported content and permits an explicit composited viewport fallback', async () => {
+test('reports unsupported control appearance and retains the surrounding content', async () => {
   const page = await newPage(source, { viewport: { width:320, height:200 } });
   try {
-    await page.setContent('<input type="checkbox" checked>');
-    await expect(captureCurrentPage(page, { mirror })).rejects.toThrow('checkbox control');
-    const result = await captureCurrentPage(page, { mirror, unsupported:'rasterize' });
-    expect(result.html).toContain('data:image/png;base64,');
-    expect(result.warnings).toHaveLength(1);
+    await page.setContent('<input type="checkbox" checked><p>Editable content</p>');
+    const result = await captureCurrentPage(page, { mirror });
+    expect(result.html).toContain('Editable content');
+    expect(result.warnings).toEqual(expect.arrayContaining([expect.stringContaining('checkbox control')]));
   } finally { await page.close(); }
 });
 
@@ -120,14 +119,14 @@ test('document extent keeps the current materialized document and root scroll in
   } finally {await page.close();}
 });
 
-test('missing CSS resources report an error or use the explicit viewport fallback',async()=>{
+test('missing CSS resources are omitted with a warning while text is retained',async()=>{
   const page=await newPage(source,{viewport:{width:320,height:200}});
   try {
-    await page.setContent('<!doctype html><div style="width:100px;height:100px;background-image:url(http://127.0.0.1:1/image.png)"></div>');
-    await expect(captureCurrentPage(page,{mirror})).rejects.toThrow('uncaptured resources');
-    const result=await captureCurrentPage(page,{mirror,unsupported:'rasterize'});
-    expect(result.warnings[0]).toContain('uncaptured resources');
-    expect(result.html).toContain('data:image/png;base64,');
+    await page.setContent('<!doctype html><div style="width:100px;height:100px;background-image:url(http://127.0.0.1:1/image.png)">Retained text</div>');
+    const result=await captureCurrentPage(page,{mirror});
+    expect(result.warnings).toContain('Uncaptured resource omitted: http://127.0.0.1:1/image.png');
+    expect(result.html).toContain('Retained text');
+    expect(result.html).not.toContain('http://127.0.0.1:1/image.png');
   } finally {await page.close();}
 });
 

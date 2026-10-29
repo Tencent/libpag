@@ -34,7 +34,9 @@ test.each([
   [scenario([{ type: 'waitFor', target, attribute: { name: '', value: '' } }, capture]), /non-empty string/],
   [scenario([{ type: 'waitFor', target, attribute: { name: 'ready', value: true } }, capture]), /value must be a string/],
   [scenario([{ ...capture, extent: 'all' }]), /invalid extent/],
-  [scenario([{ ...capture, unsupported: 'ignore' }]), /invalid unsupported policy/],
+  [scenario([{ ...capture, unsupported: 'ignore' }]), /unknown field 'unsupported'/],
+  [scenario([{ ...capture, unsupported: 'error' }]), /unknown field 'unsupported'/],
+  [scenario([{ ...capture, unsupported: 'rasterize' }]), /unknown field 'unsupported'/],
   [scenario([{ ...capture, name: 'a'.repeat(81) }]), /invalid checkpoint name/],
   [scenario([{ type: 'click', target }]), /1–32 named capture/],
   [scenario(Array.from({ length: 33 }, (_, i) => ({ ...capture, name: `state${i}` }))), /1–32 named capture/],
@@ -63,7 +65,7 @@ test('accepts boundary values and empty form/text conditions without changing ca
     { type: 'scroll', x: -10000000, y: 10000000 },
     { type: 'waitFor', url: '#next' }, { type: 'waitFor', target, text: '' },
     { type: 'waitFor', target, attribute: { name: 'data-ready', value: '' } },
-    { ...capture, extent: 'document', unsupported: 'rasterize', timeoutMs: 300000 },
+    { ...capture, extent: 'document', timeoutMs: 300000 },
   ];
   const input = { ...scenario(steps), viewport: { width: 1, height: 16384 },
     timeoutMs: 600000, stepTimeoutMs: 300000, stableMs: 0 };

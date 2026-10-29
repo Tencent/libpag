@@ -30,7 +30,6 @@ export interface Step {
   text?: string;
   url?: string;
   extent?: CaptureOptions['extent'];
-  unsupported?: CaptureOptions['unsupported'];
   timeoutMs?: number;
 }
 
@@ -98,7 +97,7 @@ export function parseScenario(input: unknown): Scenario {
     press: ['target', 'key', 'url'], hover: ['target'], focus: ['target'],
     check: ['target', 'value'], select: ['target', 'value'], scroll: ['target', 'x', 'y'],
     waitFor: ['target', 'state', 'attribute', 'text', 'url'],
-    capture: ['name', 'extent', 'unsupported'],
+    capture: ['name', 'extent'],
   };
   const names = new Set<string>();
   for (const key of ['width', 'height']) {
@@ -153,7 +152,6 @@ export function parseScenario(input: unknown): Scenario {
       if (names.has(name)) throw new Error(`${label}: duplicate checkpoint '${name}'`);
       names.add(name);
       if (step.extent !== undefined && !['viewport', 'document'].includes(String(step.extent))) throw new Error(`${label}: invalid extent`);
-      if (step.unsupported !== undefined && !['error', 'rasterize'].includes(String(step.unsupported))) throw new Error(`${label}: invalid unsupported policy`);
     }
     return { ...step } as unknown as Step;
   });
@@ -315,8 +313,8 @@ async function perform(page: Page, engine: string, step: Step, timeoutMs: number
 
 /** Resource and layout readiness is bounded; explicit waitFor steps express business readiness. */
 export async function waitForCaptureReady(page: Page, timeoutMs: number, stableMs: number,
-  extent = 'viewport'): Promise<void> {
-  await page.evaluate(async (cfg: { timeoutMs: number; stableMs: number; extent: string }) => {
+  extent = 'viewport'): Promise<string[]> {
+  return page.evaluate(async (cfg: { timeoutMs: number; stableMs: number; extent: string }) => {
     const deadline = performance.now() + cfg.timeoutMs;
     let last = '', since = performance.now();
     while (performance.now() < deadline) {
@@ -339,14 +337,27 @@ export async function waitForCaptureReady(page: Page, timeoutMs: number, stableM
       }));
       if (fingerprint !== last || !resourceReady) { since = performance.now(); last = fingerprint; }
       if (resourceReady && performance.now() - since >= cfg.stableMs) {
-        if (images.some(img => !img.naturalWidth)) throw new Error('Visible image failed to load');
+        const warnings: string[] = [];
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-          await Promise.race([Promise.all(images.map(img => img.decode())), new Promise((_, reject) => {
+          await Promise.race([Promise.all(images.map(async img => {
+            const label = `img${img.id ? `#${img.id}` : ''}`;
+            if (!img.naturalWidth) {
+              if (img.currentSrc || img.getAttribute('src') || img.getAttribute('srcset')) {
+                warnings.push(`${label}: image is not decoded; image omitted`);
+              }
+              return;
+            }
+            try { await img.decode(); }
+            catch (error) {
+              if (!(error instanceof DOMException) || error.name !== 'EncodingError') throw error;
+              warnings.push(`${label}: image decode failed: ${error.message}`);
+            }
+          })), new Promise((_, reject) => {
             timer = setTimeout(() => reject(new Error('Image decode timed out')), Math.max(1, deadline - performance.now()));
           })]);
         } finally { if (timer) clearTimeout(timer); }
-        return;
+        return Array.from(new Set(warnings));
       }
       await new Promise(resolve => setTimeout(resolve, 30));
     }
@@ -405,7 +416,7 @@ export async function runScenario(
         const task = (async (): Promise<boolean> => {
           if (step.type === 'capture') {
             if (options.checkpoint && step.name !== options.checkpoint) return false;
-            await waitForCaptureReady(page, remaining(step), scenario.stableMs, step.extent);
+            const readinessWarnings = await waitForCaptureReady(page, remaining(step), scenario.stableMs, step.extent);
             const resources = await resourceCapture.snapshot(remaining(step));
             if (cancelled) throw new Error('Scenario timed out');
             if (!mirror) mirror = await launchBrowser({ engine });
@@ -414,7 +425,7 @@ export async function runScenario(
               throw new Error('Scenario timed out');
             }
             const result: Checkpoint = { ...await captureCurrentPage(page, {
-              mirror, engine, extent: step.extent, unsupported: step.unsupported, timeoutMs: remaining(step),
+              mirror, engine, extent: step.extent, timeoutMs: remaining(step),
               inlineIconFonts: options.inlineIconFonts,
               resources,
             }), name: step.name! };
@@ -435,6 +446,7 @@ export async function runScenario(
                 result.html = result.html.split(urls[index]).join(escaped);
               }
             }
+            result.warnings = Array.from(new Set([...readinessWarnings, ...result.warnings]));
             if (cancelled) throw new Error('Scenario timed out');
             results.push(result);
             if (options.onCheckpoint) await options.onCheckpoint(result);

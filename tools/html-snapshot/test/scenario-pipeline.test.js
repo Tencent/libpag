@@ -56,6 +56,22 @@ test('default export retains its manifest format and does not generate a preview
   expect(readManifest().status).toBe('complete');
 });
 
+test('capture warnings are logged and retained without failing later conversions or the manifest', async () => {
+  const log = jest.fn();
+  runScenario.mockImplementation(async (_, __, ___, opts) => {
+    const results = ['preview', 'last'].map(name => ({ ...checkpoint(name), warnings: ['iframe: embedded content omitted'] }));
+    for (const result of results) await opts.onCheckpoint(result);
+    return results;
+  });
+  await runScenarioToPagx({ ...options, log });
+  expect(readManifest()).toMatchObject({ status: 'complete', outputs: [
+    { name: 'preview', warnings: ['iframe: embedded content omitted'] },
+    { name: 'last', warnings: ['iframe: embedded content omitted'] },
+  ] });
+  expect(runHtmlToPagx).toHaveBeenCalledTimes(2);
+  expect(log).toHaveBeenCalledWith('preview: iframe: embedded content omitted');
+});
+
 test('a capture failure invalidates an earlier successful manifest', async () => {
   await runScenarioToPagx({ ...options, preview: true });
   runScenario.mockRejectedValueOnce(new Error('navigation failed'));

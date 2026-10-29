@@ -15,43 +15,44 @@ afterAll(async () => {
   if (mirror) await mirror.browser.close();
 });
 
-test('raster fallback is well formed and retains the complete viewport pixels', async () => {
+test.each(['viewport', 'document'])('unsupported %s content preserves light DOM without screenshots', async extent => {
   const page = await newPage(source, { viewport: { width: 120, height: 90 } });
   try {
-    await page.setContent('<!doctype html><input type="checkbox" checked><div style="width:40px;height:30px;background:red"></div>');
-    const pixels = PNG.sync.read(Buffer.from(await page.screenshot()));
-    const result = await captureCurrentPage(page, { mirror, unsupported: 'rasterize' });
-    // The 10/19 regression left the <img> start tag open. Check XML parsing as well
-    // as pixels: HTML error recovery can otherwise hide a broken serialization.
-    expect(result.html).toMatch(/<img\s[^>]+\/>/);
-    const valid = await page.evaluate(html => {
-      const xml = new DOMParser().parseFromString(html, 'application/xhtml+xml');
-      return !xml.querySelector('parsererror') && xml.querySelectorAll('img').length === 1;
-    }, result.html);
-    expect(valid).toBe(true);
-    const encoded = result.html.match(/src="data:image\/png;base64,([^\"]+)"/)[1];
-    const raster = PNG.sync.read(Buffer.from(encoded, 'base64'));
-    expect([raster.width, raster.height]).toEqual([120, 90]);
-    expect(raster.data.equals(pixels.data)).toBe(true);
-    await expect(captureCurrentPage(page, { mirror, unsupported: 'rasterize', extent: 'document' }))
-      .rejects.toThrow('checkbox control');
+    await page.setContent(`<!doctype html><body style="height:300px">
+      <custom-box style="display:block"><span>Retained child</span></custom-box>
+      <iframe style="width:40px;height:30px" srcdoc="<script>parent.frameRan=true</script>"></iframe>`);
+    const screenshot = jest.spyOn(page, 'screenshot').mockRejectedValue(new Error('Screenshot must not run'));
+    const state = await page.evaluate(collectCurrentState);
+    expect(state.html).not.toMatch(/<iframe|srcdoc=|<script/);
+    const result = await captureCurrentPage(page, { mirror, extent });
+    expect(result.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')).toContain('Retained child');
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('custom-box'), expect.stringContaining('iframe'),
+    ]));
+    expect(screenshot).not.toHaveBeenCalled();
     await expect(captureCurrentPage(page, { mirror: source })).rejects.toThrow('separate browser');
   } finally { await page.close(); }
 });
 
-test('static copies reject version mismatches and changed geometry without leaking pages', async () => {
+test('static copies warn about geometry and missing nodes while version errors remain fatal', async () => {
   const page = await newPage(source, { viewport: { width: 120, height: 90 } });
   try {
     await page.setContent('<!doctype html><div id="box" style="width:30px;height:20px">text</div>');
     const state = await page.evaluate(collectCurrentState);
     const before = (await mirror.browser.pages()).length;
     await expect(renderCapturedPage(mirror, { ...state, version: 2 })).rejects.toThrow('version');
-    await expect(renderCapturedPage(mirror, { ...state, unsupported: ['unsupported fixture'] })).rejects.toThrow('unsupported fixture');
+    const limited = await renderCapturedPage(mirror, { ...state, unsupported: ['unsupported fixture', 'unsupported fixture'] });
+    expect(limited.warnings).toEqual(['unsupported fixture']);
+    expect(limited.html).toContain('text');
     const box = state.boxes.find(box => box.tag === 'div#box');
     box.rect[2] += 10;
-    await expect(renderCapturedPage(mirror, state)).rejects.toThrow('changed layout');
+    const changed = await renderCapturedPage(mirror, state);
+    expect(changed.warnings).toEqual(expect.arrayContaining([expect.stringContaining('changed layout')]));
+    expect(changed.html).toContain('text');
     box.id = 9999;
-    await expect(renderCapturedPage(mirror, state)).rejects.toThrow('missing from static copy');
+    const missing = await renderCapturedPage(mirror, state);
+    expect(missing.warnings).toEqual(expect.arrayContaining([expect.stringContaining('missing from static copy')]));
+    expect(missing.html).toContain('text');
     expect((await mirror.browser.pages()).length).toBe(before);
   } finally { await page.close(); }
 });
@@ -61,12 +62,15 @@ test('collector retains live form values while removing executable content and a
   try {
     await page.setContent(`<!doctype html><textarea id="text">old</textarea>
       <select id="select"><option selected>a</option><option>b</option></select>
+      <input id="checked" type="checkbox"><input id="unchecked" type="checkbox" checked>
       <input id="input" autofocus value="old" onclick="window.clicked=true">
       <canvas id="canvas" width="10" height="10"></canvas><script>window.executed=1</script>`);
     await page.evaluate(() => {
       document.querySelector('#text').value = 'live <value> & text';
       document.querySelector('#input').value = 'edited';
       document.querySelector('#select').selectedIndex = 1;
+      document.querySelector('#checked').checked = true;
+      document.querySelector('#unchecked').checked = false;
       const ctx = document.querySelector('#canvas').getContext('2d');
       ctx.fillStyle = 'red'; ctx.fillRect(0, 0, 10, 10);
     });
@@ -78,9 +82,79 @@ test('collector retains live form values while removing executable content and a
     expect(await page.evaluate(() => window.executed)).toBe(1);
     const selected = await page.evaluate(html => {
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      return [...doc.querySelectorAll('option')].map(option => option.hasAttribute('selected'));
+      return { options: [...doc.querySelectorAll('option')].map(option => option.hasAttribute('selected')),
+        checked: doc.querySelector('#checked').checked, unchecked: doc.querySelector('#unchecked').checked };
     }, state.html);
-    expect(selected).toEqual([false, true]);
+    expect(selected).toEqual({ options: [false, true], checked: true, unchecked: false });
+  } finally { await page.close(); }
+});
+
+test('font source lists keep captured alternatives and omit missing URLs', async () => {
+  const page = await newPage(source, { viewport: { width: 320, height: 200 } });
+  const font = fs.readFileSync(path.resolve(__dirname, '../../../resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2'));
+  const uri = `data:font/woff2;base64,${font.toString('base64')}`;
+  try {
+    await page.setContent(`<!doctype html><style>@font-face { font-family: CapturedFont;
+      src: local("missing, local font"), url("http://127.0.0.1:1/missing.woff2") format("woff2"), url("${uri}") format("woff2");
+    } p { font:16px CapturedFont }</style><p>Captured font</p>`);
+    await page.evaluate(() => document.fonts.ready);
+    const state = await page.evaluate(collectCurrentState);
+    expect(state.html).toContain(uri);
+    expect(state.html).toContain('local("missing, local font")');
+    expect(state.html).not.toContain('http://127.0.0.1:1/missing.woff2');
+    const result = await renderCapturedPage(mirror, state);
+    expect(result.warnings).toContain('Uncaptured resource omitted: http://127.0.0.1:1/missing.woff2');
+    expect(result.html).toContain('Captured font');
+  } finally { await page.close(); }
+});
+
+test('failed fonts fall back with warnings instead of blocking static content', async () => {
+  const page = await newPage(source, { viewport: { width: 320, height: 200 } });
+  try {
+    await page.setContent(`<!doctype html><style>@font-face { font-family: BrokenFont;
+      src:url(data:font/woff2;base64,invalid) } p { font:16px BrokenFont }</style><p>Fallback content</p>`);
+    await page.evaluate(() => document.fonts.ready);
+    const result = await captureCurrentPage(page, { mirror });
+    expect(result.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/font BrokenFont.*failed to load/)]));
+    expect(result.html).toContain('Fallback content');
+  } finally { await page.close(); }
+});
+
+test('older payloads cannot execute embedded scripts or pass blocked image URLs to import', async () => {
+  const page = await newPage(source, { viewport: { width: 320, height: 200 } });
+  try {
+    await page.setContent('<!doctype html><p id="content">Original</p>');
+    const state = await page.evaluate(collectCurrentState);
+    state.unsupported = ['iframe: embedded content omitted'];
+    state.html = state.html.replace('</head>', `<style>#content::before { content:""; display:block;
+      width:10px; height:10px; background-image:url(http://127.0.0.1:1/pseudo.png) }</style></head>`);
+    state.html = state.html.replace('</body>', `<iframe srcdoc="<script>parent.document.querySelector('#content').textContent='Mutated'</script>"></iframe>
+      <img width="10" height="10" src="http://127.0.0.1:1/missing.png">
+      <div style="width:10px;height:10px;background-image:url(http://127.0.0.1:1/missing.png)"></div></body>`);
+    const result = await renderCapturedPage(mirror, state);
+    expect(result.html).toContain('Original');
+    expect(result.html).not.toContain('Mutated');
+    expect(result.html).not.toContain('http://127.0.0.1:1/missing.png');
+    expect(result.html).not.toContain('http://127.0.0.1:1/pseudo.png');
+    expect(result.warnings).toContain('Uncaptured resource omitted: http://127.0.0.1:1/missing.png');
+    expect(result.warnings).toContain('Uncaptured resource omitted: http://127.0.0.1:1/pseudo.png');
+  } finally { await page.close(); }
+});
+
+test('local SVG references survive resource cleanup and missing external SVG images are omitted', async () => {
+  const page = await newPage(source, { viewport: { width: 320, height: 200 } });
+  try {
+    await page.setContent(`<!doctype html><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <defs><clipPath id="clip"><rect width="20" height="20"/></clipPath></defs>
+      <rect width="50" height="50" fill="red" style="clip-path:url(#clip)"/>
+      <image width="10" height="10" href="http://127.0.0.1:1/missing.svg"/>
+    </svg>`);
+    const state = await page.evaluate(collectCurrentState);
+    expect(state.html).toContain('url(&quot;#clip&quot;)');
+    expect(state.html).not.toContain('http://127.0.0.1:1/missing.svg');
+    const result = await renderCapturedPage(mirror, state);
+    expect(result.warnings.some(warning => warning.includes('about:blank'))).toBe(false);
+    expect(result.html).toContain('clip');
   } finally { await page.close(); }
 });
 
