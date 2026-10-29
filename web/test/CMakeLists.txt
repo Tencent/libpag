@@ -239,7 +239,7 @@ target_link_options(pag-test PRIVATE
         -sMAXIMUM_MEMORY=2GB
         -sSTACK_SIZE=1MB
         -sEXPORT_NAME='PAGTest'
-        -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
+        -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest','_malloc','_free']
         ${WEB_EXPORTED_RUNTIME_METHODS}
         -sMODULARIZE=1
         -sEXPORT_ES6=1
