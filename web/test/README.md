@@ -87,7 +87,11 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAG_WEBGL_ONLY` 宏（仅 webgl 构建定义，见 `web/test/CMakeLists.txt`）排除出
   webgl 车道。`FromTexture`/`GLRestorer` 在 webgpu 车道与 native 构建保留（它们在那里
   通过，基线受保护）；`PAGSurfaceWrapRejectsMismatchedDevice` 因 `TGFX_USE_OPENGL`
-  未定义本就不参与 webgpu 构建，由 native GL 构建保留。
+  未定义本就不参与 webgpu 构建，由 native GL 构建保留。排除后 webgl 车道全绿：
+  `autotest.sh USE_WEBGL --skip-images` 双轮（seed + 真 md5 比对）各 1624 例
+  （1622 过 + 2 skip，0 失败），md5 基线 8635 条落地（含 `PAGCompareFrameTest`
+  逐帧与 `PAGXTest/svg_*` 渲染用例；`PAGXSVGTest` 145 例为导出断言，不依赖
+  md5 基线）。
 - `resources/apitest/SVG` 永不打包，但 SVG 导入代码仍参与编译。
 - WebGPU 构建开启 Asyncify，使 `Baseline::Compare` 使用的同步 `readPixels()`
   可以等待 buffer 映射完成。
