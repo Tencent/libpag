@@ -28,9 +28,15 @@ set(PAG_USE_FREETYPE ON)
 # The test suites call into CLI entry points (RunVerify, image storage helpers), which also
 # pulls in the libxml2 vendor and the generated pagx_xsd.h header from the root's CLI block.
 set(PAG_BUILD_CLI ON)
-# Web platform only enables WEBP decode by default. Enable encode for baseline image generation.
-set(TGFX_USE_WEBP_ENCODE ON)
-set(TGFX_USE_JPEG_ENCODE ON)
+# Web platform only enables WEBP decode by default. Enable encode for baseline image generation
+# and PNG encoding for the pagx static-image rasterization path (HTML/PPT diamond/conic gradients,
+# plus-darker backdrops, mask baking) whose artifacts are PNG-encoded by tgfx::ImageCodec.
+# These must use the PAG_USE_ prefix: the root CMakeLists mirrors PAG_USE_* onto TGFX_USE_* when it
+# configures tgfx, which would silently drop variables set in the tgfx namespace here.
+set(PAG_USE_PNG_DECODE ON)
+set(PAG_USE_PNG_ENCODE ON)
+set(PAG_USE_WEBP_ENCODE ON)
+set(PAG_USE_JPEG_ENCODE ON)
 
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
