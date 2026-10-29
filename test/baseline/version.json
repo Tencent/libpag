@@ -1,4 +1,9 @@
 {
+    "PAGBlendMetalTest": {
+        "BothBottomLeft": "c0b63f058",
+        "CopyDstTexture": "c0b63f058",
+        "TextureBottomLeft": "c0b63f058"
+    },
     "PAGBlendTest": {
         "Blend_Add": "60a88e548",
         "Blend_Color": "60a88e548",
@@ -8442,6 +8447,10 @@
     "PAGSolidLayerTest": {
         "SolidColor": "60a88e548"
     },
+    "PAGSurfaceMetalTest": {
+        "BottomLeftScissor": "c0b63f058",
+        "Mask": "c0b63f058"
+    },
     "PAGSurfaceTest": {
         "BottomLeftScissor": "60a88e548",
         "FromTexture": "60a88e548",
@@ -8556,6 +8565,8 @@
         "AnimationTimelineNegativeEvaluationOffset_red": "309e78192",
         "AnimationVisibleChannelWindow_hidden": "31aafada0",
         "AnimationVisibleChannelWindow_visible": "31aafada0",
+        "MetalPAGSurfaceFromBackendRenderTarget": "c0b63f058",
+        "MetalPAGSurfaceFromBackendTexture": "c0b63f058",
         "PAGSceneDrawAutoClearOverlay_green": "60a88e548",
         "PAGSceneDrawAutoClearOverlay_overlay": "60a88e548",
         "PAGSceneDrawAutoClearOverlay_red": "60a88e548",

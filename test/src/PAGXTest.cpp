@@ -230,7 +230,7 @@ static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) 
  * Test case: Convert all SVG files to PAGX format, save as files, then load and render.
  * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
  */
-PAGX_TEST(PAGXTest, SVGToPAGXAll) {
+PAGX_PIXEL_TEST(PAGXTest, SVGToPAGXAll) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -328,7 +328,7 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
 /**
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
-PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
+PAGX_PIXEL_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -893,7 +893,7 @@ PAGX_TEST(PAGXTest, GlyphRunTransforms) {
  * Creates a document with English, mixed Chinese-English text at different sizes, shapes and embeds
  * fonts, exports to XML, reimports and renders from embedded glyphs.
  */
-PAGX_TEST(PAGXTest, PrecomposedTextRender) {
+PAGX_PIXEL_TEST(PAGXTest, PrecomposedTextRender) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -1096,7 +1096,7 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
  * Test all PAGX sample files in spec/samples directory.
  * Renders each sample and compares with baseline screenshots.
  */
-PAGX_TEST(PAGXTest, SpecSamples) {
+PAGX_PIXEL_TEST(PAGXTest, SpecSamples) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("spec/samples"), "spec_");
@@ -1105,7 +1105,7 @@ PAGX_TEST(PAGXTest, SpecSamples) {
 /**
  * Test all text-related PAGX files in resources/text directory.
  */
-PAGX_TEST(PAGXTest, TextFiles) {
+PAGX_PIXEL_TEST(PAGXTest, TextFiles) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/text"), "text_");
@@ -1115,7 +1115,7 @@ PAGX_TEST(PAGXTest, TextFiles) {
  * Test all layout-related PAGX files in resources/layout directory.
  * Tests container layout and constraint positioning behaviors with visual verification.
  */
-PAGX_TEST(PAGXTest, LayoutFiles) {
+PAGX_PIXEL_TEST(PAGXTest, LayoutFiles) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/layout"), "layout_");
@@ -5694,7 +5694,7 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
 /**
  * Test all HTML-related PAGX files in resources/pagx_to_html directory.
  */
-PAGX_TEST(PAGXTest, HtmlFiles) {
+PAGX_PIXEL_TEST(PAGXTest, HtmlFiles) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/pagx_to_html"),
@@ -8467,7 +8467,7 @@ static void WriteSVGFile(const std::string& svgContent, const std::string& relat
 /**
  * Test rendering with Mono, Duo, and Multi noise filters side by side.
  */
-PAGX_TEST(PAGXTest, NoiseFilterModes) {
+PAGX_PIXEL_TEST(PAGXTest, NoiseFilterModes) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -8530,7 +8530,7 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
  * Text, Group, TextBox) plus Repeater, outputting SVG for visual inspection of contentBounds
  * correctness.
  */
-PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
+PAGX_PIXEL_TEST(PAGXTest, NoiseFilterAllElements) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -8726,7 +8726,7 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
  * Test NoiseStyle with blendMode applied to an image layer, verifying both rendering and SVG
  * export. The blendMode is set to Multiply so the noise composites differently from Normal.
  */
-PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
+PAGX_PIXEL_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -8793,7 +8793,7 @@ PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
  * Test rendering with Mono, Duo, and Multi noise styles side by side.
  * Covers writeNoiseStyle for all three modes.
  */
-PAGX_TEST(PAGXTest, NoiseStyleModes) {
+PAGX_PIXEL_TEST(PAGXTest, NoiseStyleModes) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -9157,7 +9157,7 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
  * The baseline key is "NoiseFilterAnimation" (without the "Export" prefix) to avoid
  * re-accepting baselines after renaming the test.
  */
-PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
+PAGX_PIXEL_TEST(PAGXTest, ExportNoiseFilterAnimation) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
   auto* context = deviceLock.context();
@@ -11775,7 +11775,7 @@ PAGX_TEST(PAGXTest, HitTestReturnsCompositionNode) {
  * reset when notifyChange marks a timeline node dirty. The two baseline snapshots capture different
  * alpha values, proving the nested composition's timeline was actually rebuilt.
  */
-PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
+PAGX_PIXEL_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
 
@@ -12597,7 +12597,7 @@ PAGX_TEST(PAGXTest, NotifyChangeDocumentSize) {
  * layout (bottom/right anchored) re-layout to new positions relative to the new canvas size.
  * Baseline snapshots are taken before and after the resize for visual verification.
  */
-PAGX_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
+PAGX_PIXEL_TEST(PAGXTest, NotifyChangeDocumentSizeConstraints) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
 
   // Top-level layer anchored to document canvas via bottom/right constraints.
@@ -12803,7 +12803,7 @@ PAGX_TEST(PAGXTest, GetRequiredFontsFromComposition) {
   EXPECT_EQ(fonts[0].fontFamily, "System");
 }
 
-PAGX_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
+PAGX_PIXEL_TEST(PAGXTest, GetRequiredFontsCrossDocument) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
 
   auto typeface =
@@ -14464,7 +14464,7 @@ PAGX_TEST(PAGXTest, SMImporterErrorsForMissingRefAt) {
 // StateMachine screenshot (baseline) tests
 // =============================================================================
 
-PAGX_TEST(PAGXTest, SMCrossfade) {
+PAGX_PIXEL_TEST(PAGXTest, SMCrossfade) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto layer = doc->makeNode<pagx::Layer>("target");
@@ -14810,7 +14810,7 @@ PAGX_TEST(PAGXTest, SMCrossfadeKeepsTransformComponentsNotDrivenByTargetState) {
   EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 3), 40);
 }
 
-PAGX_TEST(PAGXTest, SMStableStateOutput) {
+PAGX_PIXEL_TEST(PAGXTest, SMStableStateOutput) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto child = doc->makeNode<pagx::Layer>("child");
@@ -14881,7 +14881,7 @@ PAGX_TEST(PAGXTest, SMStableStateOutput) {
 // child layer. The SM is auto-driven by scene->advanceAndApply.
 // =============================================================================
 
-PAGX_TEST(PAGXTest, SMNestedSceneDriven) {
+PAGX_PIXEL_TEST(PAGXTest, SMNestedSceneDriven) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   // Child layer inside a Composition resource.

@@ -228,7 +228,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceWrapRejectsMismatchedDevice) {
 /**
  * Test case: advancing a top-level alpha animation produces distinct rendered frames over time.
  */
-PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto layer = doc->makeNode<pagx::Layer>("L");
   layer->width = 200;
@@ -287,7 +287,7 @@ PAGX_TEST(PAGXRuntimeTest, AdvanceRendersDistinctFrames) {
  * Test case: PAGScene::draw() with autoClear=false overlays the scene content onto existing
  * surface pixels instead of clearing the surface first.
  */
-PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>("L");
   layer->width = 100;
@@ -364,7 +364,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
  * introduced.
  */
 #ifdef TGFX_USE_OPENGL
-PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   const int width = 100;
   const int height = 100;
 
@@ -439,7 +439,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
  * Test case: PAGSurface::MakeFrom(BackendRenderTarget) creates a surface that can render PAGScene
  * content and produce a correct screenshot.
  */
-PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   const int width = 100;
   const int height = 100;
 
@@ -653,7 +653,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentTypeMismatch) {
  * 250ms evaluation passes frame 10 (red). This confirms the offset affects content timing without
  * altering the timeline's own advance() clock.
  */
-PAGX_TEST(PAGXRuntimeTest, AnimationTimelineEvaluationOffset) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, AnimationTimelineEvaluationOffset) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto innerComp = doc->makeNode<pagx::Composition>("inner");
@@ -732,7 +732,7 @@ PAGX_TEST(PAGXRuntimeTest, AnimationTimelineEvaluationOffset) {
  * evaluationOffset = -10, the evaluation frame is currentFrame + 10, so even at timeline
  * frame 0 the content is already at the red keyframe.
  */
-PAGX_TEST(PAGXRuntimeTest, AnimationTimelineNegativeEvaluationOffset) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, AnimationTimelineNegativeEvaluationOffset) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto innerComp = doc->makeNode<pagx::Composition>("inner");
@@ -804,7 +804,7 @@ PAGX_TEST(PAGXRuntimeTest, AnimationTimelineNegativeEvaluationOffset) {
  * (30, true) -> (60, false). The target fills the frame red, so the three sampled instants
  * distinguish before-window (hidden), inside-window (visible red), and after-window (hidden).
  */
-PAGX_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
   auto innerComp = doc->makeNode<pagx::Composition>("inner");

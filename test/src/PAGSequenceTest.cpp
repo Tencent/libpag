@@ -27,7 +27,7 @@ namespace pag {
 /**
  * 用例描述: 测试直接上屏
  */
-PAG_TEST(PAGSequenceTest, RenderOnScreen) {
+PAG_PIXEL_TEST(PAGSequenceTest, RenderOnScreen) {
   auto pagFile = LoadPAGFile("resources/apitest/wz_mvp.pag");
   EXPECT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(750, 1334);
@@ -44,7 +44,7 @@ PAG_TEST(PAGSequenceTest, RenderOnScreen) {
 /**
  * 用例描述: bitmapSequence关键帧不是全屏的时候要清屏
  */
-PAG_TEST(PAGSequenceTest, BitmapSequenceReader) {
+PAG_PIXEL_TEST(PAGSequenceTest, BitmapSequenceReader) {
   auto pagFile = LoadPAGFile("resources/apitest/ZC_mg_seky2_landscape.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -60,7 +60,7 @@ PAG_TEST(PAGSequenceTest, BitmapSequenceReader) {
 /**
  * 用例描述: 视频序列帧作为遮罩
  */
-PAG_TEST(PAGSequenceTest, VideoSequenceAsMask) {
+PAG_PIXEL_TEST(PAGSequenceTest, VideoSequenceAsMask) {
   auto pagFile = LoadPAGFile("resources/apitest/video_sequence_as_mask.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();

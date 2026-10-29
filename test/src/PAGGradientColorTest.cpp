@@ -23,7 +23,7 @@ namespace pag {
 /**
  * 用例描述: 渐变
  */
-PAG_TEST(PAGGradientColorTest, GradientColor) {
+PAG_PIXEL_TEST(PAGGradientColorTest, GradientColor) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto files = GetAllPAGFiles("resources/gradient");
   for (auto& file : files) {

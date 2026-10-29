@@ -1135,13 +1135,16 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    if (NOT PAG_USE_METAL)
+        list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
+    endif ()
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture)|CocoaSurface(Header)?)Test\\.mm$")
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
         if (NOT PAG_USE_METAL)
-            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture)Test\\.mm$")
+            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture|Atlas)Test\\.mm$")
         endif ()
     endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
@@ -1163,7 +1166,6 @@ if (PAG_BUILD_TESTS)
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
-
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
@@ -1212,6 +1214,15 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    if (PAG_USE_METAL)
+        # MetalTestSupport temporarily uses tgfx's private atlas API. Keep its dependencies local
+        # to Metal test targets, never exported by pag or enabled for other backends.
+        foreach (METAL_TEST_TARGET UpdateBaseline_Metal PAGUnitTest_Metal PAGFullTest_Metal)
+            target_include_directories(${METAL_TEST_TARGET} PRIVATE
+                    ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        endforeach ()
+    endif ()
 
     if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
         # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros

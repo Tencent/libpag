@@ -29,7 +29,7 @@ using nlohmann::json;
 /**
  * 用例描述: PAGCompositionLayer基础功能
  */
-PAG_TEST(PAGCompositionTest, composition) {
+PAG_PIXEL_TEST(PAGCompositionTest, composition) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagComposition = std::static_pointer_cast<PAGComposition>(TestPAGFile->getLayerAt(0));
   ASSERT_EQ(pagComposition->width(), 720);
@@ -94,7 +94,7 @@ PAG_TEST(PAGCompositionTest, composition) {
 /**
  * 用例描述: VideoSequence的大小和Composition不一致
  */
-PAG_TEST(PAGCompositionTest, VideoSequence) {
+PAG_PIXEL_TEST(PAGCompositionTest, VideoSequence) {
   auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();

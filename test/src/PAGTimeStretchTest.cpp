@@ -80,42 +80,42 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
 /**
  * 用例描述: PAGTimeStrech渲染测试: Repeat模式-缩减
  */
-PAG_TEST(PAGTimeStrechTest, Repeat_Shorten) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, Repeat_Shorten) {
   TimeStretchTest("resources/timestretch/repeat.pag", "Repeat_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试: Repeat模式-拉伸
  */
-PAG_TEST(PAGTimeStrechTest, Repeat_Stretch) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, Repeat_Stretch) {
   TimeStretchTest("resources/timestretch/repeat.pag", "Repeat_Stretch", 2);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-RepeatInverted-缩减
  */
-PAG_TEST(PAGTimeStrechTest, RepeatInverted_Shorten) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, RepeatInverted_Shorten) {
   TimeStretchTest("resources/timestretch/repeatInverted.pag", "RepeatInverted_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-RepeatInverted-拉伸
  */
-PAG_TEST(PAGTimeStrechTest, RepeatInverted_Stretch) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, RepeatInverted_Stretch) {
   TimeStretchTest("resources/timestretch/repeatInverted.pag", "RepeatInverted_Stretch", 2);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-Scale模式-缩减
  */
-PAG_TEST(PAGTimeStrechTest, Scale_Shorten) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, Scale_Shorten) {
   TimeStretchTest("resources/timestretch/scale.pag", "Scale_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试: Scale模式-拉伸
  */
-PAG_TEST(PAGTimeStrechTest, Scale_Stretch) {
+PAG_PIXEL_TEST(PAGTimeStrechTest, Scale_Stretch) {
   TimeStretchTest("resources/timestretch/scale.pag", "Scale_Stretch", 2);
 }
 
