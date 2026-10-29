@@ -347,9 +347,11 @@ Write in this order: VectorElements → child Layers → LayerStyles → LayerFi
 
 | CSS | PAGX | Position |
 |-----|------|----------|
-| `box-shadow` | `<DropShadowStyle offsetX offsetY blurX blurY color/>` | Below content |
+| `box-shadow` | `<DropShadowStyle offsetX offsetY blurX blurY spread color/>` | Below content |
 | `backdrop-filter: blur()` | `<BackgroundBlurStyle blurX blurY/>` | Below content |
-| `box-shadow: inset` | `<InnerShadowStyle offsetX offsetY blurX blurY color/>` | Above content |
+| `box-shadow: inset` | `<InnerShadowStyle offsetX offsetY blurX blurY spread color/>` | Above content |
+
+The fourth length of a CSS `box-shadow` is its spread. The HTML importer currently drops a non-zero spread with a diagnostic, so add `spread` manually when such a design has to match. PAGX also applies `spread` to ellipses and stroke bands, and approximates irregular paths by their bounding rectangle; the exact rules are in `spec/pagx_spec.md` §5.3.1.
 
 ## Filters
 

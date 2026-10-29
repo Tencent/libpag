@@ -25,6 +25,11 @@ namespace pagx {
 
 /**
  * An inner shadow layer style that renders a shadow inside the layer content.
+ *
+ * Fields are append-only: the importer, exporter, and channel table address them by name, so
+ * declaration order carries no format meaning, while appending keeps the offsets of existing
+ * fields stable. See PAGXDocument::makeNode() for why that alone does not make the class binary
+ * compatible across header versions.
  */
 class InnerShadowStyle : public LayerStyle {
  public:
@@ -52,6 +57,12 @@ class InnerShadowStyle : public LayerStyle {
    * The color of the shadow.
    */
   Color color = {};
+
+  /**
+   * The inner shadow spread distance in pixels in layer-local coordinates. Positive values increase inward
+   * shadow coverage, and negative values reduce it. The default value is 0.
+   */
+  float spread = 0.0f;
 
   NodeType nodeType() const override {
     return NodeType::InnerShadowStyle;

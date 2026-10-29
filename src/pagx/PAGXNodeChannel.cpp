@@ -822,6 +822,7 @@ static std::vector<ChannelDef> BuildDropShadowStyleFields() {
       FIELD_FLOAT(DropShadowStyle, "offsetY", offsetY, Anim),
       FIELD_FLOAT(DropShadowStyle, "blurX", blurX, Anim),
       FIELD_FLOAT(DropShadowStyle, "blurY", blurY, Anim),
+      FIELD_FLOAT(DropShadowStyle, "spread", spread, Anim),
       FIELD_COLOR(DropShadowStyle, "color", color, Anim),
       FIELD_BOOL(DropShadowStyle, "showBehindLayer", showBehindLayer, Anim),
   };
@@ -835,6 +836,7 @@ static std::vector<ChannelDef> BuildInnerShadowStyleFields() {
       FIELD_FLOAT(InnerShadowStyle, "offsetY", offsetY, Anim),
       FIELD_FLOAT(InnerShadowStyle, "blurX", blurX, Anim),
       FIELD_FLOAT(InnerShadowStyle, "blurY", blurY, Anim),
+      FIELD_FLOAT(InnerShadowStyle, "spread", spread, Anim),
       FIELD_COLOR(InnerShadowStyle, "color", color, Anim),
   };
 }

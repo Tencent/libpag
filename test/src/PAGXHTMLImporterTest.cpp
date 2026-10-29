@@ -6541,6 +6541,49 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowSpreadIsIgnoredWithWarning) {
   EXPECT_TRUE(warned);
 }
 
+/**
+ * Box shadows accept a fourth length, while drop-shadow filters reject spread, inset, lists and
+ * negative blur without emitting a default shadow or discarding the following valid filter.
+ */
+PAG_TEST(PAGXHTMLValueParserTest, ShadowSyntaxAndSpreadDiagnostics) {
+  auto document = pagx::PAGXDocument::Make(100, 100);
+  float width = 100;
+  float height = 100;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  diagnostics.bindDocument(document.get());
+  pagx::HTMLValueParser parser(diagnostics, width, height);
+  for (const auto* value : {"0 1px 2px 3px black", "inset 0 1px 2px -3px black"}) {
+    document->errors.clear();
+    auto shadows = parser.parseShadowList(value);
+    ASSERT_EQ(shadows.size(), 1u);
+    EXPECT_FLOAT_EQ(shadows[0].blur, 2);
+    ASSERT_EQ(document->errors.size(), 1u);
+    EXPECT_NE(document->errors[0].find("not yet mapped by HTML import"), std::string::npos);
+  }
+  document->errors.clear();
+  EXPECT_EQ(parser.parseShadowList("0 1px 2px 0 black").size(), 1u);
+  EXPECT_TRUE(document->errors.empty());
+  for (const auto* value : {"0 1px 2px 3px black", "0 1px 2px 0 black", "inset 0 1px black",
+                            "0 1px -2px black", "0 1px black, 0 2px black", "black"}) {
+    SCOPED_TRACE(value);
+    document->errors.clear();
+    auto filters = parser.parseFilterChain(std::string("drop-shadow(") + value + ") blur(4px)");
+    ASSERT_EQ(filters.size(), 1u);
+    EXPECT_EQ(filters[0].kind, pagx::HTMLValueParser::FilterStep::Kind::Blur);
+    ASSERT_EQ(document->errors.size(), 1u);
+    EXPECT_NE(document->errors[0].find("malformed drop-shadow()"), std::string::npos);
+    EXPECT_EQ(document->errors[0].find("box-shadow"), std::string::npos);
+  }
+  document->errors.clear();
+  auto filters = parser.parseFilterChain("drop-shadow(1px 2px 3px red)");
+  ASSERT_EQ(filters.size(), 1u);
+  EXPECT_EQ(filters[0].kind, pagx::HTMLValueParser::FilterStep::Kind::DropShadow);
+  EXPECT_FLOAT_EQ(filters[0].shadow.offsetX, 1);
+  EXPECT_FLOAT_EQ(filters[0].shadow.offsetY, 2);
+  EXPECT_FLOAT_EQ(filters[0].shadow.blur, 3);
+  EXPECT_TRUE(document->errors.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, BoxShadowMalformedSkippedWithWarning) {
   // A shadow with fewer than two length tokens is malformed.
   auto doc = ParseFromString(R"HTML(

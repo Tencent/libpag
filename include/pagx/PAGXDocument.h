@@ -92,6 +92,16 @@ class PAGXDocument : public Node {
    * If an ID is provided, the node will be indexed for lookup.
    * If the ID already exists, an error will be logged and the new node will replace the old one in
    * the index.
+   *
+   * Binary compatibility: T is constructed here, in the caller's translation unit, so the caller's
+   * view of T decides both the allocation size and which fields are initialized. A caller built
+   * against older headers allocates the older sizeof(T), and a library that writes a field added
+   * since then writes past the end of that object. Appending new fields at the end of a node class
+   * keeps the existing offsets stable and may happen to fit in the trailing padding, but that
+   * depends on the layout of each class rather than being a guarantee. Adding or changing fields in
+   * a node class is therefore an ABI break: rebuild callers against the headers of the library they
+   * link.
+   *
    * @param id an optional unique identifier for the node, used for lookup via findNode(). If empty,
    * the node is not indexed.
    */

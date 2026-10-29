@@ -113,6 +113,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
@@ -126,7 +127,9 @@
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/GlassStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
+#include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
@@ -15661,6 +15664,1404 @@ PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
   ASSERT_NE(vmRuntime->textBlob(), nullptr);
   float vmWidthAfterSize = vmRuntime->textBlob()->getBounds().width();
   EXPECT_GT(vmWidthAfterSize, vmWidthAfter) << "viewmodel did not reshape vmText fontSize to 60";
+}
+
+namespace {
+
+// Independent TGFX description of one shadow style used by the spread reference renders. The
+// reference path builds tgfx layers directly and never goes through LayerBuilder, so a PAGX
+// mapping bug cannot hide behind a shared conversion helper.
+struct ShadowSpreadReferenceStyle {
+  bool inner = false;
+  float offsetX = 0.0f;
+  float offsetY = 0.0f;
+  float blurX = 0.0f;
+  float blurY = 0.0f;
+  float spread = 0.0f;
+  tgfx::Color color = tgfx::Color::Black();
+  bool showBehindLayer = true;
+  bool excludeChildEffects = false;
+};
+
+struct ShadowSpreadReferenceShape {
+  bool ellipse = false;
+  float layerX = 0.0f;
+  float layerY = 0.0f;
+  float centerX = 0.0f;
+  float centerY = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  float roundness = 0.0f;
+  tgfx::Color fill = tgfx::Color::White();
+};
+
+static std::shared_ptr<tgfx::LayerStyle> MakeReferenceShadowStyle(
+    const ShadowSpreadReferenceStyle& style) {
+  std::shared_ptr<tgfx::LayerStyle> result = nullptr;
+  if (style.inner) {
+    auto inner = tgfx::InnerShadowStyle::Make(style.offsetX, style.offsetY, style.blurX,
+                                              style.blurY, style.color);
+    inner->setSpread(style.spread);
+    result = inner;
+  } else {
+    auto drop = tgfx::DropShadowStyle::Make(style.offsetX, style.offsetY, style.blurX, style.blurY,
+                                            style.color, style.showBehindLayer);
+    drop->setSpread(style.spread);
+    result = drop;
+  }
+  if (style.excludeChildEffects) {
+    result->setExcludeChildEffects(true);
+  }
+  return result;
+}
+
+static std::shared_ptr<tgfx::VectorElement> MakeReferenceShadowGeometry(
+    const ShadowSpreadReferenceShape& shape) {
+  if (shape.ellipse) {
+    auto ellipse = tgfx::Ellipse::Make();
+    ellipse->setPosition(tgfx::Point::Make(shape.centerX, shape.centerY));
+    ellipse->setSize(tgfx::Size(shape.width, shape.height));
+    return ellipse;
+  }
+  auto rect = tgfx::Rectangle::Make();
+  rect->setPosition(tgfx::Point::Make(shape.centerX, shape.centerY));
+  rect->setSize(tgfx::Size(shape.width, shape.height));
+  rect->setRoundness(shape.roundness);
+  return rect;
+}
+
+static std::shared_ptr<tgfx::VectorLayer> MakeReferenceShadowLayer(
+    const ShadowSpreadReferenceShape& shape,
+    const std::vector<ShadowSpreadReferenceStyle>& styles) {
+  auto layer = tgfx::VectorLayer::Make();
+  auto fill = tgfx::FillStyle::Make(tgfx::SolidColor::Make(shape.fill));
+  layer->setContents({MakeReferenceShadowGeometry(shape), fill});
+  std::vector<std::shared_ptr<tgfx::LayerStyle>> tgfxStyles;
+  tgfxStyles.reserve(styles.size());
+  for (const auto& style : styles) {
+    tgfxStyles.push_back(MakeReferenceShadowStyle(style));
+  }
+  if (!tgfxStyles.empty()) {
+    layer->setLayerStyles(tgfxStyles);
+  }
+  if (shape.layerX != 0 || shape.layerY != 0) {
+    layer->setMatrix(tgfx::Matrix::MakeTrans(shape.layerX, shape.layerY));
+  }
+  return layer;
+}
+
+static std::shared_ptr<tgfx::Surface> RenderReferenceShadowScene(
+    tgfx::Context* context, int surfaceWidth, int surfaceHeight, float contentWidth,
+    float contentHeight, float zoomScale, const std::vector<std::shared_ptr<tgfx::Layer>>& layers) {
+  auto surface = tgfx::Surface::Make(context, surfaceWidth, surfaceHeight);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto root = tgfx::Layer::Make();
+  root->setScrollRect(tgfx::Rect::MakeWH(contentWidth, contentHeight));
+  for (const auto& layer : layers) {
+    root->addChild(layer);
+  }
+  tgfx::DisplayList displayList;
+  displayList.root()->addChild(root);
+  displayList.setZoomScale(zoomScale);
+  displayList.render(surface.get(), true);
+  return surface;
+}
+
+static std::vector<uint8_t> ReadReferenceSurfacePixels(
+    const std::shared_ptr<tgfx::Surface>& surface) {
+  std::vector<uint8_t> pixels = {};
+  if (surface == nullptr) {
+    return pixels;
+  }
+  const auto width = surface->width();
+  const auto height = surface->height();
+  const size_t rowBytes = static_cast<size_t>(width) * 4;
+  pixels.resize(rowBytes * static_cast<size_t>(height));
+  auto info = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
+                                    tgfx::AlphaType::Premultiplied, rowBytes);
+  if (!surface->readPixels(info, pixels.data())) {
+    pixels.clear();
+  }
+  return pixels;
+}
+
+static std::vector<uint8_t> ReadPAGXSurfacePixels(
+    const std::shared_ptr<pagx::PAGSurface>& surface) {
+  std::vector<uint8_t> pixels = {};
+  if (surface == nullptr) {
+    return pixels;
+  }
+  const size_t rowBytes = static_cast<size_t>(surface->width()) * 4;
+  pixels.resize(rowBytes * static_cast<size_t>(surface->height()));
+  if (!surface->readPixels(pixels.data(), rowBytes)) {
+    pixels.clear();
+  }
+  return pixels;
+}
+
+static int CountPixelDifferences(const std::vector<uint8_t>& first,
+                                 const std::vector<uint8_t>& second) {
+  if (first.empty() || first.size() != second.size()) {
+    return -1;
+  }
+  int count = 0;
+  for (size_t index = 0; index + 3 < first.size(); index += 4) {
+    if (first[index] != second[index] || first[index + 1] != second[index + 1] ||
+        first[index + 2] != second[index + 2] || first[index + 3] != second[index + 3]) {
+      count++;
+    }
+  }
+  return count;
+}
+
+static int CountOccurrences(const std::string& text, const std::string& token) {
+  int count = 0;
+  size_t position = text.find(token);
+  while (position != std::string::npos) {
+    count++;
+    position = text.find(token, position + token.size());
+  }
+  return count;
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeShadowSpreadStyleDocument(float dropSpread,
+                                                                         float innerSpread) {
+  auto doc = pagx::PAGXDocument::Make(160, 160);
+  auto layer = doc->makeNode<pagx::Layer>("layer");
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {80, 80};
+  rect->size = {80, 80};
+  rect->roundness = 12;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  auto drop = doc->makeNode<pagx::DropShadowStyle>("drop");
+  drop->offsetY = 8;
+  drop->blurX = 6;
+  drop->blurY = 6;
+  drop->spread = dropSpread;
+  drop->color = {0.0f, 0.0f, 0.0f, 0.6f};
+  auto inner = doc->makeNode<pagx::InnerShadowStyle>("inner");
+  inner->offsetY = 6;
+  inner->blurX = 5;
+  inner->blurY = 5;
+  inner->spread = innerSpread;
+  inner->color = {0.0f, 0.0f, 0.0f, 0.5f};
+  layer->styles = {drop, inner};
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+static std::shared_ptr<tgfx::VectorLayer> MakeShadowSpreadStyleReferenceLayer(float dropSpread,
+                                                                              float innerSpread) {
+  ShadowSpreadReferenceShape shape;
+  shape.centerX = 80;
+  shape.centerY = 80;
+  shape.width = 80;
+  shape.height = 80;
+  shape.roundness = 12;
+  shape.fill = {0.8f, 0.8f, 0.8f, 1.0f};
+  ShadowSpreadReferenceStyle drop;
+  drop.offsetY = 8;
+  drop.blurX = 6;
+  drop.blurY = 6;
+  drop.spread = dropSpread;
+  drop.color = {0.0f, 0.0f, 0.0f, 0.6f};
+  ShadowSpreadReferenceStyle inner;
+  inner.inner = true;
+  inner.offsetY = 6;
+  inner.blurX = 5;
+  inner.blurY = 5;
+  inner.spread = innerSpread;
+  inner.color = {0.0f, 0.0f, 0.0f, 0.5f};
+  return MakeReferenceShadowLayer(shape, {drop, inner});
+}
+
+// Actual editor parameters for the three stacked inner shadows: light, upper dark, lower dark.
+static constexpr float THREE_SHADOW_SPREAD = -19.587f;
+static constexpr float THREE_SHADOW_OFFSET = 19.587f;
+static constexpr float THREE_SHADOW_LIGHT_BLUR = 7.34513f;
+static constexpr float THREE_SHADOW_DARK_BLUR = 2.44838f;
+static constexpr float THREE_SHADOW_PANEL_WIDTH = 23.5044f;
+static constexpr float THREE_SHADOW_PANEL_HEIGHT = 102.832f;
+static constexpr float THREE_SHADOW_PANEL_ROUNDNESS = 489.676f;
+static constexpr float THREE_SHADOW_LIGHT = 230.0f / 255.0f;
+static constexpr float THREE_SHADOW_DARK = 40.0f / 255.0f;
+
+static std::shared_ptr<pagx::PAGXDocument> MakeThreeInnerShadowDocument(bool withGlass,
+                                                                        bool zeroSpread) {
+  auto doc = pagx::PAGXDocument::Make(120, 160);
+
+  auto background = doc->makeNode<pagx::Layer>("background");
+  auto backgroundRect = doc->makeNode<pagx::Rectangle>();
+  backgroundRect->position = {60, 80};
+  backgroundRect->size = {120, 160};
+  auto backgroundFill = doc->makeNode<pagx::Fill>();
+  auto backgroundColor = doc->makeNode<pagx::SolidColor>();
+  backgroundColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  backgroundFill->color = backgroundColor;
+  background->contents = {backgroundRect, backgroundFill};
+  doc->layers.push_back(background);
+
+  auto panel = doc->makeNode<pagx::Layer>("panel");
+  auto panelRect = doc->makeNode<pagx::Rectangle>();
+  panelRect->position = {60, 80};
+  panelRect->size = {THREE_SHADOW_PANEL_WIDTH, THREE_SHADOW_PANEL_HEIGHT};
+  panelRect->roundness = THREE_SHADOW_PANEL_ROUNDNESS;
+  auto panelFill = doc->makeNode<pagx::Fill>();
+  auto panelColor = doc->makeNode<pagx::SolidColor>();
+  panelColor->color = {0.0f, 0.0f, 0.0f, 0.004f};
+  panelFill->color = panelColor;
+  panel->contents = {panelRect, panelFill};
+
+  const float spread = zeroSpread ? 0.0f : THREE_SHADOW_SPREAD;
+  auto light = doc->makeNode<pagx::InnerShadowStyle>("lightShadow");
+  light->offsetY = THREE_SHADOW_OFFSET;
+  light->blurX = THREE_SHADOW_LIGHT_BLUR;
+  light->blurY = THREE_SHADOW_LIGHT_BLUR;
+  light->spread = spread;
+  light->color = {THREE_SHADOW_LIGHT, THREE_SHADOW_LIGHT, THREE_SHADOW_LIGHT, 1.0f};
+  light->excludeChildEffects = true;
+  panel->styles.push_back(light);
+
+  auto upperDark = doc->makeNode<pagx::InnerShadowStyle>("upperDarkShadow");
+  upperDark->offsetY = -THREE_SHADOW_OFFSET;
+  upperDark->blurX = THREE_SHADOW_DARK_BLUR;
+  upperDark->blurY = THREE_SHADOW_DARK_BLUR;
+  upperDark->spread = spread;
+  upperDark->color = {THREE_SHADOW_DARK, THREE_SHADOW_DARK, THREE_SHADOW_DARK, 1.0f};
+  upperDark->excludeChildEffects = true;
+  panel->styles.push_back(upperDark);
+
+  auto lowerDark = doc->makeNode<pagx::InnerShadowStyle>("lowerDarkShadow");
+  lowerDark->offsetY = THREE_SHADOW_OFFSET;
+  lowerDark->blurX = THREE_SHADOW_DARK_BLUR;
+  lowerDark->blurY = THREE_SHADOW_DARK_BLUR;
+  lowerDark->spread = spread;
+  lowerDark->color = {THREE_SHADOW_DARK, THREE_SHADOW_DARK, THREE_SHADOW_DARK, 1.0f};
+  lowerDark->excludeChildEffects = true;
+  panel->styles.push_back(lowerDark);
+
+  if (withGlass) {
+    auto glass = doc->makeNode<pagx::GlassStyle>("glass");
+    glass->refraction = 70;
+    glass->depth = 30;
+    glass->frost = 6;
+    glass->dispersion = 20;
+    glass->splay = 20;
+    glass->lightAngle = 0;
+    glass->lightIntensity = 25;
+    glass->excludeChildEffects = true;
+    panel->styles.push_back(glass);
+  }
+
+  doc->layers.push_back(panel);
+  return doc;
+}
+
+static std::vector<std::shared_ptr<tgfx::Layer>> MakeThreeInnerShadowReferenceLayers(
+    bool withGlass, bool zeroSpread) {
+  std::vector<std::shared_ptr<tgfx::Layer>> layers = {};
+
+  ShadowSpreadReferenceShape background;
+  background.centerX = 60;
+  background.centerY = 80;
+  background.width = 120;
+  background.height = 160;
+  background.fill = tgfx::Color::White();
+  layers.push_back(MakeReferenceShadowLayer(background, {}));
+
+  ShadowSpreadReferenceShape panel;
+  panel.centerX = 60;
+  panel.centerY = 80;
+  panel.width = THREE_SHADOW_PANEL_WIDTH;
+  panel.height = THREE_SHADOW_PANEL_HEIGHT;
+  panel.roundness = THREE_SHADOW_PANEL_ROUNDNESS;
+  panel.fill = {0.0f, 0.0f, 0.0f, 0.004f};
+
+  const float spread = zeroSpread ? 0.0f : THREE_SHADOW_SPREAD;
+  ShadowSpreadReferenceStyle light;
+  light.inner = true;
+  light.offsetY = THREE_SHADOW_OFFSET;
+  light.blurX = THREE_SHADOW_LIGHT_BLUR;
+  light.blurY = THREE_SHADOW_LIGHT_BLUR;
+  light.spread = spread;
+  light.color = {THREE_SHADOW_LIGHT, THREE_SHADOW_LIGHT, THREE_SHADOW_LIGHT, 1.0f};
+  light.excludeChildEffects = true;
+
+  ShadowSpreadReferenceStyle upperDark;
+  upperDark.inner = true;
+  upperDark.offsetY = -THREE_SHADOW_OFFSET;
+  upperDark.blurX = THREE_SHADOW_DARK_BLUR;
+  upperDark.blurY = THREE_SHADOW_DARK_BLUR;
+  upperDark.spread = spread;
+  upperDark.color = {THREE_SHADOW_DARK, THREE_SHADOW_DARK, THREE_SHADOW_DARK, 1.0f};
+  upperDark.excludeChildEffects = true;
+
+  ShadowSpreadReferenceStyle lowerDark = upperDark;
+  lowerDark.offsetY = THREE_SHADOW_OFFSET;
+
+  auto panelLayer = MakeReferenceShadowLayer(panel, {light, upperDark, lowerDark});
+  if (withGlass) {
+    auto styles = panelLayer->layerStyles();
+    auto glass = tgfx::GlassStyle::Make(70, 30, 6, 20, 20, 0, 25);
+    glass->setExcludeChildEffects(true);
+    styles.push_back(glass);
+    panelLayer->setLayerStyles(styles);
+  }
+  layers.push_back(panelLayer);
+  return layers;
+}
+
+// Closed-form region used by the spread oracle tests. Expected pixels come from geometry alone and
+// never from a TGFX render, so the checks hold the renderer to the spec instead of to itself. A zero
+// radius describes sharp corners measured with the Chebyshev distance, a positive radius describes a
+// rounded rect with Euclidean corners.
+struct SpreadOracleShape {
+  float left = 0.0f;
+  float top = 0.0f;
+  float right = 0.0f;
+  float bottom = 0.0f;
+  float radius = 0.0f;
+};
+
+struct SpreadOracleColor {
+  uint8_t red = 0;
+  uint8_t green = 0;
+  uint8_t blue = 0;
+  uint8_t alpha = 0;
+};
+
+struct SpreadImage {
+  int width = 0;
+  int height = 0;
+  std::vector<uint8_t> pixels = {};
+};
+
+// Pixel centers closer than SPREAD_ORACLE_MARGIN to an expected edge are left to anti-aliasing.
+static constexpr float SPREAD_ORACLE_MARGIN = 1.0f;
+static constexpr int SPREAD_ORACLE_TOLERANCE = 3;
+static constexpr SpreadOracleColor SPREAD_RED = {255, 0, 0, 255};
+static constexpr SpreadOracleColor SPREAD_BLUE = {0, 0, 255, 255};
+static constexpr SpreadOracleColor SPREAD_CLEAR = {0, 0, 0, 0};
+static constexpr SpreadOracleShape SPREAD_CANVAS = {0, 0, 200, 200, 0};
+
+// The 80x60 rounded rect (radius 10) centered in the 200x200 canvas, and the outline of its drop
+// shadow with offset (6, 10) and spread 12. The spread edges are exact. Corner rules are left to the
+// renderer, so the corners are only bounded between the concentric round outline (radius 10 + 12)
+// that must be covered and the sharp outline that must not be exceeded.
+static constexpr SpreadOracleShape SPREAD_CONTENT = {60, 70, 140, 130, 10};
+static constexpr SpreadOracleShape SPREAD_DROP_CORE = {54, 68, 158, 152, 22};
+static constexpr SpreadOracleShape SPREAD_DROP_HULL = {54, 68, 158, 152, 0};
+
+static SpreadOracleShape OutsetSpreadOracleShape(const SpreadOracleShape& shape, float distance,
+                                                 float radius) {
+  return {shape.left - distance, shape.top - distance, shape.right + distance,
+          shape.bottom + distance, radius};
+}
+
+static SpreadOracleShape ScaleSpreadOracleShape(const SpreadOracleShape& shape, float scale) {
+  return {shape.left * scale, shape.top * scale, shape.right * scale, shape.bottom * scale,
+          shape.radius * scale};
+}
+
+static float SpreadSignedDistance(const SpreadOracleShape& shape, float x, float y) {
+  auto halfWidth = (shape.right - shape.left) * 0.5f;
+  auto halfHeight = (shape.bottom - shape.top) * 0.5f;
+  auto distanceX = std::abs(x - shape.left - halfWidth) - halfWidth;
+  auto distanceY = std::abs(y - shape.top - halfHeight) - halfHeight;
+  if (shape.radius <= 0.0f) {
+    return std::max(distanceX, distanceY);
+  }
+  auto cornerX = distanceX + shape.radius;
+  auto cornerY = distanceY + shape.radius;
+  auto outside = std::hypot(std::max(cornerX, 0.0f), std::max(cornerY, 0.0f));
+  return outside + std::min(std::max(cornerX, cornerY), 0.0f) - shape.radius;
+}
+
+static size_t SpreadPixelOffset(const SpreadImage& image, int x, int y) {
+  return (static_cast<size_t>(y) * static_cast<size_t>(image.width) + static_cast<size_t>(x)) * 4;
+}
+
+static int SpreadPixelAlpha(const SpreadImage& image, int x, int y) {
+  return image.pixels[SpreadPixelOffset(image, x, y) + 3];
+}
+
+static std::string DescribeSpreadPixel(const SpreadImage& image, int x, int y) {
+  auto offset = SpreadPixelOffset(image, x, y);
+  return "(" + std::to_string(image.pixels[offset]) + ", " +
+         std::to_string(image.pixels[offset + 1]) + ", " +
+         std::to_string(image.pixels[offset + 2]) + ", " +
+         std::to_string(image.pixels[offset + 3]) + ")";
+}
+
+static bool SpreadPixelsMatch(const SpreadImage& actual, const SpreadImage& expected, int x,
+                              int y) {
+  auto offset = SpreadPixelOffset(actual, x, y);
+  for (size_t channel = 0; channel < 4; channel++) {
+    auto difference = static_cast<int>(actual.pixels[offset + channel]) -
+                      static_cast<int>(expected.pixels[offset + channel]);
+    if (std::abs(difference) > SPREAD_ORACLE_TOLERANCE) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static SpreadImage MakeSolidSpreadImage(int width, int height, const SpreadOracleColor& color) {
+  SpreadImage image = {width, height, {}};
+  image.pixels.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+  for (size_t index = 0; index < image.pixels.size(); index += 4) {
+    image.pixels[index] = color.red;
+    image.pixels[index + 1] = color.green;
+    image.pixels[index + 2] = color.blue;
+    image.pixels[index + 3] = color.alpha;
+  }
+  return image;
+}
+
+static std::string MakeSpreadXML(const std::string& layers) {
+  return R"(<pagx width="200" height="200">)" + layers + "</pagx>";
+}
+
+// Renders the XML with the test font registered as family "SpreadTest", so text never resolves to
+// a system font.
+static SpreadImage RenderSpreadImage(const std::string& xml, int width, int height,
+                                     float zoomScale) {
+  SpreadImage image = {};
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  if (doc == nullptr || !doc->errors.empty()) {
+    return image;
+  }
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "SpreadTest", "Regular");
+  doc->applyLayout(&fontConfig);
+  auto scene = pagx::PAGScene::Make(doc);
+  auto surface = pagx::PAGSurface::MakeOffscreen(width, height);
+  if (scene == nullptr || surface == nullptr) {
+    return image;
+  }
+  scene->getDisplayOptions()->setZoomScale(zoomScale);
+  if (!scene->draw(surface)) {
+    return image;
+  }
+  image.pixels = ReadPAGXSurfacePixels(surface);
+  image.width = width;
+  image.height = height;
+  return image;
+}
+
+// Returns the bounds of all pixels with non-zero alpha. The bounds are empty when nothing is drawn.
+static SpreadOracleShape FindSpreadInkBounds(const SpreadImage& image) {
+  auto left = image.width;
+  auto top = image.height;
+  auto right = 0;
+  auto bottom = 0;
+  for (int y = 0; y < image.height; y++) {
+    for (int x = 0; x < image.width; x++) {
+      if (SpreadPixelAlpha(image, x, y) == 0) {
+        continue;
+      }
+      left = std::min(left, x);
+      top = std::min(top, y);
+      right = std::max(right, x + 1);
+      bottom = std::max(bottom, y + 1);
+    }
+  }
+  return {static_cast<float>(left), static_cast<float>(top), static_cast<float>(right),
+          static_cast<float>(bottom), 0.0f};
+}
+
+// Expects every pixel whose center lies inside include and outside exclude by more than the
+// anti-aliasing margin to match the same pixel of expected. An empty region fails, so a check can
+// never pass vacuously.
+static void ExpectSpreadRegionMatches(const SpreadImage& actual, const SpreadImage& expected,
+                                      const SpreadOracleShape& include,
+                                      const SpreadOracleShape* exclude) {
+  ASSERT_EQ(actual.width, expected.width);
+  ASSERT_EQ(actual.height, expected.height);
+  ASSERT_EQ(actual.pixels.size(),
+            static_cast<size_t>(actual.width) * static_cast<size_t>(actual.height) * 4);
+  ASSERT_EQ(expected.pixels.size(), actual.pixels.size());
+  int checked = 0;
+  int mismatched = 0;
+  int firstX = -1;
+  int firstY = -1;
+  for (int y = 0; y < actual.height; y++) {
+    for (int x = 0; x < actual.width; x++) {
+      auto centerX = static_cast<float>(x) + 0.5f;
+      auto centerY = static_cast<float>(y) + 0.5f;
+      if (SpreadSignedDistance(include, centerX, centerY) >= -SPREAD_ORACLE_MARGIN) {
+        continue;
+      }
+      if (exclude != nullptr &&
+          SpreadSignedDistance(*exclude, centerX, centerY) <= SPREAD_ORACLE_MARGIN) {
+        continue;
+      }
+      checked++;
+      if (SpreadPixelsMatch(actual, expected, x, y)) {
+        continue;
+      }
+      if (mismatched == 0) {
+        firstX = x;
+        firstY = y;
+      }
+      mismatched++;
+    }
+  }
+  EXPECT_GT(checked, 0) << "the expected region is empty";
+  if (mismatched > 0) {
+    ADD_FAILURE() << mismatched << " of " << checked << " pixels mismatch, first at (" << firstX
+                  << ", " << firstY << "): actual " << DescribeSpreadPixel(actual, firstX, firstY)
+                  << ", expected " << DescribeSpreadPixel(expected, firstX, firstY);
+  }
+}
+
+static void ExpectSpreadRegionColor(const SpreadImage& actual, const SpreadOracleColor& color,
+                                    const SpreadOracleShape& include,
+                                    const SpreadOracleShape* exclude) {
+  auto expected = MakeSolidSpreadImage(actual.width, actual.height, color);
+  ExpectSpreadRegionMatches(actual, expected, include, exclude);
+}
+
+}  // namespace
+
+/**
+ * Test case: spread defaults to zero on both shadow style node types, stays zero for a missing or
+ * explicit zero XML attribute, is omitted from exported XML when zero, and a zero-spread render
+ * matches an independent TGFX reference.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadDefaults) {
+  auto doc = pagx::PAGXDocument::Make(160, 160);
+  auto drop = doc->makeNode<pagx::DropShadowStyle>("drop");
+  auto inner = doc->makeNode<pagx::InnerShadowStyle>("inner");
+  EXPECT_FLOAT_EQ(drop->spread, 0.0f);
+  EXPECT_FLOAT_EQ(inner->spread, 0.0f);
+  EXPECT_FLOAT_EQ(pagx::Default<pagx::DropShadowStyle>().spread, 0.0f);
+  EXPECT_FLOAT_EQ(pagx::Default<pagx::InnerShadowStyle>().spread, 0.0f);
+
+  const std::string xml =
+      R"(<pagx width="160" height="160">)"
+      R"(<Layer id="L"><Rectangle width="80" height="80" roundness="8"/><Fill color="#CCCCCC"/>)"
+      R"(<DropShadowStyle id="d" offsetY="8" blurX="6" blurY="6"/>)"
+      R"(<InnerShadowStyle id="i" offsetY="8" blurX="6" blurY="6" spread="0"/>)"
+      R"(</Layer></pagx>)";
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  ASSERT_TRUE(reloaded->errors.empty());
+  auto* reloadedDrop = reloaded->findNode<pagx::DropShadowStyle>("d");
+  auto* reloadedInner = reloaded->findNode<pagx::InnerShadowStyle>("i");
+  ASSERT_TRUE(reloadedDrop != nullptr);
+  ASSERT_TRUE(reloadedInner != nullptr);
+  EXPECT_FLOAT_EQ(reloadedDrop->spread, 0.0f);
+  EXPECT_FLOAT_EQ(reloadedInner->spread, 0.0f);
+
+  auto exported = pagx::PAGXExporter::ToXML(*reloaded);
+  EXPECT_EQ(exported.find("spread="), std::string::npos);
+
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(160, 160);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto pagxPixels = ReadPAGXSurfacePixels(surface);
+  ASSERT_FALSE(pagxPixels.empty());
+
+  ShadowSpreadReferenceShape shape;
+  shape.centerX = 40;
+  shape.centerY = 40;
+  shape.width = 80;
+  shape.height = 80;
+  shape.roundness = 8;
+  shape.fill = {0.8f, 0.8f, 0.8f, 1.0f};
+  ShadowSpreadReferenceStyle dropStyle;
+  dropStyle.offsetY = 8;
+  dropStyle.blurX = 6;
+  dropStyle.blurY = 6;
+  dropStyle.spread = 0.0f;
+  dropStyle.color = {0.0f, 0.0f, 0.0f, 1.0f};
+  ShadowSpreadReferenceStyle innerStyle = dropStyle;
+  innerStyle.inner = true;
+  auto referenceLayer = MakeReferenceShadowLayer(shape, {dropStyle, innerStyle});
+  std::vector<uint8_t> referencePixels;
+  {
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    auto referenceSurface = RenderReferenceShadowScene(deviceLock.context(), 160, 160, 160, 160,
+                                                       1.0f, {referenceLayer});
+    ASSERT_TRUE(referenceSurface != nullptr);
+    referencePixels = ReadReferenceSurfacePixels(referenceSurface);
+  }
+  ASSERT_FALSE(referencePixels.empty());
+  EXPECT_EQ(CountPixelDifferences(pagxPixels, referencePixels), 0);
+}
+
+/**
+ * Test case: spread survives repeated XML export/import for positive, negative, fractional and
+ * default values on both shadow style types; non-zero values are written and zero is omitted.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadXMLRoundTrip) {
+  const float values[] = {8.0f, -8.0f, 2.25f, -19.587f, 0.0f};
+  for (float value : values) {
+    auto doc = pagx::PAGXDocument::Make(120, 80);
+    auto layer = doc->makeNode<pagx::Layer>("L");
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {60, 40};
+    rect->size = {80, 60};
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0.5f, 0.5f, 0.5f, 1.0f};
+    fill->color = solid;
+    layer->contents = {rect, fill};
+    auto drop = doc->makeNode<pagx::DropShadowStyle>("drop");
+    drop->offsetY = 4;
+    drop->spread = value;
+    auto inner = doc->makeNode<pagx::InnerShadowStyle>("inner");
+    inner->offsetY = 4;
+    inner->spread = value;
+    layer->styles = {drop, inner};
+    doc->layers.push_back(layer);
+
+    std::string xml = pagx::PAGXExporter::ToXML(*doc);
+    ASSERT_FALSE(xml.empty());
+    if (value == 0.0f) {
+      EXPECT_EQ(xml.find("spread="), std::string::npos);
+    } else {
+      EXPECT_EQ(CountOccurrences(xml, "spread="), 2);
+    }
+
+    for (int round = 0; round < 2; round++) {
+      auto reloaded = pagx::PAGXImporter::FromXML(xml);
+      ASSERT_TRUE(reloaded != nullptr) << "value " << value << " round " << round;
+      ASSERT_TRUE(reloaded->errors.empty()) << "value " << value << " round " << round;
+      auto* reloadedDrop = reloaded->findNode<pagx::DropShadowStyle>("drop");
+      auto* reloadedInner = reloaded->findNode<pagx::InnerShadowStyle>("inner");
+      ASSERT_TRUE(reloadedDrop != nullptr) << "round " << round;
+      ASSERT_TRUE(reloadedInner != nullptr) << "round " << round;
+      EXPECT_FLOAT_EQ(reloadedDrop->spread, value) << "round " << round;
+      EXPECT_FLOAT_EQ(reloadedInner->spread, value) << "round " << round;
+      xml = pagx::PAGXExporter::ToXML(*reloaded);
+      ASSERT_FALSE(xml.empty());
+    }
+  }
+}
+
+/**
+ * Test case: both shadow style types expose spread through the generic node channel API with the
+ * expected animatable flag, get/set/reset behavior, wrong-type rejection, and no layout flag;
+ * shadow filters and unrelated style types do not expose it.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadNodeChannels) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto drop = doc->makeNode<pagx::DropShadowStyle>("drop");
+  auto inner = doc->makeNode<pagx::InnerShadowStyle>("inner");
+
+  EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::DropShadowStyle, "spread"));
+  EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::InnerShadowStyle, "spread"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::DropShadowStyle, "spread"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::InnerShadowStyle, "spread"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::DropShadowStyle, "spread"));
+  EXPECT_FALSE(pagx::RequiresLayout(pagx::NodeType::InnerShadowStyle, "spread"));
+
+  const auto dropChannels = pagx::ListChannels(pagx::NodeType::DropShadowStyle);
+  EXPECT_NE(std::find(dropChannels.begin(), dropChannels.end(), "spread"), dropChannels.end());
+  const auto innerChannels = pagx::ListChannels(pagx::NodeType::InnerShadowStyle);
+  EXPECT_NE(std::find(innerChannels.begin(), innerChannels.end(), "spread"), innerChannels.end());
+
+  const auto& dropTable = pagx::ChannelsFor(pagx::NodeType::DropShadowStyle);
+  bool sawDropSpread = false;
+  for (const auto& channel : dropTable) {
+    if (std::strcmp(channel.channel, "spread") != 0) {
+      continue;
+    }
+    sawDropSpread = true;
+    EXPECT_TRUE(pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable));
+    EXPECT_FALSE(pagx::HasFlag(channel.flags, pagx::ChannelFlags::RequiresLayout));
+  }
+  EXPECT_TRUE(sawDropSpread);
+
+  pagx::KeyValue out;
+  EXPECT_TRUE(pagx::GetNodeChannel(drop, "spread", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), 0.0f);
+  EXPECT_TRUE(pagx::SetNodeChannel(drop, "spread", pagx::KeyValue(-19.587f)));
+  EXPECT_FLOAT_EQ(drop->spread, -19.587f);
+  EXPECT_TRUE(pagx::GetNodeChannel(drop, "spread", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), -19.587f);
+  EXPECT_FALSE(pagx::SetNodeChannel(drop, "spread", pagx::KeyValue(std::string("x"))));
+  EXPECT_FLOAT_EQ(drop->spread, -19.587f);
+  EXPECT_TRUE(pagx::ResetNodeChannel(drop, "spread"));
+  EXPECT_FLOAT_EQ(drop->spread, 0.0f);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(inner, "spread", pagx::KeyValue(2.25f)));
+  EXPECT_FLOAT_EQ(inner->spread, 2.25f);
+  EXPECT_TRUE(pagx::ResetNodeChannel(inner, "spread"));
+  EXPECT_FLOAT_EQ(inner->spread, 0.0f);
+
+  auto dropFilter = doc->makeNode<pagx::DropShadowFilter>("dropFilter");
+  auto innerFilter = doc->makeNode<pagx::InnerShadowFilter>("innerFilter");
+  auto glass = doc->makeNode<pagx::GlassStyle>("glass");
+  auto noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::DropShadowFilter, "spread"));
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::InnerShadowFilter, "spread"));
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::GlassStyle, "spread"));
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::NoiseStyle, "spread"));
+  EXPECT_FALSE(pagx::SetNodeChannel(dropFilter, "spread", pagx::KeyValue(4.0f)));
+  EXPECT_FALSE(pagx::SetNodeChannel(innerFilter, "spread", pagx::KeyValue(4.0f)));
+  EXPECT_FALSE(pagx::SetNodeChannel(glass, "spread", pagx::KeyValue(4.0f)));
+  EXPECT_FALSE(pagx::SetNodeChannel(noise, "spread", pagx::KeyValue(4.0f)));
+  EXPECT_FALSE(pagx::GetNodeChannel(dropFilter, "spread", &out));
+  EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::DropShadowFilter, "spread"));
+}
+
+/**
+ * Test case: a directly built document, an XML reloaded document and the checked-in
+ * shadow_spread.pagx resource all pass the authored spread into the TGFX shadow styles.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadSceneBuild) {
+  auto doc = MakeShadowSpreadStyleDocument(8.0f, -6.0f);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto* dropNode = doc->findNode<pagx::DropShadowStyle>("drop");
+  auto* innerNode = doc->findNode<pagx::InnerShadowStyle>("inner");
+  ASSERT_TRUE(dropNode != nullptr);
+  ASSERT_TRUE(innerNode != nullptr);
+  auto tgfxDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  auto tgfxInner = binding->get<tgfx::InnerShadowStyle>(innerNode);
+  ASSERT_TRUE(tgfxDrop != nullptr);
+  ASSERT_TRUE(tgfxInner != nullptr);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 8.0f);
+  EXPECT_FLOAT_EQ(tgfxInner->spread(), -6.0f);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  ASSERT_TRUE(reloaded->errors.empty());
+  auto reloadedScene = pagx::PAGScene::Make(reloaded);
+  ASSERT_TRUE(reloadedScene != nullptr);
+  auto* reloadedBinding = reloadedScene->mutableBinding();
+  ASSERT_TRUE(reloadedBinding != nullptr);
+  auto* reloadedDrop = reloaded->findNode<pagx::DropShadowStyle>("drop");
+  auto* reloadedInner = reloaded->findNode<pagx::InnerShadowStyle>("inner");
+  ASSERT_TRUE(reloadedDrop != nullptr);
+  ASSERT_TRUE(reloadedInner != nullptr);
+  auto reloadedTgfxDrop = reloadedBinding->get<tgfx::DropShadowStyle>(reloadedDrop);
+  auto reloadedTgfxInner = reloadedBinding->get<tgfx::InnerShadowStyle>(reloadedInner);
+  ASSERT_TRUE(reloadedTgfxDrop != nullptr);
+  ASSERT_TRUE(reloadedTgfxInner != nullptr);
+  EXPECT_FLOAT_EQ(reloadedTgfxDrop->spread(), 8.0f);
+  EXPECT_FLOAT_EQ(reloadedTgfxInner->spread(), -6.0f);
+
+  auto resource =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/apitest/shadow_spread.pagx"));
+  ASSERT_TRUE(resource != nullptr);
+  ASSERT_TRUE(resource->errors.empty());
+  auto* resourceDrop = resource->findNode<pagx::DropShadowStyle>("drop");
+  auto* resourceInner = resource->findNode<pagx::InnerShadowStyle>("inner");
+  ASSERT_TRUE(resourceDrop != nullptr);
+  ASSERT_TRUE(resourceInner != nullptr);
+  EXPECT_FLOAT_EQ(resourceDrop->spread, 8.0f);
+  EXPECT_FLOAT_EQ(resourceInner->spread, -6.0f);
+  auto resourceScene = pagx::PAGScene::Make(resource);
+  ASSERT_TRUE(resourceScene != nullptr);
+  auto* resourceBinding = resourceScene->mutableBinding();
+  ASSERT_TRUE(resourceBinding != nullptr);
+  auto resourceTgfxDrop = resourceBinding->get<tgfx::DropShadowStyle>(resourceDrop);
+  auto resourceTgfxInner = resourceBinding->get<tgfx::InnerShadowStyle>(resourceInner);
+  ASSERT_TRUE(resourceTgfxDrop != nullptr);
+  ASSERT_TRUE(resourceTgfxInner != nullptr);
+  EXPECT_FLOAT_EQ(resourceTgfxDrop->spread(), 8.0f);
+  EXPECT_FLOAT_EQ(resourceTgfxInner->spread(), -6.0f);
+}
+
+/**
+ * Test case: float spread channels targeting both style ids survive two XML export/import rounds
+ * with their key values and interpolation types, then evaluate to the authored values at the
+ * corresponding timeline times.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadAnimationRoundTrip) {
+  auto doc = MakeShadowSpreadStyleDocument(0.0f, 0.0f);
+  auto animation = doc->makeNode<pagx::Animation>("spread-animation");
+  animation->duration = 120;
+  animation->frameRate = 60;
+  animation->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(animation);
+
+  auto dropObject = doc->makeNode<pagx::AnimationObject>();
+  dropObject->target = "drop";
+  auto dropChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  dropChannel->name = "spread";
+  dropChannel->keyframes = {
+      {0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {30, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, -8.0f, pagx::KeyframeInterpolationType::Hold, {}, {}},
+      {90, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+  dropObject->channels.push_back(dropChannel);
+  animation->objects.push_back(dropObject);
+
+  auto innerObject = doc->makeNode<pagx::AnimationObject>();
+  innerObject->target = "inner";
+  auto innerChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  innerChannel->name = "spread";
+  innerChannel->keyframes = {
+      {0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {30, -6.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, 6.0f, pagx::KeyframeInterpolationType::Hold, {}, {}},
+      {90, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+  innerObject->channels.push_back(innerChannel);
+  animation->objects.push_back(innerObject);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_EQ(CountOccurrences(xml, "name=\"spread\""), 2);
+
+  for (int round = 0; round < 2; round++) {
+    auto reloaded = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(reloaded != nullptr) << "round " << round;
+    ASSERT_TRUE(reloaded->errors.empty()) << "round " << round;
+    auto* reloadedAnimation = reloaded->findNode<pagx::Animation>("spread-animation");
+    ASSERT_TRUE(reloadedAnimation != nullptr) << "round " << round;
+    ASSERT_EQ(reloadedAnimation->objects.size(), 2u) << "round " << round;
+    const float expectedDrop[] = {0.0f, 8.0f, -8.0f, 0.0f};
+    const float expectedInner[] = {0.0f, -6.0f, 6.0f, 0.0f};
+    for (size_t objectIndex = 0; objectIndex < reloadedAnimation->objects.size(); objectIndex++) {
+      auto* object = reloadedAnimation->objects[objectIndex];
+      ASSERT_EQ(object->channels.size(), 1u) << "round " << round;
+      auto* channel = object->channels[0];
+      EXPECT_EQ(channel->name, "spread");
+      ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Float);
+      auto* typed = static_cast<pagx::TypedChannel<float>*>(channel);
+      ASSERT_EQ(typed->keyframes.size(), 4u) << "round " << round;
+      const float* expected = objectIndex == 0 ? expectedDrop : expectedInner;
+      for (size_t keyIndex = 0; keyIndex < typed->keyframes.size(); keyIndex++) {
+        EXPECT_FLOAT_EQ(typed->keyframes[keyIndex].value, expected[keyIndex])
+            << "round " << round << " object " << objectIndex << " key " << keyIndex;
+      }
+      EXPECT_EQ(typed->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Linear);
+      EXPECT_EQ(typed->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Linear);
+      EXPECT_EQ(typed->keyframes[2].interpolation, pagx::KeyframeInterpolationType::Hold);
+      EXPECT_EQ(typed->keyframes[3].interpolation, pagx::KeyframeInterpolationType::Linear);
+    }
+    xml = pagx::PAGXExporter::ToXML(*reloaded);
+  }
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto* dropNode = reloaded->findNode<pagx::DropShadowStyle>("drop");
+  auto* innerNode = reloaded->findNode<pagx::InnerShadowStyle>("inner");
+  ASSERT_TRUE(dropNode != nullptr);
+  ASSERT_TRUE(innerNode != nullptr);
+  auto tgfxDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  auto tgfxInner = binding->get<tgfx::InnerShadowStyle>(innerNode);
+  ASSERT_TRUE(tgfxDrop != nullptr);
+  ASSERT_TRUE(tgfxInner != nullptr);
+
+  auto timeline = scene->getAnimation("spread-animation");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->setCurrentTime(500'000);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 8.0f);
+  EXPECT_FLOAT_EQ(tgfxInner->spread(), -6.0f);
+  timeline->setCurrentTime(1'000'000);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), -8.0f);
+  EXPECT_FLOAT_EQ(tgfxInner->spread(), 6.0f);
+  timeline->setCurrentTime(1'500'000);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 0.0f);
+  EXPECT_FLOAT_EQ(tgfxInner->spread(), 0.0f);
+}
+
+/**
+ * Test case: the runtime accessor pair reads and writes spread on both TGFX shadow styles; the
+ * reader reports the live runtime value instead of the document value, and mixing follows the
+ * existing float channel rules.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadRuntimeAccessors) {
+  auto doc = MakeShadowSpreadStyleDocument(2.0f, -3.0f);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto* dropNode = doc->findNode<pagx::DropShadowStyle>("drop");
+  auto* innerNode = doc->findNode<pagx::InnerShadowStyle>("inner");
+  ASSERT_TRUE(dropNode != nullptr);
+  ASSERT_TRUE(innerNode != nullptr);
+  auto tgfxDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  auto tgfxInner = binding->get<tgfx::InnerShadowStyle>(innerNode);
+  ASSERT_TRUE(tgfxDrop != nullptr);
+  ASSERT_TRUE(tgfxInner != nullptr);
+
+  EXPECT_TRUE(binding->hasWriter(dropNode, "spread"));
+  EXPECT_TRUE(binding->hasWriter(innerNode, "spread"));
+
+  EXPECT_TRUE(binding->apply(dropNode, "spread", pagx::KeyValue(-8.0f), 1.0f));
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), -8.0f);
+  EXPECT_FLOAT_EQ(dropNode->spread, 2.0f);
+  pagx::KeyValue out;
+  EXPECT_TRUE(binding->read(dropNode, "spread", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), -8.0f);
+
+  EXPECT_TRUE(binding->apply(dropNode, "spread", pagx::KeyValue(8.0f), 0.5f));
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 0.0f);
+  EXPECT_TRUE(binding->apply(dropNode, "spread", pagx::KeyValue(20.0f), 0.0f));
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 0.0f);
+
+  EXPECT_TRUE(binding->apply(innerNode, "spread", pagx::KeyValue(-12.0f), 1.0f));
+  EXPECT_FLOAT_EQ(tgfxInner->spread(), -12.0f);
+  EXPECT_FLOAT_EQ(innerNode->spread, -3.0f);
+  EXPECT_TRUE(binding->read(innerNode, "spread", &out));
+  EXPECT_FLOAT_EQ(std::get<float>(out), -12.0f);
+}
+
+/**
+ * Test case: the spread animation interpolates across zero with mix 1, 0.5 and 0, and a second
+ * timeline stacks on the live runtime value produced by the first one.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadAnimationMix) {
+  auto doc = MakeShadowSpreadStyleDocument(0.0f, 0.0f);
+
+  auto animationA = doc->makeNode<pagx::Animation>("spread-a");
+  animationA->duration = 120;
+  animationA->frameRate = 60;
+  animationA->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(animationA);
+  auto objectA = doc->makeNode<pagx::AnimationObject>();
+  objectA->target = "drop";
+  auto channelA = doc->makeNode<pagx::TypedChannel<float>>();
+  channelA->name = "spread";
+  channelA->keyframes = {
+      {0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {120, -8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+  objectA->channels.push_back(channelA);
+  animationA->objects.push_back(objectA);
+
+  auto animationB = doc->makeNode<pagx::Animation>("spread-b");
+  animationB->duration = 120;
+  animationB->frameRate = 60;
+  animationB->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(animationB);
+  auto objectB = doc->makeNode<pagx::AnimationObject>();
+  objectB->target = "drop";
+  auto channelB = doc->makeNode<pagx::TypedChannel<float>>();
+  channelB->name = "spread";
+  channelB->keyframes = {{0, -4.0f, pagx::KeyframeInterpolationType::Hold, {}, {}}};
+  objectB->channels.push_back(channelB);
+  animationB->objects.push_back(objectB);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* dropNode = doc->findNode<pagx::DropShadowStyle>("drop");
+  ASSERT_TRUE(dropNode != nullptr);
+  auto tgfxDrop = scene->mutableBinding()->get<tgfx::DropShadowStyle>(dropNode);
+  ASSERT_TRUE(tgfxDrop != nullptr);
+  auto timelineA = scene->getAnimation("spread-a");
+  auto timelineB = scene->getAnimation("spread-b");
+  ASSERT_TRUE(timelineA != nullptr);
+  ASSERT_TRUE(timelineB != nullptr);
+
+  timelineA->setCurrentTime(1'000'000);
+  timelineA->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 8.0f);
+  timelineA->setCurrentTime(2'000'000);
+  timelineA->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), -8.0f);
+
+  timelineA->setCurrentTime(1'000'000);
+  timelineA->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 0.0f);
+
+  timelineA->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 8.0f);
+  timelineB->setCurrentTime(0);
+  timelineB->apply(0.5f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 2.0f);
+  timelineB->apply(0.0f);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 2.0f);
+}
+
+/**
+ * Test case: editing spread through SetNodeChannel and notifying the owning layer refreshes the
+ * live scene without a layout pass; the refreshed TGFX style carries the new value and matches the
+ * independent TGFX reference. Reset plus notify restores the default.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadNotifyChange) {
+  auto doc = MakeShadowSpreadStyleDocument(0.0f, 0.0f);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto* dropNode = doc->findNode<pagx::DropShadowStyle>("drop");
+  auto* layer = doc->findNode<pagx::Layer>("layer");
+  ASSERT_TRUE(dropNode != nullptr);
+  ASSERT_TRUE(layer != nullptr);
+  auto tgfxDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  ASSERT_TRUE(tgfxDrop != nullptr);
+  EXPECT_FLOAT_EQ(tgfxDrop->spread(), 0.0f);
+
+  EXPECT_TRUE(pagx::SetNodeChannel(dropNode, "spread", pagx::KeyValue(-12.0f)));
+  bool layoutChanged = pagx::RequiresLayout(dropNode->nodeType(), "spread");
+  EXPECT_FALSE(layoutChanged);
+  doc->notifyChange({layer}, layoutChanged);
+  auto refreshedDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  ASSERT_TRUE(refreshedDrop != nullptr);
+  EXPECT_FLOAT_EQ(refreshedDrop->spread(), -12.0f);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(160, 160);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto pagxPixels = ReadPAGXSurfacePixels(surface);
+  ASSERT_FALSE(pagxPixels.empty());
+  auto referenceLayer = MakeShadowSpreadStyleReferenceLayer(-12.0f, 0.0f);
+  std::vector<uint8_t> referencePixels;
+  {
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    auto referenceSurface = RenderReferenceShadowScene(deviceLock.context(), 160, 160, 160, 160,
+                                                       1.0f, {referenceLayer});
+    ASSERT_TRUE(referenceSurface != nullptr);
+    referencePixels = ReadReferenceSurfacePixels(referenceSurface);
+  }
+  ASSERT_FALSE(referencePixels.empty());
+  EXPECT_EQ(CountPixelDifferences(pagxPixels, referencePixels), 0);
+
+  EXPECT_TRUE(pagx::ResetNodeChannel(dropNode, "spread"));
+  layoutChanged = pagx::RequiresLayout(dropNode->nodeType(), "spread");
+  EXPECT_FALSE(layoutChanged);
+  doc->notifyChange({layer}, layoutChanged);
+  auto resetDrop = binding->get<tgfx::DropShadowStyle>(dropNode);
+  ASSERT_TRUE(resetDrop != nullptr);
+  EXPECT_FLOAT_EQ(resetDrop->spread(), 0.0f);
+}
+
+/**
+ * Test case: the three inner shadows from the editor reproduce a direct TGFX scene with and
+ * without glass, and retaining their negative spread changes the zero-spread result.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadThreeInnerShadows) {
+  for (bool withGlass : {false, true}) {
+    SCOPED_TRACE(withGlass ? "with glass" : "without glass");
+    auto doc = MakeThreeInnerShadowDocument(withGlass, false);
+    auto scene = pagx::PAGScene::Make(doc);
+    ASSERT_TRUE(scene != nullptr);
+    auto surface = pagx::PAGSurface::MakeOffscreen(120, 160);
+    ASSERT_TRUE(surface != nullptr);
+    ASSERT_TRUE(scene->draw(surface));
+    auto pixels = ReadPAGXSurfacePixels(surface);
+    ASSERT_FALSE(pixels.empty());
+
+    std::vector<uint8_t> referencePixels;
+    {
+      pag::DeviceLockScope deviceLock;
+      ASSERT_TRUE(static_cast<bool>(deviceLock));
+      auto layers = MakeThreeInnerShadowReferenceLayers(withGlass, false);
+      auto referenceSurface =
+          RenderReferenceShadowScene(deviceLock.context(), 120, 160, 120, 160, 1.0f, layers);
+      ASSERT_TRUE(referenceSurface != nullptr);
+      referencePixels = ReadReferenceSurfacePixels(referenceSurface);
+    }
+    ASSERT_FALSE(referencePixels.empty());
+    EXPECT_EQ(CountPixelDifferences(pixels, referencePixels), 0);
+
+    auto zeroDoc = MakeThreeInnerShadowDocument(withGlass, true);
+    auto zeroScene = pagx::PAGScene::Make(zeroDoc);
+    ASSERT_TRUE(zeroScene != nullptr);
+    auto zeroSurface = pagx::PAGSurface::MakeOffscreen(120, 160);
+    ASSERT_TRUE(zeroSurface != nullptr);
+    ASSERT_TRUE(zeroScene->draw(zeroSurface));
+    auto zeroPixels = ReadPAGXSurfacePixels(zeroSurface);
+    ASSERT_FALSE(zeroPixels.empty());
+    EXPECT_GT(CountPixelDifferences(pixels, zeroPixels), 0);
+  }
+}
+
+/**
+ * Test case: a positive drop shadow spread grows the shadow outline of a rounded rect by exactly the
+ * spread on every side. Every pixel is checked against closed-form geometry instead of a TGFX
+ * reference, so a clipped or misplaced shadow cannot pass. The same expectation holds when the
+ * layer is placed by layout, scaled by its matrix with halved geometry and spread, or rendered with
+ * a zoom scale. With blur the half-coverage crossing stays on the spread outline and the blur tail
+ * beyond it is kept, and a negative spread that consumes the geometry leaves no shadow.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadDropGeometry) {
+  const std::string positioned =
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  const std::string laidOut =
+      MakeSpreadXML(R"(<Layer left="60" top="70" width="80" height="60">)"
+                    R"(<Rectangle width="80" height="60" roundness="10"/><Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  const std::string scaled =
+      MakeSpreadXML(R"(<Layer matrix="2,0,0,2,0,0">)"
+                    R"(<Rectangle position="50,50" size="40,30" roundness="5"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetX="3" offsetY="5" spread="6" color="#0000FF"/>)"
+                    R"(</Layer>)");
+  struct DropCase {
+    const char* name = nullptr;
+    std::string xml = "";
+    int surfaceSize = 0;
+    float zoomScale = 1.0f;
+  };
+  const DropCase cases[] = {{"position", positioned, 200, 1.0f},
+                            {"layout", laidOut, 200, 1.0f},
+                            {"layer matrix", scaled, 200, 1.0f},
+                            {"zoom", positioned, 400, 2.0f}};
+  for (const auto& dropCase : cases) {
+    SCOPED_TRACE(dropCase.name);
+    auto image = RenderSpreadImage(dropCase.xml, dropCase.surfaceSize, dropCase.surfaceSize,
+                                   dropCase.zoomScale);
+    ASSERT_FALSE(image.pixels.empty());
+    auto content = ScaleSpreadOracleShape(SPREAD_CONTENT, dropCase.zoomScale);
+    auto hull = ScaleSpreadOracleShape(SPREAD_DROP_HULL, dropCase.zoomScale);
+    ExpectSpreadRegionColor(image, SPREAD_RED, content, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_BLUE,
+                            ScaleSpreadOracleShape(SPREAD_DROP_CORE, dropCase.zoomScale), &content);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR,
+                            ScaleSpreadOracleShape(SPREAD_CANVAS, dropCase.zoomScale), &hull);
+  }
+
+  auto blurred = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle blurX="4" blurY="4" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)"),
+      200, 200, 1.0f);
+  ASSERT_FALSE(blurred.pixels.empty());
+  // Each probe samples the middle of one side of the spread outline (48, 58, 152, 142) 1.5px inside,
+  // 1.5px outside and 4.5px outside. A straight blurred edge crosses half coverage exactly on the
+  // outline, and the tail beyond the outline must not be clipped.
+  struct EdgeProbe {
+    int insideX = 0;
+    int insideY = 0;
+    int outsideX = 0;
+    int outsideY = 0;
+    int tailX = 0;
+    int tailY = 0;
+  };
+  const EdgeProbe probes[] = {{150, 100, 153, 100, 156, 100},
+                              {49, 100, 46, 100, 43, 100},
+                              {100, 140, 100, 143, 100, 146},
+                              {100, 59, 100, 56, 100, 53}};
+  for (const auto& probe : probes) {
+    EXPECT_GT(SpreadPixelAlpha(blurred, probe.insideX, probe.insideY), 128);
+    EXPECT_LT(SpreadPixelAlpha(blurred, probe.outsideX, probe.outsideY), 128);
+    EXPECT_GT(SpreadPixelAlpha(blurred, probe.tailX, probe.tailY), 0);
+  }
+
+  auto collapsed = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/>)"
+                    R"(<DropShadowStyle offsetY="10" spread="-30" color="#0000FF"/></Layer>)"),
+      200, 200, 1.0f);
+  auto plain = RenderSpreadImage(
+      MakeSpreadXML(R"(<Layer><Rectangle position="100,100" size="80,60" roundness="10"/>)"
+                    R"(<Fill color="#FF0000"/></Layer>)"),
+      200, 200, 1.0f);
+  ASSERT_FALSE(collapsed.pixels.empty());
+  ASSERT_FALSE(plain.pixels.empty());
+  EXPECT_EQ(CountPixelDifferences(collapsed.pixels, plain.pixels), 0);
+}
+
+/**
+ * Test case: with showBehindLayer disabled the layer contour erases the spread shadow under the
+ * semi-transparent content, so the content area matches a render without styles while the spread
+ * ring outside the content keeps the shadow color. With showBehindLayer enabled the content area
+ * shows the content composited over the shadow instead.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadShowBehindLayer) {
+  const std::string content =
+      R"(<Rectangle position="100,100" size="80,60" roundness="10"/><Fill color="#FF000080"/>)";
+  auto hidden = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + content +
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF")"
+                    R"( showBehindLayer="false"/></Layer>)"),
+      200, 200, 1.0f);
+  auto shown = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + content +
+                    R"(<DropShadowStyle offsetX="6" offsetY="10" spread="12" color="#0000FF"/>)"
+                    R"(</Layer>)"),
+      200, 200, 1.0f);
+  auto plain = RenderSpreadImage(MakeSpreadXML("<Layer>" + content + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(hidden.pixels.empty());
+  ASSERT_FALSE(shown.pixels.empty());
+  ASSERT_FALSE(plain.pixels.empty());
+  ExpectSpreadRegionMatches(hidden, plain, SPREAD_CONTENT, nullptr);
+  ExpectSpreadRegionColor(hidden, SPREAD_BLUE, SPREAD_DROP_CORE, &SPREAD_CONTENT);
+  ExpectSpreadRegionColor(hidden, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_DROP_HULL);
+  const SpreadOracleColor contentOverShadow = {128, 0, 127, 255};
+  ExpectSpreadRegionColor(shown, contentOverShadow, SPREAD_CONTENT, nullptr);
+}
+
+/**
+ * Test case: a positive inner shadow spread contracts the occluder by the spread, so the shadow band
+ * inside a rounded rect is exactly the spread wide, moves with the offset and leaves an exact core
+ * of content color. Once the spread reaches half of the shorter side the occluder collapses and the
+ * shadow covers the whole content regardless of offset and blur, without leaking outside it.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadInnerGeometry) {
+  const std::string content =
+      R"(<Rectangle position="100,100" size="80,60" roundness="10"/><Fill color="#FF0000"/>)";
+  // Each occluder is the content inset by the spread with its corner radius reduced by the same
+  // amount and floored at zero, then moved by the offset.
+  struct BandCase {
+    const char* style = nullptr;
+    SpreadOracleShape occluder = {};
+  };
+  const BandCase bandCases[] = {
+      {R"(<InnerShadowStyle spread="8" color="#0000FF"/>)", {68, 78, 132, 122, 2}},
+      {R"(<InnerShadowStyle offsetY="6" spread="8" color="#0000FF"/>)", {68, 84, 132, 128, 2}},
+      {R"(<InnerShadowStyle spread="28" color="#0000FF"/>)", {88, 98, 112, 102, 0}},
+  };
+  for (const auto& bandCase : bandCases) {
+    SCOPED_TRACE(bandCase.style);
+    auto image = RenderSpreadImage(MakeSpreadXML("<Layer>" + content + bandCase.style + "</Layer>"),
+                                   200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    ExpectSpreadRegionColor(image, SPREAD_BLUE, SPREAD_CONTENT, &bandCase.occluder);
+    ExpectSpreadRegionColor(image, SPREAD_RED, bandCase.occluder, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_CONTENT);
+  }
+
+  const char* collapsedStyles[] = {
+      R"(<InnerShadowStyle spread="30" color="#0000FF"/>)",
+      R"(<InnerShadowStyle offsetX="20" offsetY="20" blurX="4" blurY="4" spread="45")"
+      R"( color="#0000FF"/>)",
+  };
+  for (const auto* style : collapsedStyles) {
+    SCOPED_TRACE(style);
+    auto image =
+        RenderSpreadImage(MakeSpreadXML("<Layer>" + content + style + "</Layer>"), 200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    ExpectSpreadRegionColor(image, SPREAD_BLUE, SPREAD_CONTENT, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &SPREAD_CONTENT);
+  }
+}
+
+/**
+ * Test case: the approximation paths documented for spread, checked against closed-form footprints.
+ * The content shares the shadow color, so each expected footprint is one uniform region. A
+ * stroke-only outline widens the stroke band by the spread on both sides for every alignment and
+ * keeps the inner hole clear, a fill with a stroke spreads the outer stroke edge, an irregular path
+ * spreads its bounding rect, multiple geometries spread their union bounds including the gap
+ * between them, and a single text element spreads the bounds of its glyphs. Several text elements
+ * must cover at least the spread glyph bounds.
+ */
+PAGX_TEST(PAGXTest, ShadowSpreadApproximations) {
+  const SpreadOracleShape outline = {60, 70, 140, 130, 0};
+  struct StrokeCase {
+    const char* align = nullptr;
+    float innerEdge = 0.0f;
+    float outerEdge = 0.0f;
+  };
+  const StrokeCase strokeCases[] = {{"center", -2, 2}, {"inside", -4, 0}, {"outside", 0, 4}};
+  for (const auto& strokeCase : strokeCases) {
+    SCOPED_TRACE(strokeCase.align);
+    auto image = RenderSpreadImage(
+        MakeSpreadXML(std::string(R"(<Layer><Rectangle position="100,100" size="80,60"/>)") +
+                      R"(<Stroke color="#0000FF" width="4" align=")" + strokeCase.align +
+                      R"("/><DropShadowStyle spread="6" color="#0000FF"/></Layer>)"),
+        200, 200, 1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    auto hole = OutsetSpreadOracleShape(outline, strokeCase.innerEdge - 6, 0);
+    auto hull = OutsetSpreadOracleShape(outline, strokeCase.outerEdge + 6, 0);
+    ExpectSpreadRegionColor(image, SPREAD_BLUE,
+                            OutsetSpreadOracleShape(outline, strokeCase.outerEdge + 6, 6), &hole);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, hole, nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &hull);
+  }
+
+  struct FootprintCase {
+    const char* name = nullptr;
+    const char* contents = nullptr;
+    SpreadOracleShape bounds = {};
+    float spread = 0.0f;
+  };
+  const FootprintCase footprintCases[] = {
+      {"fill and stroke",
+       R"(<Rectangle position="100,100" size="80,60"/><Fill color="#0000FF"/>)"
+       R"(<Stroke color="#0000FF" width="4"/><DropShadowStyle spread="6" color="#0000FF"/>)",
+       {58, 68, 142, 132, 0},
+       6},
+      {"irregular path",
+       R"(<Path data="M 60 140 L 100 60 L 140 140 Z"/><Fill color="#0000FF"/>)"
+       R"(<DropShadowStyle spread="8" color="#0000FF"/>)",
+       {60, 60, 140, 140, 0},
+       8},
+      {"multiple geometries",
+       R"(<Rectangle position="70,100" size="40,40"/>)"
+       R"(<Rectangle position="130,100" size="40,40"/><Fill color="#0000FF"/>)"
+       R"(<DropShadowStyle spread="8" color="#0000FF"/>)",
+       {50, 80, 150, 120, 0},
+       8},
+  };
+  for (const auto& footprintCase : footprintCases) {
+    SCOPED_TRACE(footprintCase.name);
+    auto image = RenderSpreadImage(
+        MakeSpreadXML(std::string("<Layer>") + footprintCase.contents + "</Layer>"), 200, 200,
+        1.0f);
+    ASSERT_FALSE(image.pixels.empty());
+    auto hull = OutsetSpreadOracleShape(footprintCase.bounds, footprintCase.spread, 0);
+    ExpectSpreadRegionColor(
+        image, SPREAD_BLUE,
+        OutsetSpreadOracleShape(footprintCase.bounds, footprintCase.spread, footprintCase.spread),
+        nullptr);
+    ExpectSpreadRegionColor(image, SPREAD_CLEAR, SPREAD_CANVAS, &hull);
+  }
+
+  // Glyph bounds are measured from pixels, so the text footprints are checked one pixel inside and
+  // outside the spread of 8.
+  const std::string textShadow = R"(<DropShadowStyle spread="8" color="#0000FF"/>)";
+  const std::string singleText =
+      R"(<Text text="Hg" position="60,80" fontFamily="SpreadTest" fontStyle="Regular")"
+      R"( fontSize="48"/><Fill color="#0000FF"/>)";
+  auto singleGlyphs =
+      RenderSpreadImage(MakeSpreadXML("<Layer>" + singleText + "</Layer>"), 200, 200, 1.0f);
+  auto singleShadow = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + singleText + textShadow + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(singleGlyphs.pixels.empty());
+  ASSERT_FALSE(singleShadow.pixels.empty());
+  auto singleInk = FindSpreadInkBounds(singleGlyphs);
+  ASSERT_LT(singleInk.left, singleInk.right);
+  auto singleHull = OutsetSpreadOracleShape(singleInk, 9, 0);
+  ExpectSpreadRegionColor(singleShadow, SPREAD_BLUE, OutsetSpreadOracleShape(singleInk, 7, 7),
+                          nullptr);
+  ExpectSpreadRegionColor(singleShadow, SPREAD_CLEAR, SPREAD_CANVAS, &singleHull);
+
+  const std::string multipleTexts =
+      R"(<Text text="H" position="60,80" fontFamily="SpreadTest" fontStyle="Regular")"
+      R"( fontSize="48"/><Text text="g" position="110,80" fontFamily="SpreadTest")"
+      R"( fontStyle="Regular" fontSize="48"/><Fill color="#0000FF"/>)";
+  auto multipleGlyphs =
+      RenderSpreadImage(MakeSpreadXML("<Layer>" + multipleTexts + "</Layer>"), 200, 200, 1.0f);
+  auto multipleShadow = RenderSpreadImage(
+      MakeSpreadXML("<Layer>" + multipleTexts + textShadow + "</Layer>"), 200, 200, 1.0f);
+  ASSERT_FALSE(multipleGlyphs.pixels.empty());
+  ASSERT_FALSE(multipleShadow.pixels.empty());
+  auto multipleInk = FindSpreadInkBounds(multipleGlyphs);
+  ASSERT_LT(multipleInk.left, multipleInk.right);
+  // Several text elements have no single outline, so the spread falls back to the content image
+  // bounds. TGFX derives those bounds for text from the font bounding boxes, which reach far beyond
+  // the glyphs, so only the lower bound is checked until the fallback uses tight glyph bounds.
+  ExpectSpreadRegionColor(multipleShadow, SPREAD_BLUE, OutsetSpreadOracleShape(multipleInk, 7, 7),
+                          nullptr);
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.

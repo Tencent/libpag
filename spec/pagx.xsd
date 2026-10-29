@@ -768,6 +768,7 @@
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="spread" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="showBehindLayer" type="BoolType" default="true"/>
@@ -791,6 +792,7 @@
     <xs:attribute name="offsetY" type="xs:decimal" default="0"/>
     <xs:attribute name="blurX" type="xs:decimal" default="0"/>
     <xs:attribute name="blurY" type="xs:decimal" default="0"/>
+    <xs:attribute name="spread" type="xs:decimal" default="0"/>
     <xs:attribute name="color" type="ColorType" default="#000000"/>
     <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
     <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
