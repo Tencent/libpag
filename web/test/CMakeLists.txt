@@ -35,6 +35,7 @@ set(PAG_BUILD_CLI ON)
 # configures tgfx, which would silently drop variables set in the tgfx namespace here.
 set(PAG_USE_PNG_DECODE ON)
 set(PAG_USE_PNG_ENCODE ON)
+set(PAG_USE_JPEG_DECODE ON)
 set(PAG_USE_WEBP_ENCODE ON)
 set(PAG_USE_JPEG_ENCODE ON)
 
