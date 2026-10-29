@@ -8,12 +8,16 @@ const WEB_TEST_DIR = __dirname;
 const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8083;
-const TEST_URL = `http://127.0.0.1:${PORT}/index.html`;
 const TIMEOUT_MS = 30 * 60 * 1000;
 
 // Determine the backend from the --backend argument (default: webgl).
 const backendArg = process.argv.find(a => a.startsWith('--backend'));
 const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
+// Optional gtest filter passed through to the page URL (e.g. --filter=PAGTypefaceCacheTest.*)
+// for fast single-suite iteration.
+const filterArg = process.argv.find(a => a.startsWith('--filter'));
+const FILTER = filterArg ? (filterArg.includes('=') ? filterArg.split('=').slice(1).join('=') : '') : null;
+const TEST_URL = `http://127.0.0.1:${PORT}/index.html${FILTER ? `?filter=${encodeURIComponent(FILTER)}` : ''}`;
 const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
 if (!ALLOWED_BACKENDS.has(BACKEND)) {
   console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);

@@ -114,7 +114,7 @@ PAG_TEST(PAGImageLayerTest, imageLayerContentDuration) {
   ASSERT_NE(imageLayer, nullptr);
   ASSERT_EQ(imageLayer->contentDuration(), 1160000);
 
-  testFile = LoadPAGFile("resources/apitest/test_TimeRemapBeyondFileRange.pag");
+  testFile = LoadPAGFile("resources/apitest/test_timeRemapBeyondFileRange.pag");
   // 图层 timeremap 都超过了文件显示区域
   imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(testFile, LayerType::Image, commonTarget));

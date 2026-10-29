@@ -49,7 +49,7 @@ PAG_TEST(PAGFilterTest, CornerPin) {
  * 用例描述: Bulge效果测试
  */
 PAG_TEST(PAGFilterTest, Bulge) {
-  auto pagFile = LoadPAGFile("resources/filter/bulge.pag");
+  auto pagFile = LoadPAGFile("resources/filter/Bulge.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
