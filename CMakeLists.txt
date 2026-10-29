@@ -917,17 +917,15 @@ endif ()
 
 if (WEB)
     if (PAG_USE_WEBGPU)
-        # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
-        # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
-        # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
-        # without this line the target is never built and the final link fails on tint
-        # symbols. Appended before the branch split so both consumers pick it up: the
-        # subdirectory (web/test) build merges it into pag.a via merge_libraries_into, and
-        # the standalone web SDK build links it through target_link_libraries. The
-        # $<TARGET_FILE:...> generator expression resolves to the archive path, which
-        # lib-merge requires (a bare target name is not resolvable there).
+        # tgfx's WebGPU backend links libtint (an ALIAS of tint_api) as a separate
+        # EXCLUDE_FROM_ALL target, so the final link needs it. It must be referenced by target
+        # name (not a $<TARGET_FILE:...> path): tint_api is a thin archive whose implementation
+        # lives in ~50 component libraries propagated through CMake's link closure, and a file
+        # path entry drops that closure, leaving the tint symbols undefined. The closure flows
+        # to the consumers through target_link_libraries(pag ...) below; lib-merge cannot take
+        # a target name, but tint needs no merging for the same reason.
         if (TARGET libtint)
-            list(APPEND PAG_STATIC_LIBS "$<TARGET_FILE:libtint>")
+            set(PAG_LINK_TARGETS libtint)
         else ()
             message(FATAL_ERROR
                     "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
@@ -1012,7 +1010,7 @@ target_include_directories(pag PUBLIC include PRIVATE ${PAG_INCLUDES})
 if (PAG_USE_RTTR)
     target_include_directories(pag SYSTEM PRIVATE ${RTTR_INCLUDE})
 endif ()
-target_link_libraries(pag ${PAG_STATIC_LIBS} ${PAG_SHARED_LIBS})
+target_link_libraries(pag ${PAG_STATIC_LIBS} ${PAG_LINK_TARGETS} ${PAG_SHARED_LIBS})
 set_target_properties(pag PROPERTIES PREFIX "")
 set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 
