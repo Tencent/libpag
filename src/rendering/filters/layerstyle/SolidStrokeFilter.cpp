@@ -187,6 +187,9 @@ void SolidStrokeFilter::onUpdateUniforms(
   spreadSizeX = std::min(spreadSizeX, STROKE_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, STROKE_MAX_SPREAD_SIZE);
 
+  // std140 rounds the `FilterUniforms` block up to the vec3 member's alignment (16 bytes), so
+  // the block is 48 bytes: pad the struct to match, otherwise the bound size fails WebGPU
+  // validation.
   struct Uniforms {
     float color[3] = {};
     float isUseOriginalTexture = 0.0f;
@@ -194,7 +197,10 @@ void SolidStrokeFilter::onUpdateUniforms(
     float isOutside = 0.0f;
     float isCenter = 0.0f;
     float isInside = 0.0f;
+    float padding[3] = {};
   };
+  static_assert(sizeof(Uniforms) == 48,
+                "Uniforms must match the std140 size of the FilterUniforms block");
   Uniforms uniforms = {};
   uniforms.color[0] = color.red;
   uniforms.color[1] = color.green;

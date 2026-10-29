@@ -45,13 +45,12 @@ inline static void VerifyFile(const std::string& filePath, const std::string& ke
   // Register the repo font fixtures as fallbacks: web has no system fonts, so without them the
   // text measurement collapses to zero height and the zero-size diagnostics reject the file.
   // The first fallback must cover most text; later ones serve per-character fallback (emoji/RTL).
-  auto verifyRet = CallRun(pagx::cli::RunVerify,
-                           {"verify", "--skip-render", "--skip-layout",
-                            "--font", "resources/font/NotoSansSC-Regular.otf",
-                            "--font", "resources/font/NotoColorEmoji.ttf",
-                            "--font", "resources/font/NotoSansHebrew-Regular.ttf",
-                            "--font", "resources/font/NotoSerifSC-Regular.otf",
-                            filePath});
+  auto verifyRet =
+      CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", "--font",
+                                     "resources/font/NotoSansSC-Regular.otf", "--font",
+                                     "resources/font/NotoColorEmoji.ttf", "--font",
+                                     "resources/font/NotoSansHebrew-Regular.ttf", "--font",
+                                     "resources/font/NotoSerifSC-Regular.otf", filePath});
   std::cerr.rdbuf(oldErr);
   EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }

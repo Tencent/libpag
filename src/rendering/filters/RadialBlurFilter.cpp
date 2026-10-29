@@ -85,11 +85,15 @@ std::vector<tgfx::BindingEntry> RadialBlurFilter::uniformBlocks() const {
 void RadialBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                         const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                         const tgfx::Point&) const {
+  // std140 rounds the `Args` block up to the vec2 member's alignment (8 bytes), so the block is
+  // 16 bytes: pad the struct to match, otherwise the bound size fails WebGPU validation.
   struct Uniforms {
     float centerX = 0.0f;
     float centerY = 0.0f;
     float amount = 0.0f;
+    float padding = 0.0f;
   };
+  static_assert(sizeof(Uniforms) == 16, "Uniforms must match the std140 size of the Args block");
 
   Uniforms uniforms = {};
   uniforms.amount = static_cast<float>(amount);
