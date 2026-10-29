@@ -98,8 +98,16 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAGTextLayerTest.Emoji_ID79762747`（同根，布局声明 2 sampler 实绑 1）。
   `PAGFilterTest.RadialBlur` 是另一类问题：uniform buffer 以 12 字节绑定，
   低于 WebGPU 要求的最小 16 字节（bound with size 12）。已在 tgfx WebGPU
-  后端修复（tgfx 分支 `bugfix/billyjin_webgpu_bindgroup`，commit dd82d66）：
+  后端修复（tgfx 分支 `bugfix/billyjin_webgpu_bindgroup`，commit dd82d66 +
+  f7dfe3a 补占位纹理 sampleCount/mipLevelCount/dimension 字段）：
   `updateBindGroup()` 对布局声明但未绑定的 texture/sampler 槽位填 1×1 占位
   纹理（占位永不被采样，语义等价 GL 惰性绑定）；uniform 绑定 size 向上取整
-  到 16 的倍数并在 `WebGPUBuffer::Make` 对 UNIFORM 容量按 16 对齐。该修复
-  的 seed md5 仍是修复前错误渲染的固化，验证编译通过后需重 seed 这批用例。
+  到 16 的倍数并在 `WebGPUBuffer::Make` 对 UNIFORM 容量按 16 对齐。已验证：
+  两类 validation error 清零，5 用例渲染恢复。
+- `PAGXSVGTest.SVGExport_WritingModeVerticalJustifyEmitsTextLength` 已排除出
+  web（emscripten）构建：vertical justify 的 `textLength` 发射条件依赖 shaper
+  列几何，浏览器字体度量与 native 不同导致断言不触发。native 构建保留该用例。
+- web 车道的 md5 基线有整批性：`Baseline::saveData()` 在
+  `PAGTest::HasFailure()` 为 true 时拒绝写任何 md5（保守设计，不固化失败
+  态）。任何用例失败都会使整次 seed 的 md5 不落地，`update_baseline.sh` 会
+  以 FAILED 退出。

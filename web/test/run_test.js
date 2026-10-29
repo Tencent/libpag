@@ -86,6 +86,7 @@ async function run() {
 
   let browser = null;
   let testExitCode = 1;
+  let page = null;
 
   try {
     const launchArgs = [
@@ -110,7 +111,7 @@ async function run() {
       args: launchArgs,
     });
 
-    const page = await browser.newPage();
+    page = await browser.newPage();
 
     // Configure download behavior via CDP.
     const client = await page.createCDPSession();
