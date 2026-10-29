@@ -2614,6 +2614,9 @@ PAGX_TEST(PAGXTest, TextLayoutCanReshapeReadableTextWhenGlyphRunsAreIgnored) {
   text->glyphRuns.push_back(embeddedRun);
 
   pagx::FontConfig fontConfig;
+  // The reshaped pass resolves the empty-family Text through fallback typefaces; web has no
+  // system fonts, so register the repo fixture to keep the shaping non-empty there.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.boxWidth = 440;

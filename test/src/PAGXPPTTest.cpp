@@ -5009,7 +5009,11 @@ PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineDisablesAutoWrap) {
   pagx::TextLayoutParams params = {};
   params.boxWidth = textBox->width;
   params.boxHeight = textBox->height;
-  pagx::LayoutContext layoutContext(nullptr);
+  pagx::FontConfig fontConfig;
+  // The editable pass re-shapes "ABCD" from scratch through the platform font stack; web has no
+  // system fonts, so the repo fixture keeps the editable lines non-empty there.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  pagx::LayoutContext layoutContext(&fontConfig);
   auto textElements = pagx::TextLayout::MakeElements({text});
   auto embeddedLayout = pagx::TextLayout::Layout(textElements, params, &layoutContext);
   EXPECT_EQ(embeddedLayout.getTextLines(text), nullptr);
@@ -5056,7 +5060,11 @@ PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineRejectsHostInferredBreaks) {
   pagx::TextLayoutParams params = {};
   params.boxWidth = textBox->width;
   params.boxHeight = textBox->height;
-  pagx::LayoutContext layoutContext(nullptr);
+  pagx::FontConfig fontConfig;
+  // Same as TextBoxEmbeddedSingleLineDisablesAutoWrap: web has no system fonts, so register the
+  // serif fixture (matching the authored family) as the fallback for the editable re-shaping pass.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0);
+  pagx::LayoutContext layoutContext(&fontConfig);
   auto editableLayout = pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params,
                                                  &layoutContext, false);
   auto* editableLines = editableLayout.getTextLines(text);
