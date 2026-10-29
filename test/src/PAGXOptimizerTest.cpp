@@ -2084,11 +2084,9 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsPaintedChildWhenParentHasGeometry) {
   EXPECT_EQ(parent->contents[0], placeholder);
 }
 
-// ---------------------------------------------------------------------------
 // Glass geometry mask: a GlassStyle layer is masked by its own geometry, which
 // excludes its children, so the rules that move geometry between a layer and
 // its children must leave such a layer's subtree alone.
-// ---------------------------------------------------------------------------
 
 // Only the downgrade rule is enabled, so no other pass can explain the control cases below:
 // collapseShellChildren would drop the shell parent before the downgrade is observable.

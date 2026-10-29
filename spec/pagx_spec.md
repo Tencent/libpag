@@ -880,7 +880,7 @@ Layers are the fundamental organizational units for PAGX content. Each Layer ser
 
 ### 5.1 Core Concepts
 
-This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
+This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, layer geometry, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
 
 #### Layer Rendering Pipeline
 
