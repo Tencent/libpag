@@ -107,6 +107,11 @@ static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   auto* text = authoredDoc->makeNode<pagx::Text>();
   text->text = "Hi";
   text->fontSize = 24;
+  // Without an explicit family the layout falls back to platform system fonts, which are empty on
+  // web: shaping then produces no glyphs and every case below fails on FindFirstEmbeddedFont.
+  // Set the family/style to the registered font so Stage 1 resolves it deterministically.
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
   auto* fill = authoredDoc->makeNode<pagx::Fill>();
   auto* solid = authoredDoc->makeNode<pagx::SolidColor>();
   solid->color = {0, 0, 0, 1};
