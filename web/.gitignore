@@ -2,6 +2,7 @@
 pag.js
 pag.worker.js
 *.wasm
+!test/ffavc.wasm
 *.data
 package-lock.json
 lib

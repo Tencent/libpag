@@ -6,6 +6,8 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
             integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
             crossorigin="anonymous"></script>
+    <!-- Local ffavc copy (see web/test/README.md) supplying the wasm software video decoder. -->
+    <script src="./ffavc.min.js"></script>
 </head>
 <body>
     <canvas id="pag-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
@@ -89,6 +91,17 @@
             // The test runner embeds no SDK, so bind the real ones built from
             // third_party/tgfx/web (npm run build:tgfx), following tgfx's own web test harness.
             TGFXBind(module);
+            // Register the ffavc software decoder factory (same flow as the official demo) so
+            // video-sequence tests can decode. Without it the wasm decoder factory chain fails
+            // and video sequences render empty.
+            if (window.ffavc) {
+                const FFAVC = await window.ffavc.FFAVCInit();
+                module._registerSoftwareDecoderFactory(new FFAVC.FFAVCDecoderFactory());
+                module._useSoftwareDecoder = true;
+                console.log('=== ffavc software decoder registered ===');
+            } else {
+                console.warn('ffavc not loaded; video-sequence tests will render empty.');
+            }
             // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
             // both the Asyncify and non-Asyncify cases.
             // Support a gtest filter through the URL (e.g. index.html?filter=PAGTypefaceCacheTest.*)

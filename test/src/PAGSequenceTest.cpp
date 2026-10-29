@@ -117,9 +117,6 @@ PAG_TEST(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
 /**
  * 用例描述: 同一个序列帧多图层引用且时间轴交错，测试解码器数量是否正确。
  */
-// Excluded on web: the sequence cache lifecycle assertions require a video decoder instance per
-// reference; the web build has no decoder, so the caches stay empty and the counts cannot hold.
-#if !defined(__EMSCRIPTEN__)
 PAG_TEST(PAGSequenceTest, Sequence_Multiple_References) {
   auto pagFile = LoadPAGFile("resources/apitest/sequence_mul_ref.pag");
   EXPECT_NE(pagFile, nullptr);
@@ -153,6 +150,5 @@ PAG_TEST(PAGSequenceTest, Sequence_Multiple_References) {
   ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
   EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
 }
-#endif
 
 }  // namespace pag

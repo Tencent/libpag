@@ -68,10 +68,8 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "\\.mm$")
 list(FILTER TEST_SOURCES EXCLUDE REGEX "TestMain\\.cpp$")
 # Phase-1 exclusions (see README.md "Excluded on the web"):
 list(FILTER TEST_SOURCES EXCLUDE REGEX "MultiThreadCase\\.cpp$")            # pthreads
-list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGANRRegressionTest\\.cpp$")       # pthreads + ffavc
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGANRRegressionTest\\.cpp$")       # pthreads
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGDiskCacheTest\\.cpp$")           # pthreads + MEMFS disk cache
-list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGVideoSequenceTest\\.cpp$")       # needs wasm ffavc
-list(FILTER TEST_SOURCES EXCLUDE REGEX "VideoSequenceFallbackTest\\.cpp$")  # needs wasm ffavc
 # The suite asserts sequence/image cache counts driven by the native 500ms prefetch window
 # (DECODING_VISIBLE_DISTANCE); the web build prefetches the whole timeline in
 # RenderCache::prepareLayers(), so the counts permanently differ from the native semantics.

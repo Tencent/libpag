@@ -62,7 +62,6 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 | File | Reason |
 |---|---|
 | `MultiThreadCase.cpp`, `PAGANRRegressionTest.cpp`, `PAGDiskCacheTest.cpp` | require pthreads (single-threaded build) / MEMFS disk-cache semantics |
-| `PAGVideoSequenceTest.cpp`, `VideoSequenceFallbackTest.cpp` | require the ffavc software decoder, which has no wasm build |
 | `AsyncDecodeTest.cpp` | asserts sequence/image cache counts driven by the native 500ms prefetch window; the web build prefetches the whole timeline (`RenderCache::prepareLayers`), so the counts permanently differ |
 | `PAGXSVGTest.cpp` | the `resources/apitest/SVG` corpus is 492MB; not preloaded |
 | `PAGXCliTest.cpp` | CLI sources are not compiled into the web test |
@@ -81,8 +80,11 @@ that fundamentally requires a video decoder, which the web build does not have.
   typeinfo, so enabling RTTI anywhere in the same embind registry breaks all JS-to-C++ calls
   (BindingError: unknown type). This is why the dynamic_cast-based `PAGXHTMLImporterTest`
   cannot run on the web.
-- Video-sequence decoding is unavailable (no wasm ffavc), so PAG files containing
-  video sequences render those layers empty.
+- Video-sequence decoding is provided by the local ffavc software decoder
+  (`ffavc.min.js` + `ffavc.wasm` in this directory, registered in `index.html` through
+  `Module._registerSoftwareDecoderFactory`, same flow as the official demo). Refresh the local
+  copy from `https://unpkg.com/ffavc@latest/lib/` when a decoder upgrade is needed; without it
+  the decoder factory chain fails and video sequences render empty.
 - The WebGL backend runs on Emscripten's single global GL context: there is no multi-context /
   multi-device semantics. `PAGSurfaceTest.FromTexture` (GL semaphore semantics),
   `PAGSurfaceTest.GLRestorer` (viewport/scissor/FBO state restore across contexts) and
