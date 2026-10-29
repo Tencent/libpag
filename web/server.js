@@ -24,11 +24,14 @@ app.get('/', (req, res) => {
 
 const port = 8081;
 const args = process.argv.slice(2);
-const fileName = args.includes('wasm-mt') ? 'index': 'index-st';
+const target = require('./script/targets').resolveTarget(
+  args.includes('wasm-mt') ? 'wasm-mt' : 'wasm',
+  args.includes('webgpu') ? 'webgpu' : 'gl'
+);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 
-  const url = `http://localhost:${port}/demo/${fileName}.html`;
+  const url = `http://localhost:${port}/demo/${target.demoHtml}`;
   const start = (process.platform === 'darwin'? 'open': 'start');
   require('child_process').exec(start + ' ' + url);
 });

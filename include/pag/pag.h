@@ -40,6 +40,8 @@ class Recorder;
 
 class RenderCache;
 
+class PAGSurfaceReadback;
+
 class Drawable;
 
 class Content {
@@ -1183,6 +1185,9 @@ class PAGPlayer;
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
  * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ *
+ * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
+ * by std::shared_ptr.
  */
 class PAG_API PAGSurface {
  public:
@@ -1296,6 +1301,10 @@ class PAG_API PAGSurface {
   friend class FileReporter;
 
   friend class PAGSurfaceExt;
+
+  friend class PAGSurfaceReadback;
+
+  friend std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface);
 };
 
 class FileReporter;

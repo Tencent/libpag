@@ -29,6 +29,8 @@ class PAGTest : public testing::Test {
 
   static bool RegisterPixelComparison(const char* testSuite, const char* testName);
 
+  static bool IsPixelComparison();
+
   void SetUp() override;
 
   void TearDown() override;
@@ -39,9 +41,12 @@ class PAGTest : public testing::Test {
               ::testing::internal::GetTypeId<pag::PAGTest>())
 
 // Keep the fixture type unchanged: one suite may mix pixel and non-pixel tests.
-#define PAG_PIXEL_TEST(test_case_name, test_name)                                     \
+#define PAG_REGISTER_PIXEL_TEST(test_case_name, test_name)                            \
   [[maybe_unused]] static const bool test_case_name##_##test_name##_pixelComparison = \
-      pag::PAGTest::RegisterPixelComparison(#test_case_name, #test_name);             \
+      pag::PAGTest::RegisterPixelComparison(#test_case_name, #test_name);
+
+#define PAG_PIXEL_TEST(test_case_name, test_name)    \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
   PAG_TEST(test_case_name, test_name)
 
 #define PAG_SETUP(pagSurface, pagPlayer, pagFile)                                \
@@ -92,15 +97,18 @@ class PAGXTest : public PAGTest {
   GTEST_TEST_(test_case_name, test_name, pag::PAGXTest, \
               ::testing::internal::GetTypeId<pag::PAGXTest>())
 
-#define PAGX_PIXEL_TEST(test_case_name, test_name)                                    \
-  [[maybe_unused]] static const bool test_case_name##_##test_name##_pixelComparison = \
-      pag::PAGTest::RegisterPixelComparison(#test_case_name, #test_name);             \
+#define PAGX_PIXEL_TEST(test_case_name, test_name)   \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
   PAGX_TEST(test_case_name, test_name)
 
-class CLITest : public testing::Test {};
+class CLITest : public PAGTest {};
 
 #define CLI_TEST(test_case_name, test_name)            \
   GTEST_TEST_(test_case_name, test_name, pag::CLITest, \
               ::testing::internal::GetTypeId<pag::CLITest>())
+
+#define CLI_PIXEL_TEST(test_case_name, test_name)    \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
+  CLI_TEST(test_case_name, test_name)
 
 }  // namespace pag

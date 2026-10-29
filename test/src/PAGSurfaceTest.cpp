@@ -16,6 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
+#include <thread>
+#include "base/utils/Log.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/drawables/TextureDrawable.h"
 #include "utils/TestUtils.h"
 
@@ -267,3 +271,160 @@ PAG_PIXEL_TEST(PAGSurfaceTest, BottomLeftScissor) {
 }  // namespace pag
 
 #endif  // TGFX_USE_OPENGL
+
+namespace pag {
+
+// Poll interval of the readback readiness loops. status() takes the surface's context lock on
+// every call, so a 1ms interval polls at ~kHz and competes with the render thread for the lock;
+// readiness is a one-shot event (fence drain or mapAsync callback), so a 10ms detection delay is
+// negligible against the 5s timeout budget.
+static const int READBACK_POLL_INTERVAL_MS = 10;
+
+// GL readback readiness is fence-based: it only flips after the GPU drains previously queued
+// work, so tests must poll instead of assuming immediate readiness.
+static bool WaitReadbackReady(const std::shared_ptr<PAGSurfaceReadback>& readback,
+                              int timeoutMs = 5000) {
+  auto start = std::chrono::steady_clock::now();
+  auto deadline = start + std::chrono::milliseconds(timeoutMs);
+  while (!readback->isReady()) {
+    if (std::chrono::steady_clock::now() >= deadline) {
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - start)
+                         .count();
+      LOGE("WaitReadbackReady() timed out after %lld ms.", static_cast<long long>(elapsed));
+      return false;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(READBACK_POLL_INTERVAL_MS));
+  }
+  return true;
+}
+
+/**
+ * 用例描述: 测试 PAGSurface 异步回读会话，公共 API 覆盖全部后端。GL 回读基于 fence，
+ * 就绪要等 GPU 排空之前堆积的任务，不能假定创建即就绪，必须与同步 readPixels 的结果
+ * 逐字节比对
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = AsyncReadPixels(pagSurface);
+  ASSERT_TRUE(readback != nullptr);
+  EXPECT_EQ(readback->width(), pagFile->width());
+  EXPECT_EQ(readback->height(), pagFile->height());
+  ASSERT_TRUE(WaitReadbackReady(readback));
+
+  const auto width = readback->width();
+  const auto height = readback->height();
+  std::vector<uint8_t> asyncPixels(static_cast<size_t>(width * height * 4));
+  ASSERT_TRUE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                   asyncPixels.data(), static_cast<size_t>(width * 4)));
+
+  std::vector<uint8_t> syncPixels(static_cast<size_t>(width * height * 4));
+  ASSERT_TRUE(pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                     syncPixels.data(), static_cast<size_t>(width * 4)));
+  EXPECT_EQ(asyncPixels, syncPixels);
+}
+
+/**
+ * 用例描述: 异步回读的非法参数防御与 ALPHA_8 格式转换路径（回读数据为表面原生 RGBA
+ * 格式，经 Pixmap 转换到目标格式，结果须与同步 readPixels 一致）
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = AsyncReadPixels(pagSurface);
+  ASSERT_TRUE(readback != nullptr);
+  const auto width = readback->width();
+  const auto height = readback->height();
+
+  // 「未就绪时 readPixels 返回 false」无法在 GL 上确定性构造：isReady() 的探测与
+  // readPixels 内部的就绪重查之间存在 fence 置位竞态，GPU 排空进度不受 CPU 控制。
+  // WebGPU 上 mapAsync 的异步映射天然存在未就绪窗口，但当前仓库没有浏览器端 WebGPU
+  // 测试车道（web/cypress 仅覆盖 GL 构建），该路径暂无自动化覆盖，待 WebGPU 车道
+  // 在独立 PR 落地后补充。
+  ASSERT_TRUE(WaitReadbackReady(readback));
+
+  std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
+  EXPECT_FALSE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, nullptr,
+                                    static_cast<size_t>(width * 4)));
+  EXPECT_FALSE(
+      readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(), 0));
+
+  std::vector<uint8_t> asyncAlpha(static_cast<size_t>(width * height));
+  ASSERT_TRUE(readback->readPixels(ColorType::ALPHA_8, AlphaType::Premultiplied, asyncAlpha.data(),
+                                   static_cast<size_t>(width)));
+  std::vector<uint8_t> syncAlpha(static_cast<size_t>(width * height));
+  ASSERT_TRUE(pagSurface->readPixels(ColorType::ALPHA_8, AlphaType::Premultiplied, syncAlpha.data(),
+                                     static_cast<size_t>(width)));
+  EXPECT_EQ(asyncAlpha, syncAlpha);
+}
+
+/**
+ * 用例描述: 回读会话持有 PAGSurface 的生命周期，外部释放 surface 与 player 后会话
+ * 仍能完成就绪等待与取像素
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadPixelsOutlivesSurface) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  std::shared_ptr<PAGSurfaceReadback> readback = nullptr;
+  {
+    auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+    ASSERT_TRUE(pagSurface != nullptr);
+    auto pagPlayer = std::make_shared<PAGPlayer>();
+    pagPlayer->setComposition(pagFile);
+    pagPlayer->setSurface(pagSurface);
+    pagPlayer->setProgress(0.5);
+    ASSERT_TRUE(pagPlayer->flush());
+    readback = AsyncReadPixels(pagSurface);
+    ASSERT_TRUE(readback != nullptr);
+  }
+
+  ASSERT_TRUE(WaitReadbackReady(readback));
+  const auto width = readback->width();
+  const auto height = readback->height();
+  std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 4));
+  EXPECT_TRUE(readback->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(),
+                                   static_cast<size_t>(width * 4)));
+}
+
+/**
+ * 用例描述: 回读会话的 status() 状态机，创建后为 Ready 或 Pending，轮询后必须到达 Ready，
+ * 任何时刻都不得出现 Failed
+ */
+PAG_TEST(PAGSurfaceTest, AsyncReadbackStatus) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setProgress(0.5);
+  ASSERT_TRUE(pagPlayer->flush());
+
+  auto readback = AsyncReadPixels(pagSurface);
+  ASSERT_TRUE(readback != nullptr);
+  auto status = readback->status();
+  EXPECT_TRUE(status == ReadbackStatus::Ready || status == ReadbackStatus::Pending);
+  ASSERT_TRUE(WaitReadbackReady(readback));
+  EXPECT_EQ(readback->status(), ReadbackStatus::Ready);
+  EXPECT_TRUE(readback->isReady());
+}
+
+}  // namespace pag

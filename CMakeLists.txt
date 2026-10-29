@@ -130,6 +130,13 @@ if (PAG_USE_METAL AND IOS)
     set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
 endif ()
 
+# The WebGPU backend glue (src/rendering/gpu/webgpu/) pulls in tgfx's webgpu headers, which
+# require emscripten — reject the flag on other platforms at configure time instead of failing
+# on missing headers.
+if (PAG_USE_WEBGPU AND NOT WEB)
+    message(FATAL_ERROR "PAG_USE_WEBGPU is only supported on the Web platform.")
+endif ()
+
 if (PAG_USE_QT)
     set(PAG_USE_SWIFTSHADER OFF)
     set(PAG_USE_ANGLE OFF)
@@ -181,7 +188,7 @@ endif ()
 list(GET PAG_ENABLED_GPU_BACKENDS 0 PAG_GPU_BACKEND)
 
 # tgfx backend availability does not imply that libpag has implemented its device and platform glue.
-set(PAG_IMPLEMENTED_GPU_BACKENDS OPENGL METAL)
+set(PAG_IMPLEMENTED_GPU_BACKENDS OPENGL METAL WEBGPU)
 if (NOT PAG_GPU_BACKEND IN_LIST PAG_IMPLEMENTED_GPU_BACKENDS)
     message(FATAL_ERROR "The libpag ${PAG_GPU_BACKEND} backend is not yet implemented.")
 endif ()
@@ -555,6 +562,9 @@ if (WEB)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
+    # GPUDrawable reuses tgfx's ReadCanvasSize() from WebJSBindings.h, which tgfx keeps in its
+    # internal src tree instead of the public include directory.
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/src)
     list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
@@ -915,8 +925,35 @@ if (WEB)
     else ()
         add_executable(pag ${PAG_FILES})
         list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
-                -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
-                -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+                -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1
+                -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+        if (PAG_USE_WEBGPU)
+            # 'WebGPU' is exported so tgfx's JS glue can resolve GPUDevice/GPUTexture handles
+            # (Module.WebGPU.mgrDevice/mgrTexture) for color-space configuration and video
+            # uploads. 'GL' is deliberately not exported: a WebGPU build compiles no GL code,
+            # so nothing reads Module.GL at runtime.
+            # Tint (Dawn's shader compiler) runs deep recursion in DependencyAnalysis when
+            # parsing SPIR-V, which overflows emscripten's default 64KB stack and traps as a
+            # segfault. 1MB mirrors tgfx's own web builds (tgfx/web/demo/CMakeLists.txt).
+            list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1 -sSTACK_SIZE=1MB
+                    -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU'])
+            # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
+            # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
+            # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
+            # without this line the target is never built and the final link fails on tint
+            # symbols.
+            if (TARGET libtint)
+                list(APPEND PAG_STATIC_LIBS libtint)
+            else ()
+                message(FATAL_ERROR
+                        "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
+                        "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
+                        "the final link would fail on tint symbols.")
+            endif ()
+        else ()
+            list(APPEND PAG_LINK_OPTIONS -sMAX_WEBGL_VERSION=2
+                    -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'])
+        endif ()
     endif ()
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
@@ -924,6 +961,25 @@ if (WEB)
             message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported.")
         endif ()
     endforeach ()
+    # The emsdk version policy lives in web/emsdk-versions.txt, shared with
+    # web/script/setup.emsdk.js so the install pin and the configure-time check cannot drift.
+    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/web/emsdk-versions.txt EMSDK_VERSION_ENTRIES REGEX "^[A-Z_]+=")
+    foreach (entry ${EMSDK_VERSION_ENTRIES})
+        string(REGEX MATCH "^([A-Z_]+)=(.*)$" _match "${entry}")
+        set(EMSDK_${CMAKE_MATCH_1} "${CMAKE_MATCH_2}")
+    endforeach ()
+    if (PAG_USE_WEBGPU)
+        # -sUSE_WEBGPU was removed in emsdk 4.0.18 in favor of --use-port=emdawnwebgpu, and
+        # tgfx's WebGPU backend requires the 4.0.15 runtime (mirrors tgfx's own
+        # web/cmake/check_emscripten.cmake). Pin the supported window here so the failure
+        # surfaces at configure time instead of as obscure link errors.
+        if (${EMSCRIPTEN_VERSION} VERSION_LESS "${EMSDK_MIN}" OR
+                NOT ${EMSCRIPTEN_VERSION} VERSION_LESS "${EMSDK_MAX_EXCLUSIVE}")
+            message(FATAL_ERROR
+                    "PAG_USE_WEBGPU requires emsdk >= ${EMSDK_MIN} and < ${EMSDK_MAX_EXCLUSIVE}, "
+                    "but the current version is ${EMSCRIPTEN_VERSION}.")
+        endif ()
+    endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND PAG_COMPILE_OPTIONS -O0 -gsource-map)
         list(APPEND PAG_LINK_OPTIONS -O0 -gsource-map -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
@@ -1135,9 +1191,7 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    if (NOT PAG_USE_METAL)
-        list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
-    endif ()
+    list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
         list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
@@ -1166,6 +1220,7 @@ if (PAG_BUILD_TESTS)
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
@@ -1216,11 +1271,18 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
     if (PAG_USE_METAL)
-        # MetalTestSupport temporarily uses tgfx's private atlas API. Keep its dependencies local
-        # to Metal test targets, never exported by pag or enabled for other backends.
-        foreach (METAL_TEST_TARGET UpdateBaseline_Metal PAGUnitTest_Metal PAGFullTest_Metal)
-            target_include_directories(${METAL_TEST_TARGET} PRIVATE
-                    ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
+        # replace this private API when tgfx provides a supported test-reset hook.
+        add_library(pag-metal-test-support OBJECT test/src/utils/MetalTestSupport.cpp)
+        add_dependencies(pag-metal-test-support ${PAG_DEPEND_TARGETS})
+        target_include_directories(pag-metal-test-support PRIVATE ${PAG_INCLUDES}
+                ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        target_compile_definitions(pag-metal-test-support PRIVATE ${PAG_TEST_DEFINES})
+        target_compile_options(pag-metal-test-support PRIVATE ${PAG_TEST_COMPILE_OPTIONS})
+        foreach (METAL_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_sources(${METAL_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-metal-test-support>)
+            add_dependencies(${METAL_TEST_TARGET} pag-metal-test-support)
         endforeach ()
     endif ()
 

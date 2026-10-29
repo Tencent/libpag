@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !defined(TGFX_USE_WEBGPU)
 #include <GLES3/gl31.h>
+#endif
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include "VideoInfoManager.h"
@@ -25,6 +27,7 @@
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
@@ -36,6 +39,47 @@
 using namespace emscripten;
 
 namespace pag {
+
+// The backend is fixed at build time. The JS side branches on it to skip WebGL context
+// creation and to bootstrap the GPUDevice before any rendering call.
+#if defined(TGFX_USE_WEBGPU)
+constexpr bool IS_WEBGPU_BACKEND = true;
+#else
+constexpr bool IS_WEBGPU_BACKEND = false;
+#endif
+
+// Copies pixel data out of the wasm heap into a fresh JS-owned Uint8Array, so the result stays
+// valid after the temporary buffer is freed.
+static val CopyToNewUint8Array(const uint8_t* data, size_t dataSize) {
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView =
+      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(data), dataSize);
+  auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
+  auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
+  newUint8Array.call<void>("set", memoryView);
+  return newUint8Array;
+}
+
+// textureID convention: on WebGPU it is the numeric handle of the host GPUTexture registered in
+// Emscripten's WebGPU runtime (Module.WebGPU.mgrTexture) and format is the WGPUTextureFormat value
+// resolved from GPUTexture.format on the JS side; on WebGL it is the GL texture id and format is
+// ignored.
+#if defined(TGFX_USE_WEBGPU)
+static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int format) {
+  WebGPUTextureInfo webGPUInfo = {};
+  webGPUInfo.texture = reinterpret_cast<void*>(static_cast<intptr_t>(textureID));
+  webGPUInfo.format = static_cast<unsigned>(format);
+  return BackendTexture(webGPUInfo, width, height);
+}
+#else
+static BackendTexture MakeBackendTextureFromID(int textureID, int width, int height, int) {
+  GLTextureInfo glInfo = {};
+  glInfo.target = GL_TEXTURE_2D;
+  glInfo.id = static_cast<unsigned>(textureID);
+  glInfo.format = GL_RGBA8;
+  return BackendTexture(glInfo, width, height);
+}
+#endif
 
 std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   if (!emscriptenData.as<bool>()) {
@@ -96,7 +140,7 @@ emscripten::val PAGLayerToJsObject(std::shared_ptr<PAGLayer> pagLayer) {
   return layerObject;
 }
 
-bool PAGBindInit() {
+static void BindPAGLayer() {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
       .function("_uniqueID", optional_override([](PAGLayer& pagLayer) {
@@ -158,7 +202,9 @@ bool PAGBindInit() {
       .function("_excludedFromTimeline", &PAGLayer::excludedFromTimeline)
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
       .function("_isPAGFile", &PAGLayer::isPAGFile);
+}
 
+static void BindPAGSolidLayer() {
   class_<PAGSolidLayer, base<PAGLayer>>("_PAGSolidLayer")
       .smart_ptr<std::shared_ptr<PAGSolidLayer>>("_PAGSolidLayer")
       .class_function("_Make", optional_override([](int duration, int width, int height,
@@ -168,7 +214,9 @@ bool PAGBindInit() {
                       }))
       .function("_solidColor", &PAGSolidLayer::solidColor)
       .function("_setSolidColor", &PAGSolidLayer::setSolidColor);
+}
 
+static void BindPAGImageLayer() {
   class_<PAGImageLayer, base<PAGLayer>>("_PAGImageLayer")
       .smart_ptr<std::shared_ptr<PAGImageLayer>>("_PAGImageLayer")
       .class_function("_Make", optional_override([](int width, int height, int duration) {
@@ -207,7 +255,9 @@ bool PAGBindInit() {
                   }
                   return val(typed_memory_view(result->length(), result->data()));
                 }));
+}
 
+static void BindPAGTextLayer() {
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
       .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")
       .class_function("_Make", optional_override([](int duration, std::string text, float fontSize,
@@ -231,7 +281,9 @@ bool PAGBindInit() {
       .function("_text", &PAGTextLayer::text)
       .function("_setText", &PAGTextLayer::setText)
       .function("_reset", &PAGTextLayer::reset);
+}
 
+static void BindPAGComposition() {
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .class_function("_Make", PAGComposition::Make)
@@ -301,7 +353,9 @@ bool PAGBindInit() {
                   }
                   return jsArray;
                 }));
+}
 
+static void BindPAGFile() {
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_MaxSupportedTagLevel", PAGFile::MaxSupportedTagLevel)
@@ -349,22 +403,54 @@ bool PAGBindInit() {
                   return pagFile.setDuration(static_cast<int64_t>(duration));
                 }))
       .function("_copyOriginal", &PAGFile::copyOriginal);
+}
 
+static void BindPAGSurfaceReadback() {
+  class_<PAGSurfaceReadback>("_PAGSurfaceReadback")
+      .smart_ptr<std::shared_ptr<PAGSurfaceReadback>>("_PAGSurfaceReadback")
+      .function("_status", optional_override([](PAGSurfaceReadback& session) {
+                  // The int value must stay in sync with the declaration order of the
+                  // ReadbackStatus enum: 0 = Ready, 1 = Pending, 2 = Failed.
+                  return static_cast<int>(session.status());
+                }))
+      .function("_width", &PAGSurfaceReadback::width)
+      .function("_height", &PAGSurfaceReadback::height)
+      .function("_readPixels", optional_override([](PAGSurfaceReadback& session, int colorType,
+                                                    int alphaType, size_t dstRowBytes) -> val {
+                  auto dataSize = dstRowBytes * static_cast<size_t>(session.height());
+                  if (dataSize == 0) {
+                    return val::null();
+                  }
+                  std::unique_ptr<uint8_t[]> uint8Array(new (std::nothrow) uint8_t[dataSize]);
+                  if (uint8Array && session.readPixels(static_cast<ColorType>(colorType),
+                                                       static_cast<AlphaType>(alphaType),
+                                                       uint8Array.get(), dstRowBytes)) {
+                    return CopyToNewUint8Array(uint8Array.get(), dataSize);
+                  }
+                  return val::null();
+                }));
+  function("_AsyncReadPixels", &AsyncReadPixels);
+}
+
+static void BindPAGSurface() {
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")
       .class_function("_FromCanvas", optional_override([](const std::string& canvasID) {
                         return PAGSurface::MakeFrom(GPUDrawable::FromCanvasID(canvasID));
                       }))
-      .class_function("_FromTexture",
-                      optional_override([](int textureID, int width, int height, bool flipY) {
-                        GLTextureInfo glInfo = {};
-                        glInfo.target = GL_TEXTURE_2D;
-                        glInfo.id = static_cast<unsigned>(textureID);
-                        glInfo.format = GL_RGBA8;
-                        BackendTexture glTexture(glInfo, width, height);
-                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-                        return PAGSurface::MakeFrom(glTexture, origin);
+#if defined(TGFX_USE_WEBGPU)
+      .class_function("_FromCanvasObject", optional_override([](val canvas) {
+                        return PAGSurface::MakeFrom(GPUDrawable::FromCanvas(std::move(canvas)));
                       }))
+#endif
+      .class_function(
+          "_FromTexture",
+          optional_override([](int textureID, int width, int height, bool flipY, int format) {
+            auto backendTexture = MakeBackendTextureFromID(textureID, width, height, format);
+            auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+            return PAGSurface::MakeFrom(backendTexture, origin);
+          }))
+#if !defined(TGFX_USE_WEBGPU)
       .class_function("_FromRenderTarget",
                       optional_override([](int frameBufferID, int width, int height, bool flipY) {
                         GLFrameBufferInfo glFrameBufferInfo = {};
@@ -374,6 +460,7 @@ bool PAGBindInit() {
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
                         return PAGSurface::MakeFrom(glRenderTarget, origin);
                       }))
+#endif
       .function("_width", &PAGSurface::width)
       .function("_height", &PAGSurface::height)
       .function("_updateSize", &PAGSurface::updateSize)
@@ -389,18 +476,13 @@ bool PAGBindInit() {
                   if (uint8Array && pagSurface.readPixels(static_cast<ColorType>(colorType),
                                                           static_cast<AlphaType>(alphaType),
                                                           uint8Array.get(), dstRowBytes)) {
-                    auto memory = val::module_property("HEAPU8")["buffer"];
-                    auto memoryView =
-                        val::global("Uint8Array")
-                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
-                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
-                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
-                    newUint8Array.call<void>("set", memoryView);
-                    return newUint8Array;
+                    return CopyToNewUint8Array(uint8Array.get(), dataSize);
                   }
                   return val::null();
                 }));
+}
 
+static void BindPAGImage() {
   class_<PAGImage>("_PAGImage")
       .smart_ptr<std::shared_ptr<PAGImage>>("_PAGImage")
       .class_function("_FromBytes",
@@ -428,16 +510,13 @@ bool PAGBindInit() {
                                         rowBytes, static_cast<ColorType>(colorType),
                                         static_cast<AlphaType>(alphaType));
           }))
-      .class_function("_FromTexture",
-                      optional_override([](int textureID, int width, int height, bool flipY) {
-                        GLTextureInfo glInfo = {};
-                        glInfo.target = GL_TEXTURE_2D;
-                        glInfo.id = static_cast<unsigned>(textureID);
-                        glInfo.format = GL_RGBA8;
-                        BackendTexture glTexture(glInfo, width, height);
-                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-                        return PAGImage::FromTexture(glTexture, origin);
-                      }))
+      .class_function(
+          "_FromTexture",
+          optional_override([](int textureID, int width, int height, bool flipY, int format) {
+            auto backendTexture = MakeBackendTextureFromID(textureID, width, height, format);
+            auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+            return PAGImage::FromTexture(backendTexture, origin);
+          }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height)
       .function("_scaleMode", optional_override([](PAGImage& pagImage) {
@@ -448,7 +527,9 @@ bool PAGBindInit() {
                 }))
       .function("_matrix", &PAGImage::matrix)
       .function("_setMatrix", &PAGImage::setMatrix);
+}
 
+static void BindPAGPlayer() {
   class_<PAGPlayer>("_PAGPlayer")
       .smart_ptr_constructor("_PAGPlayer", &std::make_shared<PAGPlayer>)
       .function("_setProgress", &PAGPlayer::setProgress)
@@ -512,7 +593,9 @@ bool PAGBindInit() {
                   return static_cast<int>(pagPlayer.graphicsMemory());
                 }))
       .function("_prepare", &PAGPlayer::prepare);
+}
 
+static void BindPAGFont() {
   class_<PAGFont>("_PAGFont")
       .smart_ptr<std::shared_ptr<PAGFont>>("_PAGFont")
       .class_function("_create",
@@ -522,7 +605,9 @@ bool PAGBindInit() {
       .class_function("_SetFallbackFontNames", PAGFont::SetFallbackFontNames)
       .property("fontFamily", &PAGFont::fontFamily)
       .property("fontStyle", &PAGFont::fontStyle);
+}
 
+static void BindMatrix() {
   class_<Matrix>("_Matrix")
       .class_function("_MakeAll", Matrix::MakeAll)
       .class_function("_MakeScale", optional_override([](float sx, float sy) {
@@ -582,7 +667,9 @@ bool PAGBindInit() {
                   return matrix.postSkew(kx, ky, px, py);
                 }))
       .function("_postConcat", &Matrix::postConcat);
+}
 
+static void BindVideoInfoManager() {
   class_<VideoInfoManager>("_videoInfoManager")
       .smart_ptr<std::shared_ptr<VideoInfoManager>>("_videoInfoManager")
       .class_function("_Make",
@@ -602,6 +689,9 @@ bool PAGBindInit() {
       .function("_getTargetFrameByID", &VideoInfoManager::getTargetFrameByID)
       .function("_getPlaybackRateByID", &VideoInfoManager::getPlaybackRateByID)
       .function("_hasTimeRangeOverlap", &VideoInfoManager::hasTimeRangeOverlap);
+}
+
+static void BindTextDocument() {
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)
@@ -637,7 +727,9 @@ bool PAGBindInit() {
                 optional_override([](TextDocument& textDocument, uint8_t val) {
                   textDocument.direction = static_cast<TextDirection>(val);
                 }));
+}
 
+static void BindValueTypes() {
   value_object<Rect>("Rect")
       .field("left", &Rect::left)
       .field("top", &Rect::top)
@@ -663,7 +755,9 @@ bool PAGBindInit() {
              optional_override(
                  [](Marker& marker, int value) { marker.duration = static_cast<int64_t>(value); }))
       .field("comment", &Marker::comment);
+}
 
+static void BindGlobals() {
   function("_registerSoftwareDecoderFactory", optional_override([](val factory) {
              static std::unique_ptr<SoftwareDecoderFactory> softwareDecoderFactory = nullptr;
              auto webFactory = WebSoftwareDecoderFactory::Make(factory);
@@ -672,11 +766,14 @@ bool PAGBindInit() {
            }));
 
   function("_SDKVersion", &PAG::SDKVersion);
+  function("_IsWebGPUBackend", optional_override([]() { return IS_WEBGPU_BACKEND; }));
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<Marker>("VectorMarker");
+}
 
 #ifdef PAG_BUILD_PAGX
+static void BindPAGXSurface() {
   class_<pagx::PAGSurface>("_PAGXSurface")
       .smart_ptr<std::shared_ptr<pagx::PAGSurface>>("_PAGXSurface")
       .class_function(
@@ -686,8 +783,29 @@ bool PAGBindInit() {
       .class_function("_MakeOffscreen", &pagx::PAGSurface::MakeOffscreen)
       .function("_width", &pagx::PAGSurface::width)
       .function("_height", &pagx::PAGSurface::height);
+}
 #endif
 
+bool PAGBindInit() {
+  BindPAGLayer();
+  BindPAGSolidLayer();
+  BindPAGImageLayer();
+  BindPAGTextLayer();
+  BindPAGComposition();
+  BindPAGFile();
+  BindPAGSurfaceReadback();
+  BindPAGSurface();
+  BindPAGImage();
+  BindPAGPlayer();
+  BindPAGFont();
+  BindMatrix();
+  BindVideoInfoManager();
+  BindTextDocument();
+  BindValueTypes();
+  BindGlobals();
+#ifdef PAG_BUILD_PAGX
+  BindPAGXSurface();
+#endif
   return true;
 }
 }  // namespace pag

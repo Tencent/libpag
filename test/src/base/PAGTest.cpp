@@ -40,10 +40,14 @@ bool PAGTest::HasFailure() {
   return hasFailure;
 }
 
+bool PAGTest::IsPixelComparison() {
+  const auto* test = testing::UnitTest::GetInstance()->current_test_info();
+  return test != nullptr && PixelComparisons().count({test->test_suite_name(), test->name()}) != 0;
+}
+
 void PAGTest::SetUp() {
 #if defined(TGFX_USE_METAL)
-  const auto* test = testing::UnitTest::GetInstance()->current_test_info();
-  if (test == nullptr || PixelComparisons().count({test->test_suite_name(), test->name()}) == 0) {
+  if (!IsPixelComparison()) {
     return;
   }
   // Pixel tests opt into tgfx's atlas-isolation workaround before rendering. This intentionally
