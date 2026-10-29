@@ -975,6 +975,18 @@ bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer,
   return changed;
 }
 
+// Glass masks with the layer's own geometry, which excludes its children, so a rule that moves
+// geometry between a layer and its children changes what the glass covers. This mirrors
+// LayerStyleContentSource::Geometry in tgfx; extend the check when another style opts in.
+bool UsesOwnGeometryMask(const Layer* layer) {
+  for (const auto* style : layer->styles) {
+    if (style != nullptr && style->nodeType() == NodeType::GlassStyle) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // Downgrade-shell-children: when a parent Layer has no contents, no layout,
 // and ALL children are shell+downgradable Layers without further children,
@@ -995,6 +1007,9 @@ bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
   }
   if (!layer->contents.empty()) {
     return changed;  // mixed: paint order would change
+  }
+  if (UsesOwnGeometryMask(layer)) {
+    return changed;  // the layer falls back to the subtree contour; moving children changes it
   }
 
   for (auto* child : layer->children) {
@@ -1404,6 +1419,9 @@ bool ChildHasNoPaintAffectingEffect(const Layer* child) {
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
                            const std::unordered_set<const Layer*>& maskRefs) {
+  if (UsesOwnGeometryMask(parent)) {
+    return false;  // glass masks with the parent's own geometry, which absorbing would grow
+  }
   if (!child->children.empty()) {
     return false;  // only leaf payload wrappers; child layers would need layout re-parenting
   }

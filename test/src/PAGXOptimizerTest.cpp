@@ -31,6 +31,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -63,6 +64,7 @@ using pagx::Element;
 using pagx::Ellipse;
 using pagx::Fill;
 using pagx::Font;
+using pagx::GlassStyle;
 using pagx::Glyph;
 using pagx::GlyphRun;
 using pagx::Group;
@@ -2080,6 +2082,115 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsPaintedChildWhenParentHasGeometry) {
   EXPECT_EQ(parent->children[0], child);
   ASSERT_EQ(parent->contents.size(), 1u);
   EXPECT_EQ(parent->contents[0], placeholder);
+}
+
+// ---------------------------------------------------------------------------
+// Glass geometry mask: a GlassStyle layer is masked by its own geometry, which
+// excludes its children, so the rules that move geometry between a layer and
+// its children must leave such a layer's subtree alone.
+// ---------------------------------------------------------------------------
+
+// Only the downgrade rule is enabled, so no other pass can explain the control cases below:
+// collapseShellChildren would drop the shell parent before the downgrade is observable.
+static PAGXOptimizerOptions DowngradeOnly() {
+  PAGXOptimizerOptions options;
+  options.pruneEmpty = false;
+  options.mergeAdjacentShellLayers = false;
+  options.collapseSingleChildLayers = false;
+  options.unwrapRedundantFirstGroup = false;
+  options.mergeAdjacentGroups = false;
+  options.canonicalizePaths = false;
+  options.rectMaskToScrollRect = false;
+  options.dedupPathData = false;
+  options.pruneUnreferencedResources = false;
+  options.downgradeShellChildren = true;
+  return options;
+}
+
+// Unpainted geometry: nothing renders it on its own, so it only shows up through the layer's
+// glass mask once the optimizer reparents it.
+static Rectangle* MakeBareRect(PAGXDocument* doc, float x, float y, float w, float h) {
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->position = {x, y};
+  rect->size = {w, h};
+  return rect;
+}
+
+// Absorbing the child would append its bare rect to the parent's contents, growing the geometry the
+// parent's glass covers.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsFillingChildUnderGlass) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  auto* ownRect = MakeBareRect(doc.get(), 4, 4, 4, 4);
+  parent->contents.push_back(ownRect);
+  parent->styles.push_back(doc->makeNode<GlassStyle>());
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->contents.push_back(MakeBareRect(doc.get(), 12, 12, 4, 4));
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  ASSERT_EQ(parent->contents.size(), 1u);
+  EXPECT_EQ(parent->contents[0], ownRect);
+}
+
+// Control: without the glass style the same shape is absorbed, which proves the fixture really does
+// hit the rule and that the guard is what keeps the test above intact.
+CLI_TEST(PAGXOptimizerTest, CollapseAbsorbsFillingChildWithoutGlass) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->contents.push_back(MakeBareRect(doc.get(), 4, 4, 4, 4));
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->contents.push_back(MakeBareRect(doc.get(), 12, 12, 4, 4));
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  EXPECT_TRUE(parent->children.empty());
+  ASSERT_EQ(parent->contents.size(), 2u);
+  EXPECT_EQ(parent->contents[1]->nodeType(), NodeType::Rectangle);
+}
+
+// Downgrading wraps the child in a Group inside the parent's contents, which turns the fallback
+// subtree contour into the layer's own geometry and starts masking the child's bare rect.
+CLI_TEST(PAGXOptimizerTest, DowngradeKeepsShellChildrenUnderGlass) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->styles.push_back(doc->makeNode<GlassStyle>());
+  auto* child = doc->makeNode<Layer>();
+  child->contents.push_back(MakeBareRect(doc.get(), 4, 4, 4, 4));
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), DowngradeOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
+// Control: without the glass style the shell child is folded into the parent's contents.
+CLI_TEST(PAGXOptimizerTest, DowngradeFoldsShellChildrenWithoutGlass) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  auto* child = doc->makeNode<Layer>();
+  child->contents.push_back(MakeBareRect(doc.get(), 4, 4, 4, 4));
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), DowngradeOnly());
+
+  EXPECT_TRUE(parent->children.empty());
+  ASSERT_EQ(parent->contents.size(), 1u);
+  EXPECT_EQ(parent->contents[0]->nodeType(), NodeType::Group);
 }
 
 }  // namespace pag
