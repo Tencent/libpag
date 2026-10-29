@@ -87,7 +87,7 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 - `resources/apitest/SVG` 永不打包，但 SVG 导入代码仍参与编译。
 - WebGPU 构建开启 Asyncify，使 `Baseline::Compare` 使用的同步 `readPixels()`
   可以等待 buffer 映射完成。
-- WebGPU 后端的 layer style 渲染存在不完整 BindGroup 缺陷。根因在 libpag 侧：
+- WebGPU 后端的 layer style 渲染曾存在不完整 BindGroup 缺陷。根因在 libpag 侧：
   `SolidStrokeFilter` 有单输入/双输入两个构造变体，但 `textureSamplers()`
   无条件声明 2 个 sampler，单输入变体（无 `originalImage`）draw 时
   `RuntimeFilter::onDraw` 只绑定 1 个纹理（2 个 entry），而 WebGPU 要求
@@ -97,9 +97,9 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   影响。受影响用例：`PAGFilterTest.DropShadow/OuterGlow/Stroke`、
   `PAGTextLayerTest.Emoji_ID79762747`（同根，布局声明 2 sampler 实绑 1）。
   `PAGFilterTest.RadialBlur` 是另一类问题：uniform buffer 以 12 字节绑定，
-  低于 WebGPU 要求的最小 16 字节（bound with size 12）。修复方向：
-  双纹理缺陷在 libpag 按变体条件化 `textureSamplers()`（注意 pipeline 缓存
-  按 filterType 键控，变体需区分 filterType 或将布局纳入缓存键），或在 tgfx
-  `updateBindGroup()` 对未绑定的 texture 槽位填占位纹理；UBO 问题在绑定侧
-  将 size 向上取整到 16 的倍数。当前 seed 的 md5 基于该错误渲染固化，修复后
-  需重 seed 这批用例。
+  低于 WebGPU 要求的最小 16 字节（bound with size 12）。已在 tgfx WebGPU
+  后端修复（tgfx 分支 `bugfix/billyjin_webgpu_bindgroup`，commit dd82d66）：
+  `updateBindGroup()` 对布局声明但未绑定的 texture/sampler 槽位填 1×1 占位
+  纹理（占位永不被采样，语义等价 GL 惰性绑定）；uniform 绑定 size 向上取整
+  到 16 的倍数并在 `WebGPUBuffer::Make` 对 UNIFORM 容量按 16 对齐。该修复
+  的 seed md5 仍是修复前错误渲染的固化，验证编译通过后需重 seed 这批用例。
