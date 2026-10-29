@@ -74,7 +74,6 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGDiskCacheTest\\.cpp$")           # pt
 # (DECODING_VISIBLE_DISTANCE); the web build prefetches the whole timeline in
 # RenderCache::prepareLayers(), so the counts permanently differ from the native semantics.
 list(FILTER TEST_SOURCES EXCLUDE REGEX "AsyncDecodeTest\\.cpp$")            # web full-timeline prefetch
-list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXSVGTest\\.cpp$")                # 492MB SVG corpus
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
 # The legacy HTML-importer suite uses dynamic_cast. RTTI cannot be enabled to accommodate it:
 # tgfx's emscripten bindings are compiled no-rtti with synthetic typeinfo, so an RTTI libpag in

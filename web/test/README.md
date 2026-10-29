@@ -59,7 +59,6 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 |---|---|
 | `MultiThreadCase.cpp`、`PAGANRRegressionTest.cpp`、`PAGDiskCacheTest.cpp` | 依赖 pthreads（单线程构建）/ MEMFS 磁盘缓存语义 |
 | `AsyncDecodeTest.cpp` | 断言依赖原生 500ms 预取窗口驱动的序列/图片缓存计数；web 构建在 `RenderCache::prepareLayers` 中全时间线预取，计数与原生语义永久不一致 |
-| `PAGXSVGTest.cpp` | `resources/apitest/SVG` 语料达 492MB，不打包 |
 | `PAGXCliTest.cpp` | CLI 源码不编入 web 测试 |
 | `PAGXHTMLImporterTest.cpp` | 使用 `dynamic_cast`；tgfx 的 embind typeinfo 是 no-rtti 编译，无法开启 RTTI。由原生车道覆盖 |
 | `*.mm`（Metal/Cocoa） | 平台测试在 Emscripten 下永远无法编译 |
