@@ -294,8 +294,16 @@ std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
   return ParseCSSFontFamilyList(raw);
 }
 
-std::string ResolveGenericFontFamily(const std::string& name) {
-  return ResolveCSSGenericFontFamily(Trim(name));
+FontFamilyToken ClassifyFontFamilyToken(const std::string& name) {
+  FontFamilyToken token = {};
+  std::string trimmed = Trim(name);
+  if (trimmed.empty()) return token;
+  // The generic keyword table lives with the CSS font style helpers, so the importer, the HTML
+  // writer and the SVG importer all agree on which tokens are generics and what this platform
+  // maps them to.
+  token.isGeneric = IsCSSGenericFontFamily(trimmed);
+  token.resolved = ResolveCSSGenericFontFamily(trimmed);
+  return token;
 }
 
 const std::unordered_map<std::string, uint32_t>& NamedColors() {

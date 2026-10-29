@@ -104,6 +104,49 @@ CSS rule precedence (effective): `inline style` > `class rules` > `element rules
 
 External `<link rel="stylesheet">` is forbidden. The importer never performs HTTP I/O.
 
+### 3.5 Web fonts (`@font-face`)
+
+`@font-face` rules inside a `<style>` block are honoured whether `src` names a font file on
+local disk or inlines the font as a `data:` URI:
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- The `font-family`, `src`, `font-weight` and `font-style` descriptors are read. `src` is
+  scanned for `url()` sources in order, and the first usable one is taken: a local path (relative
+  paths resolve against the HTML file's directory) or a `data:` URI. `local()` names, `format()`
+  hints and every other descriptor are ignored.
+- `font-weight` / `font-style` say which face the rule declares: one weight (`700`), a variable
+  range (`400 900`), and `normal` / `italic` / `oblique` for the slant. Weights are CSS numbers in
+  `[1, 1000]` and may be fractional, and the range endpoints are compared at that precision. An
+  `oblique` angle needs a CSS angle unit and has to fall within `[-90, 90]` degrees. A rule that
+  omits both declares a Regular upright face, and a descriptor value that is not valid CSS is
+  dropped the way a browser drops it. When a family is split over several rules, each text request
+  resolves
+  to the face the browser's font matching picks — the slant first, then the CSS weight preference
+  order — and `Text.fontStyle` names the heavier of the request and that face's weight, plus the
+  face's own slant when the family has no face on the requested axis. A family that only ships
+  `font-weight: 700` therefore exports `Bold` even for text that computes to 400, instead of
+  naming a Regular face the family does not have; a family whose only face is
+  `font-weight: 700; font-style: italic` exports `Bold Italic`; and a Regular-only family used for
+  a 700 heading keeps `Bold`, because that is the weight the browser synthesises rather than
+  dropping back to Regular.
+- Only a rule whose source the importer loaded can redirect the exported style. A `@font-face`
+  whose sources are all remote or unloadable declares a face the document never renders with, so the
+  text keeps the style the platform resolves; inside a family split between a loaded face and a
+  remote one, only the loaded face counts.
+- Both kinds of source are registered under the CSS family the rule declares for import-time
+  matching and layout, so the CSS name need not match the font file's internal name. These
+  registrations are not serialized as font resources; a host loading the exported document
+  must supply the selected fonts through its own font configuration.
+- Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
+  source is registered: the last rule's file is the family's primary face, and the others join the
+  fallback chain, so a character the primary face lacks still shapes with the subset that has it.
+- Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
+  cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
+  source is dropped like any other unsupported at-rule.
+
 ## 4. Allowed CSS Properties
 
 Lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
@@ -230,8 +273,9 @@ remain supported.
 | `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
-| `font-weight: bold` / `600+` | bold weights (`bold` or numeric ≥ 600) map to the bold style; when the resolved typeface has no native bold face the importer applies synthetic `fauxBold` so the weight still shows |
-| `font-style: italic | oblique` | `Text.fontStyle = "Italic"` (combined with bold into `"Bold Italic"`) |
+| `font-weight: normal | bold | N` | CSS numeric weight (1–1000, without rounding) selects an available face after width and slant matching; the actual face name is written to `Text.fontStyle`, without synthetic bold. For an `@font-face` family, a heavier declared face can raise the exported weight, but a heavier CSS request is not lowered (see §3.5) |
+| `font-style: normal | italic | oblique` | selects the face slant before weight matching; synthetic italic remains a fallback for an upright face |
+| `font-stretch: <keyword> | N%` | selects the face width first (normal is 100%); inherited, including captured text runs |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `-webkit-text-stroke: W C` (or the `-webkit-text-stroke-width` / `-webkit-text-stroke-color` longhands) | adds a text `<Stroke color="C" width="W"/>` to the glyph run |
 | `text-align: start | left | center | right | justify` | `TextBox.textAlign = "start|center|end|justify"` (`left` → `start`, `right` → `end`) |
@@ -243,7 +287,10 @@ remain supported.
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
-`unicode-bidi`, `font-variant`, `font-stretch`, `font` shorthand, web fonts (`@font-face`).
+`unicode-bidi`, `font-variant`, `font` shorthand. Web fonts are accepted through local
+or inline `@font-face` sources (see §3.5).
+
+Font matching uses platform/font metadata for installed and registered static faces. Exact PAGX face names remain exact-name requests. Missing faces use the CSS width, slant and weight search order within the same family. Snapshot web fonts use their declared `@font-face` descriptors and preserve ordered Unicode subsets. Arbitrary variable-axis instantiation is outside this subset.
 
 **Inline text shrink-to-fit.** A non-wrapping inline text leaf (`<span>` / `<a>` with
 `white-space: nowrap` or `pre`) drops its authored inline-axis size and lets the shaped text
@@ -422,9 +469,9 @@ Behaviour:
 | Pass | Silently rewrites | Warns and drops |
 |------|-------------------|-----------------|
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
-| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
+| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element, re-emitting a `<style>` that carries only the `@keyframes` (§13) and `@font-face` (§3.5) rules | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face` without a `url()` source and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `object-position` (including affine `calc()`), `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `object-position` (including affine `calc()`), `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |

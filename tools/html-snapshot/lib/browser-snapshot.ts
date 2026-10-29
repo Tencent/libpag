@@ -38,6 +38,12 @@
 
 // @ts-nocheck
 
+import * as fontFacePass from './font-face-pass';
+const {
+  collectCarryOverFontFaces, cssQuotedString, fontFaceRuleCss,
+  normalizeFontFaceStyle, normalizeFontFaceWeight,
+} = fontFacePass;
+
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
 import { PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC } from './paint-plan';
 // Imported under a distinct name because the value is only embedded as a
@@ -94,9 +100,42 @@ const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
 // like `"PingFang SC", -apple-system, sans-serif` round-trips: the
 // importer's first concrete family lands on `Text::fontFamily` and the
 // remaining concrete entries are registered as document-level fallbacks.
-function normalizeFontFamily(value) {
+function normalizeFontFamily(value: string): string {
   if (!value) return '';
   return value.replace(/"/g, "'");
+}
+
+// Nearest ancestor (or document root) `lang` value; empty when none is declared. Never
+// guessed from the content.
+function collectLanguage(el) {
+  try {
+    const holder = el && typeof el.closest === 'function' ? el.closest('[lang]') : null;
+    if (holder) {
+      const lang = holder.getAttribute('lang');
+      if (lang && String(lang).trim()) return String(lang).trim();
+    }
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const rootLang = document.documentElement.getAttribute('lang');
+      if (rootLang && String(rootLang).trim()) return String(rootLang).trim();
+    }
+    return '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// Escapes text for a single-quoted XML attribute.
+function escapeSingleQuotedAttr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/'/g, '&apos;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildLanguageAttribute(el) {
+  const lang = collectLanguage(el);
+  return lang ? ` lang='${escapeSingleQuotedAttr(lang)}'` : '';
 }
 
 // PAGX only models `overflow: hidden`. `clip`, `auto`, and `scroll` all map to
@@ -1255,24 +1294,67 @@ function appendStyleProp(parts, computed, entry, ctx) {
   parts.push(`${outProp}: ${v.replace(/"/g, "'")}`);
 }
 
+// CSS matching for static faces and declared descriptor ranges. Keep this ordering in sync
+// with CompareCSSFontStyles; both implementations consume font-matching-cases.json in tests.
+function fontMatchRange(value, width) {
+  const widths = { 'ultra-condensed': 50, 'extra-condensed': 62.5, condensed: 75,
+    'semi-condensed': 87.5, normal: 100, 'semi-expanded': 112.5, expanded: 125,
+    'extra-expanded': 150, 'ultra-expanded': 200 };
+  const numbers = String(value || 'normal').trim().split(/\s+/).map(token => {
+    if (width && widths[token] !== undefined) return widths[token];
+    if (!width && token === 'normal') return 400;
+    if (!width && token === 'bold') return 700;
+    const number = Number(width ? token.replace(/%$/, '') : token);
+    return Number.isFinite(number) && number > 0 ? number : width ? 100 : 400;
+  });
+  return [numbers[0], numbers[1] ?? numbers[0]];
+}
+
+function fontMatchCompare(request, a, b) {
+  const desiredWeight = fontMatchRange(request.weight, false)[0];
+  const desiredWidth = fontMatchRange(request.stretch, true)[0];
+  const slant = value => /^oblique(?:\s|$)/.test(value || '') ? 'oblique' :
+    value === 'italic' ? 'italic' : 'normal';
+  const desiredSlant = slant(request.style);
+  const rank = face => {
+    const [loWidth, hiWidth] = fontMatchRange(face.stretch, true);
+    const width = Math.max(loWidth, Math.min(hiWidth, desiredWidth));
+    const widthRank = desiredWidth <= 100
+      ? width <= desiredWidth ? [0, desiredWidth - width] : [1, width - desiredWidth]
+      : width >= desiredWidth ? [0, width - desiredWidth] : [1, desiredWidth - width];
+    const actualSlant = slant(face.style);
+    const slantRank = actualSlant === desiredSlant ? 0 : desiredSlant === 'normal'
+      ? actualSlant === 'oblique' ? 1 : 2 : actualSlant === 'normal' ? 2 : 1;
+    const [loWeight, hiWeight] = fontMatchRange(face.weight, false);
+    const weight = Math.max(loWeight, Math.min(hiWeight, desiredWeight));
+    let weightRank;
+    if (desiredWeight < 400) weightRank = weight <= desiredWeight
+      ? [0, desiredWeight - weight] : [1, weight - desiredWeight];
+    else if (desiredWeight > 500) weightRank = weight >= desiredWeight
+      ? [0, weight - desiredWeight] : [1, desiredWeight - weight];
+    else if (weight >= desiredWeight && weight <= 500) weightRank = [0, weight - desiredWeight];
+    else weightRank = weight < desiredWeight ? [1, desiredWeight - weight] : [2, weight - desiredWeight];
+    return [...widthRank, slantRank, ...weightRank];
+  };
+  const first = rank(a), second = rank(b);
+  for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return first[i] - second[i];
+  return 0;
+}
+
 function snapshotFontFamily(value, computed) {
   const aliases = window.__pagxFontAliases || [];
   if (!aliases.length) return value;
   const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
-  const italic = /italic|oblique/.test(computed.getPropertyValue('font-style'));
+  const request = { weight: String(weight), style: computed.getPropertyValue('font-style') || 'normal',
+    stretch: computed.getPropertyValue('font-stretch') || '100%' };
   return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
     const family = part.trim().replace(/^["']|["']$/g, '');
     const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
-    matches.sort((a, b) => {
-      const score = (face) => {
-        const range = (face.weight || '400').split(/\s+/).map(Number);
-        const lo = range[0] || 400, hi = range[1] || lo;
-        return (italic !== /italic|oblique/.test(face.style) ? 10000 : 0) +
-          Math.max(lo - weight, weight - hi, 0);
-      };
-      return score(a) - score(b);
-    });
-    return matches.length ? `'${matches[0].to.replace(/'/g, "\\'")}'` : part.trim();
+    matches.sort((a, b) => fontMatchCompare(request, a, b));
+    // Keep the CSS name first: it owns the @font-face descriptors and the catalog identity.
+    // The file's internal name is only a fallback when no carried face can be loaded.
+    if (!matches.length || matches[0].to.toLowerCase() === family.toLowerCase()) return part.trim();
+    return part.trim() + `, '${matches[0].to.replace(/'/g, "\\'")}'`;
   }).join(', ');
 }
 
@@ -1635,8 +1717,12 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
-    // currentColor stroke/fill picks up the right tint.
+    // currentColor stroke/fill picks up the right tint, plus `font-family` so a
+    // `<text>` inside the inline SVG inherits the document's face. The SVG is
+    // serialized standalone and re-imported without the HTML cascade, so the
+    // family must ride along on the wrapper for the importer to see it.
     appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('color'));
+    appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('font-family'));
   }
 
   // Forward the host's resolved CSS `transform` (and `transform-origin`) when
@@ -2175,7 +2261,7 @@ function freezeSvg(svgEl, rect) {
     'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
     'stroke-dasharray', 'stroke-dashoffset',
     'opacity', 'visibility', 'clip-rule', 'vector-effect',
-    'font-family', 'font-size', 'font-weight', 'font-style', 'letter-spacing',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'letter-spacing',
     'text-anchor', 'marker-start', 'marker-mid', 'marker-end',
     'stop-color', 'stop-opacity',
   ];
@@ -2815,6 +2901,7 @@ const BOUNDARY_SPACE = '\u00a0';
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed, opts) {
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
@@ -2859,7 +2946,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
       : '';
-    out.push(`<span${intrinsicWidth} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${intrinsicWidth}${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -2886,6 +2973,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
   const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
   const columns = measuredTextFragments(textNode, computed, axis);
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const out = [];
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
@@ -2914,7 +3002,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
       if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
       if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
     }
-    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3412,7 +3500,7 @@ function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxSty
 }
 
 // Forward an element's author `data-*` attributes onto the emitted markup so the
-// PAGX importer can surface them as layer customData (its `applyLayerAttributes`
+// PAGX importer can surface them as layer customData (its `applyLayerName`
 // copies every `data-*` attribute into the layer's `customData`). Returns a string
 // like ` data-id="hero" data-role="cover"` (leading space, ready to splice into a
 // tag) or an empty string. The snapshot pipeline's own bookkeeping attributes
@@ -3517,7 +3605,7 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     : withNowrap(textStyle);
   const innerLayout = (multiline ? 'display: block' : 'display: flex; align-items: center') +
     '; overflow: hidden' + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  const inner = `<span${buildLanguageAttribute(el)} style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
@@ -3957,10 +4045,12 @@ function emitInlineRunMarkup(el, parentComputed) {
       deltaParts.push(`-webkit-text-stroke: ${stroke}`);
     }
     const inner = emitInlineRunMarkup(c, cs);
-    if (deltaParts.length === 0) {
+    const language = buildLanguageAttribute(c);
+    const parentLanguage = buildLanguageAttribute(el);
+    if (deltaParts.length === 0 && language === parentLanguage) {
       out += inner;
     } else {
-      out += `<span style="${deltaParts.join('; ')}">${inner}</span>`;
+      out += `<span${language} style="${deltaParts.join('; ')}">${inner}</span>`;
     }
   }
   return out;
@@ -4035,7 +4125,7 @@ function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
   // phantom wrap when the natural advance crowds the wrapper width.
   const style = withNowrap(boxStyle);
   const inner = emitInlineRunMarkup(el, computed);
-  return `<span style="${style}">${inner}${overlays}</span>`;
+  return `<span${buildLanguageAttribute(el)} style="${style}">${inner}${overlays}</span>`;
 }
 
 // Pure-text leaf (no element children): emit one outer <div> carrying the
@@ -4124,7 +4214,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       } else {
         parts.push('flex-shrink: 0');
       }
-      return `<span style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
+      return `<span${buildLanguageAttribute(el)} style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
     }
     // Mirror the source's own flex / padding declaration onto the wrapper
     // so the inline span lands where the browser painted it. A text-only
@@ -4162,7 +4252,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
                    { box: true, ...opts, flexContentSized: true })
       : boxStyle;
     const wrapperStyle = joinStyles(wrapperBox, innerLayout);
-    return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
+    return `<div style="${wrapperStyle}"><span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
 
   // Inline `transform` on the host (e.g. `<h1 style="transform: skewX(-5deg)">`)
@@ -4285,7 +4375,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
     const textStyle = withNowrap(buildStyle(0, 0, 0, 0, pseudoComputed, {
       box: false, text: true, positioned: false,
     }));
-    spans.push(`<span style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
+    spans.push(`<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
   }
   if (spans.length === 0) {
     return `<div style="${boxStyle}">${overlays}</div>`;
@@ -4339,7 +4429,7 @@ function renderFlexTextItem(child, parentComputed) {
   });
   const flexBits = `height: ${px(height)}; flex-shrink: 0`;
   const style = withNowrap([baseStyle, flexBits].filter(Boolean).join('; '));
-  return `<span style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
+  return `<span${buildLanguageAttribute(child.node.parentElement)} style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
 }
 
 // Render an element + its subtree as a flex container. The container itself
@@ -5074,6 +5164,7 @@ function snapshotMainImpl(opts) {
     const defs = (window.__pagxClipDefs || []).join('');
     return { width, height, html: `<!DOCTYPE html><html><head><style>` +
       `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
+      collectCarryOverFontFaces(document.styleSheets, document.baseURI, true).map(fontFaceRuleCss).join('') +
       `</style></head><body data-pagx-capture-mode="current-state" style="width:${width}px;height:${height}px;overflow:hidden;background-color:${rootBackground}">` +
       (defs ? `<svg width="0" height="0" style="display:none"><defs>${defs}</defs></svg>` : '') +
       content + '</body></html>' };
@@ -5173,6 +5264,17 @@ function snapshotMainImpl(opts) {
   const animKeyframes = document.getElementById('__pagx_anim_keyframes');
   if (animKeyframes && animKeyframes.textContent) {
     styleBlock += animKeyframes.textContent.trim();
+  }
+
+  // Carry the page's web fonts over as `@font-face` rules, either pointing at the absolute
+  // file path (the same form local images take) or re-using the rule's own `data:` URI. The
+  // importer registers both under the CSS family, so the subset keeps the authored name for
+  // every face instead of losing it with the cascade. The weight and style descriptors go
+  // with them: a family declared with a single 700 face answers the page's 400 text with
+  // those outlines, and the subset has to reproduce that choice rather than imply a regular
+  // cut the page never had.
+  for (const face of collectCarryOverFontFaces(document.styleSheets, document.baseURI, true)) {
+    styleBlock += fontFaceRuleCss(face);
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -5340,8 +5442,10 @@ const STYLE_SCHEMA = [
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
-  { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
-  { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
+  { prop: 'font-variation-settings', scope: 'text', normalize: normalizeFontFamily },
+  { prop: 'font-weight',           scope: 'text' },
+  { prop: 'font-style',            scope: 'text' },
+  { prop: 'font-stretch',          scope: 'text', defaults: ['normal', '100%'] },
   { prop: 'letter-spacing',        scope: 'text', defaults: ['normal', '0px'] },
   { prop: 'line-height',           scope: 'text' },
   { prop: 'text-align',            scope: 'text', defaults: ['start', 'left'] },
@@ -5366,6 +5470,9 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  collectLanguage,
+  escapeSingleQuotedAttr,
+  buildLanguageAttribute,
   normalizeFontFamily,
   normalizeOverflow,
   normalizeBorderRadius,
@@ -5425,6 +5532,8 @@ const HELPER_FNS = [
   classify,
   appendStyleProp,
   snapshotFontFamily,
+  fontMatchRange,
+  fontMatchCompare,
   appendBorder,
   appendBoxShadow,
   appendAnimation,
@@ -5510,6 +5619,11 @@ const HELPER_FNS = [
   prepareBodyForSnapshot,
   visibleContentExtent,
   measureCanvas,
+  cssQuotedString,
+  fontFaceRuleCss,
+  normalizeFontFaceWeight,
+  normalizeFontFaceStyle,
+  collectCarryOverFontFaces,
   snapshotMainImpl,
   snapshotMain,
 ];
@@ -6567,6 +6681,10 @@ export {
   readRootScrollOffset,
   resetRootScroll,
   canvasRootRect,
+  cssQuotedString,
+  collectCarryOverFontFaces,
+  fontMatchRange,
+  fontMatchCompare,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
   snapshotFontFamily,

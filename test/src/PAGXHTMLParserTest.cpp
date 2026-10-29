@@ -116,10 +116,11 @@ PAG_TEST(PAGXHTMLParserTest, DiagnosticsBufferAcrossUnbindingWithoutDuplication)
 PAG_TEST(PAGXHTMLParserTest, KeyframeListsRecoverAfterMalformedSelectorsAndSerialize) {
   std::vector<std::string> dropped;
   std::vector<pagx::html::CssKeyframesRule> keyframes;
+  std::vector<pagx::html::CssFontFaceRule> fontFaces;
   auto rules = pagx::html::TokenizeStyleSheet(
       "@keyframes pulse { broken /* { comment } */ {opacity:9} "
       "from,25%,50%,to {opacity:1} 20oops% {opacity:8} } div {color:red}",
-      dropped, keyframes);
+      dropped, keyframes, fontFaces);
   ASSERT_EQ(keyframes.size(), 1u);
   ASSERT_EQ(keyframes[0].stops.size(), 4u);
   EXPECT_FLOAT_EQ(keyframes[0].stops[0].percent, 0);
@@ -132,7 +133,7 @@ PAG_TEST(PAGXHTMLParserTest, KeyframeListsRecoverAfterMalformedSelectorsAndSeria
   auto serialized = pagx::html::SerializeKeyframes(keyframes);
   EXPECT_NE(serialized.find("opacity:1;"), std::string::npos);
   std::vector<pagx::html::CssKeyframesRule> reparsed;
-  EXPECT_TRUE(pagx::html::TokenizeStyleSheet(serialized, dropped, reparsed).empty());
+  EXPECT_TRUE(pagx::html::TokenizeStyleSheet(serialized, dropped, reparsed, fontFaces).empty());
   ASSERT_EQ(reparsed.size(), 1u);
   ASSERT_EQ(reparsed[0].stops.size(), 4u);
   EXPECT_EQ(reparsed[0].stops[2].declarations, "opacity:1;");
@@ -419,6 +420,27 @@ PAG_TEST(PAGXHTMLParserTest, TransformerKeepsKeyframesAfterExistingHeadMetadata)
   ASSERT_NE(style, nullptr);
   ASSERT_NE(style->getFirstChild(), nullptr);
   EXPECT_NE(style->getFirstChild()->name.find("@keyframes fade"), std::string::npos);
+}
+
+PAG_TEST(PAGXHTMLParserTest, RelativeFontWeightsResolveAgainstTheParentComputedWeight) {
+  struct Case {
+    double parent;
+    double bolder;
+    double lighter;
+  };
+  for (const auto& test : {Case{50, 400, 50}, Case{300, 400, 100}, Case{400, 700, 100},
+                           Case{600, 900, 400}, Case{800, 900, 700}, Case{950, 950, 700}}) {
+    SCOPED_TRACE(test.parent);
+    ParserInput input;
+    pagx::HTMLInheritedStyle parent;
+    parent.fontRequest.weight = test.parent;
+    auto bolder = ParseNode("<span style=\"font-weight:bolder\"/>");
+    auto lighter = ParseNode("<span style=\"font-weight:lighter\"/>");
+    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(bolder, parent).fontRequest.weight,
+                     test.bolder);
+    EXPECT_DOUBLE_EQ(input.styles.resolveInheritedStyle(lighter, parent).fontRequest.weight,
+                     test.lighter);
+  }
 }
 
 PAG_TEST(PAGXHTMLParserTest, InvalidVisualPropertiesUseDocumentedFallbacks) {

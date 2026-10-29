@@ -790,6 +790,9 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
 
+  // The standalone SVG must retain the resolved family from the HTML cascade.
+  _svgEmitter->applyRootFontFamily(element, svgStyle.primaryFontFamily);
+
   // Rewrite the exporter's conic-gradient-stroke workaround (`<mask>` + `<foreignObject>` with a
   // CSS-gradient `<div>`) back into native stroked shapes. The downstream SVG importer does not
   // understand `<foreignObject>` and would otherwise paint the masked region opaque black, dropping

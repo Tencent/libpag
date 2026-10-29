@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLCssCascade.h"
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include "pagx/html/importer/HTMLDetail.h"
 
 namespace pagx::html {
@@ -140,7 +142,387 @@ void ParseKeyframesBody(const std::string& body, CssKeyframesRule& rule) {
   }
 }
 
+uint32_t HexDigitValue(char c) {
+  if (c >= '0' && c <= '9') {
+    return static_cast<uint32_t>(c - '0');
+  }
+  return static_cast<uint32_t>(std::tolower(static_cast<unsigned char>(c)) - 'a' + 10);
+}
+
+void AppendUTF8(uint32_t codepoint, std::string& out) {
+  if (codepoint == 0 || codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
+    codepoint = 0xFFFD;
+  }
+  if (codepoint < 0x80) {
+    out += static_cast<char>(codepoint);
+  } else if (codepoint < 0x800) {
+    out += static_cast<char>(0xC0 | (codepoint >> 6));
+    out += static_cast<char>(0x80 | (codepoint & 0x3F));
+  } else if (codepoint < 0x10000) {
+    out += static_cast<char>(0xE0 | (codepoint >> 12));
+    out += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (codepoint & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (codepoint >> 18));
+    out += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (codepoint & 0x3F));
+  }
+}
+
+// Consumes the CSS escape whose backslash precedes `pos`, appends the character it denotes to
+// `out`, and returns the position after it. Per CSS Syntax, a hex escape takes up to six digits
+// plus one optional whitespace terminator, and a backslash-newline is a line continuation.
+size_t ConsumeCssEscape(const std::string& css, size_t pos, std::string& out) {
+  if (pos >= css.size()) {
+    return pos;
+  }
+  if (std::isxdigit(static_cast<unsigned char>(css[pos]))) {
+    uint32_t codepoint = 0;
+    size_t end = pos;
+    while (end < css.size() && end - pos < 6 &&
+           std::isxdigit(static_cast<unsigned char>(css[end]))) {
+      codepoint = codepoint * 16 + HexDigitValue(css[end]);
+      end++;
+    }
+    if (end < css.size() && std::isspace(static_cast<unsigned char>(css[end]))) {
+      end++;
+    }
+    AppendUTF8(codepoint, out);
+    return end;
+  }
+  if (css[pos] != '\n') {
+    out += css[pos];
+  }
+  return pos + 1;
+}
+
+// Reads the CSS string whose opening quote is at `pos` into `out` (escapes resolved) and returns
+// the position after the closing quote.
+size_t ReadCssString(const std::string& css, size_t pos, std::string& out) {
+  char quote = css[pos];
+  size_t i = pos + 1;
+  while (i < css.size() && css[i] != quote) {
+    if (css[i] == '\\') {
+      i = ConsumeCssEscape(css, i + 1, out);
+    } else {
+      out += css[i++];
+    }
+  }
+  return i < css.size() ? i + 1 : i;
+}
+
+std::string UnescapeCss(const std::string& text) {
+  std::string out;
+  size_t i = 0;
+  while (i < text.size()) {
+    if (text[i] == '\\') {
+      i = ConsumeCssEscape(text, i + 1, out);
+    } else {
+      out += text[i++];
+    }
+  }
+  return out;
+}
+
+std::string QuoteCssString(const std::string& text) {
+  std::string out = "\"";
+  for (char c : text) {
+    if (c == '"' || c == '\\') {
+      out += '\\';
+      out += c;
+    } else if (c == '\n') {
+      out += "\\a ";
+    } else {
+      out += c;
+    }
+  }
+  out += '"';
+  return out;
+}
+
+std::string ParseFontFaceFamily(const std::string& value) {
+  if (value.empty()) {
+    return {};
+  }
+  if (value[0] == '"' || value[0] == '\'') {
+    std::string family;
+    ReadCssString(value, 0, family);
+    return family;
+  }
+  // An unquoted family is a sequence of identifiers, which CSS joins with single spaces.
+  std::string family;
+  for (auto& word : SplitTopLevelWhitespace(UnescapeCss(value))) {
+    if (!family.empty()) {
+      family += ' ';
+    }
+    family += word;
+  }
+  return family;
+}
+
+bool StartsWithUrlFunction(const std::string& value, size_t pos) {
+  if (pos + 4 > value.size() || ToLower(value.substr(pos, 4)) != "url(") {
+    return false;
+  }
+  return pos == 0 || !IsIdentChar(value[pos - 1]);
+}
+
+std::vector<std::string> ParseFontFaceSources(const std::string& value) {
+  std::vector<std::string> sources;
+  size_t i = 0;
+  while (i < value.size()) {
+    char c = value[i];
+    // Quoted strings outside url() belong to local() / format() and are skipped whole, so a quote
+    // or parenthesis inside them cannot desynchronise the scan.
+    if (c == '"' || c == '\'') {
+      std::string skipped;
+      i = ReadCssString(value, i, skipped);
+      continue;
+    }
+    if (!StartsWithUrlFunction(value, i)) {
+      i++;
+      continue;
+    }
+    size_t p = i + 4;
+    while (p < value.size() && std::isspace(static_cast<unsigned char>(value[p]))) {
+      p++;
+    }
+    std::string url;
+    if (p < value.size() && (value[p] == '"' || value[p] == '\'')) {
+      p = ReadCssString(value, p, url);
+      while (p < value.size() && value[p] != ')') {
+        p++;
+      }
+    } else {
+      std::string raw;
+      while (p < value.size() && value[p] != ')') {
+        if (value[p] == '\\') {
+          p = ConsumeCssEscape(value, p + 1, raw);
+        } else {
+          raw += value[p++];
+        }
+      }
+      url = Trim(raw);
+    }
+    if (!url.empty()) {
+      sources.push_back(std::move(url));
+    }
+    i = p < value.size() ? p + 1 : p;
+  }
+  return sources;
+}
+
+// Parses one CSS weight token: `normal` / `bold` or a number in the OpenType 1-1000 range. The
+// value keeps its precision, so a fractional weight is compared as authored.
+bool ParseWeightToken(const std::string& token, float& outWeight) {
+  std::string lower = ToLower(token);
+  if (lower == "normal") {
+    outWeight = 400;
+    return true;
+  }
+  if (lower == "bold") {
+    outWeight = 700;
+    return true;
+  }
+  char* end = nullptr;
+  double value = std::strtod(lower.c_str(), &end);
+  if (end == lower.c_str() || *end != '\0' || !(value >= 1.0 && value <= 1000.0)) {
+    return false;
+  }
+  outWeight = static_cast<float>(value);
+  return true;
+}
+
+// Parses the angle of `oblique <angle>` into degrees. Any CSS angle unit is accepted and converted
+// with the factor the specification defines; a value without a unit is not an angle.
+bool ParseObliqueAngle(const std::string& token, double& outDegrees) {
+  std::string lower = ToLower(token);
+  static const char* kUnits[] = {"deg", "grad", "rad", "turn"};
+  constexpr size_t kUnitCount = sizeof(kUnits) / sizeof(kUnits[0]);
+  for (size_t i = 0; i < kUnitCount; i++) {
+    std::string suffix = kUnits[i];
+    if (lower.size() <= suffix.size() ||
+        lower.compare(lower.size() - suffix.size(), suffix.size(), suffix) != 0) {
+      continue;
+    }
+    std::string number = lower.substr(0, lower.size() - suffix.size());
+    char* end = nullptr;
+    double value = std::strtod(number.c_str(), &end);
+    if (end == number.c_str() || *end != '\0' || !std::isfinite(value)) {
+      return false;
+    }
+    if (i == 0) {
+      outDegrees = value;
+    } else if (i == 1) {
+      outDegrees = value * 0.9;
+    } else if (i == 2) {
+      outDegrees = value * 180.0 / 3.14159265358979323846;
+    } else {
+      outDegrees = value * 360.0;
+    }
+    return true;
+  }
+  return false;
+}
+
+void ApplyFontFaceDescriptor(const std::string& declaration, CssFontFaceRule& rule) {
+  // Descriptor names never contain a colon, so the first one ends the name.
+  auto colon = declaration.find(':');
+  if (colon == std::string::npos) {
+    return;
+  }
+  std::string name = ToLower(Trim(declaration.substr(0, colon)));
+  std::string value = Trim(declaration.substr(colon + 1));
+  if (name == "font-family") {
+    rule.family = ParseFontFaceFamily(value);
+  } else if (name == "src") {
+    rule.sources = ParseFontFaceSources(value);
+  } else if (name == "font-weight") {
+    // The descriptor text is kept verbatim so the subset transformer can re-emit the rule, but only
+    // when it is a value the browser would have honoured.
+    CssFontWeightRange range = {};
+    if (ParseFontFaceWeight(value, range)) {
+      rule.weight = value;
+    }
+  } else if (name == "font-style") {
+    bool italic = false;
+    if (ParseFontFaceStyle(value, italic)) {
+      rule.style = value;
+    }
+  }
+}
+
+// Splits an `@font-face` body on the semicolons that end its descriptors. Semicolons inside
+// quotes, parentheses (an unquoted data: URL) or comments do not end a descriptor.
+CssFontFaceRule ParseFontFaceBody(const std::string& body) {
+  CssFontFaceRule rule = {};
+  std::string declaration;
+  int parenDepth = 0;
+  size_t i = 0;
+  while (i < body.size()) {
+    char c = body[i];
+    if (c == '/' && i + 1 < body.size() && body[i + 1] == '*') {
+      auto end = body.find("*/", i + 2);
+      i = end == std::string::npos ? body.size() : end + 2;
+      continue;
+    }
+    if (c == '"' || c == '\'') {
+      std::string skipped;
+      size_t end = ReadCssString(body, i, skipped);
+      declaration += body.substr(i, end - i);
+      i = end;
+      continue;
+    }
+    if (c == '(') {
+      parenDepth++;
+    } else if (c == ')' && parenDepth > 0) {
+      parenDepth--;
+    } else if (c == ';' && parenDepth == 0) {
+      ApplyFontFaceDescriptor(declaration, rule);
+      declaration.clear();
+      i++;
+      continue;
+    }
+    declaration += c;
+    i++;
+  }
+  ApplyFontFaceDescriptor(declaration, rule);
+  return rule;
+}
+
 }  // namespace
+
+bool ParseFontFaceWeight(const std::string& value, CssFontWeightRange& out) {
+  out = CssFontWeightRange();
+  auto tokens = SplitTopLevelWhitespace(value);
+  if (tokens.empty()) {
+    return true;
+  }
+  float minWeight = 0;
+  float maxWeight = 0;
+  if (!ParseWeightToken(tokens[0], minWeight)) {
+    return false;
+  }
+  if (tokens.size() == 1) {
+    out.minWeight = minWeight;
+    out.maxWeight = minWeight;
+    return true;
+  }
+  if (tokens.size() != 2 || !ParseWeightToken(tokens[1], maxWeight) || minWeight > maxWeight) {
+    return false;
+  }
+  out.minWeight = minWeight;
+  out.maxWeight = maxWeight;
+  return true;
+}
+
+bool ParseFontFaceStyle(const std::string& value, bool& outItalic) {
+  outItalic = false;
+  auto tokens = SplitTopLevelWhitespace(value);
+  if (tokens.empty()) {
+    return true;
+  }
+  std::string lower = ToLower(tokens[0]);
+  if (lower == "normal") {
+    return tokens.size() == 1;
+  }
+  if (lower == "italic") {
+    outItalic = true;
+    return tokens.size() == 1;
+  }
+  if (lower != "oblique") {
+    return false;
+  }
+  if (tokens.size() == 1) {
+    outItalic = true;
+    return true;
+  }
+  // An oblique face leans by at most a quarter turn; an angle outside that range is not a value a
+  // browser accepts, so the declaration is dropped rather than reinterpreted.
+  double degrees = 0;
+  if (tokens.size() != 2 || !ParseObliqueAngle(tokens[1], degrees) || degrees < -90.0 ||
+      degrees > 90.0) {
+    return false;
+  }
+  outItalic = true;
+  return true;
+}
+
+bool SelectFontFace(const std::vector<CssFontFaceRule>& faces, const std::string& family,
+                    const CSSFontStyle& request, CssFontFaceMatch& out) {
+  out = CssFontFaceMatch();
+  // Projecting each rule onto the request (weight clamped into its interval, slant from the
+  // descriptor) lets the shared matcher rank declared faces with the CSS preference order.
+  std::vector<CSSFontFace> candidates = {};
+  std::vector<size_t> ruleIndices = {};
+  for (size_t index = 0; index < faces.size(); index++) {
+    const auto& face = faces[index];
+    if (face.family != family) {
+      continue;
+    }
+    CssFontWeightRange range = {};
+    ParseFontFaceWeight(face.weight, range);
+    bool italic = false;
+    CSSFontFace candidate = {};
+    candidate.style.weight =
+        std::min(std::max(request.weight, static_cast<double>(range.minWeight)),
+                 static_cast<double>(range.maxWeight));
+    // ParseFontFaceStyle validates the descriptor; the typed parse keeps italic and oblique apart.
+    candidate.style.slant = ParseFontFaceStyle(face.style, italic)
+                                ? ParseCSSFontStyle(std::string(), face.style).slant
+                                : CSSFontSlant::Normal;
+    candidates.push_back(std::move(candidate));
+    ruleIndices.push_back(index);
+  }
+  auto best = MatchCSSFontFace(candidates, request);
+  if (best < 0) {
+    return false;
+  }
+  out.rule = &faces[ruleIndices[static_cast<size_t>(best)]];
+  out.style = candidates[static_cast<size_t>(best)].style;
+  return true;
+}
 
 ParsedSelector ClassifySelector(const std::string& selector) {
   ParsedSelector result = {};
@@ -178,7 +560,8 @@ ParsedSelector ClassifySelector(const std::string& selector) {
 
 std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
                                            std::vector<std::string>& droppedAtRules,
-                                           std::vector<CssKeyframesRule>& keyframesRules) {
+                                           std::vector<CssKeyframesRule>& keyframesRules,
+                                           std::vector<CssFontFaceRule>& fontFaceRules) {
   std::vector<RawCssRule> rules;
   size_t pos = 0;
   while (pos < css.size()) {
@@ -224,6 +607,15 @@ std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
         }
         pos = blockEnd;
         continue;
+      }
+      if (atName == "@font-face" && brace != std::string::npos) {
+        size_t blockEnd = SkipBalancedBlock(css, brace);
+        auto rule = ParseFontFaceBody(css.substr(brace + 1, blockEnd - brace - 2));
+        if (!rule.family.empty() && !rule.sources.empty()) {
+          fontFaceRules.push_back(std::move(rule));
+          pos = blockEnd;
+          continue;
+        }
       }
       droppedAtRules.push_back(head);
       if (brace != std::string::npos) {
@@ -292,6 +684,35 @@ std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRul
       out += " }";
     }
     out += " }\n";
+  }
+  return out;
+}
+
+std::string SerializeFontFaces(const std::vector<CssFontFaceRule>& fontFaceRules) {
+  std::string out;
+  for (const auto& rule : fontFaceRules) {
+    out += "@font-face { font-family: ";
+    out += QuoteCssString(rule.family);
+    out += "; src: ";
+    for (size_t i = 0; i < rule.sources.size(); i++) {
+      if (i > 0) {
+        out += ", ";
+      }
+      out += "url(";
+      out += QuoteCssString(rule.sources[i]);
+      out += ')';
+    }
+    // The weight and style descriptors decide which face a text request resolves to, so they have
+    // to survive the round trip through the subset transformer.
+    if (!rule.weight.empty()) {
+      out += "; font-weight: ";
+      out += rule.weight;
+    }
+    if (!rule.style.empty()) {
+      out += "; font-style: ";
+      out += rule.style;
+    }
+    out += "; }\n";
   }
   return out;
 }

@@ -35,6 +35,8 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/types/Data.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -68,6 +70,24 @@ HTMLTextFragmentBuilder::HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink,
 
 void HTMLTextFragmentBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+}
+
+// Every face also joins the fallback chain: a family split across several @font-face rules
+// (unicode-range subsets) registers each file under the same (family, style) key, which holds only
+// the last one, and the chain is what keeps the earlier subsets reachable.
+bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path,
+                                               std::string* internalFamily) {
+  if (RegisterFontFileFaces(&_document->fontConfig(), path, true, family, internalFamily) == 0) {
+    return false;
+  }
+  return true;
+}
+
+bool HTMLTextFragmentBuilder::registerFontData(const std::string& family, const Data& fontData) {
+  if (RegisterFontDataFaces(&_document->fontConfig(), fontData.bytes(), fontData.size(), true,
+                            family) == 0)
+    return false;
+  return true;
 }
 
 Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {

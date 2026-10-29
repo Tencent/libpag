@@ -296,10 +296,13 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
 // HTML import behaviour is fixed in code (no longer exposed via CLI/ImportFormatOptions): the
 // importer always normalizes the subset, prefers the <body> intrinsic size, recovers flex from
 // absolute layout, and downgrades unsupported constructs to warnings rather than hard errors.
-static HTMLImporter::Options ToHTMLOptions(float targetWidth = NAN, float targetHeight = NAN) {
+// Font replacements are applied before layout.
+static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOptions,
+                                           float targetWidth = NAN, float targetHeight = NAN) {
   HTMLImporter::Options options = {};
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
+  options.fontReplacements = formatOptions.fontReplacements;
   return options;
 }
 
@@ -331,7 +334,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
+    auto htmlOptions = ToHTMLOptions(formatOptions, targetWidth, targetHeight);
     if (snapshotEnabled) {
       // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
       // subset HTML) straight to the importer. No temp file touches the disk; the HTML
@@ -368,7 +371,8 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
+    result.document =
+        HTMLImporter::ParseString(content, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
   } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
@@ -468,6 +472,9 @@ HTML options:
   --html-download-fonts           Download web fonts for native font fallbacks
   --html-embed-fonts              Embed fonts; implies --html-download-fonts
   --html-font-dir <dir>           Downloaded font directory
+  --font-replacement <families> <weight> <style> <target-family> <target-face>
+                                 Replace one source font request before layout
+                                 Use --font-replacement=<families> for leading-dash families
   --html-download-images          Download page images instead of snapshot inlining
   --html-image-dir <dir>          Downloaded image directory
   --html-cookie <name=value>      URL cookie (repeatable)
@@ -553,14 +560,26 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       o.inputFile = arg;
       continue;
     }
+    std::string inlineValue;
+    auto equal = arg.find('=');
+    bool hasInlineValue = equal != std::string::npos;
+    if (hasInlineValue) {
+      inlineValue = arg.substr(equal + 1);
+      arg.resize(equal);
+    }
     if (arg.rfind("--html-", 0) == 0) {
       htmlOptions = true;
       snapshotOptions |= arg != "--html-no-snapshot";
     }
     auto flag = switches.find(arg);
     if (flag != switches.end()) {
+      if (hasInlineValue) return ImportArgumentError(arg + " does not accept a value");
       *flag->second = true;
       continue;
+    }
+    if (hasInlineValue && (arg == "--no-resolve" || arg == "--svg-no-expand-use" ||
+                           arg == "--html-no-inline-icon-fonts")) {
+      return ImportArgumentError(arg + " does not accept a value");
     }
     if (arg == "--no-resolve") {
       o.resolve = false;
@@ -577,13 +596,39 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
     auto str = strings.find(arg);
     auto num = numbers.find(arg);
     if (str == strings.end() && num == numbers.end() && arg != "--images" &&
-        arg != "--html-cookie" && arg != "--html-header") {
+        arg != "--html-cookie" && arg != "--html-header" && arg != "--font-replacement") {
       return ImportArgumentError("unknown option '" + arg + "'");
     }
-    if (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-') {
+    if ((hasInlineValue && inlineValue.empty()) ||
+        (!hasInlineValue && (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-'))) {
       return ImportArgumentError(arg + " requires a value");
     }
-    std::string value = argv[++i];
+    std::string value = hasInlineValue ? inlineValue : argv[++i];
+    if (arg == "--font-replacement") {
+      if (i + 4 >= argc) return ImportArgumentError(arg + " requires five values");
+      HTMLImporter::FontReplacement replacement;
+      replacement.families = value;
+      char* end = nullptr;
+      replacement.weight = std::strtof(argv[++i], &end);
+      if (*end != '\0' || !std::isfinite(replacement.weight) || replacement.weight < 1 ||
+          replacement.weight > 1000) {
+        return ImportArgumentError(arg + " weight must be between 1 and 1000");
+      }
+      replacement.style = argv[++i];
+      replacement.targetFamily = argv[++i];
+      replacement.targetStyle = argv[++i];
+      if (replacement.style != "normal" && replacement.style != "italic" &&
+          replacement.style != "oblique") {
+        return ImportArgumentError(arg + " style expects normal, italic or oblique");
+      }
+      if (replacement.targetFamily.empty() || replacement.targetStyle.empty() ||
+          replacement.targetFamily.rfind("--", 0) == 0 ||
+          replacement.targetStyle.rfind("--", 0) == 0) {
+        return ImportArgumentError(arg + " requires a target family and face");
+      }
+      o.formatOptions.fontReplacements.push_back(std::move(replacement));
+      continue;
+    }
     if (str != strings.end()) {
       if (arg == "--input" && !o.inputFile.empty()) {
         return ImportArgumentError("only one input may be specified");
@@ -633,6 +678,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   o.format = NormalizeFormat(o.format, !h.batchDir.empty() || IsHttpUrl(o.inputFile)
                                            ? "html"
                                            : GetFileExtension(o.inputFile));
+  if (!o.formatOptions.fontReplacements.empty() && o.format != "html")
+    return ImportArgumentError("--font-replacement requires HTML input");
   if (o.format != "html" && o.format != "svg")
     return ImportArgumentError("unsupported format '" + o.format + "'");
   if (htmlOptions && o.format != "html")
@@ -762,6 +809,18 @@ static std::string ImportRequest(const ImportOptions& o, const std::string& exec
   number("waitMs", h.waitMs);
   array("cookies", h.cookies);
   array("headers", h.headers);
+  json << ",\"fontReplacements\":[";
+  bool firstReplacement = true;
+  for (const auto& replacement : o.formatOptions.fontReplacements) {
+    if (!firstReplacement) json << ',';
+    json << "{\"families\":\"" << EscapeJson(replacement.families)
+         << "\",\"weight\":" << replacement.weight << ",\"style\":\""
+         << EscapeJson(replacement.style) << "\",\"targetFamily\":\""
+         << EscapeJson(replacement.targetFamily) << "\",\"targetStyle\":\""
+         << EscapeJson(replacement.targetStyle) << "\"}";
+    firstReplacement = false;
+  }
+  json << ']';
   std::vector<std::string> svg;
   if (!o.formatOptions.svgExpandUse) svg.emplace_back("--svg-no-expand-use");
   if (o.formatOptions.svgFlattenTransforms) svg.emplace_back("--svg-flatten-transforms");

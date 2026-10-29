@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/HTMLImporter.h"
 
 namespace pagx {
 class PAGXDocument;
@@ -36,6 +37,7 @@ struct ImportResult {
 };
 
 struct ImportFormatOptions {
+  std::vector<HTMLImporter::FontReplacement> fontReplacements = {};
   bool svgExpandUse = true;
   bool svgFlattenTransforms = false;
   bool svgPreserveUnknown = false;

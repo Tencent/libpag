@@ -26,6 +26,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
+import { prepareSnapshotFontReplacements } from './snapshot-fonts';
+import type { FontReplacement } from './snapshot-fonts';
+import type { AvailableFont } from './font-matcher';
 
 // Recover the `<repo-root>/cmake-build-debug/pagx` path the way pagx import
 // does, so callers that don't pass --pagx-bin / $PAGX_BIN still hit the
@@ -60,6 +63,7 @@ interface SpawnPagxImportArgs {
   pagxBin: string;
   htmlPath: string;
   outPath: string;
+  fontReplacements?: FontReplacement[];
 }
 
 interface SpawnPagxImportResult {
@@ -71,7 +75,7 @@ interface SpawnPagxImportResult {
 // just because pagx printed a warning — only the exit code and the
 // existence of the output file matter.
 function spawnPagxImport(
-  { pagxBin, htmlPath, outPath }: SpawnPagxImportArgs,
+  { pagxBin, htmlPath, outPath, fontReplacements = [] }: SpawnPagxImportArgs,
 ): Promise<SpawnPagxImportResult> {
   return new Promise<SpawnPagxImportResult>((resolve, reject) => {
     const args = [
@@ -84,10 +88,12 @@ function spawnPagxImport(
       // out here to preserve that contract and avoid work the caller may not want.
       '--no-resolve', '--html-no-snapshot',
     ];
-    // Flex inference is always on inside the importer now, so there is no flag
-    // to pass. We feed it the already-rendered subset HTML, so disable the
-    // importer's own snapshot pre-pass (--html-no-snapshot) — otherwise it
-    // would render our flat subset in a second browser pass.
+    for (const replacement of fontReplacements) {
+      args.push(...(replacement.families.startsWith('-')
+      ? [`--font-replacement=${replacement.families}`] : ['--font-replacement', replacement.families]),
+      String(replacement.weight),
+        replacement.style, replacement.targetFamily, replacement.targetStyle);
+    }
     const child = spawn(pagxBin, args, {
       // stdin: not needed (input is a file path); stdout/stderr piped so we
       // can capture pagx's diagnostics for forwarding into our own log.
@@ -144,6 +150,7 @@ export interface RunPagxImportOptions {
   pagxBin?: string;
   html?: string;
   log?: ((msg: string) => void) | null;
+  availableFonts?: AvailableFont[];
 }
 
 // Convenience wrapper: drop the snapshot HTML into a per-call temp dir,
@@ -157,7 +164,7 @@ export interface RunPagxImportOptions {
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
 export async function runPagxImport(
-  { pagxBin, html, log }: RunPagxImportOptions = {},
+  { pagxBin, html, log, availableFonts }: RunPagxImportOptions = {},
 ): Promise<string> {
   if (typeof pagxBin !== 'string' || !pagxBin) {
     throw new PagxImportError('pagxBin is required');
@@ -165,6 +172,7 @@ export async function runPagxImport(
   if (typeof html !== 'string' || !html) {
     throw new PagxImportError('html payload is required');
   }
+  const prepared = availableFonts === undefined ? undefined : prepareSnapshotFontReplacements(html, availableFonts);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'html-snapshot-pagx-'));
   const htmlPath = path.join(dir, 'input.subset.html');
   const pagxPath = path.join(dir, 'output.pagx');
@@ -174,6 +182,7 @@ export async function runPagxImport(
       pagxBin,
       htmlPath,
       outPath: pagxPath,
+      fontReplacements: prepared?.replacements,
     });
     if (log) {
       const filtered = filterKnownWarnings(stderr);
@@ -184,6 +193,10 @@ export async function runPagxImport(
         'pagx import did not produce an output file',
         { stderr },
       );
+    }
+    if (prepared && log) {
+      const { replaced, unmatched, missingRequests } = prepared.mapping;
+      log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
     }
     return fs.readFileSync(pagxPath, 'utf8');
   } finally {

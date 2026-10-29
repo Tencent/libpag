@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
+import type { FontReplacement } from './snapshot-fonts';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
 
@@ -193,6 +194,7 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
 }
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
+  fontReplacements?: FontReplacement[];
   pagxBin?: string;
   input?: string;
   format?: 'html' | 'svg';
@@ -218,6 +220,12 @@ export async function runPagxImportToFile(opts: RunPagxImportToFileOptions = {})
   if (opts.imageBaseDir) args.push('--image-base-dir', opts.imageBaseDir);
   if (opts.verbose) args.push('--verbose');
   if (opts.svgOptions) args.push(...opts.svgOptions);
+  for (const replacement of opts.fontReplacements || []) {
+    args.push(...(replacement.families.startsWith('-')
+      ? [`--font-replacement=${replacement.families}`] : ['--font-replacement', replacement.families]),
+      String(replacement.weight),
+      replacement.style, replacement.targetFamily, replacement.targetStyle);
+  }
   const result = await spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
@@ -337,6 +345,7 @@ function assertStepOk(stepName: string, result: SpawnCaptureResult): void {
 export type SnapshotImpl = (args: BuildSnapshotArgsOptions) => Promise<SpawnCaptureResult>;
 
 export interface RunHtmlToPagxOptions {
+  fontReplacements?: FontReplacement[];
   log?: (line: string) => void;
   pagxBin?: string;
   scriptDir?: string;
@@ -398,6 +407,7 @@ export async function convertToArtifacts(opts: RunHtmlToPagxOptions, input: stri
     imageStorage: opts.pagxImages || 'external',
     imageBaseDir: opts.pagxImageBaseDir || (isHttpUrl(opts.input!) ? '' : path.dirname(path.resolve(opts.input!))),
     svgOptions: opts.svgOptions, verbose: opts.verbose,
+    fontReplacements: opts.fontReplacements,
   });
   assertStepOk('pagx import', result);
   if (!fs.existsSync(pagxFile)) throw new PipelineStepError('pagx import produced no output', { step: 'pagx import' });

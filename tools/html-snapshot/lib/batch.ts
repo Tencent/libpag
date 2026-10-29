@@ -18,6 +18,7 @@ import {
   type BuildSnapshotArgsOptions,
   type SpawnCaptureResult,
   type SnapshotImpl,
+  type RunHtmlToPagxOptions,
 } from './pipeline';
 
 // Walk `root` recursively and collect every regular file whose name ends
@@ -137,7 +138,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
   };
 }
 
-export interface RunBatchOptions {
+export interface RunBatchOptions extends Pick<RunHtmlToPagxOptions, 'fontReplacements'> {
   svgOptions?: string[];
   verbose?: boolean;
   pagxImageBaseDir?: string;
@@ -312,6 +313,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           pagxImageBaseDir: opts.pagxImageBaseDir,
           svgOptions: opts.svgOptions,
           verbose: opts.verbose,
+          fontReplacements: opts.fontReplacements,
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
           captureAnimations: opts.captureAnimations,

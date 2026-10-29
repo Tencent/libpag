@@ -127,6 +127,37 @@ std::string RewriteCurrentColorInInlineStyle(const std::string& style,
   return out;
 }
 
+// Rewrites the `font-family` declaration inside an inline `style="..."` value to a single resolved
+// family (appending one when the style carries none). Other declarations — including a leading
+// `color: ...` — are preserved verbatim. The SVG importer has no CSS-stack resolution, so a stack
+// left in the root style would be taken as one literal family name and fall back to a default face.
+std::string RewriteInlineFontFamily(const std::string& style, const std::string& family) {
+  auto decls = ParseStyleDeclarations(style);
+  std::string out;
+  out.reserve(style.size() + family.size());
+  bool first = true;
+  bool replaced = false;
+  for (auto& decl : decls) {
+    if (!first) out.push_back(';');
+    out += decl.first;
+    out.push_back(':');
+    out.push_back(' ');
+    if (EqualsIgnoreCase(decl.first, "font-family")) {
+      out += family;
+      replaced = true;
+    } else {
+      out += decl.second;
+    }
+    first = false;
+  }
+  if (!replaced) {
+    if (!first) out.push_back(';');
+    out += "font-family: ";
+    out += family;
+  }
+  return out;
+}
+
 // Walks an inline SVG subtree and replaces `currentColor` references in `fill` /
 // `stroke` (attribute form plus inline `style="…"` form) with the concrete
 // colour active at that node. CSS cascade for the `color` property is honoured
@@ -416,6 +447,25 @@ void HTMLInlineSvgEmitter::stripRootOpacity(const std::shared_ptr<DOMNode>& svgR
 void HTMLInlineSvgEmitter::resolveCurrentColor(const std::shared_ptr<DOMNode>& svgRoot,
                                                const std::string& rootColor) {
   ResolveCurrentColorRecursive(svgRoot, rootColor, /*depth=*/0, /*isRoot=*/true);
+}
+
+void HTMLInlineSvgEmitter::applyRootFontFamily(const std::shared_ptr<DOMNode>& svgRoot,
+                                               const std::string& family) {
+  if (!svgRoot || family.empty()) {
+    return;
+  }
+  // The subset cascade stamps the inherited `font-family` stack onto the root's inline `style`,
+  // and a style declaration outranks a presentation attribute in the SVG importer. Rewrite that
+  // declaration to the resolved single family so `<text>` inside the standalone SVG import inherits
+  // a real face; a lone authored family already equals the resolved one, so only genuine stacks
+  // change. When the root carries no style, fall back to the presentation attribute.
+  for (auto& attr : svgRoot->attributes) {
+    if (EqualsIgnoreCase(attr.name, "style") && !attr.value.empty()) {
+      attr.value = RewriteInlineFontFamily(attr.value, family);
+      return;
+    }
+  }
+  SetAttribute(svgRoot, "font-family", family);
 }
 
 void HTMLInlineSvgEmitter::collectSharedDefs(const std::shared_ptr<DOMNode>& root) {

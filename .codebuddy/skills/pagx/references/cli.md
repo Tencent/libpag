@@ -579,3 +579,9 @@ pagx preview --log                     # print the daemon log file
 - **Lifecycle.** Reuse the server while iterating. Stop it through the chosen launcher when the
   requested preview work is finished, unless the user wants it left running.
 
+
+### HTML font matching
+
+`pagx import` supports `--font-replacement <families> <weight> <style> <target-family>
+<target-face>` for exact face selection before layout. Bind a leading-dash family stack with
+`--font-replacement=<families>`.

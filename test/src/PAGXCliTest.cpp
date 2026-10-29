@@ -1748,6 +1748,45 @@ CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
   EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
 
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
+  auto input = TempDir() + "/font-replacement.html";
+  auto output = TempDir() + "/font-replacement.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style='font-family:Source;font-size:20px;font-weight:600'>A</span>"
+                          "</body></html>";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--html-no-snapshot",
+                     "--font-replacement", "Source", "600", "normal", "Target", "Bold"}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+  EXPECT_EQ(xml.find("font-request"), std::string::npos);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--html-no-snapshot",
+                     "--font-replacement", "Source", "NaN", "normal", "Target", "Bold"}),
+            0);
+}
+
+// A CSS font stack can start with a hyphenated family (-apple-system), which the positional value
+// rule reads as an option; binding it with '=' keeps the stack verbatim.
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementAcceptsHyphenatedStack) {
+  auto input = TempDir() + "/font-replacement-stack.html";
+  auto output = TempDir() + "/font-replacement-stack.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style=\"font-family:-apple-system, LongCang;font-size:20px;"
+                          "font-weight:600\">A</span>"
+                          "</body></html>";
+  ASSERT_EQ(
+      CallRun(pagx::cli::RunImport,
+              {"import", "--input", input, "--output", output, "--html-no-snapshot",
+               "--font-replacement=-apple-system, LongCang", "600", "normal", "Target", "Bold"}),
+      0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+}
+
 // An invalid --images value is rejected during option parsing.
 CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "test.svg", "--images", "bogus"});

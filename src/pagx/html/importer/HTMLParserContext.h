@@ -364,6 +364,10 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
+  // CSS family names declared by the loaded @font-face rules. Layout registers every source under
+  // its own rule's family, so a font-family stack that names one of them resolves at render time
+  // regardless of the family name stored inside the file.
+  std::unordered_set<std::string> _webFontFamilies = {};
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
@@ -388,8 +392,8 @@ class HTMLParserContext {
   static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
 
   // Reports whether `family` will resolve at render time without triggering system font
-  // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
-  // installed system font (the family the platform resolves matches the request). A name the
+  // substitution: it is carried by a loaded `@font-face` file, it is registered/embedded in the
+  // document's FontConfig, or it is a genuinely installed system font (the family the platform resolves matches the request). A name the
   // renderer would silently swap for a mismatched default (e.g. the hidden "SF Mono" system font,
   // which `MakeFromName` replaces with a proportional face) counts as unavailable. Results are
   // memoised in `_fontAvailabilityCache`.
@@ -401,18 +405,25 @@ class HTMLParserContext {
   // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
   // exported PAGX carries names a host process can look up with an exact-matching font lookup
   // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
-  // Families registered or embedded in the document's FontConfig keep their names verbatim,
-  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
-  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
-  void resolveFontFaceNames(std::string& family, std::string& style);
+  // Families carried by a loaded `@font-face` file keep their names verbatim: the layout registers
+  // them under the authored CSS name, and the exported label already names the face the loaded file
+  // provides. A family registered in the document's FontConfig retains its alias and reports the
+  // registration style key the request selects; a family the platform substitutes with a different
+  // one keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style, const CSSFontStyle& request);
 
   // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
-  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style,
+                                        const CSSFontStyle& request);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
   // discovered during the walk is available for per-glyph fallback at layout time.
   void flushFontFallbacksToDocument();
+
+  // Registers local or inline @font-face sources before matching text against their descriptors.
+  void loadWebFontFiles();
+  void registerMappedFontAliases(const void* bytes, size_t length);
 };
 
 }  // namespace pagx

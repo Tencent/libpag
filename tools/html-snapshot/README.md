@@ -417,16 +417,40 @@ pre-flag behaviour. Use this when:
 - network egress is undesirable (the pass fetches each unique font URL
   once via Node's `fetch`).
 
+### Local web fonts
+
+A page whose `@font-face` rules point at font files on **local disk** (a saved
+page, or a design-tool HTML export with an `assets/fonts/` folder) needs no
+extra flag: the snapshot carries every such rule over into its `<style>` block
+as `@font-face{font-family:"…";src:url("<absolute path>");font-weight:…;font-style:…}`
+— the same absolute path form local images take. Rules whose `src` is a `data:`
+URI are carried over verbatim, so a page that inlines its fonts needs neither a
+file on disk nor any flag. The importer registers each source under the **CSS
+family the rule declares** — not the family stored inside the font file, which a
+page routinely aliases (`font-family: MaShanZheng` for a file named
+`Ma Shan Zheng`). These registrations are used during import and are not serialized as
+font resources. The host rendering the exported PAGX must supply the selected fonts.
+HTTP font declarations are also carried into the snapshot so catalog matching can read their
+weight and style. This does not download font bytes: native import only loads local or inline
+sources. Without a font catalog or captured font files, remote fonts still use host fallbacks;
+use `--download-fonts` below when the actual font files are needed.
+When a captured file has a different internal family name, the snapshot retains the CSS family
+first and appends the internal name as a fallback, preserving the catalog identity.
+
+The weight and style descriptors travel with the source because they decide
+which cut of the family the page actually painted. A page may declare a single
+`font-weight: 700` face for a family its CSS requests at 400 — the browser then
+matches that face and renders bold outlines — while a variable face declared as
+`font-weight: 400 900` answers the same 400 request at weight 400. Carrying only
+the family name and source would make the subset claim a regular cut the page
+never had, and the editor-catalog match built from it (below) would pick one.
+Faces are de-duplicated by family, source **and** descriptors, so the several
+cuts of one family survive as separate rules.
+
 ### Download web fonts
 
-The snapshot bakes each text node's computed `font-family` **name** into its
-inline style, but it cannot embed the font itself: the HTML subset disallows
-`@font-face`, so the importer drops it. At render time PAGX resolves a family
-by name via `tgfx::Typeface::MakeFromName`, which only finds fonts **installed
-on the rendering host**. A page styled with a Google-Fonts / self-hosted web
-font that isn't installed locally therefore renders with a wrong fallback face
-(e.g. the `font-[900] italic` `Noto Sans SC` heading falls back to a default
-sans-serif).
+Local and inline `@font-face` sources are carried into the subset for import-time font
+matching. Remote fonts still require capture of the font files used by the browser.
 
 Pass `--download-fonts` to capture the actual font files. Rather than
 re-deriving the `@font-face` set from CSS, the pass saves the font files
@@ -844,3 +868,67 @@ and is never Babel-compiled at runtime.
   pixels to keep the output diff-friendly.
 - The page is force-scrolled to `(0, 0)` before measurement so that scroll
   position never leaks into the captured coordinates.
+
+### Match available editor fonts
+
+Provide the frontend's available font catalog in the same conversion request. The converter
+reads original CSS family stacks, numeric weights and slants from the snapshot in memory,
+selects a catalog face and passes its exact family/style to native import before layout.
+No source-font JSON file or matching round trip is required.
+
+The match starts from the cut the page's own `@font-face` rules produced, not from the raw
+computed request: when the family at the **head** of the stack declares a face, that face's
+weight and slant drive the catalog search (a family declared only at 700 therefore maps to
+the catalog's bold face even though the text computes to 400). Requests already inside a
+variable face's range are left as computed, and a request is only ever promoted to a heavier
+declared cut, never lowered: a 700 heading served by a lone 400 face keeps its 700. A stack
+whose head declares no face is left untouched — a font installed on the machine may have
+answered it, so a later family's cut is never applied to it (in `Arial, Cinzel`, a declared
+700 cut of `Cinzel` never makes the `Arial` request bold). The `--font-replacement`
+arguments still carry the computed family, weight and style as the key — that is what the
+subset's inline styles declare — with the resolved catalog face as the target.
+
+```json
+[
+  { "fontName": { "family": "ZCOOL XiaoWei", "style": "Regular" } },
+  { "fontName": { "family": "Noto Sans", "style": "Regular" } },
+  { "fontName": { "family": "Noto Sans", "style": "Bold" } }
+]
+```
+
+Module API: `runPagxImport({ pagxBin, html: snapshotHtml, availableFonts })` matches the
+catalog against the snapshot in memory and forwards the result to native import as
+`--font-replacement <families> <weight> <style> <target-family> <target-face>`; it returns
+only PAGX text. Native conversions no longer generate `<output-name>.fonts.json`, and the
+former `--font-map` / `fontMap` / `fontMetadataPath` contract has been removed.
+
+Matching follows the ordered CSS family stack. Each family tries literal identity, unique
+Unicode NFKC/case/whitespace normalization, then unique normalization of spaces, hyphens and
+underscores. Fuzzy matching requires at least six normalized characters, at most 64, a score
+of at least 0.85 and a margin of at least 0.08 over the runner-up. A unique vendor-prefix
+suffix match (for example `XiaoWei` → `ZCOOL XiaoWei`, length ratio at least 0.5) scores 0.94;
+otherwise at most two character edits are considered. Ambiguities stay unmatched. Generic
+families such as `sans-serif` and `system-ui` are skipped because the catalog defines no
+generic-to-family policy. Missing/empty catalogs preserve existing conversion behavior.
+
+Within a family, prefer the requested slant (italic and oblique may approximate one another),
+then a known nearest numeric weight. Common face labels and numeric face names are recognized;
+unknown labels are not assumed to weigh 400. Equal distances prefer the lighter face at
+weights up to 500, the heavier face above 500. Remaining ties use the original style string's
+code-unit order, independent of catalog ordering. Arbitrary variable axes and glyph coverage
+are not inferred from names. The original catalog names are copied verbatim to the native
+replacement arguments; no family or face is synthesized. The converter still needs the
+selected font file installed or captured from the page to lay out that target correctly.
+
+Invalid catalog entries are rejected before browser work. At most 100,000 faces are accepted;
+each family/style must be a nonempty string of at most 256 characters without control codes.
+Requests are cached within the conversion. `fontMapping` and `[font-map]` logs count matched,
+unmatched and request-less text runs; they do not publish a font inventory. Inline SVG text
+retains authored markup and is outside computed HTML font matching. Existing icon-to-vector
+handling is unchanged.
+
+### Native font replacement
+
+`pagx import` accepts `--font-replacement <families> <weight> <style> <target-family>
+<target-face>` to select the exact face before layout. For a family stack beginning with `-`,
+use `--font-replacement="-apple-system, sans-serif" 400 normal Target Regular`.
