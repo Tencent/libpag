@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
@@ -2316,6 +2317,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
     if (ls->nodeType() == NodeType::DropShadowStyle) {
       auto ds = static_cast<const DropShadowStyle*>(ls);
+      if (ds->spread != 0) {
+        std::cerr
+            << "HTMLExporter: DropShadowStyle spread is not supported and was ignored on layer '"
+            << layer->id << "'.\n";
+      }
       if (hasBlendMode) {
         if (!pendingFilterDropShadows.empty()) {
           std::string filterRef = emitDropShadowFilterDef(pendingFilterDropShadows);
@@ -2405,6 +2411,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         pendingFilterDropShadows.clear();
       }
       auto is = static_cast<const InnerShadowStyle*>(ls);
+      if (is->spread != 0) {
+        std::cerr
+            << "HTMLExporter: InnerShadowStyle spread is not supported and was ignored on layer '"
+            << layer->id << "'.\n";
+      }
       if (hasBlendMode) {
         aboveStyles.push_back({NodeType::InnerShadowStyle, ls});
       } else {

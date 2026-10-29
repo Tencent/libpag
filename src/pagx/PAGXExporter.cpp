@@ -1223,13 +1223,12 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
 // LayerStyle writing
 //==============================================================================
 
-static void WriteShadowAttributes(XMLBuilder& xml, float offsetX, float offsetY, float blurX,
-                                  float blurY, const Color& color) {
+static void WriteShadowGeometryAttributes(XMLBuilder& xml, float offsetX, float offsetY,
+                                          float blurX, float blurY) {
   xml.addAttribute("offsetX", offsetX);
   xml.addAttribute("offsetY", offsetY);
   xml.addAttribute("blurX", blurX);
   xml.addAttribute("blurY", blurY);
-  xml.addAttribute("color", ColorToHexString(color, color.alpha < 1.0f));
 }
 
 // NoiseStyle and NoiseFilter share the same noise parameters, so these two helpers serve both.
@@ -1275,9 +1274,10 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       }
       xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
                        Default<DropShadowStyle>().excludeChildEffects);
-      WriteShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                            style->color);
+      WriteShadowGeometryAttributes(xml, style->offsetX, style->offsetY, style->blurX,
+                                    style->blurY);
       xml.addAttribute("spread", style->spread, Default<DropShadowStyle>().spread);
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
       xml.addAttribute("showBehindLayer", style->showBehindLayer,
                        Default<DropShadowStyle>().showBehindLayer);
       WriteCustomData(xml, node);
@@ -1293,9 +1293,10 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       }
       xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
                        Default<InnerShadowStyle>().excludeChildEffects);
-      WriteShadowAttributes(xml, style->offsetX, style->offsetY, style->blurX, style->blurY,
-                            style->color);
+      WriteShadowGeometryAttributes(xml, style->offsetX, style->offsetY, style->blurX,
+                                    style->blurY);
       xml.addAttribute("spread", style->spread, Default<InnerShadowStyle>().spread);
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1382,8 +1383,9 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
       xml.addAttribute("id", filter->id);
-      WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                            filter->color);
+      WriteShadowGeometryAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX,
+                                    filter->blurY);
+      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<DropShadowFilter>().shadowOnly);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1393,8 +1395,9 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
       xml.addAttribute("id", filter->id);
-      WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
-                            filter->color);
+      WriteShadowGeometryAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX,
+                                    filter->blurY);
+      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<InnerShadowFilter>().shadowOnly);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();

@@ -1310,6 +1310,35 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
 }
 
 /**
+ * Vector export reports the loss of non-zero spread for both shadow styles and preserves the
+ * zero-spread output. Zero values do not emit warnings.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadWarnings) {
+  for (const auto* spread : {"8", "-8", "0"}) {
+    SCOPED_TRACE(spread);
+    auto xml = std::string(R"(<pagx width="100" height="100"><Layer>)") +
+               R"(<Rectangle size="80,80"/><Fill color="#FF0000"/>)" +
+               R"(<DropShadowStyle id="drop" spread=")" + spread + R"("/>)" +
+               R"(<InnerShadowStyle id="inner" spread=")" + spread + R"("/></Layer></pagx>)";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(doc, nullptr);
+    std::vector<std::string> warnings;
+    auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+    EXPECT_FALSE(svg.empty());
+    EXPECT_NE(svg.find("<feMerge"), std::string::npos);
+    if (std::string(spread) == "0") {
+      EXPECT_TRUE(warnings.empty());
+    } else {
+      ASSERT_EQ(warnings.size(), 2u);
+      EXPECT_NE(warnings[0].find("DropShadowStyle spread"), std::string::npos);
+      EXPECT_NE(warnings[0].find("'drop'"), std::string::npos);
+      EXPECT_NE(warnings[1].find("InnerShadowStyle spread"), std::string::npos);
+      EXPECT_NE(warnings[1].find("'inner'"), std::string::npos);
+    }
+  }
+}
+
+/**
  * GlassStyle has no faithful SVG representation. The base vector content remains visible and no
  * empty filter is emitted.
  */

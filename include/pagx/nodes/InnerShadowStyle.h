@@ -59,7 +59,7 @@ class InnerShadowStyle : public LayerStyle {
   Color color = {};
 
   /**
-   * The inner shadow spread distance in layer-local coordinates. Positive values increase inward
+   * The inner shadow spread distance in pixels in layer-local coordinates. Positive values increase inward
    * shadow coverage, and negative values reduce it. The default value is 0.
    */
   float spread = 0.0f;

@@ -1058,6 +1058,23 @@ The rules above are the normative behavior of this version: they state exactly h
 
 **Compatibility**: `spread` defaults to 0, so documents written before this attribute keep their appearance. A reader that predates it may ignore `spread` or reject such documents, and will not show the spread effect. In the C++ API the field is a new member of `DropShadowStyle` and `InnerShadowStyle`, so code built against an older header must be rebuilt.
 
+
+**Units and PAG conversion**: PAGX `spread` is an absolute pixel distance in layer-local coordinates. The binary PAG `DropShadowStyleV2.spread` is instead a dimensionless proportion of `size`: its stroke extent is `size × spread` and its remaining blur radius is `size × (1 − spread) / 2`. Do not copy the same-named field directly between formats. Converters must account for both spread and blur, and the different geometry algorithms may prevent an exact conversion.
+
+**Export/import limitations**: HTML import currently diagnoses and drops non-zero CSS `box-shadow` spread. HTML and SVG vector export currently render shadow styles with zero spread; HTML reports this degradation on stderr, and SVG reports it through the export API's `warnings` output. These limitations apply to both drop and inner shadows.
+
+**Performance**: Non-zero spread requires generating an additional shadow shape image when the layer is redrawn. Animating it can therefore cost more than using the zero-spread raster path; measure performance with representative content and output scales.
+
+**Example**:
+
+```xml
+<Layer>
+  <Rectangle position="60,40" size="120,80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+</Layer>
+```
+
 #### 5.3.2 BackgroundBlurStyle
 
 Applies blur effect to layer background **below** the layer. Computes effect based on **layer background**, using opaque layer content as mask for clipping.

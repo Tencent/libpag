@@ -1058,6 +1058,23 @@ Layer 的子元素按类型自动归类为五个集合：
 
 **兼容性**：`spread` 默认值为 0，因此早于该属性的文档外观保持不变。不支持该属性的旧版读取器可能忽略 `spread` 或拒绝该文档，不会呈现扩散效果。C++ API 中该字段是 `DropShadowStyle` 与 `InnerShadowStyle` 的新增成员，按旧头文件编译的代码需要重新编译。
 
+
+**单位与 PAG 转换**：PAGX 的 `spread` 是图层局部坐标中的绝对像素距离。PAG 二进制格式的 `DropShadowStyleV2.spread` 则是相对于 `size` 的无量纲比例：描边扩展量为 `size × spread`，剩余模糊半径为 `size × (1 − spread) / 2`。不同格式之间不可直接复制同名字段，转换时必须同时处理扩散与模糊；几何算法的差异也可能使转换无法完全保真。
+
+**导入导出限制**：HTML 导入当前会提示并忽略 CSS `box-shadow` 的非零 spread。HTML 和 SVG 矢量导出当前按零 spread 渲染阴影样式；HTML 在 stderr 中报告降级，SVG 通过导出 API 的 `warnings` 输出报告。上述限制同时适用于投影和内阴影。
+
+**性能**：非零 spread 在图层重绘时需要额外生成阴影形状图像，因此扩散动画的开销可能高于零值的栅格路径。应使用实际内容和输出缩放比例评估性能。
+
+**示例**：
+
+```xml
+<Layer>
+  <Rectangle position="60,40" size="120,80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+</Layer>
+```
+
 #### 5.3.2 背景模糊（BackgroundBlurStyle）
 
 在图层**下方**对图层背景应用模糊效果。基于**图层背景**计算效果，使用不透明图层内容作为遮罩裁剪。

@@ -19,7 +19,9 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1995,6 +1997,31 @@ CLI_TEST(PAGXHtmlTest, CompositionLayerWithFilterKeepsDeclaredSize) {
 // =============================================================================
 // Layer styles
 // =============================================================================
+
+CLI_TEST(PAGXHtmlTest, ShadowSpreadWarnings) {
+  for (const auto* spread : {"8", "-8", "0"}) {
+    for (const auto* blend : {"normal", "multiply"}) {
+      SCOPED_TRACE(std::string(spread) + " " + blend);
+      auto xml = std::string(R"(<pagx width="100" height="100"><Layer id="panel">)") +
+                 R"(<Rectangle size="80,80"/><Fill color="#FF0000"/>)" +
+                 R"(<DropShadowStyle spread=")" + spread + R"(" blendMode=")" + blend + R"("/>)" +
+                 R"(<InnerShadowStyle spread=")" + spread + R"(" blendMode=")" + blend +
+                 R"("/></Layer></pagx>)";
+      std::ostringstream messages;
+      auto* previous = std::cerr.rdbuf(messages.rdbuf());
+      auto html = LoadXMLAndConvert(xml);
+      std::cerr.rdbuf(previous);
+      EXPECT_FALSE(html.empty());
+      if (std::string(spread) == "0") {
+        EXPECT_TRUE(messages.str().empty());
+      } else {
+        EXPECT_EQ(CountOccurrences(messages.str(), "DropShadowStyle spread"), 1u);
+        EXPECT_EQ(CountOccurrences(messages.str(), "InnerShadowStyle spread"), 1u);
+        EXPECT_EQ(CountOccurrences(messages.str(), "layer 'panel'"), 2u);
+      }
+    }
+  }
+}
 
 CLI_TEST(PAGXHtmlTest, StyleShadows) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/style_shadows.pagx"));
