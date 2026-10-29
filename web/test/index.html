@@ -15,6 +15,10 @@
         import PAGTest from './pag-test.js';
         import { TGFXBind } from './tgfx.esm.js';
 
+        // Zips are also exposed here as base64: the headless CDP download channel is unreliable
+        // (downloads may never land on disk), so the harness retrieves them via page.evaluate.
+        window.__testZips = {};
+
         function collectFiles(fs, dir) {
             const files = [];
             for (const name of fs.readdir(dir)) {
@@ -50,7 +54,10 @@
                 const relativePath = filePath.replace(prefix, '');
                 zip.file(relativePath, data);
             }
-            const blob = await zip.generateAsync({type: 'blob'});
+            const base64 = await zip.generateAsync({type: 'base64'});
+            window.__testZips[zipName] = base64;
+            const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+            const blob = new Blob([bytes], {type: 'application/zip'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -120,28 +127,21 @@
         if (module) {
             await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
             await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
-            // Pack md5.json and version.json from baseline-out as cache-web.zip for reuse.
+            // Pack the md5 cache Baseline::saveData() wrote to /test/baseline/.cache. This
+            // path is stable across builds; the old /test/baseline-out source is renamed
+            // away to /test/out by saveData() in UPDATE_BASELINE builds and is always empty.
             // run_test.js extracts this zip into test/baseline/.cache/{backend}/.
             try {
-                const cacheZip = new JSZip();
-                const baselineOut = '/test/baseline-out';
-                for (const name of ['md5.json', 'version.json']) {
-                    try {
-                        const data = module.FS.readFile(baselineOut + '/' + name);
-                        cacheZip.file(name, data);
-                    } catch (e) { /* file may not exist */ }
-                }
-                if (Object.keys(cacheZip.files).length > 0) {
-                    const blob = await cacheZip.generateAsync({type: 'blob'});
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'cache-web.zip';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    console.log('Download started: cache-web.zip');
+                const cacheRoot = '/test/baseline/.cache';
+                let cacheFiles = [];
+                try {
+                    module.FS.stat(cacheRoot);
+                    cacheFiles = collectFiles(module.FS, cacheRoot);
+                } catch (e) { /* cache root missing */ }
+                if (cacheFiles.length > 0) {
+                    await downloadOutputDir(module.FS, cacheRoot, 'cache-web.zip');
+                } else {
+                    console.warn('Failed to create cache-web.zip: no cache files under ' + cacheRoot);
                 }
             } catch (e) {
                 console.warn('Failed to create cache-web.zip:', e);

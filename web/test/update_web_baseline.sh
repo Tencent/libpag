@@ -132,5 +132,15 @@ node run_test.js --backend="$BACKEND" || true
 
 cd "$PROJECT_ROOT"
 
+# The run harness may silently fail to deliver the page artifacts (see run_test.js); a
+# missing md5.json means the seed did not land and must not be reported as success.
+CACHE_MD5_FILE="test/baseline/.cache/${BACKEND}/md5.json"
+if [ ! -f "$CACHE_MD5_FILE" ]; then
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND) FAILED~~~~~~~~~~~~~~~~~~~~~" >&2
+    echo "Baseline cache md5.json is missing at: $CACHE_MD5_FILE" >&2
+    echo "The test harness failed to deliver the cache artifacts; check the run log above." >&2
+    exit 1
+fi
+
 echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND) Success~~~~~~~~~~~~~~~~~~~~~"
 echo "Baseline cache updated at: test/baseline/.cache/${BACKEND}/"

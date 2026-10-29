@@ -202,6 +202,22 @@ async function run() {
     server.kill('SIGTERM');
   }
 
+  // The CDP download channel is unreliable in headless Chrome (downloads may start but never
+  // complete or land on disk). The page exposes every packed zip as base64 on window.__testZips;
+  // write any zip that did not arrive through the download channel ourselves.
+  try {
+    const pageZips = await page.evaluate(() => window.__testZips || {});
+    for (const [zipName, base64] of Object.entries(pageZips)) {
+      const zipPath = path.join(DOWNLOADS_DIR, zipName);
+      if (!fs.existsSync(zipPath) && typeof base64 === 'string' && base64.length > 0) {
+        fs.writeFileSync(zipPath, Buffer.from(base64, 'base64'));
+        console.log(`  Saved ${zipName} from page data (${(base64.length * 3 / 4 / 1048576).toFixed(1)} MB).`);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to retrieve page zips:', e.message);
+  }
+
   // Extract the downloaded zip files to their destinations.
   // Preserve the existing baseline version.json so that subsequent runs still compare against
   // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
