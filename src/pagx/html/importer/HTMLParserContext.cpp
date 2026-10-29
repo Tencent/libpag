@@ -166,6 +166,8 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // variants sharing a normalised key can disagree on the exact match (only one is registered),
   // and caching one variant's verdict under the shared key would wrongly answer the other.
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+    // [TEMP-DEBUG] web lane diagnosis: trace each availability verdict to locate the divergence.
+    printf("[Woff2Dbg] isAvailable('%s') = true (registered)\n", family.c_str());
     return true;
   }
   // Only the system-font probe is cached, keyed on the normalised name so spelling/spacing
@@ -180,6 +182,9 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
   bool available =
       typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
+  // [TEMP-DEBUG] web lane diagnosis: trace each availability verdict to locate the divergence.
+  printf("[Woff2Dbg] isAvailable('%s') = %d (probe, doc=%p)\n", family.c_str(),
+         available ? 1 : 0, reinterpret_cast<void*>(_document));
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
