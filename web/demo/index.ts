@@ -3,11 +3,13 @@ import { AudioPlayer } from './module/audio-player';
 
 import type { PAGFile } from '../src/pag-file';
 import type { PAGView } from '../src/pag-view';
-import  {type PAG as PAGNamespace,LayerType } from '../src/types';
+import { type PAG as PAGNamespace } from '../src/types';
 import type { PAGComposition } from '../src/pag-composition';
 import type { PAGImageLayer } from '../src/pag-image-layer';
-import type * as Libpag from "../src/pag";
-import type {PAGTextLayer} from "../src/pag-text-layer";
+
+// Injected per build variant by the esbuild define option in script/rollup.config.js.
+declare const __PAG_DEMO_LIB_DIR__: string;
+declare const __PAG_DEMO_BACKEND__: string;
 
 declare global {
   interface Window {
@@ -30,7 +32,16 @@ let isMobile = false;
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
-    PAG = await PAGInit({ locateFile: (file: string) => '../lib-mt/' + file });
+    if (__PAG_DEMO_BACKEND__ === 'webgpu' && !('gpu' in navigator)) {
+      document.getElementById('waiting')!.innerText = 'WebGPU is not supported in this browser.';
+      return;
+    }
+    try {
+      PAG = await PAGInit({ locateFile: (file: string) => `../${__PAG_DEMO_LIB_DIR__}/` + file });
+    } catch (error) {
+      document.getElementById('waiting')!.innerText = `libpag init failed: ${error}`;
+      return;
+    }
     // Mobile
     isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
     if (isMobile) {
@@ -131,13 +142,6 @@ if (typeof window !== 'undefined') {
       PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
       console.log('=== 开启 ffavc 软件解码 ===');
     });
-    document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
-      if (window.ffavc) {
-        const FFAVC = await window.ffavc.FFAVCInit();
-        const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
-        PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
-      }
-    });
 
     // Get PAGFile duration
     document.getElementById('btn-pagfile-get-duration')?.addEventListener('click', () => {
@@ -201,6 +205,7 @@ if (typeof window !== 'undefined') {
       let progress = Number((document.getElementById('progress') as HTMLInputElement).value);
       if (!(progress >= 0 && progress <= 1)) {
         alert('请输入0～1之间');
+        return;
       }
       pagView.setProgress(progress);
       console.log(`已设置进度：${progress}`);
@@ -260,9 +265,12 @@ if (typeof window !== 'undefined') {
     document.getElementById('btn-freeCache')?.addEventListener('click', () => {
       pagView.freeCache();
     });
-    // freeCache
+    // makeSnapshot
     document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
-      pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
+      pagView
+          .makeSnapshot()
+          .then((bitmap) => console.log('makeSnapshot:', bitmap))
+          .catch((error) => console.error('makeSnapshot fail:', error));
     });
 
     // cacheScale
@@ -275,11 +283,11 @@ if (typeof window !== 'undefined') {
       let cacheScale = Number((document.getElementById('cacheScale') as HTMLInputElement).value);
       if (!(cacheScale >= 0 && cacheScale <= 1)) {
         alert('请输入0～1之间');
+        return;
       }
       pagView.setCacheScale(cacheScale);
     });
   };
-
 }
 
 const existsLayer = (pagLayer: object) => {

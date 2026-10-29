@@ -16,6 +16,8 @@ emsdk/
 api-docs
 *.js.map
 demo/*.js
+demo/index.html
+demo/index-*.html
 cypress/videos
 cypress/screenshots
 demo/wechat-miniprogram/utils/libpag.js
@@ -24,3 +26,10 @@ demo/wasm
 demo/wasm-mt
 lib-mt
 refresh-lib.sh
+lib-webgpu
+lib-webgpu-mt
+src/wasm-webgpu
+src/wasm-webgpu-mt
+src-webgpu-tmp
+demo/wasm-webgpu
+demo/wasm-webgpu-mt
