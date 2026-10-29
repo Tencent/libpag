@@ -29,6 +29,16 @@ declare global {
   }
 }
 
+/**
+ * Minimal structure of a GPUDevice accepted by PAGInit for WebGPU rendering. lib.dom of
+ * TypeScript ~5.0 does not ship WebGPU declarations, so a structural type is used; a real
+ * GPUDevice satisfies it.
+ */
+export interface WebGPUDeviceLike {
+  createTexture: (descriptor: object) => object;
+  queue: object;
+}
+
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
     _Load: (buffer: Uint8Array) => any;
@@ -44,14 +54,24 @@ export interface PAG extends EmscriptenModule {
       colorType: ColorType,
       alphaType: AlphaType,
     ) => any;
-    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
   };
   _PAGPlayer: any;
   _PAGSurface: {
     _FromCanvas: (canvasID: string) => any;
-    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
+    /**
+     * WebGPU build only. Wraps a canvas object (HTMLCanvasElement or OffscreenCanvas) instead of
+     * a DOM id selector.
+     */
+    _FromCanvasObject?: (canvas: HTMLCanvasElement | OffscreenCanvas) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean, format: number) => any;
     _FromRenderTarget: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
+  /**
+   * Starts an async readback on a PAGSurface wasm instance and returns a _PAGSurfaceReadback
+   * session, or null when the surface does not support readback.
+   */
+  _AsyncReadPixels: (surface: any) => any;
   _PAGComposition: {
     _Make: (width: number, height: number) => any;
   };
@@ -122,6 +142,23 @@ export interface PAG extends EmscriptenModule {
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
+  _IsWebGPUBackend: () => boolean;
+  /**
+   * WebGPU build only. The GPUDevice preinitialized on the JS side during PAGInit, picked up by
+   * tgfx via emscripten_webgpu_get_device().
+   */
+  preinitializedWebGPUDevice?: WebGPUDeviceLike;
+  /**
+   * WebGPU build only. Emscripten's WebGPU runtime exported via EXPORTED_RUNTIME_METHODS,
+   * providing the object managers that map wasm handle numbers to JS WebGPU objects.
+   */
+  WebGPU?: {
+    mgrTexture?: {
+      create: (object: object) => number;
+      release: (id: number) => void;
+    };
+    TextureFormat?: string[];
+  };
   currentPlayer: PAGPlayer | null;
   videoReaderManager: VideoReaderManager | null;
   _videoInfoManager: {

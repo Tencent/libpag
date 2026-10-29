@@ -49,8 +49,7 @@ function replaceInFile(filePath, searchString, replacement) {
     }
 }
 
-function replaceFileNameInFiles() {
-    const dir = path.resolve(__dirname, "../lib-mt/");
+function replaceFileNameInFiles(dir) {
     const extension = '.js';
     const searchString = 'libpag.js';
     const files = getFilesInDir(dir, extension);
@@ -85,12 +84,16 @@ function replacePathInFiles(rootDir) {
     });
 }
 
-if(argv.a ==="wasm-mt" || argv.a ==="wasm"){
+const target = require("./targets").resolveByWasmDir(argv.a);
+if(target){
     restoreFile(filePath);
-    if(argv.a ==="wasm-mt"){
-        replaceFileNameInFiles();
+    if(target.arch ==="wasm-mt"){
+        replaceFileNameInFiles(path.resolve(__dirname, `../${target.libDir}/`));
     }
-    replacePathInFiles(path.resolve(__dirname, "../types/web/src"));
+    const typesDir = path.resolve(__dirname, "../types/web/src");
+    if(fs.existsSync(typesDir)){
+        replacePathInFiles(typesDir);
+    }
 }else if(argv.a ==="wechat"){
     replacePathInFiles(path.resolve(__dirname, "../wechat/types/web/src"));
 }

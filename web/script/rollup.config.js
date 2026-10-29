@@ -5,20 +5,25 @@ import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
 import alias from '@rollup/plugin-alias';
-import pkg from '../package.json';
 import { readFileSync } from 'node:fs';
 
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
-const arch = process.env.ARCH;
-const libPath = (arch === 'wasm-mt' ? "lib-mt" : "lib");
-const demoName = (arch === 'wasm-mt'? 'index': 'index-st');
+const { backend, libDir, wasmDir } = require('./targets').resolveTarget(process.env.ARCH, process.env.BACKEND);
 
 require("./update.pag.import");
+require("./gen.demo.html");
 
 
 const plugins = [
-  esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+  esbuild({
+    tsconfig: 'tsconfig.json',
+    minify: false,
+    define: {
+      __PAG_DEMO_LIB_DIR__: JSON.stringify(libDir),
+      __PAG_DEMO_BACKEND__: JSON.stringify(backend),
+    },
+  }),
   json(),
   resolve({ extensions: ['.ts', '.js'] }),
   commonJs(),
@@ -47,7 +52,7 @@ const umdConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: `${libPath}/libpag.umd.js`,
+      file: `${libDir}/libpag.umd.js`,
     },
   ],
   plugins: [...plugins],
@@ -62,7 +67,7 @@ const umdMinConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: `${libPath}/libpag.min.js`,
+      file: `${libDir}/libpag.min.js`,
     },
   ],
   plugins: [...plugins, terser()],
@@ -74,14 +79,14 @@ export default [
   {
     input: 'src/pag.ts',
     output: [
-      { banner, file: `${libPath}/libpag.esm.js`, format: 'esm', sourcemap: true },
-      { banner, file: `${libPath}/libpag.cjs.js`, format: 'cjs', exports: 'named', sourcemap: true },
+      { banner, file: `${libDir}/libpag.esm.js`, format: 'esm', sourcemap: true },
+      { banner, file: `${libDir}/libpag.cjs.js`, format: 'cjs', exports: 'named', sourcemap: true },
     ],
     plugins: [...plugins],
   },
   {
-    input: `demo/${demoName}.ts`,
-    output: { banner, file: `demo/${arch}/libpag.js`, format: 'esm', sourcemap: true },
+    input: 'demo/index.ts',
+    output: { banner, file: `demo/${wasmDir}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   },
 ];
