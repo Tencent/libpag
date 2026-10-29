@@ -916,6 +916,23 @@ if (PAG_EXCLUDE_FILES)
 endif ()
 
 if (WEB)
+    if (PAG_USE_WEBGPU)
+        # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
+        # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
+        # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
+        # without this line the target is never built and the final link fails on tint
+        # symbols. Appended before the branch split so both consumers pick it up: the
+        # subdirectory (web/test) build merges it into pag.a via merge_libraries_into, and
+        # the standalone web SDK build links it through target_link_libraries.
+        if (TARGET libtint)
+            list(APPEND PAG_STATIC_LIBS libtint)
+        else ()
+            message(FATAL_ERROR
+                    "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
+                    "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
+                    "the final link would fail on tint symbols.")
+        endif ()
+    endif ()
     if (HasParent)
         # When used as a subdirectory, build as a static library for the parent to link.
         add_library(pag STATIC ${PAG_FILES})
@@ -935,19 +952,6 @@ if (WEB)
             # segfault. 1MB mirrors tgfx's own web builds (tgfx/web/demo/CMakeLists.txt).
             list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1 -sSTACK_SIZE=1MB
                     -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU'])
-            # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
-            # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
-            # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
-            # without this line the target is never built and the final link fails on tint
-            # symbols.
-            if (TARGET libtint)
-                list(APPEND PAG_STATIC_LIBS libtint)
-            else ()
-                message(FATAL_ERROR
-                        "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
-                        "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
-                        "the final link would fail on tint symbols.")
-            endif ()
         else ()
             list(APPEND PAG_LINK_OPTIONS -sMAX_WEBGL_VERSION=2
                     -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'])
