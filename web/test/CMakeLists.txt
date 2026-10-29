@@ -207,6 +207,10 @@ if (PAG_USE_WEBGPU)
     # only defines for the pag library target, not for the test sources.
     target_compile_definitions(pag-test PRIVATE TGFX_USE_WEBGPU)
     target_compile_definitions(pag-test PRIVATE PAG_USE_ASYNCIFY)
+    # Mirror tgfx's own web test lane: WebGPUBuffer's synchronous map (EM_ASYNC_JS) is only
+    # compiled with TGFX_USE_ASYNCIFY. Without it requestMapAsync() takes the callback path,
+    # never suspends the stack, and Surface::readPixels() always fails on WebGPU.
+    target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
     # HEAPU8 mirrors the main web build (root CMakeLists.txt): tgfx's web image paths
     # (WebImageBuffer/NativeCodec/ReadPixelsFromCanvasImage) read Module.HEAPU8 directly.
