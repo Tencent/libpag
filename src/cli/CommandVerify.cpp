@@ -31,12 +31,14 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include "cli/CliUtils.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -102,6 +104,7 @@ struct VerifyOptions {
   bool skipRender = false;
   bool skipLayout = false;
   bool jsonOutput = false;
+  std::vector<std::string> fontPaths = {};
 };
 
 // ============================================================================
@@ -2979,6 +2982,7 @@ static void PrintUsage() {
             << "  --scale <float>     Render scale factor (default: 1.0)\n"
             << "  --skip-render       Skip screenshot generation\n"
             << "  --skip-layout       Skip layout XML generation\n"
+            << "  --font <path>       Add a fallback font file for text layout (repeatable)\n"
             << "  --json              Output diagnostics in JSON format\n"
             << "  -h, --help          Show this help message\n";
 }
@@ -3007,6 +3011,12 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
       opts->skipLayout = true;
     } else if (strcmp(argv[i], "--json") == 0) {
       opts->jsonOutput = true;
+    } else if (strcmp(argv[i], "--font") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "pagx verify: --font requires an argument\n";
+        return 1;
+      }
+      opts->fontPaths.push_back(argv[++i]);
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -3048,7 +3058,17 @@ int RunVerify(int argc, char* argv[]) {
     return 1;
   }
 
-  doc->applyLayout();
+  // Fall back to user-supplied fonts when the platform has no system fonts (web): without a
+  // fallback the text measurement collapses to zero height, which trips the zero-size checks.
+  if (opts.fontPaths.empty()) {
+    doc->applyLayout();
+  } else {
+    FontConfig fontConfig;
+    for (const auto& fontPath : opts.fontPaths) {
+      fontConfig.addFallbackFont(fontPath, 0);
+    }
+    doc->applyLayout(&fontConfig);
+  }
 
   // Parse the XML DOM for signature-based duplicate detection.
   auto xmlDoc = xmlReadFile(opts.inputFile.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
