@@ -83,7 +83,11 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAGSurfaceTest.FromTexture`（GL semaphore 语义）、`PAGSurfaceTest.GLRestorer`
   （跨上下文的 viewport/scissor/FBO 状态恢复）与
   `PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice`（`Devices::MakeDefault()` 返回
-  同一单例，无法构造「设备不匹配」场景）断言的是桌面 GL 行为，在本车道上预期失败。
+  同一单例，无法构造「设备不匹配」场景）断言的是桌面 GL 行为，已通过
+  `PAG_WEBGL_ONLY` 宏（仅 webgl 构建定义，见 `web/test/CMakeLists.txt`）排除出
+  webgl 车道。`FromTexture`/`GLRestorer` 在 webgpu 车道与 native 构建保留（它们在那里
+  通过，基线受保护）；`PAGSurfaceWrapRejectsMismatchedDevice` 因 `TGFX_USE_OPENGL`
+  未定义本就不参与 webgpu 构建，由 native GL 构建保留。
 - `resources/apitest/SVG` 永不打包，但 SVG 导入代码仍参与编译。
 - WebGPU 构建开启 Asyncify，使 `Baseline::Compare` 使用的同步 `readPixels()`
   可以等待 buffer 映射完成。

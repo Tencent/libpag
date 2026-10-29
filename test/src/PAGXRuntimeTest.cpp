@@ -205,7 +205,11 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceWrapRejectsNullInputs) {
   EXPECT_EQ(pagx::Drawable::MakeFrom(nullptr, surface), nullptr);
 }
 
-#ifdef TGFX_USE_OPENGL
+// Excluded from the webgl lane via PAG_WEBGL_ONLY: Devices::MakeDefault() returns the same
+// singleton on Emscripten's single global GL context, so a "mismatched device" scenario cannot
+// be constructed there. Native GL builds keep this case. (WebGPU builds do not compile it:
+// TGFX_USE_OPENGL is undefined there.)
+#if defined(TGFX_USE_OPENGL) && !defined(PAG_WEBGL_ONLY)
 /**
  * Test case: a surface created on one GL device is rejected when paired with another device.
  */

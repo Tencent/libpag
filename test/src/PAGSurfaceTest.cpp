@@ -74,7 +74,11 @@ uint32_t GetGLVersion(const char* versionString) {
 
 /**
  * 用例描述: 测试 PAGSurface 数据同步
+ * Excluded from the webgl lane (PAG_WEBGL_ONLY): the case asserts desktop-GL semaphore
+ * semantics, which do not exist on Emscripten's single global GL context. The webgpu lane
+ * and native builds keep it.
  */
+#ifndef PAG_WEBGL_ONLY
 PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
@@ -127,6 +131,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
     EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceTest/FromTexture"));
   }
 }
+#endif
 
 /**
  * 用例描述: 遮罩使用屏幕坐标系时origin不一致的情况
@@ -161,7 +166,11 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 
 /**
  * 用例描述: 测试 GLRestorer 在共享纹理场景下正确保存和恢复 OpenGL 状态
+ * Excluded from the webgl lane (PAG_WEBGL_ONLY): the case asserts cross-context
+ * viewport/scissor/FBO state restoration, which does not exist on Emscripten's single
+ * global GL context. The webgpu lane and native builds keep it.
  */
+#ifndef PAG_WEBGL_ONLY
 PAG_TEST(PAGSurfaceTest, GLRestorer) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
@@ -237,6 +246,7 @@ PAG_TEST(PAGSurfaceTest, GLRestorer) {
   glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
+#endif
 
 /**
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。

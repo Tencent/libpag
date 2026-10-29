@@ -139,6 +139,12 @@ if (PAG_USE_WEBGPU)
     set(PAG_BACKEND_NAME "webgpu")
 else ()
     set(PAG_BACKEND_NAME "webgl")
+    # The webgl lane runs on Emscripten's single global GL context: multi-device and
+    # multi-context semantics do not exist there. Tests that assert desktop-GL behavior
+    # (PAGSurfaceTest.FromTexture/GLRestorer, PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice)
+    # are excluded from this lane via the PAG_WEBGL_ONLY macro; the webgpu lane and native
+    # builds keep them (they pass there, so their baselines stay protected).
+    target_compile_definitions(pag-test PRIVATE PAG_WEBGL_ONLY)
 endif ()
 
 # Preload the backend-specific baseline cache if it exists locally (from a previous run's
