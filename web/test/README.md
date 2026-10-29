@@ -87,3 +87,8 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 - `resources/apitest/SVG` 永不打包，但 SVG 导入代码仍参与编译。
 - WebGPU 构建开启 Asyncify，使 `Baseline::Compare` 使用的同步 `readPixels()`
   可以等待 buffer 映射完成。
+- WebGPU 后端在双纹理 effect 上存在 BindGroup 构建缺陷（布局需 4 个绑定、实际只写入
+  2 个），浏览器报 Uncaptured Validation Error（Number of entries 2 vs 4）；受影响用例：
+  `PAGFilterTest.DropShadow/OuterGlow/Stroke/RadialBlur`、`PAGTextLayerTest.Emoji_ID79762747`
+  （后者另有 uniform buffer 12 字节未按 16 对齐的问题）。当前 seed 的 md5 基于该错误渲染
+  固化，tgfx 侧修复后需重 seed 这批用例。
