@@ -923,9 +923,11 @@ if (WEB)
         # without this line the target is never built and the final link fails on tint
         # symbols. Appended before the branch split so both consumers pick it up: the
         # subdirectory (web/test) build merges it into pag.a via merge_libraries_into, and
-        # the standalone web SDK build links it through target_link_libraries.
+        # the standalone web SDK build links it through target_link_libraries. The
+        # $<TARGET_FILE:...> generator expression resolves to the archive path, which
+        # lib-merge requires (a bare target name is not resolvable there).
         if (TARGET libtint)
-            list(APPEND PAG_STATIC_LIBS libtint)
+            list(APPEND PAG_STATIC_LIBS "$<TARGET_FILE:libtint>")
         else ()
             message(FATAL_ERROR
                     "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
