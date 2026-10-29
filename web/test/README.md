@@ -70,9 +70,10 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 
 Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
 `__EMSCRIPTEN__` guards; `PAGFrameCompareTest` runs its corpus serially.
-`VideoSequenceHitTestPoint` and `PAGSequenceTest.Sequence_Multiple_References` are guarded the
-same way: both assert behavior (hit test on decoded frames, per-reference decoder cache counts)
-that fundamentally requires a video decoder, which the web build does not have.
+`PAGSequenceTest.Sequence_Multiple_References` is guarded the same way: its cache-count
+assertions rely on the native 500ms prefetch window (`DECODING_VISIBLE_DISTANCE`), while the web
+build prefetches the whole timeline in `RenderCache::prepareLayers()`, so the counts permanently
+differ from the native semantics (same reason `AsyncDecodeTest.cpp` is excluded).
 
 ## Known limitations
 

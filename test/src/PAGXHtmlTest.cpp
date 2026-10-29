@@ -2901,22 +2901,12 @@ CLI_TEST(PAGXHtmlTest, Woff2MetadataDoesNotPolluteFontFallbacks) {
       "</body></html>";
   pagx::FontConfig fontConfig;
   fontConfig.addFallbackFont(std::string(), 0, "pagx-font-custom", "Regular");
-  // [TEMP-DEBUG] web lane diagnosis: trace which layer drops the registered fallback family.
-  std::string dbgFamilies;
-  for (const auto& name : fontConfig.fallbackFamilyNames()) {
-    dbgFamilies += name;
-    dbgFamilies += ";";
-  }
-  std::cout << "[Woff2Dbg] pre-parse fallbacks: [" << dbgFamilies << "]\n";
   pagx::HTMLImporter::Options plainOptions;
   plainOptions.fontConfig = &fontConfig;
   auto doc2 = pagx::HTMLImporter::ParseString(htmlPlain, plainOptions);
   ASSERT_NE(doc2, nullptr);
-  std::cout << "[Woff2Dbg] doc2 containsFamily(pagx-font-custom): "
-            << (doc2->fontConfig().containsFamily("pagx-font-custom") ? 1 : 0) << "\n";
   auto texts2 = CollectAllTexts(doc2);
   ASSERT_EQ(texts2.size(), 1u);
-  std::cout << "[Woff2Dbg] texts2[0] fontFamily: [" << texts2[0]->fontFamily << "]\n";
   EXPECT_EQ(texts2[0]->fontFamily, "pagx-font-custom");
 }
 
