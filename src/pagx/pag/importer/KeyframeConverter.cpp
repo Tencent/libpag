@@ -24,6 +24,7 @@
 // first dimension's handles (PAGX stores one easing per keyframe).
 
 #include <string>
+#include <typeinfo>
 #include <vector>
 #include "pag/file.h"
 #include "pagx/PAGXDocument.h"
@@ -576,6 +577,173 @@ void MigrateBrightnessContrastEffectAnimation(pag::BrightnessContrastEffect* eff
   }
 }
 
+// DisplacementMap effect channels (spec 7.5): the max displacements animate as float channels
+// and the flags as Hold bool channels; the source/behavior enums carry no PAGX animation
+// channels and stay static. Legacy effect keyframes are composition-absolute, so raw keyframe
+// times carry over without a layer offset.
+void MigrateDisplacementMapEffectAnimation(pag::DisplacementMapEffect* effect, float frameRate,
+                                           PAGXDocument* document, AnimationObject* object) {
+  if (effect == nullptr || object == nullptr) {
+    return;
+  }
+  // The legacy gates the whole effect off once the referenced map layer leaves its time window
+  // (DisplacementMapEffect::visibleAt), which the renderer reproduces by skipping the filter
+  // entirely; a Hold bool channel on the filter carries that window. The other visibleAt
+  // conditions (both selectors const, or both max displacements zero) collapse to identity on
+  // their own in the shader.
+  auto* mapLayer = effect->displacementMapLayer;
+  if (mapLayer != nullptr) {
+    auto* channel = document->makeNode<TypedChannel<bool>>();
+    channel->name = "enabled";
+    auto start = mapLayer->startTime;
+    auto end = mapLayer->startTime + mapLayer->duration;
+    if (start > 0) {
+      Keyframe<bool> off = {};
+      off.time = 0;
+      off.value = false;
+      off.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(off);
+    }
+    Keyframe<bool> on = {};
+    on.time = start;
+    on.value = true;
+    on.interpolation = KeyframeInterpolationType::Hold;
+    channel->keyframes.push_back(on);
+    auto* containing = mapLayer->containingComposition;
+    auto containingFrameCount =
+        containing != nullptr
+            ? static_cast<Frame>(llround(static_cast<double>(containing->duration) *
+                                         static_cast<double>(containing->frameRate)))
+            : 0;
+    if (end < containingFrameCount) {
+      Keyframe<bool> off = {};
+      off.time = end;
+      off.value = false;
+      off.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(off);
+    }
+    object->channels.push_back(channel);
+  }
+  pag::Property<float>* floatProperties[2] = {effect->maxHorizontalDisplacement,
+                                              effect->maxVerticalDisplacement};
+  const char* floatNames[2] = {"maxHorizontalDisplacement", "maxVerticalDisplacement"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = floatProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = floatNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    object->channels.push_back(channel);
+  }
+  pag::Property<bool>* boolProperties[2] = {effect->edgeBehavior, effect->expandOutput};
+  const char* boolNames[2] = {"edgeBehavior", "expandOutput"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = boolProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<bool>*>(legacy);
+    if (animatable == nullptr || animatable->keyframes.empty()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<bool>>();
+    channel->name = boolNames[i];
+    for (auto* legacyKeyframe : animatable->keyframes) {
+      Keyframe<bool> keyframe = {};
+      keyframe.time = legacyKeyframe->startTime;
+      keyframe.value = legacyKeyframe->startValue;
+      keyframe.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
+  }
+  // The behavior and source selectors animate as discrete properties in the legacy; they ride Int
+  // Hold channels (the PAGX channel system has no enum value type), each key holding its
+  // segment's start value. The legacy and PAGX enums share their element order, so the int value
+  // round-trips through static_cast on both the writer and the reader side.
+  pag::Property<pag::DisplacementMapBehavior>* behavior = effect->displacementMapBehavior;
+  if (behavior != nullptr && behavior->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<uint8_t>*>(
+        reinterpret_cast<pag::Property<uint8_t>*>(static_cast<void*>(behavior)));
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channel = document->makeNode<TypedChannel<int>>();
+      channel->name = "displacementMapBehavior";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<int> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = static_cast<int>(legacyKeyframe->startValue);
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      // The final legacy segment's end value has no successor key; without this trailing key
+      // every later frame would hold the last start value instead of the segment's end value.
+      auto* lastKeyframe = animatable->keyframes.back();
+      if (lastKeyframe->endTime > lastKeyframe->startTime) {
+        Keyframe<int> endKeyframe = {};
+        endKeyframe.time = lastKeyframe->endTime;
+        endKeyframe.value = static_cast<int>(lastKeyframe->endValue);
+        endKeyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(endKeyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+  // The effect compositing option rides an alpha channel: the legacy gates the whole effect off
+  // when the opacity hits zero (visibleAt), which the shader's effectOpacity mix reproduces.
+  auto* opacity = effect->effectOpacity;
+  if (opacity != nullptr) {
+    auto staticOpaque = opacity->getValueAt(0) >= 255;
+    if (opacity->animatable() || !staticOpaque) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "effectOpacity";
+      if (opacity->animatable()) {
+        ConvertOpacityChannel(opacity, frameRate, channel);
+      } else {
+        Keyframe<float> keyframe = {};
+        keyframe.time = 0;
+        keyframe.value = opacity->getValueAt(0) / 255.0f;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+  pag::Property<pag::DisplacementMapSource>* sources[2] = {effect->useForHorizontalDisplacement,
+                                                           effect->useForVerticalDisplacement};
+  const char* sourceNames[2] = {"useForHorizontalDisplacement", "useForVerticalDisplacement"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = sources[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<uint8_t>*>(
+        reinterpret_cast<pag::Property<uint8_t>*>(static_cast<void*>(legacy)));
+    if (animatable == nullptr || animatable->keyframes.empty()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<int>>();
+    channel->name = sourceNames[i];
+    for (auto* legacyKeyframe : animatable->keyframes) {
+      Keyframe<int> keyframe = {};
+      keyframe.time = legacyKeyframe->startTime;
+      keyframe.value = static_cast<int>(legacyKeyframe->startValue);
+      keyframe.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(keyframe);
+    }
+    auto* lastKeyframe = animatable->keyframes.back();
+    if (lastKeyframe->endTime > lastKeyframe->startTime) {
+      Keyframe<int> endKeyframe = {};
+      endKeyframe.time = lastKeyframe->endTime;
+      endKeyframe.value = static_cast<int>(lastKeyframe->endValue);
+      endKeyframe.interpolation = KeyframeInterpolationType::Hold;
+      channel->keyframes.push_back(endKeyframe);
+    }
+    object->channels.push_back(channel);
+  }
+}
+
 // Public entry used by LegacyPAGImporter: migrates one legacy layer's Transform2D animation
 // into channels on the given object (target = the layer's converted id).
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
@@ -619,11 +787,35 @@ void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
   }
 }
 
+// Returns true when any sibling in the containing composition uses this layer as its track
+// matte source (the target side of the pag::Layer::trackMatteLayer back-reference).
+static bool IsTrackMatteSource(pag::Layer* layer) {
+  auto* composition = layer->containingComposition;
+  if (composition == nullptr || composition->type() != pag::CompositionType::Vector) {
+    return false;
+  }
+  for (auto* sibling : static_cast<pag::VectorComposition*>(composition)->layers) {
+    if (sibling != nullptr && sibling->trackMatteLayer == layer) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // In/out points (design doc §7.4): the legacy layer's [startTime, startTime + duration)
 // visible window becomes a Hold "visible" channel — true from the start, false outside.
+// An isActive=false layer never draws as regular content in the legacy, but its content stays
+// readable by referencing effects. Track matte sources keep the window channel: the runtime
+// needs them visible for tgfx hasValidMask() and suppresses their drawing via maskOwner.
+// Other inactive layers (displacement map sources, guide layers) have no drawing suppression,
+// so the static visible=false must stay authoritative — no channel may flip it on inside the
+// time window.
 void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
                             AnimationObject* object) {
   if (legacyLayer == nullptr) {
+    return;
+  }
+  if (!legacyLayer->isActive && !IsTrackMatteSource(legacyLayer)) {
     return;
   }
   auto* channel = document->makeNode<TypedChannel<bool>>();

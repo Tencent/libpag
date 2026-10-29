@@ -34,6 +34,7 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -89,6 +90,7 @@
 #include "renderer/BrightnessContrastLayerFilter.h"
 #include "renderer/BulgeLayerFilter.h"
 #include "renderer/CornerPinLayerFilter.h"
+#include "renderer/DisplacementMapLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/HueSaturationLayerFilter.h"
@@ -600,12 +602,14 @@ class LayerBuilderContext {
     auto root = tgfx::Layer::Make();
     if (comp != nullptr) {
       for (const auto& child : comp->layers) {
+        recordContainingSize(child, comp->width, comp->height);
         auto childLayer = convertLayer(child);
         if (childLayer) {
           root->addChild(childLayer);
         }
       }
       resolvePendingMasks();
+      resolvePendingDisplacementMaps();
     }
     LayerBuildResult result = std::move(_result);
     _result = {};
@@ -766,6 +770,7 @@ class LayerBuilderContext {
     if (node->mask != nullptr) {
       _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
       resolvePendingMasks();
+      resolvePendingDisplacementMaps();
     }
     // Reconcile nested child layers (Layer.children) so additions and removals are reflected.
     // Composition slot layers are skipped: their children come from the runtime composition slot,
@@ -978,6 +983,7 @@ class LayerBuilderContext {
     _result.binding = std::move(*binding);
     auto layer = convertLayer(node);
     resolvePendingMasks();
+    resolvePendingDisplacementMaps();
     *binding = std::move(_result.binding);
     return layer;
   }
@@ -989,12 +995,14 @@ class LayerBuilderContext {
     // Apply canvas clipping: the root layer clips to the canvas dimensions.
     rootLayer->setScrollRect(tgfx::Rect::MakeWH(document.width, document.height));
     for (const auto& layer : document.layers) {
+      recordContainingSize(layer, document.width, document.height);
       auto childLayer = convertLayer(layer);
       if (childLayer) {
         rootLayer->addChild(childLayer);
       }
     }
     resolvePendingMasks();
+    resolvePendingDisplacementMaps();
     return rootLayer;
   }
 
@@ -1011,6 +1019,54 @@ class LayerBuilderContext {
       }
     }
     _pendingMasks.clear();
+  }
+
+  void resolvePendingDisplacementMaps() {
+    for (const auto& [filter, targetPagx, mapPagx] : _pendingDisplacementMaps) {
+      auto mapIt = _tgfxLayersByPagxLayer.find(mapPagx);
+      auto targetIt = _tgfxLayersByPagxLayer.find(targetPagx);
+      if (mapIt != _tgfxLayersByPagxLayer.end() && !mapIt->second.empty() &&
+          targetIt != _tgfxLayersByPagxLayer.end() && !targetIt->second.empty()) {
+        filter->setTargetLayer(targetIt->second.front());
+        filter->setMapLayer(mapIt->second.front());
+        auto targetSize = legacyBoundsSize(targetPagx);
+        filter->setTargetSize(targetSize.first, targetSize.second);
+        auto mapSize = legacyBoundsSize(mapPagx);
+        filter->setDisplacementSize(mapSize.first, mapSize.second);
+      }
+    }
+    _pendingDisplacementMaps.clear();
+  }
+
+  // Records the size of the composition a layer node directly lives in. Shape and text layers
+  // resolve their legacy getBounds through the containing composition, so every build entry
+  // point that converts a composition's children records it here; the context outlives the
+  // builds, letting runtime single-layer refreshes keep resolving sizes recorded earlier.
+  void recordContainingSize(const Layer* node, float width, float height) {
+    if (node != nullptr) {
+      _containingSizeByPagxLayer[node] = {width, height};
+    }
+  }
+
+  // Mirrors pag::Layer::getBounds() for the displacement map shader inputs: the referenced
+  // composition's size for precompose layers, the seeded layer size for image layers, and the
+  // containing composition's size for shape/text layers. Returns {0, 0} when unknown - the
+  // filter then falls back to the tgfx layer bounds (children union), which is only an
+  // approximation. Solid layers have no seeded size, so they land on the containing fallback
+  // until a sample needs the exact legacy width/height semantics.
+  std::pair<float, float> legacyBoundsSize(const Layer* node) {
+    if (node->composition != nullptr) {
+      return {node->composition->width, node->composition->height};
+    }
+    if (!std::isnan(node->width) && node->width > 0 && !std::isnan(node->height) &&
+        node->height > 0) {
+      return {node->width, node->height};
+    }
+    auto it = _containingSizeByPagxLayer.find(node);
+    if (it != _containingSizeByPagxLayer.end()) {
+      return it->second;
+    }
+    return {0.0f, 0.0f};
   }
 
   // Returns every tgfx layer produced for the given pagx Layer. Order matches convertLayer()
@@ -1196,6 +1252,7 @@ class LayerBuilderContext {
     }
     auto containerLayer = tgfx::Layer::Make();
     for (const auto& compLayer : comp->layers) {
+      recordContainingSize(compLayer, comp->width, comp->height);
       auto childLayer = convertLayer(compLayer);
       if (childLayer) {
         containerLayer->addChild(childLayer);
@@ -1476,6 +1533,12 @@ class LayerBuilderContext {
   template <typename T, auto Getter>
   static bool ReadBoolean(const void* object, KeyValue* out) {
     *out = KeyValue{static_cast<bool>((static_cast<const T*>(object)->*Getter)())};
+    return true;
+  }
+
+  template <typename T, auto Getter>
+  static bool ReadInteger(const void* object, KeyValue* out) {
+    *out = KeyValue{static_cast<int>((static_cast<const T*>(object)->*Getter)())};
     return true;
   }
 
@@ -2799,6 +2862,14 @@ class LayerBuilderContext {
     for (const auto& filter : node->filters) {
       auto tgfxFilter = convertLayerFilter(filter);
       if (tgfxFilter) {
+        if (filter->nodeType() == NodeType::DisplacementMapFilter) {
+          auto* mapNode = static_cast<const DisplacementMapFilter*>(filter);
+          if (mapNode->displacementMapLayer != nullptr) {
+            _pendingDisplacementMaps.emplace_back(
+                std::static_pointer_cast<DisplacementMapLayerFilter>(tgfxFilter), node,
+                mapNode->displacementMapLayer);
+          }
+        }
         filters.push_back(tgfxFilter);
       }
     }
@@ -3598,6 +3669,88 @@ class LayerBuilderContext {
     WriteCornerPinFilterCorner(object, value, mix, 3, false);
   }
 
+  static void WriteDisplacementMapFilterMaxHorizontal(void* object, const KeyValue& value,
+                                                      float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DisplacementMapLayerFilter*>(object);
+    filter->setMaxHorizontalDisplacement(MixFloat(filter->maxHorizontalDisplacement(), *v, mix));
+  }
+
+  static void WriteDisplacementMapFilterMaxVertical(void* object, const KeyValue& value,
+                                                    float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DisplacementMapLayerFilter*>(object);
+    filter->setMaxVerticalDisplacement(MixFloat(filter->maxVerticalDisplacement(), *v, mix));
+  }
+
+  static void WriteDisplacementMapFilterEdgeBehavior(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setEdgeBehavior(*v);
+  }
+
+  static void WriteDisplacementMapFilterExpandOutput(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setExpandOutput(*v);
+  }
+
+  static void WriteDisplacementMapFilterBehavior(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setDisplacementMapBehavior(
+        static_cast<DisplacementMapBehavior>(*v));
+  }
+
+  static void WriteDisplacementMapFilterUseForHorizontal(void* object, const KeyValue& value,
+                                                         float) {
+    auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setUseForHorizontalDisplacement(
+        static_cast<DisplacementMapSource>(*v));
+  }
+
+  static void WriteDisplacementMapFilterUseForVertical(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setUseForVerticalDisplacement(
+        static_cast<DisplacementMapSource>(*v));
+  }
+
+  static void WriteDisplacementMapFilterEffectOpacity(void* object, const KeyValue& value,
+                                                      float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DisplacementMapLayerFilter*>(object);
+    filter->setEffectOpacity(MixFloat(filter->effectOpacity(), *v, mix));
+  }
+
+  static void WriteDisplacementMapFilterEnabled(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DisplacementMapLayerFilter*>(object)->setEnabled(*v);
+  }
+
   static void WriteBrightnessContrastFilterBrightness(void* object, const KeyValue& value,
                                                       float mix) {
     auto* v = std::get_if<float>(&value);
@@ -3706,6 +3859,40 @@ class LayerBuilderContext {
     }
     auto* filter = static_cast<GlowLayerFilter*>(object);
     filter->setGlowIntensity(MixFloat(filter->glowIntensity(), *v, mix));
+  }
+
+  void bindDisplacementMapFilterChannels(const DisplacementMapFilter* node) {
+    _result.binding.setAccessor(node, "maxHorizontalDisplacement",
+                                WriteDisplacementMapFilterMaxHorizontal,
+                                ReadScalar<DisplacementMapLayerFilter,
+                                           &DisplacementMapLayerFilter::maxHorizontalDisplacement>);
+    _result.binding.setAccessor(node, "maxVerticalDisplacement",
+                                WriteDisplacementMapFilterMaxVertical,
+                                ReadScalar<DisplacementMapLayerFilter,
+                                           &DisplacementMapLayerFilter::maxVerticalDisplacement>);
+    _result.binding.setAccessor(
+        node, "edgeBehavior", WriteDisplacementMapFilterEdgeBehavior,
+        ReadBoolean<DisplacementMapLayerFilter, &DisplacementMapLayerFilter::edgeBehavior>);
+    _result.binding.setAccessor(
+        node, "expandOutput", WriteDisplacementMapFilterExpandOutput,
+        ReadBoolean<DisplacementMapLayerFilter, &DisplacementMapLayerFilter::expandOutput>);
+    _result.binding.setAccessor(node, "displacementMapBehavior", WriteDisplacementMapFilterBehavior,
+                                ReadInteger<DisplacementMapLayerFilter,
+                                            &DisplacementMapLayerFilter::displacementMapBehavior>);
+    _result.binding.setAccessor(
+        node, "useForHorizontalDisplacement", WriteDisplacementMapFilterUseForHorizontal,
+        ReadInteger<DisplacementMapLayerFilter,
+                    &DisplacementMapLayerFilter::useForHorizontalDisplacement>);
+    _result.binding.setAccessor(
+        node, "useForVerticalDisplacement", WriteDisplacementMapFilterUseForVertical,
+        ReadInteger<DisplacementMapLayerFilter,
+                    &DisplacementMapLayerFilter::useForVerticalDisplacement>);
+    _result.binding.setAccessor(
+        node, "effectOpacity", WriteDisplacementMapFilterEffectOpacity,
+        ReadScalar<DisplacementMapLayerFilter, &DisplacementMapLayerFilter::effectOpacity>);
+    _result.binding.setAccessor(
+        node, "enabled", WriteDisplacementMapFilterEnabled,
+        ReadBoolean<DisplacementMapLayerFilter, &DisplacementMapLayerFilter::enabled>);
   }
 
   void bindBrightnessContrastFilterChannels(const BrightnessContrastFilter* node) {
@@ -4278,6 +4465,16 @@ class LayerBuilderContext {
         bindBlurFilterChannels(filter);
         return tgfxFilter;
       }
+      case NodeType::DisplacementMapFilter: {
+        auto filter = static_cast<const DisplacementMapFilter*>(node);
+        auto tgfxFilter = DisplacementMapLayerFilter::Make(
+            filter->useForHorizontalDisplacement, filter->maxHorizontalDisplacement,
+            filter->useForVerticalDisplacement, filter->maxVerticalDisplacement,
+            filter->displacementMapBehavior, filter->edgeBehavior, filter->expandOutput);
+        _result.binding.set(filter, tgfxFilter);
+        bindDisplacementMapFilterChannels(filter);
+        return tgfxFilter;
+      }
       case NodeType::BrightnessContrastFilter: {
         auto filter = static_cast<const BrightnessContrastFilter*>(node);
         auto tgfxFilter = BrightnessContrastLayerFilter::Make(filter->brightness, filter->contrast);
@@ -4439,6 +4636,13 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  // Displacement map filters wait for the composition's children to finish building before
+  // their map layer references resolve (the map layer may convert after the target).
+  std::vector<std::tuple<std::shared_ptr<DisplacementMapLayerFilter>, const Layer*, const Layer*>>
+      _pendingDisplacementMaps = {};
+  // The composition size each layer node directly lives in, recorded during builds so
+  // legacyBoundsSize() can resolve the shape/text getBounds semantics at any later time.
+  std::unordered_map<const Layer*, std::pair<float, float>> _containingSizeByPagxLayer = {};
   // Maps pagx Image node pointers to their tgfx::Image wrappers. The raw pointer keys are stable
   // as long as the document's node vector is not structurally modified. If the document undergoes
   // structural changes (node additions/removals via notifyChange), callers must call

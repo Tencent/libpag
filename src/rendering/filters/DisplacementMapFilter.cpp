@@ -107,6 +107,7 @@ std::shared_ptr<tgfx::Image> DisplacementMapFilter::Apply(
     tgfx::Point* offset) {
 
   auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
+
   auto bounds = layer->getBounds();
   auto size = tgfx::Size::Make(bounds.width(), bounds.height());
   auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
@@ -140,7 +141,8 @@ std::shared_ptr<tgfx::Image> DisplacementMapFilter::Apply(
       pagEffect->expandOutput->getValueAt(layerFrame),
       ToAlpha(pagEffect->effectOpacity->getValueAt(layerFrame)), layerMatrix, size,
       displacementSize, contentBounds, referenceImage);
-  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+  auto legacyResult = input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+  return legacyResult;
 }
 
 std::string DisplacementMapFilter::onBuildFragmentShader() const {
@@ -352,7 +354,9 @@ void DisplacementMapFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx:
       memcpy(data, &uniforms, sizeof(DisplacementMapUniforms));
       uniformBuffer->unmap();
       renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(DisplacementMapUniforms));
+    } else {
     }
+  } else {
   }
 }
 

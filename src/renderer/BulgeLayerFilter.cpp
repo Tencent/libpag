@@ -79,7 +79,8 @@ void BulgeLayerFilter::setPinning(bool value) {
 
 std::shared_ptr<tgfx::Image> BulgeLayerFilter::onFilterImage(std::shared_ptr<tgfx::Image> input,
                                                              float, const tgfx::Rect& contentBounds,
-                                                             tgfx::Point* offset) {
+                                                             tgfx::Point* offset,
+                                                             const tgfx::Point&) {
   if (input == nullptr || contentBounds.isEmpty()) {
     return input;
   }

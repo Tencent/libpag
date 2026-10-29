@@ -61,8 +61,8 @@ class GlowLayerFilter : public tgfx::LayerFilter {
 
  protected:
   std::shared_ptr<tgfx::Image> onFilterImage(std::shared_ptr<tgfx::Image> input, float scale,
-                                             const tgfx::Rect& contentBounds,
-                                             tgfx::Point* offset) override;
+                                             const tgfx::Rect& contentBounds, tgfx::Point* offset,
+                                             const tgfx::Point& inputOrigin) override;
 
  private:
   float _glowThreshold = 0.0f;

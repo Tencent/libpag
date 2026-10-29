@@ -215,7 +215,8 @@ void LevelsIndividualLayerFilter::setBlueOutputWhite(float value) {
 }
 
 std::shared_ptr<tgfx::Image> LevelsIndividualLayerFilter::onFilterImage(
-    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect&, tgfx::Point* offset) {
+    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect&, tgfx::Point* offset,
+    const tgfx::Point&) {
   if (input == nullptr) {
     return nullptr;
   }

@@ -49,7 +49,8 @@ void BrightnessContrastLayerFilter::setContrast(float value) {
 }
 
 std::shared_ptr<tgfx::Image> BrightnessContrastLayerFilter::onFilterImage(
-    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect&, tgfx::Point* offset) {
+    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect&, tgfx::Point* offset,
+    const tgfx::Point&) {
   if (input == nullptr) {
     return nullptr;
   }

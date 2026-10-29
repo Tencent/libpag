@@ -62,7 +62,8 @@ void GlowLayerFilter::setGlowIntensity(float value) {
 
 std::shared_ptr<tgfx::Image> GlowLayerFilter::onFilterImage(std::shared_ptr<tgfx::Image> input,
                                                             float, const tgfx::Rect&,
-                                                            tgfx::Point* offset) {
+                                                            tgfx::Point* offset,
+                                                            const tgfx::Point&) {
   if (input == nullptr) {
     return nullptr;
   }

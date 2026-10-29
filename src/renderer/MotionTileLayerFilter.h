@@ -91,8 +91,8 @@ class MotionTileLayerFilter : public tgfx::LayerFilter {
 
  protected:
   std::shared_ptr<tgfx::Image> onFilterImage(std::shared_ptr<tgfx::Image> input, float scale,
-                                             const tgfx::Rect& contentBounds,
-                                             tgfx::Point* offset) override;
+                                             const tgfx::Rect& contentBounds, tgfx::Point* offset,
+                                             const tgfx::Point& inputOrigin) override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect, float contentScale,
                           tgfx::MapDirection direction) override;

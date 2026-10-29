@@ -30,6 +30,7 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlowFilter.h"
@@ -87,6 +88,8 @@ void MigrateLevelsIndividualEffectAnimation(pag::LevelsIndividualEffect* effect,
 void MigrateBrightnessContrastEffectAnimation(pag::BrightnessContrastEffect* effect,
                                               float frameRate, PAGXDocument* document,
                                               AnimationObject* object);
+void MigrateDisplacementMapEffectAnimation(pag::DisplacementMapEffect* effect, float frameRate,
+                                           PAGXDocument* document, AnimationObject* object);
 void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float frameRate,
                                          PAGXDocument* document, AnimationObject* object);
 
@@ -140,6 +143,9 @@ struct ConvertState {
   Composition* currentComposition = nullptr;
   int textIdCounter = 0;
   int imageIdCounter = 0;
+  // Displacement map references waiting for the map layer's node to convert (resolved in the
+  // composition post-pass, like the track mattes).
+  std::vector<std::pair<DisplacementMapFilter*, pag::Layer*>> pendingDisplacementMaps = {};
 
   void warn(PAGExportWarning code, const std::string& message) {
     if (issues == nullptr) {
@@ -855,6 +861,18 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
         break;
     }
   }
+  // Displacement map layer references resolve now that every layer of this composition has a
+  // converted node (the reference targets a sibling layer by its deterministic legacy id).
+  for (auto& pending : state->pendingDisplacementMaps) {
+    auto* mapLayer = state->document->findNode<Layer>(LegacyLayerTargetId(pending.second));
+    if (mapLayer != nullptr) {
+      pending.first->displacementMapLayer = mapLayer;
+    } else {
+      state->warn(PAGExportWarning::UnsupportedColorSource, "unresolved displacement map layer");
+    }
+  }
+  state->pendingDisplacementMaps.clear();
+
   // Composition-scoped animations (spec 5.4) auto-play in the instance. The attachment runs
   // AFTER the layer loop: EnsureCompositionAnimation creates the animation lazily while the
   // layers convert, so looking it up before the loop would always miss it and the runtime
@@ -901,15 +919,50 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
 // mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile, LevelsIndividual,
-// HueSaturation and BrightnessContrast effects map to their filter nodes (animated properties
-// join the composition animation). Other effect types report an issue until their phase-3
-// filters land.
+// HueSaturation, BrightnessContrast and DisplacementMap effects map to their filter nodes
+// (animated properties join the composition animation). Other effect types report an issue
+// until their phase-3 filters land.
 void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
   for (auto* effect : legacyLayer->effects) {
     if (effect == nullptr) {
       continue;
     }
-    if (effect->type() == pag::EffectType::BrightnessContrast) {
+    if (effect->type() == pag::EffectType::DisplacementMap) {
+      auto* legacy = static_cast<pag::DisplacementMapEffect*>(effect);
+      auto* displacement = state->document->makeNode<DisplacementMapFilter>(
+          "pag-legacy-displacement-" + std::to_string(legacy->uniqueID));
+      displacement->useForHorizontalDisplacement =
+          static_cast<DisplacementMapSource>(PropertyValueAtStart(
+              legacy->useForHorizontalDisplacement, legacyLayer->startTime, nullptr));
+      displacement->maxHorizontalDisplacement =
+          PropertyValueAtStart(legacy->maxHorizontalDisplacement, legacyLayer->startTime, nullptr);
+      displacement->useForVerticalDisplacement =
+          static_cast<DisplacementMapSource>(PropertyValueAtStart(
+              legacy->useForVerticalDisplacement, legacyLayer->startTime, nullptr));
+      displacement->maxVerticalDisplacement =
+          PropertyValueAtStart(legacy->maxVerticalDisplacement, legacyLayer->startTime, nullptr);
+      displacement->displacementMapBehavior = static_cast<DisplacementMapBehavior>(
+          PropertyValueAtStart(legacy->displacementMapBehavior, legacyLayer->startTime, nullptr));
+      displacement->edgeBehavior =
+          PropertyValueAtStart(legacy->edgeBehavior, legacyLayer->startTime, nullptr) != 0;
+      displacement->expandOutput =
+          PropertyValueAtStart(legacy->expandOutput, legacyLayer->startTime, nullptr) != 0;
+      layer->filters.push_back(displacement);
+      // The map layer reference resolves after the whole composition converts (the map layer
+      // may come later in the list); track it for the post-pass next to the track mattes.
+      if (legacy->displacementMapLayer != nullptr) {
+        state->pendingDisplacementMaps.push_back({displacement, legacy->displacementMapLayer});
+      }
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = displacement->id;
+        MigrateDisplacementMapEffectAnimation(legacy, state->currentFrameRate, state->document,
+                                              object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (effect->type() == pag::EffectType::BrightnessContrast) {
       auto* legacy = static_cast<pag::BrightnessContrastEffect*>(effect);
       auto* bc = state->document->makeNode<BrightnessContrastFilter>(
           "pag-legacy-brightness-" + std::to_string(legacy->uniqueID));

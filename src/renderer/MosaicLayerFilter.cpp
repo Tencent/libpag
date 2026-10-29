@@ -59,7 +59,8 @@ void MosaicLayerFilter::setSharpColors(bool value) {
 
 std::shared_ptr<tgfx::Image> MosaicLayerFilter::onFilterImage(std::shared_ptr<tgfx::Image> input,
                                                               float, const tgfx::Rect&,
-                                                              tgfx::Point* offset) {
+                                                              tgfx::Point* offset,
+                                                              const tgfx::Point&) {
   if (input == nullptr) {
     return nullptr;
   }

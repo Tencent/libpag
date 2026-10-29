@@ -48,8 +48,8 @@ void RadialBlurLayerFilter::setCenter(float x, float y) {
 }
 
 std::shared_ptr<tgfx::Image> RadialBlurLayerFilter::onFilterImage(
-    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect& contentBounds,
-    tgfx::Point* offset) {
+    std::shared_ptr<tgfx::Image> input, float, const tgfx::Rect& contentBounds, tgfx::Point* offset,
+    const tgfx::Point&) {
   if (input == nullptr) {
     return nullptr;
   }
