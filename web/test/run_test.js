@@ -25,10 +25,12 @@ if (!ALLOWED_BACKENDS.has(BACKEND)) {
 }
 
 // Map downloaded zip files to their extraction destinations.
+// cache-web.zip is packed from the in-page /test/baseline/.cache tree, so its entries keep
+// their backend prefix (e.g. webgpu/md5.json); extract it to .cache itself, not .cache/backend.
 const ZIP_DESTINATIONS = {
   'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
   'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
-  'cache-web.zip': path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`),
+  'cache-web.zip': path.join(PROJECT_ROOT, 'test/baseline/.cache'),
 };
 
 function startHttpServer() {
