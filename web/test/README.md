@@ -71,6 +71,9 @@ is emitted at configure time). Always run `update_baseline.sh` first.
 
 Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
 `__EMSCRIPTEN__` guards; `PAGFrameCompareTest` runs its corpus serially.
+`VideoSequenceHitTestPoint` and `PAGSequenceTest.Sequence_Multiple_References` are guarded the
+same way: both assert behavior (hit test on decoded frames, per-reference decoder cache counts)
+that fundamentally requires a video decoder, which the web build does not have.
 
 ## Known limitations
 
@@ -80,6 +83,12 @@ Race sections inside `PAGTextLayerTest`/`PAGImageLayerTest` are skipped through
   cannot run on the web.
 - Video-sequence decoding is unavailable (no wasm ffavc), so PAG files containing
   video sequences render those layers empty.
+- The WebGL backend runs on Emscripten's single global GL context: there is no multi-context /
+  multi-device semantics. `PAGSurfaceTest.FromTexture` (GL semaphore semantics),
+  `PAGSurfaceTest.GLRestorer` (viewport/scissor/FBO state restore across contexts) and
+  `PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice` (`Devices::MakeDefault()` returns the
+  same singleton, so "mismatched device" cannot be constructed) assert desktop-GL behavior and
+  are expected to fail on this lane.
 - `resources/apitest/SVG` is never preloaded; the SVG import code is still compiled in.
 - The WebGPU build enables Asyncify so the synchronous `readPixels()` used by
   `Baseline::Compare` can await buffer mapping.

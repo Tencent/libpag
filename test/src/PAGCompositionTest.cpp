@@ -535,6 +535,9 @@ PAG_TEST(ContainerTest, HitTestPoint) {
 /**
  * 用例描述: 视频序列帧HitTest
  */
+// Excluded on web: hit test with a video sequence layer requires decoded frames, and the web
+// build has no video decoder (the factory chain fails and the sequence renders empty).
+#if !defined(__EMSCRIPTEN__)
 PAG_TEST(VideoSequenceHitTestPoint, VideoSequenceHitTestPoint) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/video_sequence_test.pag");
@@ -544,6 +547,7 @@ PAG_TEST(VideoSequenceHitTestPoint, VideoSequenceHitTestPoint) {
   EXPECT_TRUE(TestPAGPlayer->hitTestPoint(TestPAGFile, 250, 400, false));
   EXPECT_TRUE(TestPAGPlayer->hitTestPoint(TestPAGFile, 250, 600, true));
 }
+#endif
 
 /**
  * 用例描述: 图片序列帧HitTest
