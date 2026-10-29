@@ -210,11 +210,11 @@ if (PAG_USE_WEBGPU)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
     # HEAPU8 mirrors the main web build (root CMakeLists.txt): tgfx's web image paths
     # (WebImageBuffer/NativeCodec/ReadPixelsFromCanvasImage) read Module.HEAPU8 directly.
-    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','WebGPU','HEAPU8']")
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','WebGPU','HEAPU8','HEAP8']")
 else ()
     set(ASYNCIFY_LINK_OPTIONS "")
     set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
-    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','HEAPU8']")
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','HEAPU8','HEAP8']")
 endif ()
 target_compile_definitions(pag-test PRIVATE
         PAG_BACKEND_NAME="${PAG_BACKEND_NAME}"
