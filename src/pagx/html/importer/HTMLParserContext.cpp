@@ -185,7 +185,7 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
       typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   // [TEMP-DEBUG] web lane diagnosis: trace each availability verdict to locate the divergence.
   printf("[Woff2Dbg] isAvailable('%s') = %d (probe, doc=%p)\n", family.c_str(),
-         available ? 1 : 0, reinterpret_cast<void*>(_document));
+         available ? 1 : 0, reinterpret_cast<void*>(_document.get()));
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
