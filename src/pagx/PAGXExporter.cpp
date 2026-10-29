@@ -1346,7 +1346,19 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("alpha", style->alpha, Default<GradientOverlayStyle>().alpha);
       xml.addAttribute("angle", style->angle, Default<GradientOverlayStyle>().angle);
       if (style->overlayType != Default<GradientOverlayStyle>().overlayType) {
-        xml.addAttribute("overlayType", "radial");
+        switch (style->overlayType) {
+          case GradientOverlayType::Radial:
+            xml.addAttribute("overlayType", "radial");
+            break;
+          case GradientOverlayType::Reflected:
+            xml.addAttribute("overlayType", "reflected");
+            break;
+          case GradientOverlayType::Angle:
+            xml.addAttribute("overlayType", "angle");
+            break;
+          case GradientOverlayType::Linear:
+            break;
+        }
       }
       xml.addAttribute("reverse", style->reverse, Default<GradientOverlayStyle>().reverse);
       xml.addAttribute("alignWithLayer", style->alignWithLayer,

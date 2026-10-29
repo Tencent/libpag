@@ -24,6 +24,8 @@
 
 namespace pagx {
 
+class Gradient;
+
 enum class StrokePosition : uint8_t {
   Outside,
   Center,
@@ -55,6 +57,8 @@ class StrokeLayerStyle : public LayerStyle {
 enum class GradientOverlayType : uint8_t {
   Linear,
   Radial,
+  Reflected,
+  Angle,
 };
 
 /**

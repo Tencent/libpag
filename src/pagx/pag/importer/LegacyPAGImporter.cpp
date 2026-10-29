@@ -55,6 +55,7 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
@@ -92,6 +93,8 @@ void MigrateDisplacementMapEffectAnimation(pag::DisplacementMapEffect* effect, f
                                            PAGXDocument* document, AnimationObject* object);
 void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float frameRate,
                                          PAGXDocument* document, AnimationObject* object);
+void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, float frameRate,
+                                          PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -916,6 +919,83 @@ void ConvertTransform2D(ConvertState* state, pag::Transform2D* transform, Layer*
   layer->alpha = opacity / 255.0f;
 }
 
+// Converts legacy layer styles into PAGX style nodes. The GradientOverlay style maps to the
+// GradientOverlayStyle node: the gradient rides a shared Gradient resource built with neutral
+// unit geometry, because the renderer recomputes the real geometry from the style's
+// angle/scale/offset each frame exactly like the legacy GradientOverlayFilter derives it from
+// the content image size. The gradient colors, fill type and blend mode are static-only
+// (animatable values report an issue); the remaining animated properties join the composition
+// animation as channels. Other style types report an issue until their rounds land.
+void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
+  for (auto* style : legacyLayer->layerStyles) {
+    if (style == nullptr) {
+      continue;
+    }
+    if (style->type() == pag::LayerStyleType::GradientOverlay) {
+      auto* legacy = static_cast<pag::GradientOverlayStyle*>(style);
+      auto startFrame = legacyLayer->startTime;
+      auto overlay = state->document->makeNode<GradientOverlayStyle>(
+          "pag-legacy-gradient-overlay-" + std::to_string(style->uniqueID));
+      overlay->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
+      overlay->angle = PropertyValueAtStart(legacy->angle, startFrame, nullptr);
+      auto fillType = PropertyValueAtStart(legacy->style, startFrame, nullptr);
+      switch (fillType) {
+        case pag::GradientFillType::Radial:
+          overlay->overlayType = GradientOverlayType::Radial;
+          break;
+        case pag::GradientFillType::Angle:
+          overlay->overlayType = GradientOverlayType::Angle;
+          break;
+        case pag::GradientFillType::Reflected:
+          overlay->overlayType = GradientOverlayType::Reflected;
+          break;
+        case pag::GradientFillType::Linear:
+        case pag::GradientFillType::Diamond:
+          overlay->overlayType = GradientOverlayType::Linear;
+          break;
+      }
+      overlay->reverse = PropertyValueAtStart(legacy->reverse, startFrame, nullptr);
+      overlay->alignWithLayer = PropertyValueAtStart(legacy->alignWithLayer, startFrame, nullptr);
+      overlay->scale = PropertyValueAtStart(legacy->scale, startFrame, nullptr);
+      auto offset = PropertyValueAtStart(legacy->offset, startFrame, nullptr);
+      overlay->offsetX = offset.x;
+      overlay->offsetY = offset.y;
+      overlay->blendMode =
+          ConvertBlendMode(PropertyValueAtStart(legacy->blendMode, startFrame, nullptr));
+      auto colors = PropertyValueAtStart(legacy->colors, startFrame, nullptr);
+      overlay->gradient = static_cast<Gradient*>(ConvertGradientColorSource(
+          state, fillType, pag::Point{0.0f, 0.0f}, pag::Point{1.0f, 0.0f}, colors));
+      layer->styles.push_back(overlay);
+      if (fillType == pag::GradientFillType::Diamond) {
+        state->warn(PAGExportWarning::UnsupportedColorSource,
+                    "diamond gradient overlay approximated as linear");
+      }
+      if (legacy->colors != nullptr && legacy->colors->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "animated gradient overlay colors");
+      }
+      if (legacy->style != nullptr && legacy->style->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource,
+                    "animated gradient overlay fill type");
+      }
+      if (legacy->blendMode != nullptr && legacy->blendMode->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource,
+                    "animated gradient overlay blend mode");
+      }
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = overlay->id;
+        MigrateGradientOverlayStyleAnimation(legacy, state->currentFrameRate, state->document,
+                                             object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else {
+      state->warn(PAGExportWarning::UnsupportedColorSource, "unsupported layer style");
+    }
+  }
+}
+
 // Converts legacy layer effects into PAGX filters. The FastBlur effect maps to BlurFilter
 // (blurriness becomes blurX/blurY per the blur direction, repeatEdgePixels selects the tile
 // mode), and the Glow, Mosaic, RadialBlur, CornerPin, Bulge, MotionTile, LevelsIndividual,
@@ -1252,6 +1332,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       // The legacy renderer applies layer effects to precompose layers the same way (e.g. a
       // HueSaturation over a nested composition).
       ConvertLayerEffects(state, legacyLayer, layer);
+      ConvertLayerStyles(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Solid: {
@@ -1271,6 +1352,10 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       solid->color = ConvertColor(legacy->solidColor);
       fill->color = solid;
       layer->contents.push_back(fill);
+      // The legacy renderer applies layer effects and styles to solid layers the same as every
+      // other layer type.
+      ConvertLayerEffects(state, legacyLayer, layer);
+      ConvertLayerStyles(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Shape: {
@@ -1287,9 +1372,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
       }
       ConvertLayerEffects(state, legacyLayer, layer);
-      if (legacyLayer->layerStyles.empty() == false) {
-        state->warn(PAGExportWarning::UnsupportedColorSource, "layer styles");
-      }
+      ConvertLayerStyles(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Text: {
@@ -1333,6 +1416,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       // The legacy renderer applies layer effects to every layer type; text layers carry them
       // the same way (the runtime applies node->filters uniformly in buildLayerInto).
       ConvertLayerEffects(state, legacyLayer, layer);
+      ConvertLayerStyles(state, legacyLayer, layer);
       if (legacyLayer->masks.empty() == false) {
         state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
       }
@@ -1392,6 +1476,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         state->convertedImages.push_back({legacyImage, pattern, state->currentComposition});
       }
       ConvertLayerEffects(state, legacyLayer, layer);
+      ConvertLayerStyles(state, legacyLayer, layer);
       return layer;
     }
     default:

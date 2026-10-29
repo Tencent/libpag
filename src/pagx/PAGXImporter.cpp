@@ -2638,8 +2638,13 @@ static GradientOverlayStyle* ParseGradientOverlayStyle(const DOMNode* node, PAGX
       node, "excludeChildEffects", Default<GradientOverlayStyle>().excludeChildEffects, doc);
   style->alpha = GetFloatAttribute(node, "alpha", Default<GradientOverlayStyle>().alpha, doc);
   style->angle = GetFloatAttribute(node, "angle", Default<GradientOverlayStyle>().angle, doc);
-  if (GetAttribute(node, "overlayType") == "radial") {
+  auto overlayType = GetAttribute(node, "overlayType");
+  if (overlayType == "radial") {
     style->overlayType = GradientOverlayType::Radial;
+  } else if (overlayType == "reflected") {
+    style->overlayType = GradientOverlayType::Reflected;
+  } else if (overlayType == "angle") {
+    style->overlayType = GradientOverlayType::Angle;
   }
   style->reverse = GetBoolAttribute(node, "reverse", Default<GradientOverlayStyle>().reverse, doc);
   style->alignWithLayer =

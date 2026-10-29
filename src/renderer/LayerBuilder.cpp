@@ -69,6 +69,7 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
@@ -93,6 +94,7 @@
 #include "renderer/DisplacementMapLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/GradientOverlayLayerFilter.h"
 #include "renderer/HueSaturationLayerFilter.h"
 #include "renderer/LevelsIndividualLayerFilter.h"
 #include "renderer/MosaicLayerFilter.h"
@@ -2873,6 +2875,40 @@ class LayerBuilderContext {
         filters.push_back(tgfxFilter);
       }
     }
+    // Gradient overlay styles have no tgfx-native equivalent and ride the layer filter chain,
+    // appended after the node filters so they apply over the effect-processed content, matching
+    // the legacy FilterRenderer order (styles run after effects).
+    for (const auto& style : node->styles) {
+      if (style == nullptr || style->nodeType() != NodeType::GradientOverlayStyle) {
+        continue;
+      }
+      auto* overlayNode = static_cast<const GradientOverlayStyle*>(style);
+      auto overlayFilter = std::make_shared<GradientOverlayLayerFilter>();
+      overlayFilter->setAlpha(overlayNode->alpha);
+      overlayFilter->setAngle(overlayNode->angle);
+      overlayFilter->setOverlayType(overlayNode->overlayType);
+      overlayFilter->setReverse(overlayNode->reverse);
+      overlayFilter->setScale(overlayNode->scale);
+      overlayFilter->setOffsetX(overlayNode->offsetX);
+      overlayFilter->setOffsetY(overlayNode->offsetY);
+      overlayFilter->setBlendMode(ToTGFX(overlayNode->blendMode));
+      if (overlayNode->gradient != nullptr) {
+        std::vector<tgfx::Color> colors = {};
+        std::vector<float> positions = {};
+        colors.reserve(overlayNode->gradient->colorStops.size());
+        positions.reserve(overlayNode->gradient->colorStops.size());
+        for (const auto& stop : overlayNode->gradient->colorStops) {
+          if (stop != nullptr) {
+            colors.push_back(ToTGFX(stop->color));
+            positions.push_back(stop->offset);
+          }
+        }
+        overlayFilter->setGradientStops(std::move(colors), std::move(positions));
+      }
+      filters.push_back(overlayFilter);
+      _result.binding.set(overlayNode, overlayFilter);
+      bindGradientOverlayStyleChannels(overlayNode);
+    }
     if (!filters.empty()) {
       layer->setFilters(filters);
     }
@@ -3032,6 +3068,80 @@ class LayerBuilderContext {
       return;
     }
     static_cast<tgfx::DropShadowStyle*>(object)->setShowBehindLayer(*v);
+  }
+
+  static void WriteGradientOverlayStyleAlpha(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GradientOverlayLayerFilter*>(object);
+    filter->setAlpha(MixFloat(filter->alpha(), *v, mix));
+  }
+
+  static void WriteGradientOverlayStyleAngle(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GradientOverlayLayerFilter*>(object);
+    filter->setAngle(MixFloat(filter->angle(), *v, mix));
+  }
+
+  static void WriteGradientOverlayStyleScale(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GradientOverlayLayerFilter*>(object);
+    filter->setScale(MixFloat(filter->scale(), *v, mix));
+  }
+
+  static void WriteGradientOverlayStyleOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GradientOverlayLayerFilter*>(object);
+    filter->setOffsetX(MixFloat(filter->offsetX(), *v, mix));
+  }
+
+  static void WriteGradientOverlayStyleOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<GradientOverlayLayerFilter*>(object);
+    filter->setOffsetY(MixFloat(filter->offsetY(), *v, mix));
+  }
+
+  static void WriteGradientOverlayStyleReverse(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<GradientOverlayLayerFilter*>(object)->setReverse(*v);
+  }
+
+  void bindGradientOverlayStyleChannels(const GradientOverlayStyle* node) {
+    _result.binding.setAccessor(
+        node, "alpha", WriteGradientOverlayStyleAlpha,
+        ReadScalar<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::alpha>);
+    _result.binding.setAccessor(
+        node, "angle", WriteGradientOverlayStyleAngle,
+        ReadScalar<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::angle>);
+    _result.binding.setAccessor(
+        node, "scale", WriteGradientOverlayStyleScale,
+        ReadScalar<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::scale>);
+    _result.binding.setAccessor(
+        node, "offsetX", WriteGradientOverlayStyleOffsetX,
+        ReadScalar<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::offsetX>);
+    _result.binding.setAccessor(
+        node, "offsetY", WriteGradientOverlayStyleOffsetY,
+        ReadScalar<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::offsetY>);
+    _result.binding.setAccessor(
+        node, "reverse", WriteGradientOverlayStyleReverse,
+        ReadBoolean<GradientOverlayLayerFilter, &GradientOverlayLayerFilter::reverse>);
   }
 
   void bindDropShadowStyleChannels(const DropShadowStyle* node) {

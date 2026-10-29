@@ -872,4 +872,110 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
   object->channels.push_back(channel);
 }
 
+// Channels for the gradient overlay style's animated properties. The gradient colors, fill type
+// and blend mode are static in practice (the importer warns when they animate, mirroring the
+// effect skeleton); reverse rides a Hold bool channel. The offset point flattens into the two
+// offsetX/offsetY channels the style node exposes.
+void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, float frameRate,
+                                          PAGXDocument* document, AnimationObject* object) {
+  if (style == nullptr || object == nullptr) {
+    return;
+  }
+  auto* opacity = style->opacity;
+  if (opacity != nullptr) {
+    auto staticOpaque = opacity->getValueAt(0) >= 255;
+    if (opacity->animatable() || !staticOpaque) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "alpha";
+      if (opacity->animatable()) {
+        ConvertOpacityChannel(opacity, frameRate, channel);
+      } else {
+        Keyframe<float> keyframe = {};
+        keyframe.time = 0;
+        keyframe.value = opacity->getValueAt(0) / 255.0f;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+  pag::Property<float>* floatProperties[2] = {style->angle, style->scale};
+  const char* floatNames[2] = {"angle", "scale"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = floatProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = floatNames[i];
+    ConvertFloatChannel(legacy, frameRate, channel);
+    if (!channel->keyframes.empty()) {
+      object->channels.push_back(channel);
+    }
+  }
+  if (style->offset != nullptr && style->offset->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(style->offset);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channelX = document->makeNode<TypedChannel<float>>();
+      channelX->name = "offsetX";
+      auto* channelY = document->makeNode<TypedChannel<float>>();
+      channelY->name = "offsetY";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<float> keyX = {};
+        keyX.time = legacyKeyframe->startTime;
+        keyX.value = legacyKeyframe->startValue.x;
+        keyX.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyX);
+        channelX->keyframes.push_back(keyX);
+        Keyframe<float> keyY = {};
+        keyY.time = legacyKeyframe->startTime;
+        keyY.value = legacyKeyframe->startValue.y;
+        keyY.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyY);
+        channelY->keyframes.push_back(keyY);
+      }
+      auto* last = animatable->keyframes.back();
+      if (last->endTime > last->startTime) {
+        Keyframe<float> keyX = {};
+        keyX.time = last->endTime;
+        keyX.value = last->endValue.x;
+        keyX.interpolation = ConvertInterpolation(last->interpolationType);
+        ConvertEase(last->bezierOut, last->bezierIn, &keyX);
+        channelX->keyframes.push_back(keyX);
+        Keyframe<float> keyY = {};
+        keyY.time = last->endTime;
+        keyY.value = last->endValue.y;
+        keyY.interpolation = ConvertInterpolation(last->interpolationType);
+        ConvertEase(last->bezierOut, last->bezierIn, &keyY);
+        channelY->keyframes.push_back(keyY);
+      }
+      object->channels.push_back(channelX);
+      object->channels.push_back(channelY);
+    }
+  }
+  if (style->reverse != nullptr && style->reverse->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<bool>*>(style->reverse);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channel = document->makeNode<TypedChannel<bool>>();
+      channel->name = "reverse";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<bool> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = legacyKeyframe->startValue;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      auto* last = animatable->keyframes.back();
+      if (last->endTime > last->startTime) {
+        Keyframe<bool> endKeyframe = {};
+        endKeyframe.time = last->endTime;
+        endKeyframe.value = last->endValue;
+        endKeyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(endKeyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+}
+
 }  // namespace pagx
