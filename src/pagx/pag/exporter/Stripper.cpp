@@ -24,6 +24,7 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DisplacementMapFilter.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -182,6 +183,40 @@ bool IsUsedAsMaskAnywhere(const PAGXDocument* document, const Layer* candidate) 
   return false;
 }
 
+// Recursively checks whether a Layer is referenced as the displacement map of any filter in
+// the tree. Displacement map sources are invisible by design (the effect reads their content
+// offscreen), so without this check the dead-layer pass strips them and every displacement
+// filter referencing them degrades to a no-op in the exported binary.
+bool IsUsedAsDisplacementMap(const Layer* candidate, const std::vector<Layer*>& layers) {
+  for (auto* layer : layers) {
+    for (auto* filter : layer->filters) {
+      if (filter != nullptr && filter->nodeType() == NodeType::DisplacementMapFilter &&
+          static_cast<DisplacementMapFilter*>(filter)->displacementMapLayer == candidate) {
+        return true;
+      }
+    }
+    if (IsUsedAsDisplacementMap(candidate, layer->children)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IsUsedAsDisplacementMapAnywhere(const PAGXDocument* document, const Layer* candidate) {
+  if (IsUsedAsDisplacementMap(candidate, document->layers)) {
+    return true;
+  }
+  for (auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* composition = static_cast<Composition*>(node.get());
+      if (IsUsedAsDisplacementMap(candidate, composition->layers)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Liveness targets are ids referenced by animations and data binds specifically. All Layer
 // ids survive for PAGLayer::id(), but only liveness targets keep invisible nodes alive.
 std::unordered_set<std::string> CollectLivenessTargets(const PAGXDocument* document) {
@@ -237,7 +272,8 @@ void RemoveDeadLayers(std::vector<Layer*>* layers,
                                  if (!layer->visible) {
                                    auto isTarget =
                                        !layer->id.empty() && livenessTargets.count(layer->id) > 0;
-                                   if (!isTarget && !IsUsedAsMaskAnywhere(document, layer)) {
+                                   if (!isTarget && !IsUsedAsMaskAnywhere(document, layer) &&
+                                       !IsUsedAsDisplacementMapAnywhere(document, layer)) {
                                      return true;
                                    }
                                  }
