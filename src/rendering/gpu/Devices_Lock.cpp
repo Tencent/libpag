@@ -16,9 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/Log.h"
 #include "rendering/gpu/Devices.h"
+#if DEBUG && !defined(NO_LOG)
+#include <unordered_set>
+#endif
 
 namespace pag {
+#if DEBUG && !defined(NO_LOG)
+static std::unordered_set<const tgfx::Device*>& HeldDeviceScopes() {
+  thread_local std::unordered_set<const tgfx::Device*> devices;
+  return devices;
+}
+#endif
 
 DeviceLockScope::DeviceLockScope() : DeviceLockScope(Devices::MakeDefault()) {
 }
@@ -26,13 +36,27 @@ DeviceLockScope::DeviceLockScope() : DeviceLockScope(Devices::MakeDefault()) {
 DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device)
     : _device(std::move(device)) {
   if (_device != nullptr) {
+#if DEBUG && !defined(NO_LOG)
+    DEBUG_ASSERT(HeldDeviceScopes().count(_device.get()) == 0);
+#endif
     _context = _device->lockContext();
+#if DEBUG && !defined(NO_LOG)
+    if (_context != nullptr) {
+      HeldDeviceScopes().insert(_device.get());
+    }
+#endif
   }
 }
 
 DeviceLockScope::~DeviceLockScope() {
   if (_context != nullptr) {
+#if DEBUG && !defined(NO_LOG)
+    DEBUG_ASSERT(HeldDeviceScopes().count(_device.get()) != 0);
+#endif
     _device->unlock();
+#if DEBUG && !defined(NO_LOG)
+    HeldDeviceScopes().erase(_device.get());
+#endif
   }
 }
 

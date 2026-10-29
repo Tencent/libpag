@@ -254,6 +254,8 @@ class Devices {
  * device's context lock. Construct and destroy the scope on the same thread, and pass context()
  * to work performed within the scope instead of acquiring the device lock again.
  * Callers must release the lock before invoking libpag APIs that manage device locks internally.
+ * Debug builds with logging detect reentry through DeviceLockScope and wrong-thread destruction.
+ * Direct Device::lockContext() calls are not tracked by this boundary guard.
  */
 class DeviceLockScope {
  public:

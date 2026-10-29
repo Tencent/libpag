@@ -40,7 +40,9 @@ using namespace tgfx;
 using nlohmann::json;
 
 static constexpr float MAX_FRAME_SIZE = 360.0f;
+#if !defined(TGFX_USE_METAL)
 static constexpr int MAX_THREADS = 6;
+#endif
 static constexpr bool PrintPerformance = false;
 
 struct RenderCost {
@@ -163,8 +165,7 @@ PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
     ASSERT_TRUE(ResetMetalAtlasForComparison());
     CompareFileFrames(file);
   }
-  return;
-#endif
+#else
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {
@@ -177,6 +178,7 @@ PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   for (auto& thread : threads) {
     thread.join();
   }
+#endif
 }
 }  // namespace pag
 #endif

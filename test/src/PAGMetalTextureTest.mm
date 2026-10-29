@@ -28,7 +28,6 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
 #include "utils/TestUtils.h"

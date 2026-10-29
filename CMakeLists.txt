@@ -1191,9 +1191,7 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
-    if (NOT PAG_USE_METAL)
-        list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
-    endif ()
+    list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
         list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
@@ -1222,6 +1220,7 @@ if (PAG_BUILD_TESTS)
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
@@ -1272,11 +1271,18 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
     if (PAG_USE_METAL)
-        # MetalTestSupport temporarily uses tgfx's private atlas API. Keep its dependencies local
-        # to Metal test targets, never exported by pag or enabled for other backends.
-        foreach (METAL_TEST_TARGET UpdateBaseline_Metal PAGUnitTest_Metal PAGFullTest_Metal)
-            target_include_directories(${METAL_TEST_TARGET} PRIVATE
-                    ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
+        # replace this private API when tgfx provides a supported test-reset hook.
+        add_library(pag-metal-test-support OBJECT test/src/utils/MetalTestSupport.cpp)
+        add_dependencies(pag-metal-test-support ${PAG_DEPEND_TARGETS})
+        target_include_directories(pag-metal-test-support PRIVATE ${PAG_INCLUDES}
+                ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        target_compile_definitions(pag-metal-test-support PRIVATE ${PAG_TEST_DEFINES})
+        target_compile_options(pag-metal-test-support PRIVATE ${PAG_TEST_COMPILE_OPTIONS})
+        foreach (METAL_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_sources(${METAL_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-metal-test-support>)
+            add_dependencies(${METAL_TEST_TARGET} pag-metal-test-support)
         endforeach ()
     endif ()
 

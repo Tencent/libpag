@@ -88,9 +88,10 @@ PAG_TEST(PAGMetalAtlasTest, ResetRemovesPreviousTextHistory) {
 }
 
 /**
- * Reuses cached glyphs across surfaces and intervening draws without clearing atlas history.
+ * Smoke-tests cached glyph reuse across surfaces and intervening draws without clearing history.
+ * This small workload does not establish eviction, relocation or locator-invalidation coverage.
  */
-PAG_TEST(PAGMetalAtlasTest, ReusesTextWithoutReset) {
+PAG_TEST(PAGMetalAtlasTest, CachedTextReuseSmokeTest) {
   constexpr int width = 512;
   constexpr int height = 256;
   auto typeface =
