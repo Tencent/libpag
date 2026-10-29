@@ -247,6 +247,15 @@ const EDIT_LINE_CLASS = 'pagx-edit-line';
 const EDIT_SELECTION_CLASS = 'pagx-edit-selection';
 const XML_MARKER_OWNER = 'pagx-xml-syntax';
 const XML_VALIDATION_DELAY_MS = 400;
+// Documents above this many UTF-16 characters skip the automatic (typing-pause) validation. Such a
+// document costs a full DOMParser pass plus an importer parse (seconds on a large PAGX with inline
+// base64 images) per run, which would freeze the editor after every keystroke. Apply and Save still
+// validate explicitly, so an invalid edit is still rejected where it matters.
+const AUTO_VALIDATE_MAX_CHARS = 8 * 1024 * 1024;
+// Monaco's TextModel refuses getValue() once the buffer exceeds an internal 50 MB sync limit
+// (TextModel._MODEL_SYNC_LIMIT) rather than allocating one huge string. A large PAGX document blows
+// past it, so the text has to be read back in batches instead (see readFullText).
+const MODEL_CHUNK_LINES = 256;
 // Editor context key gating the Cut/Paste context menu actions to edit mode.
 const EDITING_CONTEXT_KEY = 'pagxSourceEditing';
 
@@ -359,6 +368,10 @@ export class SourceEditor {
     private editingActive = false;
     private contentChangeListener: MonacoNS.IDisposable | null = null;
     private syntaxValidationTimer: number | null = null;
+    // Result of the most recent completed validation. Automatic runs that are skipped for oversized
+    // documents (see AUTO_VALIDATE_MAX_CHARS) return this unchanged instead of clearing markers they
+    // did not recompute.
+    private lastDiagnostics: SourceDiagnostic[] = [];
     private destroyed = false;
     private creating = false;
     // Latest setContent() text that arrived while Monaco was still loading. createEditor's
@@ -611,7 +624,7 @@ export class SourceEditor {
                 contextMenuOrder: 2,
                 run: () => {
                     if (this.model !== null) {
-                        copyTextToClipboard(this.model.getValue());
+                        copyTextToClipboard(this.readFullText(this.model));
                     }
                 },
             }),
@@ -882,13 +895,21 @@ export class SourceEditor {
      *  provider is independently owned in Monaco. XML syntax failure skips semantic providers,
      *  avoiding misleading schema errors while a tag or attribute is being typed. Stale async
      *  validation results are dropped if the model text changes before they resolve. */
-    private async updateSyntaxDiagnostics(): Promise<SourceDiagnostic[]> {
+    private async updateSyntaxDiagnostics(force = false): Promise<SourceDiagnostic[]> {
         const model = this.model;
         const monaco = monacoInstance;
         if (model === null || monaco === null) {
             return [];
         }
-        const xmlText = model.getValue();
+        // Oversized documents are validated only when the user commits (Apply/Save). The automatic
+        // pass that runs after every typing pause would re-parse the whole document and block the
+        // editor for seconds, so it keeps the previous result instead: markers are neither cleared
+        // nor recomputed from text that no run looked at.
+        if (!force && model.getValueLength() > AUTO_VALIDATE_MAX_CHARS) {
+            return this.lastDiagnostics;
+        }
+        const version = model.getVersionId();
+        const xmlText = this.readFullText(model);
         const generation = ++this.diagnosticGeneration;
         const syntaxDiagnostics = getXmlSyntaxDiagnostics(xmlText);
         const syntaxMarkers = syntaxDiagnostics.map((diagnostic): SourceDiagnostic => ({
@@ -903,23 +924,31 @@ export class SourceEditor {
             for (const provider of this.diagnosticProviders) {
                 monaco.editor.setModelMarkers(model, provider.id, []);
             }
+            this.lastDiagnostics = syntaxMarkers;
             return syntaxMarkers;
         }
         const providerDiagnostics = await this.getProviderDiagnostics(xmlText);
-        if (this.destroyed || generation !== this.diagnosticGeneration || this.model !== model || model.getValue() !== xmlText) {
+        // Content identity is checked through the model version rather than by reading the text
+        // back: a second full read of a large document just to compare it is half the cost of the
+        // validation itself.
+        if (this.destroyed || generation !== this.diagnosticGeneration || this.model !== model ||
+            model.getVersionId() !== version) {
             return [];
         }
         for (const provider of this.diagnosticProviders) {
             const diagnostics = providerDiagnostics.filter((diagnostic) => diagnostic.owner === provider.id);
             monaco.editor.setModelMarkers(model, provider.id, this.makeErrorMarkers(diagnostics));
         }
+        this.lastDiagnostics = providerDiagnostics;
         return providerDiagnostics;
     }
 
     /** Returns the first blocking diagnostic for Apply and Save, after synchronously awaiting the
      *  current validation generation so the toast and Monaco marker always describe the same text. */
     public async getValidationError(): Promise<string> {
-        const diagnostics = await this.updateSyntaxDiagnostics();
+        // Forced: Apply/Save are the operations that must never accept invalid source, even on the
+        // oversized documents whose automatic validation is skipped.
+        const diagnostics = await this.updateSyntaxDiagnostics(true);
         const error = diagnostics.find((diagnostic) => diagnostic.severity === 'error');
         if (error === undefined) {
             return '';
@@ -971,6 +1000,8 @@ export class SourceEditor {
         this.editingActive = false;
         this.editingContextKey?.set(false);
         this.editPointerDown = null;
+        // Markers and diagnostics belong to the model that was just replaced.
+        this.lastDiagnostics = [];
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
         this.editor.updateOptions({
@@ -999,7 +1030,7 @@ export class SourceEditor {
             return;
         }
         const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-        if (this.model.getValue() !== trimmed) {
+        if (this.getContent() !== trimmed) {
             // Discard is commonly invoked after Apply has returned the editor to read-only mode.
             // editor.executeEdits() silently no-ops while readOnly is enabled; mutate the model
             // directly instead, exactly like the read-only Delete actions. pushEditOperations keeps
@@ -1025,7 +1056,78 @@ export class SourceEditor {
         if (this.model === null) {
             return '';
         }
-        return this.model.getValue();
+        return this.readFullText(this.model);
+    }
+
+    /** Returns the model version, which changes on every content edit. Callers that only need to
+     *  know whether the text moved (Apply's await window, for instance) compare this instead of
+     *  reading a large document back just to diff it. */
+    getContentVersion(): number {
+        return this.model?.getVersionId() ?? -1;
+    }
+
+    /** Returns the number of physical lines in the current document. */
+    getLineCount(): number {
+        return this.model?.getLineCount() ?? 0;
+    }
+
+    /** Returns the text of the inclusive 1-based line range without a trailing line break.
+     *  Reads only those lines, so a host that needs to inspect one tag block never has to split
+     *  (and copy) the whole document. */
+    getLines(startLine: number, endLine: number): string {
+        const model = this.model;
+        if (model === null) {
+            return '';
+        }
+        const lineCount = model.getLineCount();
+        const start = clampLine(startLine, lineCount);
+        const end = clampLine(endLine, lineCount);
+        if (start > end) {
+            return '';
+        }
+        if (start === end) {
+            return model.getLineContent(start);
+        }
+        return model.getValueInRange({
+            startLineNumber: start,
+            startColumn: 1,
+            endLineNumber: end,
+            endColumn: model.getLineMaxColumn(end),
+        });
+    }
+
+    /** Reads the whole model text. Monaco throws from getValue() once the buffer exceeds its
+     *  internal 50 MB sync limit (TextModel._MODEL_SYNC_LIMIT) instead of allocating one huge
+     *  string, so a large PAGX document (hundreds of MB of inline base64 images) has to be read in
+     *  batches. The throw is not a failure to report: the chunked read below returns the same text. */
+    private readFullText(model: MonacoNS.editor.ITextModel): string {
+        try {
+            return model.getValue();
+        } catch {
+            return this.readTextInChunks(model);
+        }
+    }
+
+    private readTextInChunks(model: MonacoNS.editor.ITextModel): string {
+        const lineCount = model.getLineCount();
+        const eol = model.getEOL();
+        const chunks: string[] = [];
+        for (let startLine = 1; startLine <= lineCount; startLine += MODEL_CHUNK_LINES) {
+            const endLine = Math.min(startLine + MODEL_CHUNK_LINES - 1, lineCount);
+            if (startLine === endLine) {
+                chunks.push(model.getLineContent(startLine));
+                continue;
+            }
+            chunks.push(
+                model.getValueInRange({
+                    startLineNumber: startLine,
+                    startColumn: 1,
+                    endLineNumber: endLine,
+                    endColumn: model.getLineMaxColumn(endLine),
+                }),
+            );
+        }
+        return chunks.join(eol);
     }
 
     /** Returns the current physical XML tag line, or null for text, blank and attribute-continuation

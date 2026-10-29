@@ -32,6 +32,11 @@ export interface ChannelEdit {
     value: string;
 }
 
+/** Documents above this many characters skip the incremental path: the classifier has to split
+ *  both texts to diff them line by line, which on a large PAGX (hundreds of MB of inline images)
+ *  copies the whole document twice to save a reparse that is comparable in cost. */
+const INCREMENTAL_MAX_CHARS = 4 * 1024 * 1024;
+
 /** Parses a node's source-span fragment and returns its root element, or null when the fragment is
  *  not a single well-formed element (malformed XML, or extra content around the root). */
 function parseSpanElement(span: string): Element | null {
@@ -347,6 +352,9 @@ export function classifyEdits(
     newXml: string,
     sourceMap: readonly NodeSourceEntry[],
 ): ChannelEdit[] | null {
+    if (oldXml.length > INCREMENTAL_MAX_CHARS || newXml.length > INCREMENTAL_MAX_CHARS) {
+        return null;
+    }
     const oldLines = oldXml.split('\n');
     const newLines = newXml.split('\n');
     if (oldLines.length !== newLines.length) {

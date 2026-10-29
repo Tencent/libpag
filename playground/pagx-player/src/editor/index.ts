@@ -420,6 +420,24 @@ export class EditorPanel {
         return this.editor?.getContent() ?? '';
     }
 
+    /** Returns the model version, which changes on every content edit (-1 when the editor instance
+     *  is not created). Cheaper than getContent() for callers that only compare text identity. */
+    public getContentVersion(): number {
+        return this.editor?.getContentVersion() ?? -1;
+    }
+
+    /** Returns the number of physical lines in the current document (0 when the editor instance is
+     *  not created). */
+    public getLineCount(): number {
+        return this.editor?.getLineCount() ?? 0;
+    }
+
+    /** Returns the text of the inclusive 1-based line range without a trailing line break. Reads
+     *  only those lines, so a tag-span check never has to split a whole large document. */
+    public getLines(startLine: number, endLine: number): string {
+        return this.editor?.getLines(startLine, endLine) ?? '';
+    }
+
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the
      *  editor may have left on the host DOM (with-editor class on the canvas container,
      *  --editor-width property, body cursor/user-select set during a drag) are cleared here
@@ -640,21 +658,31 @@ export class EditorPanel {
         if (this.editor === null || this.busy) {
             return;
         }
-        const xmlText = this.editor.getContent();
+        let xmlText: string;
+        try {
+            xmlText = this.editor.getContent();
+        } catch (err) {
+            // Materializing the whole source can fail (a multi-hundred-MB document is a lot of
+            // string). Report it instead of letting the rejection escape the click handler, which
+            // would leave Apply looking unresponsive with no message at all.
+            this.report(err instanceof Error ? err.message : String(err), 'error');
+            return;
+        }
         // Nothing changed since the last applied/loaded text: skip the whole pipeline so Apply is a
         // no-op (no reparse, no incremental write, no baseline churn).
         if (this.currentXmlText !== null && this.currentXmlText === xmlText) {
             this.report('No changes to apply', 'info');
             return;
         }
-        // Snapshot the document version and content BEFORE any await: the validation provider
-        // may be a host-injected async SourceDiagnosticProvider, and a document swap or panel
-        // destroy landing inside that await window must abort this Apply instead of promoting
-        // stale content back into the runtime.
+        // Snapshot the document version and model version BEFORE any await: the validation provider
+        // may be a host-injected async SourceDiagnosticProvider, and an edit, a document swap or a
+        // panel destroy landing inside that await window must abort this Apply instead of promoting
+        // stale content back into the runtime. The model version is compared instead of the text so
+        // this guard never re-reads a large document.
         const applyDocGen = this.documentGeneration;
-        const contentAtApply = xmlText;
+        const contentVersionAtApply = this.editor.getContentVersion();
         const validationError = await this.editor.getValidationError();
-        if (this.editor === null || this.editor.getContent() !== contentAtApply ||
+        if (this.editor === null || this.editor.getContentVersion() !== contentVersionAtApply ||
             this.documentGeneration !== applyDocGen) {
             return;
         }
@@ -751,7 +779,14 @@ export class EditorPanel {
         if (this.editor === null || this.busy) {
             return;
         }
-        const xmlText = this.editor.getContent();
+        let xmlText: string;
+        try {
+            xmlText = this.editor.getContent();
+        } catch (err) {
+            // Same rationale as handleApply: never let a failed read leave Save silently dead.
+            this.report(err instanceof Error ? err.message : String(err), 'error');
+            return;
+        }
         // Same await-window protection as handleApply: an async validation provider lets a
         // destroy or document swap land between getContent and the await's resolution.
         const saveDocGen = this.documentGeneration;

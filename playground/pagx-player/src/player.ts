@@ -801,11 +801,12 @@ export class PAGXPlayer extends EventTarget {
             return null;
         }
         const end = entry.endLine > 0 ? entry.endLine : start;
-        const lines = this.editor.getContent().split('\n');
-        if (end > lines.length) {
+        if (end > this.editor.getLineCount()) {
             return null;
         }
-        if (!hasMatchingSpanBoundaries(lines.slice(start - 1, end).join('\n'))) {
+        // Only the mapped span is read back. Splitting the whole document here would copy the
+        // entire text (hundreds of MB for a large PAGX with inline images) to check one tag block.
+        if (!hasMatchingSpanBoundaries(this.editor.getLines(start, end))) {
             return null;
         }
         return { startLine: start, endLine: end };
