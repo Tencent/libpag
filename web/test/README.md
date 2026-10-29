@@ -103,7 +103,8 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `updateBindGroup()` 对布局声明但未绑定的 texture/sampler 槽位填 1×1 占位
   纹理（占位永不被采样，语义等价 GL 惰性绑定）；uniform 绑定 size 向上取整
   到 16 的倍数并在 `WebGPUBuffer::Make` 对 UNIFORM 容量按 16 对齐。已验证：
-  两类 validation error 清零，5 用例渲染恢复。
+  两类 validation error 清零，5 用例渲染恢复，重 seed 后全量真 md5 比对
+  1617 例全绿（1615 过 + 2 skip，0 失败）。
 - `PAGXSVGTest.SVGExport_WritingModeVerticalJustifyEmitsTextLength` 已排除出
   web（emscripten）构建：vertical justify 的 `textLength` 发射条件依赖 shaper
   列几何，浏览器字体度量与 native 不同导致断言不触发。native 构建保留该用例。
@@ -111,3 +112,14 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAGTest::HasFailure()` 为 true 时拒绝写任何 md5（保守设计，不固化失败
   态）。任何用例失败都会使整次 seed 的 md5 不落地，`update_baseline.sh` 会
   以 FAILED 退出。
+- seed 应使用 `--skip-images` 模式：带图模式（GENERATE_BASELINE_IMAGES）下
+  `saveData` 把页内 `_base` 图集 rename 进 `/test/out`，其中 `PAGCompareFrameTest`
+  逐帧比对会产出 8000+ 张 `_base` webp，页面 JSZip 打包时内存不足导致页面崩溃
+  （detached Frame），导出通道全断。`--skip-images` 下 `/test/out` 只有数百个
+  运行时文件，打包可承受；宿主 `_base` 图不更新不影响判定（web 车道的真基线
+  是 `.cache/{backend}/md5.json`，`_base` 图仅供可视化参考）。
+- 车道产物传输不依赖 headless Chrome 的 CDP 下载（多次实测不可靠，下载可能
+  不落盘）：页面把 zip 的 base64 挂到 `window.__testZips`，`run_test.js` 用
+  `page.evaluate` 取回写盘；CDP 下载作为兼容通道并存。`cache-web.zip` 从页内
+  `/test/baseline/.cache` 整树打包（entry 带后端前缀），宿主提取到
+  `test/baseline/.cache` 本身而非 `.cache/{backend}`，避免双层嵌套。
