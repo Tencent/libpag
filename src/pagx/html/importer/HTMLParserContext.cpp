@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <utility>
 #include "pagx/FontConfig.h"
 #include "pagx/SystemFonts.h"
