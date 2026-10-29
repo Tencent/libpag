@@ -19,6 +19,7 @@
 #include "MotionBlurFilter.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 
 namespace pag {
 #define MOTION_BLUR_SCALE_FACTOR 1.2f
@@ -150,10 +151,16 @@ void MotionBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU*
 
   // Vertex uniform buffer for matrices
   // mat3 in std140 is stored as 3 vec4s (each column padded to vec4)
-  struct VertexUniforms {
+  struct alignas(16) VertexUniforms {
     float prevTransform[12] = {};  // mat3 padded to 3 vec4s
     float transform[12] = {};      // mat3 padded to 3 vec4s
   };
+
+  static_assert(HasStd140UniformLayout<VertexUniforms, 96>(),
+                "VertexArgs must match the std140 layout.");
+  static_assert(
+      offsetof(VertexUniforms, prevTransform) == 0 && offsetof(VertexUniforms, transform) == 48,
+      "VertexArgs matrix offsets must match the shader declaration.");
 
   VertexUniforms vertexUniforms = {};
   // Copy mat3 with padding (each column padded to vec4)
@@ -180,10 +187,16 @@ void MotionBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU*
   }
 
   // Fragment uniform buffer
-  struct FragmentUniforms {
+  struct alignas(16) FragmentUniforms {
     float velCenter = 0.0f;
     float maxDistance = 0.0f;
   };
+
+  static_assert(HasStd140UniformLayout<FragmentUniforms, 16>(),
+                "FragmentArgs must match the std140 layout.");
+  static_assert(
+      offsetof(FragmentUniforms, velCenter) == 0 && offsetof(FragmentUniforms, maxDistance) == 4,
+      "FragmentArgs member offsets must match the shader declaration.");
 
   FragmentUniforms fragmentUniforms = {};
   fragmentUniforms.velCenter = scaling ? 0.0f : 0.5f;

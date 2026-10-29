@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BrightnessContrastFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -92,10 +93,14 @@ std::vector<tgfx::BindingEntry> BrightnessContrastFilter::uniformBlocks() const 
 void BrightnessContrastFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                                 const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                                 const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float brightness = 0.0f;
     float contrast = 0.0f;
   };
+
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(), "Args must match the std140 layout.");
+  static_assert(offsetof(Uniforms, brightness) == 0 && offsetof(Uniforms, contrast) == 4,
+                "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.brightness = brightness > 0 ? brightness / 250.f : brightness / 650.f;

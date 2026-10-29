@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LevelsIndividualFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -136,7 +137,7 @@ void LevelsIndividualFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx
   constexpr int blueChannel = 2;
   constexpr int globalChannel = 3;
 
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float inputBlack = 0.0f;
     float inputWhite = 0.0f;
     float gamma = 0.0f;
@@ -158,6 +159,19 @@ void LevelsIndividualFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx
     float greenOutputBlack = 0.0f;
     float greenOutputWhite = 0.0f;
   };
+  static_assert(HasStd140UniformLayout<Uniforms, 80>(), "Args must match the std140 layout.");
+  static_assert(
+      offsetof(Uniforms, inputBlack) == 0 && offsetof(Uniforms, inputWhite) == 4 &&
+          offsetof(Uniforms, gamma) == 8 && offsetof(Uniforms, outputBlack) == 12 &&
+          offsetof(Uniforms, outputWhite) == 16 && offsetof(Uniforms, redInputBlack) == 20 &&
+          offsetof(Uniforms, redInputWhite) == 24 && offsetof(Uniforms, redGamma) == 28 &&
+          offsetof(Uniforms, redOutputBlack) == 32 && offsetof(Uniforms, redOutputWhite) == 36 &&
+          offsetof(Uniforms, blueInputBlack) == 40 && offsetof(Uniforms, blueInputWhite) == 44 &&
+          offsetof(Uniforms, blueGamma) == 48 && offsetof(Uniforms, blueOutputBlack) == 52 &&
+          offsetof(Uniforms, blueOutputWhite) == 56 && offsetof(Uniforms, greenInputBlack) == 60 &&
+          offsetof(Uniforms, greenInputWhite) == 64 && offsetof(Uniforms, greenGamma) == 68 &&
+          offsetof(Uniforms, greenOutputBlack) == 72 && offsetof(Uniforms, greenOutputWhite) == 76,
+      "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.inputBlack = param.inBlack[globalChannel];

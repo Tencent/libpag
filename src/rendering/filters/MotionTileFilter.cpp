@@ -18,6 +18,7 @@
 
 #include "MotionTileFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -119,7 +120,7 @@ std::vector<tgfx::BindingEntry> MotionTileFilter::uniformBlocks() const {
 void MotionTileFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                         const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                         const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float tileCenterX = 0.0f;
     float tileCenterY = 0.0f;
     float tileWidth = 0.0f;
@@ -130,6 +131,15 @@ void MotionTileFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU*
     float phase = 0.0f;
     int isHorizontalPhaseShift = 0;
   };
+
+  static_assert(HasStd140UniformLayout<Uniforms, 48>(), "Args must match the std140 layout.");
+  static_assert(offsetof(Uniforms, tileCenterX) == 0 && offsetof(Uniforms, tileCenterY) == 4 &&
+                    offsetof(Uniforms, tileWidth) == 8 && offsetof(Uniforms, tileHeight) == 12 &&
+                    offsetof(Uniforms, outputWidth) == 16 &&
+                    offsetof(Uniforms, outputHeight) == 20 &&
+                    offsetof(Uniforms, mirrorEdges) == 24 && offsetof(Uniforms, phase) == 28 &&
+                    offsetof(Uniforms, isHorizontalPhaseShift) == 32,
+                "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.tileCenterX = tileCenter.x;
