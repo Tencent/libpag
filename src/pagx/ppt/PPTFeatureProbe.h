@@ -46,30 +46,38 @@ struct PPTFeatureFlags {
   bool hasConicGradient = false;     // OOXML has no sweep/angular gradient primitive; any path
                                      // gradient approximation collapses the angular distribution
                                      // and must be rasterized for a faithful result.
-  bool hasShearTransform = false;    // A Group (or Layer matrix) carries a shear/skew that the
+  bool hasShearTransform = false;    // A Group transform, or the complete Layer transform
+                                     // (BuildLayerMatrix, including the transform components and
+                                     // matrix3D projected to 2D), carries a shear/skew that the
                                      // OOXML <a:xfrm> primitive cannot represent (it only supports
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
-  bool hasBackdropStyle = false;     // A backdrop-sampling layer style (BackgroundBlurStyle or
-                                     // GlassStyle). Both are shader-based effects that sample the
-                                     // pixels behind the layer (frosted blur for BackgroundBlur;
-                                     // refraction / dispersion / edge lighting for Glass). OOXML
-                                     // has no primitive that can reproduce either; on the vector
-                                     // path the style is silently dropped, and only the
-                                     // backdrop-aware raster fallback can reproduce it.
+  // Perspective and shared 3D depth compositing require rasterization of the entire layer subtree.
+  bool hasPerspectiveTransform = false;
+  bool hasPreserve3D = false;
+  bool hasBackdropStyle = false;  // A backdrop-sampling layer style (BackgroundBlurStyle or
+                                  // GlassStyle). Both are shader-based effects that sample the
+                                  // pixels behind the layer (frosted blur for BackgroundBlur;
+                                  // refraction / dispersion / edge lighting for Glass). OOXML
+                                  // has no primitive that can reproduce either; on the vector
+                                  // path the style is silently dropped, and only the
+                                  // backdrop-aware raster fallback can reproduce it.
 
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
-   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms) always
-   * trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
-   * modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
+   * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear, perspective, preserve3D)
+   * always trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported
+   * blend modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
+  // preserve3D bakes the whole subtree even though a fully 2D subtree would flatten identically:
+  // preserving depth changes the offscreen group-opacity semantics, so the conservative raster
+  // output is intentional.
   bool needsRasterization(bool bakeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
-        hasDiamondGradient || hasShearTransform) {
+        hasDiamondGradient || hasShearTransform || hasPerspectiveTransform || hasPreserve3D) {
       return true;
     }
     if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackdropStyle)) {

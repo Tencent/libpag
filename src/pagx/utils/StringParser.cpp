@@ -797,7 +797,8 @@ std::string FloatToString(float value) {
     return "0";
   }
   char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g", value);
+  // FLT_DECIMAL_DIG significant digits: every distinct float round-trips through the text form.
+  snprintf(buf, sizeof(buf), "%.9g", value);
   std::string s(buf);
   // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
   // in fixed form so the result always matches the schema's decimal patterns. We deliberately

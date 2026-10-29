@@ -25,6 +25,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
 
@@ -54,6 +55,34 @@ static void ApplyResolved(
   }
 }
 
+// Applies the Layer transform priority within one animation, independent of the channel order:
+// matrix3D overrides matrix, x / y / z and the transform components, and matrix overrides x / y
+// and the transform components.
+static void FilterLayerChannels(std::vector<Channel*>* channels) {
+  bool hasMatrix = false;
+  bool hasMatrix3D = false;
+  for (auto* channel : *channels) {
+    hasMatrix = hasMatrix || channel->name == "matrix";
+    hasMatrix3D = hasMatrix3D || channel->name == "matrix3D";
+  }
+  if (!hasMatrix && !hasMatrix3D) {
+    return;
+  }
+  auto component = Matrix3DComponent::RotateX;
+  auto end = channels->begin();
+  for (auto* channel : *channels) {
+    const auto& name = channel->name;
+    bool overridden = name == "x" || name == "y" || Matrix3DComponentFromChannel(name, &component);
+    if (hasMatrix3D) {
+      overridden = overridden || name == "z" || name == "matrix";
+    }
+    if (!overridden) {
+      *end++ = channel;
+    }
+  }
+  channels->erase(end, channels->end());
+}
+
 PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
                            std::weak_ptr<PAGScene> owner)
     : PAGTimeline(binding, contextDoc, std::move(owner)), animation(anim) {
@@ -78,16 +107,40 @@ void PAGAnimation::resolveTargets(const RuntimeBinding* effectiveBinding) {
     if (!effectiveBinding->contains(targetNode)) {
       continue;
     }
-    std::vector<Channel*> channels = {};
-    for (auto* ch : object->channels) {
-      if (ch != nullptr) {
-        channels.push_back(ch);
+    // Objects targeting the same node share one entry so the Layer channel precedence below spans
+    // the whole animation.
+    std::vector<Channel*>* channels = nullptr;
+    for (auto& entry : resolvedTargets) {
+      if (entry.first == targetNode) {
+        channels = &entry.second;
+        break;
       }
     }
-    if (!channels.empty()) {
-      resolvedTargets.emplace_back(targetNode, std::move(channels));
+    if (channels == nullptr) {
+      resolvedTargets.emplace_back(targetNode, std::vector<Channel*>{});
+      channels = &resolvedTargets.back().second;
+    }
+    for (auto* ch : object->channels) {
+      if (ch != nullptr) {
+        channels->push_back(ch);
+      }
     }
   }
+  size_t count = 0;
+  for (size_t i = 0; i < resolvedTargets.size(); ++i) {
+    auto& entry = resolvedTargets[i];
+    if (entry.first->nodeType() == NodeType::Layer) {
+      FilterLayerChannels(&entry.second);
+    }
+    if (entry.second.empty()) {
+      continue;
+    }
+    if (count != i) {
+      resolvedTargets[count] = std::move(entry);
+    }
+    ++count;
+  }
+  resolvedTargets.resize(count);
 }
 
 const std::string& PAGAnimation::getId() const {

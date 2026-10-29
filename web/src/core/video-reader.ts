@@ -248,7 +248,9 @@ export class VideoReader {
     }
 
     public onDestroy() {
-        this.isDestroyed = true;
+        // The destroyVerify decorator blocks all prototype method calls once isDestroyed is true,
+        // so the flag must be set after cleanup is done, otherwise clearVisibilityListener()
+        // below is intercepted and the visibilitychange listener leaks.
         if (this.player) {
             this.player.unlinkVideoReader(this);
             this.player = null;
@@ -265,6 +267,7 @@ export class VideoReader {
         this.videoEl = null;
         this.bitmapCanvas = null;
         this.bitmapCtx = null;
+        this.isDestroyed = true;
     }
 
     private seek(targetTime: number, play = true) {

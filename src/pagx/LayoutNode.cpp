@@ -62,6 +62,10 @@ Rect LayoutNode::layoutBounds() const {
   return Rect::MakeXYWH(x, y, w, h);
 }
 
+Point LayoutNode::layoutPosition() const {
+  return {layoutX, layoutY};
+}
+
 float LayoutNode::constraintExtentX() const {
   if (!std::isnan(centerX)) {
     return std::abs(centerX) * 2;

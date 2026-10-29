@@ -210,7 +210,8 @@ jobs:
           name: android_build
           path: android
 
-  web:
+  web-webgl:
+    name: web (webgl)
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
@@ -317,7 +318,104 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: web_build
+          name: web_webgl_build
+          path: |
+            web
+            !web/emsdk
+            !web/node_modules
+
+  web-webgpu:
+    # Compile-only verification of the WebGPU backend. WebGPU runtime tests are not run because
+    # GitHub Actions Linux runners lack GPU hardware (mirrors tgfx's web-webgpu job). The emsdk
+    # version is read from web/emsdk-versions.txt by script/setup.emsdk.js, so the CI pin, the
+    # configure-time window check, and local installs share a single source of truth.
+    name: web (webgpu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get emsdk Cache
+        id: emsdk-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: web/emsdk
+          key: emsdk-webgpu-linux-20261027
+          restore-keys: emsdk-webgpu-linux-
+
+      - name: Get node_modules Cache
+        id: node-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            web/node_modules
+            web/package-lock.json
+          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
+          restore-keys: node-modules-web-linux-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-web-webgpu-
+
+      # depsync must run before Install emsdk: script/setup.emsdk.js requires
+      # third_party/vendor_tools, which is only populated by depsync (or the cache above).
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install node_modules
+        if: ${{ (steps.node-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+
+      - name: Install emsdk
+        if: ${{ (steps.emsdk-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          node script/setup.emsdk.js
+
+      - name: Build WebGPU
+        run: |
+          cd web
+          source emsdk/emsdk_env.sh
+          npm run build:webgpu:st
+
+      - name: Save emsdk Cache
+        if: ${{ (github.event_name == 'push') && (steps.emsdk-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: web/emsdk
+          key: emsdk-webgpu-linux-20261027
+
+      - name: Save node_modules Cache
+        if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            web/node_modules
+            web/package-lock.json
+          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web_webgpu_build
           path: |
             web
             !web/emsdk
