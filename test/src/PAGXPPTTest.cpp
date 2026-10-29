@@ -1654,6 +1654,11 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesBitmapGlyphPosition) {
   options.ignoreGlyphRuns = true;
   pagx::PPTWriterContext writerContext;
   pagx::FontConfig fontConfig;
+  // The ignoreGlyphRuns path still re-shapes Text::text to recover line metadata; web has no
+  // system fonts, so the emoji needs a fallback or the editable lines stay empty and the embedded
+  // position/baseline adjustments are skipped.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"), 0);
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
   pagx::XMLBuilder xml;
@@ -1740,6 +1745,11 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
   options.ignoreGlyphRuns = true;
   pagx::PPTWriterContext writerContext;
   pagx::FontConfig fontConfig;
+  // Same as TextIgnoreGlyphRunsPreservesBitmapGlyphPosition: the emoji and CJK runs must resolve
+  // through fallbacks on web so the editable line metadata (and the embedded-derived emoji
+  // baseline/size adjustments) is produced.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"), 0);
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
   pagx::XMLBuilder xml;
