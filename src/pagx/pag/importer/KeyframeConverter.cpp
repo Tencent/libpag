@@ -23,9 +23,11 @@
 // has no spatial-interpolation concept. Multi-dimensional bezier eases collapse to the
 // first dimension's handles (PAGX stores one easing per keyframe).
 
+#include <cmath>
 #include <string>
 #include <typeinfo>
 #include <vector>
+#include "base/utils/MathUtil.h"
 #include "pag/file.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -975,6 +977,126 @@ void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, floa
       }
       object->channels.push_back(channel);
     }
+  }
+}
+
+// Channels for the drop shadow style's animated properties. The polar angle/distance pair
+// flattens into per-frame-sampled offsetX/offsetY channels (interpolating polar samples
+// linearly would bow the shadow path), size maps through the static spread factor into the
+// blur pair, and color plus opacity combine into one per-frame color channel carrying the
+// alpha.
+void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRate,
+                                     PAGXDocument* document, AnimationObject* object) {
+  (void)frameRate;
+  if (style == nullptr || object == nullptr) {
+    return;
+  }
+  auto* angleAnimatable = style->angle != nullptr && style->angle->animatable()
+                              ? dynamic_cast<pag::AnimatableProperty<float>*>(style->angle)
+                              : nullptr;
+  auto* distanceAnimatable = style->distance != nullptr && style->distance->animatable()
+                                 ? dynamic_cast<pag::AnimatableProperty<float>*>(style->distance)
+                                 : nullptr;
+  if (angleAnimatable != nullptr || distanceAnimatable != nullptr) {
+    auto first = pag::Frame{0};
+    auto last = pag::Frame{0};
+    if (angleAnimatable != nullptr && !angleAnimatable->keyframes.empty()) {
+      first = angleAnimatable->keyframes.front()->startTime;
+      last = angleAnimatable->keyframes.back()->endTime;
+    }
+    if (distanceAnimatable != nullptr && !distanceAnimatable->keyframes.empty()) {
+      if (distanceAnimatable->keyframes.front()->startTime < first || first == last) {
+        first = distanceAnimatable->keyframes.front()->startTime;
+      }
+      last = std::max(last, distanceAnimatable->keyframes.back()->endTime);
+    }
+    auto* channelX = document->makeNode<TypedChannel<float>>();
+    channelX->name = "offsetX";
+    auto* channelY = document->makeNode<TypedChannel<float>>();
+    channelY->name = "offsetY";
+    for (auto frame = first; frame < last; frame++) {
+      auto distance = style->distance->getValueAt(frame);
+      auto angle = style->angle->getValueAt(frame);
+      auto offsetX = 0.0f;
+      auto offsetY = 0.0f;
+      if (distance > 0.0f) {
+        auto radians = pag::DegreesToRadians(angle - 180.0f);
+        offsetX = cosf(radians) * distance;
+        offsetY = -sinf(radians) * distance;
+      }
+      Keyframe<float> keyX = {};
+      keyX.time = frame;
+      keyX.value = offsetX;
+      keyX.interpolation = KeyframeInterpolationType::Linear;
+      channelX->keyframes.push_back(keyX);
+      Keyframe<float> keyY = {};
+      keyY.time = frame;
+      keyY.value = offsetY;
+      keyY.interpolation = KeyframeInterpolationType::Linear;
+      channelY->keyframes.push_back(keyY);
+    }
+    object->channels.push_back(channelX);
+    object->channels.push_back(channelY);
+  }
+  if (style->size != nullptr && style->size->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<float>*>(style->size);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto spread = style->spread != nullptr ? style->spread->getValueAt(0) : 0.0f;
+      auto* channelX = document->makeNode<TypedChannel<float>>();
+      channelX->name = "blurX";
+      auto* channelY = document->makeNode<TypedChannel<float>>();
+      channelY->name = "blurY";
+      for (auto frame = animatable->keyframes.front()->startTime;
+           frame < animatable->keyframes.back()->endTime; frame++) {
+        auto blur = style->size->getValueAt(frame) * (1.0f - spread) / 2.0f;
+        Keyframe<float> keyX = {};
+        keyX.time = frame;
+        keyX.value = blur;
+        keyX.interpolation = KeyframeInterpolationType::Linear;
+        channelX->keyframes.push_back(keyX);
+        Keyframe<float> keyY = {};
+        keyY.time = frame;
+        keyY.value = blur;
+        keyY.interpolation = KeyframeInterpolationType::Linear;
+        channelY->keyframes.push_back(keyY);
+      }
+      object->channels.push_back(channelX);
+      object->channels.push_back(channelY);
+    }
+  }
+  auto* colorAnimatable = style->color != nullptr && style->color->animatable()
+                              ? dynamic_cast<pag::AnimatableProperty<pag::Color>*>(style->color)
+                              : nullptr;
+  auto* opacityAnimatable =
+      style->opacity != nullptr && style->opacity->animatable()
+          ? dynamic_cast<pag::AnimatableProperty<pag::Opacity>*>(style->opacity)
+          : nullptr;
+  if (colorAnimatable != nullptr || opacityAnimatable != nullptr) {
+    auto first = pag::Frame{0};
+    auto last = pag::Frame{0};
+    if (colorAnimatable != nullptr && !colorAnimatable->keyframes.empty()) {
+      first = colorAnimatable->keyframes.front()->startTime;
+      last = colorAnimatable->keyframes.back()->endTime;
+    }
+    if (opacityAnimatable != nullptr && !opacityAnimatable->keyframes.empty()) {
+      if (opacityAnimatable->keyframes.front()->startTime < first || first == last) {
+        first = opacityAnimatable->keyframes.front()->startTime;
+      }
+      last = std::max(last, opacityAnimatable->keyframes.back()->endTime);
+    }
+    auto* channel = document->makeNode<TypedChannel<Color>>();
+    channel->name = "color";
+    for (auto frame = first; frame < last; frame++) {
+      auto color = style->color->getValueAt(frame);
+      auto opacity = style->opacity->getValueAt(frame);
+      Keyframe<Color> keyframe = {};
+      keyframe.time = frame;
+      keyframe.value = {color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f,
+                        opacity / 255.0f, ColorSpace::SRGB};
+      keyframe.interpolation = KeyframeInterpolationType::Linear;
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
   }
 }
 

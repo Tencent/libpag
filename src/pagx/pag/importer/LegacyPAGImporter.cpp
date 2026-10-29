@@ -18,6 +18,7 @@
 
 #include "pagx/LegacyPAGImporter.h"
 #include <unordered_map>
+#include "base/utils/MathUtil.h"
 #include "pag/file.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -31,6 +32,7 @@
 #include "pagx/nodes/CornerPinFilter.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DisplacementMapFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlowFilter.h"
@@ -95,6 +97,8 @@ void MigrateHueSaturationEffectAnimation(pag::HueSaturationEffect* effect, float
                                          PAGXDocument* document, AnimationObject* object);
 void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, float frameRate,
                                           PAGXDocument* document, AnimationObject* object);
+void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRate,
+                                     PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -931,7 +935,43 @@ void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* lay
     if (style == nullptr) {
       continue;
     }
-    if (style->type() == pag::LayerStyleType::GradientOverlay) {
+    if (style->type() == pag::LayerStyleType::DropShadow) {
+      auto* legacy = static_cast<pag::DropShadowStyle*>(style);
+      auto startFrame = legacyLayer->startTime;
+      auto shadow = state->document->makeNode<DropShadowStyle>("pag-legacy-drop-shadow-" +
+                                                               std::to_string(style->uniqueID));
+      auto distance = PropertyValueAtStart(legacy->distance, startFrame, nullptr);
+      if (distance > 0.0f) {
+        auto angle = PropertyValueAtStart(legacy->angle, startFrame, nullptr);
+        auto radians = pag::DegreesToRadians(angle - 180.0f);
+        shadow->offsetX = cosf(radians) * distance;
+        shadow->offsetY = -sinf(radians) * distance;
+      }
+      auto size = PropertyValueAtStart(legacy->size, startFrame, nullptr);
+      auto spread = PropertyValueAtStart(legacy->spread, startFrame, nullptr);
+      shadow->blurX = size * (1.0f - spread) / 2.0f;
+      shadow->blurY = shadow->blurX;
+      shadow->spread = spread;
+      auto color = PropertyValueAtStart(legacy->color, startFrame, nullptr);
+      auto opacity = PropertyValueAtStart(legacy->opacity, startFrame, nullptr);
+      shadow->color = ConvertColor(color);
+      shadow->color.alpha = opacity / 255.0f;
+      shadow->blendMode =
+          ConvertBlendMode(PropertyValueAtStart(legacy->blendMode, startFrame, nullptr));
+      shadow->showBehindLayer = true;
+      layer->styles.push_back(shadow);
+      if (legacy->spread != nullptr && legacy->spread->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "animated drop shadow spread");
+      }
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = shadow->id;
+        MigrateDropShadowStyleAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (style->type() == pag::LayerStyleType::GradientOverlay) {
       auto* legacy = static_cast<pag::GradientOverlayStyle*>(style);
       auto startFrame = legacyLayer->startTime;
       auto overlay = state->document->makeNode<GradientOverlayStyle>(
