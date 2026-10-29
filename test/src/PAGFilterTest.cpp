@@ -31,7 +31,7 @@ using nlohmann::json;
 /**
  * 用例描述: CornerPin用例
  */
-PAG_TEST(PAGFilterTest, CornerPin) {
+PAG_PIXEL_TEST(PAGFilterTest, CornerPin) {
   auto pagFile = LoadPAGFile("resources/filter/cornerpin.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -48,7 +48,7 @@ PAG_TEST(PAGFilterTest, CornerPin) {
 /**
  * 用例描述: Bulge效果测试
  */
-PAG_TEST(PAGFilterTest, Bulge) {
+PAG_PIXEL_TEST(PAGFilterTest, Bulge) {
   auto pagFile = LoadPAGFile("resources/filter/bulge.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -65,7 +65,7 @@ PAG_TEST(PAGFilterTest, Bulge) {
 /**
  * 用例描述: MotionTile效果测试
  */
-PAG_TEST(PAGFilterTest, MotionTile) {
+PAG_PIXEL_TEST(PAGFilterTest, MotionTile) {
   auto pagFile = LoadPAGFile("resources/filter/motiontile.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -82,7 +82,7 @@ PAG_TEST(PAGFilterTest, MotionTile) {
 /**
  * 用例描述: MotionBlur效果测试
  */
-PAG_TEST(PAGFilterTest, MotionBlur) {
+PAG_PIXEL_TEST(PAGFilterTest, MotionBlur) {
   auto pagFile = LoadPAGFile("resources/filter/MotionBlur.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -103,7 +103,7 @@ PAG_TEST(PAGFilterTest, MotionBlur) {
 /**
  * 用例描述: GaussBlur效果测试
  */
-PAG_TEST(PAGFilterTest, GaussBlur) {
+PAG_PIXEL_TEST(PAGFilterTest, GaussBlur) {
   auto pagFile = LoadPAGFile("resources/filter/fastblur.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -132,7 +132,7 @@ PAG_TEST(PAGFilterTest, GaussBlur) {
 /**
  * 用例描述: Glow效果测试
  */
-PAG_TEST(PAGFilterTest, Glow) {
+PAG_PIXEL_TEST(PAGFilterTest, Glow) {
   auto pagFile = LoadPAGFile("resources/filter/Glow.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -150,7 +150,7 @@ PAG_TEST(PAGFilterTest, Glow) {
  * 用例描述: DropShadow效果测试
  */
 
-PAG_TEST(PAGFilterTest, DropShadow) {
+PAG_PIXEL_TEST(PAGFilterTest, DropShadow) {
   auto pagFile = LoadPAGFile("resources/filter/DropShadow.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -167,7 +167,7 @@ PAG_TEST(PAGFilterTest, DropShadow) {
 /**
  * 用例描述: DisplacementMap
  */
-PAG_TEST(PAGFilterTest, DisplacementMap) {
+PAG_PIXEL_TEST(PAGFilterTest, DisplacementMap) {
   auto pagFile = LoadPAGFile("resources/filter/DisplacementMap.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -184,7 +184,7 @@ PAG_TEST(PAGFilterTest, DisplacementMap) {
 /**
  * 用例描述: DisplacementMap特殊用例测试，包含：缩放，模糊
  */
-PAG_TEST(PAGFilterTest, DisplacementMap_Scale) {
+PAG_PIXEL_TEST(PAGFilterTest, DisplacementMap_Scale) {
   auto pagFile = LoadPAGFile("resources/filter/displement_map_video_scale.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -201,7 +201,7 @@ PAG_TEST(PAGFilterTest, DisplacementMap_Scale) {
 /**
  * 用例描述: GaussBlur_Static
  */
-PAG_TEST(PAGFilterTest, GaussBlur_Static) {
+PAG_PIXEL_TEST(PAGFilterTest, GaussBlur_Static) {
   auto pagFile = LoadPAGFile("resources/filter/GaussBlur_Static.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -218,7 +218,7 @@ PAG_TEST(PAGFilterTest, GaussBlur_Static) {
 /**
  * 用例描述: GaussianBlur_NoRepeat_Clip
  */
-PAG_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
+PAG_PIXEL_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
   auto pagFile = LoadPAGFile("resources/filter/GaussianBlur_NoRepeat_Clip.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -235,7 +235,7 @@ PAG_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
 /**
  * 用例描述: RadialBlur
  */
-PAG_TEST(PAGFilterTest, RadialBlur) {
+PAG_PIXEL_TEST(PAGFilterTest, RadialBlur) {
   auto pagFile = LoadPAGFile("resources/filter/RadialBlur.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -252,7 +252,7 @@ PAG_TEST(PAGFilterTest, RadialBlur) {
 /**
  * 用例描述: Mosaic
  */
-PAG_TEST(PAGFilterTest, Mosaic) {
+PAG_PIXEL_TEST(PAGFilterTest, Mosaic) {
   auto pagFile = LoadPAGFile("resources/filter/MosaicChange.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -269,7 +269,7 @@ PAG_TEST(PAGFilterTest, Mosaic) {
 /**
  * 用例描述: 多滤镜混合效果测试
  */
-PAG_TEST(PAGFilterTest, MultiFilter) {
+PAG_PIXEL_TEST(PAGFilterTest, MultiFilter) {
   auto pagFile = LoadPAGFile("resources/filter/cornerpin-bulge.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -298,7 +298,7 @@ PAG_TEST(PAGFilterTest, MultiFilter) {
 /**
  * 用例描述: LevelsIndividualFilter
  */
-PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
+PAG_PIXEL_TEST(PAGFilterTest, LevelsIndividualFilter) {
   auto pagFile = LoadPAGFile("resources/filter/LevelsIndividualFilter.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->replaceImage(0, MakePAGImage("assets/rotation.jpg"));
@@ -315,7 +315,7 @@ PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
 /**
  * 用例描述: GradientOverlayFilter
  */
-PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
+PAG_PIXEL_TEST(PAGFilterTest, GradientOverlayFilter) {
   auto pagFile = LoadPAGFile("resources/filter/GradientOverlay.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -331,7 +331,7 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
 /**
  * 用例描述: GradientOverlayFilter_Star
  */
-PAG_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
+PAG_PIXEL_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
   auto pagFile = LoadPAGFile("resources/filter/GradientOverlayStar.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -347,7 +347,7 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
 /**
  * 用例描述: GradientOverlayFilter_Scale
  */
-PAG_TEST(PAGFilterTest, GradientOverlayFilter_Scale) {
+PAG_PIXEL_TEST(PAGFilterTest, GradientOverlayFilter_Scale) {
   auto pagFile = LoadPAGFile("resources/filter/GradientOverlayScale.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -363,7 +363,7 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter_Scale) {
 /**
  * 用例描述: FeatherMask
  */
-PAG_TEST(PAGFilterTest, FeatherMask) {
+PAG_PIXEL_TEST(PAGFilterTest, FeatherMask) {
   auto pagFile = LoadPAGFile("resources/filter/FeatherMask.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -379,7 +379,7 @@ PAG_TEST(PAGFilterTest, FeatherMask) {
 /**
  * 用例描述: Corner Pin 缩放
  */
-PAG_TEST(PAGFilterTest, CornerPinScale) {
+PAG_PIXEL_TEST(PAGFilterTest, CornerPinScale) {
   auto pagFile = LoadPAGFile("resources/filter/corner_pin_scale.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->replaceImage(0, MakePAGImage("resources/apitest/rotation.jpg"));
@@ -395,7 +395,7 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
 /**
  * 用例描述: HueSaturation
  */
-PAG_TEST(PAGFilterTest, HueSaturation) {
+PAG_PIXEL_TEST(PAGFilterTest, HueSaturation) {
   auto pagFile = LoadPAGFile("resources/filter/HueSaturation.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -411,7 +411,7 @@ PAG_TEST(PAGFilterTest, HueSaturation) {
 /**
  * 用例描述: BrightnessContrast
  */
-PAG_TEST(PAGFilterTest, BrightnessContrast) {
+PAG_PIXEL_TEST(PAGFilterTest, BrightnessContrast) {
   auto pagFile = LoadPAGFile("resources/filter/BrightnessContrast.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -427,7 +427,7 @@ PAG_TEST(PAGFilterTest, BrightnessContrast) {
 /**
  * 用例描述: Logo with mipmap
  */
-PAG_TEST(PAGFilterTest, LogoMipmap) {
+PAG_PIXEL_TEST(PAGFilterTest, LogoMipmap) {
   auto pagFile = LoadPAGFile("resources/filter/LogoMipmap.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -443,7 +443,7 @@ PAG_TEST(PAGFilterTest, LogoMipmap) {
 /**
  * 用例描述: OuterGlow
  */
-PAG_TEST(PAGFilterTest, OuterGlow) {
+PAG_PIXEL_TEST(PAGFilterTest, OuterGlow) {
   auto pagFile = LoadPAGFile("resources/filter/outerglow.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -459,7 +459,7 @@ PAG_TEST(PAGFilterTest, OuterGlow) {
 /**
  * 用例描述: Stroke
  */
-PAG_TEST(PAGFilterTest, Stroke) {
+PAG_PIXEL_TEST(PAGFilterTest, Stroke) {
   auto pagFile = LoadPAGFile("resources/filter/stroke.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
@@ -475,7 +475,7 @@ PAG_TEST(PAGFilterTest, Stroke) {
 /**
  * 用例描述: Default feather mask color
  */
-PAG_TEST(PAGFilterTest, DefaultFeatherMask) {
+PAG_PIXEL_TEST(PAGFilterTest, DefaultFeatherMask) {
   auto pagFile = LoadPAGFile("resources/filter/DefaultFeatherMask.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());

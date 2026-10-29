@@ -1191,13 +1191,14 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture)|CocoaSurface(Header)?)Test\\.mm$")
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
         if (NOT PAG_USE_METAL)
-            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture)Test\\.mm$")
+            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture|Atlas)Test\\.mm$")
         endif ()
     endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
@@ -1268,6 +1269,22 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    if (PAG_USE_METAL)
+        # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
+        # replace this private API when tgfx provides a supported test-reset hook.
+        add_library(pag-metal-test-support OBJECT test/src/utils/MetalTestSupport.cpp)
+        add_dependencies(pag-metal-test-support ${PAG_DEPEND_TARGETS})
+        target_include_directories(pag-metal-test-support PRIVATE ${PAG_INCLUDES}
+                ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        target_compile_definitions(pag-metal-test-support PRIVATE ${PAG_TEST_DEFINES})
+        target_compile_options(pag-metal-test-support PRIVATE ${PAG_TEST_COMPILE_OPTIONS})
+        foreach (METAL_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_sources(${METAL_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-metal-test-support>)
+            add_dependencies(${METAL_TEST_TARGET} pag-metal-test-support)
+        endforeach ()
+    endif ()
 
     if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
         # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros

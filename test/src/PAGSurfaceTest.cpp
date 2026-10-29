@@ -76,7 +76,7 @@ uint32_t GetGLVersion(const char* versionString) {
 /**
  * 用例描述: 测试 PAGSurface 数据同步
  */
-PAG_TEST(PAGSurfaceTest, FromTexture) {
+PAG_PIXEL_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
@@ -132,7 +132,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
 /**
  * 用例描述: 遮罩使用屏幕坐标系时origin不一致的情况
  */
-PAG_TEST(PAGSurfaceTest, Mask) {
+PAG_PIXEL_TEST(PAGSurfaceTest, Mask) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
@@ -242,7 +242,7 @@ PAG_TEST(PAGSurfaceTest, GLRestorer) {
 /**
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
  */
-PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
+PAG_PIXEL_TEST(PAGSurfaceTest, BottomLeftScissor) {
   auto pagFile = LoadPAGFile("assets/test.pag");
   auto width = pagFile->width();
   auto height = pagFile->height() * 2;

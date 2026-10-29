@@ -14,6 +14,9 @@ const { backend, libDir, wasmDir } = require('./targets').resolveTarget(process.
 require("./update.pag.import");
 require("./gen.demo.html");
 
+// PAGInit runs after script evaluation, when document.currentScript is already null.
+const captureScriptUrl = `const __pagScriptUrl = typeof document !== 'undefined' && document.currentScript
+  ? document.currentScript.src : typeof location !== 'undefined' ? location.href : undefined;`;
 
 const plugins = [
   esbuild({
@@ -33,9 +36,13 @@ const plugins = [
   {
     name: 'preserve-import-meta-url',
     resolveImportMeta(property, options) {
-      // Preserve the original behavior of `import.meta.url`.
       if (property === 'url') {
-        return 'import.meta.url';
+        if (options.format === 'es') {
+          return 'import.meta.url';
+        }
+        if (options.format === 'umd') {
+          return '__pagScriptUrl';
+        }
       }
       return null;
     },
@@ -50,6 +57,7 @@ const umdConfig = {
       name: 'libpag',
       banner,
       format: 'umd',
+      intro: captureScriptUrl,
       exports: 'named',
       sourcemap: true,
       file: `${libDir}/libpag.umd.js`,
@@ -65,6 +73,7 @@ const umdMinConfig = {
       name: 'libpag',
       banner,
       format: 'umd',
+      intro: captureScriptUrl,
       exports: 'named',
       sourcemap: true,
       file: `${libDir}/libpag.min.js`,

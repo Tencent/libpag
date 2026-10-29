@@ -86,15 +86,53 @@ namespace pag {
 //  std::filesystem::remove_all(cacheDir);
 //}
 
-/**
- * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
- */
-PAG_TEST(PAGDiskCacheTest, SequenceFile) {
-  auto cacheDir = Platform::Current()->getCacheDir();
+namespace {
+class ScopedDiskCacheCleanup {
+ public:
+  ScopedDiskCacheCleanup() : originalMaxDiskSize(PAGDiskCache::MaxDiskSize()) {
+  }
+
+  ~ScopedDiskCacheCleanup() {
+    DiskIOWorker::GetInstance()->waitAll();
+    PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
+    DiskIOWorker::GetInstance()->waitAll();
+    PAGDiskCache::RemoveAll();
+    DiskIOWorker::GetInstance()->waitAll();
+  }
+
+  ScopedDiskCacheCleanup(const ScopedDiskCacheCleanup&) = delete;
+  ScopedDiskCacheCleanup& operator=(const ScopedDiskCacheCleanup&) = delete;
+
+  const size_t originalMaxDiskSize;
+};
+
+static void ResetSequenceFileFixture(const std::string& cacheDir, size_t maxDiskSize) {
+  auto diskCache = DiskCache::GetInstance();
+  DiskIOWorker::GetInstance()->waitAll();
+  PAGDiskCache::RemoveAll();
+  DiskIOWorker::GetInstance()->waitAll();
   std::filesystem::remove_all(cacheDir);
   std::filesystem::create_directories(cacheDir);
   std::filesystem::copy(ProjectPath::Absolute("resources/disk/libpag"), cacheDir,
                         std::filesystem::copy_options::recursive);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_TRUE(diskCache->openedFiles.empty());
+    diskCache->fileIDCount = 1;
+    diskCache->maxDiskSize = maxDiskSize;
+    ASSERT_TRUE(diskCache->readConfig());
+  }
+  DiskIOWorker::GetInstance()->waitAll();
+}
+}  // namespace
+
+/**
+ * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
+ */
+PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
+  ScopedDiskCacheCleanup cleanup;
+  auto cacheDir = Platform::Current()->getCacheDir();
+  ASSERT_NO_FATAL_FAILURE(ResetSequenceFileFixture(cacheDir, cleanup.originalMaxDiskSize));
   auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
   ASSERT_TRUE(pagFile != nullptr);
   auto info =
@@ -224,12 +262,13 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   sequenceFile2 = nullptr;
   DiskIOWorker::GetInstance()->waitAll();  // Wait for async file deletions to complete
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-  PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
-  pag::PAGDiskCache::RemoveAll();
 }
 
-PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
+PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
+  ScopedDiskCacheCleanup cleanup;
+  DiskIOWorker::GetInstance()->waitAll();
   pag::PAGDiskCache::RemoveAll();
+  DiskIOWorker::GetInstance()->waitAll();
   auto cacheDir = Platform::Current()->getCacheDir();
 
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
@@ -335,6 +374,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
   auto decoder7 = PAGDecoder::MakeFrom(pagFile2, 20, 0.f);
   EXPECT_TRUE(decoder7 == nullptr);
 
+  DiskIOWorker::GetInstance()->waitAll();
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
@@ -413,7 +453,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
 }
 #endif  // TGFX_USE_OPENGL
 
-PAG_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
+PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(pagFile != nullptr);

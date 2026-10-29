@@ -94,8 +94,38 @@ bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::str
   return baseline->compare(byteData, key);
 }
 
+bool Baseline::IsNonGpuPixelComparison(const std::string& testSuite, const std::string& testName,
+                                       const std::string& key) {
+  // CPU codec output and external Chromium screenshots do not use libpag's Metal glyph atlas.
+  return (testSuite == "PAGImageTest" && testName == "image2" && key == "PAGImageTest/image2") ||
+         (testSuite == "PAGXHtmlTest" && testName == "HtmlScreenshotCompare" &&
+          key.rfind("PAGXTest/html/", 0) == 0);
+}
+
+bool Baseline::CheckPixelComparison(const std::string& key, bool allowNonGpu) {
+#if defined(TGFX_USE_METAL)
+  if (PAGTest::IsPixelComparison()) {
+    return true;
+  }
+  const auto* test = testing::UnitTest::GetInstance()->current_test_info();
+  if (allowNonGpu && test != nullptr &&
+      IsNonGpuPixelComparison(test->test_suite_name(), test->name(), key)) {
+    return true;
+  }
+  ADD_FAILURE() << "Metal pixel comparison requires a pixel-test declaration before rendering: "
+                << (test ? test->test_suite_name() : "<no test>") << "."
+                << (test ? test->name() : "<no test>") << ", key=" << key
+                << ". Use PAG_PIXEL_TEST, PAGX_PIXEL_TEST or CLI_PIXEL_TEST.";
+  return false;
+#else
+  USE(key);
+  USE(allowNonGpu);
+  return true;
+#endif
+}
+
 bool Baseline::compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
-  if (surface == nullptr) {
+  if (!CheckPixelComparison(key) || surface == nullptr) {
     return false;
   }
   Bitmap bitmap(surface->width(), surface->height(), false, false);
@@ -108,7 +138,7 @@ bool Baseline::compare(std::shared_ptr<tgfx::Surface> surface, const std::string
 }
 
 bool Baseline::compare(const Bitmap& bitmap, const std::string& key) {
-  if (bitmap.isEmpty()) {
+  if (!CheckPixelComparison(key, true) || bitmap.isEmpty()) {
     return false;
   }
   Pixmap pixmap(bitmap);
@@ -152,7 +182,7 @@ bool Baseline::tryCopyExistingBaseline(const std::string& key, const std::string
 #endif
 
 bool Baseline::compare(const Pixmap& pixmap, const std::string& key) {
-  if (pixmap.isEmpty()) {
+  if (!CheckPixelComparison(key, true) || pixmap.isEmpty()) {
     return false;
   }
   std::string md5;
@@ -182,7 +212,7 @@ bool Baseline::compare(const Pixmap& pixmap, const std::string& key) {
 }
 
 bool Baseline::compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key) {
-  if (surface == nullptr) {
+  if (!CheckPixelComparison(key) || surface == nullptr) {
     return false;
   }
   Bitmap bitmap(surface->width(), surface->height(), false, false);
@@ -196,7 +226,7 @@ bool Baseline::compare(const std::shared_ptr<PAGSurface>& surface, const std::st
 }
 
 bool Baseline::compare(const std::shared_ptr<pagx::PAGSurface>& surface, const std::string& key) {
-  if (surface == nullptr) {
+  if (!CheckPixelComparison(key) || surface == nullptr) {
     return false;
   }
   Bitmap bitmap(surface->width(), surface->height(), false, false);

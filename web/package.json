@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build:js:mt": "rimraf --glob lib-mt/*.js lib-mt/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm-mt && tsc -p ./tsconfig.type.json && cp -r ./tsconfig.json ./types/web/ && node script/restore.replace.js -a wasm-mt",
-    "build:js:st": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm && tsc -p ./tsconfig.type.json && cp -r ./tsconfig.json ./types/web/ && node script/restore.replace.js -a wasm",
+    "build:js:st": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm && npm run test:bundle && tsc -p ./tsconfig.type.json && cp -r ./tsconfig.json ./types/web/ && node script/restore.replace.js -a wasm",
     "build:wx:js": "rimraf --glob wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && cp -r ./tsconfig.json ./wechat/types/web/ && brotli ./wechat/lib/libpag.wasm && node script/restore.replace.js -a wechat",
     "build:mt": "node script/cmake.demo.js -a wasm-mt && npm run build:js:mt",
     "build:st": "node script/cmake.demo.js -a wasm && npm run build:js:st",
@@ -43,6 +43,7 @@
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "UnitTest": "node ./script/UnitTest.js",
     "cypress": "cypress run --browser electron --headless ",
+    "test:bundle": "node --test script/bundle-format.test.cjs",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm",
     "server:mt": "node server.js wasm-mt",
