@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/svg/SMILAnimationParser.h"
+
+#include <unordered_set>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <set>
@@ -1286,6 +1289,22 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
 //   with baseValue so the element reverts to its static state after the animation ends. The +1
 //   offset avoids colliding with the last animation keyframe at endFrame, which would otherwise
 //   be shadowed by the base-value keyframe during evaluation.
+// An indefinite repeat never reaches its end, so the "revert to base value" keyframe must not be
+// emitted: it would sit one frame past the animation and remain active for the rest of the
+// timeline (which is longer when other objects run longer), teleporting the target back to its
+// static pose mid-loop.
+static bool IsIndefiniteRepeat(const std::shared_ptr<DOMNode>& element) {
+  if (element == nullptr) {
+    return false;
+  }
+  const auto* repeatCount = element->findAttribute("repeatCount");
+  if (repeatCount != nullptr && *repeatCount == "indefinite") {
+    return true;
+  }
+  const auto* repeatDur = element->findAttribute("repeatDur");
+  return repeatDur != nullptr && *repeatDur == "indefinite";
+}
+
 static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, KeyValue baseValue,
                                   Frame beginFrames, Frame endFrame, bool fillFreeze) {
   if (beginFrames > 0) {
@@ -1604,6 +1623,54 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
   }
 }
 
+// Parse an `animateMotion` keyPoints list. Unlike keyTimes the values need not ascend — a motion
+// can travel to one end of the path and come back — so only the [0, 1] range is enforced.
+static std::vector<double> ParseKeyPointList(const std::string& text) {
+  std::vector<double> points = {};
+  const char* cursor = text.c_str();
+  while (*cursor != '\0') {
+    if (*cursor == ';' || std::isspace(static_cast<unsigned char>(*cursor)) != 0) {
+      ++cursor;
+      continue;
+    }
+    char* end = nullptr;
+    const double value = std::strtod(cursor, &end);
+    if (end == cursor || value < -1e-6 || value > 1.0 + 1e-6) {
+      return {};
+    }
+    points.push_back(value);
+    cursor = end;
+  }
+  return points;
+}
+
+// SVG `pathLength` normalises dash values into the author's coordinate space. The static
+// dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
+// stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
+void SMILAnimationParser::ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode>& element,
+                                                   std::vector<Channel*>& channels,
+                                                   SVGParserContext& ctx) {
+  if (element == nullptr) {
+    return;
+  }
+  const std::string path_length = ctx.getAttribute(element, "pathLength");
+  const float author_length = path_length.empty() ? 0.0f : strtof(path_length.c_str(), nullptr);
+  if (author_length <= 0.0f) {
+    return;
+  }
+  const float real_length = ctx.computePathTotalLength(element);
+  if (real_length <= 0.0f) {
+    return;
+  }
+  const float scale = real_length / author_length;
+  for (auto* ch : channels) {
+    auto* float_channel = static_cast<TypedChannel<float>*>(ch);
+    for (auto& key : float_channel->keyframes) {
+      key.value *= scale;
+    }
+  }
+}
+
 std::vector<Channel*> SMILAnimationParser::parseAnimate(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
@@ -1843,6 +1910,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     }
   }
 
+  // SVG `pathLength` normalises dash values into the author's coordinate space. The static
+  // dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
+  // stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
+  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float) {
+    ScaleDashOffsetKeyframes(nodeInfo.domElement, channels, ctx);
+  }
+
   // Special case: <animate attributeName="stroke-dashoffset"> on a <circle>/<ellipse> needs the
   // same phase+direction correction that addFillStroke applies to the static Stroke.dashOffset
   // (90-degree phase alignment with SVG's 3 o'clock start + tgfx's reverse-path dashOffset
@@ -1909,7 +1983,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // SMIL default fill is "remove" (element reverts to static state after animation ends).
   // fill="freeze" keeps the last animated value, which is PAGX's natural post-endframe behavior.
   auto fillStr = ctx.getAttribute(animElement, "fill");
-  bool fillFreeze = (fillStr == "freeze");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   KeyValue baseValue = ReadBaseValue(target);
   for (auto* ch : channels) {
     AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze);
@@ -1965,7 +2039,8 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   // set the element reverts to base value after begin+dur. When dur is absent the <set> effect
   // is permanent (treated as freeze), matching SMIL semantics for indefinite-duration <set>.
   Frame endFrame = beginFrames;
-  bool fillFreeze = (durSeconds <= 0.0) || (ctx.getAttribute(setElement, "fill") == "freeze");
+  bool fillFreeze = (durSeconds <= 0.0) || (ctx.getAttribute(setElement, "fill") == "freeze") ||
+                     IsIndefiniteRepeat(setElement);
   if (durSeconds > 0.0) {
     endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
   }
@@ -2160,10 +2235,47 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
   // transform and begin-offset holds the static state before the animation starts.
   auto fillStr = ctx.getAttribute(animElement, "fill");
-  bool fillFreeze = (fillStr == "freeze");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
                         fillFreeze);
   return channels;
+}
+
+// Ramer–Douglas–Peucker over sampled path positions: keeps the curvature-defining samples and
+// drops the ones that lie within `tolerance` of the chord, so a smooth arc does not need a keyframe
+// every few units.
+static void SimplifyMotionSamples(const std::vector<tgfx::Point>& points, size_t first, size_t last,
+                                  float tolerance, std::vector<char>* keep) {
+  if (last <= first + 1) {
+    return;
+  }
+  const tgfx::Point& a = points[first];
+  const tgfx::Point& b = points[last];
+  const float dx = b.x - a.x;
+  const float dy = b.y - a.y;
+  const float lengthSquared = dx * dx + dy * dy;
+  float maxDistance = 0.0f;
+  size_t farthest = first;
+  for (size_t i = first + 1; i < last; ++i) {
+    const tgfx::Point& p = points[i];
+    float distance = 0.0f;
+    if (lengthSquared <= 1e-6f) {
+      distance = std::hypot(p.x - a.x, p.y - a.y);
+    } else {
+      const float cross = std::abs(dx * (p.y - a.y) - dy * (p.x - a.x));
+      distance = cross / std::sqrt(lengthSquared);
+    }
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      farthest = i;
+    }
+  }
+  if (maxDistance <= tolerance || farthest == first) {
+    return;
+  }
+  (*keep)[farthest] = 1;
+  SimplifyMotionSamples(points, first, farthest, tolerance, keep);
+  SimplifyMotionSamples(points, farthest, last, tolerance, keep);
 }
 
 std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
@@ -2226,15 +2338,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
 
   // Parse keyPoints: optional list of normalized [0,1] offsets along the path, one per keyframe.
   // When absent, path positions are sampled uniformly.
-  auto keyPointsStr = ctx.getAttribute(animElement, "keyPoints");
-  std::vector<double> keyPoints = {};
-  if (!keyPointsStr.empty()) {
-    keyPoints = parseKeyTimes(keyPointsStr);
-    // keyPoints must start at 0 and end at 1 and be monotonic for well-formed motion.
-    if (keyPoints.empty() || keyPoints.front() != 0.0 || keyPoints.back() != 1.0) {
-      keyPoints.clear();
-    }
-  }
+  // keyPoints may move back and forth along the path (a knob that travels to one end and
+  // returns), so this list is parsed without the monotonic requirement of keyTimes.
+  const std::vector<double> keyPoints =
+      ParseKeyPointList(ctx.getAttribute(animElement, "keyPoints"));
 
   // Determine sample count: adaptive based on path length, clamped to [32, 256]. When keyPoints
   // are provided, the sample count is fixed by the keyPoints list.
@@ -2267,8 +2374,22 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
   const auto& staticMatrix = nodeInfo.targetLayer->matrix;
   auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
-  for (int i = 0; i < sampleCount; ++i) {
-    double normalizedTime = static_cast<double>(i) / static_cast<double>(sampleCount - 1);
+  struct MotionKey {
+    Frame time = 0;
+    Matrix matrix = {};
+    tgfx::Point position = {};
+  };
+  std::vector<MotionKey> samples;
+  // Sample densely first; the keyframes actually emitted are decimated afterwards, so the density
+  // here only bounds the geometric resolution of the simplification.
+  int denseCount = sampleCount;
+  if (keyPoints.empty()) {
+    denseCount = static_cast<int>(totalLength * 2.0f);
+    if (denseCount < 128) denseCount = 128;
+    if (denseCount > 512) denseCount = 512;
+  }
+  for (int i = 0; i < denseCount; ++i) {
+    double normalizedTime = static_cast<double>(i) / static_cast<double>(denseCount - 1);
     double pathProgress = normalizedTime;
     if (!keyPoints.empty()) {
       pathProgress = keyPoints[i];
@@ -2293,8 +2414,32 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
       m = staticMatrix * m;
     }
     Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
-    AppendKeyframe(ch, ChannelValueType::Matrix, time, m, KeyframeInterpolationType::Linear, {},
-                   {});
+    samples.push_back({time, m, pos});
+  }
+  if (samples.size() >= 3 && keyPoints.empty()) {
+    std::vector<tgfx::Point> positions;
+    positions.reserve(samples.size());
+    for (const auto& sample : samples) {
+      positions.push_back(sample.position);
+    }
+    std::vector<char> keep(samples.size(), 0);
+    keep.front() = 1;
+    keep.back() = 1;
+    SimplifyMotionSamples(positions, 0, positions.size() - 1, 1.0f, &keep);
+    std::vector<MotionKey> simplified;
+    simplified.reserve(samples.size());
+    for (size_t i = 0; i < samples.size(); ++i) {
+      if (keep[i]) {
+        simplified.push_back(samples[i]);
+      }
+    }
+    if (simplified.size() >= 2) {
+      samples = std::move(simplified);
+    }
+  }
+  for (const auto& sample : samples) {
+    AppendKeyframe(ch, ChannelValueType::Matrix, sample.time, sample.matrix,
+                   KeyframeInterpolationType::Linear, {}, {});
   }
   channels.push_back(ch);
 
@@ -2316,10 +2461,61 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     }
   }
   auto fillStr = ctx.getAttribute(animElement, "fill");
-  bool fillFreeze = (fillStr == "freeze");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
                         fillFreeze);
   return channels;
+}
+
+// An element with repeatCount="indefinite" only carries one cycle of keyframes, while the timeline
+// runs for the longest animation in the document (a 3s orbit next to a 4s spin lasts 4s). Tile the
+// cycle so the object keeps moving until the timeline loops instead of freezing on its last pose.
+template <typename T>
+static void TileTypedChannel(TypedChannel<T>* channel, Frame period, Frame maxEnd) {
+  if (channel == nullptr || period <= 0) {
+    return;
+  }
+  // A tiled copy of the first keyframe lands exactly on the cycle's last keyframe, and runtime
+  // evaluation rejects a channel whose keyframe times are not unique (the whole track then falls
+  // back to the static pose, which looks like "nothing animates"). Drop such duplicates.
+  std::unordered_set<Frame> usedTimes;
+  for (const auto& keyframe : channel->keyframes) {
+    usedTimes.insert(keyframe.time);
+  }
+  const auto base = channel->keyframes;
+  for (Frame offset = period; offset < maxEnd; offset += period) {
+    for (const auto& source : base) {
+      Frame time = source.time + offset;
+      if (time > maxEnd) {
+        break;
+      }
+      if (!usedTimes.insert(time).second) {
+        continue;
+      }
+      auto copy = source;
+      copy.time = time;
+      channel->keyframes.push_back(copy);
+    }
+  }
+}
+
+static void TileChannelKeyframes(Channel* channel, Frame period, Frame maxEnd) {
+  if (channel == nullptr) {
+    return;
+  }
+  switch (channel->valueType()) {
+    case ChannelValueType::Float:
+      TileTypedChannel(static_cast<TypedChannel<float>*>(channel), period, maxEnd);
+      break;
+    case ChannelValueType::Color:
+      TileTypedChannel(static_cast<TypedChannel<Color>*>(channel), period, maxEnd);
+      break;
+    case ChannelValueType::Matrix:
+      TileTypedChannel(static_cast<TypedChannel<Matrix>*>(channel), period, maxEnd);
+      break;
+    default:
+      break;
+  }
 }
 
 Animation* SMILAnimationParser::buildAnimation(
@@ -2335,6 +2531,13 @@ Animation* SMILAnimationParser::buildAnimation(
   animation->loop = LoopMode::Once;
   Frame maxEndFrame = 0;
   bool hasIndefiniteLoop = false;
+  // Objects whose SMIL element repeats forever. Their keyframes only cover one cycle, so they are
+  // tiled up to the timeline duration once it is known (periods differ per element: 3s vs 4s).
+  struct InfiniteObjectEntry {
+    AnimationObject* object = nullptr;
+    Frame period = 0;
+  };
+  std::vector<InfiniteObjectEntry> infiniteObjects = {};
 
   // Solve begin/end timing for every SMIL element up front (syncbase references like
   // begin="id.end" need cross-element dependency resolution before any parsing).
@@ -2342,6 +2545,7 @@ Animation* SMILAnimationParser::buildAnimation(
   ResolvedTiming defaultTiming = {};
 
   for (const auto& pair : animatedNodeMap) {
+    bool elementIndefinite = false;
     const auto& nodeInfo = pair.second;
     auto smilIt = smilAnimations.find(pair.first);
     if (smilIt == smilAnimations.end()) {
@@ -2376,6 +2580,7 @@ Animation* SMILAnimationParser::buildAnimation(
       auto repeatCount = ctx.getAttribute(animEl, "repeatCount");
       if (repeatCount == "indefinite") {
         hasIndefiniteLoop = true;
+        elementIndefinite = true;
       }
     }
     for (const auto& setEl : group.sets) {
@@ -2415,6 +2620,7 @@ Animation* SMILAnimationParser::buildAnimation(
         auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
         if (repeatCount == "indefinite") {
           hasIndefiniteLoop = true;
+          elementIndefinite = true;
         }
       }
       for (const auto& motionEl : group.animateMotions) {
@@ -2432,6 +2638,7 @@ Animation* SMILAnimationParser::buildAnimation(
         auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
         if (repeatCount == "indefinite") {
           hasIndefiniteLoop = true;
+          elementIndefinite = true;
         }
       }
     }
@@ -2447,6 +2654,9 @@ Animation* SMILAnimationParser::buildAnimation(
       obj->channels = MergeAdditiveChannels(&channels);
       if (!obj->channels.empty()) {
         animation->objects.push_back(obj);
+        if (elementIndefinite && layerEndFrame > 0) {
+          infiniteObjects.push_back({obj, layerEndFrame});
+        }
       }
     }
     if (layerEndFrame > maxEndFrame) {
@@ -2458,7 +2668,17 @@ Animation* SMILAnimationParser::buildAnimation(
     return nullptr;
   }
 
+  // Timeline length is the longest animation; shorter infinite repetitions are tiled up to it so
+  // they keep moving instead of freezing on their last pose.
   animation->duration = maxEndFrame;
+  for (const auto& entry : infiniteObjects) {
+    if (entry.object == nullptr || entry.period <= 0 || entry.period >= maxEndFrame) {
+      continue;
+    }
+    for (auto* channel : entry.object->channels) {
+      TileChannelKeyframes(channel, entry.period, maxEndFrame);
+    }
+  }
   if (hasIndefiniteLoop) {
     animation->loop = LoopMode::Loop;
   }
