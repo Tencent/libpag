@@ -458,6 +458,8 @@ struct TimingInfo {
   bool hasEndSync = false;
   bool endResolved = false;
   double resolvedEnd = -1;
+  // Member of a syncbase cycle: its begin comes from the previous lap, and the timeline loops.
+  bool cyclic = false;
 };
 
 // The active duration of a timing target: dur * repeats. Indefinite repeats and missing dur
@@ -593,11 +595,44 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
       }
     }
   }
-  // Cyclic references never resolved: fall back to 0.
+  // Cyclic references (A.begin = B.end, B.begin = A.end) cannot be solved by the fixed point
+  // above. Anchor the members that carry a clock value, then let the cascade resolve the rest:
+  // the sequence runs one lap after another and repeats, so the timeline loops.
+  bool saw_cycle = false;
+  for (auto& info : infos) {
+    if (info.beginResolved || !info.hasClockBegin) {
+      continue;
+    }
+    info.resolvedBegin = info.clockBegin;
+    info.beginResolved = true;
+    info.cyclic = true;
+    saw_cycle = true;
+  }
+  if (saw_cycle) {
+    progress = true;
+    while (progress) {
+      progress = false;
+      for (auto& info : infos) {
+        if (info.beginResolved || !info.hasBeginSync) {
+          continue;
+        }
+        auto it = idToIndex.find(info.beginSync.targetId);
+        if (it == idToIndex.end() || !infos[it->second].beginResolved) {
+          continue;
+        }
+        info.resolvedBegin = SyncEventTime(infos[it->second], info.beginSync);
+        info.beginResolved = true;
+        info.cyclic = true;
+        progress = true;
+      }
+    }
+  }
+  // Remaining members are a cycle without any clock anchor: keep the previous 0 fallback.
   for (auto& info : infos) {
     if (!info.beginResolved) {
       info.resolvedBegin = 0;
       info.beginResolved = true;
+      info.cyclic = true;
     }
   }
 
@@ -637,6 +672,7 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
     ResolvedTiming timing = {};
     timing.beginSeconds = info.resolvedBegin;
     timing.endSeconds = info.endResolved ? info.resolvedEnd : -1;
+    timing.cyclic = info.cyclic;
     result[info.element] = timing;
   }
   return result;
@@ -2569,6 +2605,14 @@ Animation* SMILAnimationParser::buildAnimation(
   // begin="id.end" need cross-element dependency resolution before any parsing).
   auto timings = ResolveAllTimings(ctx, smilAnimations);
   ResolvedTiming defaultTiming = {};
+  // A syncbase cycle repeats by construction (each animation restarts the other), so the whole
+  // timeline loops instead of playing a single lap.
+  for (const auto& entry : timings) {
+    if (entry.second.cyclic) {
+      hasIndefiniteLoop = true;
+      break;
+    }
+  }
 
   for (const auto& pair : animatedNodeMap) {
     bool elementIndefinite = false;
