@@ -1010,6 +1010,57 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
 //   rotate   angle [cx cy]    -> Translate(cx,cy) * Rotate(angle) * Translate(-cx,-cy)
 //   skewX    angle             -> matrix with c = tan(angle)
 //   skewY    angle             -> matrix with b = tan(angle)
+// A rotate transform bakes its center into the matrix translation (T(c) * R * T(-c)). Layer.anchor
+// expresses that pivot explicitly, so a constant center is recovered from the keyframes and moved
+// out of the translation; downstream consumers then do not have to solve matrix fixed points.
+// A center that varies between keyframes cannot be expressed by one anchor value and keeps the
+// baked form.
+static bool TryAdoptConstantPivot(TypedChannel<Matrix>* channel, float* pivotX, float* pivotY) {
+  // Solve (I - L) * p = t for every keyframe that carries rotation, then require all solutions to
+  // agree. A keyframe with an identity linear part has no pivot information and is skipped.
+  bool found = false;
+  bool hasTranslation = false;
+  float px = 0.0f;
+  float py = 0.0f;
+  for (const auto& key : channel->keyframes) {
+    const Matrix& m = key.value;
+    const float ia = 1.0f - m.a;
+    const float ib = -m.b;
+    const float ic = -m.c;
+    const float id = 1.0f - m.d;
+    const float det = ia * id - ic * ib;
+    if (std::abs(det) < 1e-4f) {
+      continue;
+    }
+    const float x = (id * m.tx - ic * m.ty) / det;
+    const float y = (-ib * m.tx + ia * m.ty) / det;
+    if (!found) {
+      px = x;
+      py = y;
+      found = true;
+    } else if (std::abs(x - px) > 0.01f || std::abs(y - py) > 0.01f) {
+      return false;
+    }
+    hasTranslation = hasTranslation || m.tx != 0.0f || m.ty != 0.0f;
+  }
+  if (!found || !hasTranslation) {
+    return false;
+  }
+  // Snap to 1/1000 px: the solved pivot carries float noise from the rotation matrix.
+  px = std::round(px * 1000.0f) / 1000.0f;
+  py = std::round(py * 1000.0f) / 1000.0f;
+  if (px == 0.0f && py == 0.0f) {
+    return false;
+  }
+  for (auto& key : channel->keyframes) {
+    key.value.tx = 0.0f;
+    key.value.ty = 0.0f;
+  }
+  *pivotX = px;
+  *pivotY = py;
+  return true;
+}
+
 static Matrix TransformParamsToMatrix(const std::string& type, const std::vector<float>& params) {
   if (type == "translate") {
     float tx = (params.size() > 0) ? params[0] : 0.0f;
@@ -2300,6 +2351,17 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
                         fillFreeze);
+
+  // Move a constant rotate center out of the keyframe translations and into Layer.anchor; a center
+  // that drifts between keyframes keeps the baked form.
+  if (type == "rotate" && !additive && nodeInfo.targetLayer != nullptr) {
+    float pivotX = 0.0f;
+    float pivotY = 0.0f;
+    auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(ch);
+    if (TryAdoptConstantPivot(matrixChannel, &pivotX, &pivotY)) {
+      nodeInfo.targetLayer->anchor = {pivotX, pivotY};
+    }
+  }
   return channels;
 }
 

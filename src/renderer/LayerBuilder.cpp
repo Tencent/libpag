@@ -265,10 +265,11 @@ struct LayerRuntimeTarget : RuntimeTarget {
     layoutX = std::isnan(position.x) ? 0 : position.x;
     layoutY = std::isnan(position.y) ? 0 : position.y;
     hasComponents = !hasStaticMatrix3D && !hasStaticMatrix;
+    anchor = node->anchor;
     if (hasComponents) {
       LayerTransformComponents(node, &components, &pose);
     } else {
-      pose = BuildLayerLocalMatrix3D(node);
+      pose = ComposeLayerLocalMatrix3D(node);
     }
     publish();
   }
@@ -281,6 +282,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   float layoutY = 0;
   bool hasStaticMatrix = false;
   bool hasStaticMatrix3D = false;
+  Point anchor = {};
   bool rejectedMaskedWriteLogged = false;
   bool rejectedComponentWriteLogged = false;
 
@@ -457,7 +459,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (layer == nullptr) {
       return;
     }
-    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(pose, layoutX, layoutY)));
+    // The anchor is applied once here, after the pose is final: T(anchor) * pose * T(-anchor).
+    // Layout position stays outside the local transform.
+    const auto anchored = ApplyAnchorToMatrix(pose, anchor);
+    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(anchored, layoutX, layoutY)));
   }
 };
 
