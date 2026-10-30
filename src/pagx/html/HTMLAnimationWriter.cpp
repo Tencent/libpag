@@ -1053,6 +1053,19 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     std::string tf = {};
     if (chSet.xCh != nullptr || chSet.yCh != nullptr) {
       Point basePos = hostLayer != nullptr ? hostLayer->renderPosition() : Point{0.0f, 0.0f};
+      if (hostLayer != nullptr && chSet.matrixCh == nullptr && hostLayer->matrix.isIdentity() &&
+          hostLayer->matrix3D.isIdentity()) {
+        // With layout constraints left/top are the layout slot, while LayerTransformCSS already
+        // contains the authored x/y. Subtracting renderPosition here would subtract that slot a
+        // second time; only the change relative to the authored value belongs in this translate.
+        auto layoutPos = hostLayer->layoutPosition();
+        if (!std::isnan(layoutPos.x)) {
+          basePos.x = hostLayer->x;
+        }
+        if (!std::isnan(layoutPos.y)) {
+          basePos.y = hostLayer->y;
+        }
+      }
       float dx = EvalFloatChannel(chSet.xCh, t, basePos.x) - basePos.x;
       float dy = EvalFloatChannel(chSet.yCh, t, basePos.y) - basePos.y;
       tf = "translate(" + CssFloatToString(dx) + "px, " + CssFloatToString(dy) + "px)";
