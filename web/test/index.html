@@ -3,149 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <title>libpag Web Test</title>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
-            integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
-            crossorigin="anonymous"></script>
-    <!-- Local ffavc copy (see web/test/README.md) supplying the wasm software video decoder. -->
     <script src="./ffavc.min.js"></script>
 </head>
 <body>
     <canvas id="pag-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
     <script type="module">
-        import PAGTest from './pag-test.js';
-        import { TGFXBind } from './tgfx.esm.js';
+        window.__pagTest = { finished: false, buildInfo: null, result: null, errors: [] };
+        const state = window.__pagTest;
+        const config = window.__pagTestConfig;
+        let device = null;
 
-        // Zips are also exposed here as base64: the headless CDP download channel is unreliable
-        // (downloads may never land on disk), so the harness retrieves them via page.evaluate.
-        window.__testZips = {};
+        function recordDeviceLoss(info) {
+            state.errors.push(`GPU device lost: ${info.message}`);
+        }
 
-        function collectFiles(fs, dir) {
-            const files = [];
-            for (const name of fs.readdir(dir)) {
-                if (name === '.' || name === '..') continue;
-                const fullPath = dir + '/' + name;
-                const stat = fs.stat(fullPath);
-                if (fs.isDir(stat.mode)) {
-                    files.push(...collectFiles(fs, fullPath));
-                } else {
-                    files.push(fullPath);
+        function recordGPUError(event) {
+            state.errors.push(`GPU error: ${event.error.message}`);
+        }
+
+        function recordContextLoss(event) {
+            event.preventDefault();
+            state.errors.push('WebGL context lost');
+        }
+
+        try {
+            if (!config) throw new Error('Launch this page through run_test.js');
+            const response = await fetch('./build-info.json');
+            if (!response.ok) throw new Error('Missing build manifest');
+            const manifest = await response.json();
+            for (const key of ['protocol', 'backend', 'mode', 'buildId']) {
+                if (manifest[key] !== config.buildInfo[key]) {
+                    throw new Error(`Manifest mismatch: ${key}`);
                 }
             }
-            return files;
-        }
-
-        async function downloadOutputDir(fs, dir, zipName) {
-            try {
-                fs.stat(dir);
-            } catch (e) {
-                console.warn(`No ${dir} directory found, skipping download.`);
-                return;
-            }
-            const files = collectFiles(fs, dir);
-            if (files.length === 0) {
-                console.warn(`No output files found in ${dir}.`);
-                return;
-            }
-            console.log(`Packing ${files.length} files from ${dir} into ${zipName}...`);
-            const zip = new JSZip();
-            const prefix = dir.endsWith('/') ? dir : dir + '/';
-            for (const filePath of files) {
-                const data = fs.readFile(filePath);
-                const relativePath = filePath.replace(prefix, '');
-                zip.file(relativePath, data);
-            }
-            const base64 = await zip.generateAsync({type: 'base64'});
-            window.__testZips[zipName] = base64;
-            const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-            const blob = new Blob([bytes], {type: 'application/zip'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = zipName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            console.log(`Download started: ${zipName}`);
-        }
-
-        const moduleOptions = {
-            // The WebGL backend resolves its default GL context through this canvas.
-            canvas: document.getElementById('pag-test-canvas'),
-        };
-        // Initialize a WebGPU device if available. The WebGPU backend reads it through
-        // Module.preinitializedWebGPUDevice (see pag::Devices::MakeDefault); the WebGL
-        // backend simply ignores it.
-        if (navigator.gpu) {
-            try {
+            const { default: PAGTest } = await import('./pag-test.js');
+            const { TGFXBind } = await import('./tgfx.esm.js');
+            const canvas = document.getElementById('pag-test-canvas');
+            canvas.addEventListener('webglcontextlost', recordContextLoss);
+            const options = { canvas };
+            if (manifest.backend === 'webgpu') {
+                if (!navigator.gpu) throw new Error('WebGPU is unavailable');
                 const adapter = await navigator.gpu.requestAdapter();
-                if (adapter) {
-                    const device = await adapter.requestDevice();
-                    if (device) {
-                        moduleOptions.preinitializedWebGPUDevice = device;
+                if (!adapter) throw new Error('No WebGPU adapter');
+                device = await adapter.requestDevice();
+                device.lost.then(recordDeviceLoss);
+                device.addEventListener('uncapturederror', recordGPUError);
+                device.pushErrorScope('validation');
+                device.pushErrorScope('internal');
+                device.pushErrorScope('out-of-memory');
+                options.preinitializedWebGPUDevice = device;
+            }
+            const module = await PAGTest(options);
+            window.__pagTestFS = module.FS;
+            state.buildInfo = JSON.parse(module.ccall('GetBuildInfo', 'string', [], []));
+            for (const key of ['protocol', 'backend', 'mode', 'buildId', 'sourceRevision', 'tgfxRevision']) {
+                if (state.buildInfo[key] !== manifest[key]) {
+                    throw new Error(`WASM identity mismatch: ${key}`);
+                }
+            }
+            const fs = module.FS;
+            const baseline = fs.readFile('/test/baseline/version.json', { encoding: 'utf8' });
+            if (baseline !== config.baselineVersion) {
+                throw new Error('Baseline version changed since the DATA file was built');
+            }
+            if (manifest.mode === 'compare') {
+                if (!config.cache) throw new Error('Missing baseline cache');
+                const cachePath = `/test/baseline/.cache/${manifest.backend}`;
+                fs.mkdirTree(cachePath);
+                fs.writeFile(`${cachePath}/md5.json`, config.cache.md5);
+                fs.writeFile(`${cachePath}/version.json`, config.cache.version);
+            }
+            TGFXBind(module);
+            if (!window.ffavc) throw new Error('ffavc software decoder is unavailable');
+            const FFAVC = await window.ffavc.FFAVCInit();
+            module._registerSoftwareDecoderFactory(new FFAVC.FFAVCDecoderFactory());
+            module._useSoftwareDecoder = true;
+            fs.mkdirTree('/test');
+            const exitCode = config.filter
+                ? await module.ccall('RunTest', 'number', ['string'], [config.filter], { async: true })
+                : await module.ccall('RunAllTests', 'number', [], [], { async: true });
+            if (device) await device.queue.onSubmittedWorkDone();
+            state.result = JSON.parse(module.ccall('GetRunResult', 'string', [], []));
+            if (!state.result || state.result.exitCode !== exitCode) {
+                throw new Error('Missing or inconsistent native test result');
+            }
+        } catch (error) {
+            state.errors.push(error.stack || String(error));
+        } finally {
+            if (device) {
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        const error = await device.popErrorScope();
+                        if (error) state.errors.push(`GPU scoped error: ${error.message}`);
+                    } catch (error) {
+                        state.errors.push(`GPU error collection failed: ${error.message}`);
                     }
                 }
-            } catch (e) {
-                console.warn('WebGPU initialization failed:', e);
             }
-        }
-
-        let module = null;
-        try {
-            module = await PAGTest(moduleOptions);
-            // The wasm side reads browser-only capabilities (Module.tgfx, Module.ScalerContext,
-            // Module.PathRasterizer, ...) through JS bindings injected by the tgfx web SDK.
-            // The test runner embeds no SDK, so bind the real ones built from
-            // third_party/tgfx/web (npm run build:tgfx), following tgfx's own web test harness.
-            TGFXBind(module);
-            // Register the ffavc software decoder factory (same flow as the official demo) so
-            // video-sequence tests can decode. Without it the wasm decoder factory chain fails
-            // and video sequences render empty.
-            if (window.ffavc) {
-                const FFAVC = await window.ffavc.FFAVCInit();
-                module._registerSoftwareDecoderFactory(new FFAVC.FFAVCDecoderFactory());
-                module._useSoftwareDecoder = true;
-                console.log('=== ffavc software decoder registered ===');
-            } else {
-                console.warn('ffavc not loaded; video-sequence tests will render empty.');
-            }
-            // When Asyncify is enabled (WebGPU builds), ccall returns a Promise; await handles
-            // both the Asyncify and non-Asyncify cases.
-            // Support a gtest filter through the URL (e.g. index.html?filter=PAGTypefaceCacheTest.*)
-            // for fast single-suite iteration without rebuilding.
-            const filter = new URLSearchParams(window.location.search).get('filter');
-            const result = filter
-                ? await module.ccall('RunTest', 'number', ['string'], [filter], {async: true})
-                : await module.ccall('RunAllTests', 'number', [], [], {async: true});
-            console.log('All tests finished with exit code:', result);
-        } catch (e) {
-            console.error('Test execution failed:', e && e.stack ? e.stack : e);
-            console.log('All tests finished with exit code: 1');
-        }
-        // Always export the outputs, even when the test run crashed mid-way: the harness needs
-        // the artifacts (screenshots, partial md5) to diagnose the failure.
-        if (module) {
-            await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
-            await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
-            // Pack the md5 cache Baseline::saveData() wrote to /test/baseline/.cache. This
-            // path is stable across builds; the old /test/baseline-out source is renamed
-            // away to /test/out by saveData() in UPDATE_BASELINE builds and is always empty.
-            // run_test.js extracts this zip into test/baseline/.cache/{backend}/.
-            try {
-                const cacheRoot = '/test/baseline/.cache';
-                let cacheFiles = [];
-                try {
-                    module.FS.stat(cacheRoot);
-                    cacheFiles = collectFiles(module.FS, cacheRoot);
-                } catch (e) { /* cache root missing */ }
-                if (cacheFiles.length > 0) {
-                    await downloadOutputDir(module.FS, cacheRoot, 'cache-web.zip');
-                } else {
-                    console.warn('Failed to create cache-web.zip: no cache files under ' + cacheRoot);
-                }
-            } catch (e) {
-                console.warn('Failed to create cache-web.zip:', e);
-            }
+            state.finished = true;
         }
     </script>
 </body>

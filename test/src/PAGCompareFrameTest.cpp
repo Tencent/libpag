@@ -40,7 +40,7 @@ using namespace tgfx;
 using nlohmann::json;
 
 static constexpr float MAX_FRAME_SIZE = 360.0f;
-#if !defined(TGFX_USE_METAL)
+#if !defined(TGFX_USE_METAL) && !defined(__EMSCRIPTEN__)
 static constexpr int MAX_THREADS = 6;
 #endif
 static constexpr bool PrintPerformance = false;

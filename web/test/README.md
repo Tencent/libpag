@@ -1,8 +1,9 @@
 # libpag Web 测试车道
 
 在浏览器中运行原生 `test/src` 的 Google Test 测试套件，渲染后端为 **WebGL** 或 **WebGPU**，
-沿用 tgfx `web/test` 的模式：测试二进制经 Emscripten 编译为 WebAssembly，由 Puppeteer 驱动；
-截图输出与基线 MD5 缓存通过 CDP 下载从虚拟文件系统导出。
+测试二进制经 Emscripten 编译为 WebAssembly，由 Puppeteer 驱动。运行器校验实际后端、
+构建模式和成套文件指纹，通过分块读取 MEMFS 回传结果，不依赖 CDN、ZIP 或浏览器下载。
+`web/test` 覆盖 C++ 测试；发布 SDK 和非 Asyncify 浏览器集成由 `web/cypress` 单独覆盖。
 
 ## 前置条件
 
@@ -39,19 +40,32 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 
 ## 工作原理
 
-1. `emcmake cmake` 构建 `pag-test`（Emscripten 可执行程序，入口为
-   `src/WebTestRunner.cpp`，导出 `RunAllTests`/`RunTest`）。
-2. `run_test.js` 启动 http-server，通过 Puppeteer 拉起 headless Chrome
-   （无 GPU 的 Linux 上附加 `--use-webgpu-adapter=swiftshader`），打开 `index.html`。
-3. `index.html` 实例化模块（WebGL：`#pag-test-canvas` 上的默认 GL 上下文；
-   WebGPU：`preinitializedWebGPUDevice`），调用 `ccall('RunAllTests')`，随后把
-   `baseline-out/`、`test/out/` 与 md5 缓存打包成 zip，由测试框架解回仓库。
-4. 基线比较遵循原生语义：将仓库的 `test/baseline/version.json` 与各后端快照
-   `test/baseline/.cache/{webgl,webgpu}/version.json` 比对；版本一致时用
-   `.cache/{backend}/md5.json` 做 MD5 比较，版本不一致时跳过比较。
+1. 普通构建使用 `build-webgl` / `build-webgpu`，显式关闭 `PAG_UPDATE_BASELINE`。
+   生成缓存每次使用 `build-baseline-{backend}` 下的新目录，不继承 TGFX 路径或旧合包。
+2. `artifacts.js` 将 JS、WASM、DATA、TGFX binding 和页面发布到
+   `dist/{backend}-{compare,update}`。每次运行先复制完整工件到独立快照，再校验 SHA-256；
+   HTTP 仅服务该快照，重新构建或发布不会替换运行中的文件。
+3. `run_test.js` 仅在 `127.0.0.1` 的随机端口提供本次产物，通过 Puppeteer 启动 Chrome。
+   页面检查 WASM 导出的 `GetBuildInfo`，再注入只读缓存并调用 `RunAllTests` / `RunTest`。
+   默认保留浏览器沙箱；确有需要的隔离 CI 环境可显式传递 `--no-sandbox`。
+4. `GetRunResult` 返回执行、失败、跳过数量，以及实际 MD5 比较、版本跳过、缺少基线数量。
+   无测试执行、缺少基线、后端/模式不符、浏览器错误或必需报告丢失均返回非零。
+5. 关闭浏览器前按 256 KiB 分块读取输出，写入独立的 `results/{backend}-{mode}-{id}`。
+   包含 `run-result.json`、GoogleTest `report.json` 和失败图等产物。
+   `--output` 可指定仓库内尚不存在的输出目录；根 `autotest.sh` 将本轮结果直接放入 `result/`。
 
-未生成基线缓存时，所有截图比较会静默通过（配置阶段会输出 CMake WARNING）。
-请务必先运行 `update_baseline.sh`。
+普通测试只读 `.cache/{backend}`，不自动刷新或合并期待值。只有基线与缓存 key 都存在且版本
+不同时才保留版本跳过语义；缺失版本或 MD5 是失败，不是接受变更。普通测试不生成 `_base` 图。
+缓存刷新要求干净工作区以及 `origin/main` 已包含本协议，同时验证 `third_party/tgfx` 为 main
+钉版的干净源码。不回退到待测分支；仅完整成功后整体替换缓存，并记录来源及文件摘要。
+普通比较拒绝缺失 `provenance.json`、来源不可信或内容不一致的旧缓存，不自动补写来源。
+缓存源提交可不同于当前候选提交，但必须属于本地 `origin/main` 历史，且依赖、版本与该来源一致。
+接受仓库截图基线仍须用户执行 `/accept-baseline`。迁移期间未建立可信缓存前，不应将运行器
+夹具测试或编译成功当成截图回归通过，也不应提前接入 C++ 全量 CI 门禁。
+
+运行 `npm run test:harness` 验证运行器逻辑；`npm run test:harness:browser` 使用真实 Chromium
+和模拟 WASM/GPU 验证页面协议，均不使用真实基线。GPU 实际渲染仍需后端完整测试。
+测试和产物回传共用 30 分钟期限；浏览器与 HTTP 清理各有独立的 10 秒兜底。
 
 ## Web 端排除项（第一阶段）
 
@@ -85,13 +99,9 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice`（`Devices::MakeDefault()` 返回
   同一单例，无法构造「设备不匹配」场景）断言的是桌面 GL 行为，已通过
   `PAG_WEBGL_ONLY` 宏（仅 webgl 构建定义，见 `web/test/CMakeLists.txt`）排除出
-  webgl 车道。`FromTexture`/`GLRestorer` 在 webgpu 车道与 native 构建保留（它们在那里
-  通过，基线受保护）；`PAGSurfaceWrapRejectsMismatchedDevice` 因 `TGFX_USE_OPENGL`
-  未定义本就不参与 webgpu 构建，由 native GL 构建保留。排除后 webgl 车道全绿：
-  `autotest.sh USE_WEBGL --skip-images` 双轮（seed + 真 md5 比对）各 1624 例
-  （1622 过 + 2 skip，0 失败），md5 基线 8635 条落地（含 `PAGCompareFrameTest`
-  逐帧与 `PAGXTest/svg_*` 渲染用例；`PAGXSVGTest` 145 例为导出断言，不依赖
-  md5 基线）。
+  webgl 车道。这些 GL 专用用例受 `TGFX_USE_OPENGL` 保护，不参与 WebGPU 构建，
+  由 native GL 保留。旧运行器的通过数量不能证明进行了真实 MD5 比较；以严格协议报告中的
+  `comparisons.compared`、`versionSkipped` 和 `missingBaseline` 为准。
 - `resources/apitest/SVG` 永不打包，但 SVG 导入代码仍参与编译。
 - WebGPU 构建开启 Asyncify，使 `Baseline::Compare` 使用的同步 `readPixels()`
   可以等待 buffer 映射完成。
@@ -120,14 +130,7 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
   `PAGTest::HasFailure()` 为 true 时拒绝写任何 md5（保守设计，不固化失败
   态）。任何用例失败都会使整次 seed 的 md5 不落地，`update_baseline.sh` 会
   以 FAILED 退出。
-- seed 应使用 `--skip-images` 模式：带图模式（GENERATE_BASELINE_IMAGES）下
-  `saveData` 把页内 `_base` 图集 rename 进 `/test/out`，其中 `PAGCompareFrameTest`
-  逐帧比对会产出 8000+ 张 `_base` webp，页面 JSZip 打包时内存不足导致页面崩溃
-  （detached Frame），导出通道全断。`--skip-images` 下 `/test/out` 只有数百个
-  运行时文件，打包可承受；宿主 `_base` 图不更新不影响判定（web 车道的真基线
-  是 `.cache/{backend}/md5.json`，`_base` 图仅供可视化参考）。
-- 车道产物传输不依赖 headless Chrome 的 CDP 下载（多次实测不可靠，下载可能
-  不落盘）：页面把 zip 的 base64 挂到 `window.__testZips`，`run_test.js` 用
-  `page.evaluate` 取回写盘；CDP 下载作为兼容通道并存。`cache-web.zip` 从页内
-  `/test/baseline/.cache` 整树打包（entry 带后端前缀），宿主提取到
-  `test/baseline/.cache` 本身而非 `.cache/{backend}`，避免双层嵌套。
+- 生成缓存可使用 `--skip-images` 减少 MEMFS 占用；MD5 才是实际比较依据，
+  `_base` 图仅供参考。回传采用分块读取，已移除整批 ZIP/base64 的额外内存副本。
+- 当前 GitHub Actions 的 Web 运行测试为 Cypress，尚未接入本目录 C++ 全量测试。
+  WebGPU 的同步截图使用 Asyncify，不能代替发布 SDK 的非 Asyncify 异步读回测试。

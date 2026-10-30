@@ -30,19 +30,14 @@ case "$BACKEND_ARG" in
   USE_WEBGL|USE_WEBGPU)
     # Web lanes run through the Emscripten harness in web/test instead of a native binary.
     ./install_tools.sh
-    ./update_baseline.sh "$@"
     cd web/test
     [ -d node_modules ] || npm install
     BACKEND_LC=$(echo "${BACKEND_ARG#USE_}" | tr '[:upper:]' '[:lower:]')
     npm run "build:${BACKEND_LC}"
     TEST_RESULT=0
-    node run_test.js --backend="$BACKEND_LC" || TEST_RESULT=$?
+    RUN_OUTPUT="$WORKSPACE/result/web-${BACKEND_LC}-$(date +%s)-$$"
+    node run_test.js --backend="$BACKEND_LC" --output="$RUN_OUTPUT" || TEST_RESULT=$?
     cd "$WORKSPACE"
-    rm -rf "$WORKSPACE/result"
-    mkdir -p "$WORKSPACE/result"
-    if [ -d "$WORKSPACE/test/out" ]; then
-      cp -R "$WORKSPACE/test/out" "$WORKSPACE/result/"
-    fi
     if [ "$TEST_RESULT" -ne 0 ]; then
       echo "pag-test ($BACKEND_LC) failed." >&2
     else

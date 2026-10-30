@@ -66,6 +66,8 @@ file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${ROOT}/test/src/*.*)
 list(FILTER TEST_SOURCES EXCLUDE REGEX "\\.mm$")
 # The web build uses WebTestRunner.cpp as its entry point.
 list(FILTER TEST_SOURCES EXCLUDE REGEX "TestMain\\.cpp$")
+# Native CMake compiles this helper only into Metal targets.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "MetalTestSupport\\.cpp$")
 # Phase-1 exclusions (see README.md "Excluded on the web"):
 list(FILTER TEST_SOURCES EXCLUDE REGEX "MultiThreadCase\\.cpp$")            # pthreads
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGANRRegressionTest\\.cpp$")       # pthreads
@@ -142,26 +144,28 @@ else ()
     # The webgl lane runs on Emscripten's single global GL context: multi-device and
     # multi-context semantics do not exist there. Tests that assert desktop-GL behavior
     # (PAGSurfaceTest.FromTexture/GLRestorer, PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice)
-    # are excluded from this lane via the PAG_WEBGL_ONLY macro; the webgpu lane and native
-    # builds keep them (they pass there, so their baselines stay protected).
+    # are excluded from this lane via PAG_WEBGL_ONLY. These OpenGL-specific tests remain
+    # covered by the native OpenGL build, not the WebGPU build.
     target_compile_definitions(pag-test PRIVATE PAG_WEBGL_ONLY)
 endif ()
 
-# Preload the backend-specific baseline cache if it exists locally (from a previous run's
-# cache-web.zip download), so comparisons actually happen.
-set(CACHE_DIR ${ROOT}/test/baseline/.cache/${PAG_BACKEND_NAME})
-set(PRELOAD_CACHE "")
-if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
-    set(PRELOAD_CACHE
-        "SHELL:--preload-file ${CACHE_DIR}/md5.json@/test/baseline/.cache/${PAG_BACKEND_NAME}/md5.json"
-        "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${PAG_BACKEND_NAME}/version.json"
-    )
-else ()
-    string(TOUPPER "${PAG_BACKEND_NAME}" BACKEND_ARG_NAME)
-    message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
-        "Screenshot tests will pass without actual comparison. "
-        "Run './update_baseline.sh USE_${BACKEND_ARG_NAME}' from project root first.")
+# Runtime cache injection keeps comparison inputs independent of the WASM build and read-only.
+# Each configure generates an identity shared by the module and its published artifact manifest.
+execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${ROOT}
+        OUTPUT_VARIABLE SOURCE_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${TGFX_DIR}
+        OUTPUT_VARIABLE TGFX_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(RANDOM LENGTH 32 ALPHABET 0123456789abcdef PAG_TEST_BUILD_ID)
+set(PAG_TEST_MODE "compare")
+if (PAG_UPDATE_BASELINE)
+    set(PAG_TEST_MODE "update")
 endif ()
+set(BUILD_INFO "{\"protocol\":1,\"backend\":\"${PAG_BACKEND_NAME}\",\"mode\":\"${PAG_TEST_MODE}\",\"buildId\":\"${PAG_TEST_BUILD_ID}\",\"sourceRevision\":\"${SOURCE_REVISION}\",\"tgfxRevision\":\"${TGFX_REVISION}\",\"configuration\":\"${CMAKE_BUILD_TYPE}\"}")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json "${BUILD_INFO}\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/tgfx-binding-path.txt "${TGFX_DIR}/web/lib/tgfx.esm.js\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/WebTestBuildInfo.h
+        "#pragma once\nstatic constexpr const char* BuildInfoJson = R\"json(${BUILD_INFO})json\";\n")
+target_include_directories(pag-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Preload test resources. The whole-dataset directories mirror the native runs; the apitest
 # fixtures are linked file-by-file at the top level only, excluding the 492MB apitest/SVG
@@ -228,7 +232,7 @@ endif ()
 target_compile_definitions(pag-test PRIVATE
         PAG_BACKEND_NAME="${PAG_BACKEND_NAME}"
         $<$<BOOL:${PAG_UPDATE_BASELINE}>:UPDATE_BASELINE>
-        $<$<NOT:$<BOOL:${PAG_SKIP_GENERATE_BASELINE_IMAGES}>>:GENERATE_BASELINE_IMAGES>
+        $<$<AND:$<BOOL:${PAG_UPDATE_BASELINE}>,$<NOT:$<BOOL:${PAG_SKIP_GENERATE_BASELINE_IMAGES}>>>:GENERATE_BASELINE_IMAGES>
 )
 
 target_link_options(pag-test PRIVATE
@@ -248,14 +252,13 @@ target_link_options(pag-test PRIVATE
         -sMAXIMUM_MEMORY=2GB
         -sSTACK_SIZE=1MB
         -sEXPORT_NAME='PAGTest'
-        -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest','_malloc','_free']
+        -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest','_GetBuildInfo','_GetRunResult','_malloc','_free']
         ${WEB_EXPORTED_RUNTIME_METHODS}
         -sMODULARIZE=1
         -sEXPORT_ES6=1
         -sENVIRONMENT=web,worker
         "SHELL:--preload-file ${ROOT}/test/baseline/version.json@/test/baseline/version.json"
         "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache/${PAG_BACKEND_NAME}/HEAD"
-        ${PRELOAD_CACHE}
         ${PRELOAD_RESOURCES}
 )
 

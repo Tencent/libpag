@@ -34,3 +34,6 @@ src/wasm-webgpu-mt
 src-webgpu-tmp
 demo/wasm-webgpu
 demo/wasm-webgpu-mt
+test/results/
+test/build-baseline-webgl/
+test/build-baseline-webgpu/

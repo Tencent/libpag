@@ -18,78 +18,84 @@
 
 #include <emscripten/emscripten.h>
 #include <string>
+#include "WebTestBuildInfo.h"
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
-#if defined(__EMSCRIPTEN__) && !defined(TGFX_USE_WEBGPU)
+#include "utils/Baseline.h"
+#if !defined(TGFX_USE_WEBGPU)
 #include <emscripten/html5_webgl.h>
 #endif
 
-static bool initialized = false;
+static bool Initialized = false;
+static std::string RunResult = "null";
 
-// The WebGL backend's Devices::MakeDefault() falls back to GLDevice::Current(), which requires a
-// WebGL context to already be created and current. tgfx's own web tests set this up through their
-// JS bindings module; the test runner has no bindings, so create the context here on the hidden
-// #pag-test-canvas element before any test touches a device.
-static void initGLContext() {
-#if defined(__EMSCRIPTEN__) && !defined(TGFX_USE_WEBGPU)
-  static bool glReady = false;
-  if (glReady) {
-    return;
-  }
-  glReady = true;
+// Devices::MakeDefault uses the current Emscripten WebGL context.
+static bool InitGLContext() {
+#if !defined(TGFX_USE_WEBGPU)
   EmscriptenWebGLContextAttributes attrs = {};
   emscripten_webgl_init_context_attributes(&attrs);
   attrs.majorVersion = 2;
   auto context = emscripten_webgl_create_context("#pag-test-canvas", &attrs);
-  if (context == 0) {
-    return;
+  if (context <= 0) {
+    return false;
   }
-  emscripten_webgl_make_context_current(context);
+  if (emscripten_webgl_make_context_current(context) != EMSCRIPTEN_RESULT_SUCCESS) {
+    emscripten_webgl_destroy_context(context);
+    return false;
+  }
 #endif
+  return true;
 }
 
-// Asyncify (WebGPU only) rewrites the whole wasm binary at link time and can corrupt the
-// execution state of code that busy-waits on the main thread. Tests incompatible with
-// instrumentation are excluded here through the gtest filter, mirroring tgfx's web runner.
-// No libpag test is currently known to be incompatible, so the list stays empty.
-static const char* excludeFilter = "";
-
-static void initTests() {
-  if (initialized) {
-    return;
+static int ExecuteTests(const char* filter) {
+  if (Initialized || !InitGLContext()) {
+    return 1;
   }
-  initialized = true;
+  Initialized = true;
   int argc = 1;
-  const char* argv[] = {"pag-test"};
+  char name[] = "pag-test";
+  char* argv[] = {name, nullptr};
   testing::AddGlobalTestEnvironment(new pag::TestEnvironment());
-  testing::InitGoogleTest(&argc, const_cast<char**>(argv));
-  if (excludeFilter[0] != '\0') {
-    testing::GTEST_FLAG(filter) = excludeFilter;
+  testing::InitGoogleTest(&argc, argv);
+  testing::GTEST_FLAG(filter) = filter && filter[0] ? filter : "*";
+  testing::GTEST_FLAG(output) = "json:/test/report.json";
+  auto exitCode = RUN_ALL_TESTS();
+  const auto* tests = testing::UnitTest::GetInstance();
+  auto stats = pag::Baseline::GetComparisonStats();
+  if (tests->test_to_run_count() == 0 || stats.missingBaseline != 0) {
+    exitCode = 1;
   }
+  nlohmann::json result = {{"exitCode", exitCode},
+                           {"tests", tests->test_to_run_count()},
+                           {"failed", tests->failed_test_count()},
+                           {"skipped", tests->skipped_test_count()},
+                           {"comparisons",
+                            {{"compared", stats.compared},
+                             {"versionSkipped", stats.versionSkipped},
+                             {"missingBaseline", stats.missingBaseline}}}};
+  RunResult = result.dump();
+  return exitCode;
 }
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
+const char* GetBuildInfo() {
+  return BuildInfoJson;
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char* GetRunResult() {
+  return RunResult.c_str();
+}
+
+EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
-  initGLContext();
-  initTests();
-  return RUN_ALL_TESTS();
+  return ExecuteTests(nullptr);
 }
 
 EMSCRIPTEN_KEEPALIVE
 int RunTest(const char* filter) {
-  initGLContext();
-  initTests();
-  if (filter != nullptr && filter[0] != '\0') {
-    if (excludeFilter[0] != '\0') {
-      testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
-    } else {
-      testing::GTEST_FLAG(filter) = filter;
-    }
-  } else if (excludeFilter[0] != '\0') {
-    testing::GTEST_FLAG(filter) = excludeFilter;
-  }
-  return RUN_ALL_TESTS();
+  return ExecuteTests(filter);
 }
 }

@@ -67,13 +67,25 @@ static void RemoveEmptyFolder(const std::filesystem::path& path) {
   }
 }
 
+static Baseline::ComparisonStats CompletedComparisonStats = {};
+
 void Baseline::SetUp() {
+  CompletedComparisonStats = {};
   baseline = std::make_unique<Baseline>(BASELINE_ROOT, CACHE_ROOT, OUT_ROOT);
 }
 
 void Baseline::TearDown() {
   baseline->saveData();
+  CompletedComparisonStats = baseline->comparisonStats();
   baseline = nullptr;
+}
+
+Baseline::ComparisonStats Baseline::GetComparisonStats() {
+  return baseline ? baseline->comparisonStats() : CompletedComparisonStats;
+}
+
+Baseline::ComparisonStats Baseline::comparisonStats() const {
+  return {compared.load(), versionSkipped.load(), missingBaseline.load()};
 }
 
 bool Baseline::Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
@@ -341,8 +353,24 @@ bool Baseline::compareMd5(const std::string& key, const std::string& md5) {
 #endif
   auto baselineVersion = getJSONValue(baselineVersions, key);
   auto cacheVersion = getJSONValue(cacheVersions, key);
-  if (baselineVersion.empty() ||
-      (baselineVersion == cacheVersion && getJSONValue(cacheMD5, key) != md5)) {
+  auto expectedMD5 = getJSONValue(cacheMD5, key);
+  auto missing = baselineVersion.empty();
+#if defined(__EMSCRIPTEN__)
+  missing = missing || cacheVersion.empty() || expectedMD5.empty();
+#else
+  missing = missing || (baselineVersion == cacheVersion && expectedMD5.empty());
+#endif
+  bool matches = false;
+  if (missing) {
+    ++missingBaseline;
+  } else if (baselineVersion != cacheVersion) {
+    ++versionSkipped;
+    matches = true;
+  } else {
+    ++compared;
+    matches = expectedMD5 == md5;
+  }
+  if (!matches) {
     setJSONValue(outputVersions, key, currentVersion);
     setJSONValue(outputMD5, key, md5);
     return false;

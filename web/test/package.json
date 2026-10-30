@@ -4,24 +4,23 @@
   "description": "libpag Web Test Runner",
   "scripts": {
     "build": "npm run build:webgl",
-    "build:webgl": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Release && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
-    "build:webgpu": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Release -DPAG_USE_WEBGPU=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
-    "build:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Debug && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
-    "build:webgpu:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Debug -DPAG_USE_WEBGPU=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
-    "copy:webgl": "cp build-webgl/pag-test.js build-webgl/pag-test.wasm build-webgl/pag-test.data . 2>/dev/null || true; cp ../../third_party/tgfx/web/lib/tgfx.esm.js . 2>/dev/null || true",
-    "copy:webgpu": "cp build-webgpu/pag-test.js build-webgpu/pag-test.wasm build-webgpu/pag-test.data . 2>/dev/null || true; cp ../../third_party/tgfx/web/lib/tgfx.esm.js . 2>/dev/null || true",
-    "serve": "npx http-server -p 8083 -c-1",
+    "build:webgl": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Release -DPAG_USE_WEBGPU=OFF -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
+    "build:webgpu": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Release -DPAG_USE_WEBGPU=ON -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
+    "build:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Debug -DPAG_USE_WEBGPU=OFF -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
+    "build:webgpu:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Debug -DPAG_USE_WEBGPU=ON -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
+    "copy:webgl": "node artifacts.js webgl compare build-webgl",
+    "copy:webgpu": "node artifacts.js webgpu compare build-webgpu",
+    "test:harness": "node --test harness.test.js",
+    "test:harness:browser": "PAG_HARNESS_BROWSER=1 node --test harness.test.js",
     "test": "npm run test:webgl",
     "test:webgl": "npm run build:webgl && node run_test.js --backend=webgl",
     "test:webgpu": "npm run build:webgpu && node run_test.js --backend=webgpu",
     "autotest": "npm run autotest:webgl",
     "autotest:webgl": "node run_test.js --backend=webgl",
     "autotest:webgpu": "node run_test.js --backend=webgpu",
-    "clean": "rm -rf build-webgl build-webgpu .downloads pag-test.js pag-test.wasm pag-test.data"
+    "clean": "rm -rf build-webgl build-webgpu build-baseline-webgl build-baseline-webgpu dist results"
   },
   "devDependencies": {
-    "adm-zip": "^0.5.16",
-    "http-server": "^14.1.1",
     "puppeteer": "^24.38.0"
   },
   "keywords": [

@@ -1,292 +1,373 @@
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const puppeteer = require('puppeteer');
-const AdmZip = require('adm-zip');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const http = require('node:http');
+const path = require('node:path');
+const { ArtifactNames, Backends, Modes, SnapshotBuild, HashText, RemoveBackup, ValidateBuildInfo,
+  ValidateCache, ValidateResult } = require('./artifacts');
+const { SourceMetadata, ValidateProvenance, CheckUpdateSource } = require('./cache-source');
 
-const WEB_TEST_DIR = __dirname;
-const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
-const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
-const PORT = 8083;
-const TIMEOUT_MS = 30 * 60 * 1000;
+const ProjectRoot = path.resolve(__dirname, '../..');
+const TimeoutMS = 30 * 60 * 1000;
 
-// Determine the backend from the --backend argument (default: webgl).
-const backendArg = process.argv.find(a => a.startsWith('--backend'));
-const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
-// Optional gtest filter passed through to the page URL (e.g. --filter=PAGTypefaceCacheTest.*)
-// for fast single-suite iteration.
-const filterArg = process.argv.find(a => a.startsWith('--filter'));
-const FILTER = filterArg ? (filterArg.includes('=') ? filterArg.split('=').slice(1).join('=') : '') : null;
-const TEST_URL = `http://127.0.0.1:${PORT}/index.html${FILTER ? `?filter=${encodeURIComponent(FILTER)}` : ''}`;
-const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
-if (!ALLOWED_BACKENDS.has(BACKEND)) {
-  console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);
-  process.exit(1);
+function ParseOptions(args) {
+  const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false };
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--no-sandbox') {
+      options.noSandbox = true;
+      continue;
+    }
+    const match = /^--(backend|mode|filter|output)(?:=(.*))?$/.exec(args[i]);
+    if (!match) throw new Error(`Unknown option: ${args[i]}`);
+    const value = match[2] === undefined ? args[++i] : match[2];
+    if (!value || value.startsWith('--')) throw new Error(`Missing value: ${match[1]}`);
+    options[match[1]] = value;
+  }
+  if (!Backends.includes(options.backend) || !Modes.includes(options.mode)) {
+    throw new Error('Invalid backend or mode');
+  }
+  if (options.mode === 'update' && options.filter) throw new Error('Filtered baseline updates are forbidden');
+  return options;
 }
 
-// Map downloaded zip files to their extraction destinations.
-// cache-web.zip is packed from the in-page /test/baseline/.cache tree, so its entries keep
-// their backend prefix (e.g. webgpu/md5.json); extract it to .cache itself, not .cache/backend.
-const ZIP_DESTINATIONS = {
-  'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
-  'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
-  'cache-web.zip': path.join(PROJECT_ROOT, 'test/baseline/.cache'),
-};
+function ReadCache(directory) {
+  const cache = {
+    md5: fs.readFileSync(path.join(directory, 'md5.json'), 'utf8'),
+    version: fs.readFileSync(path.join(directory, 'version.json'), 'utf8'),
+    head: fs.readFileSync(path.join(directory, 'HEAD'), 'utf8'),
+  };
+  ValidateCache(cache);
+  return cache;
+}
 
-function startHttpServer() {
-  return new Promise((resolve, reject) => {
-    const server = spawn('npx', ['http-server', '-p', String(PORT), '--cors', '-c-1'], {
-      cwd: WEB_TEST_DIR,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let started = false;
-    const onData = (data) => {
-      const text = data.toString();
-      if (!started && text.includes('Hit CTRL-C to stop')) {
-        started = true;
-        resolve(server);
-      }
-    };
-    server.stdout.on('data', onData);
-    server.stderr.on('data', onData);
-    server.on('error', reject);
-    setTimeout(() => {
-      if (!started) {
-        reject(new Error('http-server failed to start within 10 seconds'));
-      }
-    }, 10000);
+function ReadExpectedCache(directory, backend) {
+  const cache = ReadCache(directory);
+  const provenance = JSON.parse(fs.readFileSync(path.join(directory, 'provenance.json'), 'utf8'));
+  const metadata = SourceMetadata(provenance.buildInfo?.sourceRevision);
+  ValidateProvenance(cache, provenance, backend, metadata);
+  return { ...cache, provenance };
+}
+
+function StartServer(directory) {
+  const allowed = new Set([...ArtifactNames, 'build-info.json']);
+  function handleRequest(request, response) {
+    const name = request.url?.slice(1);
+    if (!['GET', 'HEAD'].includes(request.method) || !allowed.has(name)) {
+      response.writeHead(404).end();
+      return;
+    }
+    const file = path.join(directory, name);
+    const types = { '.js': 'text/javascript', '.html': 'text/html', '.json': 'application/json',
+      '.wasm': 'application/wasm' };
+    response.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    if (request.method === 'HEAD') {
+      response.end();
+      return;
+    }
+    const stream = fs.createReadStream(file);
+    stream.on('error', function onError() { response.destroy(); });
+    stream.pipe(response);
+  }
+  return new Promise(function start(resolve, reject) {
+    const server = http.createServer(handleRequest);
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', function onListening() { resolve(server); });
   });
 }
 
-function extractZip(zipPath, destDir) {
-  if (!fs.existsSync(zipPath)) {
-    return;
-  }
-  fs.mkdirSync(destDir, { recursive: true });
-  const zip = new AdmZip(zipPath);
-  const resolved = path.resolve(destDir);
-  for (const entry of zip.getEntries()) {
-    const target = path.resolve(destDir, entry.entryName);
-    if (!target.startsWith(resolved + path.sep) && target !== resolved) {
-      throw new Error(`Zip-Slip path traversal detected: ${entry.entryName}`);
-    }
-  }
-  zip.extractAllTo(destDir, true);
-}
-
-async function run() {
-  // Clean and create the downloads directory.
-  if (fs.existsSync(DOWNLOADS_DIR)) {
-    fs.rmSync(DOWNLOADS_DIR, { recursive: true });
-  }
-  fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
-
-  // Start http-server.
-  console.log('Starting http-server...');
-  const server = await startHttpServer();
-  console.log(`http-server running on port ${PORT}`);
-
-  let browser = null;
-  let testExitCode = 1;
-  let page = null;
-
+async function WithDeadline(promise, timeout, message) {
+  let timer = null;
   try {
-    const launchArgs = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--enable-unsafe-webgpu',
-      '--enable-features=Vulkan,UseSkiaRenderer,WebGPU',
-      '--experimental-wasm-stack-switching',
-    ];
-    if (process.platform === 'darwin') {
-      launchArgs.push('--use-gl=angle', '--use-angle=metal');
-    }
-    if (process.platform === 'linux') {
-      launchArgs.push('--disable-dev-shm-usage');
-      if (BACKEND === 'webgpu') {
-        // CI runners have no GPU hardware; fall back to the SwiftShader WebGPU adapter.
-        launchArgs.push('--use-webgpu-adapter=swiftshader');
-      }
-    }
-    browser = await puppeteer.launch({
-      headless: true,
-      args: launchArgs,
+    const deadline = new Promise(function limit(resolve, reject) {
+      timer = setTimeout(function expired() { reject(new Error(message)); }, timeout);
     });
-
-    page = await browser.newPage();
-
-    // Configure download behavior via CDP.
-    const client = await page.createCDPSession();
-    await client.send('Browser.setDownloadBehavior', {
-      behavior: 'allow',
-      downloadPath: DOWNLOADS_DIR,
-    });
-
-    // Track completed downloads via CDP events.
-    let pendingDownloads = 0;
-    client.on('Browser.downloadWillBegin', () => {
-      pendingDownloads++;
-    });
-    client.on('Browser.downloadProgress', (event) => {
-      if (event.state === 'completed' || event.state === 'canceled') {
-        pendingDownloads--;
-      }
-    });
-
-    // Promise that resolves when "All tests finished" is logged.
-    let resolveTestDone = null;
-    const testDone = new Promise((resolve) => {
-      resolveTestDone = resolve;
-    });
-
-    // Promise that resolves when all page-side download actions complete (cache-web.zip is last).
-    let resolvePageDone = null;
-    const pageDone = new Promise((resolve) => {
-      resolvePageDone = resolve;
-    });
-
-    // Listen to console output and relay to the terminal.
-    page.on('console', (msg) => {
-      const text = msg.text();
-      console.log(text);
-      const exitMatch = text.match(/All tests finished with exit code:\s*(\d+)/);
-      if (exitMatch) {
-        testExitCode = parseInt(exitMatch[1], 10);
-        resolveTestDone();
-      }
-      // cache-web.zip is the last download action in index.html.
-      if (text.includes('Download started: cache-web.zip') ||
-          text.includes('Failed to create cache-web.zip')) {
-        resolvePageDone();
-      }
-    });
-
-    // Listen to page errors.
-    page.on('pageerror', (err) => {
-      console.error('PAGE ERROR:', err.message);
-    });
-
-    // Navigate to the test page. Use a long timeout: WASM loading plus the full corpus suites
-    // (PAGFrameCompareTest renders every compare frame in the browser) can take a while.
-    console.log(`Opening ${TEST_URL}...`);
-    page.goto(TEST_URL, { timeout: TIMEOUT_MS }).catch((err) => {
-      console.error('Navigation error:', err.message);
-    });
-
-    // Wait for the tests to complete.
-    const testTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Test timed out')), TIMEOUT_MS);
-    });
-    await Promise.race([testDone, testTimeout]);
-
-    // Wait for the page to finish initiating all downloads.
-    const pageTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Page download actions timed out')), 60000);
-    });
-    await Promise.race([pageDone, pageTimeout]).catch((err) => {
-      console.warn(err.message);
-    });
-
-    // Wait for pending CDP downloads to finish writing to disk.
-    const downloadStart = Date.now();
-    while (pendingDownloads > 0 && Date.now() - downloadStart < 60000) {
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    // Small delay to ensure all file handles are released.
-    await new Promise((r) => setTimeout(r, 1000));
-
-  } catch (err) {
-    console.error('Test run failed:', err.message);
+    return await Promise.race([promise, deadline]);
   } finally {
-    if (browser) {
-      await browser.close();
-    }
-    server.kill('SIGTERM');
+    clearTimeout(timer);
   }
-
-  // The CDP download channel is unreliable in headless Chrome (downloads may start but never
-  // complete or land on disk). The page exposes every packed zip as base64 on window.__testZips;
-  // write any zip that did not arrive through the download channel ourselves.
-  try {
-    const pageZips = await page.evaluate(() => window.__testZips || {});
-    for (const [zipName, base64] of Object.entries(pageZips)) {
-      const zipPath = path.join(DOWNLOADS_DIR, zipName);
-      if (!fs.existsSync(zipPath) && typeof base64 === 'string' && base64.length > 0) {
-        fs.writeFileSync(zipPath, Buffer.from(base64, 'base64'));
-        console.log(`  Saved ${zipName} from page data (${(base64.length * 3 / 4 / 1048576).toFixed(1)} MB).`);
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to retrieve page zips:', e.message);
-  }
-
-  // Extract the downloaded zip files to their destinations.
-  // Preserve the existing baseline version.json so that subsequent runs still compare against
-  // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
-  // current build are recognized as passing on the next rebuild + run cycle.
-  const cacheDir = path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`);
-  const md5Path = path.join(cacheDir, 'md5.json');
-  const versionPath = path.join(cacheDir, 'version.json');
-  const versionBackupPath = versionPath + '.bak';
-  let existingMd5 = {};
-  if (fs.existsSync(md5Path)) {
-    try {
-      existingMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-    } catch (e) { /* ignore parse errors */ }
-  }
-  if (fs.existsSync(versionPath)) {
-    fs.copyFileSync(versionPath, versionBackupPath);
-  }
-
-  console.log('\nExtracting downloaded files...');
-  for (const [zipName, destDir] of Object.entries(ZIP_DESTINATIONS)) {
-    const zipPath = path.join(DOWNLOADS_DIR, zipName);
-    if (fs.existsSync(zipPath)) {
-      console.log(`  ${zipName} -> ${path.relative(PROJECT_ROOT, destDir)}/`);
-      extractZip(zipPath, destDir);
-    } else {
-      console.warn(`  ${zipName} not found, skipping.`);
-    }
-  }
-
-  // Restore the baseline version.json after cache-web.zip extraction overwrites it.
-  if (fs.existsSync(versionBackupPath)) {
-    fs.copyFileSync(versionBackupPath, versionPath);
-    fs.unlinkSync(versionBackupPath);
-  }
-
-  // Merge new MD5 values from the test output into the existing cache.
-  // The test only writes MD5 entries for keys that failed comparison, so we merge them
-  // into the full cache rather than replacing it.
-  if (fs.existsSync(md5Path)) {
-    try {
-      const newMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-      for (const [suite, tests] of Object.entries(newMd5)) {
-        if (!existingMd5[suite]) {
-          existingMd5[suite] = {};
-        }
-        for (const [name, md5] of Object.entries(tests)) {
-          existingMd5[suite][name] = md5;
-        }
-      }
-      fs.writeFileSync(md5Path, JSON.stringify(existingMd5, null, 4) + '\n');
-      console.log(`  Merged new MD5 values into .cache/${BACKEND}/md5.json`);
-    } catch (e) {
-      console.warn('  Failed to merge MD5 values:', e.message);
-    }
-  }
-
-  // Clean up the downloads directory.
-  if (fs.existsSync(DOWNLOADS_DIR)) {
-    fs.rmSync(DOWNLOADS_DIR, { recursive: true });
-  }
-
-  console.log(`\nTest exit code: ${testExitCode}`);
-  process.exit(testExitCode);
 }
 
-run().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+async function CloseResources(browser, server, timeout = 10000) {
+  const errors = [];
+  try {
+    if (browser) await WithDeadline(browser.close(), timeout, 'Browser cleanup timed out');
+  } catch (error) {
+    errors.push(error.message);
+    try {
+      browser.process()?.kill('SIGKILL');
+    } catch (killError) {
+      errors.push(killError.message);
+    }
+  } finally {
+    if (server) {
+      try {
+        const stopped = new Promise(function stop(resolve, reject) {
+          server.close(function closed(error) { if (error) reject(error); else resolve(); });
+          server.closeAllConnections();
+        });
+        await WithDeadline(stopped, timeout, 'HTTP server cleanup timed out');
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+  }
+  return errors;
+}
+
+function InstallConfig(config) {
+  window.__pagTestConfig = config;
+}
+
+function IsFinished() {
+  return window.__pagTest?.finished === true;
+}
+
+function ReadState() {
+  return window.__pagTest;
+}
+
+function ListFiles(roots) {
+  const fs = window.__pagTestFS;
+  const files = [];
+  if (!fs) return files;
+  function visit(file) {
+    const stat = fs.lstat(file);
+    if (fs.isDir(stat.mode)) {
+      for (const name of fs.readdir(file)) {
+        if (name !== '.' && name !== '..') visit(`${file}/${name}`);
+      }
+    } else if (fs.isFile(stat.mode)) {
+      files.push({ path: file, size: stat.size });
+    } else {
+      throw new Error(`Unsupported output entry: ${file}`);
+    }
+  }
+  for (const root of roots) {
+    if (fs.analyzePath(root).exists) visit(root);
+  }
+  return files;
+}
+
+function ReadChunk(file, offset, length) {
+  const fs = window.__pagTestFS;
+  const stream = fs.open(file, 'r');
+  try {
+    const bytes = new Uint8Array(length);
+    const count = fs.read(stream, bytes, 0, length, offset);
+    if (count !== length) throw new Error(`Short read: ${file}`);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    return btoa(binary);
+  } finally {
+    fs.close(stream);
+  }
+}
+
+function OutputPath(directory, file, backend, mode) {
+  const allowed = file === '/test/report.json' || file.startsWith('/test/out/') ||
+    file.startsWith('/test/baseline-out/') ||
+    (mode === 'update' && file.startsWith(`/test/baseline/.cache/${backend}/`));
+  if (!allowed || file.includes('\\') || file.includes('\0') || file.split('/').includes('..')) {
+    throw new Error(`Invalid output path: ${file}`);
+  }
+  const destination = path.resolve(directory, file.slice('/test/'.length));
+  if (!destination.startsWith(path.resolve(directory) + path.sep)) throw new Error('Output path escapes run');
+  return destination;
+}
+
+async function CollectFiles(page, directory, options) {
+  const roots = ['/test/report.json', '/test/out', '/test/baseline-out'];
+  if (options.mode === 'update') roots.push(`/test/baseline/.cache/${options.backend}`);
+  const files = await page.evaluate(ListFiles, roots);
+  const seen = new Set();
+  let total = 0;
+  for (const file of files) {
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > 512 * 1024 * 1024 ||
+        seen.has(file.path) || files.length > 200000) throw new Error('Invalid artifact manifest');
+    seen.add(file.path);
+    total += file.size;
+    if (total > 2 * 1024 * 1024 * 1024) throw new Error('Artifact size budget exceeded');
+    const destination = OutputPath(directory, file.path, options.backend, options.mode);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    const fd = fs.openSync(destination, 'wx');
+    try {
+      for (let offset = 0; offset < file.size; offset += 256 * 1024) {
+        const length = Math.min(256 * 1024, file.size - offset);
+        const data = Buffer.from(await page.evaluate(ReadChunk, file.path, offset, length), 'base64');
+        if (data.length !== length) throw new Error(`Incomplete artifact: ${file.path}`);
+        fs.writeFileSync(fd, data);
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+  return files;
+}
+
+function CommitCache(source, destination, baselineVersion, runInfo) {
+  ValidateResult(runInfo.result);
+  if (runInfo.result.exitCode !== 0 || runInfo.errors.length || runInfo.buildInfo.mode !== 'update') {
+    throw new Error('Cannot publish a failed baseline run');
+  }
+  const cache = ReadCache(source);
+  if (cache.version !== baselineVersion) throw new Error('Generated cache version mismatch');
+  runInfo.cacheHashes = {};
+  for (const name of ['md5', 'version', 'head']) runInfo.cacheHashes[name] = HashText(cache[name]);
+  ValidateProvenance(cache, runInfo, runInfo.buildInfo.backend, runInfo.source);
+  const parent = path.dirname(destination);
+  fs.mkdirSync(parent, { recursive: true });
+  const stage = fs.mkdtempSync(path.join(parent, '.web-cache-'));
+  const backup = `${stage}.previous`;
+  try {
+    fs.writeFileSync(path.join(stage, 'md5.json'), cache.md5);
+    fs.writeFileSync(path.join(stage, 'version.json'), cache.version);
+    fs.writeFileSync(path.join(stage, 'HEAD'), cache.head);
+    fs.writeFileSync(path.join(stage, 'provenance.json'), JSON.stringify(runInfo, null, 2) + '\n');
+    if (fs.existsSync(destination)) fs.renameSync(destination, backup);
+    try {
+      fs.renameSync(stage, destination);
+    } catch (error) {
+      if (fs.existsSync(backup)) fs.renameSync(backup, destination);
+      throw error;
+    }
+    RemoveBackup(backup);
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+}
+
+async function Run(options) {
+  if (options.mode === 'update' && process.env.PAG_WEB_BASELINE_INVOKED !== '1') {
+    throw new Error('Baseline generation requires the explicit baseline entry point');
+  }
+  const published = path.join(__dirname, 'dist', `${options.backend}-${options.mode}`);
+  const cacheDirectory = path.join(ProjectRoot, 'test/baseline/.cache', options.backend);
+  let buildInfo = null;
+  let config = null;
+  const output = options.output ? path.resolve(options.output) :
+    path.join(__dirname, 'results', `${options.backend}-${options.mode}-${crypto.randomUUID()}`);
+  if (!output.startsWith(ProjectRoot + path.sep) || fs.existsSync(output)) {
+    throw new Error('Output must be a new directory inside the repository');
+  }
+  fs.mkdirSync(output, { recursive: true });
+  const runInfo = { buildInfo, filter: options.filter, result: null, errors: [], artifacts: [] };
+  let server = null;
+  let browser = null;
+  let page = null;
+  let timer = null;
+  let closing = false;
+  let failed = false;
+  let collecting = false;
+  try {
+    const directory = path.join(output, 'artifacts');
+    buildInfo = SnapshotBuild(published, directory, options.backend, options.mode);
+    runInfo.buildInfo = buildInfo;
+    config = { buildInfo, filter: options.filter,
+      baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
+      cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
+    if (options.mode === 'update') {
+      runInfo.source = { ...CheckUpdateSource(buildInfo), ref: 'origin/main', clean: true };
+    } else {
+      runInfo.cacheProvenance = config.cache.provenance;
+    }
+    server = await StartServer(directory);
+    const args = ['--enable-unsafe-webgpu'];
+    if (options.noSandbox) args.push('--no-sandbox', '--disable-setuid-sandbox');
+    if (process.platform === 'darwin') args.push('--use-gl=angle', '--use-angle=metal');
+    if (process.platform === 'linux') {
+      args.push('--disable-dev-shm-usage');
+      if (options.backend === 'webgpu') args.push('--use-webgpu-adapter=swiftshader');
+    }
+    browser = await require('puppeteer').launch({ headless: true, args });
+    runInfo.browser = await browser.version();
+    page = await browser.newPage();
+    page.on('console', function onConsole(message) { console.log(message.text()); });
+    await page.evaluateOnNewDocument(InstallConfig, config);
+    const fatal = new Promise(function watch(resolve, reject) {
+      timer = setTimeout(function onTimeout() { reject(new Error('Test or artifact transfer timed out')); }, TimeoutMS);
+      page.on('pageerror', function onPageError(error) { reject(error); });
+      page.on('error', function onCrash(error) { reject(error); });
+      browser.on('disconnected', function onDisconnected() {
+        if (!closing) reject(new Error('Browser disconnected'));
+      });
+    });
+    async function execute() {
+      await page.goto(`http://127.0.0.1:${server.address().port}/index.html`,
+        { waitUntil: 'domcontentloaded', timeout: TimeoutMS });
+      await page.waitForFunction(IsFinished, { timeout: TimeoutMS });
+      const state = await page.evaluate(ReadState);
+      runInfo.result = state.result;
+      runInfo.errors.push(...state.errors);
+      collecting = true;
+      runInfo.artifacts = await CollectFiles(page, output, options);
+      ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
+      if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
+      ValidateResult(state.result);
+      const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
+      if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
+          report.failures !== state.result.failed) {
+        throw new Error('GoogleTest report does not match the execution result');
+      }
+      const finalState = await page.evaluate(ReadState);
+      runInfo.errors = finalState.errors;
+      if (state.result.exitCode !== 0 || runInfo.errors.length) throw new Error('Tests or browser validation failed');
+    }
+    await Promise.race([execute(), fatal]);
+  } catch (error) {
+    failed = true;
+    runInfo.errors.push(error.message);
+    console.error(error.message);
+    if (page && !page.isClosed() && !collecting) {
+      let partialTimer = null;
+      try {
+        collecting = true;
+        const deadline = new Promise(function limit(resolve, reject) {
+          partialTimer = setTimeout(function timeout() { reject(new Error('Partial transfer timed out')); }, 10000);
+        });
+        runInfo.artifacts = await Promise.race([CollectFiles(page, output, options), deadline]);
+      } catch (artifactError) {
+        runInfo.errors.push(`Partial artifacts unavailable: ${artifactError.message}`);
+      } finally {
+        clearTimeout(partialTimer);
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+    closing = true;
+    const cleanupErrors = await CloseResources(browser, server);
+    if (cleanupErrors.length) {
+      failed = true;
+      runInfo.errors.push(...cleanupErrors);
+    }
+  }
+  if (!failed && options.mode === 'update') {
+    try {
+      CheckUpdateSource(buildInfo);
+      CommitCache(path.join(output, 'baseline/.cache', options.backend), cacheDirectory,
+        config.baselineVersion, runInfo);
+    } catch (error) {
+      failed = true;
+      runInfo.errors.push(error.message);
+    }
+  }
+  runInfo.exitCode = failed ? 1 : 0;
+  fs.writeFileSync(path.join(output, 'run-result.json'), JSON.stringify(runInfo, null, 2) + '\n');
+  console.log(`Results: ${output}`);
+  if (runInfo.result) console.log(JSON.stringify(runInfo.result));
+  return failed ? 1 : 0;
+}
+
+module.exports = { ParseOptions, ReadCache, ReadExpectedCache, StartServer, CloseResources, OutputPath,
+  CollectFiles, CommitCache, Run };
+
+if (require.main === module) {
+  Run(ParseOptions(process.argv.slice(2))).then(function finish(code) {
+    process.exitCode = code;
+  }).catch(function fail(error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
