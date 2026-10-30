@@ -54,7 +54,7 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
 
 // Moves the transform pivot to `anchor`: T(anchor) * matrix * T(-anchor). The linear part is kept
 // and the translation becomes t + anchor - L * anchor. A zero anchor returns the input unchanged.
-Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor);
+Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ);
 
 // Returns the Layer's local transform without the layout position and without the anchor: the
 // non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
