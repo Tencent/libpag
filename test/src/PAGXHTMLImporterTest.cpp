@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -7916,6 +7917,34 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationDiscardedNegativeDelayDoesNotShiftPlayab
   EXPECT_EQ(alpha->keyframes.front().time, 0);
   EXPECT_EQ(alpha->keyframes.back().time, 60);
   EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
+}
+
+// An inline-SVG animation suppressed by iteration-count: 0 must not reach the timing finalizer.
+// Isolate parsing in a child process so the regression fails without terminating the test suite.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgZeroIterationsDoesNotCrashImporter) {
+  EXPECT_EXIT(
+      {
+        pagx::HTMLImporter::Options opts;
+        opts.autoNormalize = false;
+        auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+          <html><head><style>
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(90deg); }
+            }
+          </style></head>
+          <body style="width:100px;height:100px">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none"
+                      style="animation-name:spin;animation-duration:1s;
+                             animation-iteration-count:0"/>
+            </svg>
+          </body></html>
+        )HTML",
+                                                   opts);
+        std::_Exit(doc != nullptr && doc->animations.empty() ? 0 : 1);
+      },
+      ::testing::ExitedWithCode(0), "");
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
