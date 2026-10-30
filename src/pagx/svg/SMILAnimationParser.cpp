@@ -2175,7 +2175,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       // degrees sits on the atan2 ±pi boundary, where float sin(pi) is a tiny negative number,
       // the keyframe decomposes to -pi instead of +pi, and the shortest-arc wrap (which uses
       // strict inequality) leaves the diff unwrapped — reversing that step's direction.
-      int steps = static_cast<int>(std::ceil(std::abs(delta) / 179.0f));
+      // 179 degrees only guards winding loss; linear matrix interpolation still cuts a chord
+      // across the arc between keys, so a 120-degree step renders the shape inside its orbit
+      // (radius shrinks up to 13%). Cap the step at 20 degrees as well: the chord sagitta stays
+      // sub-pixel for typical orbit radii, and a full turn becomes 18 keys.
+      constexpr float kMaxRotateStep = 20.0f;
+      int steps = static_cast<int>(std::ceil(std::abs(delta) / kMaxRotateStep));
       for (int k = 1; k <= steps; ++k) {
         float t = static_cast<float>(k) / static_cast<float>(steps);
         std::vector<float> params = {};
