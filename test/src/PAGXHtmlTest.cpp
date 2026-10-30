@@ -4755,6 +4755,46 @@ CLI_TEST(PAGXHtmlTest, AnimationTextBoxContainerProps) {
   EXPECT_NE(html.find("100% { opacity: 1; transform: translate(50px, 0px); }"), std::string::npos);
 }
 
+// Repeater copy transforms and alpha live on per-copy divs. When SVG draws are coalesced for
+// animation export, each copy's SVG must be emitted before its own wrapper closes.
+CLI_TEST(PAGXHtmlTest, AnimatedRepeaterStrokeStaysInsideEachCopy) {
+  const char* xml = R"(<pagx width="240" height="100">
+    <Layer width="240" height="100">
+      <Ellipse position="30,50" size="36,36"/>
+      <Stroke id="repeatedStroke" color="#2563EB" width="4"/>
+      <Repeater copies="3" position="70,0" startAlpha="0.8" endAlpha="0.2"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
+        <Object target="repeatedStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="4" interpolation="linear"/>
+            <Key time="60" value="8"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  for (const char* id : {"repeatedStroke", "repeatedStroke__1", "repeatedStroke__2"}) {
+    auto path = html.find(std::string("id=\"") + id + "\"");
+    ASSERT_NE(path, std::string::npos) << id;
+    auto wrapper = html.rfind("<div style=\"position:absolute", path);
+    ASSERT_NE(wrapper, std::string::npos) << id;
+    auto wrapperEnd = html.find("</div>", wrapper);
+    ASSERT_NE(wrapperEnd, std::string::npos) << id;
+    EXPECT_LT(path, wrapperEnd) << id;
+    auto wrapperTagEnd = html.find('>', wrapper);
+    ASSERT_NE(wrapperTagEnd, std::string::npos) << id;
+    auto wrapperTag = html.substr(wrapper, wrapperTagEnd - wrapper + 1);
+    EXPECT_NE(wrapperTag.find("opacity:"), std::string::npos) << id << wrapperTag;
+  }
+}
+
 CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
   const char* xml = R"(<pagx width="200" height="160">
     <Layer matrix="2.66667,0,0,2.66667,0,0">
