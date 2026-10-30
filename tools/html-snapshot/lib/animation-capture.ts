@@ -1564,6 +1564,7 @@ export function pagxBuildCanonicalAnimation(
   index: number,
   prefix: string,
 ): { name: string; keyframesCss: string; animationShorthand: string } | null {
+  if (cap.iterations === 0) return null;
   const stops = cap.keyframes.slice().sort((a, b) => a.offset - b.offset);
   const lines: string[] = [];
   for (const s of stops) {
@@ -1594,7 +1595,7 @@ export function pagxBuildCanonicalAnimation(
   const infinite =
     cap.iterations === Infinity || !isFinite(cap.iterations as number) ||
     String(cap.iterations) === 'infinite';
-  const iter = infinite ? 'infinite' : cap.iterations || 1;
+  const iter = infinite ? 'infinite' : cap.iterations ?? 1;
   const dir = cap.direction || 'normal';
   // `both` so the element holds the 0% keyframe state during `animation-delay`
   // *and* its 100% keyframe state after a finite iteration finishes, instead
@@ -2047,14 +2048,16 @@ export function pagxCollectCSS(captured: unknown[], seen: Set<Element>, maxEleme
     if (norm.length === 0) continue;
     const durMs = pagxParseTimeMs((cs.animationDuration || '').split(',')[0]);
     if (!durMs) continue;
+    const iterationCount = (cs.animationIterationCount || '').split(',')[0].trim();
+    const parsedIterations = parseFloat(iterationCount);
     captured.push({
       el: el as HTMLElement,
       keyframes: norm,
       durationMs: durMs,
       delayMs: pagxParseTimeMs((cs.animationDelay || '').split(',')[0]) || 0,
-      iterations: (cs.animationIterationCount || '').split(',')[0].trim() === 'infinite'
+      iterations: iterationCount === 'infinite'
         ? Infinity
-        : parseFloat(cs.animationIterationCount) || 1,
+        : Number.isNaN(parsedIterations) ? 1 : parsedIterations,
       direction: (cs.animationDirection || 'normal').split(',')[0].trim(),
       timing: (cs.animationTimingFunction || 'linear').split(',')[0].trim(),
     });
