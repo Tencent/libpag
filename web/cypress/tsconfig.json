@@ -6,5 +6,5 @@
     "strict": false,
     "noEmit": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../cypress.config.ts"]
 }

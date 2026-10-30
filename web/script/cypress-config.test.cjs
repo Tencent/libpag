@@ -73,32 +73,51 @@ test('WebGPU rejects unsupported launchers before running tests', function () {
   }
 });
 
-test('a successful run records backend and the exact Cypress outcome', function () {
+test('a completed run without a status field records the exact Cypress outcome', function () {
   const harness = CreateHarness('webgpu');
-  const result = { status: 'finished', totalTests: 12, totalPassed: 11, totalPending: 1, totalFailed: 0 };
-  harness.handlers.get('after:run')(result);
+  const result = { totalTests: 12, totalPassed: 11, totalPending: 1, totalFailed: 0, totalSkipped: 0 };
+  assert.doesNotThrow(function completed() { harness.handlers.get('after:run')(result); });
   const report = JSON.parse(harness.files.get(path.join('cypress/results/webgpu', 'summary.json')));
   assert.deepEqual(report, { backend: 'webgpu', ...result });
 });
 
-test('zero tests and entirely skipped or failed runs are not successful gates', function () {
+test('zero tests and entirely skipped runs are not successful gates', function () {
   for (const result of [
-    { status: 'failed', message: 'browser crashed' },
-    { status: 'finished', totalTests: 0, totalPassed: 0 },
-    { status: 'finished', totalTests: 12, totalPassed: 0, totalPending: 12 },
-    { status: 'finished', totalTests: 12, totalPassed: 0, totalFailed: 12 },
+    { totalTests: 0, totalPassed: 0, totalPending: 0, totalSkipped: 0, totalFailed: 0 },
+    { totalTests: 12, totalPassed: 0, totalPending: 12, totalSkipped: 0, totalFailed: 0 },
+    { totalTests: 12, totalPassed: 0, totalPending: 0, totalSkipped: 12, totalFailed: 0 },
   ]) {
     const harness = CreateHarness('webgl');
-    assert.throws(function failed() { harness.handlers.get('after:run')(result); }, /did not complete/);
+    assert.throws(function failed() { harness.handlers.get('after:run')(result); }, /did not execute/);
     assert.ok(harness.files.has(path.join('cypress/results/webgl', 'summary.json')));
   }
 });
 
-test('mixed failures remain visible in the report without changing the Cypress result', function () {
+test('test failures are reported without masking them with a plugin exception', function () {
+  for (const result of [
+    { totalTests: 178, totalPassed: 164, totalFailed: 1, totalPending: 13, totalSkipped: 0 },
+    { totalTests: 12, totalPassed: 0, totalFailed: 12, totalPending: 0, totalSkipped: 0 },
+  ]) {
+    const harness = CreateHarness('webgl');
+    assert.doesNotThrow(function failedTests() { harness.handlers.get('after:run')(Object.freeze(result)); });
+    const report = JSON.parse(harness.files.get(path.join('cypress/results/webgl', 'summary.json')));
+    assert.deepEqual(report, { backend: 'webgl', ...result });
+  }
+});
+
+test('startup failures preserve the original error message in the report and exception', function () {
   const harness = CreateHarness('webgl');
-  const result = { status: 'finished', totalTests: 3, totalPassed: 2, totalFailed: 1 };
-  harness.handlers.get('after:run')(Object.freeze(result));
+  const result = { status: 'failed', failures: 1, message: 'browser crashed' };
+  assert.throws(function crashed() { harness.handlers.get('after:run')(result); }, /could not run: browser crashed/);
   const report = JSON.parse(harness.files.get(path.join('cypress/results/webgl', 'summary.json')));
-  assert.equal(report.totalFailed, 1);
-  assert.equal(result.totalFailed, 1);
+  assert.deepEqual(report, { backend: 'webgl', ...result });
+});
+
+test('missing or malformed counts are not accepted as a completed run', function () {
+  const valid = { totalTests: 1, totalPassed: 1, totalFailed: 0, totalPending: 0, totalSkipped: 0 };
+  for (const result of [{}, { ...valid, totalTests: -1 }, { ...valid, totalPassed: undefined },
+    { ...valid, totalSkipped: 0.5 }]) {
+    const harness = CreateHarness('webgl');
+    assert.throws(function malformed() { harness.handlers.get('after:run')(result); }, /invalid test counts/);
+  }
 });

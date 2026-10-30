@@ -33,8 +33,17 @@ export default defineConfig({
       config.reporterOptions = { mochaFile: path.join(resultsDir, 'junit-[hash].xml'), toConsole: false };
       on('after:run', (results) => {
         fs.writeFileSync(path.join(resultsDir, 'summary.json'), JSON.stringify({ backend, ...results }, null, 2));
-        if (results.status !== 'finished' || results.totalTests === 0 || results.totalPassed === 0) {
-          throw new Error(`Cypress ${backend} did not complete any successful tests`);
+        if ('status' in results) {
+          throw new Error(`Cypress ${backend} could not run: ${results.message}`);
+        }
+        const counts = [results.totalTests, results.totalPassed, results.totalFailed,
+          results.totalPending, results.totalSkipped];
+        if (counts.some((count) => !Number.isSafeInteger(count) || count < 0)) {
+          throw new Error(`Cypress ${backend} returned invalid test counts`);
+        }
+        if (results.totalFailed > 0) return;
+        if (results.totalTests === 0 || results.totalPassed === 0) {
+          throw new Error(`Cypress ${backend} did not execute any tests`);
         }
       });
 
