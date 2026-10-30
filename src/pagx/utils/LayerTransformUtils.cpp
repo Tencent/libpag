@@ -85,7 +85,7 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
 
 // Moves the transform pivot to `anchor`: T(anchor) * M * T(-anchor). The linear part is unchanged
 // and the translation becomes t + anchor - L * anchor, so the translation stays outside the pivot.
-static Matrix3D ApplyAnchor(const Matrix3D& matrix, const Point& anchor) {
+Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor) {
   if (anchor.x == 0.0f && anchor.y == 0.0f) {
     return matrix;
   }
@@ -102,23 +102,27 @@ static Matrix3D ApplyAnchor(const Matrix3D& matrix, const Point& anchor) {
   return result;
 }
 
-Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
+Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     if (IsFiniteMatrix3D(layer->matrix3D)) {
-      return ApplyAnchor(layer->matrix3D, layer->anchor);
+      return layer->matrix3D;
     }
     LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix3D.");
   }
   if (!layer->matrix.isIdentity()) {
     if (IsFiniteMatrix(layer->matrix)) {
-      return ApplyAnchor(LiftMatrixToMatrix3D(layer->matrix, layer->z), layer->anchor);
+      return LiftMatrixToMatrix3D(layer->matrix, layer->z);
     }
     LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix.");
   }
   Matrix3DComponents components = {};
   Matrix3D result = {};
   LayerTransformComponents(layer, &components, &result);
-  return ApplyAnchor(result, layer->anchor);
+  return result;
+}
+
+Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
+  return ApplyAnchorToMatrix(ComposeLayerLocalMatrix3D(layer), layer->anchor);
 }
 
 }  // namespace pagx
