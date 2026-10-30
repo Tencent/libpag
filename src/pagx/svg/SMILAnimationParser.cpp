@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/svg/SMILAnimationParser.h"
-
-#include <unordered_set>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -26,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <set>
+#include <unordered_set>
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
@@ -2087,8 +2086,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
       const float anchor = horizontal ? rect->position.x - rect->size.width * 0.5f
                                       : rect->position.y - rect->size.height * 0.5f;
       auto* size_channel = static_cast<TypedChannel<float>*>(channels.front());
-      auto* anchor_channel = CreateChannelForType(
-          doc, ChannelValueType::Float, horizontal ? "position.x" : "position.y");
+      auto* anchor_channel = CreateChannelForType(doc, ChannelValueType::Float,
+                                                  horizontal ? "position.x" : "position.y");
       for (const auto& key : size_channel->keyframes) {
         AppendKeyframe(anchor_channel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
                        key.interpolation, {}, {});
@@ -2148,7 +2147,7 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   // is permanent (treated as freeze), matching SMIL semantics for indefinite-duration <set>.
   Frame endFrame = beginFrames;
   bool fillFreeze = (durSeconds <= 0.0) || (ctx.getAttribute(setElement, "fill") == "freeze") ||
-                     IsIndefiniteRepeat(setElement);
+                    IsIndefiniteRepeat(setElement);
   if (durSeconds > 0.0) {
     endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
   }

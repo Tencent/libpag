@@ -319,8 +319,7 @@ void SVGParserContext::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
     child = child->getNextSibling();
   }
 }
-static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document,
-                                     Layer* layer);
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document, Layer* layer);
 
 // Splits "angle cx cy" style transform parameters into numbers.
 static std::vector<float> ParseTransformParams(const std::string& value) {
@@ -523,10 +522,9 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
             continue;
           }
           auto valuesAttribute = getAttribute(transformElement, "values");
-          std::string first =
-              valuesAttribute.empty()
-                  ? getAttribute(transformElement, "from")
-                  : valuesAttribute.substr(0, valuesAttribute.find(';'));
+          std::string first = valuesAttribute.empty()
+                                  ? getAttribute(transformElement, "from")
+                                  : valuesAttribute.substr(0, valuesAttribute.find(';'));
           auto params = ParseTransformParams(first);
           if (params.size() >= 3) {
             pivotX = params[1];
@@ -1302,8 +1300,7 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
                        fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
                            state->fontSize * 0.5f;
       // A fill change inside one visual line also opens a run, so each Text keeps one paint.
-      auto* currentLine =
-          opensLine ? nullptr : &state->lines[state->currentLineIndex];
+      auto* currentLine = opensLine ? nullptr : &state->lines[state->currentLineIndex];
       bool fillChanged = currentLine != nullptr && currentLine->fill != fill;
       if (opensLine || fillChanged) {
         state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill});
@@ -1869,8 +1866,7 @@ static void EnsureOpaqueClipFill(const std::shared_ptr<PAGXDocument>& document,
   elements.push_back(fill);
 }
 
-static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document,
-                                     Layer* layer) {
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document, Layer* layer) {
   if (layer == nullptr) {
     return;
   }
