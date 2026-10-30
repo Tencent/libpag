@@ -218,6 +218,11 @@ class SMILAnimationParser {
   // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
   // skewY, including rotate's "angle cx cy" form) are baked into a full Matrix. additive="sum"
   // pre-composes the layer's static matrix; fill="remove" reverts to it.
+  /// Scale animated stroke-dashoffset keyframes by the SVG `pathLength` ratio, matching the
+  /// scale already applied to the static dasharray/dashoffset.
+  static void ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode>& element,
+                                       std::vector<Channel*>& channels, SVGParserContext& ctx);
+
   static std::vector<Channel*> parseAnimateTransform(SVGParserContext& ctx, PAGXDocument* doc,
                                                      const std::shared_ptr<DOMNode>& animElement,
                                                      const AnimatedNodeInfo& nodeInfo,

@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/SVGImporter.h"
@@ -348,6 +349,10 @@ class SVGParserContext {
   // SMIL animation elements grouped by their parent SVG graphics element (raw DOMNode pointer
   // key, valid for the lifetime of the parsed XMLDOM which outlives parseDOM).
   std::unordered_map<const DOMNode*, SMILAnimationGroup> _smilAnimations = {};
+
+  // Layers whose rotate-about-point animation was hoisted onto a parent pivot layer. Their matrix
+  // keyframes are rewritten to pure rotation (no pivot compensation) during buildAnimation.
+  std::unordered_map<const Layer*, std::pair<float, float>> _pivotNormalizedLayers = {};
 
   // PAGX node info for each animated SVG element, populated during convertToLayer and consumed
   // by buildAnimation. Key matches _smilAnimations so the two maps can be walked together.
