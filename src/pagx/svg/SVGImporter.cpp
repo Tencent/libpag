@@ -23,6 +23,8 @@
 #include <cstring>
 #include <sstream>
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -320,7 +322,26 @@ void SVGParserContext::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
 static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document,
                                      Layer* layer);
 
->>>>>>> b2dd8724 (Keep CSS class rules separated and give clipPath masks an opaque fill.)
+// Splits "angle cx cy" style transform parameters into numbers.
+static std::vector<float> ParseTransformParams(const std::string& value) {
+  std::vector<float> params = {};
+  std::string token = {};
+  for (char ch : value) {
+    if (ch == ',' || ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+      if (!token.empty()) {
+        params.push_back(strtof(token.c_str(), nullptr));
+        token.clear();
+      }
+      continue;
+    }
+    token.push_back(ch);
+  }
+  if (!token.empty()) {
+    params.push_back(strtof(token.c_str(), nullptr));
+  }
+  return params;
+}
+
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                         const InheritedStyle& parentStyle, int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH) {
@@ -486,6 +507,49 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     if (tag == "g" && layer->children.empty() && layer->contents.empty() &&
         layer->mask == nullptr && layer->filters.empty() && layer->styles.empty()) {
       return nullptr;
+    }
+
+    // A rotate animation about a point ("angle cx cy") becomes a matrix with the pivot baked into
+    // tx/ty. Consumers that decompose the matrix see a translation track, so hoist the pivot onto
+    // a parent layer and let the animated layer rotate about its own origin instead.
+    if (layer->matrix.isIdentity() && layer->contents.empty() && !layer->children.empty()) {
+      auto smilIt = _smilAnimations.find(element.get());
+      if (smilIt != _smilAnimations.end()) {
+        float pivotX = 0.0f;
+        float pivotY = 0.0f;
+        bool hasPivot = false;
+        for (const auto& transformElement : smilIt->second.animateTransforms) {
+          if (getAttribute(transformElement, "type") != "rotate") {
+            continue;
+          }
+          auto valuesAttribute = getAttribute(transformElement, "values");
+          std::string first =
+              valuesAttribute.empty()
+                  ? getAttribute(transformElement, "from")
+                  : valuesAttribute.substr(0, valuesAttribute.find(';'));
+          auto params = ParseTransformParams(first);
+          if (params.size() >= 3) {
+            pivotX = params[1];
+            pivotY = params[2];
+            hasPivot = true;
+          }
+          break;
+        }
+        if (hasPivot && (pivotX != 0.0f || pivotY != 0.0f)) {
+          // Registration normally happens after the content branch; the early return below skips
+          // it, so the animated layer must be registered here.
+          registerAnimatedElement(element, layer);
+          for (auto* childLayer : layer->children) {
+            childLayer->matrix = Matrix::Translate(-pivotX, -pivotY) * childLayer->matrix;
+          }
+          auto* pivotLayer = _document->makeNode<Layer>();
+          pivotLayer->matrix = Matrix::Translate(pivotX, pivotY);
+          pivotLayer->children.push_back(layer);
+          layer->matrix = Matrix::Identity();
+          _pivotNormalizedLayers[layer] = {pivotX, pivotY};
+          return pivotLayer;
+        }
+      }
     }
   } else if (tag == "use") {
     // A <use> may reference a container (<symbol>/<g>/<svg>) or a leaf (<image>/shape). Container
@@ -1475,6 +1539,59 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   if (group->children.empty()) {
     return nullptr;
   }
+
+  // A referenced <g>/<symbol>/<svg> may carry its own mask or clip-path.
+  // Expanding a <use> copies only the referenced subtree children, so the referenced
+  // element's own mask attributes are applied here; otherwise the mask is silently dropped.
+  std::string refMaskAttr = getAttribute(refElement, "mask");
+  if (!refMaskAttr.empty() && refMaskAttr != "none") {
+    auto maskIt = _defs.find(resolveUrl(refMaskAttr));
+    if (maskIt != _defs.end()) {
+      auto* maskLayer = convertMaskElement(maskIt->second, refStyle);
+      if (maskLayer) {
+        // One mask definition expands into one instance per <use> reference; ids must stay
+        // unique across instances, otherwise mask="@..." can resolve to the wrong one.
+        static int maskInstanceSeq = 0;
+        maskLayer->id = maskLayer->id + "_" + std::to_string(++maskInstanceSeq);
+        maskLayer->name = maskLayer->id;
+        group->mask = maskLayer;
+        group->maskType = (getAttribute(maskIt->second, "mask-type") == "alpha")
+                              ? MaskType::Alpha
+                              : MaskType::Luminance;
+        _maskLayers.push_back(maskLayer);
+      }
+    }
+  }
+
+  std::string refClipAttr = getAttribute(refElement, "clip-path");
+  if (!refClipAttr.empty() && refClipAttr != "none") {
+    auto clipIt = _defs.find(resolveUrl(refClipAttr));
+    if (clipIt != _defs.end()) {
+      auto* clipLayer = convertMaskElement(clipIt->second, refStyle);
+      if (clipLayer) {
+        EnsureOpaqueClipMaskFill(_document, clipLayer);
+        if (group->mask != nullptr) {
+          // Both mask and clip-path are present: clip-path goes on the outer layer and the
+          // mask stays on the inner one.
+          auto* wrapper = _document->makeNode<Layer>();
+          wrapper->mask = clipLayer;
+          wrapper->maskType = MaskType::Alpha;
+          wrapper->matrix = group->matrix;
+          wrapper->alpha = group->alpha;
+          group->matrix = Matrix::Identity();
+          group->alpha = 1.0f;
+          wrapper->children.push_back(group);
+          _maskLayers.push_back(clipLayer);
+          group = wrapper;
+        } else {
+          group->mask = clipLayer;
+          group->maskType = MaskType::Alpha;
+          _maskLayers.push_back(clipLayer);
+        }
+      }
+    }
+  }
+
   return group;
 }
 // Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
@@ -1800,6 +1917,9 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         subLayer->matrix = combinedMatrix;
         convertChildren(child, subLayer->contents, inheritedStyle);
         maskLayer->children.push_back(subLayer);
+        // Mask content can carry SMIL animations; registering the host layer is required for
+        // those animations to bind.
+        registerAnimatedElement(child, subLayer);
       } else {
         // Each SVG shape carries its own paint, so wrap it in a Group to isolate the fill/stroke.
         // Otherwise multiple shapes sharing the mask layer's flat contents list would let a later
@@ -1808,7 +1928,18 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         auto group = _document->makeNode<Group>();
         convertChildren(child, group->elements, inheritedStyle);
         if (!group->elements.empty()) {
-          maskLayer->contents.push_back(group);
+          if (_smilAnimations.count(child.get()) > 0) {
+            // An animated shape needs its own layer to host the animation. Path/Stroke are put
+            // directly into that layer: an intermediate Group prevents stroke channels from
+            // resolving their host element.
+            auto subLayer = _document->makeNode<Layer>();
+            subLayer->contents.clear();
+            convertChildren(child, subLayer->contents, inheritedStyle);
+            maskLayer->children.push_back(subLayer);
+            registerAnimatedElement(child, subLayer);
+          } else {
+            maskLayer->contents.push_back(group);
+          }
         }
       }
     } else if (child->name == "g") {
@@ -1848,6 +1979,27 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
   // If filter only produces shadow without merging with original content,
   // we should set shadowOnly=true.
   bool shadowOnly = !hasMerge;
+
+  // A blur merged back with the sharp source is a glow composite (feMerge of the blurred result and
+  // SourceGraphic). PAGX has no duplication primitive for that pattern; blurring the layer itself
+  // would soften the artwork instead of adding a halo, so keep the graphic sharp.
+  bool blurMergesWithSource = false;
+  for (const auto& primitive : primitives) {
+    if (primitive->name != "feMerge") {
+      continue;
+    }
+    auto mergeChild = primitive->getFirstChild();
+    while (mergeChild) {
+      if (mergeChild->name == "feMergeNode" && getAttribute(mergeChild, "in") == "SourceGraphic") {
+        blurMergesWithSource = true;
+        break;
+      }
+      mergeChild = mergeChild->getNextSibling();
+    }
+    if (blurMergesWithSource) {
+      break;
+    }
+  }
 
   // Detect Figma-style drop shadow pattern and extract shadow parameters.
   // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix
@@ -2045,7 +2197,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         }
       }
 
-      if (isSourceGraphic) {
+      if (isSourceGraphic && !blurMergesWithSource) {
         auto [devX, devY] = parseFilterBlur(node);
         auto blurFilter = _document->makeNode<BlurFilter>();
         blurFilter->blurX = devX;
@@ -3081,16 +3233,13 @@ static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-<<<<<<< HEAD
     // Skip the separator of an empty declaration too: rule bodies collected from a <style> element
     // may join with a semicolon that follows one the previous body already ended with.
     while (pos < styleStr.size() &&
            (std::isspace(static_cast<unsigned char>(styleStr[pos])) || styleStr[pos] == ';')) {
-=======
     // Empty declarations (consecutive semicolons) would turn the next property name
     // into ";prop".
     while (pos < styleStr.size() && (std::isspace(styleStr[pos]) || styleStr[pos] == ';')) {
->>>>>>> b2dd8724 (Keep CSS class rules separated and give clipPath masks an opaque fill.)
       ++pos;
     }
     // Skip CSS comments.
@@ -3528,8 +3677,10 @@ void SVGParserContext::collectSMILAnimations(const std::shared_ptr<DOMNode>& nod
   // <animate> elements that drive the filter's blur/offset channels (see registerAnimatedElement's
   // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
   const auto& name = node->name;
+  // <mask> is not skipped: its content can carry SMIL animations, and skipping it would
+  // drop them.
   if (name == "style" || name == "title" || name == "desc" || name == "metadata" ||
-      name == "mask" || name == "clipPath" || name == "marker" || name == "linearGradient" ||
+      name == "clipPath" || name == "marker" || name == "linearGradient" ||
       name == "radialGradient" || name == "pattern") {
     return;
   }
@@ -3612,6 +3763,80 @@ void SVGParserContext::registerAnimatedContentNodes(const std::shared_ptr<DOMNod
   // <animate>/<set> targets a Fill/Stroke/Shape. Nothing to do here at convertToLayer time.
 }
 
+// A matrix channel replaces the target layer's static matrix at runtime. Consumers that render the
+// document without evaluating the timeline (design canvases, static exports) only see the shipped
+// matrix, so a layer positioned solely by the animation would collapse to the parent origin.
+// Mirror the first keyframe onto layers that carry no authored transform of their own.
+static void BakeFirstMatrixKeyframe(const Animation* animation, PAGXDocument* document) {
+  if (animation == nullptr || document == nullptr) {
+    return;
+  }
+  for (auto* object : animation->objects) {
+    if (object == nullptr || object->target.empty()) {
+      continue;
+    }
+    auto* node = document->findNode(object->target);
+    if (node == nullptr || node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node);
+    if (!layer->matrix.isIdentity() || layer->layout != LayoutMode::None) {
+      continue;
+    }
+    for (auto* channel : object->channels) {
+      if (channel == nullptr || channel->name != "matrix" ||
+          channel->valueType() != ChannelValueType::Matrix) {
+        continue;
+      }
+      auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
+      if (matrixChannel->keyframes.empty() || matrixChannel->keyframes.front().time != 0) {
+        continue;
+      }
+      layer->matrix = matrixChannel->keyframes.front().value;
+      break;
+    }
+  }
+}
+
+// With the pivot hoisted onto a parent layer, the animated layer only needs the rotation part of
+// each keyframe. Rewrite M as T(-p) * M * T(p) so the composed transform stays identical while the
+// translation components collapse to zero for pure rotations.
+static void NormalizePivotKeyframes(
+    const Animation* animation, PAGXDocument* document,
+    const std::unordered_map<const Layer*, std::pair<float, float>>& pivots) {
+  if (animation == nullptr || document == nullptr || pivots.empty()) {
+    return;
+  }
+  for (auto* object : animation->objects) {
+    if (object == nullptr || object->target.empty()) {
+      continue;
+    }
+    auto* node = document->findNode(object->target);
+    if (node == nullptr || node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node);
+    auto pivotIt = pivots.find(layer);
+    if (pivotIt == pivots.end()) {
+      continue;
+    }
+    const float pivotX = pivotIt->second.first;
+    const float pivotY = pivotIt->second.second;
+    for (auto* channel : object->channels) {
+      if (channel == nullptr || channel->name != "matrix" ||
+          channel->valueType() != ChannelValueType::Matrix) {
+        continue;
+      }
+      auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
+      for (auto& keyframe : matrixChannel->keyframes) {
+        const Matrix& value = keyframe.value;
+        keyframe.value.tx = value.tx + (value.a * pivotX + value.c * pivotY) - pivotX;
+        keyframe.value.ty = value.ty + (value.b * pivotX + value.d * pivotY) - pivotY;
+      }
+    }
+  }
+}
+
 void SVGParserContext::buildAnimation(Layer* rootLayer) {
   if (_animatedNodeMap.empty() || !rootLayer) {
     return;
@@ -3624,6 +3849,8 @@ void SVGParserContext::buildAnimation(Layer* rootLayer) {
   animation->id = generateUniqueId("smil_anim");
   _document->registerNode(animation, animation->id);
   _document->animations.push_back(animation);
+  NormalizePivotKeyframes(animation, _document.get(), _pivotNormalizedLayers);
+  BakeFirstMatrixKeyframe(animation, _document.get());
 
   // Attach an AnimationTimeline to the root layer so the runtime activates this animation.
   auto timeline = std::make_unique<AnimationTimeline>();
