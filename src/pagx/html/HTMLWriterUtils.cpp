@@ -570,17 +570,30 @@ const char* BlendModeToMixBlendMode(BlendMode mode) {
   return nullptr;
 }
 
+// Applies the anchor pivot to a 2D matrix: the linear part stays and the translation becomes
+// t + anchor - L * anchor. A non-zero anchorZ has no effect on a 2D transform.
+static Matrix AnchorMatrix2D(const Matrix& matrix, const Point& anchor) {
+  if (anchor.x == 0.0f && anchor.y == 0.0f) {
+    return matrix;
+  }
+  Matrix result = matrix;
+  result.tx = matrix.tx + anchor.x - (matrix.a * anchor.x + matrix.c * anchor.y);
+  result.ty = matrix.ty + anchor.y - (matrix.b * anchor.x + matrix.d * anchor.y);
+  return result;
+}
+
 std::string LayerTransformCSS(const Layer* layer) {
-  // A non-finite matrix3D is ignored by the renderer, so it must not reach the CSS either;
-  // BuildLayerLocalMatrix3D below applies the same rule.
+  // Every branch applies the anchor pivot, so the exported CSS matches the renderer.
+  // A non-finite matrix3D is ignored by the renderer, so it must not reach the CSS either.
   if (!layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D)) {
-    return Matrix3DToCSS(layer->matrix3D);
+    return Matrix3DToCSS(ApplyAnchorToMatrix(layer->matrix3D, layer->anchor, layer->anchorZ));
   }
   bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
   // Transform components compose with the complete authored x / y / z (the perspective applies
   // outside the translation), so the caller emits only the generated layout slot as left / top.
   if (!hasMatrix && HasLayerTransformComponents(layer)) {
-    return Matrix3DToCSS(BuildLayerLocalMatrix3D(layer));
+    const auto composed = ComposeLayerLocalMatrix3D(layer);
+    return Matrix3DToCSS(ApplyAnchorToMatrix(composed, layer->anchor, layer->anchorZ));
   }
   // Generated layout is emitted as the outer left/top slot. Keep authored x/y in the local
   // transform only on axes where layout supplied a separate position.
@@ -594,8 +607,10 @@ std::string LayerTransformCSS(const Layer* layer) {
     }
   }
   if (layer->z != 0) {
-    return Matrix3DToCSS(LiftMatrixToMatrix3D(m, layer->z));
+    const auto lifted = LiftMatrixToMatrix3D(m, layer->z);
+    return Matrix3DToCSS(ApplyAnchorToMatrix(lifted, layer->anchor, layer->anchorZ));
   }
+  m = AnchorMatrix2D(m, layer->anchor);
   if (m.isIdentity()) {
     return {};
   }

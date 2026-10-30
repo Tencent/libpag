@@ -42,6 +42,7 @@ struct SVGFeatureFlags {
   // Perspective and shared 3D depth compositing require rasterization of the entire layer subtree.
   bool hasPerspectiveTransform = false;
   bool hasPreserve3D = false;
+  bool hasAnimation = false;  // PAGX Animation nodes (SVG export cannot express animation).
 
   /**
    * Returns true when at least one feature is present.

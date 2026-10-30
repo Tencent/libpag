@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60" viewBox="0 0 200 60">
+  <rect x="10" y="15" width="30" height="30" rx="6" fill="#3b82f6">
+    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0s" fill="freeze"/>
+  </rect>
+  <rect x="50" y="15" width="30" height="30" rx="6" fill="#3b82f6">
+    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0.3s" fill="freeze"/>
+  </rect>
+  <rect x="90" y="15" width="30" height="30" rx="6" fill="#3b82f6">
+    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0.6s" fill="freeze"/>
+  </rect>
+  <rect x="130" y="15" width="30" height="30" rx="6" fill="#3b82f6">
+    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0.9s" fill="freeze"/>
+  </rect>
+  <rect x="170" y="15" width="20" height="30" rx="6" fill="#3b82f6">
+    <animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="1.2s" fill="freeze"/>
+  </rect>
+</svg>

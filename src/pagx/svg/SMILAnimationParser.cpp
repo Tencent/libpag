@@ -1,0 +1,2819 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "pagx/svg/SMILAnimationParser.h"
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <set>
+#include <unordered_set>
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/svg/SVGParserContext.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/PathMeasure.h"
+
+namespace pagx {
+
+static void SkipWhitespaceAndComma(const char*& ptr, const char* end) {
+  while (ptr < end && (std::isspace(static_cast<unsigned char>(*ptr)) != 0 || *ptr == ',')) {
+    ++ptr;
+  }
+}
+
+double SMILAnimationParser::parseSMILClockValue(const std::string& value) {
+  if (value.empty()) {
+    return 0.0;
+  }
+  if (value == "indefinite") {
+    return -1.0;
+  }
+
+  // Timecolon form: HH:MM:SS.ss (hours optional) or MM:SS.ss.
+  if (value.find(':') != std::string::npos) {
+    int hours = 0;
+    int minutes = 0;
+    double seconds = 0.0;
+    auto firstColon = value.find(':');
+    auto secondColon = value.find(':', firstColon + 1);
+    if (secondColon != std::string::npos) {
+      hours = std::atoi(value.substr(0, firstColon).c_str());
+      minutes = std::atoi(value.substr(firstColon + 1, secondColon - firstColon - 1).c_str());
+      seconds = std::atof(value.substr(secondColon + 1).c_str());
+    } else {
+      minutes = std::atoi(value.substr(0, firstColon).c_str());
+      seconds = std::atof(value.substr(firstColon + 1).c_str());
+    }
+    return hours * 3600.0 + minutes * 60.0 + seconds;
+  }
+
+  // Suffix form: numeric value followed by an optional unit.
+  // Detect the longest matching unit suffix first so "ms" wins over "s".
+  if (value.size() >= 2 && value.compare(value.size() - 2, 2, "ms") == 0) {
+    return std::atof(value.substr(0, value.size() - 2).c_str()) / 1000.0;
+  }
+  if (value.size() >= 3 && value.compare(value.size() - 3, 3, "min") == 0) {
+    return std::atof(value.substr(0, value.size() - 3).c_str()) * 60.0;
+  }
+  if (value.size() >= 1 && value.back() == 's') {
+    return std::atof(value.substr(0, value.size() - 1).c_str());
+  }
+  if (value.size() >= 1 && value.back() == 'h') {
+    return std::atof(value.substr(0, value.size() - 1).c_str()) * 3600.0;
+  }
+
+  // Bare number means seconds per SMIL spec.
+  return std::atof(value.c_str());
+}
+
+std::vector<double> SMILAnimationParser::parseKeyTimes(const std::string& value) {
+  std::vector<double> result = {};
+  if (value.empty()) {
+    return result;
+  }
+  size_t pos = 0;
+  while (pos < value.size()) {
+    while (pos < value.size() && (std::isspace(static_cast<unsigned char>(value[pos])) != 0)) {
+      ++pos;
+    }
+    if (pos >= value.size()) {
+      break;
+    }
+    char* endPtr = nullptr;
+    double num = std::strtod(value.c_str() + pos, &endPtr);
+    if (endPtr == value.c_str() + pos) {
+      return {};
+    }
+    result.push_back(num);
+    pos = static_cast<size_t>(endPtr - value.c_str());
+    while (pos < value.size() && (std::isspace(static_cast<unsigned char>(value[pos])) != 0)) {
+      ++pos;
+    }
+    if (pos < value.size() && value[pos] == ';') {
+      ++pos;
+    }
+  }
+  if (result.empty()) {
+    return result;
+  }
+  if (result.front() != 0.0 || result.back() != 1.0) {
+    return {};
+  }
+  for (size_t i = 1; i < result.size(); ++i) {
+    if (result[i] < result[i - 1]) {
+      return {};
+    }
+  }
+  return result;
+}
+
+std::vector<BezierControlPoints> SMILAnimationParser::parseKeySplines(const std::string& value) {
+  std::vector<BezierControlPoints> result = {};
+  if (value.empty()) {
+    return result;
+  }
+  size_t pos = 0;
+  while (pos < value.size()) {
+    float nums[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    int filled = 0;
+    while (pos < value.size() && filled < 4) {
+      while (pos < value.size() && (std::isspace(static_cast<unsigned char>(value[pos])) != 0)) {
+        ++pos;
+      }
+      if (pos >= value.size() || value[pos] == ';') {
+        break;
+      }
+      char* endPtr = nullptr;
+      double num = std::strtod(value.c_str() + pos, &endPtr);
+      if (endPtr == value.c_str() + pos) {
+        return {};
+      }
+      nums[filled++] = static_cast<float>(num);
+      pos = static_cast<size_t>(endPtr - value.c_str());
+    }
+    if (filled != 4) {
+      return {};
+    }
+    // X components must stay within [0,1] so the bezier is a proper easing curve.
+    if (nums[0] < 0.0f || nums[0] > 1.0f || nums[2] < 0.0f || nums[2] > 1.0f) {
+      return {};
+    }
+    BezierControlPoints controls = {};
+    controls.p1x = nums[0];
+    controls.p1y = nums[1];
+    controls.p2x = nums[2];
+    controls.p2y = nums[3];
+    result.push_back(controls);
+    while (pos < value.size() && (std::isspace(static_cast<unsigned char>(value[pos])) != 0)) {
+      ++pos;
+    }
+    if (pos < value.size() && value[pos] == ';') {
+      ++pos;
+    }
+  }
+  return result;
+}
+
+// Splits a semicolon-separated values string into trimmed tokens. Used for SMIL `values`,
+// `keyTimes`, and similar list attributes.
+static std::vector<std::string> SplitSemicolons(const std::string& value) {
+  std::vector<std::string> result = {};
+  if (value.empty()) {
+    return result;
+  }
+  size_t start = 0;
+  while (start <= value.size()) {
+    auto sep = value.find(';', start);
+    if (sep == std::string::npos) {
+      sep = value.size();
+    }
+    std::string token = value.substr(start, sep - start);
+    // Trim whitespace.
+    auto first = token.find_first_not_of(" \t\n\r");
+    auto last = token.find_last_not_of(" \t\n\r");
+    if (first != std::string::npos) {
+      result.push_back(token.substr(first, last - first + 1));
+    }
+    start = sep + 1;
+  }
+  return result;
+}
+
+// Parses a single SMIL transform value token ("tx,ty" or "angle" or "angle cx cy") into a list
+// of floats. Space and comma are both accepted as separators. Used by parseAnimateTransform to
+// extract per-keyframe parameters for each transform type.
+static std::vector<float> ParseFloatParams(const std::string& token) {
+  std::vector<float> result = {};
+  if (token.empty()) {
+    return result;
+  }
+  const char* ptr = token.c_str();
+  const char* end = ptr + token.length();
+  while (ptr < end) {
+    SkipWhitespaceAndComma(ptr, end);
+    if (ptr >= end) {
+      break;
+    }
+    char* endPtr = nullptr;
+    float num = std::strtof(ptr, &endPtr);
+    if (endPtr == ptr) {
+      break;
+    }
+    result.push_back(num);
+    ptr = endPtr;
+  }
+  return result;
+}
+
+// Computes the bezier handles for keyframe i given the interpolation mode and splines list.
+// Returns {bezierOut, bezierIn} via out params; both are zero when interpolation is not Bezier
+// or i is the last keyframe.
+static void ComputeBezierHandles(KeyframeInterpolationType interpolation,
+                                 const std::vector<BezierControlPoints>& splines, size_t i,
+                                 size_t keyframeCount, Point* outBezierOut, Point* outBezierIn) {
+  *outBezierOut = {};
+  *outBezierIn = {};
+  if (interpolation == KeyframeInterpolationType::Bezier && i < keyframeCount - 1 &&
+      i < splines.size()) {
+    outBezierOut->x = static_cast<float>(splines[i].p1x);
+    outBezierOut->y = static_cast<float>(splines[i].p1y);
+    outBezierIn->x = static_cast<float>(splines[i].p2x);
+    outBezierIn->y = static_cast<float>(splines[i].p2y);
+  }
+}
+
+// Reads repeatCount attribute: returns -1.0 for "indefinite", 0.0 for unparseable, otherwise the
+// count (clamped to >=1.0). Fractional counts are preserved so ExpandRepeatCount can truncate the
+// final repetition at the fractional offset. Callers compare > 1.0 instead of > 1.
+static double ParseRepeatCount(const std::string& value) {
+  if (value == "indefinite") {
+    return -1.0;
+  }
+  if (value.empty()) {
+    return 1.0;
+  }
+  double count = std::atof(value.c_str());
+  if (count < 1.0) {
+    return 1.0;
+  }
+  return count;
+}
+
+// Resolves the effective repeat count from repeatCount and repeatDur. SMIL: repeatDur specifies
+// the total duration of the repetitions, so the equivalent count is repeatDur / dur. When both
+// are set, the one that expires first wins; "indefinite" repeatCount wins outright. Returns -1.0
+// for indefinite, otherwise a count >= 1.0.
+static double ResolveRepeatCount(const std::string& repeatCountStr, const std::string& repeatDurStr,
+                                 double durSeconds) {
+  double count = ParseRepeatCount(repeatCountStr);
+  if (count < 0.0) {
+    return -1.0;
+  }
+  double repeatDurSeconds = SMILAnimationParser::parseSMILClockValue(repeatDurStr);
+  if (repeatDurSeconds > 0.0 && durSeconds > 0.0) {
+    double fromDur = repeatDurSeconds / durSeconds;
+    if (fromDur < 1.0) {
+      fromDur = 1.0;
+    }
+    // repeatCount unset (count == 1 with an empty attribute) → repeatDur alone; both set → the
+    // earlier expiry wins (the smaller count).
+    if (repeatCountStr.empty() || fromDur < count) {
+      count = fromDur;
+    }
+  }
+  return count;
+}
+
+// A single syncbase reference parsed from a begin/end list item:
+//   id                    → target's begin
+//   id.begin (+offset)    → target's begin + offset
+//   id.end   (+offset)    → target's active end (begin + dur * repeats) + offset
+//   id.repeat(n) (+offset)→ target's begin + dur * n + offset
+struct SyncBaseRef {
+  bool valid = false;
+  std::string targetId = {};
+  int eventKind = 0;  // 0 = begin, 1 = end, 2 = repeat(n)
+  int repeatIndex = 1;
+  double offsetSeconds = 0;
+};
+
+// True when the trimmed token looks like a clock value (starts with a digit, sign, or dot).
+// Interactive offsets like "click" and "accessKey(...)" fail this test.
+static bool IsClockToken(const std::string& token) {
+  auto first = token.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return false;
+  }
+  char c = token[first];
+  return (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.';
+}
+
+// SMIL interactive event names; these have no PAGX equivalent and are ignored as begin/end
+// offsets. Without this check a bare "click" would be mistaken for a syncbase target id.
+static bool IsInteractiveEvent(const std::string& s) {
+  return s == "click" || s == "focusin" || s == "focusout" || s == "activate" || s == "mousedown" ||
+         s == "mouseup" || s == "mouseover" || s == "mousemove" || s == "mouseout" ||
+         s == "beginEvent" || s == "endEvent" || s == "repeatEvent" ||
+         s.compare(0, 10, "accessKey(") == 0;
+}
+
+// Parses one begin/end list item. Returns a valid SyncBaseRef for syncbase syntax; clock values
+// and interactive offsets (click/accessKey) are not syncbases (the caller handles those).
+static SyncBaseRef ParseSyncBase(const std::string& token) {
+  SyncBaseRef ref = {};
+  std::string s = token;
+  // Trim whitespace.
+  auto first = s.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return ref;
+  }
+  auto last = s.find_last_not_of(" \t");
+  s = s.substr(first, last - first + 1);
+
+  // Split the trailing +/- clock offset, if any.
+  double offset = 0;
+  for (size_t i = 1; i < s.size(); ++i) {
+    if (s[i] == '+' || s[i] == '-') {
+      offset = SMILAnimationParser::parseSMILClockValue(s.substr(i));
+      s = s.substr(0, i);
+      break;
+    }
+  }
+  auto dot = s.rfind('.');
+  if (dot == std::string::npos || dot == 0 || dot + 1 >= s.size()) {
+    // A bare id (no event suffix) is a valid syncbase defaulting to the target's begin. Clock
+    // values ("1s") and interactive event names ("click") must not be mistaken for ids.
+    if (!s.empty() && s.find_first_of(" \t()") == std::string::npos && !IsClockToken(s) &&
+        !IsInteractiveEvent(s)) {
+      ref.valid = true;
+      ref.targetId = s;
+      ref.eventKind = 0;
+      ref.offsetSeconds = offset;
+    }
+    return ref;
+  }
+  ref.targetId = s.substr(0, dot);
+  auto event = s.substr(dot + 1);
+  if (event == "begin") {
+    ref.valid = true;
+    ref.eventKind = 0;
+  } else if (event == "end") {
+    ref.valid = true;
+    ref.eventKind = 1;
+  } else if (event.compare(0, 7, "repeat(") == 0 && event.back() == ')') {
+    ref.valid = true;
+    ref.eventKind = 2;
+    ref.repeatIndex = std::max(1, atoi(event.substr(7, event.size() - 8).c_str()));
+  }
+  ref.offsetSeconds = offset;
+  return ref;
+}
+
+// Truncates a channel's keyframes at endFrame: evaluates the channel at endFrame, drops
+// keyframes beyond it, and appends a Hold keyframe carrying the evaluated value so fill="freeze"
+// holds the end-time value and fill="remove" (whose base-value keyframe is added later at
+// endFrame+1 by AddBaseValueKeyframes) reverts from there.
+static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Frame endFrame) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<TypedChannel<float>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      float value = std::get<float>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<float>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<float> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<TypedChannel<Color>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      Color value = std::get<Color>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<Color>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<Color> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      Matrix value = std::get<Matrix>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<Matrix>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<Matrix> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Timing info for one SMIL animation element, gathered in a pre-scan and used to solve
+// syncbase references (begin="id.end") across all elements before any parsing happens.
+struct TimingInfo {
+  const DOMNode* element = nullptr;
+  std::string id = {};
+  double durSeconds = 0;
+  double repeatCount = 1;  // >= 1, or -1 for indefinite
+  // begin list: the earliest clock item and the first syncbase item.
+  bool hasClockBegin = false;
+  double clockBegin = 0;
+  SyncBaseRef beginSync = {};
+  bool hasBeginSync = false;
+  bool beginResolved = false;
+  double resolvedBegin = 0;
+  // end: single value (first item of the list).
+  bool hasClockEnd = false;
+  double clockEnd = -1;
+  SyncBaseRef endSync = {};
+  bool hasEndSync = false;
+  bool endResolved = false;
+  double resolvedEnd = -1;
+  // Member of a syncbase cycle: its begin comes from the previous lap, and the timeline loops.
+  bool cyclic = false;
+};
+
+// The active duration of a timing target: dur * repeats. Indefinite repeats and missing dur
+// fall back to a single dur (the sync event time is approximate in those rare cases).
+static double ActiveDuration(const TimingInfo& info) {
+  if (info.durSeconds <= 0) {
+    return 0;
+  }
+  if (info.repeatCount < 0) {
+    return info.durSeconds;
+  }
+  return info.durSeconds * info.repeatCount;
+}
+
+// Computes the document time a syncbase reference points at, given its (already resolved)
+// target.
+static double SyncEventTime(const TimingInfo& target, const SyncBaseRef& ref) {
+  double base = target.resolvedBegin;
+  if (ref.eventKind == 1) {
+    base += ActiveDuration(target);
+  } else if (ref.eventKind == 2) {
+    base += target.durSeconds * static_cast<double>(ref.repeatIndex);
+  }
+  return base + ref.offsetSeconds;
+}
+
+// Pre-scans every SMIL element in the document, parses begin/end, and solves syncbase
+// references to fixed-point (chains like a.end -> b.end -> c resolve in dependency order;
+// cycles fall back to 0). Interactive offsets resolve to their clock component or 0. Returns
+// per-element resolved timing consumed by the parse functions.
+std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveAllTimings(
+    SVGParserContext& ctx,
+    const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations) {
+  std::vector<TimingInfo> infos = {};
+  std::unordered_map<std::string, size_t> idToIndex = {};
+
+  // Collect timing info for every animation element (id, dur, repeatCount, begin/end lists).
+  for (const auto& pair : smilAnimations) {
+    const auto& group = pair.second;
+    std::vector<const std::vector<std::shared_ptr<DOMNode>>*> elements = {
+        &group.animates, &group.sets, &group.animateTransforms, &group.animateMotions};
+    for (const auto* list : elements) {
+      for (const auto& el : *list) {
+        if (el == nullptr) {
+          continue;
+        }
+        TimingInfo info = {};
+        info.element = el.get();
+        info.id = ctx.getAttribute(el, "id");
+        info.durSeconds = parseSMILClockValue(ctx.getAttribute(el, "dur"));
+        info.repeatCount = ResolveRepeatCount(ctx.getAttribute(el, "repeatCount"),
+                                              ctx.getAttribute(el, "repeatDur"), info.durSeconds);
+
+        auto beginTokens = SplitSemicolons(ctx.getAttribute(el, "begin"));
+        for (const auto& token : beginTokens) {
+          SyncBaseRef sync = ParseSyncBase(token);
+          if (sync.valid) {
+            if (!info.hasBeginSync) {
+              info.beginSync = sync;
+              info.hasBeginSync = true;
+            }
+            continue;
+          }
+          if (IsClockToken(token)) {
+            double t = parseSMILClockValue(token);
+            if (!info.hasClockBegin || t < info.clockBegin) {
+              info.clockBegin = t;
+              info.hasClockBegin = true;
+            }
+          }
+          // Interactive offsets (click, accessKey) have no PAGX equivalent: skipped.
+        }
+
+        auto endTokens = SplitSemicolons(ctx.getAttribute(el, "end"));
+        if (!endTokens.empty()) {
+          SyncBaseRef sync = ParseSyncBase(endTokens.front());
+          if (sync.valid) {
+            info.endSync = sync;
+            info.hasEndSync = true;
+          } else if (IsClockToken(endTokens.front())) {
+            info.clockEnd = parseSMILClockValue(endTokens.front());
+            info.hasClockEnd = true;
+          }
+        }
+
+        if (!info.id.empty()) {
+          idToIndex[info.id] = infos.size();
+        }
+        infos.push_back(std::move(info));
+      }
+    }
+  }
+
+  // Solve begin times to a fixed point.
+  bool progress = true;
+  while (progress) {
+    progress = false;
+    for (auto& info : infos) {
+      if (info.beginResolved) {
+        continue;
+      }
+      bool blocked = false;
+      double best = 0;
+      bool hasCandidate = false;
+      if (info.hasClockBegin) {
+        best = info.clockBegin;
+        hasCandidate = true;
+      }
+      if (info.hasBeginSync) {
+        auto it = idToIndex.find(info.beginSync.targetId);
+        if (it == idToIndex.end()) {
+          // Unknown target id: treat the offset alone as the begin time.
+          double t = info.beginSync.offsetSeconds;
+          if (!hasCandidate || t < best) {
+            best = t;
+            hasCandidate = true;
+          }
+        } else if (infos[it->second].beginResolved) {
+          double t = SyncEventTime(infos[it->second], info.beginSync);
+          if (!hasCandidate || t < best) {
+            best = t;
+            hasCandidate = true;
+          }
+        } else {
+          blocked = true;
+        }
+      }
+      if (!blocked && (hasCandidate || (!info.hasClockBegin && !info.hasBeginSync))) {
+        // No begin attribute at all resolves to 0.
+        info.resolvedBegin = hasCandidate ? best : 0;
+        info.beginResolved = true;
+        progress = true;
+      }
+    }
+  }
+  // Cyclic references (A.begin = B.end, B.begin = A.end) cannot be solved by the fixed point
+  // above. Anchor the members that carry a clock value, then let the cascade resolve the rest:
+  // the sequence runs one lap after another and repeats, so the timeline loops.
+  bool saw_cycle = false;
+  for (auto& info : infos) {
+    if (info.beginResolved || !info.hasClockBegin) {
+      continue;
+    }
+    info.resolvedBegin = info.clockBegin;
+    info.beginResolved = true;
+    info.cyclic = true;
+    saw_cycle = true;
+  }
+  if (saw_cycle) {
+    progress = true;
+    while (progress) {
+      progress = false;
+      for (auto& info : infos) {
+        if (info.beginResolved || !info.hasBeginSync) {
+          continue;
+        }
+        auto it = idToIndex.find(info.beginSync.targetId);
+        if (it == idToIndex.end() || !infos[it->second].beginResolved) {
+          continue;
+        }
+        info.resolvedBegin = SyncEventTime(infos[it->second], info.beginSync);
+        info.beginResolved = true;
+        info.cyclic = true;
+        progress = true;
+      }
+    }
+  }
+  // Remaining members are a cycle without any clock anchor: keep the previous 0 fallback.
+  for (auto& info : infos) {
+    if (!info.beginResolved) {
+      info.resolvedBegin = 0;
+      info.beginResolved = true;
+      info.cyclic = true;
+    }
+  }
+
+  // Solve end times (single value each: clock or syncbase).
+  progress = true;
+  while (progress) {
+    progress = false;
+    for (auto& info : infos) {
+      if (info.endResolved) {
+        continue;
+      }
+      if (info.hasClockEnd) {
+        info.resolvedEnd = info.clockEnd;
+        info.endResolved = true;
+        progress = true;
+        continue;
+      }
+      if (!info.hasEndSync) {
+        info.endResolved = true;
+        continue;
+      }
+      auto it = idToIndex.find(info.endSync.targetId);
+      if (it == idToIndex.end()) {
+        info.resolvedEnd = info.endSync.offsetSeconds;
+        info.endResolved = true;
+        progress = true;
+      } else if (infos[it->second].beginResolved) {
+        info.resolvedEnd = SyncEventTime(infos[it->second], info.endSync);
+        info.endResolved = true;
+        progress = true;
+      }
+    }
+  }
+
+  std::unordered_map<const DOMNode*, ResolvedTiming> result = {};
+  for (const auto& info : infos) {
+    ResolvedTiming timing = {};
+    timing.beginSeconds = info.resolvedBegin;
+    timing.endSeconds = info.endResolved ? info.resolvedEnd : -1;
+    timing.cyclic = info.cyclic;
+    result[info.element] = timing;
+  }
+  return result;
+}
+
+// Expands a float-typed channel's keyframes to repeat the animation repeatCount times. When
+// accumulate is true, each repetition's values are offset by k * (lastValue - firstValue) so the
+// animation accumulates across loops. The original keyframes are replaced by the expanded set.
+static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
+                                   bool accumulate) {
+  auto* ch = static_cast<TypedChannel<float>*>(channel);
+  auto original = ch->keyframes;
+  if (original.empty() || repeatCount <= 1.0) {
+    return;
+  }
+  int fullRepeats = static_cast<int>(std::floor(repeatCount));
+  double fraction = repeatCount - std::floor(repeatCount);
+  float delta = 0.0f;
+  if (accumulate && original.size() >= 2) {
+    delta = original.back().value - original.front().value;
+  }
+  ch->keyframes.clear();
+  for (int k = 0; k < fullRepeats; ++k) {
+    float offset = static_cast<float>(k) * delta;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    for (size_t idx = 0; idx < original.size(); ++idx) {
+      auto key = original[idx];
+      key.time += timeOffset;
+      if (accumulate) {
+        key.value += offset;
+      }
+      ch->keyframes.push_back(key);
+    }
+  }
+  // Fractional tail: sample one extra keyframe at the fractional boundary so the last repetition
+  // is truncated rather than dropped. The boundary value is the interpolated value at the original
+  // keyframe whose normalized time equals the fraction (linear interp between first and second
+  // keyframe covers the common case; for multi-keyframe sequences we sample at fraction of dur).
+  if (fraction > 0.0 && original.size() >= 2) {
+    int k = fullRepeats;
+    float offset = static_cast<float>(k) * delta;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    // Sample the original keyframe sequence at the fractional position. Use the first keyframe's
+    // interpolation mode (commonly Linear) and interpolate between the two surrounding originals.
+    float firstVal = original.front().value + offset;
+    float lastVal = original.back().value + offset;
+    float sampled = firstVal + (lastVal - firstVal) * static_cast<float>(fraction);
+    Keyframe<float> key = {};
+    key.time = fractionalTime;
+    key.value = sampled;
+    key.interpolation = original.front().interpolation;
+    key.bezierOut = original.front().bezierOut;
+    key.bezierIn = original.front().bezierIn;
+    ch->keyframes.push_back(key);
+  }
+}
+
+// Expands a Color-typed channel's keyframes similarly to ExpandFloatRepeatCount, accumulating
+// each color channel independently.
+static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
+                                   bool accumulate) {
+  auto* ch = static_cast<TypedChannel<Color>*>(channel);
+  auto original = ch->keyframes;
+  if (original.empty() || repeatCount <= 1.0) {
+    return;
+  }
+  int fullRepeats = static_cast<int>(std::floor(repeatCount));
+  double fraction = repeatCount - std::floor(repeatCount);
+  Color delta = {0, 0, 0, 0};
+  if (accumulate && original.size() >= 2) {
+    delta.red = original.back().value.red - original.front().value.red;
+    delta.green = original.back().value.green - original.front().value.green;
+    delta.blue = original.back().value.blue - original.front().value.blue;
+    delta.alpha = original.back().value.alpha - original.front().value.alpha;
+  }
+  ch->keyframes.clear();
+  for (int k = 0; k < fullRepeats; ++k) {
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    for (size_t idx = 0; idx < original.size(); ++idx) {
+      auto key = original[idx];
+      key.time += timeOffset;
+      if (accumulate) {
+        key.value.red += static_cast<float>(k) * delta.red;
+        key.value.green += static_cast<float>(k) * delta.green;
+        key.value.blue += static_cast<float>(k) * delta.blue;
+        key.value.alpha += static_cast<float>(k) * delta.alpha;
+      }
+      ch->keyframes.push_back(key);
+    }
+  }
+  if (fraction > 0.0 && original.size() >= 2) {
+    int k = fullRepeats;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    Color firstVal = original.front().value;
+    Color lastVal = original.back().value;
+    if (accumulate) {
+      firstVal.red += static_cast<float>(k) * delta.red;
+      firstVal.green += static_cast<float>(k) * delta.green;
+      firstVal.blue += static_cast<float>(k) * delta.blue;
+      firstVal.alpha += static_cast<float>(k) * delta.alpha;
+      lastVal.red += static_cast<float>(k) * delta.red;
+      lastVal.green += static_cast<float>(k) * delta.green;
+      lastVal.blue += static_cast<float>(k) * delta.blue;
+      lastVal.alpha += static_cast<float>(k) * delta.alpha;
+    }
+    Keyframe<Color> key = {};
+    key.time = fractionalTime;
+    key.value.red = firstVal.red + (lastVal.red - firstVal.red) * static_cast<float>(fraction);
+    key.value.green =
+        firstVal.green + (lastVal.green - firstVal.green) * static_cast<float>(fraction);
+    key.value.blue = firstVal.blue + (lastVal.blue - firstVal.blue) * static_cast<float>(fraction);
+    key.value.alpha =
+        firstVal.alpha + (lastVal.alpha - firstVal.alpha) * static_cast<float>(fraction);
+    key.interpolation = original.front().interpolation;
+    key.bezierOut = original.front().bezierOut;
+    key.bezierIn = original.front().bezierIn;
+    ch->keyframes.push_back(key);
+  }
+}
+
+// Dispatches repeatCount expansion to the correct TypedChannel<T> specialization based on
+// valueType. Non-numeric types (bool/string) repeat without accumulation.
+static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Frame durFrames,
+                              double repeatCount, bool accumulate) {
+  if (repeatCount <= 1.0) {
+    return;
+  }
+  switch (valueType) {
+    case ChannelValueType::Float:
+      ExpandFloatRepeatCount(channel, durFrames, repeatCount, accumulate);
+      break;
+    case ChannelValueType::Color:
+      ExpandColorRepeatCount(channel, durFrames, repeatCount, accumulate);
+      break;
+    case ChannelValueType::Matrix: {
+      // Matrix repeats copy keyframes without accumulation. animateTransform accumulate on a
+      // baked matrix is intentionally ignored, matching animateMotion's accumulate behaviour.
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      auto original = ch->keyframes;
+      if (original.empty()) {
+        break;
+      }
+      int fullRepeats = static_cast<int>(std::floor(repeatCount));
+      double fraction = repeatCount - std::floor(repeatCount);
+      ch->keyframes.clear();
+      for (int k = 0; k < fullRepeats; ++k) {
+        Frame timeOffset = static_cast<Frame>(k) * durFrames;
+        for (size_t idx = 0; idx < original.size(); ++idx) {
+          auto key = original[idx];
+          key.time += timeOffset;
+          ch->keyframes.push_back(key);
+        }
+      }
+      // Fractional tail: sample one extra matrix keyframe at the fractional boundary by linearly
+      // interpolating between the first and last original (runtime MixTGFXMatrix will re-blend).
+      if (fraction > 0.0 && original.size() >= 2) {
+        int k = fullRepeats;
+        Frame timeOffset = static_cast<Frame>(k) * durFrames;
+        Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+        const auto& first = original.front().value;
+        const auto& last = original.back().value;
+        Keyframe<Matrix> key = {};
+        key.time = fractionalTime;
+        auto lerp = [](float a, float b, double t) { return a + (b - a) * static_cast<float>(t); };
+        key.value.a = lerp(first.a, last.a, fraction);
+        key.value.b = lerp(first.b, last.b, fraction);
+        key.value.c = lerp(first.c, last.c, fraction);
+        key.value.d = lerp(first.d, last.d, fraction);
+        key.value.tx = lerp(first.tx, last.tx, fraction);
+        key.value.ty = lerp(first.ty, last.ty, fraction);
+        key.interpolation = original.front().interpolation;
+        key.bezierOut = original.front().bezierOut;
+        key.bezierIn = original.front().bezierIn;
+        ch->keyframes.push_back(key);
+      }
+      break;
+    }
+    default: {
+      // For non-numeric types, repeat keyframes without accumulation. Use float as a generic
+      // channel since we cannot easily template-dispatch here; but bool/string channels need
+      // their own handling. For now, only float and color support repeat expansion.
+      break;
+    }
+  }
+}
+
+// Recomputes keyTimes so that time is distributed proportionally to the distance between
+// adjacent values (calcMode="paced"). Only supports float and Color value types; other types
+// fall back to uniform distribution. Returns true when keyTimes were recomputed.
+static bool ComputePacedKeyTimes(const std::vector<KeyValue>& values, ChannelValueType valueType,
+                                 std::vector<double>* outKeyTimes) {
+  if (values.size() < 2 || outKeyTimes == nullptr) {
+    return false;
+  }
+  std::vector<double> distances = {};
+  double totalDist = 0.0;
+  for (size_t i = 1; i < values.size(); ++i) {
+    double d = 0.0;
+    if (valueType == ChannelValueType::Float) {
+      d = std::abs(std::get<float>(values[i]) - std::get<float>(values[i - 1]));
+    } else if (valueType == ChannelValueType::Color) {
+      const auto& c0 = std::get<Color>(values[i - 1]);
+      const auto& c1 = std::get<Color>(values[i]);
+      double dr = c1.red - c0.red;
+      double dg = c1.green - c0.green;
+      double db = c1.blue - c0.blue;
+      d = std::sqrt(dr * dr + dg * dg + db * db);
+    } else {
+      return false;
+    }
+    distances.push_back(d);
+    totalDist += d;
+  }
+  if (totalDist <= 0.0) {
+    return false;
+  }
+  outKeyTimes->resize(values.size());
+  (*outKeyTimes)[0] = 0.0;
+  double cumul = 0.0;
+  for (size_t i = 0; i < distances.size(); ++i) {
+    cumul += distances[i];
+    (*outKeyTimes)[i + 1] = cumul / totalDist;
+  }
+  return true;
+}
+
+// A channel paired with its source SMIL element's additive flag, used by MergeAdditiveChannels
+// to precompute additive="sum" overlays into a single keyframe sequence per channel name.
+struct ChannelWithAdditive {
+  Channel* channel = nullptr;
+  bool additive = false;
+};
+
+// Merges one additive channel into the base channel for float-typed channels. Collects the union
+// of keyframe times from both channels, samples each at every time point, and replaces base's
+// keyframes with the summed values. Interpolation mode and bezier handles at a given time are
+// taken from whichever channel already has a keyframe there (base takes priority).
+static void MergeAdditiveFloat(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<float>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<float>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+
+  std::vector<Keyframe<float>> merged = {};
+  for (Frame time : allTimes) {
+    float baseVal = std::get<float>(base->evaluateAt(time));
+    float additiveVal = std::get<float>(additive->evaluateAt(time));
+    Keyframe<float> key = {};
+    key.time = time;
+    key.value = baseVal + additiveVal;
+    // Prefer base's interpolation/bezier when the time matches a base keyframe; otherwise take
+    // additive's. Times present in neither (shouldn't happen) default to Linear.
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<float>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+      key.bezierOut = baseIt->bezierOut;
+      key.bezierIn = baseIt->bezierIn;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<float>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+        key.bezierOut = addIt->bezierOut;
+        key.bezierIn = addIt->bezierIn;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
+// Merges one additive channel into the base channel for Color-typed channels. Each RGBA component
+// is summed independently, mirroring the float merge logic.
+static void MergeAdditiveColor(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<Color>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<Color>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+
+  std::vector<Keyframe<Color>> merged = {};
+  for (Frame time : allTimes) {
+    Color baseVal = std::get<Color>(base->evaluateAt(time));
+    Color additiveVal = std::get<Color>(additive->evaluateAt(time));
+    Keyframe<Color> key = {};
+    key.time = time;
+    key.value.red = baseVal.red + additiveVal.red;
+    key.value.green = baseVal.green + additiveVal.green;
+    key.value.blue = baseVal.blue + additiveVal.blue;
+    key.value.alpha = baseVal.alpha + additiveVal.alpha;
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<Color>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+      key.bezierOut = baseIt->bezierOut;
+      key.bezierIn = baseIt->bezierIn;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<Color>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+        key.bezierOut = addIt->bezierOut;
+        key.bezierIn = addIt->bezierIn;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
+// Builds a Matrix from one animateTransform keyframe's parameter list. type selects the transform
+// kind; params carries the numeric arguments as parsed by ParseFloatParams:
+//   translate tx [ty]         -> Translate(tx, ty ?: tx)
+//   scale    sx [sy]           -> Scale(sx, sy ?: sx)
+//   rotate   angle [cx cy]    -> Translate(cx,cy) * Rotate(angle) * Translate(-cx,-cy)
+//   skewX    angle             -> matrix with c = tan(angle)
+//   skewY    angle             -> matrix with b = tan(angle)
+// A rotate transform bakes its center into the matrix translation (T(c) * R * T(-c)). Layer.anchor
+// expresses that pivot explicitly, so a constant center is recovered from the keyframes and moved
+// out of the translation; downstream consumers then do not have to solve matrix fixed points.
+// A center that varies between keyframes cannot be expressed by one anchor value and keeps the
+// baked form.
+static bool TryAdoptConstantPivot(TypedChannel<Matrix>* channel, float* pivotX, float* pivotY) {
+  // Solve (I - L) * p = t for every keyframe that carries rotation, then require all solutions to
+  // agree. A keyframe with an identity linear part has no pivot information and is skipped.
+  bool found = false;
+  bool hasTranslation = false;
+  float px = 0.0f;
+  float py = 0.0f;
+  for (const auto& key : channel->keyframes) {
+    const Matrix& m = key.value;
+    const float ia = 1.0f - m.a;
+    const float ib = -m.b;
+    const float ic = -m.c;
+    const float id = 1.0f - m.d;
+    const float det = ia * id - ic * ib;
+    if (std::abs(det) < 1e-4f) {
+      continue;
+    }
+    const float x = (id * m.tx - ic * m.ty) / det;
+    const float y = (-ib * m.tx + ia * m.ty) / det;
+    if (!found) {
+      px = x;
+      py = y;
+      found = true;
+    } else if (std::abs(x - px) > 0.01f || std::abs(y - py) > 0.01f) {
+      return false;
+    }
+    hasTranslation = hasTranslation || m.tx != 0.0f || m.ty != 0.0f;
+  }
+  if (!found || !hasTranslation) {
+    return false;
+  }
+  // Snap to 1/1000 px: the solved pivot carries float noise from the rotation matrix.
+  px = std::round(px * 1000.0f) / 1000.0f;
+  py = std::round(py * 1000.0f) / 1000.0f;
+  if (px == 0.0f && py == 0.0f) {
+    return false;
+  }
+  for (auto& key : channel->keyframes) {
+    key.value.tx = 0.0f;
+    key.value.ty = 0.0f;
+  }
+  *pivotX = px;
+  *pivotY = py;
+  return true;
+}
+
+static Matrix TransformParamsToMatrix(const std::string& type, const std::vector<float>& params) {
+  if (type == "translate") {
+    float tx = (params.size() > 0) ? params[0] : 0.0f;
+    float ty = (params.size() > 1) ? params[1] : 0.0f;
+    return Matrix::Translate(tx, ty);
+  }
+  if (type == "scale") {
+    float sx = (params.size() > 0) ? params[0] : 1.0f;
+    float sy = (params.size() > 1) ? params[1] : sx;
+    return Matrix::Scale(sx, sy);
+  }
+  if (type == "rotate") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    if (params.size() >= 3) {
+      float cx = params[1];
+      float cy = params[2];
+      return Matrix::Translate(cx, cy) * Matrix::Rotate(angle) * Matrix::Translate(-cx, -cy);
+    }
+    return Matrix::Rotate(angle);
+  }
+  if (type == "skewX") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    float t = std::tan(angle * 3.14159265358979323846f / 180.0f);
+    Matrix m = {};
+    m.c = t;
+    return m;
+  }
+  if (type == "skewY") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    float t = std::tan(angle * 3.14159265358979323846f / 180.0f);
+    Matrix m = {};
+    m.b = t;
+    return m;
+  }
+  return Matrix::Identity();
+}
+
+// Merges one additive="sum" matrix channel into the base matrix channel by composing both at the
+// union of their keyframe times. Matrix additive composition is multiplication (base * additive),
+// matching how SVG layers consecutive additive transforms. Mirrors MergeAdditiveFloat/Color.
+static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<Matrix>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<Matrix>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  std::vector<Keyframe<Matrix>> merged = {};
+  for (Frame time : allTimes) {
+    Matrix baseVal = std::get<Matrix>(base->evaluateAt(time));
+    Matrix additiveVal = std::get<Matrix>(additive->evaluateAt(time));
+    Keyframe<Matrix> key = {};
+    key.time = time;
+    key.value = baseVal * additiveVal;
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<Matrix>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+      key.bezierOut = baseIt->bezierOut;
+      key.bezierIn = baseIt->bezierIn;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<Matrix>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+        key.bezierOut = addIt->bezierOut;
+        key.bezierIn = addIt->bezierIn;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
+// Merges additive="sum" Bool channels by logical OR at each keyframe time. SMIL does not define
+// arithmetic addition for booleans; the common interpretation (and the one that matches SVG's
+// `display`/`visibility` accumulation) is that the element stays visible if any contributing
+// animation says so. Mirrors MergeAdditiveFloat/Color/Matrix's union-of-times approach.
+static void MergeAdditiveBool(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<bool>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<bool>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  std::vector<Keyframe<bool>> merged = {};
+  for (Frame time : allTimes) {
+    bool baseVal = std::get<bool>(base->evaluateAt(time));
+    bool additiveVal = std::get<bool>(additive->evaluateAt(time));
+    Keyframe<bool> key = {};
+    key.time = time;
+    key.value = baseVal || additiveVal;
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<bool>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<bool>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
+// Merges additive="sum" channels into their preceding base (replace) channel. Channels sharing
+// the same name are grouped; within each group, the first channel is the base and subsequent
+// additive="sum" channels are sampled and summed into it. A subsequent additive="replace"
+// channel resets the base. Returns the deduplicated channel list (one entry per name).
+static std::vector<Channel*> MergeAdditiveChannels(std::vector<ChannelWithAdditive>* channels) {
+  if (channels->empty()) {
+    return {};
+  }
+  // Group channels by name, preserving document order within each group.
+  std::unordered_map<std::string, std::vector<size_t>> nameToIndices = {};
+  for (size_t i = 0; i < channels->size(); ++i) {
+    nameToIndices[(*channels)[i].channel->name].push_back(i);
+  }
+
+  std::vector<Channel*> result = {};
+  // Track which indices have been consumed by a merge so we skip them in the output.
+  std::vector<bool> consumed(channels->size(), false);
+  for (size_t i = 0; i < channels->size(); ++i) {
+    if (consumed[i]) {
+      continue;
+    }
+    auto& indices = nameToIndices[(*channels)[i].channel->name];
+    Channel* base = (*channels)[i].channel;
+    for (size_t j = 1; j < indices.size(); ++j) {
+      size_t idx = indices[j];
+      consumed[idx] = true;
+      if ((*channels)[idx].additive) {
+        // additive="sum": merge into base. Only float and Color are supported; other types
+        // fall through (the additive channel is dropped, matching replace-on-incompatible).
+        if (base->valueType() == ChannelValueType::Float) {
+          MergeAdditiveFloat(base, (*channels)[idx].channel);
+        } else if (base->valueType() == ChannelValueType::Color) {
+          MergeAdditiveColor(base, (*channels)[idx].channel);
+        } else if (base->valueType() == ChannelValueType::Matrix) {
+          MergeAdditiveMatrix(base, (*channels)[idx].channel);
+        } else if (base->valueType() == ChannelValueType::Bool) {
+          MergeAdditiveBool(base, (*channels)[idx].channel);
+        }
+      } else {
+        // additive="replace": this channel becomes the new base.
+        base = (*channels)[idx].channel;
+      }
+    }
+    result.push_back(base);
+  }
+  return result;
+}
+
+// Reads the static (base) value of a Layer-level or content-node channel from the PAGX node tree.
+// Used by fill="remove" and begin-offset logic to restore the element's pre-animation state.
+// For Color channels, only SolidColor sources are supported; gradients/patterns fall back to
+// opaque black.
+static KeyValue ReadBaseValue(const ChannelTarget& target) {
+  if (target.node == nullptr) {
+    return 0.0f;
+  }
+  auto nodeType = target.node->nodeType();
+  if (target.valueType == ChannelValueType::Float) {
+    if (nodeType == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(target.node);
+      if (target.channelName == "alpha") return layer->alpha;
+      if (target.channelName == "x") return layer->x;
+      if (target.channelName == "y") return layer->y;
+    } else if (nodeType == NodeType::Fill) {
+      auto* fill = static_cast<Fill*>(target.node);
+      if (target.channelName == "alpha") return fill->alpha;
+    } else if (nodeType == NodeType::Stroke) {
+      auto* stroke = static_cast<Stroke*>(target.node);
+      if (target.channelName == "width") return stroke->width;
+      if (target.channelName == "alpha") return stroke->alpha;
+      if (target.channelName == "dashOffset") return stroke->dashOffset;
+      if (target.channelName == "miterLimit") return stroke->miterLimit;
+    } else if (nodeType == NodeType::Ellipse) {
+      auto* ellipse = static_cast<Ellipse*>(target.node);
+      if (target.channelName == "position.x") return ellipse->position.x;
+      if (target.channelName == "position.y") return ellipse->position.y;
+      if (target.channelName == "size.width") return ellipse->size.width;
+      if (target.channelName == "size.height") return ellipse->size.height;
+    } else if (nodeType == NodeType::Rectangle) {
+      auto* rect = static_cast<Rectangle*>(target.node);
+      if (target.channelName == "position.x") return rect->position.x;
+      if (target.channelName == "position.y") return rect->position.y;
+      if (target.channelName == "size.width") return rect->size.width;
+      if (target.channelName == "size.height") return rect->size.height;
+      if (target.channelName == "roundness") return rect->roundness;
+    } else if (nodeType == NodeType::Group) {
+      auto* group = static_cast<Group*>(target.node);
+      if (target.channelName == "position.x") return group->position.x;
+      if (target.channelName == "position.y") return group->position.y;
+      if (target.channelName == "rotation") return group->rotation;
+      if (target.channelName == "scale.x") return group->scale.x;
+      if (target.channelName == "scale.y") return group->scale.y;
+      if (target.channelName == "skew") return group->skew;
+      if (target.channelName == "anchor.x") return group->anchor.x;
+      if (target.channelName == "anchor.y") return group->anchor.y;
+    } else if (nodeType == NodeType::BlurFilter) {
+      auto* f = static_cast<BlurFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+    } else if (nodeType == NodeType::DropShadowFilter) {
+      auto* f = static_cast<DropShadowFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+      if (target.channelName == "offsetX") return f->offsetX;
+      if (target.channelName == "offsetY") return f->offsetY;
+    } else if (nodeType == NodeType::InnerShadowFilter) {
+      auto* f = static_cast<InnerShadowFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+      if (target.channelName == "offsetX") return f->offsetX;
+      if (target.channelName == "offsetY") return f->offsetY;
+    }
+    return 0.0f;
+  }
+  if (target.valueType == ChannelValueType::Color) {
+    ColorSource* source = nullptr;
+    if (nodeType == NodeType::Fill) {
+      source = static_cast<Fill*>(target.node)->color;
+    } else if (nodeType == NodeType::Stroke) {
+      source = static_cast<Stroke*>(target.node)->color;
+    }
+    if (source != nullptr && source->nodeType() == NodeType::SolidColor) {
+      return static_cast<SolidColor*>(source)->color;
+    }
+    return Color{0.0f, 0.0f, 0.0f, 1.0f};
+  }
+  if (target.valueType == ChannelValueType::Bool) {
+    if (nodeType == NodeType::Layer && target.channelName == "visible") {
+      return static_cast<Layer*>(target.node)->visible;
+    }
+    return false;
+  }
+  return 0.0f;
+}
+
+static bool FloatKeyframeTimeLess(const Keyframe<float>& a, const Keyframe<float>& b) {
+  return a.time < b.time;
+}
+
+static bool ColorKeyframeTimeLess(const Keyframe<Color>& a, const Keyframe<Color>& b) {
+  return a.time < b.time;
+}
+
+static bool BoolKeyframeTimeLess(const Keyframe<bool>& a, const Keyframe<bool>& b) {
+  return a.time < b.time;
+}
+
+static bool MatrixKeyframeTimeLess(const Keyframe<Matrix>& a, const Keyframe<Matrix>& b) {
+  return a.time < b.time;
+}
+
+// Sorts a channel's keyframes by time after inserting base-value keyframes out of order
+// (e.g. a begin-offset Hold keyframe at frame 0 appended after the animation keyframes).
+static void SortKeyframes(Channel* channel, ChannelValueType valueType) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<TypedChannel<float>*>(channel);
+      std::sort(ch->keyframes.begin(), ch->keyframes.end(), FloatKeyframeTimeLess);
+      break;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<TypedChannel<Color>*>(channel);
+      std::sort(ch->keyframes.begin(), ch->keyframes.end(), ColorKeyframeTimeLess);
+      break;
+    }
+    case ChannelValueType::Bool: {
+      auto* ch = static_cast<TypedChannel<bool>*>(channel);
+      std::sort(ch->keyframes.begin(), ch->keyframes.end(), BoolKeyframeTimeLess);
+      break;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      std::sort(ch->keyframes.begin(), ch->keyframes.end(), MatrixKeyframeTimeLess);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Forward declaration: AppendKeyframe is defined later in this file but AddBaseValueKeyframes
+// (below) needs to call it.
+static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame time, KeyValue value,
+                           KeyframeInterpolationType interpolation, Point bezierOut,
+                           Point bezierIn);
+
+// Appends base-value Hold keyframes for fill="remove" and begin-offset semantics, then sorts
+// the channel's keyframes by time. Called after all animation keyframes (including repeatCount
+// expansion) have been generated.
+// - When beginFrames > 0: inserts a Hold keyframe at frame 0 with baseValue so the element
+//   shows its static state before the animation starts.
+// - When fillFreeze is false (SMIL default "remove"): inserts a Hold keyframe at endFrame+1
+//   with baseValue so the element reverts to its static state after the animation ends. The +1
+//   offset avoids colliding with the last animation keyframe at endFrame, which would otherwise
+//   be shadowed by the base-value keyframe during evaluation.
+// An indefinite repeat never reaches its end, so the "revert to base value" keyframe must not be
+// emitted: it would sit one frame past the animation and remain active for the rest of the
+// timeline (which is longer when other objects run longer), teleporting the target back to its
+// static pose mid-loop.
+static bool IsIndefiniteRepeat(const std::shared_ptr<DOMNode>& element) {
+  if (element == nullptr) {
+    return false;
+  }
+  const auto* repeatCount = element->findAttribute("repeatCount");
+  if (repeatCount != nullptr && *repeatCount == "indefinite") {
+    return true;
+  }
+  const auto* repeatDur = element->findAttribute("repeatDur");
+  return repeatDur != nullptr && *repeatDur == "indefinite";
+}
+
+static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, KeyValue baseValue,
+                                  Frame beginFrames, Frame endFrame, bool fillFreeze) {
+  if (beginFrames > 0) {
+    AppendKeyframe(channel, valueType, 0, baseValue, KeyframeInterpolationType::Hold, {}, {});
+  }
+  if (!fillFreeze && endFrame > 0) {
+    AppendKeyframe(channel, valueType, endFrame + 1, baseValue, KeyframeInterpolationType::Hold, {},
+                   {});
+  }
+  if (beginFrames > 0 || (!fillFreeze && endFrame > 0)) {
+    SortKeyframes(channel, valueType);
+  }
+}
+
+// Finds the first element of the given NodeType in a Layer's contents. Returns nullptr when not
+// found.
+Element* SMILAnimationParser::findContentNode(const AnimatedNodeInfo& nodeInfo, NodeType type) {
+  if (nodeInfo.targetLayer != nullptr) {
+    for (auto* el : nodeInfo.targetLayer->contents) {
+      if (el != nullptr && el->nodeType() == type) {
+        return el;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// Ensures the given content node has an id, allocating one via ctx when missing, and records the
+// mapping in nodeInfo.contentNodeIds so buildAnimation can resolve the target later.
+std::string SMILAnimationParser::ensureContentNodeId(SVGParserContext& ctx, PAGXDocument* doc,
+                                                     Element* node,
+                                                     const AnimatedNodeInfo& nodeInfo,
+                                                     const char* prefix) {
+  if (node == nullptr) {
+    return {};
+  }
+  auto it = nodeInfo.contentNodeIds.find(node);
+  if (it != nodeInfo.contentNodeIds.end()) {
+    return it->second;
+  }
+  std::string id = node->id;
+  if (id.empty()) {
+    id = ctx.generateUniqueId(prefix);
+    node->id = id;
+    doc->registerNode(node, id);
+  }
+  return id;
+}
+
+ChannelTarget SMILAnimationParser::resolveAnimateTarget(SVGParserContext& ctx, PAGXDocument* doc,
+                                                        const std::string& attributeName,
+                                                        const AnimatedNodeInfo& nodeInfo) {
+  ChannelTarget target = {};
+  // Filter primitive animations: <animate> on feGaussianBlur/feOffset drives the PAGX filter
+  // node's blur/offset channels. stdDeviation maps to blurX+blurY (a single animate drives
+  // both channels, mirroring how `r` drives both size.width and size.height on a circle); the
+  // two-value "sx sy" form is split in parseAnimate's stdDeviation special case.
+  if (nodeInfo.targetFilter != nullptr) {
+    if (attributeName == "stdDeviation") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "blurX";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    if (attributeName == "dx") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "offsetX";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    if (attributeName == "dy") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "offsetY";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    // Unsupported filter attributeName — fall through to return empty target.
+    return target;
+  }
+  if (attributeName == "opacity") {
+    target.node = nodeInfo.targetLayer;
+    target.nodeId = nodeInfo.targetId;
+    target.channelName = "alpha";
+    target.valueType = ChannelValueType::Float;
+    return target;
+  }
+  if (attributeName == "display" || attributeName == "visibility") {
+    target.node = nodeInfo.targetLayer;
+    target.nodeId = nodeInfo.targetId;
+    target.channelName = "visible";
+    target.valueType = ChannelValueType::Bool;
+    return target;
+  }
+  if (attributeName == "fill" || attributeName == "fill-opacity") {
+    auto* fill = static_cast<Fill*>(findContentNode(nodeInfo, NodeType::Fill));
+    target.node = fill;
+    target.nodeId = ensureContentNodeId(ctx, doc, fill, nodeInfo, "anim_fill");
+    target.channelName = (attributeName == "fill") ? "color" : "alpha";
+    target.valueType =
+        (attributeName == "fill") ? ChannelValueType::Color : ChannelValueType::Float;
+    return target;
+  }
+  if (attributeName == "stroke" || attributeName == "stroke-opacity" ||
+      attributeName == "stroke-width" || attributeName == "stroke-dashoffset" ||
+      attributeName == "stroke-miterlimit") {
+    auto* stroke = static_cast<Stroke*>(findContentNode(nodeInfo, NodeType::Stroke));
+    target.node = stroke;
+    target.nodeId = ensureContentNodeId(ctx, doc, stroke, nodeInfo, "anim_stroke");
+    if (attributeName == "stroke") {
+      target.channelName = "color";
+      target.valueType = ChannelValueType::Color;
+    } else if (attributeName == "stroke-opacity") {
+      target.channelName = "alpha";
+      target.valueType = ChannelValueType::Float;
+    } else if (attributeName == "stroke-width") {
+      target.channelName = "width";
+      target.valueType = ChannelValueType::Float;
+    } else if (attributeName == "stroke-dashoffset") {
+      target.channelName = "dashOffset";
+      target.valueType = ChannelValueType::Float;
+    } else {
+      target.channelName = "miterLimit";
+      target.valueType = ChannelValueType::Float;
+    }
+    return target;
+  }
+  // cx/cy/r are ellipse-only geometry attributes.
+  if (attributeName == "cx" || attributeName == "cy" || attributeName == "r") {
+    auto* ellipse = static_cast<Ellipse*>(findContentNode(nodeInfo, NodeType::Ellipse));
+    target.node = ellipse;
+    target.nodeId = ensureContentNodeId(ctx, doc, ellipse, nodeInfo, "anim_shape");
+    if (attributeName == "cx") {
+      target.channelName = "position.x";
+    } else if (attributeName == "cy") {
+      target.channelName = "position.y";
+    } else {
+      target.channelName = "size.width";
+    }
+    target.valueType = ChannelValueType::Float;
+    return target;
+  }
+  // x/y/width/height are rectangle-only geometry attributes.
+  if (attributeName == "x" || attributeName == "y" || attributeName == "width" ||
+      attributeName == "height") {
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    target.node = rect;
+    target.nodeId = ensureContentNodeId(ctx, doc, rect, nodeInfo, "anim_shape");
+    if (attributeName == "x") {
+      target.channelName = "position.x";
+    } else if (attributeName == "y") {
+      target.channelName = "position.y";
+    } else if (attributeName == "width") {
+      target.channelName = "size.width";
+    } else {
+      target.channelName = "size.height";
+    }
+    target.valueType = ChannelValueType::Float;
+    return target;
+  }
+  // rx/ry are ambiguous: on <ellipse> they are radii (size), on <rect> they are corner roundness.
+  // Route by the actual content node type so <rect rx> animates roundness instead of being
+  // dropped by the ellipse branch above.
+  if (attributeName == "rx" || attributeName == "ry") {
+    auto* ellipse = static_cast<Ellipse*>(findContentNode(nodeInfo, NodeType::Ellipse));
+    if (ellipse != nullptr) {
+      target.node = ellipse;
+      target.nodeId = ensureContentNodeId(ctx, doc, ellipse, nodeInfo, "anim_shape");
+      target.channelName = (attributeName == "rx") ? "size.width" : "size.height";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    target.node = rect;
+    target.nodeId = ensureContentNodeId(ctx, doc, rect, nodeInfo, "anim_shape");
+    target.channelName = "roundness";
+    target.valueType = ChannelValueType::Float;
+    return target;
+  }
+  // Unsupported attributeName (including "transform" which should use animateTransform).
+  return target;
+}
+
+KeyValue SMILAnimationParser::parseValue(SVGParserContext& ctx, const std::string& str,
+                                         ChannelValueType valueType) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      return std::strtof(str.c_str(), nullptr);
+    }
+    case ChannelValueType::Color: {
+      return ctx.parseColor(str);
+    }
+    case ChannelValueType::Bool: {
+      // SVG display/visibility use string values ("none"/"inline", "visible"/"hidden") that
+      // must map to bool for the Layer.visible channel. "true"/"1" are also accepted.
+      return str == "true" || str == "1" || str == "inline" || str == "visible";
+    }
+    case ChannelValueType::Int: {
+      return static_cast<int>(std::strtol(str.c_str(), nullptr, 10));
+    }
+    default:
+      return str;
+  }
+}
+
+// Creates a TypedChannel<T> for the given value type, populated with the supplied keyframes.
+// The keyframe times, values, interpolation modes, and bezier handles must already be aligned.
+static Channel* CreateChannelForType(PAGXDocument* doc, ChannelValueType valueType,
+                                     const std::string& name) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      auto* ch = doc->makeNode<TypedChannel<float>>();
+      ch->name = name;
+      return ch;
+    }
+    case ChannelValueType::Bool: {
+      auto* ch = doc->makeNode<TypedChannel<bool>>();
+      ch->name = name;
+      return ch;
+    }
+    case ChannelValueType::Int: {
+      auto* ch = doc->makeNode<TypedChannel<int>>();
+      ch->name = name;
+      return ch;
+    }
+    case ChannelValueType::String: {
+      auto* ch = doc->makeNode<TypedChannel<std::string>>();
+      ch->name = name;
+      return ch;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = doc->makeNode<TypedChannel<Color>>();
+      ch->name = name;
+      return ch;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = doc->makeNode<TypedChannel<Matrix>>();
+      ch->name = name;
+      return ch;
+    }
+    default:
+      return nullptr;
+  }
+}
+
+// Appends a keyframe to the correct TypedChannel<T> specialization by dispatching on valueType.
+// The KeyValue is unpacked into the matching T before storing.
+static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame time, KeyValue value,
+                           KeyframeInterpolationType interpolation, Point bezierOut,
+                           Point bezierIn) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<TypedChannel<float>*>(channel);
+      Keyframe<float> key = {};
+      key.time = time;
+      key.value = std::get<float>(value);
+      key.interpolation = interpolation;
+      key.bezierOut = bezierOut;
+      key.bezierIn = bezierIn;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Bool: {
+      auto* ch = static_cast<TypedChannel<bool>*>(channel);
+      Keyframe<bool> key = {};
+      key.time = time;
+      key.value = std::get<bool>(value);
+      key.interpolation = interpolation;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Int: {
+      auto* ch = static_cast<TypedChannel<int>*>(channel);
+      Keyframe<int> key = {};
+      key.time = time;
+      key.value = std::get<int>(value);
+      key.interpolation = interpolation;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::String: {
+      auto* ch = static_cast<TypedChannel<std::string>*>(channel);
+      Keyframe<std::string> key = {};
+      key.time = time;
+      key.value = std::get<std::string>(value);
+      key.interpolation = interpolation;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<TypedChannel<Color>*>(channel);
+      Keyframe<Color> key = {};
+      key.time = time;
+      key.value = std::get<Color>(value);
+      key.interpolation = interpolation;
+      key.bezierOut = bezierOut;
+      key.bezierIn = bezierIn;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      Keyframe<Matrix> key = {};
+      key.time = time;
+      key.value = std::get<Matrix>(value);
+      key.interpolation = interpolation;
+      key.bezierOut = bezierOut;
+      key.bezierIn = bezierIn;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Parse an `animateMotion` keyPoints list. Unlike keyTimes the values need not ascend — a motion
+// can travel to one end of the path and come back — so only the [0, 1] range is enforced.
+static std::vector<double> ParseKeyPointList(const std::string& text) {
+  std::vector<double> points = {};
+  const char* cursor = text.c_str();
+  while (*cursor != '\0') {
+    if (*cursor == ';' || std::isspace(static_cast<unsigned char>(*cursor)) != 0) {
+      ++cursor;
+      continue;
+    }
+    char* end = nullptr;
+    const double value = std::strtod(cursor, &end);
+    if (end == cursor || value < -1e-6 || value > 1.0 + 1e-6) {
+      return {};
+    }
+    points.push_back(value);
+    cursor = end;
+  }
+  return points;
+}
+
+// SVG `pathLength` normalises dash values into the author's coordinate space. The static
+// dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
+// stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
+void SMILAnimationParser::ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode>& element,
+                                                   std::vector<Channel*>& channels,
+                                                   SVGParserContext& ctx) {
+  if (element == nullptr) {
+    return;
+  }
+  const std::string path_length = ctx.getAttribute(element, "pathLength");
+  const float author_length = path_length.empty() ? 0.0f : strtof(path_length.c_str(), nullptr);
+  if (author_length <= 0.0f) {
+    return;
+  }
+  const float real_length = ctx.computePathTotalLength(element);
+  if (real_length <= 0.0f) {
+    return;
+  }
+  const float scale = real_length / author_length;
+  for (auto* ch : channels) {
+    auto* float_channel = static_cast<TypedChannel<float>*>(ch);
+    for (auto& key : float_channel->keyframes) {
+      key.value *= scale;
+    }
+  }
+}
+
+std::vector<Channel*> SMILAnimationParser::parseAnimate(
+    SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame, std::string& outTargetId) {
+  std::vector<Channel*> channels = {};
+  outTargetId = nodeInfo.targetId;
+  if (!animElement) {
+    return channels;
+  }
+
+  auto attributeName = ctx.getAttribute(animElement, "attributeName");
+  if (attributeName.empty()) {
+    return channels;
+  }
+
+  auto target = resolveAnimateTarget(ctx, doc, attributeName, nodeInfo);
+  if (target.node == nullptr) {
+    // attributeName not supported (e.g. "transform"); skip this animation.
+    return channels;
+  }
+  outTargetId = target.nodeId;
+
+  // Parse timing attributes.
+  auto durStr = ctx.getAttribute(animElement, "dur");
+  double durSeconds = parseSMILClockValue(durStr);
+  if (durSeconds <= 0.0) {
+    // No duration: cannot build keyframes.
+    return channels;
+  }
+  Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+
+  // begin comes pre-resolved by buildAnimation (syncbase references like "id.end" solved against
+  // their targets). Negative values keep negative keyframe times: the animation started before
+  // the timeline origin, so evaluation at time 0 lands mid-animation via the natural clamp.
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+
+  // Parse values: either explicit `values` list or from/to/by.
+  auto valuesStr = ctx.getAttribute(animElement, "values");
+  auto fromStr = ctx.getAttribute(animElement, "from");
+  auto toStr = ctx.getAttribute(animElement, "to");
+  auto byStr = ctx.getAttribute(animElement, "by");
+
+  std::vector<KeyValue> keyValues = {};
+  if (!valuesStr.empty()) {
+    auto tokens = SplitSemicolons(valuesStr);
+    for (const auto& token : tokens) {
+      keyValues.push_back(parseValue(ctx, token, target.valueType));
+    }
+  } else if (!fromStr.empty() && !toStr.empty()) {
+    keyValues.push_back(parseValue(ctx, fromStr, target.valueType));
+    keyValues.push_back(parseValue(ctx, toStr, target.valueType));
+  } else if (!fromStr.empty() && !byStr.empty()) {
+    // to = from + by (numeric only; by is ignored for non-numeric types).
+    KeyValue fromValue = parseValue(ctx, fromStr, target.valueType);
+    KeyValue byValue = parseValue(ctx, byStr, target.valueType);
+    keyValues.push_back(fromValue);
+    if (target.valueType == ChannelValueType::Float) {
+      keyValues.push_back(std::get<float>(fromValue) + std::get<float>(byValue));
+    } else {
+      // For non-numeric types, by is not meaningful; fall back to from→to semantics with by as to.
+      keyValues.push_back(byValue);
+    }
+  } else if (!toStr.empty()) {
+    // to-only: SMIL animates from the current base value. The true base value is a runtime
+    // sandwich-priority concept; approximate with the target node's static value.
+    keyValues.push_back(ReadBaseValue(target));
+    keyValues.push_back(parseValue(ctx, toStr, target.valueType));
+  } else if (!byStr.empty()) {
+    // by-only: from the base value to base + by (numeric additive types only).
+    KeyValue baseValue = ReadBaseValue(target);
+    KeyValue byValue = parseValue(ctx, byStr, target.valueType);
+    keyValues.push_back(baseValue);
+    if (target.valueType == ChannelValueType::Float) {
+      keyValues.push_back(std::get<float>(baseValue) + std::get<float>(byValue));
+    } else if (target.valueType == ChannelValueType::Color) {
+      Color c = std::get<Color>(baseValue);
+      const Color& by = std::get<Color>(byValue);
+      c.red += by.red;
+      c.green += by.green;
+      c.blue += by.blue;
+      c.alpha += by.alpha;
+      keyValues.push_back(c);
+    } else {
+      keyValues.push_back(byValue);
+    }
+  } else {
+    return channels;
+  }
+
+  if (keyValues.size() < 2) {
+    return channels;
+  }
+
+  // Parse keyTimes.
+  auto keyTimesStr = ctx.getAttribute(animElement, "keyTimes");
+  auto keyTimes = parseKeyTimes(keyTimesStr);
+  if (keyTimes.empty()) {
+    // Default: uniform distribution in [0, 1].
+    keyTimes.resize(keyValues.size());
+    for (size_t i = 0; i < keyValues.size(); ++i) {
+      keyTimes[i] = static_cast<double>(i) / static_cast<double>(keyValues.size() - 1);
+    }
+  } else if (keyTimes.size() != keyValues.size()) {
+    // Mismatch: fall back to uniform.
+    keyTimes.resize(keyValues.size());
+    for (size_t i = 0; i < keyValues.size(); ++i) {
+      keyTimes[i] = static_cast<double>(i) / static_cast<double>(keyValues.size() - 1);
+    }
+  }
+
+  // Parse calcMode and keySplines.
+  auto calcMode = ctx.getAttribute(animElement, "calcMode");
+  KeyframeInterpolationType interpolation = KeyframeInterpolationType::Linear;
+  std::vector<BezierControlPoints> splines = {};
+  if (calcMode == "discrete") {
+    interpolation = KeyframeInterpolationType::Hold;
+  } else if (calcMode == "spline") {
+    interpolation = KeyframeInterpolationType::Bezier;
+    splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
+  } else if (calcMode == "paced") {
+    // Recompute keyTimes based on value distance so the animation progresses at constant speed.
+    interpolation = KeyframeInterpolationType::Linear;
+    std::vector<double> pacedKeyTimes = {};
+    if (ComputePacedKeyTimes(keyValues, target.valueType, &pacedKeyTimes)) {
+      keyTimes = pacedKeyTimes;
+    }
+  }
+
+  // Build the primary channel.
+  auto* primaryChannel = CreateChannelForType(doc, target.valueType, target.channelName);
+  if (primaryChannel == nullptr) {
+    return channels;
+  }
+  for (size_t i = 0; i < keyValues.size(); ++i) {
+    Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+    Point bezierOut = {};
+    Point bezierIn = {};
+    if (interpolation == KeyframeInterpolationType::Bezier && i < keyValues.size() - 1) {
+      if (i < splines.size()) {
+        bezierOut = {static_cast<float>(splines[i].p1x), static_cast<float>(splines[i].p1y)};
+        bezierIn = {static_cast<float>(splines[i].p2x), static_cast<float>(splines[i].p2y)};
+      }
+    }
+    AppendKeyframe(primaryChannel, target.valueType, time, keyValues[i], interpolation, bezierOut,
+                   bezierIn);
+  }
+  channels.push_back(primaryChannel);
+
+  // Special case: "r" on a circle drives both size.width and size.height (r*2).
+  if (attributeName == "r" && target.valueType == ChannelValueType::Float) {
+    auto* sizeChannel = CreateChannelForType(doc, ChannelValueType::Float, "size.height");
+    if (sizeChannel != nullptr) {
+      for (size_t i = 0; i < keyValues.size(); ++i) {
+        Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+        float r = std::get<float>(keyValues[i]);
+        KeyValue sizeValue = r * 2.0f;
+        Point bezierOut = {};
+        Point bezierIn = {};
+        if (interpolation == KeyframeInterpolationType::Bezier && i < keyValues.size() - 1) {
+          if (i < splines.size()) {
+            bezierOut = {static_cast<float>(splines[i].p1x), static_cast<float>(splines[i].p1y)};
+            bezierIn = {static_cast<float>(splines[i].p2x), static_cast<float>(splines[i].p2y)};
+          }
+        }
+        AppendKeyframe(sizeChannel, ChannelValueType::Float, time, sizeValue, interpolation,
+                       bezierOut, bezierIn);
+      }
+      channels.push_back(sizeChannel);
+    }
+    // Also adjust the primary channel (size.width) values to r*2.
+    auto* widthChannel = static_cast<TypedChannel<float>*>(primaryChannel);
+    for (auto& key : widthChannel->keyframes) {
+      key.value *= 2.0f;
+    }
+  }
+
+  // Special case: "rx"/"ry" on ellipse need *2 to convert radius to diameter. On <rect>,
+  // rx/ry drive roundness (a pixel value) and must NOT be scaled.
+  if ((attributeName == "rx" || attributeName == "ry") &&
+      target.valueType == ChannelValueType::Float && target.node != nullptr &&
+      target.node->nodeType() == NodeType::Ellipse) {
+    auto* sizeChannel = static_cast<TypedChannel<float>*>(primaryChannel);
+    for (auto& key : sizeChannel->keyframes) {
+      key.value *= 2.0f;
+    }
+  }
+
+  // Special case: "stdDeviation" on a filter drives both blurX and blurY. SVG's stdDeviation
+  // accepts "x" (uniform) or "x y" (per-axis). parseValue only reads the first number, so
+  // primaryChannel (blurX) already holds the first value; here we build blurY from the second
+  // value (or copy blurX when only one value was given per token). Re-parses the raw values/from
+  // /to strings so the second number is not lost.
+  if (attributeName == "stdDeviation" && target.valueType == ChannelValueType::Float &&
+      target.node != nullptr) {
+    auto nt = target.node->nodeType();
+    if (nt == NodeType::BlurFilter || nt == NodeType::DropShadowFilter ||
+        nt == NodeType::InnerShadowFilter) {
+      auto* blurYChannel = CreateChannelForType(doc, ChannelValueType::Float, "blurY");
+      if (blurYChannel != nullptr) {
+        // Collect the raw value tokens in document order (values, or from+to).
+        std::vector<std::string> rawTokens = {};
+        if (!valuesStr.empty()) {
+          rawTokens = SplitSemicolons(valuesStr);
+        } else if (!fromStr.empty() && !toStr.empty()) {
+          rawTokens.push_back(fromStr);
+          rawTokens.push_back(toStr);
+        }
+        // rawTokens aligns 1:1 with primaryChannel->keyframes (same order, same count).
+        auto* blurXChannel = static_cast<TypedChannel<float>*>(primaryChannel);
+        for (size_t i = 0; i < blurXChannel->keyframes.size(); ++i) {
+          float yVal = blurXChannel->keyframes[i].value;  // default: same as x
+          if (i < rawTokens.size()) {
+            auto params = ParseFloatParams(rawTokens[i]);
+            if (params.size() >= 2) {
+              yVal = params[1];
+            }
+          }
+          const auto& srcKey = blurXChannel->keyframes[i];
+          AppendKeyframe(blurYChannel, ChannelValueType::Float, srcKey.time, yVal,
+                         srcKey.interpolation, srcKey.bezierOut, srcKey.bezierIn);
+        }
+        channels.push_back(blurYChannel);
+      }
+    }
+  }
+
+  // Special case: "x"/"y" on rectangle need +width/2 or +height/2 to convert top-left to center.
+  if ((attributeName == "x" || attributeName == "y") &&
+      target.valueType == ChannelValueType::Float) {
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    if (rect != nullptr) {
+      float offset = (attributeName == "x") ? rect->size.width / 2.0f : rect->size.height / 2.0f;
+      auto* posChannel = static_cast<TypedChannel<float>*>(primaryChannel);
+      for (auto& key : posChannel->keyframes) {
+        key.value += offset;
+      }
+    }
+  }
+
+  // SVG `pathLength` normalises dash values into the author's coordinate space. The static
+  // dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
+  // stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
+  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float) {
+    ScaleDashOffsetKeyframes(nodeInfo.domElement, channels, ctx);
+  }
+
+  // Special case: <animate attributeName="stroke-dashoffset"> on a <circle>/<ellipse> needs the
+  // same phase+direction correction that addFillStroke applies to the static Stroke.dashOffset
+  // (90-degree phase alignment with SVG's 3 o'clock start + tgfx's reverse-path dashOffset
+  // direction). Without this the animated stroke-dasharray draws in the mirror direction
+  // from the SVG side, producing symmetric arc frames rather than a matching animation.
+  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float &&
+      target.node != nullptr) {
+    auto el = nodeInfo.domElement;
+    if (el && (el->name == "circle" || el->name == "ellipse")) {
+      float rx = 0.0f;
+      float ry = 0.0f;
+      if (el->name == "circle") {
+        rx = ry = ctx.parseLength(ctx.getAttribute(el, "r"), ctx.getViewBoxWidth());
+      } else {
+        rx = ctx.parseLength(ctx.getAttribute(el, "rx"), ctx.getViewBoxWidth());
+        ry = ctx.parseLength(ctx.getAttribute(el, "ry"), ctx.getViewBoxHeight());
+      }
+      const float sum = rx + ry;
+      if (sum > 0.0f) {
+        // Ramanujan's first approximation; exact when rx == ry.
+        const float h = (rx - ry) * (rx - ry) / (sum * sum);
+        const float perimeter = static_cast<float>(M_PI) * sum *
+                                (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
+        const float correction = perimeter / 4.0f;
+        for (auto* ch : channels) {
+          auto* fch = static_cast<TypedChannel<float>*>(ch);
+          for (auto& key : fch->keyframes) {
+            key.value -= correction;
+          }
+        }
+      }
+    }
+  }
+
+  // Expand repeatCount (resolved against repeatDur): integer N replicates the keyframe sequence
+  // N times with time offset. accumulate="sum" offsets each repetition's values by
+  // k*(lastValue - firstValue). "indefinite" is handled by buildAnimation (sets LoopMode::Loop),
+  // not expanded here.
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
+  if (repeatCount > 1.0) {
+    for (auto* ch : channels) {
+      ExpandRepeatCount(ch, target.valueType, durFrames, repeatCount, accumulate);
+    }
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else {
+    outEndFrame = beginFrames + durFrames;
+  }
+
+  // end limits the active duration: keyframes beyond it are truncated and a Hold keyframe with
+  // the end-time value is appended, so freeze holds that value and remove reverts from there.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      for (auto* ch : channels) {
+        ApplyEndTimeLimit(ch, target.valueType, endLimit);
+      }
+      outEndFrame = endLimit;
+    }
+  }
+
+  // Add base-value keyframes for begin-offset and fill="remove" semantics.
+  // SMIL default fill is "remove" (element reverts to static state after animation ends).
+  // fill="freeze" keeps the last animated value, which is PAGX's natural post-endframe behavior.
+  auto fillStr = ctx.getAttribute(animElement, "fill");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
+  KeyValue baseValue = ReadBaseValue(target);
+  for (auto* ch : channels) {
+    AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze);
+  }
+
+  // SVG 的 rect 以左上角定位，PAGX 的 Rectangle 以中心定位：只动 size 会让矩形从中心向两边
+  // 收缩。这里按同一组时间点补一条位置通道，把「被动画的那条边」钉在静态左上角上。
+  // 基准值关键帧已经写在 size 通道里（值等于静态尺寸），复制过来算出的中心正好是静态中心。
+  if ((attributeName == "width" || attributeName == "height") &&
+      target.valueType == ChannelValueType::Float && !channels.empty()) {
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    if (rect != nullptr) {
+      const bool horizontal = (attributeName == "width");
+      const float anchor = horizontal ? rect->position.x - rect->size.width * 0.5f
+                                      : rect->position.y - rect->size.height * 0.5f;
+      auto* size_channel = static_cast<TypedChannel<float>*>(channels.front());
+      auto* anchor_channel = CreateChannelForType(doc, ChannelValueType::Float,
+                                                  horizontal ? "position.x" : "position.y");
+      for (const auto& key : size_channel->keyframes) {
+        AppendKeyframe(anchor_channel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
+                       key.interpolation, {}, {});
+      }
+      channels.push_back(anchor_channel);
+    }
+  }
+  return channels;
+}
+std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXDocument* doc,
+                                                    const std::shared_ptr<DOMNode>& setElement,
+                                                    const AnimatedNodeInfo& nodeInfo,
+                                                    float frameRate, const ResolvedTiming& timing,
+                                                    Frame& outEndFrame, std::string& outTargetId) {
+  std::vector<Channel*> channels = {};
+  outTargetId = nodeInfo.targetId;
+  if (!setElement) {
+    return channels;
+  }
+
+  auto attributeName = ctx.getAttribute(setElement, "attributeName");
+  if (attributeName.empty()) {
+    return channels;
+  }
+
+  auto toStr = ctx.getAttribute(setElement, "to");
+  if (toStr.empty()) {
+    // SMIL 2.0 spec (Section 3.5.2): when <set> has no `to` attribute, "no animation occurs".
+    // Skipping is the normative behavior, not a missing fallback.
+    return channels;
+  }
+
+  auto target = resolveAnimateTarget(ctx, doc, attributeName, nodeInfo);
+  if (target.node == nullptr) {
+    return channels;
+  }
+  outTargetId = target.nodeId;
+
+  // begin comes pre-resolved by buildAnimation (syncbase references solved); negative values
+  // mean the set applied before the timeline origin.
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+
+  auto durStr = ctx.getAttribute(setElement, "dur");
+  double durSeconds = parseSMILClockValue(durStr);
+
+  auto* channel = CreateChannelForType(doc, target.valueType, target.channelName);
+  if (channel == nullptr) {
+    return channels;
+  }
+
+  KeyValue value = parseValue(ctx, toStr, target.valueType);
+  AppendKeyframe(channel, target.valueType, beginFrames, value, KeyframeInterpolationType::Hold, {},
+                 {});
+
+  // Compute end frame and determine fill mode. <set> defaults to fill="remove": when dur is
+  // set the element reverts to base value after begin+dur. When dur is absent the <set> effect
+  // is permanent (treated as freeze), matching SMIL semantics for indefinite-duration <set>.
+  Frame endFrame = beginFrames;
+  bool fillFreeze = (durSeconds <= 0.0) || (ctx.getAttribute(setElement, "fill") == "freeze") ||
+                    IsIndefiniteRepeat(setElement);
+  if (durSeconds > 0.0) {
+    endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
+  }
+  // end limits the active duration: the set value holds until end, then remove reverts.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < endFrame) {
+      endFrame = endLimit;
+    }
+  }
+  outEndFrame = endFrame;
+
+  // Add base-value keyframes for begin-offset and fill="remove" semantics.
+  KeyValue baseValue = ReadBaseValue(target);
+  AddBaseValueKeyframes(channel, target.valueType, baseValue, beginFrames, endFrame, fillFreeze);
+
+  channels.push_back(channel);
+  return channels;
+}
+
+std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
+    SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame) {
+  std::vector<Channel*> channels = {};
+  if (!animElement || nodeInfo.targetLayer == nullptr) {
+    return channels;
+  }
+
+  // The Layer node exposes a runtime "matrix" channel (TypedChannel<Matrix>) that replaces the
+  // layer's static matrix when applied, affecting both contents and children. Bake each
+  // animateTransform keyframe into a full Matrix and drive the Layer's matrix channel directly —
+  // for shape elements as well as <g> elements. This matches SMIL additive="replace" (default)
+  // semantics: the baked matrix replaces the layer's static transform. For additive="sum" each
+  // keyframe is pre-composed with the layer's static matrix (static * animated) so the animation
+  // adds on top of it. Multiple animateTransform elements with additive="sum" are composed by
+  // MergeAdditiveMatrix in buildAnimation. Known limitation: matrix decomposition interpolation
+  // cannot recover multi-turn rotation (rotate 0->720 collapses to the shortest arc).
+  auto type = ctx.getAttribute(animElement, "type");
+  if (type.empty()) {
+    return channels;
+  }
+
+  // Parse values: either explicit `values` list or from/to.
+  auto valuesStr = ctx.getAttribute(animElement, "values");
+  auto fromStr = ctx.getAttribute(animElement, "from");
+  auto toStr = ctx.getAttribute(animElement, "to");
+
+  std::vector<std::vector<float>> paramSets = {};
+  if (!valuesStr.empty()) {
+    auto tokens = SplitSemicolons(valuesStr);
+    for (const auto& token : tokens) {
+      paramSets.push_back(ParseFloatParams(token));
+    }
+  } else if (!fromStr.empty() && !toStr.empty()) {
+    paramSets.push_back(ParseFloatParams(fromStr));
+    paramSets.push_back(ParseFloatParams(toStr));
+  } else {
+    return channels;
+  }
+
+  if (paramSets.size() < 2) {
+    return channels;
+  }
+
+  // Parse timing attributes (same logic as parseAnimate, inlined to keep this method
+  // self-contained and avoid exposing internal timing structs in the header).
+  auto durStr = ctx.getAttribute(animElement, "dur");
+  double durSeconds = parseSMILClockValue(durStr);
+  if (durSeconds <= 0.0) {
+    return channels;
+  }
+  Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+
+  // begin comes pre-resolved by buildAnimation (syncbase references solved); negative values
+  // keep negative keyframe times (the animation started before the timeline origin).
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+
+  auto keyTimesStr = ctx.getAttribute(animElement, "keyTimes");
+  auto keyTimes = parseKeyTimes(keyTimesStr);
+  if (keyTimes.empty() || keyTimes.size() != paramSets.size()) {
+    keyTimes.resize(paramSets.size());
+    for (size_t i = 0; i < paramSets.size(); ++i) {
+      keyTimes[i] = static_cast<double>(i) / static_cast<double>(paramSets.size() - 1);
+    }
+  }
+
+  auto calcMode = ctx.getAttribute(animElement, "calcMode");
+  KeyframeInterpolationType interpolation = KeyframeInterpolationType::Linear;
+  std::vector<BezierControlPoints> splines = {};
+  if (calcMode == "discrete") {
+    interpolation = KeyframeInterpolationType::Hold;
+  } else if (calcMode == "spline") {
+    interpolation = KeyframeInterpolationType::Bezier;
+    splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
+  }
+
+  // Rotate interpolation on the matrix channel goes through DecomposeAffine/MixDecomposed,
+  // which recovers rotation via atan2 confined to (-pi, pi] and interpolates the shortest arc.
+  // A Linear keyframe pair whose angle delta exceeds 180 degrees therefore loses winding:
+  // 0->360 bakes both endpoints to the identity matrix (the tween never rotates), and 0->270
+  // is recovered as -90 (reversed direction). Split such segments into <=180-degree steps at
+  // bake time so every interpolated step stays inside the shortest-arc window; time is split
+  // proportionally to keep the angular velocity constant, and rotation centers (when the
+  // three-parameter form is used) are linearly interpolated across the inserted keyframes.
+  // Only Linear interpolation is split: Bezier-eased multi-turn rotations stay unsplit (rare;
+  // splitting would need spline subdivision) and keep the shortest-arc limitation, while Hold
+  // never interpolates so it has no winding to lose.
+  if (type == "rotate" && interpolation == KeyframeInterpolationType::Linear &&
+      paramSets.size() >= 2) {
+    std::vector<std::vector<float>> expandedParams = {};
+    std::vector<double> expandedTimes = {};
+    expandedParams.reserve(paramSets.size() * 2);
+    expandedTimes.reserve(paramSets.size() * 2);
+    expandedParams.push_back(paramSets.front());
+    expandedTimes.push_back(keyTimes.front());
+    for (size_t i = 1; i < paramSets.size(); ++i) {
+      float prevAngle = (paramSets[i - 1].size() > 0) ? paramSets[i - 1][0] : 0.0f;
+      float curAngle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
+      float delta = curAngle - prevAngle;
+      if (std::abs(delta) <= 180.0f) {
+        expandedParams.push_back(paramSets[i]);
+        expandedTimes.push_back(keyTimes[i]);
+        continue;
+      }
+      float prevCX = (paramSets[i - 1].size() >= 3) ? paramSets[i - 1][1] : 0.0f;
+      float prevCY = (paramSets[i - 1].size() >= 3) ? paramSets[i - 1][2] : 0.0f;
+      float curCX = (paramSets[i].size() >= 3) ? paramSets[i][1] : 0.0f;
+      float curCY = (paramSets[i].size() >= 3) ? paramSets[i][2] : 0.0f;
+      bool hasCenter = paramSets[i - 1].size() >= 3 || paramSets[i].size() >= 3;
+      // The step bound is 179 rather than 180 degrees: an inserted keyframe at exactly 180
+      // degrees sits on the atan2 ±pi boundary, where float sin(pi) is a tiny negative number,
+      // the keyframe decomposes to -pi instead of +pi, and the shortest-arc wrap (which uses
+      // strict inequality) leaves the diff unwrapped — reversing that step's direction.
+      // 179 degrees only guards winding loss; linear matrix interpolation still cuts a chord
+      // across the arc between keys, so a 120-degree step renders the shape inside its orbit
+      // (radius shrinks up to 13%). Cap the step at 20 degrees as well: the chord sagitta stays
+      // sub-pixel for typical orbit radii, and a full turn becomes 18 keys.
+      constexpr float kMaxRotateStep = 20.0f;
+      int steps = static_cast<int>(std::ceil(std::abs(delta) / kMaxRotateStep));
+      for (int k = 1; k <= steps; ++k) {
+        float t = static_cast<float>(k) / static_cast<float>(steps);
+        std::vector<float> params = {};
+        params.push_back(prevAngle + delta * t);
+        if (hasCenter) {
+          params.push_back(prevCX + (curCX - prevCX) * t);
+          params.push_back(prevCY + (curCY - prevCY) * t);
+        }
+        expandedParams.push_back(std::move(params));
+        expandedTimes.push_back(keyTimes[i - 1] + (keyTimes[i] - keyTimes[i - 1]) * t);
+      }
+    }
+    paramSets = std::move(expandedParams);
+    keyTimes = std::move(expandedTimes);
+  }
+
+  // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
+  // targeting the Layer. The runtime evaluates Matrix keyframes with decomposition interpolation
+  // (LerpKeyframeValue<Matrix>) and applies keySplines bezier easing through the same
+  // EvaluateKeyframeSequence path as scalar channels.
+  bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
+  const auto& staticMatrix = nodeInfo.targetLayer->matrix;
+  auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+  for (size_t i = 0; i < paramSets.size(); ++i) {
+    Matrix m = TransformParamsToMatrix(type, paramSets[i]);
+    if (additive) {
+      // SMIL additive="sum": the animated transform post-multiplies the base value, so each
+      // keyframe composes as static * animated.
+      m = staticMatrix * m;
+    }
+    Point bo = {}, bi = {};
+    ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
+    Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+    AppendKeyframe(ch, ChannelValueType::Matrix, time, m, interpolation, bo, bi);
+  }
+  channels.push_back(ch);
+
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  if (repeatCount > 1.0) {
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else {
+    outEndFrame = beginFrames + durFrames;
+  }
+
+  // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
+  // keyframe carrying the end-time value.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
+      outEndFrame = endLimit;
+    }
+  }
+
+  // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
+  // transform and begin-offset holds the static state before the animation starts.
+  auto fillStr = ctx.getAttribute(animElement, "fill");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
+  AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
+                        fillFreeze);
+
+  // Move a constant rotate center out of the keyframe translations and into Layer.anchor; a center
+  // that drifts between keyframes keeps the baked form.
+  if (type == "rotate" && !additive && nodeInfo.targetLayer != nullptr) {
+    float pivotX = 0.0f;
+    float pivotY = 0.0f;
+    auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(ch);
+    if (TryAdoptConstantPivot(matrixChannel, &pivotX, &pivotY)) {
+      nodeInfo.targetLayer->anchor = {pivotX, pivotY};
+    }
+  }
+  return channels;
+}
+
+// Ramer–Douglas–Peucker over sampled path positions: keeps the curvature-defining samples and
+// drops the ones that lie within `tolerance` of the chord, so a smooth arc does not need a keyframe
+// every few units.
+static void SimplifyMotionSamples(const std::vector<tgfx::Point>& points, size_t first, size_t last,
+                                  float tolerance, std::vector<char>* keep) {
+  if (last <= first + 1) {
+    return;
+  }
+  const tgfx::Point& a = points[first];
+  const tgfx::Point& b = points[last];
+  const float dx = b.x - a.x;
+  const float dy = b.y - a.y;
+  const float lengthSquared = dx * dx + dy * dy;
+  float maxDistance = 0.0f;
+  size_t farthest = first;
+  for (size_t i = first + 1; i < last; ++i) {
+    const tgfx::Point& p = points[i];
+    float distance = 0.0f;
+    if (lengthSquared <= 1e-6f) {
+      distance = std::hypot(p.x - a.x, p.y - a.y);
+    } else {
+      const float cross = std::abs(dx * (p.y - a.y) - dy * (p.x - a.x));
+      distance = cross / std::sqrt(lengthSquared);
+    }
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      farthest = i;
+    }
+  }
+  if (maxDistance <= tolerance || farthest == first) {
+    return;
+  }
+  (*keep)[farthest] = 1;
+  SimplifyMotionSamples(points, first, farthest, tolerance, keep);
+  SimplifyMotionSamples(points, farthest, last, tolerance, keep);
+}
+
+std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
+    SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame) {
+  std::vector<Channel*> channels = {};
+  if (!animElement || nodeInfo.targetLayer == nullptr) {
+    return channels;
+  }
+
+  // Like parseAnimateTransform, motion animations bake path position (and optional rotation)
+  // into a Matrix per keyframe on the Layer's runtime "matrix" channel — for shape elements as
+  // well as <g> elements. additive="sum" pre-composes the layer's static matrix.
+
+  // Resolve the motion path: either the `path` attribute on <animateMotion> itself, or an
+  // <mpath href="#id"> child referencing a <path> element in defs.
+  std::string pathStr = ctx.getAttribute(animElement, "path");
+  if (pathStr.empty()) {
+    auto child = animElement->getFirstChild();
+    while (child) {
+      if (child->name == "mpath") {
+        std::string href = ctx.getHrefAttribute(child);
+        std::string refId = ctx.resolveUrl(href);
+        auto defIt = ctx._defs.find(refId);
+        if (defIt != ctx._defs.end()) {
+          pathStr = ctx.getAttribute(defIt->second, "d");
+        }
+        break;
+      }
+      child = child->getNextSibling();
+    }
+  }
+  if (pathStr.empty()) {
+    return channels;
+  }
+
+  // Parse timing.
+  auto durStr = ctx.getAttribute(animElement, "dur");
+  double durSeconds = parseSMILClockValue(durStr);
+  if (durSeconds <= 0.0) {
+    return channels;
+  }
+  Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+
+  // begin comes pre-resolved by buildAnimation (syncbase references solved).
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+
+  // Build tgfx::Path from the SVG path data string.
+  auto pathData = PathDataFromSVGString(pathStr);
+  tgfx::Path tgfxPath = ToTGFX(pathData);
+  auto pathMeasure = tgfx::PathMeasure::MakeFrom(tgfxPath);
+  if (pathMeasure == nullptr) {
+    return channels;
+  }
+  float totalLength = pathMeasure->getLength();
+  if (totalLength <= 0.0f) {
+    return channels;
+  }
+
+  // Parse keyPoints: optional list of normalized [0,1] offsets along the path, one per keyframe.
+  // When absent, path positions are sampled uniformly.
+  // keyPoints may move back and forth along the path (a knob that travels to one end and
+  // returns), so this list is parsed without the monotonic requirement of keyTimes.
+  const std::vector<double> keyPoints =
+      ParseKeyPointList(ctx.getAttribute(animElement, "keyPoints"));
+
+  // Determine sample count: adaptive based on path length, clamped to [32, 256]. When keyPoints
+  // are provided, the sample count is fixed by the keyPoints list.
+  int sampleCount = 0;
+  if (!keyPoints.empty()) {
+    sampleCount = static_cast<int>(keyPoints.size());
+  } else {
+    sampleCount = static_cast<int>(totalLength / 10.0f);
+    if (sampleCount < 32) sampleCount = 32;
+    if (sampleCount > 256) sampleCount = 256;
+  }
+  if (sampleCount < 2) {
+    sampleCount = 2;
+  }
+
+  // Parse rotate attribute: "auto" / "auto-reverse" / <number> (default "0").
+  std::string rotateStr = ctx.getAttribute(animElement, "rotate", "0");
+  bool rotateAuto = (rotateStr == "auto");
+  bool rotateAutoReverse = (rotateStr == "auto-reverse");
+  float fixedRotation = 0.0f;
+  bool hasFixedRotation = false;
+  if (!rotateAuto && !rotateAutoReverse) {
+    fixedRotation = std::strtof(rotateStr.c_str(), nullptr);
+    hasFixedRotation = true;
+  }
+
+  // Bake each path sample into Translate(pos) * Rotate(angle) (rotation only when auto/auto-
+  // reverse; fixed rotation is also baked into each keyframe's matrix). A single "matrix"
+  // channel targets the Layer; fill="remove" reverts to the layer's static matrix.
+  bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
+  const auto& staticMatrix = nodeInfo.targetLayer->matrix;
+  auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+  struct MotionKey {
+    Frame time = 0;
+    Matrix matrix = {};
+    tgfx::Point position = {};
+  };
+  std::vector<MotionKey> samples;
+  // Sample densely first; the keyframes actually emitted are decimated afterwards, so the density
+  // here only bounds the geometric resolution of the simplification.
+  int denseCount = sampleCount;
+  if (keyPoints.empty()) {
+    denseCount = static_cast<int>(totalLength * 2.0f);
+    if (denseCount < 128) denseCount = 128;
+    if (denseCount > 512) denseCount = 512;
+  }
+  for (int i = 0; i < denseCount; ++i) {
+    double normalizedTime = static_cast<double>(i) / static_cast<double>(denseCount - 1);
+    double pathProgress = normalizedTime;
+    if (!keyPoints.empty()) {
+      pathProgress = keyPoints[i];
+    }
+    float distance = static_cast<float>(pathProgress) * totalLength;
+    tgfx::Point pos = {};
+    tgfx::Point tan = {};
+    if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
+      continue;
+    }
+    Matrix m = Matrix::Translate(pos.x, pos.y);
+    if (rotateAuto || rotateAutoReverse) {
+      float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
+      if (rotateAutoReverse) {
+        angle += 180.0f;
+      }
+      m = m * Matrix::Rotate(angle);
+    } else if (hasFixedRotation) {
+      m = m * Matrix::Rotate(fixedRotation);
+    }
+    if (additive) {
+      m = staticMatrix * m;
+    }
+    Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
+    samples.push_back({time, m, pos});
+  }
+  if (samples.size() >= 3 && keyPoints.empty()) {
+    std::vector<tgfx::Point> positions;
+    positions.reserve(samples.size());
+    for (const auto& sample : samples) {
+      positions.push_back(sample.position);
+    }
+    std::vector<char> keep(samples.size(), 0);
+    keep.front() = 1;
+    keep.back() = 1;
+    SimplifyMotionSamples(positions, 0, positions.size() - 1, 1.0f, &keep);
+    std::vector<MotionKey> simplified;
+    simplified.reserve(samples.size());
+    for (size_t i = 0; i < samples.size(); ++i) {
+      if (keep[i]) {
+        simplified.push_back(samples[i]);
+      }
+    }
+    if (simplified.size() >= 2) {
+      samples = std::move(simplified);
+    }
+  }
+  for (const auto& sample : samples) {
+    AppendKeyframe(ch, ChannelValueType::Matrix, sample.time, sample.matrix,
+                   KeyframeInterpolationType::Linear, {}, {});
+  }
+  channels.push_back(ch);
+
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  if (repeatCount > 1.0) {
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else {
+    outEndFrame = beginFrames + durFrames;
+  }
+  // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
+  // keyframe carrying the end-time value.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
+      outEndFrame = endLimit;
+    }
+  }
+  auto fillStr = ctx.getAttribute(animElement, "fill");
+  bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
+  AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
+                        fillFreeze);
+  return channels;
+}
+
+// An element with repeatCount="indefinite" only carries one cycle of keyframes, while the timeline
+// runs for the longest animation in the document (a 3s orbit next to a 4s spin lasts 4s). Tile the
+// cycle so the object keeps moving until the timeline loops instead of freezing on its last pose.
+template <typename T>
+static void TileTypedChannel(TypedChannel<T>* channel, Frame period, Frame maxEnd) {
+  if (channel == nullptr || period <= 0) {
+    return;
+  }
+  // A tiled copy of the first keyframe lands exactly on the cycle's last keyframe, and runtime
+  // evaluation rejects a channel whose keyframe times are not unique (the whole track then falls
+  // back to the static pose, which looks like "nothing animates"). Drop such duplicates.
+  std::unordered_set<Frame> usedTimes;
+  for (const auto& keyframe : channel->keyframes) {
+    usedTimes.insert(keyframe.time);
+  }
+  const auto base = channel->keyframes;
+  for (Frame offset = period; offset < maxEnd; offset += period) {
+    for (const auto& source : base) {
+      Frame time = source.time + offset;
+      if (time > maxEnd) {
+        break;
+      }
+      if (!usedTimes.insert(time).second) {
+        continue;
+      }
+      auto copy = source;
+      copy.time = time;
+      channel->keyframes.push_back(copy);
+    }
+  }
+}
+
+static void TileChannelKeyframes(Channel* channel, Frame period, Frame maxEnd) {
+  if (channel == nullptr) {
+    return;
+  }
+  switch (channel->valueType()) {
+    case ChannelValueType::Float:
+      TileTypedChannel(static_cast<TypedChannel<float>*>(channel), period, maxEnd);
+      break;
+    case ChannelValueType::Color:
+      TileTypedChannel(static_cast<TypedChannel<Color>*>(channel), period, maxEnd);
+      break;
+    case ChannelValueType::Matrix:
+      TileTypedChannel(static_cast<TypedChannel<Matrix>*>(channel), period, maxEnd);
+      break;
+    default:
+      break;
+  }
+}
+
+Animation* SMILAnimationParser::buildAnimation(
+    SVGParserContext& ctx, PAGXDocument* doc,
+    const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations,
+    const std::unordered_map<const DOMNode*, AnimatedNodeInfo>& animatedNodeMap, float frameRate) {
+  if (animatedNodeMap.empty()) {
+    return nullptr;
+  }
+
+  auto* animation = doc->makeNode<Animation>();
+  animation->frameRate = frameRate;
+  animation->loop = LoopMode::Once;
+  Frame maxEndFrame = 0;
+  bool hasIndefiniteLoop = false;
+  // Objects whose SMIL element repeats forever. Their keyframes only cover one cycle, so they are
+  // tiled up to the timeline duration once it is known (periods differ per element: 3s vs 4s).
+  struct InfiniteObjectEntry {
+    AnimationObject* object = nullptr;
+    Frame period = 0;
+  };
+  std::vector<InfiniteObjectEntry> infiniteObjects = {};
+
+  // Solve begin/end timing for every SMIL element up front (syncbase references like
+  // begin="id.end" need cross-element dependency resolution before any parsing).
+  auto timings = ResolveAllTimings(ctx, smilAnimations);
+  ResolvedTiming defaultTiming = {};
+  // A syncbase cycle repeats by construction (each animation restarts the other), so the whole
+  // timeline loops instead of playing a single lap.
+  for (const auto& entry : timings) {
+    if (entry.second.cyclic) {
+      hasIndefiniteLoop = true;
+      break;
+    }
+  }
+
+  for (const auto& pair : animatedNodeMap) {
+    bool elementIndefinite = false;
+    const auto& nodeInfo = pair.second;
+    auto smilIt = smilAnimations.find(pair.first);
+    if (smilIt == smilAnimations.end()) {
+      continue;
+    }
+    const auto& group = smilIt->second;
+
+    // Collect <animate>/<set> channels grouped by their actual target node id. A single SVG
+    // element may carry animations that drive different PAGX nodes (e.g. opacity → Layer,
+    // stroke-dashoffset → Stroke), so we must create one AnimationObject per target.
+    struct ChannelEntry {
+      Channel* channel = nullptr;
+      bool additive = false;
+      std::string targetId = {};
+    };
+    std::vector<ChannelEntry> layerEntries = {};
+    Frame layerEndFrame = 0;
+
+    for (const auto& animEl : group.animates) {
+      Frame endFrame = 0;
+      bool additive = (ctx.getAttribute(animEl, "additive") == "sum");
+      std::string targetId;
+      auto parsedChannels = parseAnimate(
+          ctx, doc, animEl, nodeInfo, frameRate,
+          timings.count(animEl.get()) ? timings[animEl.get()] : defaultTiming, endFrame, targetId);
+      for (auto* ch : parsedChannels) {
+        layerEntries.push_back({ch, additive, targetId});
+      }
+      if (endFrame > layerEndFrame) {
+        layerEndFrame = endFrame;
+      }
+      auto repeatCount = ctx.getAttribute(animEl, "repeatCount");
+      if (repeatCount == "indefinite") {
+        hasIndefiniteLoop = true;
+        elementIndefinite = true;
+      }
+    }
+    for (const auto& setEl : group.sets) {
+      Frame endFrame = 0;
+      bool additive = (ctx.getAttribute(setEl, "additive") == "sum");
+      std::string targetId;
+      auto parsedChannels = parseSet(
+          ctx, doc, setEl, nodeInfo, frameRate,
+          timings.count(setEl.get()) ? timings[setEl.get()] : defaultTiming, endFrame, targetId);
+      for (auto* ch : parsedChannels) {
+        layerEntries.push_back({ch, additive, targetId});
+      }
+      if (endFrame > layerEndFrame) {
+        layerEndFrame = endFrame;
+      }
+    }
+
+    // animateTransform/animateMotion bake Matrix keyframes onto the Layer's runtime "matrix"
+    // channel. Collect them into layerEntries so they share the Layer-targeted AnimationObject
+    // with <animate>/<set> channels (e.g. opacity), and MergeAdditiveChannels composes multiple
+    // additive matrix channels.
+    if (nodeInfo.targetLayer != nullptr &&
+        (!group.animateTransforms.empty() || !group.animateMotions.empty())) {
+      for (const auto& transformEl : group.animateTransforms) {
+        Frame endFrame = 0;
+        bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
+        auto parsedChannels = parseAnimateTransform(
+            ctx, doc, transformEl, nodeInfo, frameRate,
+            timings.count(transformEl.get()) ? timings[transformEl.get()] : defaultTiming,
+            endFrame);
+        for (auto* ch : parsedChannels) {
+          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+        }
+        if (endFrame > layerEndFrame) {
+          layerEndFrame = endFrame;
+        }
+        auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
+        if (repeatCount == "indefinite") {
+          hasIndefiniteLoop = true;
+          elementIndefinite = true;
+        }
+      }
+      for (const auto& motionEl : group.animateMotions) {
+        Frame endFrame = 0;
+        bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
+        auto parsedChannels = parseAnimateMotion(
+            ctx, doc, motionEl, nodeInfo, frameRate,
+            timings.count(motionEl.get()) ? timings[motionEl.get()] : defaultTiming, endFrame);
+        for (auto* ch : parsedChannels) {
+          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+        }
+        if (endFrame > layerEndFrame) {
+          layerEndFrame = endFrame;
+        }
+        auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
+        if (repeatCount == "indefinite") {
+          hasIndefiniteLoop = true;
+          elementIndefinite = true;
+        }
+      }
+    }
+
+    // Group channels by targetId and create one AnimationObject per target.
+    std::unordered_map<std::string, std::vector<ChannelWithAdditive>> groupedByTarget;
+    for (const auto& entry : layerEntries) {
+      groupedByTarget[entry.targetId].push_back({entry.channel, entry.additive});
+    }
+    for (auto& [targetId, channels] : groupedByTarget) {
+      auto* obj = doc->makeNode<AnimationObject>();
+      obj->target = targetId;
+      obj->channels = MergeAdditiveChannels(&channels);
+      if (!obj->channels.empty()) {
+        animation->objects.push_back(obj);
+        if (elementIndefinite && layerEndFrame > 0) {
+          infiniteObjects.push_back({obj, layerEndFrame});
+        }
+      }
+    }
+    if (layerEndFrame > maxEndFrame) {
+      maxEndFrame = layerEndFrame;
+    }
+  }
+
+  if (animation->objects.empty()) {
+    return nullptr;
+  }
+
+  // Timeline length is the longest animation; shorter infinite repetitions are tiled up to it so
+  // they keep moving instead of freezing on their last pose.
+  animation->duration = maxEndFrame;
+  for (const auto& entry : infiniteObjects) {
+    if (entry.object == nullptr || entry.period <= 0 || entry.period >= maxEndFrame) {
+      continue;
+    }
+    for (auto* channel : entry.object->channels) {
+      TileChannelKeyframes(channel, entry.period, maxEndFrame);
+    }
+  }
+  if (hasIndefiniteLoop) {
+    animation->loop = LoopMode::Loop;
+  }
+  return animation;
+}
+
+}  // namespace pagx
