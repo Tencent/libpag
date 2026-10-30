@@ -619,7 +619,8 @@ class HTMLWriter {
   // Group's CSS transform stacks on top, since the inner Group's renderPosition is expressed in
   // the outer Group's local space (not the enclosing Layer's).
   void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
-                  const Matrix& parentMatrix = {});
+                  const Matrix& parentMatrix = {},
+                  const std::vector<Element*>* propagatedPainters = nullptr);
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha,
                      const TrimPath* trim = nullptr, bool applyCopyAlphaDecay = true);
