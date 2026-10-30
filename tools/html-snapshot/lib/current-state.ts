@@ -93,12 +93,32 @@ export function collectCurrentState(resources: CaptureResources = {}): CapturedP
       if (result === null) { onMissing?.(); return 'none'; }
       return `url("${result.replace(/"/g, '%22')}")`;
     });
-  const styles = (computed: CSSStyleDeclaration): string => {
+  const marginSides = ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'];
+  const marginProperties = new Set([
+    'margin', ...marginSides, 'margin-block', 'margin-inline',
+    'margin-block-start', 'margin-block-end', 'margin-inline-start', 'margin-inline-end',
+    '-webkit-margin-before', '-webkit-margin-after', '-webkit-margin-start', '-webkit-margin-end',
+  ]);
+  const styles = (computed: CSSStyleDeclaration, source?: Element): string => {
+    let typed: StylePropertyMapReadOnly | undefined;
+    try { typed = source?.computedStyleMap?.(); }
+    catch (_) { /* Older browser collectors can still copy resolved values. */ }
     const result: string[] = [];
     for (const key of Array.from(computed)) {
       // Copy actual values now: CSSStyleDeclaration is a live view.
-      if (key.startsWith('animation') || key.startsWith('transition')) continue;
+      if (marginProperties.has(key) || key.startsWith('animation') || key.startsWith('transition')) continue;
       result.push(`${key}:${rewriteUrls(computed.getPropertyValue(key))} !important`);
+    }
+    // Chromium can report 0px for an auto margin even when the box is centered.
+    // Retain that keyword from Typed OM; freeze other margins at their resolved values.
+    // Emit physical sides only: replaying logical aliases alongside them can override
+    // auto after HTML serialization. Typed OM already maps writing-mode/direction.
+    // Pseudos have no source Element here and retain their own resolved margins.
+    for (const key of marginSides) {
+      let value = computed.getPropertyValue(key);
+      try { if (typed?.get(key)?.toString() === 'auto') value = 'auto'; }
+      catch (_) { /* A partial Typed OM implementation may not expose every property. */ }
+      result.push(`${key}:${value} !important`);
     }
     result.push('animation:none !important', 'transition:none !important', 'scroll-behavior:auto !important');
     return result.join(';');
@@ -148,7 +168,7 @@ export function collectCurrentState(resources: CaptureResources = {}): CapturedP
     }
     const id = boxes.length;
     clone.setAttribute('data-pagx-capture-id', String(id));
-    clone.setAttribute('style', styles(computed));
+    clone.setAttribute('style', styles(computed, source));
     if (placeholder && computed.display === 'inline') {
       (clone as HTMLElement).style.setProperty('display', 'inline-block', 'important');
     }
