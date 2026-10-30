@@ -77,6 +77,9 @@ struct SMILAnimationGroup {
 struct ResolvedTiming {
   double beginSeconds = 0;
   double endSeconds = -1;
+  /// Set when the element takes part in a syncbase cycle (A.begin = B.end, B.begin = A.end):
+  /// the sequence repeats with the period of one lap, so the timeline loops.
+  bool cyclic = false;
 };
 
 /**

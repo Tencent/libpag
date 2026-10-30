@@ -3233,13 +3233,9 @@ static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-    // Skip the separator of an empty declaration too: rule bodies collected from a <style> element
-    // may join with a semicolon that follows one the previous body already ended with.
+    // 连续的分号会产出空声明：跳过时分隔符要一起吃掉，避免下一个属性名带上 ";"。
     while (pos < styleStr.size() &&
            (std::isspace(static_cast<unsigned char>(styleStr[pos])) || styleStr[pos] == ';')) {
-    // Empty declarations (consecutive semicolons) would turn the next property name
-    // into ";prop".
-    while (pos < styleStr.size() && (std::isspace(styleStr[pos]) || styleStr[pos] == ';')) {
       ++pos;
     }
     // Skip CSS comments.
