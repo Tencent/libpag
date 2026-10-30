@@ -1988,6 +1988,27 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   for (auto* ch : channels) {
     AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze);
   }
+
+  // SVG 的 rect 以左上角定位，PAGX 的 Rectangle 以中心定位：只动 size 会让矩形从中心向两边
+  // 收缩。这里按同一组时间点补一条位置通道，把「被动画的那条边」钉在静态左上角上。
+  // 基准值关键帧已经写在 size 通道里（值等于静态尺寸），复制过来算出的中心正好是静态中心。
+  if ((attributeName == "width" || attributeName == "height") &&
+      target.valueType == ChannelValueType::Float && !channels.empty()) {
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    if (rect != nullptr) {
+      const bool horizontal = (attributeName == "width");
+      const float anchor = horizontal ? rect->position.x - rect->size.width * 0.5f
+                                      : rect->position.y - rect->size.height * 0.5f;
+      auto* size_channel = static_cast<TypedChannel<float>*>(channels.front());
+      auto* anchor_channel = CreateChannelForType(
+          doc, ChannelValueType::Float, horizontal ? "position.x" : "position.y");
+      for (const auto& key : size_channel->keyframes) {
+        AppendKeyframe(anchor_channel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
+                       key.interpolation, {}, {});
+      }
+      channels.push_back(anchor_channel);
+    }
+  }
   return channels;
 }
 std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXDocument* doc,
