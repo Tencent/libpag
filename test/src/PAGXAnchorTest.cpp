@@ -107,8 +107,7 @@ std::string MakeRectDoc(const std::string& layerAttributes) {
          "</pagx>\n";
 }
 
-std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std::string& firstKey,
-                                  const std::string& lastKey) {
+std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std::string& keys) {
   return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          "<pagx width=\"200\" height=\"200\">\n"
          "  <Layer>\n"
@@ -122,13 +121,8 @@ std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std:
          "  <Animations>\n"
          "    <Animation id=\"rotate\" duration=\"60\">\n"
          "      <Object target=\"rotated\">\n"
-         "        <Channel name=\"matrix\" type=\"matrix\">\n"
-         "          <Key time=\"0\" value=\"" +
-         firstKey +
-         "\"/>\n"
-         "          <Key time=\"60\" value=\"" +
-         lastKey +
-         "\"/>\n"
+         "        <Channel name=\"matrix\" type=\"matrix\">\n" +
+         keys +
          "        </Channel>\n"
          "      </Object>\n"
          "    </Animation>\n"
@@ -278,9 +272,23 @@ PAGX_TEST(PAGXAnchorTest, RenderAnchorZMatchesBaked3D) {
  * written with a zero translation matches one that bakes the pivot into every keyframe.
  */
 PAGX_TEST(PAGXAnchorTest, RenderAnimatedAnchorMatchesBaked) {
-  auto anchored = ParseDoc(
-      MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50\"", "1,0,0,1,0,0", "0,1,-1,0,0,0"));
-  auto baked = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\"", "1,0,0,1,0,0", "0,1,-1,0,150,-50"));
+  // Both documents sample the same poses: the anchored one carries the pivot, the baked one folds
+  // it into the keyframe translation (a - L * a). Comparing at a keyframe time keeps the
+  // element-wise matrix interpolation out of the comparison.
+  const std::string identity = "1,0,0,1,0,0";
+  const std::string rotate45 = "0.70710678,0.70710678,-0.70710678,0.70710678";
+  const std::string rotate90 = "0,1,-1,0";
+  const std::string anchored_keys = "          <Key time=\"0\" value=\"" + identity +
+                                    "\"/>\n          <Key time=\"30\" value=\"" + rotate45 +
+                                    ",0,0\"/>\n          <Key time=\"60\" value=\"" + rotate90 +
+                                    ",0,0\"/>\n";
+  const std::string baked_keys = "          <Key time=\"0\" value=\"" + identity +
+                                 "\"/>\n          <Key time=\"30\" value=\"" + rotate45 +
+                                 ",64.6446,-56.066\"/>\n          <Key time=\"60\" value=\"" +
+                                 rotate90 + ",150,-50\"/>\n";
+  auto anchored =
+      ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50\"", anchored_keys));
+  auto baked = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\"", baked_keys));
   ASSERT_TRUE(anchored != nullptr);
   ASSERT_TRUE(baked != nullptr);
   const auto anchoredPixels = RenderFrame(anchored, 500'000);
