@@ -110,7 +110,18 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
 
   /**
    * Returns the source Layer node associated with this runtime layer, or nullptr for the root
-   * composition.
+   * composition. This is the runtime's only exposure of the source model and the hook hosts use to
+   * own the source-node to runtime-layer correspondence: the core keeps no such map, so a host
+   * walks the runtime tree (from getLayersUnderPoint or the root composition) and matches on this
+   * pointer, using PAGXDocument::ownsNode() to tell its own nodes apart from those of an embedded
+   * external document. The node is owned by the source document, which the scene keeps alive, so
+   * the pointer stays valid while this handle is part of the current runtime tree; the runtime never
+   * rewrites it in place.
+   *
+   * The guarantee is scoped to the tree the handle came from. A rebuild replaces the tree with new
+   * handles — PAGXDocument::detachInlineImport() is the case that matters, since it also frees the
+   * sub-document some handles used to point into — so a handle cached across such a call can dangle.
+   * Re-query after a structural document change instead of holding onto an earlier handle.
    */
   const Layer* getNode() const {
     return node;
@@ -135,6 +146,13 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   const Layer* node = nullptr;
   std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
   std::vector<std::shared_ptr<PAGLayer>> children = {};
+  // Parent in the runtime tree. weak_ptr because the parent owns its children via shared_ptr; a
+  // strong ref here would create a cycle (parent → child → parent) that prevents destruction.
+  // Written on every build and rebuild but not read in this PR: the accessor that walks the chain
+  // (PAGLayer::getParent(), used by the source editor's ancestor-chain hit testing) arrives in a
+  // follow-up PR together with its callers, which this PR dropped as unexercised. Kept and kept
+  // wired so that PR re-adds only the accessor and not the chain maintenance.
+  std::weak_ptr<PAGLayer> parent = {};
 
   /**
    * Traverses the runtime layer subtree and calls visitor for every PAGComposition node found.

@@ -190,6 +190,10 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
   auto& svgDoc = result.document;
 
+  // A previously applied layout mounts the inline import as a sub-document; detach it before
+  // flattening so the layer renders the flattened contents instead of the composition reference.
+  doc->detachInlineImport(layer);
+
   // Update Layer dimensions from source. Keep existing absolute or percentage values untouched.
   if (std::isnan(layer->width) && std::isnan(layer->percentWidth) && svgDoc->width > 0) {
     layer->width = svgDoc->width;
@@ -278,12 +282,12 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     }
   }
 
-  // Transfer ownership of all nodes from imported document to target document.
-  for (auto& node : svgDoc->nodes) {
-    doc->nodes.push_back(std::move(node));
-  }
-  svgDoc->nodes.clear();
-  svgDoc->layers.clear();
+  // Transfer ownership of all nodes from the imported document to the target document.
+  // adoptNodes() renames the auto-numbered importer ids (image1, path1, ...) first: they collide
+  // across separately resolved SVGs and with the host document's own ids, and adopting them
+  // unrenamed would report duplicates or hijack the host's "@id" references.
+  // adoptNodes() drains svgDoc, so its layer list goes with the nodes.
+  doc->adoptNodes(*svgDoc);
 
   // Clear import fields and set resolved marker.
   layer->importDirective.source.clear();
@@ -296,30 +300,10 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
 
 // Each inline <svg> is imported by its own SVGImporter instance, which numbers auto-generated ids
 // (image1, path1, color1, ...) from scratch. When several inline SVGs in one document are resolved
-// and their nodes merged into the same target document, those counters collide — e.g. two unrelated
-// <image> elements both become Image id="image1". On reload the second registration overwrites the
-// first in the id index, so every reference (@image1) binds to the same node and the other resource
-// is lost. Walk the merged node list and rename any id that repeats to a fresh unique one; node
-// references are in-memory pointers, so the exporter picks up the new id automatically.
-static void DeduplicateNodeIds(PAGXDocument* doc) {
-  std::unordered_set<std::string> usedIds;
-  for (auto& node : doc->nodes) {
-    if (node->id.empty()) {
-      continue;
-    }
-    if (usedIds.insert(node->id).second) {
-      continue;
-    }
-    std::string base = node->id;
-    std::string candidate;
-    int suffix = 2;
-    do {
-      candidate = base + "_" + std::to_string(suffix++);
-    } while (usedIds.count(candidate) > 0);
-    node->id = candidate;
-    usedIds.insert(candidate);
-  }
-}
+// and their nodes merged into the same target document, those counters collide — e.g. two
+// unrelated <image> elements both become Image id="image1". ResolveOneLayer renames the colliding
+// ids (via PAGXDocument::renameCollidingIds) before each adoptNodes() call, so the merged document
+// has unique ids by construction.
 
 static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& baseDir,
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
@@ -356,19 +340,24 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
   ResolveLayers(doc->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
 
   // Also resolve in Composition layers.
+  // Snapshot the compositions before resolving: ResolveLayers() can detach an inline import, and
+  // PAGXDocument::detachInlineImport() then calls removeNodes(), which resizes and renumbers
+  // doc->nodes. Iterating nodes directly would invalidate the range-for's cached end and hand back
+  // dangling unique_ptrs (a virtual call on a destroyed node), so walk a stable snapshot and skip
+  // entries that an earlier detach already removed.
+  std::vector<Composition*> compositions = {};
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount,
-                    stats.errorCount);
+      compositions.push_back(static_cast<Composition*>(node.get()));
     }
   }
-
-  if (stats.resolvedCount > 0) {
-    // Merging several inline-SVG imports into one document can collide their auto-generated ids;
-    // rename the duplicates before the optimizer and exporter consume the merged tree.
-    DeduplicateNodeIds(doc);
+  for (auto* comp : compositions) {
+    if (!doc->ownsNode(comp)) {
+      continue;
+    }
+    ResolveLayers(comp->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
   }
+
   return stats;
 }
 

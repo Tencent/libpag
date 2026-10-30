@@ -228,6 +228,29 @@ bool IsValidSelectorModeString(const std::string& str);
 //==============================================================================
 std::string ColorToHexString(const Color& color, bool withAlpha = false);
 
+/**
+ * Parses a PAGX color attribute string into a Color. Accepts the three formats permitted by the
+ * PAGX schema: hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`, sRGB), functional sRGB (`srgb(r, g, b[, a])`),
+ * and Display P3 (`p3(r, g, b[, a])`). On success returns the parsed color and sets `*outValid` to
+ * true; on malformed input returns a default-constructed Color and sets `*outValid` to false.
+ * `outValid` may be null.
+ */
+Color ParseColor(const std::string& str, bool* outValid = nullptr);
+
+/**
+ * Parses a PAGX dimension attribute string ("100" or "50%") following the XSD DimensionType
+ * pattern "[0-9]*\.?[0-9]+%?": a bare number sets *outAbsolute, a "%"-suffixed one sets
+ * *outPercent, and exactly one of the two is written (the other stays NaN). Rejects empty input,
+ * leading whitespace, a leading sign, a hex prefix, non-finite and negative values, and any
+ * trailing characters (including whitespace around "%").
+ *
+ * Shared by the importer and the incremental channel writer: keeping one grammar is what makes
+ * "an incremental edit never accepts input a full reparse would reject" hold, so both sides must
+ * call this instead of carrying their own copy. Returns false on malformed input with both
+ * outputs NaN. The caller owns the diagnostic (importer) or the fallback (incremental edit).
+ */
+bool ParseDimension(const std::string& raw, float* outAbsolute, float* outPercent);
+
 //==============================================================================
 // Matrix
 //==============================================================================
@@ -237,6 +260,8 @@ Matrix MatrixFromString(const std::string& str);
 //==============================================================================
 // String parsing utilities
 //==============================================================================
+// Advances ptr past spaces, tabs and commas, for parsing delimiter-separated numeric tuples.
+const char* SkipWhitespaceAndComma(const char* ptr, const char* end);
 std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 
