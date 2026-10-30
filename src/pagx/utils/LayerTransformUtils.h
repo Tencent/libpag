@@ -52,8 +52,19 @@ bool HasLayerTransformComponents(const Layer* layer);
 // negative perspective), only the translation is kept; matrix is the identity if even that fails.
 void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components, Matrix3D* matrix);
 
-// Returns the Layer's local transform without the layout position: the non-identity matrix3D, else
-// the non-identity matrix lifted with z, else the composition of x / y / z and the components.
+// Moves the transform pivot to `anchor`: T(anchor) * matrix * T(-anchor). The linear part is kept
+// and the translation becomes t + anchor - L * anchor. A zero anchor returns the input unchanged.
+Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ);
+
+// Returns the Layer's local transform without the layout position and without the anchor: the
+// non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
+// z and the components. Runtime renderers keep the pose unanchored and apply ApplyAnchorToMatrix
+// once, when the pose is published.
+Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer);
+
+// Returns the Layer's local transform without the layout position, with the anchor applied: the
+// non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
+// z and the components, then ApplyAnchorToMatrix.
 Matrix3D BuildLayerLocalMatrix3D(const Layer* layer);
 
 }  // namespace pagx
