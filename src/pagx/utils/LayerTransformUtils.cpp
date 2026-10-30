@@ -85,20 +85,20 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
 
 // Moves the transform pivot to `anchor`: T(anchor) * M * T(-anchor). The linear part is unchanged
 // and the translation becomes t + anchor - L * anchor, so the translation stays outside the pivot.
-Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor) {
-  if (anchor.x == 0.0f && anchor.y == 0.0f) {
+Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ) {
+  if (anchor.x == 0.0f && anchor.y == 0.0f && anchorZ == 0.0f) {
     return matrix;
   }
   Matrix3D result = matrix;
-  const float linearX =
-      matrix.getRowColumn(0, 0) * anchor.x + matrix.getRowColumn(0, 1) * anchor.y;
-  const float linearY =
-      matrix.getRowColumn(1, 0) * anchor.x + matrix.getRowColumn(1, 1) * anchor.y;
-  const float linearZ =
-      matrix.getRowColumn(2, 0) * anchor.x + matrix.getRowColumn(2, 1) * anchor.y;
+  const float linearX = matrix.getRowColumn(0, 0) * anchor.x + matrix.getRowColumn(0, 1) * anchor.y +
+                        matrix.getRowColumn(0, 2) * anchorZ;
+  const float linearY = matrix.getRowColumn(1, 0) * anchor.x + matrix.getRowColumn(1, 1) * anchor.y +
+                        matrix.getRowColumn(1, 2) * anchorZ;
+  const float linearZ = matrix.getRowColumn(2, 0) * anchor.x + matrix.getRowColumn(2, 1) * anchor.y +
+                        matrix.getRowColumn(2, 2) * anchorZ;
   result.setRowColumn(0, 3, matrix.getRowColumn(0, 3) + anchor.x - linearX);
   result.setRowColumn(1, 3, matrix.getRowColumn(1, 3) + anchor.y - linearY);
-  result.setRowColumn(2, 3, matrix.getRowColumn(2, 3) - linearZ);
+  result.setRowColumn(2, 3, matrix.getRowColumn(2, 3) + anchorZ - linearZ);
   return result;
 }
 
@@ -122,7 +122,7 @@ Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer) {
 }
 
 Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
-  return ApplyAnchorToMatrix(ComposeLayerLocalMatrix3D(layer), layer->anchor);
+  return ApplyAnchorToMatrix(ComposeLayerLocalMatrix3D(layer), layer->anchor, layer->anchorZ);
 }
 
 }  // namespace pagx

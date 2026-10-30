@@ -184,6 +184,14 @@ class Layer : public Node, public LayoutNode {
   Point anchor = {};
 
   /**
+   * The z coordinate of the anchor pivot in layer-local pixels. The local transform rotates and
+   * scales around (anchor.x, anchor.y, anchorZ); a zero value keeps the pivot in the layer plane.
+   * Only meaningful together with a 3D transform (matrix3D or the rotationX / rotationY
+   * components), where it moves the pivot depth. The default value is 0.
+   */
+  float anchorZ = 0.0f;
+
+  /**
    * Whether to preserve 3D transformations for child layers. The default value is false.
    */
   bool preserve3D = false;
