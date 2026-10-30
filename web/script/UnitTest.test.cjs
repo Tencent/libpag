@@ -52,6 +52,10 @@ function CreateHarness(options = {}) {
     child.emit('close', code, signal);
   }
   function MockRequire(name) {
+    if (name === 'cypress/package.json') {
+      if (options.installedCypress) return require(name);
+      return { bin: { cypress: options.cliPath || 'bin/cypress' } };
+    }
     if (name === 'http-server') {
       return {
         createServer(config) {
@@ -72,8 +76,9 @@ function CreateHarness(options = {}) {
     return require(name);
   }
   MockRequire.resolve = function (name) {
-    assert.equal(name, 'cypress/bin/cypress');
-    return '/mock/cypress/bin/cypress';
+    assert.equal(name, 'cypress/package.json');
+    if (options.installedCypress) return require.resolve(name);
+    return '/mock/cypress/package.json';
   };
   const fakeModule = { exports: {} };
   const context = {
@@ -169,6 +174,34 @@ test('WebGPU uses Chrome and preserves the failing Cypress exit code', async fun
   harness.exit(7);
   assert.equal(await result, 7);
   assert.equal(harness.calls.closes, 1);
+  AssertClean(harness);
+});
+
+test('the CLI path follows the executable declared by the package', async function () {
+  const harness = CreateHarness({ cliPath: 'custom/cli.js' });
+  const result = harness.run();
+  harness.listen();
+  await Drain();
+  harness.exit(0);
+  assert.equal(await result, 0);
+  assert.equal(harness.calls.spawns[0].args[0], '/mock/cypress/custom/cli.js');
+  AssertClean(harness);
+});
+
+test('the installed Cypress package resolves its CLI without importing a private subpath', async function () {
+  const harness = CreateHarness({ installedCypress: true });
+  const result = harness.run();
+  if (harness.calls.address) {
+    harness.listen();
+    await Drain();
+    harness.exit(0);
+  }
+  assert.equal(await result, 0, harness.calls.errors.join('\n'));
+  const packagePath = require.resolve('cypress/package.json');
+  const declaredCLI = require('cypress/package.json').bin.cypress;
+  const executable = path.resolve(path.dirname(packagePath), declaredCLI);
+  assert.equal(harness.calls.spawns[0].args[0], executable);
+  assert.equal(fs.statSync(executable).isFile(), true);
   AssertClean(harness);
 });
 

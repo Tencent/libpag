@@ -88,7 +88,9 @@ async function Run(args = process.argv.slice(2)) {
 
   try {
     const backend = ParseBackend(args);
-    const cypressPath = require.resolve('cypress/bin/cypress');
+    const packagePath = require.resolve('cypress/package.json');
+    const cypressPackage = require('cypress/package.json');
+    const cypressPath = path.resolve(path.dirname(packagePath), cypressPackage.bin.cypress);
     server = require('http-server').createServer({ root: WebRoot, cache: -1 }).server;
     const interrupted = new Promise(function (resolve, reject) {
       rejectRun = reject;
