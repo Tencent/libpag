@@ -20,6 +20,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "base/PAGTest.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -28,7 +29,6 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/LayerTransformUtils.h"
-#include "base/PAGTest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -107,8 +107,8 @@ std::string MakeRectDoc(const std::string& layerAttributes) {
          "</pagx>\n";
 }
 
-std::string MakeAnimatedRotateDoc(const std::string& layerAttributes,
-                                 const std::string& firstKey, const std::string& lastKey) {
+std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std::string& firstKey,
+                                  const std::string& lastKey) {
   return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          "<pagx width=\"200\" height=\"200\">\n"
          "  <Layer>\n"
@@ -260,10 +260,11 @@ PAGX_TEST(PAGXAnchorTest, RenderIgnoresAnchorZFor2D) {
  */
 PAGX_TEST(PAGXAnchorTest, RenderAnchorZMatchesBaked3D) {
   const std::string rotation = "1,0,0,0,0,0.5,0.8660254,0,0,-0.8660254,0.5,0,0,0,0,1";
-  auto anchored = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50,20\" matrix3D=\"" + rotation +
-                                       "\""));
-  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" matrix3D=\"1,0,0,0,0,0.5,0.8660254,0,0,"
-                                    "-0.8660254,0.5,0,0,42.32051,-33.30127,1\""));
+  auto anchored =
+      ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50,20\" matrix3D=\"" + rotation + "\""));
+  auto baked =
+      ParseDoc(MakeRectDoc("id=\"layer\" matrix3D=\"1,0,0,0,0,0.5,0.8660254,0,0,"
+                           "-0.8660254,0.5,0,0,42.32051,-33.30127,1\""));
   ASSERT_TRUE(anchored != nullptr);
   ASSERT_TRUE(baked != nullptr);
   const auto anchoredPixels = RenderFrame(anchored);
@@ -277,10 +278,9 @@ PAGX_TEST(PAGXAnchorTest, RenderAnchorZMatchesBaked3D) {
  * written with a zero translation matches one that bakes the pivot into every keyframe.
  */
 PAGX_TEST(PAGXAnchorTest, RenderAnimatedAnchorMatchesBaked) {
-  auto anchored = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50\"",
-                                                 "1,0,0,1,0,0", "0,1,-1,0,0,0"));
-  auto baked = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\"", "1,0,0,1,0,0",
-                                              "0,1,-1,0,150,-50"));
+  auto anchored = ParseDoc(
+      MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50\"", "1,0,0,1,0,0", "0,1,-1,0,0,0"));
+  auto baked = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\"", "1,0,0,1,0,0", "0,1,-1,0,150,-50"));
   ASSERT_TRUE(anchored != nullptr);
   ASSERT_TRUE(baked != nullptr);
   const auto anchoredPixels = RenderFrame(anchored, 500'000);
@@ -295,8 +295,9 @@ PAGX_TEST(PAGXAnchorTest, RenderAnimatedAnchorMatchesBaked) {
  */
 PAGX_TEST(PAGXAnchorTest, LayoutPositionStaysOutsideAnchor) {
   // Same rotation as RenderAnchorMatchesBaked2D, shifted right by 40px through the layout x.
-  auto anchored = ParseDoc(MakeRectDoc("id=\"layer\" x=\"40\" anchor=\"100,50\" "
-                                       "matrix=\"0,1,-1,0,0,0\""));
+  auto anchored =
+      ParseDoc(MakeRectDoc("id=\"layer\" x=\"40\" anchor=\"100,50\" "
+                           "matrix=\"0,1,-1,0,0,0\""));
   ASSERT_TRUE(anchored != nullptr);
   const auto movedPixels = RenderFrame(anchored);
   ASSERT_FALSE(movedPixels.empty());
