@@ -548,8 +548,17 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       layer->matrix = parsed;
     }
   }
-  layer->anchor = GetPointAttribute(node, "anchor", Default<Layer>().anchor, doc);
-  layer->anchorZ = GetFloatAttribute(node, "anchorZ", Default<Layer>().anchorZ, doc);
+  // "x,y" keeps the pivot in the layer plane; "x,y,z" moves it out of the plane for 3D transforms.
+  auto anchorStr = GetAttribute(node, "anchor");
+  if (!anchorStr.empty()) {
+    auto anchorValues = ParseFloatList(anchorStr);
+    if (anchorValues.size() != 2 && anchorValues.size() != 3) {
+      ReportError(doc, node, "Invalid 'anchor' value (expected 'x,y' or 'x,y,z').");
+    } else {
+      layer->anchor = {anchorValues[0], anchorValues[1]};
+      layer->anchorZ = (anchorValues.size() == 3) ? anchorValues[2] : 0.0f;
+    }
+  }
   auto matrix3DStr = GetAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
     auto floats = ParseFloatList(matrix3DStr);

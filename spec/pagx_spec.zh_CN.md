@@ -967,8 +967,7 @@ Layer 的子元素按类型自动归类为五个集合：
 | `perspective` | float | 0 | 透视距离 `d`；0 表示无透视，负数无效 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | 单位矩阵 | 3D 变换（16 个值，列优先）；必须有限且可逆 |
-| `anchor` | Point | 0,0 | 局部变换的支点 "x,y"（图层本地像素，不随尺寸缩放，不参与布局） |
-| `anchorZ` | float | 0 | 局部变换的 z 支点，仅在 3D 变换（`matrix3D` / `rotationX` / `rotationY`）下有意义 |
+| `anchor` | Point 或 Point3 | 0,0 | 局部变换的支点 "x,y" 或 "x,y,z"（图层本地像素，不随尺寸缩放，不参与布局）；第三个值只在 3D 变换下有意义 |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | true | 组透明度 |
@@ -1001,7 +1000,7 @@ Layer 的子元素按类型自动归类为五个集合：
 M3 = T(translate) * T(anchor.x, anchor.y, anchorZ) * L3 * T(-anchor.x, -anchor.y, -anchorZ)
 ```
 
-其中 `L3` 是 `matrix` / `matrix3D` 的线性部分（`M` 为 2D 时 `anchorZ` 不参与），`translate` 是其平移量。`anchorZ` 只影响 3D 支点的深度：透视投影下的旋转中心随之移到图层平面之外，`anchorZ = 0`（默认）时支点落在图层平面内。`anchor` 为 `0,0`（默认）时退化为“矩阵即完整变换”，与既有文档完全兼容；`anchor` 非零时，`matrix` 的 `tx`/`ty` 只表示纯平移，不应再包含支点补偿。同一份数据里不允许同时存在“烘焙进 tx/ty 的支点补偿”和 `anchor`，两者叠加会导致整体偏移。
+其中 `L3` 是 `matrix` / `matrix3D` 的线性部分（`M` 为 2D 时 `anchorZ` 不参与），`translate` 是其平移量。`anchor` 写两个值时等价于 `(ax, ay, 0)`，支点落在图层平面内；写三个值时第三个值是支点深度，透视投影下的旋转中心随之移到图层平面之外。3D 支点只在 `matrix3D` 或 `rotationX` / `rotationY` 等 3D 变换下可见，2D 变换忽略第三个值。`anchor` 为 `0,0`（默认）时退化为“矩阵即完整变换”，与既有文档完全兼容；`anchor` 非零时，`matrix` 的 `tx`/`ty` 只表示纯平移，不应再包含支点补偿。同一份数据里不允许同时存在“烘焙进 tx/ty 的支点补偿”和 `anchor`，两者叠加会导致整体偏移。
 
 SVG 的 `rotate(θ, cx, cy)` 对应 `anchor="cx,cy"` 加只含线性部分（`tx = ty = 0`）的矩阵关键帧。
 
