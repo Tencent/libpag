@@ -15,7 +15,26 @@ const {
   addInitScript,
   formatLaunchHint,
   launchBrowser,
+  waitForNetworkIdle,
 } = require('../dist/lib/browser-engine');
+
+describe('waitForNetworkIdle', () => {
+  test.each(['puppeteer', 'playwright'])('%s treats a settle timeout as nonfatal', async engine => {
+    const page = { waitForNetworkIdle: jest.fn(), waitForLoadState: jest.fn() };
+    expect(await waitForNetworkIdle(page, engine, 250)).toBe(true);
+    if (engine === 'puppeteer') {
+      expect(page.waitForNetworkIdle).toHaveBeenCalledWith({ idleTime: 500, timeout: 250 });
+      expect(page.waitForLoadState).not.toHaveBeenCalled();
+      page.waitForNetworkIdle.mockRejectedValue(new Error('timeout'));
+    } else {
+      expect(page.waitForLoadState).toHaveBeenCalledWith('networkidle', { timeout: 250 });
+      expect(page.waitForNetworkIdle).not.toHaveBeenCalled();
+      page.waitForLoadState.mockRejectedValue(new Error('timeout'));
+    }
+    expect(await waitForNetworkIdle(page, engine, 250)).toBe(false);
+    expect(await waitForNetworkIdle({}, engine, 250)).toBe(false);
+  });
+});
 
 describe('resolveEngine', () => {
   const savedEnv = process.env.HTML_SNAPSHOT_BROWSER;
@@ -96,6 +115,16 @@ describe('mapWaitUntil', () => {
 });
 
 describe('newPage', () => {
+  test('accepts explicit device scale factors for puppeteer and default contexts for playwright', async () => {
+    const page = { setViewport: jest.fn(), setViewportSize: jest.fn() };
+    const browser = { newPage: jest.fn().mockResolvedValue(page) };
+    await newPage(browser, { viewport: { width: 100, height: 200, deviceScaleFactor: 2 } });
+    expect(page.setViewport).toHaveBeenCalledWith({ width: 100, height: 200, deviceScaleFactor: 2 });
+    expect(await newPage({ browser, engine: 'playwright' })).toBe(page);
+    expect(page.setViewportSize).not.toHaveBeenCalled();
+    await newPage({ browser, engine: 'playwright' }, { viewport: { width: 100, height: 200, deviceScaleFactor: 1 } });
+    expect(page.setViewportSize).toHaveBeenCalledWith({ width: 100, height: 200 });
+  });
   test('puppeteer: calls setViewport with the device scale factor', async () => {
     const calls = [];
     const page = { setViewport: (vp) => { calls.push(vp); } };
@@ -155,6 +184,13 @@ describe('setViewport', () => {
 });
 
 describe('emulateReducedMotion', () => {
+  test('supports both preference values on both engines', async () => {
+    const page = { emulateMedia: jest.fn(), emulateMediaFeatures: jest.fn() };
+    await emulateReducedMotion(page, 'puppeteer', false);
+    await emulateReducedMotion(page, 'playwright', true);
+    expect(page.emulateMediaFeatures).toHaveBeenCalledWith([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+    expect(page.emulateMedia).toHaveBeenCalledWith({ reducedMotion: 'reduce' });
+  });
   test('puppeteer uses emulateMediaFeatures', async () => {
     const calls = [];
     const page = { emulateMediaFeatures: (features) => calls.push(features) };
@@ -260,11 +296,15 @@ describe('launchBrowser — package loading & options', () => {
   // the stub instead of the real puppeteer / playwright install.
   function loadWithMock(pkg, mockFactory) {
     jest.resetModules();
-    jest.doMock(pkg, mockFactory, { virtual: true });
+    // These are installed packages. A virtual mock has a different module ID
+    // after another suite resolves the real driver in Jest's shared resolver.
+    jest.doMock(pkg, mockFactory);
     return require('../dist/lib/browser-engine');
   }
 
   afterEach(() => {
+    jest.dontMock('puppeteer');
+    jest.dontMock('playwright');
     jest.resetModules();
   });
 

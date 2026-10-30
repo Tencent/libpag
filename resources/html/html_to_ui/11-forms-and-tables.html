@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>11 · 表单控件与复杂表格</title>
+<meta name="description" content="原生 input/select/textarea/checkbox/radio/range/color/date/progress/meter + 状态（聚焦/错误/禁用）+ 自定义开关/分段/标签输入 + rowspan/colspan 财务表 + 日历表格">
+<!-- HTML→Ardot 测试集 | 11-forms-and-tables.html | 原生 input/select/textarea/checkbox/radio/range/color/date/progress/meter + 状态（聚焦/错误/禁用）+ 自定义开关/分段/标签输入 + rowspan/colspan 财务表 + 日历表格 | 单文件自包含：字体/图片均已 base64 内联，无任何外部请求 -->
+<style>
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;background:#f5f6f8;color:#1d2129;font-size:14px}
+.wrap{max-width:1280px;margin:0 auto;padding:40px}
+h1{font-size:28px}h1+p{color:#86909c;margin:6px 0 28px}
+.cols{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:start}
+.card{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:24px}
+.card h3{font-size:16px;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid #f2f3f5}
+.f{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px;margin-bottom:18px}
+.f>label{color:#4e5969;text-align:right}
+.f>label.req:before{content:"* ";color:#f53f3f}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],select,textarea{width:100%;height:36px;border:1px solid #e5e6eb;border-radius:4px;padding:0 12px;font:inherit;color:#1d2129;background:#fff}
+textarea{height:88px;padding:8px 12px;resize:none}
+input.focus{border-color:#165dff;box-shadow:0 0 0 3px rgba(22,93,255,.15)}
+input.err{border-color:#f53f3f;background:#fff7f7}
+.hint{grid-column:2;color:#f53f3f;font-size:12px;margin-top:-12px}
+input:disabled{background:#f2f3f5;color:#c9cdd4}
+.ig{display:flex}.ig span{background:#f2f3f5;border:1px solid #e5e6eb;padding:0 12px;line-height:34px;color:#4e5969}
+.ig span:first-child{border-right:0;border-radius:4px 0 0 4px}.ig span:last-child{border-left:0;border-radius:0 4px 4px 0}
+.ig input{border-radius:0!important}
+.wi{position:relative}.wi svg{position:absolute;left:10px;top:9px;color:#86909c}.wi input{padding-left:34px}
+.opts{display:flex;gap:18px;flex-wrap:wrap}.opts label{display:flex;align-items:center;gap:6px}
+input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:#165dff}
+.sw{width:40px;height:22px;border-radius:11px;background:#c9cdd4;position:relative;display:inline-block;vertical-align:middle}
+.sw:after{content:"";position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sw.on{background:#165dff}.sw.on:after{left:20px}
+input[type=range]{width:100%;accent-color:#165dff}
+.seg{display:inline-flex;background:#f2f3f5;border-radius:6px;padding:3px}.seg span{padding:5px 16px;border-radius:4px;color:#4e5969}.seg .on{background:#fff;color:#165dff;box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600}
+.tagi{display:flex;flex-wrap:wrap;gap:6px;border:1px solid #e5e6eb;border-radius:4px;padding:5px 8px;min-height:36px}
+.tagi span{background:#e8f3ff;color:#165dff;border-radius:3px;padding:1px 8px;font-size:12px;display:flex;align-items:center;gap:4px}
+.up{border:1px dashed #c9cdd4;border-radius:6px;padding:20px;text-align:center;color:#86909c;background:#fafbfc}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.b{height:34px;padding:0 16px;border-radius:4px;border:1px solid transparent;font:inherit;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.b.p{background:#165dff;color:#fff}.b.s{background:#fff;border-color:#e5e6eb;color:#1d2129}.b.d{background:#f53f3f;color:#fff}
+.b.g{background:transparent;color:#165dff}.b.x{background:#94bfff;color:#fff}.b.o{border-color:#165dff;color:#165dff;background:#fff}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%}
+progress,meter{width:100%;height:10px}
+fieldset{border:1px solid #e5e6eb;border-radius:6px;padding:12px 16px 4px;margin-bottom:18px}
+legend{padding:0 6px;color:#4e5969;font-size:13px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.fin th,.fin td{border:1px solid #e5e6eb;padding:8px 10px}
+.fin thead th{background:#f7f8fa;font-weight:600;color:#4e5969}
+.fin td.n{text-align:right}
+.fin tbody tr:nth-child(even){background:#fbfcfd}
+.fin .sum td{background:#f2f3f5;font-weight:700}
+.r{color:#f53f3f}.g{color:#00b42a}
+.cal th{color:#86909c;font-weight:500;padding:8px 0}
+.cal td{height:64px;border:1px solid #f2f3f5;vertical-align:top;padding:6px;font-size:13px;width:14.28%}
+.cal td.o{color:#c9cdd4}.cal td.t b{background:#165dff;color:#fff;border-radius:50%;display:inline-block;width:24px;height:24px;text-align:center;line-height:24px}
+.ev{display:block;font-size:11px;margin-top:4px;padding:1px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+</style>
+</head>
+<body>
+<div class="wrap"><h1>表单与表格</h1><p>原生表单控件 + 自定义控件 + 复杂表格（合并单元格）+ 日历表格。</p><div class="cols">
+<div class="card"><h3>创建项目（表单控件全集）</h3>
+<div class="f"><label class="req">项目名称</label><input type="text" value="HTML 转 Ardot 测试集"></div>
+<div class="f"><label>负责人邮箱</label><input type="email" class="focus" value="zuo@example.com"></div>
+<div class="f"><label class="req">访问密码</label><input type="password" class="err" value="123"></div><div class="hint">密码长度至少 8 位，需包含字母与数字</div>
+<div class="f"><label>项目 ID</label><input type="text" disabled value="PRJ-20260929-0001"></div>
+<div class="f"><label>预算</label><div class="ig"><span>¥</span><input type="number" value="128000"><span>元</span></div></div>
+<div class="f"><label>搜索成员</label><div class="wi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="输入姓名或拼音"></div></div>
+<div class="f"><label>开始日期</label><input type="date" value="2026-10-08"></div>
+<div class="f"><label>项目类型</label><select><option>设计工具</option><option>数据平台</option></select></div>
+<div class="f"><label>标签</label><div class="tagi"><span>Ardot ×</span><span>D2C ×</span><span>测试 ×</span><span>字体 ×</span></div></div>
+<div class="f"><label>优先级</label><div class="opts"><label><input type="radio" name="p" checked>高</label><label><input type="radio" name="p">中</label><label><input type="radio" name="p">低</label><label style="color:#c9cdd4"><input type="radio" disabled>冻结</label></div></div>
+<div class="f"><label>通知渠道</label><div class="opts"><label><input type="checkbox" checked>企业微信</label><label><input type="checkbox" checked>邮件</label><label><input type="checkbox">短信</label><label><input type="checkbox" disabled>电话</label></div></div>
+<div class="f"><label>公开项目</label><div><span class="sw on"></span>　<span class="sw"></span>　<span style="color:#86909c">自定义开关（CSS 伪元素）</span></div></div>
+<div class="f"><label>视图</label><div class="seg"><span class="on">看板</span><span>列表</span><span>甘特</span><span>日历</span></div></div>
+<div class="f"><label>完成度</label><input type="range" value="64" min="0" max="100"></div>
+<div class="f"><label>主题色</label><div style="display:flex;gap:10px;align-items:center"><input type="color" value="#5b4be0" style="width:44px;height:32px;border:1px solid #e5e6eb;border-radius:4px;padding:2px"><span>#5B4BE0</span></div></div>
+<fieldset><legend>原生进度控件</legend><div class="f"><label>progress</label><progress value="72" max="100"></progress></div><div class="f"><label>meter</label><meter value="0.35" low="0.3" high="0.7" optimum="0.9"></meter></div></fieldset>
+<div class="f"><label>附件</label><div class="up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div style="margin-top:6px">点击或拖拽文件到此处上传</div><small>支持 .html / .zip，单个不超过 20MB</small></div></div>
+<div class="f" style="align-items:start"><label>项目描述</label><textarea placeholder="请输入描述">用于测试不同 HTML 结构转换到 Ardot 画布后的还原度，覆盖字体、图片、图层、特效等维度。</textarea></div>
+<div class="f"><label></label><div class="btns"><button class="b p"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>提交</button><button class="b s">取消</button><button class="b o">保存草稿</button><button class="b g">重置</button><button class="b d"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除</button><button class="b x" disabled><i class="spin"></i>加载中</button></div></div>
+</div><div><div class="card"><h3>2026 年 9 月（table 日历）</h3><table class="cal"><tr><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th></tr><tr><td class="o">31</td><td>1</td><td>2</td><td>3<span class="ev" style="background:#fff7e8;color:#ff7d00">国庆调休</span></td><td>4</td><td>5</td><td>6</td></tr><tr><td>7</td><td>8<span class="ev" style="background:#e8f3ff;color:#165dff">评审会</span></td><td>9</td><td>10</td><td>11</td><td>12<span class="ev" style="background:#e8ffea;color:#00b42a">版本发布 v3.2</span></td><td>13</td></tr><tr><td>14</td><td>15</td><td>16</td><td>17<span class="ev" style="background:#f5e8ff;color:#722ed1">用户访谈</span></td><td>18</td><td>19</td><td>20</td></tr><tr><td>21</td><td>22<span class="ev" style="background:#e8f3ff;color:#165dff">Ardot 字体专项测试</span></td><td>23</td><td>24</td><td>25</td><td>26</td><td>27</td></tr><tr><td>28</td><td class="t"><b>29</b><span class="ev" style="background:#ffece8;color:#f53f3f">月度复盘</span></td><td>30</td><td class="o">1</td><td class="o">2</td><td class="o">3</td><td class="o">4</td></tr></table></div>
+<div class="card" style="margin-top:24px"><h3>描述列表 / 统计</h3><dl style="display:grid;grid-template-columns:100px 1fr;row-gap:10px"><dt style="color:#86909c">创建人</dt><dd>左成功</dd><dt style="color:#86909c">创建时间</dt><dd>2026-09-29 19:12</dd><dt style="color:#86909c">状态</dt><dd><span style="color:#00b42a">● 进行中</span></dd><dt style="color:#86909c">备注</dt><dd>包含 15 份测试 HTML，均为单文件自包含。</dd></dl></div></div></div><div class="card" style="margin-top:24px"><h3>2026 年分区域营收（万元）— rowspan / colspan / 合计行 / 涨红跌绿</h3>
+<table class="fin"><thead><tr><th rowspan="2">大区</th><th rowspan="2">城市</th><th colspan="2">上半年</th><th colspan="2">下半年</th><th rowspan="2">全年</th><th rowspan="2">同比</th></tr>
+<tr><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody><tr><td rowspan="3" style="font-weight:600;background:#fff">华南</td><td>深圳</td><td class="n">4,505</td><td class="n">4,614</td><td class="n">4,501</td><td class="n">4,960</td><td class="n">18,580</td><td class="n r">▲ 24.8%</td></tr><tr><td>广州</td><td class="n">2,355</td><td class="n">2,312</td><td class="n">4,993</td><td class="n">4,697</td><td class="n">14,357</td><td class="n r">▲ 13.5%</td></tr><tr><td>厦门</td><td class="n">2,325</td><td class="n">1,571</td><td class="n">4,458</td><td class="n">3,285</td><td class="n">11,639</td><td class="n g">▼ 10.9%</td></tr><tr><td rowspan="3" style="font-weight:600;background:#fff">华东</td><td>上海</td><td class="n">1,143</td><td class="n">4,045</td><td class="n">4,510</td><td class="n">2,090</td><td class="n">11,788</td><td class="n r">▲ 13.2%</td></tr><tr><td>杭州</td><td class="n">1,317</td><td class="n">1,287</td><td class="n">1,092</td><td class="n">2,358</td><td class="n">6,054</td><td class="n r">▲ 26.0%</td></tr><tr><td>南京</td><td class="n">1,046</td><td class="n">4,600</td><td class="n">3,472</td><td class="n">4,408</td><td class="n">13,526</td><td class="n r">▲ 11.5%</td></tr><tr><td rowspan="2" style="font-weight:600;background:#fff">华北</td><td>北京</td><td class="n">2,400</td><td class="n">2,714</td><td class="n">3,209</td><td class="n">4,894</td><td class="n">13,217</td><td class="n g">▼ 17.8%</td></tr><tr><td>天津</td><td class="n">1,496</td><td class="n">4,546</td><td class="n">3,078</td><td class="n">4,132</td><td class="n">13,252</td><td class="n r">▲ 31.9%</td></tr><tr class="sum"><td colspan="2">合计</td><td class="n">16,587</td><td class="n">25,689</td><td class="n">29,313</td><td class="n">30,824</td><td class="n">102,413</td><td class="n r">▲ 9.6%</td></tr></tbody></table></div></div>
+</body>
+</html>

@@ -26,6 +26,7 @@ namespace pagx {
 
 struct DOMNode;
 struct Color;
+struct HTMLInheritedStyle;
 class HTMLValueParser;
 
 /**
@@ -62,6 +63,15 @@ class HTMLInlineSvgEmitter {
   void resolveCurrentColor(const std::shared_ptr<DOMNode>& svgRoot, const std::string& rootColor);
 
   /**
+   * Writes the resolved document `font-family` onto the root `<svg>`'s `font-family` presentation
+   * attribute (unless the root already authors one), so `<text>` inside the standalone SVG import
+   * inherits the document's face instead of the SVG importer's default. After `convertInlineSvg`
+   * serialises the subtree the nested importer no longer sees the HTML cascade, so an inline SVG
+   * whose `<text>` omits `font-family` would otherwise fall back to the default family.
+   */
+  void applyRootFontFamily(const std::shared_ptr<DOMNode>& svgRoot, const std::string& family);
+
+  /**
    * Indexes every id-bearing element nested inside a `<defs>` anywhere under `root` into the
    * shared-defs table, so a later inline `<svg>` that references one by id can have it injected.
    * Safe to call once per document before any `serialize` call.
@@ -84,6 +94,8 @@ class HTMLInlineSvgEmitter {
    * not inherit, so only the root's own value is stripped — descendants keep their opacity.
    */
   void stripRootOpacity(const std::shared_ptr<DOMNode>& svgRoot);
+  // Preserve inherited HTML typography at the boundary of the standalone SVG import.
+  void inheritTextStyle(const std::shared_ptr<DOMNode>& svgRoot, const HTMLInheritedStyle& style);
 
   /**
    * Rewrites the exporter's conic-gradient-stroke workaround back into native stroked shapes.

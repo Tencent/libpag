@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/HTMLImporter.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
 
@@ -45,6 +46,11 @@ class HTMLValueParser;
  */
 class HTMLStyleCascade {
  public:
+  /** Supplies font matching results for conversion, without modifying the source DOM. */
+  void setFontReplacements(const std::vector<HTMLImporter::FontReplacement>& replacements) {
+    _fontReplacements = replacements;
+  }
+
   using PropertyMap = std::unordered_map<std::string, std::string>;
   // Receives concrete font-family chains. `userData` is the pointer registered alongside the
   // thunk via `setFontFallbackSink`. The function-pointer + opaque-pointer shape avoids
@@ -63,7 +69,8 @@ class HTMLStyleCascade {
   // the pair written to `Text::fontFamily` / `Text::fontStyle` can be looked up by name outside
   // this process — an editor consuming the exported PAGX resolves fonts with its own, usually
   // exact-matching, font lookup. Same function-pointer + opaque-user-data shape as the sinks above.
-  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style);
+  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style,
+                                     const CSSFontStyle& request);
 
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
@@ -72,7 +79,7 @@ class HTMLStyleCascade {
   void setFontFallbackSink(FontFallbackThunk thunk, void* userData);
 
   /** Wires the predicate that reports whether a concrete family resolves to a matching typeface.
-   *  When unset, `resolveInheritedStyle` keeps the stack's first concrete family verbatim. */
+   *  When unset, `resolveInheritedStyle` keeps the stack's first entry verbatim. */
   void setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData);
 
   /** Wires the in-place normaliser mapping a resolved pair to the platform's own spelling.
@@ -104,13 +111,31 @@ class HTMLStyleCascade {
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
+  // Re-resolves size-dependent corner geometry after percentage/flex layout.
+  void resolveUsedBoxSize(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                          float width, float height);
+
   /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
    *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
   const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
     return _keyframes;
   }
 
+  /** Returns the `@font-face` rules collected from `<style>` blocks in source order. Populated by
+   *  `collectStyles`; the parser context loads their font files into Font resources. */
+  const std::vector<html::CssFontFaceRule>& fontFaces() const {
+    return _fontFaces;
+  }
+
+  /** Marks the rule at `index` of `fontFaces()` as one whose source the importer loaded. Only
+   *  marked rules take part in face selection, so a remote or unloadable declaration cannot
+   *  redirect the exported style. */
+  void markFontFaceUsable(size_t index);
+
  private:
+  bool applyFontReplacement(HTMLInheritedStyle& style);
+  std::vector<HTMLImporter::FontReplacement> _fontReplacements = {};
+
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
   void mergeClassRules(const std::string& classAttribute, PropertyMap& out);
 
@@ -118,7 +143,8 @@ class HTMLStyleCascade {
   void parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
-  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props);
+  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                       bool deferBorderRadius = false);
   void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);
@@ -142,6 +168,18 @@ class HTMLStyleCascade {
   // sink. Skipped for pairs the parent already produced, which keeps the platform lookup to one
   // call per distinct pair instead of one per element.
   void applyFontFaceNames(HTMLInheritedStyle& out, const HTMLInheritedStyle& parent);
+
+  // Replaces `out.fontStyleName` with the label of the `@font-face` face the resolved request
+  // actually renders with. No-op for a family without a usable rule.
+  void applyFontFaceSelection(HTMLInheritedStyle& out);
+
+  // Picks the family to write to `Text::fontFamily`: the first entry of `authoredFamilies` the
+  // renderer can resolve, then the first of `genericFamilies`, and `fallback` when neither group
+  // yields one. Splitting the two groups keeps an authored family ahead of a generic keyword, so
+  // the written name does not depend on which platform ran the import.
+  std::string selectPrimaryFontFamily(const std::vector<std::string>& authoredFamilies,
+                                      const std::vector<std::string>& genericFamilies,
+                                      const std::string& fallback);
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
@@ -173,6 +211,13 @@ class HTMLStyleCascade {
   // `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name. The last
   // definition of a given name wins, matching CSS cascade order.
   std::unordered_map<std::string, html::CssKeyframesRule> _keyframes = {};
+
+  // `@font-face` rules collected from `<style>` blocks, in source order.
+  std::vector<html::CssFontFaceRule> _fontFaces = {};
+
+  // The rules of `_fontFaces` whose source the importer could load, in source order, carrying only
+  // the descriptors face selection reads (no sources).
+  std::vector<html::CssFontFaceRule> _usableFontFaces = {};
 };
 
 }  // namespace pagx

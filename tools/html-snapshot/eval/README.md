@@ -41,11 +41,11 @@ must stay at or above that floor because baseline capture passes the
 ./run.sh --skip-existing --label current
 
 # Download the page's web fonts, embed them into the .pagx and pass them to
-# the renderer as fallbacks (mirrors html2pagx; useful for CJK corpora).
+# the renderer as fallbacks (mirrors pagx import; useful for CJK corpora).
 ./run.sh --download-fonts --label fonts-on
 
 # Download the page's external images and reference them by file path instead
-# of inlining base64 (mirrors html2pagx; keeps subset HTML / .pagx small).
+# of inlining base64 (mirrors pagx import; keeps subset HTML / .pagx small).
 ./run.sh --download-images --label images-on
 ```
 

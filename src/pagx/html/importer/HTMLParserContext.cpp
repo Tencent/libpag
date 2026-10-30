@@ -22,6 +22,7 @@
 #include <cmath>
 #include <utility>
 #include "pagx/FontConfig.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
@@ -34,8 +35,12 @@
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -114,8 +119,8 @@ bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::st
 }
 
 void HTMLParserContext::ResolveFontFaceNamesThunk(void* userData, std::string& family,
-                                                  std::string& style) {
-  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style);
+                                                  std::string& style, const CSSFontStyle& request) {
+  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style, request);
 }
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
@@ -125,9 +130,11 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
+  _styleCascade->setFontReplacements(_options.fontReplacements);
   _animationBuilder =
       std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
-  _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
+  _layerBuilder =
+      std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter, *_idAllocator);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
@@ -165,6 +172,10 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // it must not be served from — or written to — the spacing/case-insensitive cache below: two
   // variants sharing a normalised key can disagree on the exact match (only one is registered),
   // and caching one variant's verdict under the shared key would wrongly answer the other.
+  // Web font families follow the same exact-match rule, since layout registers them the same way.
+  if (_webFontFamilies.count(family) > 0) {
+    return true;
+  }
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     return true;
   }
@@ -177,21 +188,29 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
-  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+  // Probe with the same lookup the renderer uses, so the verdict matches what rendering would
+  // pick. `Typeface::MakeFromName` alone is not enough: backends whose name lookup never reaches
+  // the platform font manager (the FreeType builds) return null for every installed family, which
+  // would report every authored family as unavailable and leave the stack's generic keyword — a
+  // face chosen by the *importing* platform — as the only candidate left.
+  auto typeface = SystemFonts::ResolveTypeface(family, "Regular");
   bool available =
       typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
 
-void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style) {
+void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style,
+                                             const CSSFontStyle& request) {
   if (family.empty()) {
     return;
   }
-  // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
-  // key, so their names must stay verbatim — renaming them would miss the registration and fall
-  // through to a system face instead.
-  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+  // A family carried by a loaded `@font-face` file is registered by the layout under the authored
+  // CSS name, and the cascade already labelled the text with the face that file provides. Resolving
+  // it against the document's registered faces would overwrite that label with the registration
+  // style key — a family whose only file is a 700 face would lose the weight the request just
+  // raised to it, and a variable face would collapse onto one of its registered instances.
+  if (_webFontFamilies.count(family) > 0) {
     return;
   }
   // The cache is keyed on the exact pair rather than a case-insensitive normalisation: the style
@@ -206,7 +225,15 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   std::string resolvedFamily = family;
   std::string resolvedStyle = style;
-  auto typeface = SystemFonts::ResolveTypeface(family, style);
+  if (_document && _document->fontConfig().containsFamily(family)) {
+    // Return the registration key, not the physical font's name: aliases are document-local.
+    LayoutContext context(&_document->fontConfig());
+    context.matchTypeface(family, request, &resolvedStyle);
+    _fontFaceNameCache.emplace(cacheKey, std::make_pair(family, resolvedStyle));
+    style = std::move(resolvedStyle);
+    return;
+  }
+  auto typeface = SystemFonts::MatchTypeface(family, request);
   // A family mismatch means the platform substituted a different face, so the authored name is
   // kept instead of baking the substitution into the exported document.
   if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
@@ -258,7 +285,18 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // subset-compliant HTML. The transformer mutates `root` in place; diagnostics are forwarded
   // through `_diagnostics` so they end up on PAGXDocument::errors once the document exists.
   if (_options.autoNormalize) {
-    auto report = HTMLSubsetTransformer::Transform(root, DeriveTransformerOptions(_options));
+    auto transformOptions = DeriveTransformerOptions(_options);
+    // Current-state snapshots already contain measured positions. Inferring responsive flex
+    // from them can move scrolled/fixed/overlapping content away from the captured state.
+    for (auto node = root->getFirstChild(); node; node = node->getNextSibling()) {
+      if (node->name != "body") continue;
+      for (const auto& attr : node->attributes) {
+        if (attr.name == "data-pagx-capture-mode" && attr.value == "current-state") {
+          transformOptions.inferFlexFromAbsolute = false;
+        }
+      }
+    }
+    auto report = HTMLSubsetTransformer::Transform(root, transformOptions);
     for (auto& diag : report.diagnostics) {
       std::string formatted = diag.message;
       if (!diag.code.empty()) {
@@ -326,9 +364,12 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _valueParser->bindDocument(_document.get());
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
+  _layerBuilder->setBackgroundImageResolver(
+      [this](const std::string& value) { return resolveBackgroundImage(value); });
   _textFragmentBuilder->bindDocument(_document.get());
   _animationBuilder->bindDocument(_document.get());
   _animationBuilder->setKeyframes(&_styleCascade->keyframes());
+  loadWebFontFiles();
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -357,6 +398,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  finishImageLayouts();
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
@@ -522,6 +564,93 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
   }
 }
 
+// Inline font bytes are registered for import-time font matching and layout.
+static bool IsInlineFontSource(const std::string& source) {
+  return ToLower(source.substr(0, 5)) == "data:";
+}
+
+// Import-time registration reads local files; remote URLs require browser capture.
+static bool IsLocalFontSource(const std::string& source) {
+  return !IsInlineFontSource(source) && source.find("://") == std::string::npos;
+}
+
+void HTMLParserContext::registerMappedFontAliases(const void* bytes, size_t length) {
+  if (_options.fontReplacements.empty()) return;
+  auto faces = MakeTypefacesFromBytes(bytes, length);
+  for (size_t faceIndex = 0; faceIndex < faces.size(); faceIndex++) {
+    auto index = static_cast<int>(faceIndex);
+    auto& face = faces[faceIndex];
+    for (const auto& replacement : _options.fontReplacements) {
+      if (!SystemFonts::FontNamesMatch(replacement.targetFamily, face->fontFamily()) ||
+          !SystemFonts::FontNamesMatch(replacement.targetStyle, face->fontStyle())) {
+        continue;
+      }
+      // A caller's canonical spelling must resolve to the same face without renaming the output.
+      _document->fontConfig().registerFont(bytes, length, index, replacement.targetFamily,
+                                           replacement.targetStyle);
+      _document->fontConfig().addFallbackFont(bytes, length, index, replacement.targetFamily,
+                                              replacement.targetStyle);
+    }
+  }
+}
+
+void HTMLParserContext::loadWebFontFiles() {
+  const auto& fontFaces = _styleCascade->fontFaces();
+  for (size_t index = 0; index < fontFaces.size(); index++) {
+    const auto& rule = fontFaces[index];
+    bool registered = false;
+    for (const auto& source : rule.sources) {
+      if (IsInlineFontSource(source)) {
+        auto bytes = DecodeBase64DataURI(source);
+        if (bytes == nullptr) {
+          warn("html: @font-face '" + rule.family +
+               "' inlined source is not a base64 data URI; skipped "
+               "(subset:font-face-unloadable)");
+          continue;
+        }
+        if (!_textFragmentBuilder->registerFontData(rule.family, *bytes)) {
+          warn("html: @font-face '" + rule.family +
+               "' inlined font bytes hold no usable face; skipped "
+               "(subset:font-face-unloadable)");
+          continue;
+        }
+        registerMappedFontAliases(bytes->data(), bytes->size());
+        registered = true;
+        break;
+      }
+      if (!IsLocalFontSource(source)) {
+        continue;
+      }
+      auto path = _imageResources->resolveSource(source);
+      if (!_textFragmentBuilder->registerFontFile(rule.family, path)) {
+        warn("html: @font-face '" + rule.family + "' source '" + path +
+             "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
+        continue;
+      }
+      if (!_options.fontReplacements.empty()) {
+        auto bytes = tgfx::Data::MakeFromFile(path);
+        if (bytes != nullptr) registerMappedFontAliases(bytes->data(), bytes->size());
+      }
+      registered = true;
+      break;
+    }
+    if (!registered) {
+      warn("html: @font-face '" + rule.family +
+           "' has no loadable font source; text using it falls back to other fonts "
+           "(subset:font-face-no-local-source)");
+      continue;
+    }
+    // Layout resolves registered fonts by the exact (family, style) key, so the set has to carry
+    // the CSS name the rule declares rather than the family stored inside the file: a page may
+    // alias a face (`MaShanZheng` for a file whose family is "Ma Shan Zheng"), and only the
+    // authored name ever appears in a Text's fontFamily.
+    _webFontFamilies.insert(rule.family);
+    // Only a rule whose source loaded describes a face the text can render with, so only it may
+    // redirect the exported weight/style to the face it declares.
+    _styleCascade->markFontFaceUsable(index);
+  }
+}
+
 //==================================================================================================
 // Diagnostics — short forwarders to `_diagnostics`, kept for the very common warn/hardError
 // call sites where the unique_ptr-deref boilerplate would dominate the surrounding code.
@@ -597,7 +726,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }
@@ -621,7 +750,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, 1);
       if (childLayer) {
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -750,7 +879,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     // A `url(...)` background is recovered as an ImagePattern fill here (it needs the image
     // registry + native-size decoding the layer builder has no access to). Runs right after the
     // background geometry is emitted so the fill stacks on top of it.
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }
@@ -782,17 +911,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        // CSS border-box: position:absolute descendants are positioned relative to the
-        // parent's padding box, which sits inside the border. Shift their explicit
-        // left/right/top/bottom offsets by the border width so they don't overlap the
-        // border stroke.
-        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
-          if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
-          if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
-          if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
-          if (!std::isnan(childLayer->bottom)) childLayer->bottom += box.borderWidthPx;
-        }
-        contentHost->children.push_back(childLayer);
+        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);

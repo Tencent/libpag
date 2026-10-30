@@ -20,6 +20,11 @@
 #include <iostream>
 #include <string>
 #include "cli/CommandBounds.h"
+#include "cli/NodeTool.h"
+#ifdef _WIN32
+#include <shellapi.h>
+#include <windows.h>
+#endif
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
@@ -58,7 +63,7 @@ static void PrintUsage() {
             << "Run 'pagx <command> --help' for detailed options and usage of each command.\n";
 }
 
-int main(int argc, char* argv[]) {
+static int RunCommand(int argc, char* argv[]) {
   if (argc < 2) {
     PrintUsage();
     return 1;
@@ -110,4 +115,22 @@ int main(int argc, char* argv[]) {
   std::cerr << "pagx: unknown command '" << command << "'\n";
   std::cerr << "Run 'pagx --help' for usage.\n";
   return 1;
+}
+
+int main(int argc, char* argv[]) {
+#ifdef _WIN32
+  // The narrow CRT argv uses the local codepage. Preserve Unicode paths from npm/PowerShell.
+  int count = 0;
+  auto wideArgs = CommandLineToArgvW(GetCommandLineW(), &count);
+  if (!wideArgs) return 1;
+  std::vector<std::string> utf8;
+  for (int i = 0; i < count; ++i) utf8.push_back(pagx::cli::WideToUTF8(wideArgs[i]));
+  LocalFree(wideArgs);
+  std::vector<char*> args;
+  for (auto& arg : utf8) args.push_back(arg.data());
+  args.push_back(nullptr);
+  return RunCommand(count, args.data());
+#else
+  return RunCommand(argc, argv);
+#endif
 }

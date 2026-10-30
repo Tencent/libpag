@@ -1823,13 +1823,13 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
                                       const LayerMatrixMap& matrices,
                                       std::vector<VerifyDiagnostic>& diagnostics,
-                                      bool isMaskLayer = false) {
+                                      const std::unordered_set<const Layer*>& maskLayers) {
   DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, matrices, diagnostics);
   // A mask layer is a synthetic, layout-excluded construct attached to its owner; its
   // `includeInLayout="false"` is required regardless of the owner's layout mode, so the
   // "ineffective layout attr" lint does not apply to it.
-  if (!isMaskLayer) {
+  if (maskLayers.count(layer) == 0) {
     DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   }
   DetectDowngradableLayers(layer, diagnostics);
@@ -1861,7 +1861,7 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
     RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
-                              matrices, diagnostics, /*isMaskLayer=*/child == layer->mask);
+                              matrices, diagnostics, maskLayers);
   }
 }
 
@@ -1908,6 +1908,14 @@ static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics,
                                const Layer* targetLayer = nullptr) {
+  // Imported SVG masks share a parent with their owners. Determine mask roles by references,
+  // including when --id selects only the mask, rather than by the traversal parent.
+  std::unordered_set<const Layer*> maskLayers;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() != NodeType::Layer) continue;
+    auto* layer = static_cast<const Layer*>(node.get());
+    if (layer->mask != nullptr) maskLayers.insert(layer->mask);
+  }
   LayerMatrixMap matrices;
   CollectLayerMatrices(doc->layers, Matrix::Identity(), matrices);
   if (targetLayer == nullptr) {
@@ -1921,11 +1929,11 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
       RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, matrices,
-                                diagnostics);
+                                diagnostics, maskLayers);
     }
   } else {
     RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, false, lineNodeMap, matrices,
-                              diagnostics);
+                              diagnostics, maskLayers);
   }
 
   for (const auto& err : doc->errors) {

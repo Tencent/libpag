@@ -19,8 +19,10 @@
 #include "StringParser.h"
 #include <algorithm>
 #include <cctype>
+#include <clocale>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <unordered_map>
 #include "base/utils/Log.h"
 
@@ -655,30 +657,47 @@ std::string FloatToString(float value) {
     return "0";
   }
   char buf[64] = {};
-  // FLT_DECIMAL_DIG significant digits: every distinct float round-trips through the text form.
-  snprintf(buf, sizeof(buf), "%.9g", value);
+  snprintf(buf, sizeof(buf), "%g", value);
+  // Keep common values compact, but use enough significant digits to recover the original float
+  // whenever the default six digits lose precision.
+  if (strtof(buf, nullptr) != value) {
+    snprintf(buf, sizeof(buf), "%.*g", std::numeric_limits<float>::max_digits10, value);
+  }
   std::string s(buf);
-  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
-  // in fixed form so the result always matches the schema's decimal patterns. We deliberately
-  // do NOT snap small magnitudes to zero here: even sub-pixel residuals (e.g. sin/cos of an
-  // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
-  // and changing them would alter rendered output for baseline-sensitive callers.
-  if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    // Use 9 fractional digits: this matches FLT_DECIMAL_DIG, the minimum precision that
-    // guarantees every distinct float value serializes to a distinct decimal string and
-    // round-trips back to the same bit pattern. Fewer digits would collapse near-denormal
-    // values (e.g. 1e-30f) onto 0 after the scientific-notation branch is rewritten. Trailing
-    // zeros are stripped below so typical values stay short.
-    snprintf(buf, sizeof(buf), "%.9f", value);
-    s = buf;
-    auto dot = s.find('.');
+  // snprintf/strtof agree on the current locale, but PAGX always uses a decimal point.
+  std::string decimalPoint = std::localeconv()->decimal_point;
+  if (decimalPoint != ".") {
+    auto dot = s.find(decimalPoint);
     if (dot != std::string::npos) {
-      auto last = s.find_last_not_of('0');
-      if (last == dot) {
-        last--;  // strip trailing dot
-      }
-      s = s.substr(0, last + 1);
+      s.replace(dot, decimalPoint.size(), ".");
     }
+  }
+
+  auto exponentAt = s.find_first_of("eE");
+  if (exponentAt == std::string::npos) {
+    return s;
+  }
+  // Expand the exponent by moving the decimal point, without rounding again. A fixed number of
+  // fractional digits would erase sufficiently small values, including subnormals.
+  int exponent = static_cast<int>(strtol(s.c_str() + exponentAt + 1, nullptr, 10));
+  bool negative = s.front() == '-';
+  size_t signLength = negative ? 1 : 0;
+  std::string digits = s.substr(signLength, exponentAt - signLength);
+  auto dot = digits.find('.');
+  int decimal = static_cast<int>(dot == std::string::npos ? digits.size() : dot) + exponent;
+  if (dot != std::string::npos) {
+    digits.erase(dot, 1);
+  }
+  if (decimal <= 0) {
+    s = "0." + std::string(static_cast<size_t>(-decimal), '0') + digits;
+  } else if (decimal >= static_cast<int>(digits.size())) {
+    s = digits + std::string(static_cast<size_t>(decimal) - digits.size(), '0');
+  } else {
+    s = digits;
+    s.insert(static_cast<size_t>(decimal), ".");
+  }
+  if (negative) {
+    s.insert(s.begin(), '-');
   }
   return s;
 }

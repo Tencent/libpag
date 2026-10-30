@@ -36,6 +36,7 @@
 #include "pagx/html/importer/HTMLImageResources.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLLayerBuilder.h"
+#include "pagx/html/importer/HTMLObjectLayout.h"
 #include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -97,6 +98,14 @@ class HTMLParserContext {
   // <img> conversion.
   Layer* convertImage(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box);
 
+  HTMLImageIntrinsicSize imageIntrinsicSize(const std::shared_ptr<DOMNode>& element, Image* image,
+                                            const std::string& svgSource,
+                                            const std::string& svgContent);
+  void emitImageContent(Layer* layer, const HTMLBoxAttributes& box,
+                        const HTMLImageIntrinsicSize& intrinsic, Image* image,
+                        const std::string& svgSource, const std::string& svgContent);
+  void finishImageLayouts();
+
   // Recovers a CSS `url(...)` background into an `ImagePattern` Fill appended to `layer`
   // (the inverse of `HTMLWriter`'s ImagePattern emission). `background-size` selects the
   // scaleMode (contain/cover/100% 100% → LetterBox/Zoom/Stretch); any explicit pixel size or a
@@ -104,6 +113,7 @@ class HTMLParserContext {
   // per-axis scale and the position offset. Returns true when a fill was emitted. The layer's
   // background geometry must already be present (added by `applyBackgroundVisuals`).
   bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
+  HTMLBackgroundImage resolveBackgroundImage(const std::string& value);
 
   // Recovers a CSS `url(...)` background whose source is an SVG — an inline `data:image/svg+xml`
   // URI (`svgContent` carries the decoded payload) or an external `.svg` reference
@@ -298,6 +308,18 @@ class HTMLParserContext {
   // fills used by `color` channels already exist).
   std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
 
+  struct PendingImageLayout {
+    Layer* layer = nullptr;
+    std::shared_ptr<DOMNode> element;
+    HTMLBoxAttributes box;
+    HTMLImageIntrinsicSize intrinsic;
+    Image* image = nullptr;
+    std::string svgSource;
+    std::string svgContent;
+  };
+  std::vector<PendingImageLayout> _pendingImageLayouts;
+  std::unordered_map<std::string, HTMLImageIntrinsicSize> _imageIntrinsicSizes;
+
   // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
   // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the
   // layer tree is built, so these shapes have no PAGX painter node yet. `convertInlineSvg` assigns
@@ -342,6 +364,10 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
+  // CSS family names declared by the loaded @font-face rules. Layout registers every source under
+  // its own rule's family, so a font-family stack that names one of them resolves at render time
+  // regardless of the family name stored inside the file.
+  std::unordered_set<std::string> _webFontFamilies = {};
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
@@ -366,8 +392,8 @@ class HTMLParserContext {
   static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
 
   // Reports whether `family` will resolve at render time without triggering system font
-  // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
-  // installed system font (the family the platform resolves matches the request). A name the
+  // substitution: it is carried by a loaded `@font-face` file, it is registered/embedded in the
+  // document's FontConfig, or it is a genuinely installed system font (the family the platform resolves matches the request). A name the
   // renderer would silently swap for a mismatched default (e.g. the hidden "SF Mono" system font,
   // which `MakeFromName` replaces with a proportional face) counts as unavailable. Results are
   // memoised in `_fontAvailabilityCache`.
@@ -379,18 +405,25 @@ class HTMLParserContext {
   // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
   // exported PAGX carries names a host process can look up with an exact-matching font lookup
   // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
-  // Families registered or embedded in the document's FontConfig keep their names verbatim,
-  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
-  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
-  void resolveFontFaceNames(std::string& family, std::string& style);
+  // Families carried by a loaded `@font-face` file keep their names verbatim: the layout registers
+  // them under the authored CSS name, and the exported label already names the face the loaded file
+  // provides. A family registered in the document's FontConfig retains its alias and reports the
+  // registration style key the request selects; a family the platform substitutes with a different
+  // one keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style, const CSSFontStyle& request);
 
   // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
-  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style,
+                                        const CSSFontStyle& request);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack
   // discovered during the walk is available for per-glyph fallback at layout time.
   void flushFontFallbacksToDocument();
+
+  // Registers local or inline @font-face sources before matching text against their descriptors.
+  void loadWebFontFiles();
+  void registerMappedFontAliases(const void* bytes, size_t length);
 };
 
 }  // namespace pagx

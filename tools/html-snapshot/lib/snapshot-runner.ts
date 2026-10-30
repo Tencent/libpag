@@ -28,6 +28,8 @@ import {
 import {
   makeFontCaptureListener,
   saveDownloadedFonts,
+  collectWebFontFaces,
+  decodeDataFont,
   type SavedFont,
 } from './font-download';
 import {
@@ -44,6 +46,8 @@ import {
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
 import { applyCanvasViewport } from './canvas-viewport';
 import { responseBytes } from './browser-engine';
+import { capturePseudoContents, captureTextLayout, installTextLayout } from './text-layout';
+import { captureControlPaints, installControlPaints } from './control-capture';
 import type {
   BrowserResponse,
   CookieParam,
@@ -328,6 +332,8 @@ export interface RunSnapshotResult {
   html: string;
   width: number;
   height: number;
+  /** Painting features that require a model beyond the supported static 2D subset. */
+  warnings?: string[];
   fonts: SavedFont[];
   images: SavedImage[];
 }
@@ -408,10 +414,15 @@ export async function runSnapshot(
   const captureFont: CaptureResponseListener | null = downloadFonts
     ? makeFontCaptureListener(engine, fontBytesByUrl, log)
     : null;
+  const fontCaptures = new Set<Promise<void>>();
   const onResponse: (resp: BrowserResponse) => void = captureFont
     ? (resp: BrowserResponse) => {
         void captureImage(resp);
-        void captureFont(resp);
+        const capture = captureFont(resp).catch((err: unknown) => {
+          if (log) log(`font capture skipped: ${errMessage(err)}`);
+        });
+        fontCaptures.add(capture);
+        void capture.finally(() => fontCaptures.delete(capture));
       }
     : (resp: BrowserResponse) => { void captureImage(resp); };
   const page = await openAndSettlePage(engineHandle, targetUrl, {
@@ -610,7 +621,13 @@ export async function runSnapshot(
     // the entire pass (e.g. a missing helper triggering `ReferenceError`
     // inside `page.evaluate`) does not get buried among importer warnings.
     try {
-      await page.evaluate(materializeDecorativePseudoElements);
+      let contents;
+      try {
+        contents = await capturePseudoContents(page, engine);
+      } catch (err) {
+        if (log) log(`generated text capture unavailable; using CSS strings: ${errMessage(err)}`);
+      }
+      await page.evaluate(materializeDecorativePseudoElements, contents);
     } catch (err) {
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
@@ -724,21 +741,68 @@ export async function runSnapshot(
       if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
     }
 
+    // Finish fonts before emitting text, so CSS family aliases can be resolved to
+    // the names the native typeface loader reads from the actual font files.
+    let fonts: SavedFont[] = [];
+    if (downloadFonts && fontDir) {
+      const faces = await page.evaluate(collectWebFontFaces) as Record<string, string>[];
+      const sources = faces.flatMap((face) => {
+        const urls = [...face.src.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)/gi)];
+        return urls.map((match) => ({
+          face,
+          url: new URL(match[1] || match[2] || match[3], face.base).href,
+        }));
+      });
+      for (const { url } of sources) {
+        if (url.startsWith('data:') && !fontBytesByUrl.has(url)) {
+          try { fontBytesByUrl.set(url, decodeDataFont(url)); }
+          catch (err) { if (log) log(`inline font skipped: ${errMessage(err)}`); }
+        }
+      }
+      await Promise.all(fontCaptures);
+      fonts = await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font');
+      const aliases = sources.flatMap(({ face, url }) => {
+        const font = fonts.find((f) => f.url === url || f.urls?.includes(url));
+        return font ? [{
+          from: face['font-family'].replace(/^["']|["']$/g, ''),
+          to: font.family, weight: face['font-weight'], style: face['font-style'],
+        }] : [];
+      });
+      await page.evaluate((value: unknown) => {
+        (window as unknown as Record<string, unknown>).__pagxFontAliases = value;
+      }, aliases);
+    }
+
+    try {
+      await page.evaluate(installControlPaints, await captureControlPaints(page, engine));
+    } catch (err) {
+      if (log) log(`native control paint capture unavailable: ${errMessage(err)}`);
+    }
+
+    // Read text boundaries after viewport settlement. Geometry is still measured
+    // by the in-page walker, in its temporarily untransformed coordinate system.
+    try {
+      const textLayout = await captureTextLayout(page, engine);
+      await page.evaluate(installTextLayout, textLayout);
+    } catch (err) {
+      if (log) log(`text layout capture unavailable; using DOM ranges: ${errMessage(err)}`);
+    }
+
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
     const snapshot = await page.evaluate(snapshotExpr) as {
-      html: string; width: number; height: number;
+      html: string; width: number; height: number; warnings?: string[];
     };
+    for (const warning of snapshot.warnings || []) {
+      if (log) log(warning);
+    }
 
     // Write the web fonts the browser fetched to disk. The font bytes were
     // captured off the `response` event during load + settle, so they are
     // already in `fontBytesByUrl` by now (no page interaction needed). This
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
-    const fonts: SavedFont[] = (downloadFonts && fontDir)
-      ? await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font')
-      : [];
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does

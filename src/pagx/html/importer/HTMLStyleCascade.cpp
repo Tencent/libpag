@@ -30,6 +30,7 @@
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -379,19 +380,88 @@ void HTMLStyleCascade::setFontFaceNameSink(FontFaceNameThunk thunk, void* userDa
   _fontFaceNameUserData = userData;
 }
 
+void HTMLStyleCascade::markFontFaceUsable(size_t index) {
+  if (index >= _fontFaces.size()) {
+    return;
+  }
+  // Only the descriptors selection reads are kept: a source may be a multi-megabyte base64 data
+  // URI, and copying one per usable face would hold it twice for the whole parse.
+  html::CssFontFaceRule face = {};
+  face.family = _fontFaces[index].family;
+  face.weight = _fontFaces[index].weight;
+  face.style = _fontFaces[index].style;
+  _usableFontFaces.push_back(std::move(face));
+}
+
+void HTMLStyleCascade::applyFontFaceSelection(HTMLInheritedStyle& out) {
+  if (_usableFontFaces.empty() || out.primaryFontFamily.empty()) {
+    return;
+  }
+  html::CssFontFaceMatch match = {};
+  if (!html::SelectFontFace(_usableFontFaces, out.primaryFontFamily, out.fontRequest, match)) {
+    return;
+  }
+  // The label names what the text renders with: the heavier of the request and the face's weight —
+  // a request lighter than the only face is lifted to it, while a heavier request is kept because a
+  // browser synthesises bold on top of a Regular-only family. An upright request takes the face's
+  // own slant (a family that only ships an italic face renders italic), while a slanted request
+  // keeps the authored slant: `fauxItalic` asks the renderer to synthesise it when the family has
+  // no slanted face. The width stays at 100% because a `@font-face` rule declares no width
+  // descriptor, so the label never names a width the loaded file may not provide.
+  CSSFontStyle label = {};
+  label.weight = std::max(out.fontRequest.weight, match.style.weight);
+  label.slant = out.fauxItalic ? out.fontRequest.slant : match.style.slant;
+  out.fontStyleName = FontStyleRequestName(label);
+}
+
 void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
                                           const HTMLInheritedStyle& parent) {
-  if (_fontFaceNameThunk == nullptr || out.primaryFontFamily.empty()) {
+  if (out.primaryFontFamily.empty()) {
     return;
   }
-  // The parent's pair was already normalised, so a child that neither changed the family nor the
-  // weight inherits it as-is. Only a pair this element actually introduced needs the platform
-  // lookup, which keeps the one-lookup-per-distinct-pair cost.
+  applyFontFaceSelection(out);
+  if (_fontFaceNameThunk == nullptr) {
+    return;
+  }
+  // The parent already resolved this exact request — same family, same width, slant and weight —
+  // so its names are the answer here too. Comparing the request rather than the style label keeps a
+  // child that changes only the weight from inheriting the face its parent selected.
   if (out.primaryFontFamily == parent.primaryFontFamily &&
-      out.fontStyleName == parent.fontStyleName) {
+      out.fontRequest.weight == parent.fontRequest.weight &&
+      out.fontRequest.width == parent.fontRequest.width &&
+      out.fontRequest.slant == parent.fontRequest.slant) {
+    out.fontStyleName = parent.fontStyleName;
     return;
   }
-  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);
+  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName,
+                     out.fontRequest);
+}
+
+std::string HTMLStyleCascade::selectPrimaryFontFamily(
+    const std::vector<std::string>& authoredFamilies,
+    const std::vector<std::string>& genericFamilies, const std::string& fallback) {
+  if (_fontAvailabilityThunk == nullptr) {
+    return fallback;
+  }
+  // An authored family always outranks a generic: `system-ui, ..., "PingFang SC", ..., sans-serif`
+  // must not collapse to whatever face the import platform treats as its UI or default sans
+  // ("Helvetica" on macOS, "DejaVu Sans" on Linux) — that name need not exist on the consuming
+  // machine and hides every later CSS fallback. The generic wins only when no authored family is
+  // installed here, which is what the CSS cascade does, since the generic sits at the tail of the
+  // stack. Within a group the first resolvable family wins, so a leading family the renderer would
+  // silently substitute (a hidden system font such as "SF Mono") is skipped in favour of a later
+  // one that does resolve (e.g. "Menlo" for a `monospace` stack).
+  for (const auto& family : authoredFamilies) {
+    if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+      return family;
+    }
+  }
+  for (const auto& family : genericFamilies) {
+    if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+      return family;
+    }
+  }
+  return fallback;
 }
 
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
@@ -423,13 +493,17 @@ void HTMLStyleCascade::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode
   }
   std::vector<std::string> droppedAtRules;
   std::vector<CssKeyframesRule> keyframesRules;
-  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules);
+  std::vector<CssFontFaceRule> fontFaceRules;
+  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules, fontFaceRules);
   for (auto& at : droppedAtRules) {
     _diagnostics.warn("html: at-rule '" + at + "' not supported in <style>; dropped");
   }
   // Keep `@keyframes` so the animation builder can map them onto PAGX animations (see §13).
   for (auto& kf : keyframesRules) {
     _keyframes[kf.name] = std::move(kf);
+  }
+  for (auto& fontFace : fontFaceRules) {
+    _fontFaces.push_back(std::move(fontFace));
   }
   for (auto& rule : rules) {
     if (rule.declarations.empty()) continue;
@@ -520,24 +594,52 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
   return fallback;
 }
 
+bool HTMLStyleCascade::applyFontReplacement(HTMLInheritedStyle& style) {
+  if (_fontReplacements.empty()) return false;
+  auto families = html::ParseFontFamilyTokens(style.fontFamily);
+  for (auto& family : families) family = ToLower(family);
+  auto cssWeight = ToLower(style.fontWeight);
+  float weight = cssWeight.empty() || cssWeight == "normal" ? 400
+                 : cssWeight == "bold"                      ? 700
+                                       : std::strtof(cssWeight.c_str(), nullptr);
+  auto slant = ToLower(style.fontStyle);
+  slant = slant.find("oblique") == 0 ? "oblique" : slant == "italic" ? "italic" : "normal";
+  for (const auto& replacement : _fontReplacements) {
+    if (weight != replacement.weight || slant != replacement.style) continue;
+    auto expected = html::ParseFontFamilyTokens(replacement.families);
+    for (auto& family : expected) family = ToLower(family);
+    if (families != expected) continue;
+    style.primaryFontFamily = replacement.targetFamily;
+    style.fontStyleName = replacement.targetStyle;
+    style.fauxBold = false;
+    style.fauxItalic = false;
+    return true;
+  }
+  return false;
+}
+
 HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                            const HTMLInheritedStyle& parent,
                                                            bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
+
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
-  // Re-parse the CSS font-family stack only when the raw value actually changed at this
-  // element. The cascade (`out = parent`) already carries the parent's parsed stack
-  // through unchanged in the common case where descendants inherit verbatim.
-  if (out.fontFamily != parent.fontFamily ||
+  // A replacement may have changed the parent's resolved family without changing its CSS.
+  // Rebuild from source CSS so an unmatched child cannot inherit the mapped family.
+  if (!_fontReplacements.empty() || out.fontFamily != parent.fontFamily ||
       (parent.fontFamilyChain.empty() && !out.fontFamily.empty())) {
     out.fontFamilyChain.clear();
     out.primaryFontFamily.clear();
+    // Families the page named, and the faces its generic keywords map to, kept apart so the
+    // primary pick below can prefer the former.
+    std::vector<std::string> authoredFamilies = {};
+    std::vector<std::string> genericFamilies = {};
     auto tokens = html::ParseFontFamilyTokens(out.fontFamily);
     for (auto& token : tokens) {
-      std::string resolved = html::ResolveGenericFontFamily(token);
-      if (resolved.empty()) {
+      auto classified = html::ClassifyFontFamilyToken(token);
+      if (classified.resolved.empty()) {
         // Recognised generic with no concrete mapping on this platform (cursive,
         // fantasy, ...). Drop with a single diagnostic so a stack like
         // `cursive, "Foo"` still falls through to "Foo".
@@ -545,23 +647,16 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
                           "' not mapped on this platform; dropped");
         continue;
       }
-      out.fontFamilyChain.push_back(resolved);
+      out.fontFamilyChain.push_back(classified.resolved);
+      if (classified.isGeneric) {
+        genericFamilies.push_back(classified.resolved);
+      } else {
+        authoredFamilies.push_back(classified.resolved);
+      }
     }
     if (!out.fontFamilyChain.empty()) {
-      // Default to the stack's first concrete family, then prefer the first family the renderer
-      // can actually resolve. A leading family that the renderer would silently substitute (a
-      // hidden system font such as "SF Mono", or any font absent on this machine) is skipped so
-      // the later CSS fallbacks that DO resolve (e.g. "Menlo" for a `monospace` stack) win —
-      // matching the browser cascade instead of collapsing to the default proportional face.
-      out.primaryFontFamily = out.fontFamilyChain.front();
-      if (_fontAvailabilityThunk != nullptr) {
-        for (const auto& family : out.fontFamilyChain) {
-          if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
-            out.primaryFontFamily = family;
-            break;
-          }
-        }
-      }
+      out.primaryFontFamily =
+          selectPrimaryFontFamily(authoredFamilies, genericFamilies, out.fontFamilyChain.front());
     }
     if (recordFontFallbacks && _fontFallbackThunk) {
       _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
@@ -570,6 +665,17 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "font-size", out.fontSize);
   CopyProperty(props, "font-weight", out.fontWeight);
   CopyProperty(props, "font-style", out.fontStyle);
+  CopyProperty(props, "font-stretch", out.fontStretch);
+  // These are inherited properties. Resolve CSS-wide keywords before parsing the numeric
+  // request, including explicit `inherit` on an inline run inside a condensed parent.
+  for (auto field : {&HTMLInheritedStyle::fontWeight, &HTMLInheritedStyle::fontStyle,
+                     &HTMLInheritedStyle::fontStretch}) {
+    auto& value = out.*field;
+    auto keyword = ToLower(Trim(value));
+    if (keyword == "inherit" || keyword == "unset") value = parent.*field;
+    else if (keyword == "initial" || keyword == "revert")
+      value.clear();
+  }
   CopyProperty(props, "letter-spacing", out.letterSpacing);
   CopyProperty(props, "line-height", out.lineHeight);
   CopyProperty(props, "text-align", out.textAlign);
@@ -607,14 +713,32 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   // so an oblique slant survives when the styled italic face is unavailable; text layout drops
   // the flag when the resolved typeface already provides a real italic face.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
-  out.fontStyleName = fontSynthesis.fontStyleName;
+  // Relative weights are resolved once, against the parent's computed value.
+  if (out.fontWeight == "bolder" || out.fontWeight == "lighter") {
+    auto weight = parent.fontRequest.weight;
+    double resolved = out.fontWeight == "bolder" ? (weight < 350   ? 400
+                                                    : weight < 550 ? 700
+                                                    : weight < 900 ? 900
+                                                                   : weight)
+                                                 : (weight < 100   ? weight
+                                                    : weight < 550 ? 100
+                                                    : weight < 750 ? 400
+                                                                   : 700);
+    out.fontWeight = std::to_string(resolved);
+  }
+  out.fontRequest = ParseCSSFontStyle(out.fontWeight, out.fontStyle, out.fontStretch);
+  out.fontStyleName = FontStyleRequestName(out.fontRequest);
   out.fauxBold = fontSynthesis.fauxBold;
-  out.fauxItalic = fontSynthesis.fauxItalic;
-  applyFontFaceNames(out, parent);
+  out.fauxItalic = out.fontRequest.slant != CSSFontSlant::Normal;
+  // A caller-supplied replacement is authoritative: its target family/style is what the document
+  // must carry, so the platform face lookup is skipped for the element it matched. An <svg> root
+  // keeps the lookup so its own font stack still resolves against the platform.
+  if (ToLower(element->name) == "svg" || !applyFontReplacement(out)) {
+    applyFontFaceNames(out, parent);
+  }
 
-  static const char* TextDisallowed[] = {
-      "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
-      "font-variant",   "font-stretch", "font"};
+  static const char* TextDisallowed[] = {"text-transform", "text-indent",  "word-spacing",
+                                         "unicode-bidi",   "font-variant", "font"};
   for (const auto* prop : TextDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
@@ -685,6 +809,29 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
+  if (element->name == "svg") {
+    // SVG geometry attributes are presentation attributes. CSS wins, including an explicit
+    // auto/zero value; otherwise the viewport must size the HTML host before layout runs.
+    if (LookupProperty(props, "width").empty()) {
+      auto* width = element->findAttribute("width");
+      if (width != nullptr) ParseSizingDimension(*width, box.widthPx, box.widthPct);
+    }
+    if (LookupProperty(props, "height").empty()) {
+      auto* height = element->findAttribute("height");
+      if (height != nullptr) ParseSizingDimension(*height, box.heightPx, box.heightPct);
+    }
+    auto* viewBoxAttr = element->findAttribute("viewBox");
+    auto viewBox = viewBoxAttr == nullptr ? std::vector<float>{} : ParseFloatList(*viewBoxAttr);
+    if (viewBox.size() == 4 && viewBox[2] > 0 && viewBox[3] > 0) {
+      bool autoWidth = std::isnan(box.widthPx) && std::isnan(box.widthPct);
+      bool autoHeight = std::isnan(box.heightPx) && std::isnan(box.heightPct);
+      if (autoWidth && !std::isnan(box.heightPx)) {
+        box.widthPx = box.heightPx * viewBox[2] / viewBox[3];
+      } else if (autoHeight && !std::isnan(box.widthPx)) {
+        box.heightPx = box.widthPx * viewBox[3] / viewBox[2];
+      }
+    }
+  }
   // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
   // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
   // only at Layer construction time so inference can still use the measured child geometry.
@@ -700,7 +847,8 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
-  parseBoxVisuals(box, props);
+  parseBoxVisuals(box, props,
+                  element->name == "img" && (std::isnan(box.widthPx) || std::isnan(box.heightPx)));
   parseBoxTransform(box, props);
   return box;
 }
@@ -881,7 +1029,8 @@ bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* o
   return true;
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                                       bool deferBorderRadius) {
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
@@ -889,33 +1038,16 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
-  // A `url(...)` background round-trips through `ImagePattern`, which needs the CSS fitting
-  // hints the exporter emitted alongside it. Capture them only for url backgrounds; gradients
-  // ignore size/repeat/position entirely.
-  if (!bgImage.empty() && ToLower(bgImage).find("url(") != std::string::npos) {
+  if (!bgImage.empty()) {
     box.backgroundSize = LookupLowerTrimmed(props, "background-size");
     box.backgroundRepeat = LookupLowerTrimmed(props, "background-repeat");
     box.backgroundPosition = LookupLowerTrimmed(props, "background-position");
+    box.backgroundOrigin = LookupLowerTrimmed(props, "background-origin");
   }
   // `background-blend-mode` blends the element's background layers among themselves. Kept
   // lower-cased so the keyword comparison in applyBackgroundFill is case-insensitive; `normal`
   // is treated as "no blending" there.
   box.backgroundBlendMode = LookupLowerTrimmed(props, "background-blend-mode");
-  auto backgroundBlendModes = SplitTopLevelCommas(box.backgroundBlendMode);
-  if (backgroundBlendModes.size() > 1) {
-    std::string firstMode = ToLower(Trim(backgroundBlendModes.front()));
-    bool hasDifferentMode = false;
-    for (size_t i = 1; i < backgroundBlendModes.size(); ++i) {
-      if (ToLower(Trim(backgroundBlendModes[i])) != firstMode) {
-        hasDifferentMode = true;
-        break;
-      }
-    }
-    if (hasDifferentMode) {
-      _diagnostics.warn("html: per-layer background-blend-mode values are not supported; using '" +
-                        firstMode + "' for every background layer");
-    }
-  }
   // `background-clip: text` routes the gradient onto descendant text fills. Any other
   // non-empty list carries per-layer box clips (`padding-box`, comma-separated in CSS layer
   // order) — kept raw so `applyBackgroundFill` can rebuild each layer with its own inset
@@ -930,7 +1062,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
 
   const std::string& br = LookupProperty(props, "border-radius");
-  if (!br.empty()) {
+  if (!br.empty() && !deferBorderRadius) {
     parseBorderRadius(box, props);
   }
 
@@ -949,6 +1081,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   box.maskMode = LookupLowerTrimmed(props, "mask-mode");
   box.maskSize = LookupLowerTrimmed(props, "mask-size");
   box.maskPosition = LookupLowerTrimmed(props, "mask-position");
+  box.maskRepeat = LookupLowerTrimmed(props, "mask-repeat");
   // `clip-path: url(#id)` reference, kept raw so the apply-side can extract the id.
   box.clipPathRef = LookupProperty(props, "clip-path");
 
@@ -962,6 +1095,12 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     }
   }
   box.mixBlendMode = LookupLowerTrimmed(props, "mix-blend-mode");
+  const auto isolation = LookupLowerTrimmed(props, "isolation");
+  if (isolation == "isolate") {
+    box.isolate = true;
+  } else if (!isolation.empty() && isolation != "auto") {
+    _diagnostics.warn("html: unsupported isolation '" + isolation + "'");
+  }
 
   // CSS `overflow` takes one or two values (`<x> <y>`) and clips the box whenever either axis is
   // not `visible` (the other axis computes to `auto` and still clips), so every clipping axis
@@ -995,6 +1134,16 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
+  if (!box.objectFit.empty() && box.objectFit != "fill" && box.objectFit != "contain" &&
+      box.objectFit != "cover" && box.objectFit != "none" && box.objectFit != "scale-down") {
+    _diagnostics.warn("html: unsupported object-fit '" + box.objectFit + "'; using fill");
+    box.objectFit.clear();
+  }
+  auto objectPosition = LookupLowerTrimmed(props, "object-position");
+  if (!objectPosition.empty() &&
+      !ParseHTMLCSSPosition(objectPosition, _valueParser, box.objectPosition)) {
+    _diagnostics.warn("html: unsupported object-position '" + objectPosition + "'; using center");
+  }
 
   static const char* VisualsDisallowed[] = {"outline", "perspective"};
   for (const auto* prop : VisualsDisallowed) {
@@ -1162,6 +1311,15 @@ static bool ResolveBorderRadiusAxis(const std::vector<std::string>& tokens, floa
   }
   out = ExpandFourSideShorthand(nums);
   return true;
+}
+
+void HTMLStyleCascade::resolveUsedBoxSize(HTMLBoxAttributes& box,
+                                          const std::shared_ptr<DOMNode>& element, float width,
+                                          float height) {
+  box.widthPx = width;
+  box.heightPx = height;
+  const auto& props = getResolvedStyle(element);
+  if (!LookupProperty(props, "border-radius").empty()) parseBorderRadius(box, props);
 }
 
 void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props) {

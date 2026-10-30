@@ -1,0 +1,38 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <cmath>
+#include <string>
+#include "pagx/html/importer/HTMLCSSPosition.h"
+#include "pagx/types/Rect.h"
+
+namespace pagx {
+struct HTMLImageIntrinsicSize {
+  // CSS pixels, not decoded texels. A viewBox supplies a ratio, not natural width/height.
+  float width = NAN;
+  float height = NAN;
+  float ratio = NAN;
+};
+
+// CSS Images default sizing algorithm, with the content box as the default object size.
+bool ResolveHTMLObjectSize(const HTMLImageIntrinsicSize& intrinsic, const std::string& fit,
+                           float width, float height, float& objectWidth, float& objectHeight);
+bool ResolveHTMLObjectRect(const HTMLImageIntrinsicSize& intrinsic, const std::string& fit,
+                           const HTMLCSSPosition& position, const Rect& content, Rect& object);
+}  // namespace pagx

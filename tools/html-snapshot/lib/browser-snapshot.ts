@@ -38,7 +38,14 @@
 
 // @ts-nocheck
 
+import * as fontFacePass from './font-face-pass';
+const {
+  collectCarryOverFontFaces, cssQuotedString, fontFaceRuleCss,
+  normalizeFontFaceStyle, normalizeFontFaceWeight,
+} = fontFacePass;
+
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
+import { PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC } from './paint-plan';
 // Imported under a distinct name because the value is only embedded as a
 // literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
 // `MAX_CAPTURE_HEIGHT_PX` that `snapshotMain` references is the const defined
@@ -60,6 +67,10 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // the subset transformer recovers flex geometry, but must not become an authored PAGX width.
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
+
+// Only enabled while converting an inert, computed-style copy. Its viewport,
+// root layout, scroll offsets and sampled animation values must stay intact.
+let SNAPSHOT_CURRENT_STATE = false;
 
 // Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
 // pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
@@ -89,9 +100,42 @@ const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
 // like `"PingFang SC", -apple-system, sans-serif` round-trips: the
 // importer's first concrete family lands on `Text::fontFamily` and the
 // remaining concrete entries are registered as document-level fallbacks.
-function normalizeFontFamily(value) {
+function normalizeFontFamily(value: string): string {
   if (!value) return '';
   return value.replace(/"/g, "'");
+}
+
+// Nearest ancestor (or document root) `lang` value; empty when none is declared. Never
+// guessed from the content.
+function collectLanguage(el) {
+  try {
+    const holder = el && typeof el.closest === 'function' ? el.closest('[lang]') : null;
+    if (holder) {
+      const lang = holder.getAttribute('lang');
+      if (lang && String(lang).trim()) return String(lang).trim();
+    }
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const rootLang = document.documentElement.getAttribute('lang');
+      if (rootLang && String(rootLang).trim()) return String(rootLang).trim();
+    }
+    return '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// Escapes text for a single-quoted XML attribute.
+function escapeSingleQuotedAttr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/'/g, '&apos;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildLanguageAttribute(el) {
+  const lang = collectLanguage(el);
+  return lang ? ` lang='${escapeSingleQuotedAttr(lang)}'` : '';
 }
 
 // PAGX only models `overflow: hidden`. `clip`, `auto`, and `scroll` all map to
@@ -118,58 +162,29 @@ function normalizeBorderRadius(value) {
   return value;
 }
 
-// PAGX supports `background-image` when the value is one of the gradient
-// functions (linear/radial/conic) or a single `url(...)` reference. A url
-// background round-trips into an `ImagePattern` fill on import (the inverse of
-// the HTML exporter's emission). Chromium reports the url already resolved to
-// an absolute form; rewrite a local `file://` url to a plain absolute path
-// (the form the PAGX importer + tgfx load directly, matching the `<img>`
-// `data-snapshot-src` path), and keep `data:` / `http(s)` urls verbatim (the
-// `inlineExternalImages` pre-pass converts remote bytes to a data URI).
-// Compound url + gradient stacks and the `none` keyword are dropped.
+// Normalize every URL independently, preserving gradient/none layers and their list indices.
+// Single-quoted CSS strings embed safely in the snapshot's double-quoted HTML style attributes.
 function normalizeBackgroundImage(value) {
-  if (!value) return '';
-  if (value === 'none') return '';
-  if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value)) {
-    return value;
-  }
-  const trimmed = value.trim();
-  if (/^url\(/i.test(trimmed)) {
-    const m = /^url\(\s*([\s\S]*?)\s*\)$/i.exec(trimmed);
-    if (!m) return '';
-    let url = m[1].trim();
-    if (url[0] === '"' || url[0] === "'") {
-      if (url.length < 2 || url[url.length - 1] !== url[0]) return '';
-      url = url.slice(1, -1);
-    } else if (/[\s'"]/.test(url)) {
-      return '';
-    }
+  if (!value || value.trim() === 'none') return '';
+  const hasGradient = /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value);
+  let found = false;
+  const normalized = value.replace(/url\(\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^)]*)\s*\)/gi, token => {
+    found = true;
+    let url = token.slice(token.indexOf('(') + 1, -1).trim();
+    if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+    else if (/[\s'"]/.test(url)) return 'none';
+    url = url.replace(/\\(['"\\])/g, '$1');
     if (/^file:/i.test(url)) {
       try {
         const u = new URL(url);
-        let p = decodeURIComponent(u.pathname);
-        if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
-        url = p;
-      } catch (_) {
-        return '';
-      }
+        url = decodeURIComponent(u.pathname);
+        if (/^\/[A-Za-z]:/.test(url)) url = url.slice(1);
+      } catch (_) { return 'none'; }
     }
-    // Emit a SINGLE-quoted url() so the value embeds safely inside the
-    // double-quoted `style="…"` attribute the snapshot writes. The <body>
-    // background path pushes this value verbatim (it does not route through
-    // `appendStyleProp`, which is the only place that rewrites embedded double
-    // quotes), so a double-quoted url() here would prematurely close the style
-    // attribute and break the importer's XML parse. CSS treats url("…") and
-    // url('…') as equivalent, and the importer's ExtractCssUrl strips either
-    // quote style, so single quotes round-trip cleanly. Escape backslashes and
-    // embedded single quotes for the CSS string; rewrite double quotes so none
-    // can close the surrounding HTML attribute. ExtractCssUrl reverses these
-    // simple CSS escapes when the snapshot is imported.
     const escaped = url.replace(/\\/g, '\\\\').replace(/"/g, "'").replace(/'/g, "\\'");
     return `url('${escaped}')`;
-  }
-  if (/url\(/i.test(value)) return '';
-  return '';
+  });
+  return found || hasGradient ? normalized : '';
 }
 
 // `background-clip: text` routes a gradient `background-image` to descendant
@@ -882,8 +897,8 @@ function hasAnyBorder(computed) {
 // capture the common "foreground decoration" pattern (a phone notch with
 // `z-index: 50` painted over the gradient header, a sticky tab bar painted
 // over the content beneath, …).
-function resolveZIndex(computed) {
-  const raw = (computed.getPropertyValue('z-index') || '').trim();
+function resolveZIndex(value) {
+  const raw = (value || '').trim();
   if (!raw || raw === 'auto') return 0;
   const v = parseInt(raw, 10);
   return isFinite(v) ? v : 0;
@@ -1003,6 +1018,9 @@ function hasPseudoContent(el) {
 function imgSrc(el) {
   const inlined = el.getAttribute('data-snapshot-src');
   if (inlined) return inlined;
+  if ((el.getAttribute('srcset') || '').trim() || el.parentElement?.tagName === 'PICTURE') {
+    return el.currentSrc || el.getAttribute('src') || '';
+  }
   return el.getAttribute('src') || '';
 }
 
@@ -1128,23 +1146,64 @@ function imgAlt(el) {
 // label). For checkboxes / radios / file pickers / colour swatches / date
 // pickers there is no meaningful text to surface; their `value` attribute is
 // metadata (`"on"`, hidden file path, ISO date) that would only confuse
-// downstream rendering, so we return empty and let `classify` drop the
-// element.
+// downstream rendering. Their visual surface is captured separately.
 function syntheticText(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'textarea') {
-    return (el.value || el.getAttribute('placeholder') || '').trim();
+    return el.value || el.getAttribute('placeholder') || '';
   }
   if (tag === 'input') {
     const type = (el.getAttribute('type') || 'text').toLowerCase();
     if (NON_TEXT_INPUT_TYPES.has(type)) return '';
-    return (el.value || el.getAttribute('placeholder') || '').trim();
+    if (type === 'password' && el.value) return '•'.repeat(Array.from(el.value).length);
+    return el.value || el.getAttribute('placeholder') || '';
   }
   if (tag === 'select') {
     const opt = el.options && el.options[el.selectedIndex];
     return opt ? (opt.text || opt.label || opt.value || '').trim() : '';
   }
   return '';
+}
+
+function needsNativeControlPaint(el, computed) {
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'fieldset' || tag === 'progress' || tag === 'meter') return true;
+  const appearance = computed.getPropertyValue('appearance');
+  if (tag === 'select') return appearance !== 'none';
+  if (tag !== 'input') return false;
+  const type = el.type;
+  if (type === 'radio' || type === 'checkbox') return appearance !== 'none';
+  return ['range', 'color', 'date', 'datetime-local', 'month', 'time', 'week',
+    'file', 'image', 'number', 'search'].includes(type);
+}
+
+function renderControlPaint(el, parentRect, rect, left, top, computed, opts) {
+  const paint = window.__pagxControlPaints && window.__pagxControlPaints.get(el);
+  if (!paint) {
+    PAINT_CAPTURE.warnings.push(`html-snapshot: native paint unavailable for <${el.tagName.toLowerCase()}>; preserved its layout box`);
+    if (syntheticText(el)) return renderTextInput(el, parentRect, rect, left, top, computed, opts);
+    return renderContainer(el, parentRect, rect, left, top, computed, opts);
+  }
+  // The captured surface is the element's own decoration. It may extend outside
+  // the border box (e.g. a focus outline); an image background would clip it and
+  // would antialias already-rounded pixels against the border radius twice.
+  const overrides = {
+    'background-color': 'transparent',
+    'background-image': 'none',
+  };
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    overrides[`border-${side}-width`] = '0px';
+    overrides[`border-${side}-style`] = 'none';
+  }
+  const surfaceStyle = textFragmentStyle(computed, overrides);
+  const style = buildStyle(left, top, rect.width, rect.height, surfaceStyle, { box: true, ...opts });
+  const image = markPaintSurface(`<img src="${escapeHtml(paint.src)}" alt="" style="position: absolute; ` +
+    `left: ${px(paint.x)}; top: ${px(paint.y)}; width: ${px(paint.width)}; height: ${px(paint.height)}"/>`);
+  // The original fieldset still lays out its rendered legend. Only its own
+  // decoration is captured; all descendants retain editable/vector content.
+  const children = el.tagName.toLowerCase() === 'fieldset'
+    ? renderChildrenInto(el, rect, computed) : '';
+  return `<div style="${style}">${image}${children}</div>`;
 }
 
 // Apply CSS `text-transform` to a text fragment. The PAGX importer downstream
@@ -1180,6 +1239,8 @@ function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
   if (DROP_TAGS.has(tag)) return null;
   if (!isVisible(computed, el)) return null;
+  if (tag === 'input' && el.type === 'hidden') return null;
+  if (needsNativeControlPaint(el, computed)) return 'control';
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
   if (tag === 'canvas') {
@@ -1198,8 +1259,9 @@ function classify(el, computed) {
     // value-less input that paints only its border-bottom underline). Keep
     // the box when the author painted any box visuals so the underline /
     // background / shadow survives the snapshot.
-    if (hasBoxVisualsForInline(computed)) return 'box';
-    return null;
+    // An empty control still occupies a layout slot (notably disabled radio
+    // buttons in a flex label). Never collapse the following label into it.
+    return 'box';
   }
   return 'box';
 }
@@ -1215,6 +1277,7 @@ function classify(el, computed) {
 // surgery on the joined style — see renderTextInput.
 function appendStyleProp(parts, computed, entry, ctx) {
   let raw = computed.getPropertyValue(entry.prop).trim();
+  if (entry.prop === 'font-family') raw = snapshotFontFamily(raw, computed);
   if (entry.prop === 'color' && ctx && ctx.textColorOverride) {
     raw = ctx.textColorOverride;
   }
@@ -1229,6 +1292,70 @@ function appendStyleProp(parts, computed, entry, ctx) {
   // `filter: url("#blur")` round-trips while no longer prematurely closing the
   // attribute and breaking the XML parse on import.
   parts.push(`${outProp}: ${v.replace(/"/g, "'")}`);
+}
+
+// CSS matching for static faces and declared descriptor ranges. Keep this ordering in sync
+// with CompareCSSFontStyles; both implementations consume font-matching-cases.json in tests.
+function fontMatchRange(value, width) {
+  const widths = { 'ultra-condensed': 50, 'extra-condensed': 62.5, condensed: 75,
+    'semi-condensed': 87.5, normal: 100, 'semi-expanded': 112.5, expanded: 125,
+    'extra-expanded': 150, 'ultra-expanded': 200 };
+  const numbers = String(value || 'normal').trim().split(/\s+/).map(token => {
+    if (width && widths[token] !== undefined) return widths[token];
+    if (!width && token === 'normal') return 400;
+    if (!width && token === 'bold') return 700;
+    const number = Number(width ? token.replace(/%$/, '') : token);
+    return Number.isFinite(number) && number > 0 ? number : width ? 100 : 400;
+  });
+  return [numbers[0], numbers[1] ?? numbers[0]];
+}
+
+function fontMatchCompare(request, a, b) {
+  const desiredWeight = fontMatchRange(request.weight, false)[0];
+  const desiredWidth = fontMatchRange(request.stretch, true)[0];
+  const slant = value => /^oblique(?:\s|$)/.test(value || '') ? 'oblique' :
+    value === 'italic' ? 'italic' : 'normal';
+  const desiredSlant = slant(request.style);
+  const rank = face => {
+    const [loWidth, hiWidth] = fontMatchRange(face.stretch, true);
+    const width = Math.max(loWidth, Math.min(hiWidth, desiredWidth));
+    const widthRank = desiredWidth <= 100
+      ? width <= desiredWidth ? [0, desiredWidth - width] : [1, width - desiredWidth]
+      : width >= desiredWidth ? [0, width - desiredWidth] : [1, desiredWidth - width];
+    const actualSlant = slant(face.style);
+    const slantRank = actualSlant === desiredSlant ? 0 : desiredSlant === 'normal'
+      ? actualSlant === 'oblique' ? 1 : 2 : actualSlant === 'normal' ? 2 : 1;
+    const [loWeight, hiWeight] = fontMatchRange(face.weight, false);
+    const weight = Math.max(loWeight, Math.min(hiWeight, desiredWeight));
+    let weightRank;
+    if (desiredWeight < 400) weightRank = weight <= desiredWeight
+      ? [0, desiredWeight - weight] : [1, weight - desiredWeight];
+    else if (desiredWeight > 500) weightRank = weight >= desiredWeight
+      ? [0, weight - desiredWeight] : [1, desiredWeight - weight];
+    else if (weight >= desiredWeight && weight <= 500) weightRank = [0, weight - desiredWeight];
+    else weightRank = weight < desiredWeight ? [1, desiredWeight - weight] : [2, weight - desiredWeight];
+    return [...widthRank, slantRank, ...weightRank];
+  };
+  const first = rank(a), second = rank(b);
+  for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return first[i] - second[i];
+  return 0;
+}
+
+function snapshotFontFamily(value, computed) {
+  const aliases = window.__pagxFontAliases || [];
+  if (!aliases.length) return value;
+  const weight = parseFloat(computed.getPropertyValue('font-weight')) || 400;
+  const request = { weight: String(weight), style: computed.getPropertyValue('font-style') || 'normal',
+    stretch: computed.getPropertyValue('font-stretch') || '100%' };
+  return (value.match(/"[^"]*"|'[^']*'|[^,]+/g) || []).map((part) => {
+    const family = part.trim().replace(/^["']|["']$/g, '');
+    const matches = aliases.filter((a) => a.from.toLowerCase() === family.toLowerCase());
+    matches.sort((a, b) => fontMatchCompare(request, a, b));
+    // Keep the CSS name first: it owns the @font-face descriptors and the catalog identity.
+    // The file's internal name is only a fallback when no carried face can be loaded.
+    if (!matches.length || matches[0].to.toLowerCase() === family.toLowerCase()) return part.trim();
+    return part.trim() + `, '${matches[0].to.replace(/'/g, "\\'")}'`;
+  }).join(', ');
 }
 
 // Forward a uniform `border` shorthand, preserving the actual line style
@@ -1397,23 +1524,20 @@ function appendTextShadow(parts, computed) {
   else parts.push(`filter: ${glow}`);
 }
 
-// Forward `background-size` / `background-repeat` / `background-position` when the element
-// carries a `url(...)` background image. The importer recovers them into the ImagePattern's
-// scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
-// properties, so emitting them there would be noise; only forward for url backgrounds. Each
-// value is suppressed when it equals the CSS default so the common fitted card stays compact.
+// Preserve the complete per-layer layout for generated and URL images alike. Keeping the
+// comma-separated lists intact also preserves entries paired with `none` background layers.
 function appendBackgroundImageFitting(parts, computed) {
   const bgImage = computed.getPropertyValue('background-image').trim();
-  if (!/^url\(/i.test(bgImage)) return;
+  if (!bgImage || bgImage === 'none') return;
   const size = computed.getPropertyValue('background-size').trim();
   if (size && size !== 'auto') parts.push(`background-size: ${size}`);
-  // `background-repeat` is always forwarded for url backgrounds (never suppressed against the
-  // CSS default `repeat`): the importer maps `repeat` to the tiling ScaleMode::None pattern, so
-  // dropping it would silently turn a tiled card into a single off-screen image.
+  // Preserve repeat lists verbatim; list indices stay paired with background-image.
   const repeat = computed.getPropertyValue('background-repeat').trim();
   if (repeat) parts.push(`background-repeat: ${repeat}`);
   const position = computed.getPropertyValue('background-position').trim();
   if (position && position !== '0% 0%') parts.push(`background-position: ${position}`);
+  const origin = computed.getPropertyValue('background-origin').trim();
+  if (origin && origin !== 'padding-box') parts.push(`background-origin: ${origin}`);
 }
 
 // Forward the `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`
@@ -1547,8 +1671,8 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.positioned !== false) {
     parts.push(`position: absolute`);
-    parts.push(`left: ${px(left)}`);
-    parts.push(`top: ${px(top)}`);
+    parts.push(`left: ${roundPx(left)}px`);
+    parts.push(`top: ${roundPx(top)}px`);
     parts.push(`width: ${px(width)}`);
     parts.push(`height: ${px(height)}`);
   }
@@ -1593,8 +1717,12 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
-    // currentColor stroke/fill picks up the right tint.
+    // currentColor stroke/fill picks up the right tint, plus `font-family` so a
+    // `<text>` inside the inline SVG inherits the document's face. The SVG is
+    // serialized standalone and re-imported without the HTML cascade, so the
+    // family must ride along on the wrapper for the importer to see it.
     appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('color'));
+    appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('font-family'));
   }
 
   // Forward the host's resolved CSS `transform` (and `transform-origin`) when
@@ -1885,7 +2013,7 @@ function readBoxTransform(computed) {
   return { transform: t, transformOrigin: o };
 }
 
-// Run `fn` with the element's inline transform temporarily cleared, then
+// Run `fn` with the element's transform temporarily set to identity, then
 // restore the original declarations. Used by the text path to obtain
 // pre-transform `getBoundingClientRect()` / `Range.getClientRects()`
 // measurements so the geometry handed to PAGX matches the unrotated layout
@@ -1894,7 +2022,9 @@ function withStrippedTransform(el, fn) {
   if (!el || !el.style) return fn();
   const savedT = el.style.transform;
   const savedO = el.style.transformOrigin;
-  el.style.transform = 'none';
+  // An identity transform keeps the original containing block for absolute/fixed children.
+  // `none` would make those children jump to a different ancestor during measurement.
+  el.style.transform = 'matrix(1, 0, 0, 1, 0, 0)';
   if (savedO) el.style.transformOrigin = '';
   try {
     return fn();
@@ -2045,6 +2175,48 @@ function imageInnerStyle(rect, flexItem, objectFit, forceExplicitSize) {
   return base;
 }
 
+// The image paints in the content box. Its absolute containing block is the wrapper's
+// padding box, so border offsets are subtracted from size, but not added to left/top.
+function replacedImageStyle(rect, computed, opts, svg) {
+  const pad = readPadding(computed);
+  const bl = borderWidthOf(computed, 'left'), br = borderWidthOf(computed, 'right');
+  const bt = borderWidthOf(computed, 'top'), bb = borderWidthOf(computed, 'bottom');
+  const fit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
+  const pos = computed.objectPosition || computed.getPropertyValue('object-position') || '';
+  let style;
+  if (bl + br + bt + bb + pad.left + pad.right + pad.top + pad.bottom === 0) {
+    style = imageInnerStyle(rect, opts.flexItem, fit, svg);
+  } else {
+    const w = Math.max(0, rect.width - bl - br - pad.left - pad.right);
+    const h = Math.max(0, rect.height - bt - bb - pad.top - pad.bottom);
+    style = `position: absolute; left: ${px(pad.left)}; top: ${px(pad.top)}; ` +
+      `width: ${px(w)}; height: ${px(h)}; object-fit: ${fit || 'fill'}`;
+    const corners = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+    const rx = [], ry = [];
+    const length = (token, base) => (parseFloat(token) || 0) * (token.endsWith('%') ? base / 100 : 1);
+    for (const corner of corners) {
+      const tokens = (computed.getPropertyValue(`border-${corner}-radius`) || '0').split(/\s+/);
+      rx.push(length(tokens[0], rect.width));
+      ry.push(length(tokens[1] || tokens[0], rect.height));
+    }
+    let scale = 1;
+    for (const [size, sum] of [[rect.width, rx[0] + rx[1]], [rect.width, rx[2] + rx[3]],
+      [rect.height, ry[0] + ry[3]], [rect.height, ry[1] + ry[2]]]) {
+      if (sum > 0) scale = Math.min(scale, size / sum);
+    }
+    const dx = [bl + pad.left, br + pad.right, br + pad.right, bl + pad.left];
+    const dy = [bt + pad.top, bt + pad.top, bb + pad.bottom, bb + pad.bottom];
+    for (let i = 0; i < 4; i++) {
+      rx[i] = Math.max(0, rx[i] * scale - dx[i]);
+      ry[i] = Math.max(0, ry[i] * scale - dy[i]);
+      if (!rx[i] || !ry[i]) rx[i] = ry[i] = 0;
+    }
+    if (rx.some(r => r > 0)) style += `; border-radius: ${rx.map(px).join(' ')} / ${ry.map(px).join(' ')}`;
+  }
+  if (pos && pos !== '50% 50%') style += `; object-position: ${pos}`;
+  return style;
+}
+
 // True when an <img> source is an SVG (by extension or `data:` MIME). SVG
 // sources are inlined as resolvable vector paths downstream, so their host
 // layer needs an explicit pixel size (see imageInnerStyle); raster sources do
@@ -2066,9 +2238,8 @@ function isSvgSource(src) {
 //      below as a function-local constant so it ships into the browser
 //      payload via `fn.toString()`) whose resolved value differs from what
 //      the cloned ancestor chain already provides gets written as an
-//      attribute on the clone. Author-emitted attributes (preserved by
-//      `cloneNode(true)`) are kept as-is — we only add what would otherwise
-//      be lost when the page's stylesheet is dropped.
+//      attribute on the clone. Computed values also replace presentation
+//      attributes overridden by CSS.
 //
 // The clone is detached from the document, so `getComputedStyle` can't
 // resolve it directly; we walk the *original* subtree (where the cascade is
@@ -2085,11 +2256,14 @@ function freezeSvg(svgEl, rect) {
   // properties (width, height, x, y, transform) are left to the SVG's own
   // attributes.
   const SVG_PRESENTATION_ATTRS = [
-    'fill', 'fill-opacity', 'fill-rule',
+    'color', 'fill', 'fill-opacity', 'fill-rule',
     'stroke', 'stroke-opacity', 'stroke-width',
     'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
     'stroke-dasharray', 'stroke-dashoffset',
     'opacity', 'visibility', 'clip-rule', 'vector-effect',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'letter-spacing',
+    'text-anchor', 'marker-start', 'marker-mid', 'marker-end',
+    'stop-color', 'stop-opacity',
   ];
   // SVG-spec defaults for the attributes above. Used as the inheritance
   // root so the top-level <svg>'s computed values only get serialised when
@@ -2111,6 +2285,9 @@ function freezeSvg(svgEl, rect) {
     'visibility': 'visible',
     'clip-rule': 'nonzero',
     'vector-effect': 'none',
+    'text-anchor': 'start',
+    'marker-start': 'none', 'marker-mid': 'none', 'marker-end': 'none',
+    'stop-color': 'rgb(0, 0, 0)', 'stop-opacity': '1',
   };
   const readPresentation = (cs) => {
     const out = {};
@@ -2185,9 +2362,18 @@ function freezeSvg(svgEl, rect) {
   if (rect && Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
     clone.setAttribute('width', String(Math.round(rect.width * 1000) / 1000));
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
+    // Authored CSS sizing outranks the geometry attributes. Freeze both to the same used
+    // viewport so percentage/auto/class sizing cannot change when the SVG is detached.
+    clone.style.setProperty('width', `${Math.round(rect.width * 1000) / 1000}px`);
+    clone.style.setProperty('height', `${Math.round(rect.height * 1000) / 1000}px`);
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
-  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot) => {
+  const useTargets = new Set(Array.from(svgEl.querySelectorAll('use')).map(use => {
+    const href = use.getAttribute('href') || use.getAttribute('xlink:href') || '';
+    return href.startsWith('#') ? svgEl.ownerDocument.getElementById(href.slice(1)) : null;
+  }));
+  const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot, inTemplate = false) => {
+    inTemplate = inTemplate || orig.localName === 'symbol' || useTargets.has(orig);
     // SVG elements inherit `color` from their CSS parent. We only re-query
     // getComputedStyle if the node is actually an element (text nodes inside
     // <text> don't carry style on their own).
@@ -2208,17 +2394,31 @@ function freezeSvg(svgEl, rect) {
       // resolved value stays the literal keyword (there is no colour to read),
       // and the browser paints nothing without a context element, so freezing
       // the element's `color` here would invent a paint the page never had.
-      if (stroke === 'currentColor') {
+      if (stroke === 'currentColor' && !inTemplate) {
         dst.setAttribute('stroke', resolvedAttrs['stroke'] || here);
       }
-      if (fill === 'currentColor') {
+      if (fill === 'currentColor' && !inTemplate) {
         dst.setAttribute('fill', resolvedAttrs['fill'] || here);
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
       if (dst.style) {
-        if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
-        if (dst.style.fill === 'currentColor') dst.style.fill = here;
-        if (dst.style.color === 'currentColor') dst.style.color = here;
+        // Current-state collection already resolved the cascade and removed
+        // author stylesheets. Its inline !important markers only protect the
+        // inert mirror's layout; the native SVG parser treats them as part of
+        // paint values (e.g. "none !important" becomes a black fill). Remove
+        // those priorities from the detached export, never the source page.
+        if (SNAPSHOT_CURRENT_STATE) {
+          for (const name of Array.from(dst.style)) {
+            if (dst.style.getPropertyPriority(name)) {
+              dst.style.setProperty(name, dst.style.getPropertyValue(name));
+            }
+          }
+        }
+        if (!inTemplate) {
+          if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
+          if (dst.style.fill === 'currentColor') dst.style.fill = here;
+          if (dst.style.color === 'currentColor') dst.style.color = here;
+        }
       }
       // Freeze any CSS-resolved presentation attribute that the cloned
       // ancestor chain doesn't already supply. This is what carries
@@ -2229,18 +2429,38 @@ function freezeSvg(svgEl, rect) {
         // strip above), so never freeze it back onto the root. Descendants still freeze
         // their opacity normally — it composites under the wrapper exactly once.
         if (isRoot && name === 'opacity') continue;
-        if (dst.hasAttribute(name)) continue;
-        const value = resolvedAttrs[name];
+        const specified = dst.style.getPropertyValue(name) || dst.getAttribute(name) || '';
+        // Referenced templates inherit in the use instance. Keep symbolic paints and relative
+        // font lengths until that context exists, rather than baking the definition's defaults.
+        if (inTemplate && (/^(inherit|unset|currentcolor)$/i.test(specified.trim()) ||
+            (name === 'font-size' && /(?:em|ex|%)$/i.test(specified.trim())))) continue;
+        let value = resolvedAttrs[name];
         if (!value) continue;
         const inherited = inheritedAttrs[name] || SVG_PRESENTATION_DEFAULTS[name] || '';
-        if (value === inherited) continue;
+        if (value === inherited && !dst.hasAttribute(name) && !dst.style.getPropertyValue(name)) continue;
+        // Computed local URL references can be absolute. They must still resolve inside the
+        // detached SVG, even after the snapshot is written to another directory.
+        value = value.replace(/url\(["']?([^"')]+)["']?\)/g, (match, url) => {
+          try {
+            const resolved = new URL(url, document.baseURI);
+            const current = new URL(document.URL);
+            if (resolved.hash && resolved.origin === current.origin &&
+                resolved.pathname === current.pathname && resolved.search === current.search) {
+              return `url(${resolved.hash})`;
+            }
+          } catch {}
+          return match;
+        });
+        // Inline the computed value too: retained <style> rules must not override the frozen
+        // attribute again in consumers with a smaller CSS cascade.
+        dst.style.setProperty(name, value);
         dst.setAttribute(name, value);
       }
     }
     const origKids = (orig && orig.children) || [];
     const dstKids = (dst && dst.children) || [];
     const n = Math.min(origKids.length, dstKids.length);
-    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false);
+    for (let i = 0; i < n; i++) walk(origKids[i], dstKids[i], here, resolvedAttrs, false, inTemplate);
   };
   walk(svgEl, clone, fallback, SVG_PRESENTATION_DEFAULTS, true);
   // outerHTML serialises U+00A0 as the named entity &nbsp;, which the importer's
@@ -2252,21 +2472,180 @@ function freezeSvg(svgEl, rect) {
 
 // ===== Multi-line text emission =====
 
-// Collapse client rects that belong to the SAME visual line/column into one
-// rect spanning their inline-axis union. `blockAxis` names the wrap-progression
-// axis ('y' = horizontal lines stacking down; 'x-rl'/'x-lr' = vertical columns
-// stacking sideways): two rects are on the same line/column when their extents
-// ALONG that axis overlap. Chromium hands back a separate rect per glyph run on
-// a line (a soft-hyphen's visible hyphen, a bidi direction switch, etc.); the
-// caller's line bisection assumes one rect per line, so without this merge a
-// stray same-line rect would split that line's text at an arbitrary offset.
-//
-// Rects arrive in document order, which is also block-axis order, so a single
-// forward pass that extends the current group while the next rect overlaps it
-// on the block axis suffices. The merged rect keeps the group's block-axis
-// position/size (top/height for 'y', left/width for the vertical modes) and
-// unions the inline-axis interval so its leading edge and extent cover every
-// glyph run on the line.
+function textFragmentStyle(computed, overrides) {
+  return new Proxy(computed, {
+    get(target, key) {
+      if (key === 'getPropertyValue') {
+        return (name) => Object.prototype.hasOwnProperty.call(overrides, name)
+          ? overrides[name] : target.getPropertyValue(name);
+      }
+      const value = target[key];
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
+// Resolve layout text offsets back to source UTF-16 offsets. Do not assume that
+// layoutText is the DOM text: first-letter removes a prefix, whitespace may be
+// collapsed, and text-transform may change the string length (e.g. ß -> SS).
+function mapLayoutText(source, layoutText, computed) {
+  const mode = computed.getPropertyValue('text-transform').trim();
+  const transformed = [];
+  const starts = [];
+  const ends = [];
+  let offset = 0;
+  for (const ch of source) {
+    const value = mode === 'uppercase' ? ch.toUpperCase()
+      : mode === 'lowercase' ? ch.toLowerCase() : ch;
+    for (let j = 0; j < value.length; j++) {
+      transformed.push(value[j]);
+      starts.push(offset);
+      ends.push(offset + ch.length);
+    }
+    offset += ch.length;
+  }
+  const candidates = [{ text: transformed.join(''), starts, ends }];
+  const collapsed = { text: '', starts: [], ends: [] };
+  for (let i = 0; i < transformed.length; i++) {
+    const ch = transformed[i];
+    if (/[ \t\r\n\f]/.test(ch)) {
+      if (collapsed.text.endsWith(' ')) collapsed.ends[collapsed.ends.length - 1] = ends[i];
+      else {
+        collapsed.text += ' ';
+        collapsed.starts.push(starts[i]);
+        collapsed.ends.push(ends[i]);
+      }
+    } else {
+      collapsed.text += ch;
+      collapsed.starts.push(starts[i]);
+      collapsed.ends.push(ends[i]);
+    }
+  }
+  candidates.push(collapsed);
+  for (const c of candidates) {
+    if (!c.text.endsWith(layoutText)) continue;
+    const index = c.text.length - layoutText.length;
+    return { starts: c.starts.slice(index), ends: c.ends.slice(index),
+      prefixEnd: layoutText ? c.starts[index] : source.length };
+  }
+  return null;
+}
+
+function initialLayoutForText(textNode) {
+  const layouts = window.__pagxInitialLayouts;
+  if (!layouts) return null;
+  for (let host = textNode.parentElement; host; host = host.parentElement) {
+    const runs = layouts.get(host);
+    if (runs) return runs;
+  }
+  return null;
+}
+
+function textLayoutWarning(textNode, reason) {
+  const host = textNode.parentElement;
+  const message = `html-snapshot: text: <${host.tagName.toLowerCase()}>` +
+    (host.id ? `#${host.id}` : '') + ': ' + reason;
+  if (!PAINT_CAPTURE.warnings.includes(message)) PAINT_CAPTURE.warnings.push(message);
+}
+
+function measuredTextFragments(textNode, computed, axis) {
+  const fragments = snapshotTextFragments(textNode, computed);
+  if (fragments) return fragments;
+  if (initialLayoutForText(textNode)) {
+    textLayoutWarning(textNode, 'first-letter source mapping unavailable; using DOM geometry');
+  } else if (!window.__pagxTextLayouts) {
+    // The standalone bundle cannot read pseudo source ranges. Report an
+    // authored first-letter style when it affects the first visible text node.
+    for (let host = textNode.parentElement; host; host = host.parentElement) {
+      const base = getComputedStyle(host), pseudo = getComputedStyle(host, '::first-letter');
+      const differs = ['font-size', 'font-family', 'color', 'float'].some((prop) =>
+        base.getPropertyValue(prop) !== pseudo.getPropertyValue(prop));
+      if (!differs) continue;
+      const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+      let first;
+      while ((first = walker.nextNode()) && !(first.nodeValue || '').trim()) {}
+      if (first === textNode) {
+        textLayoutWarning(textNode, 'first-letter style requires installed layout metadata');
+        break;
+      }
+    }
+  }
+  return splitTextNodeIntoLines(textNode, computed.getPropertyValue('white-space'), axis);
+}
+
+function snapshotTextFragments(textNode, computed) {
+  const entry = window.__pagxTextLayouts && window.__pagxTextLayouts.get(textNode);
+  if (!entry || entry.source !== textNode.nodeValue || entry.runs.length > 1) return null;
+  const source = textNode.nodeValue || '';
+  // Keep the soft-hyphen visibility resolver on the DOM path until the protocol
+  // provider also supplies the inserted hyphen's character mapping.
+  if (source.includes('\u00ad')) return null;
+  const normal = entry.runs[0];
+  const mapping = normal ? mapLayoutText(source, normal.text, computed)
+    : { starts: [], ends: [], prefixEnd: source.length };
+  if (!mapping) return null;
+  const out = [];
+  const range = document.createRange();
+  const add = (start, end, text, style, initial) => {
+    if (start >= end || !text) return;
+    range.setStart(textNode, start);
+    range.setEnd(textNode, end);
+    const rect = range.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    out.push({ start, end, text, rect, computed: style, initial });
+  };
+  if (mapping.prefixEnd > 0) {
+    const prefix = source.slice(0, mapping.prefixEnd);
+    // Collapsed leading whitespace isn't a first-letter fragment.
+    if (prefix.trim()) {
+      const initials = initialLayoutForText(textNode);
+      const initial = initials && initials.find((run) =>
+        applyTextTransform(prefix, textFragmentStyle(computed, run.style)) === run.text);
+      if (!initial) return null;
+      add(0, mapping.prefixEnd, initial.text,
+        textFragmentStyle(computed, initial.style), true);
+      if (window.__pagxInitialRunsUsed) window.__pagxInitialRunsUsed.add(initial);
+    }
+  }
+  if (normal) {
+    // Chromium's text-box offsets are inconsistent for length-changing
+    // transforms: starts can be source offsets while lengths are transformed
+    // lengths (e.g. ß -> SS). Reject that coordinate space and measure source
+    // fragments instead; never duplicate or truncate text based on those boxes.
+    const suffix = source.slice(mapping.prefixEnd);
+    const simpleOffsets = suffix.length === normal.text.length &&
+      normal.boxes.every((box, i) => i === 0 ||
+        box.start >= normal.boxes[i - 1].start + normal.boxes[i - 1].length);
+    if (!simpleOffsets) {
+      const style = textFragmentStyle(computed, normal.style);
+      const wm = computed.getPropertyValue('writing-mode');
+      const axis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
+      for (const line of splitTextNodeIntoLines(textNode,
+        computed.getPropertyValue('white-space'), axis)) {
+        if (line.end <= mapping.prefixEnd) continue;
+        // A first-letter and normal text have different measured block extents.
+        // If they cannot be separated safely, use the explicit DOM fallback.
+        if (line.start < mapping.prefixEnd && source.slice(line.start, mapping.prefixEnd).trim()) {
+          return null;
+        }
+        out.push({ ...line, text: applyTextTransform(line.text, style), computed: style,
+          initial: false });
+      }
+      return out;
+    }
+    for (const box of normal.boxes) {
+      if (box.length <= 0 || box.start + box.length > mapping.ends.length) return null;
+      add(mapping.starts[box.start], mapping.ends[box.start + box.length - 1],
+        normal.text.slice(box.start, box.start + box.length),
+        textFragmentStyle(computed, normal.style), false);
+    }
+  }
+  return out;
+}
+
+// Join connected glyph-run rectangles with the same block-axis edges. A tall
+// initial and adjacent lines with tight leading may overlap substantially but
+// must remain distinct. Source order need not be monotonic on either axis.
 function mergeRectsOnSameLine(rects, blockAxis) {
   if (rects.length <= 1) return rects.slice();
   // blockLo/blockHi read the wrap-axis interval; inlineLo/inlineHi the
@@ -2295,19 +2674,12 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   };
   for (let i = 1; i < rects.length; i++) {
     const r = rects[i];
-    // "Same line/column" means the two rects overlap on the block axis by a
-    // MAJORITY of the smaller rect's block extent — not merely by a sub-pixel
-    // sliver. A fixed pixel tolerance is wrong here: getClientRects reports
-    // glyph INK bounds, which routinely exceed the line-height (e.g. a 16px
-    // line renders ~17px of ink), so two ADJACENT lines whose tops differ by
-    // exactly the line-height still overlap by ~1px of ink. That sliver must
-    // NOT merge them. Same-line glyph runs (soft-hyphen glyph, bidi split)
-    // instead share the line's top/height, so they overlap almost fully.
-    // Requiring the overlap to cover ≥ half the smaller extent cleanly
-    // separates "next line, ink bleeds up by 1px" from "same line, split run".
-    const overlap = Math.min(blockHi(r), curBlockHi) - Math.max(blockLo(r), curBlockLo);
-    const minExtent = Math.min(blockHi(r) - blockLo(r), curBlockHi - curBlockLo);
-    const overlaps = overlap > 0 && overlap >= minExtent * 0.5;
+    // Overlap is insufficient: a drop cap or tight leading can overlap several
+    // distinct lines. Require matching block edges AND connected inline ranges.
+    // The latter also prevents one-line multicolumn fragments from being joined.
+    const overlaps = Math.abs(blockLo(r) - curBlockLo) < 0.5 &&
+      Math.abs(blockHi(r) - curBlockHi) < 0.5 &&
+      inlineLo(r) <= curInlineHi + 0.5 && inlineHi(r) >= curInlineLo - 0.5;
     if (overlaps) {
       curBlockLo = Math.min(curBlockLo, blockLo(r));
       curBlockHi = Math.max(curBlockHi, blockHi(r));
@@ -2325,56 +2697,12 @@ function mergeRectsOnSameLine(rects, blockAxis) {
   return out;
 }
 
-// Split a text node into one entry per visually-rendered line (horizontal
-// writing modes) or column (vertical writing modes). We use
-// Range.getClientRects() to obtain the per-line/column bounding boxes from the
-// browser's own layout, then binary-search the character offsets at which one
-// line/column gives way to the next. This matches Chromium's line-break
-// decisions exactly while keeping the work to O(lines · log n)
-// getBoundingClientRect calls instead of the O(n) per-character scan the
-// original implementation performed.
-//
-// `axis` selects the block-progression axis along which the run wraps:
-//   - 'y' (horizontal writing modes): lines stack downward, so the per-line
-//     rects arrive in increasing `top` order and the bisection key is a
-//     character's mid-Y.
-//   - 'x-rl' (vertical-rl): columns stack leftward, so the rects arrive in
-//     DECREASING `left` order (rightmost column first, matching document
-//     order); the bisection key is the NEGATED mid-X so it stays monotonically
-//     increasing like the 'y' case.
-//   - 'x-lr' (vertical-lr): columns stack rightward, rects in increasing
-//     `left`; key is mid-X.
-// Treating all three as "a monotonically increasing key along the block axis"
-// lets one bisection serve every writing mode.
-//
-// The host element's `white-space` controls whether embedded whitespace is
-// collapsed (`normal`, `nowrap`) or preserved (`pre`, `pre-wrap`, `pre-line`).
-// Collapsing in preserve modes would mangle code snippets, indentation, and
-// other pre-formatted content.
+// DOM-only fallback: match source graphemes to measured line/column rectangles.
+// `axis` is 'y' for horizontal lines, 'x-rl' / 'x-lr' for vertical columns.
+// The single-fragment case is constant-time; fragmented text takes O(n) Range
+// measurements. The protocol provider supplies boundaries for the common path.
 function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   const blockAxis = axis || 'y';
-  // Map a rect to its block-axis LEADING edge (the side a column/line starts
-  // from in progression order) and a character's mid-point to the same
-  // monotonically-increasing key, so "first char whose key >= the next rect's
-  // leading-edge key" lands exactly on that rect's first character.
-  //   - 'y': lines advance downward, leading edge = rect.top, char key = mid-Y.
-  //   - 'x-lr': columns advance rightward, leading edge = rect.left, char key
-  //     = mid-X.
-  //   - 'x-rl': columns advance leftward; once X is negated to make the order
-  //     ascending, the leading edge becomes the column's RIGHT edge
-  //     -(left + width), NOT -left. Using -left would place the threshold at
-  //     the column's trailing edge, half a column past the glyph centres, so
-  //     every column's characters would be misassigned to the column before it.
-  const rectKey = (r) => {
-    if (blockAxis === 'x-rl') return -(r.left + r.width);
-    if (blockAxis === 'x-lr') return r.left;
-    return r.top;
-  };
-  const charKey = (r) => {
-    if (blockAxis === 'x-rl') return -(r.left + r.width / 2);
-    if (blockAxis === 'x-lr') return r.left + r.width / 2;
-    return r.top + r.height / 2;
-  };
   const text = textNode.nodeValue || '';
   if (!text.trim()) return [];
   const preserve = typeof whiteSpace === 'string' && whiteSpace.startsWith('pre');
@@ -2420,7 +2748,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
       range.setStart(textNode, idx);
       range.setEnd(textNode, idx + 1);
       const r = range.getBoundingClientRect();
-      softHyphenVisible.set(idx, r.width > 0 || r.height > 0);
+      softHyphenVisible.set(idx, blockAxis === 'y' ? r.width > 0 : r.height > 0);
     }
   }
   // Resolve the [start, end) slice's soft hyphens against the measured map,
@@ -2440,17 +2768,7 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
     }
     return cleanLine(resolved);
   };
-  // A single text node can hand back MORE than one client rect for the same
-  // visual line/column. The common trigger is a soft-hyphen (U+00AD) wrap:
-  // Chromium materialises the visible hyphen glyph as its own rect that shares
-  // the line's `top` (and height) but sits to the right of the text rect —
-  // e.g. `Compre­hensive` wrapped at 100px yields [Compre]+[-] both at top=0,
-  // then [hensive], then [overview]. The bisection treats every rect as a
-  // distinct line, so the stray hyphen rect would split the first line into
-  // `C` + `ompre­` at an arbitrary offset. Bidi runs split a line the same way.
-  // Merge rects whose block-axis intervals overlap (same line/column) into one
-  // inline-union rect BEFORE bisecting, so one visual line maps to exactly one
-  // entry regardless of how many glyph runs Chromium reported for it.
+  // Merge adjacent same-line runs, including a separately painted soft hyphen.
   const lineRects = mergeRectsOnSameLine(rawRects, blockAxis);
   if (lineRects.length === 0) {
     range.detach && range.detach();
@@ -2460,57 +2778,54 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
     const out = [{
       text: sliceText(0, text.length),
       rect: lineRects[0],
+      start: 0, end: text.length,
     }];
     range.detach && range.detach();
     return out.filter((b) => b.text);
   }
 
-  // Binary-search the first character index whose block-axis mid-key is >=
-  // `lineKey` within [lo, hi). When the candidate char has an empty rect
-  // (whitespace collapsed at a wrap point) we treat it as before the boundary
-  // and step right; this keeps the search O(log n) at the cost of binding
-  // collapsed whitespace to whichever side wins the bisection (visually
-  // invisible either way).
-  //
-  // `loStart` lets the caller pass the previously-found boundary as the
-  // lower bound, since boundaries are strictly increasing across lines.
-  // Without this, every line's search starts from index 0 and re-flushes
-  // layout for the leading characters that we already know belong to a
-  // higher line — for a 1000-char × 20-line block that's the difference
-  // between log2(1000)·20 ≈ 200 layout flushes and roughly half that.
-  function findFirstCharAtOrBelow(lineKey, loStart) {
-    let lo = loStart;
-    let hi = text.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      range.setStart(textNode, mid);
-      range.setEnd(textNode, mid + 1);
-      const r = range.getBoundingClientRect();
-      const empty = r.width === 0 && r.height === 0;
-      const key = empty ? -Infinity : charKey(r);
-      if (empty || key < lineKey) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
-      }
-    }
-    return lo;
-  }
-
-  // Boundary i = first char index of line i (boundaries[0] = 0).
-  const boundaries = [0];
-  for (let k = 1; k < lineRects.length; k++) {
-    boundaries.push(findFirstCharAtOrBelow(rectKey(lineRects[k]), boundaries[k - 1] + 1));
-  }
-  boundaries.push(text.length);
-  range.detach && range.detach();
-
+  // A DOM-only fallback cannot assume Y/X is monotonic in source order: columns
+  // reset it, and bidi runs can reverse the inline axis. Match grapheme ranges
+  // to their actual fragment rectangles instead. Protocol-backed captures avoid
+  // this O(n) measurement by supplying exact layout text-box boundaries.
+  const segments = typeof Intl.Segmenter === 'function'
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text))
+    : Array.from(text).map((segment) => ({ segment }));
   const out = [];
-  for (let i = 0; i < lineRects.length; i++) {
-    const cleaned = sliceText(boundaries[i], boundaries[i + 1]);
-    if (cleaned) out.push({ text: cleaned, rect: lineRects[i] });
+  let offset = 0;
+  let active = null;
+  for (const { segment } of segments) {
+    const start = offset;
+    offset += segment.length;
+    range.setStart(textNode, start);
+    range.setEnd(textNode, offset);
+    const r = range.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) {
+      if (active) active.end = offset;
+      continue;
+    }
+    const blockStart = blockAxis === 'y' ? r.top : r.left;
+    const blockSize = blockAxis === 'y' ? r.height : r.width;
+    const mid = blockAxis === 'y' ? r.left + r.width / 2 : r.top + r.height / 2;
+    const index = lineRects.findIndex((box) => {
+      const lo = blockAxis === 'y' ? box.left : box.top;
+      const size = blockAxis === 'y' ? box.width : box.height;
+      return Math.abs((blockAxis === 'y' ? box.top : box.left) - blockStart) < 0.5 &&
+        Math.abs((blockAxis === 'y' ? box.height : box.width) - blockSize) < 0.5 &&
+        mid >= lo - 0.5 && mid <= lo + size + 0.5;
+    });
+    // A font fallback run can have a different block extent. Preserve that
+    // measured rectangle as its own fragment instead of attaching it to a
+    // neighboring line merely because they overlap.
+    if (!active || index < 0 || active.index !== index) {
+      active = { start, end: offset, index, rect: index < 0 ? r : lineRects[index] };
+      out.push(active);
+    } else {
+      active.end = offset;
+    }
   }
-  return out;
+  return out.map((item) => ({ ...item, text: sliceText(item.start, item.end) }))
+    .filter((item) => item.text);
 }
 
 // True when `node` is an element that shares its line box with adjacent text —
@@ -2586,17 +2901,19 @@ const BOUNDARY_SPACE = '\u00a0';
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
 function emitTextSpans(textNode, parentRect, computed, opts) {
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
     return emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve);
   }
   const ws = computed.getPropertyValue('white-space');
-  const lines = splitTextNodeIntoLines(textNode, ws, 'y');
-  const lineHeightPx = readNum(computed, 'line-height');
+  const lines = measuredTextFragments(textNode, computed, 'y');
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lineComputed = line.computed || computed;
+    const lineHeightPx = readNum(lineComputed, 'line-height');
     let lt = line.rect.top;
     let lh = line.rect.height;
     if (lineHeightPx > lh + 0.1) {
@@ -2610,20 +2927,26 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     }
     const tl = line.rect.left - parentRect.left;
     const tt = lt - parentRect.top;
-    const base = buildStyle(tl, tt, line.rect.width, lh, computed, {
+    const base = buildStyle(tl, tt, line.rect.width, lh, lineComputed, {
       box: false, text: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
-    let transformed = applyTextTransform(line.text, computed);
+    let transformed = line.computed ? line.text : applyTextTransform(line.text, lineComputed);
     // Re-materialise the seam whitespace the browser rendered against an
     // inline sibling: leading on the first line, trailing on the last.
-    if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
-    if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    const intrinsicMode = opts && opts.intrinsicWidth;
+    if (line.computed) {
+      // Protocol ranges already include rendered seam whitespace. Preserve it
+      // through the importer's trimming without adding it for a second time.
+      transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
+    } else {
+      if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
+      if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
+    }
+    const intrinsicMode = !SNAPSHOT_CURRENT_STATE && opts && opts.intrinsicWidth;
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
       : '';
-    out.push(`<span${intrinsicWidth} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    out.push(`<span${intrinsicWidth}${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -2649,11 +2972,13 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
   const seam = preserve || { leading: false, trailing: false };
   const axis = wm === 'vertical-lr' ? 'x-lr' : 'x-rl';
   const ws = computed.getPropertyValue('white-space');
-  const columns = splitTextNodeIntoLines(textNode, ws, axis);
-  const lineHeightPx = readNum(computed, 'line-height');
+  const columns = measuredTextFragments(textNode, computed, axis);
+  const languageAttr = buildLanguageAttribute(textNode.parentElement);
   const out = [];
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
+    const colComputed = col.computed || computed;
+    const lineHeightPx = readNum(colComputed, 'line-height');
     let cl = col.rect.left;
     let cw = col.rect.width;
     if (lineHeightPx > cw + 0.1) {
@@ -2667,13 +2992,17 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     }
     const tl = cl - parentRect.left;
     const tt = col.rect.top - parentRect.top;
-    const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+    const base = buildStyle(tl, tt, cw, col.rect.height, colComputed, {
       box: false, text: true,
     });
-    let transformed = applyTextTransform(col.text, computed);
-    if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
-    if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
-    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    let transformed = col.computed ? col.text : applyTextTransform(col.text, colComputed);
+    if (col.computed) {
+      transformed = transformed.replace(/^ +| +$/g, (spaces) => BOUNDARY_SPACE.repeat(spaces.length));
+    } else {
+      if (i === 0 && seam.leading) transformed = BOUNDARY_SPACE + transformed;
+      if (i === columns.length - 1 && seam.trailing) transformed += BOUNDARY_SPACE;
+    }
+    out.push(`<span${languageAttr} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3021,6 +3350,9 @@ function isFlexCrossAxisFaithful(el, computed, children) {
 // a subset-friendly flex configuration AND its border/wrapping/child shape
 // don't require absolute positioning. `null` means "render as absolute".
 function classifyFlexContainer(el, computed) {
+  // Keep layout and painting separate when positioned/context descendants must participate
+  // outside an item. The paint compiler can retain ordinary flex subtrees intact.
+  if (paintNeedsSeparateChildren(el)) return null;
   const display = computed.display;
   if (display !== 'flex' && display !== 'inline-flex') return null;
   const wrap = computed.getPropertyValue('flex-wrap').trim();
@@ -3168,7 +3500,7 @@ function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxSty
 }
 
 // Forward an element's author `data-*` attributes onto the emitted markup so the
-// PAGX importer can surface them as layer customData (its `applyLayerAttributes`
+// PAGX importer can surface them as layer customData (its `applyLayerName`
 // copies every `data-*` attribute into the layer's `customData`). Returns a string
 // like ` data-id="hero" data-role="cover"` (leading space, ready to splice into a
 // tag) or an empty string. The snapshot pipeline's own bookkeeping attributes
@@ -3191,10 +3523,17 @@ function forwardDataAttrs(el) {
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(imgAlt(el));
-  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
+  const svg = isSvgSource(src);
+  const imgStyle = replacedImageStyle(rect, computed, opts, svg);
   const dataAttrs = forwardDataAttrs(el);
-  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
+  const natural = el.naturalWidth > 0 && el.naturalHeight > 0
+    ? ` data-pagx-image-width="${el.naturalWidth}" data-pagx-image-height="${el.naturalHeight}"` : '';
+  const pixels = Number(el.getAttribute('data-snapshot-image-pixel-width'));
+  // A single width candidate preserves density in the browser preview as well as in PAGX.
+  // An x candidate would implicitly add src as 1x and select the wrong image at DPR 1.
+  const density = natural && pixels > 0 && pixels !== el.naturalWidth
+    ? ` srcset="${escapeHtml(src.replace(/\s/g, c => encodeURIComponent(c)))} ${pixels}w" sizes="${el.naturalWidth}px"` : '';
+  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs}${natural}${density} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -3208,9 +3547,9 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
 // touching PAGX's renderer.
 function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
   const src = el.getAttribute('data-snapshot-canvas-src') || '';
-  const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
-  const inner = `<img src="${escapeHtml(src)}" alt="" style="${imgStyle}"/>`;
+  const imgStyle = replacedImageStyle(rect, computed, opts, false);
+  const inner = `<img src="${escapeHtml(src)}" alt="" data-pagx-image-width="${el.width}" ` +
+    `data-pagx-image-height="${el.height}" style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -3220,19 +3559,35 @@ function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
 // box; emitting them as one rect would smear text over absolute siblings
 // (e.g. the search icon at `left: 16px` inside the same wrapper).
 //
-// Native form controls vertically centre their value/placeholder inside the
-// padding box — that's a UA behaviour, not something we can read off
-// computed style. A bare abs-positioned inner span at `top: pad.top`
-// therefore drops short single-line text against the top of the wrapper
-// (search bars in 40px-tall pills, "Email" labels in 48px login fields).
-// Emit the wrapper as a flex container with `align-items: center` and the
-// input's padding so the inner span rides centred regardless of
-// `opts.flexItem` — the box still anchors via `position: absolute` (or
-// `relative` when it's itself a flex item), so absolute overlay siblings
-// keep their positioning context. `white-space: nowrap` is mandatory so
-// PAGX's text engine doesn't re-wrap a single-line value to two lines when
-// its intrinsic width exceeds the wrapper by sub-pixel.
+// UA layout supplies the painted text, font and line bounds, including
+// placeholders, masking and scrolling. Preserve its line breaks as individual
+// spans and clip them to the control's content area. Browser-only callers
+// without a provider get a diagnosed CSS fallback: single-line values are
+// centered, whereas textarea content starts at its top padding.
 function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
+  const layout = window.__pagxControlTexts && window.__pagxControlTexts.get(el);
+  if (layout) {
+    const pad = readPadding(computed);
+    const bl = borderWidthOf(computed, 'left'), bt = borderWidthOf(computed, 'top');
+    const width = Math.max(0, rect.width - bl - borderWidthOf(computed, 'right') - pad.left - pad.right);
+    const height = Math.max(0, rect.height - bt - borderWidthOf(computed, 'bottom') - pad.top - pad.bottom);
+    const spans = layout.fragments.map(fragment => {
+      const cs = textFragmentStyle(computed, {
+        ...fragment.style, 'white-space': 'pre', 'text-transform': 'none',
+      });
+      let y = fragment.y - bt - pad.top;
+      let h = fragment.height;
+      const lineHeight = readNum(cs, 'line-height');
+      if (lineHeight > 0) { y -= (lineHeight - h) / 2; h = lineHeight; }
+      const style = buildStyle(fragment.x - bl - pad.left, y, fragment.width, h, cs, {
+        text: true, box: false,
+      });
+      return `<span style="${style}">${escapeHtml(fragment.text.replace(/ /g, BOUNDARY_SPACE))}</span>`;
+    }).join('');
+    const clip = `position: absolute; left: ${px(pad.left)}; top: ${px(pad.top)}; ` +
+      `width: ${px(width)}; height: ${px(height)}; overflow: hidden`;
+    return renderBoxedReplaced(rect, left, top, computed, opts, `<div style="${clip}">${spans}</div>`);
+  }
   const text = syntheticText(el);
   const pad = readPadding(computed);
   const placeholderColor = (!el.value && el.getAttribute('placeholder'))
@@ -3243,9 +3598,14 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     box: false, text: true, positioned: false,
     textColorOverride: placeholderColor || undefined,
   });
-  const finalTextStyle = withNowrap(textStyle);
-  const innerLayout = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  const multiline = el.tagName.toLowerCase() === 'textarea';
+  PAINT_CAPTURE.warnings.push('html-snapshot: control text layout unavailable; using CSS text fallback');
+  const finalTextStyle = multiline
+    ? joinStyles(textStyle, 'white-space: pre-wrap; width: 100%; height: 100%; overflow: hidden')
+    : withNowrap(textStyle);
+  const innerLayout = (multiline ? 'display: block' : 'display: flex; align-items: center') +
+    '; overflow: hidden' + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const inner = `<span${buildLanguageAttribute(el)} style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
@@ -3551,6 +3911,9 @@ function isIntrinsicWidthInlineRunChild(el) {
 // the inter-run advance with whatever font it actually has loaded, so the
 // runs always touch correctly regardless of font fallback.
 function isInlineTextLeafCandidate(el, computed, precomputedHasChildren) {
+  if (window.__pagxInitialLayouts && window.__pagxInitialLayouts.has(el)) return false;
+  if (computed.getPropertyValue('text-align') === 'justify') return false;
+  if (paintNeedsSeparateChildren(el)) return false;
   const hasChildren = precomputedHasChildren !== undefined
     ? precomputedHasChildren
     : elementHasChildren(el);
@@ -3682,112 +4045,15 @@ function emitInlineRunMarkup(el, parentComputed) {
       deltaParts.push(`-webkit-text-stroke: ${stroke}`);
     }
     const inner = emitInlineRunMarkup(c, cs);
-    if (deltaParts.length === 0) {
+    const language = buildLanguageAttribute(c);
+    const parentLanguage = buildLanguageAttribute(el);
+    if (deltaParts.length === 0 && language === parentLanguage) {
       out += inner;
     } else {
-      out += `<span style="${deltaParts.join('; ')}">${inner}</span>`;
+      out += `<span${language} style="${deltaParts.join('; ')}">${inner}</span>`;
     }
   }
   return out;
-}
-
-// The `<mark>` highlighter idiom paints a gradient over only a short band near
-// the text baseline via `background-size: 100% 0.6em; background-position: 0 88%;
-// background-repeat: no-repeat` — the tint hugs the lower part of the glyphs
-// rather than filling the whole line box. The snapshot bakes browser layout into
-// flat boxes, so instead of forwarding these properties (the importer paints a
-// gradient across the entire geometry) we compute the tile the browser actually
-// paints and emit the fill only over that sub-rect.
-//
-// `backgroundBandDescriptor` recognises the shape and returns the parsed
-// size/position/repeat, or null. It is deliberately restricted to a lone
-// gradient `background-image` with no border / shadow / background-color: those
-// visuals need the full box, so mixing them would require painting two rects.
-function backgroundBandDescriptor(computed) {
-  const img = (computed.getPropertyValue('background-image') || '').trim();
-  if (!img || img === 'none' || !/gradient/i.test(img)) return null;
-  const bg = (computed.getPropertyValue('background-color') || '').trim();
-  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return null;
-  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
-      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) return null;
-  const shadow = (computed.getPropertyValue('box-shadow') || '').trim();
-  if (shadow && shadow !== 'none') return null;
-  const size = (computed.getPropertyValue('background-size') || '').trim().toLowerCase();
-  if (!size || size === 'auto' || size === 'auto auto') return null;
-  // `contain` / `cover` scale to the box, so there is nothing to inset.
-  if (size.includes('contain') || size.includes('cover')) return null;
-  const sizeTokens = size.split(/\s+/);
-  if (sizeTokens.length > 2) return null;
-  const posTokens = (computed.getPropertyValue('background-position') || '0% 0%')
-    .trim().toLowerCase().split(/\s+/);
-  if (posTokens.length > 2) return null; // 3/4-value edge syntax: leave full box
-  const repeat = (computed.getPropertyValue('background-repeat') || 'repeat').trim().toLowerCase();
-  const rTokens = repeat.split(/\s+/);
-  let repeatX;
-  let repeatY;
-  if (repeat === 'repeat-x') {
-    repeatX = true;
-    repeatY = false;
-  } else if (repeat === 'repeat-y') {
-    repeatX = false;
-    repeatY = true;
-  } else if (rTokens.length === 2) {
-    repeatX = rTokens[0] !== 'no-repeat';
-    repeatY = rTokens[1] !== 'no-repeat';
-  } else {
-    repeatX = repeatY = rTokens[0] !== 'no-repeat';
-  }
-  return { sizeTokens, posTokens, repeatX, repeatY };
-}
-
-// Resolve one axis of `background-size` (a computed length or percentage; `em`
-// is already px in computed style) against the box extent `base`. Returns null
-// for an unparseable token so the caller keeps the full box.
-function resolveBandSizeAxis(tok, base) {
-  if (tok == null || tok === 'auto') return base;
-  if (tok.endsWith('%')) return (parseFloat(tok) / 100) * base;
-  const v = parseFloat(tok);
-  return Number.isFinite(v) ? v : null;
-}
-
-// Resolve one axis of `background-position` into a pixel offset of the tile
-// inside the box, following CSS: a percentage aligns the same percentage point
-// of the tile with that of the box, a length is a direct offset, keywords map to
-// 0% / 50% / 100%.
-function resolveBandPosAxis(tok, base, tile, axis) {
-  if (tok == null) return 0;
-  if (tok === 'center') return (base - tile) / 2;
-  if (axis === 'x') {
-    if (tok === 'left') return 0;
-    if (tok === 'right') return base - tile;
-  } else {
-    if (tok === 'top') return 0;
-    if (tok === 'bottom') return base - tile;
-  }
-  if (tok.endsWith('%')) return (base - tile) * (parseFloat(tok) / 100);
-  const v = parseFloat(tok);
-  return Number.isFinite(v) ? v : 0;
-}
-
-// Given a box rect, return the sub-rect the highlighter gradient actually paints
-// (per `backgroundBandDescriptor`), or null when no band applies or it fills the
-// whole box. An axis that repeats fills that axis (offset 0, extent = box).
-function bandInsetRect(r, computed) {
-  const d = backgroundBandDescriptor(computed);
-  if (!d) return null;
-  let tileW = resolveBandSizeAxis(d.sizeTokens[0], r.width);
-  let tileH = resolveBandSizeAxis(d.sizeTokens.length > 1 ? d.sizeTokens[1] : 'auto', r.height);
-  if (tileW == null || tileH == null) return null;
-  if (d.repeatX) tileW = r.width;
-  if (d.repeatY) tileH = r.height;
-  const offX = d.repeatX ? 0 : resolveBandPosAxis(d.posTokens[0], r.width, tileW, 'x');
-  const offY = d.repeatY
-    ? 0
-    : resolveBandPosAxis(d.posTokens.length > 1 ? d.posTokens[1] : 'center', r.height, tileH, 'y');
-  const rect = { left: r.left + offX, top: r.top + offY, width: tileW, height: tileH };
-  const unchanged = Math.abs(rect.left - r.left) < 0.01 && Math.abs(rect.top - r.top) < 0.01 &&
-    Math.abs(rect.width - r.width) < 0.01 && Math.abs(rect.height - r.height) < 0.01;
-  return unchanged ? null : rect;
 }
 
 // An inline-level box (`display: inline`) that wraps across several lines
@@ -3800,15 +4066,14 @@ function bandInsetRect(r, computed) {
 //
 // `inlineBoxLineRects` decides whether the element is a wrapped inline box and,
 // if so, returns one per-line border-box rect (each relative to `parentRect`),
-// with any highlighter band (see bandInsetRect) already applied. `getClientRects`
+// without applying background-size a second time. `getClientRects`
 // reports one border box per line fragment for an inline element (block /
 // inline-block / flex boxes report a single box, so those fall through to the
 // single-box path); `mergeRectsOnSameLine` coalesces same-line glyph-run splits
 // (bidi / soft-hyphen) back to one rect per visual line. Returns null when the
 // element is not an inline box, carries no box visuals, or occupies a single
-// unbanded fragment — in every such case the caller keeps its existing
-// single-box emission. A single-line box whose band shrinks the paint rect still
-// takes this path so the band is honoured. Kept free of `buildStyle` so it stays
+// fragment — in every such case the caller keeps its existing
+// single-box emission. Kept free of `buildStyle` so it stays
 // unit-testable in Node (the style schema lives only in the browser payload).
 function inlineBoxLineRects(el, parentRect, computed) {
   if (computed.display !== 'inline') return null;
@@ -3819,10 +4084,10 @@ function inlineBoxLineRects(el, parentRect, computed) {
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   const blockAxis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
   const lineRects = mergeRectsOnSameLine(raw, blockAxis);
-  const painted = lineRects.map((r) => bandInsetRect(r, computed) || r);
-  const banded = painted.some((p, i) => p !== lineRects[i]);
-  if (lineRects.length <= 1 && !banded) return null;
-  return painted.map((r) => ({
+  // Keep each measured fragment's border box. Background layout is now preserved in style;
+  // shrinking the fragment to a highlighter band here would apply size/position a second time.
+  if (lineRects.length <= 1) return null;
+  return lineRects.map((r) => ({
     left: r.left - parentRect.left,
     top: r.top - parentRect.top,
     width: r.width,
@@ -3860,7 +4125,7 @@ function renderInlineTextLeaf(el, parentRect, rect, left, top, computed, opts) {
   // phantom wrap when the natural advance crowds the wrapper width.
   const style = withNowrap(boxStyle);
   const inner = emitInlineRunMarkup(el, computed);
-  return `<span style="${style}">${inner}${overlays}</span>`;
+  return `<span${buildLanguageAttribute(el)} style="${style}">${inner}${overlays}</span>`;
 }
 
 // Pure-text leaf (no element children): emit one outer <div> carrying the
@@ -3949,7 +4214,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       } else {
         parts.push('flex-shrink: 0');
       }
-      return `<span style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
+      return `<span${buildLanguageAttribute(el)} style="${parts.filter(Boolean).join('; ')}">${escapeHtml(applyTextTransform(directText, computed))}</span>`;
     }
     // Mirror the source's own flex / padding declaration onto the wrapper
     // so the inline span lands where the browser painted it. A text-only
@@ -3987,7 +4252,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
                    { box: true, ...opts, flexContentSized: true })
       : boxStyle;
     const wrapperStyle = joinStyles(wrapperBox, innerLayout);
-    return `<div style="${wrapperStyle}"><span style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
+    return `<div style="${wrapperStyle}"><span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(directText, computed))}</span>${overlays}</div>`;
   }
 
   // Inline `transform` on the host (e.g. `<h1 style="transform: skewX(-5deg)">`)
@@ -4110,7 +4375,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
     const textStyle = withNowrap(buildStyle(0, 0, 0, 0, pseudoComputed, {
       box: false, text: true, positioned: false,
     }));
-    spans.push(`<span style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
+    spans.push(`<span${buildLanguageAttribute(el)} style="${textStyle}">${escapeHtml(applyTextTransform(text, pseudoComputed))}</span>`);
   }
   if (spans.length === 0) {
     return `<div style="${boxStyle}">${overlays}</div>`;
@@ -4164,7 +4429,7 @@ function renderFlexTextItem(child, parentComputed) {
   });
   const flexBits = `height: ${px(height)}; flex-shrink: 0`;
   const style = withNowrap([baseStyle, flexBits].filter(Boolean).join('; '));
-  return `<span style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
+  return `<span${buildLanguageAttribute(child.node.parentElement)} style="${style}">${escapeHtml(applyTextTransform(text, parentComputed))}</span>`;
 }
 
 // Render an element + its subtree as a flex container. The container itself
@@ -4291,8 +4556,8 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
     intrinsicWidth,
   });
-  const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
+  const overlays = borderOverlayHTML(computed, rect.width, rect.height).map(markPaintDecoration).join('');
+  const intrinsicAttr = !SNAPSHOT_CURRENT_STATE && intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a
@@ -4332,12 +4597,19 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
-      const isPositioned = childComputed.position !== 'static';
+      // A materialised pseudo is a real div, so author selectors (including !important)
+      // can give it a different stacking identity. Use the original pseudo's resting
+      // position/z-index for ordering; the div remains the geometry/animation proxy.
+      // This non-DOM property is installed by materializeDecorativePseudoElements and
+      // never reaches the serialized HTML.
+      const paintStyle = n.__pagxSnapshotPseudoPaintStyle || childComputed;
+      const isPositioned = paintStyle.position !== 'static';
       const isStackable = isPositioned || flexOrGridParent;
       items.push({
         stackable: isStackable,
-        zIndex: isStackable ? resolveZIndex(childComputed) : 0,
+        zIndex: isStackable ? resolveZIndex(paintStyle.zIndex) : 0,
         domIndex: domIndex++,
+        order: flexOrGridParent ? (Number(childComputed.order) || 0) : 0,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
         html: render(n, parentRect, undefined, childComputed),
@@ -4349,12 +4621,16 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
           stackable: false,
           zIndex: 0,
           domIndex: domIndex++,
+          order: 0,
           html: spans.join(''),
         });
       }
     }
   }
-  items.sort(paintOrder);
+  // CSS painting is planned across ancestor boundaries after all boxes have been measured.
+  // Retain order-modified tree order here; sorting subtrees would hide positioned descendants.
+  if (PAINT_CAPTURE.active) items.sort((a, b) => a.order - b.order || a.domIndex - b.domIndex);
+  else items.sort(paintOrder);
   return items.map((it) => it.html).join('');
 }
 
@@ -4428,7 +4704,7 @@ function applyLayerName(el, html, opts, precomputed) {
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
   const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  return applyLayerName(el, markPaintSource(el, html, opts), opts, precomputed);
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -4452,7 +4728,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // `<div class="rotate-45">` lays down as an axis-aligned square instead
   // of the diamond Chromium painted.
   //
-  // Strategy: temporarily clear the inline `transform` slot (which
+  // Strategy: temporarily set the inline `transform` to identity (which
   // out-specifies any class-level rule) so all downstream measurements —
   // this element's `getBoundingClientRect()`, every descendant's rect,
   // every text-line `Range.getClientRects()` — see the unrotated layout.
@@ -4486,7 +4762,9 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // asymmetric borders, stray text, display:contents middlemen) fall
   // through to the absolute path below — the inference pass remains a
   // backstop.
-  const flexChildren = classifyFlexContainer(el, computed);
+  capturePaintGeometry(el, parentRect);
+  const flexChildren = SNAPSHOT_CURRENT_STATE || needsNativeControlPaint(el, computed)
+    ? null : classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
   }
@@ -4849,6 +5127,48 @@ function visibleContentExtent() {
 
 function snapshotMainImpl(opts) {
   opts = opts || {};
+  if (SNAPSHOT_CURRENT_STATE) {
+    window.__pagxClipDefs = [];
+    window.__pagxClipDefMap = {};
+    const full = opts.extent === 'document';
+    const width = full ? Math.max(innerWidth, document.documentElement.scrollWidth) : innerWidth;
+    const height = full ? Math.max(innerHeight, document.documentElement.scrollHeight) : innerHeight;
+    if (full && height > MAX_CAPTURE_HEIGHT_PX) {
+      throw new Error(`Current document height ${height}px exceeds the ${MAX_CAPTURE_HEIGHT_PX}px capture limit`);
+    }
+    const origin = { left: full ? -scrollX : 0, top: full ? -scrollY : 0, width, height };
+    const htmlStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body);
+    const propagatesBody = ['rgba(0, 0, 0, 0)', 'transparent'].includes(htmlStyle.backgroundColor) &&
+      htmlStyle.backgroundImage === 'none';
+    const backgroundNode = propagatesBody ? document.body : document.documentElement;
+    const backgroundColor = propagatesBody ? bodyStyle.backgroundColor : htmlStyle.backgroundColor;
+    // Chromium's default canvas is white. A propagated body/root color paints
+    // that canvas once, rather than a second time inside the body's box.
+    const pixel = document.createElement('canvas');
+    pixel.width = pixel.height = 1;
+    const ctx = pixel.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = backgroundColor; ctx.fillRect(0, 0, 1, 1);
+    const rgba = ctx.getImageData(0, 0, 1, 1).data;
+    const rootBackground = `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})`;
+    const savedColor = backgroundNode.style.getPropertyValue('background-color');
+    const savedPriority = backgroundNode.style.getPropertyPriority('background-color');
+    backgroundNode.style.setProperty('background-color', 'transparent', 'important');
+    let content;
+    try { content = render(document.documentElement, origin); }
+    finally {
+      if (savedColor) backgroundNode.style.setProperty('background-color', savedColor, savedPriority);
+      else backgroundNode.style.removeProperty('background-color');
+    }
+    const defs = (window.__pagxClipDefs || []).join('');
+    return { width, height, html: `<!DOCTYPE html><html><head><style>` +
+      `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
+      collectCarryOverFontFaces(document.styleSheets, document.baseURI, true).map(fontFaceRuleCss).join('') +
+      `</style></head><body data-pagx-capture-mode="current-state" style="width:${width}px;height:${height}px;overflow:hidden;background-color:${rootBackground}">` +
+      (defs ? `<svg width="0" height="0" style="display:none"><defs>${defs}</defs></svg>` : '') +
+      content + '</body></html>' };
+  }
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
   // passes the dimensions it measured *before* the resize via
@@ -4858,6 +5178,7 @@ function snapshotMainImpl(opts) {
   // browser bundle) pass nothing and we fall back to the fresh measurement.
   const measured = measureCanvas();
   const body = document.body;
+  beginPaintCapture(body);
   const canvasWidth = (typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0)
     ? opts.canvasWidth : measured.width;
   const canvasHeight = (typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0)
@@ -4877,10 +5198,7 @@ function snapshotMainImpl(opts) {
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
   const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
-  const parts = [];
-  for (const c of body.children) {
-    parts.push(render(c, rootOrigin));
-  }
+  const content = compilePaintMarkup(renderChildrenInto(body, rootOrigin, getComputedStyle(body)));
 
   const title = (document.title || '').trim();
   const bodyComputed = getComputedStyle(body);
@@ -4948,6 +5266,17 @@ function snapshotMainImpl(opts) {
     styleBlock += animKeyframes.textContent.trim();
   }
 
+  // Carry the page's web fonts over as `@font-face` rules, either pointing at the absolute
+  // file path (the same form local images take) or re-using the rule's own `data:` URI. The
+  // importer registers both under the CSS family, so the subset keeps the authored name for
+  // every face instead of losing it with the cascade. The weight and style descriptors go
+  // with them: a family declared with a single 700 face answers the page's 400 text with
+  // those outlines, and the subset has to reproduce that choice rather than imply a regular
+  // cut the page never had.
+  for (const face of collectCarryOverFontFaces(document.styleSheets, document.baseURI, true)) {
+    styleBlock += fontFaceRuleCss(face);
+  }
+
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
   // hidden `<svg>` at the top of <body>. `display:none` keeps it out of the
   // browser preview render, but the pagx importer's `collectSharedDefs` still
@@ -4970,8 +5299,8 @@ function snapshotMainImpl(opts) {
     <title>${title.replace(/</g, '&lt;').replace(/&/g, '&amp;')}</title>
     <style>${styleBlock}</style>
   </head>
-  <body style="${bodyStyle.join('; ')}">
-${clipDefsSvg}${parts.join('')}
+  <body data-pagx-paint-order="fixed" style="${bodyStyle.join('; ')}">
+${clipDefsSvg}${content}
   </body>
 </html>
 `,
@@ -4984,10 +5313,29 @@ ${clipDefsSvg}${parts.join('')}
 // pre-pass. Normalise source-less placeholders here as a final safety net,
 // then always restore the live DOM once the flat snapshot has been built.
 function snapshotMain(opts) {
+  if (opts && opts.mode === 'current-state') {
+    SNAPSHOT_CURRENT_STATE = true;
+    try { return snapshotMainImpl(opts); }
+    finally { SNAPSHOT_CURRENT_STATE = false; }
+  }
   normalizeEmptyImagePlaceholders();
+  window.__pagxInitialRunsUsed = new WeakSet();
   try {
-    return snapshotMainImpl(opts);
+    const result = snapshotMainImpl(opts);
+    for (const entry of window.__pagxInitialHosts || []) {
+      if (paintSource(entry.node) &&
+          entry.runs.some((run) => !window.__pagxInitialRunsUsed.has(run))) {
+        PAINT_CAPTURE.warnings.push('html-snapshot: text: first-letter on <' +
+          entry.node.tagName.toLowerCase() + '> could not be mapped to emitted DOM text ' +
+          '(including generated content); its pseudo style may be missing');
+      }
+    }
+    result.warnings = [...new Set([
+      ...(window.__pagxTextLayoutWarnings || []), ...PAINT_CAPTURE.warnings,
+    ])];
+    return result;
   } finally {
+    endPaintCapture();
     restoreEmptyImagePlaceholders();
   }
 }
@@ -5002,6 +5350,8 @@ function snapshotMain(opts) {
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
+${PAINT_PLAN_CONSTANTS_SRC}
+let SNAPSHOT_CURRENT_STATE = false;
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
 const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
@@ -5092,8 +5442,10 @@ const STYLE_SCHEMA = [
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
-  { prop: 'font-weight',           scope: 'text', defaults: ['400', 'normal'] },
-  { prop: 'font-style',            scope: 'text', defaults: ['normal'] },
+  { prop: 'font-variation-settings', scope: 'text', normalize: normalizeFontFamily },
+  { prop: 'font-weight',           scope: 'text' },
+  { prop: 'font-style',            scope: 'text' },
+  { prop: 'font-stretch',          scope: 'text', defaults: ['normal', '100%'] },
   { prop: 'letter-spacing',        scope: 'text', defaults: ['normal', '0px'] },
   { prop: 'line-height',           scope: 'text' },
   { prop: 'text-align',            scope: 'text', defaults: ['start', 'left'] },
@@ -5106,7 +5458,7 @@ const STYLE_SCHEMA_BY_PROP = new Map(STYLE_SCHEMA.map((e) => [e.prop, e]));
 const STYLE_SCHEMA_BOX = STYLE_SCHEMA.filter((e) => e.scope === 'box');
 const STYLE_SCHEMA_TEXT = STYLE_SCHEMA.filter((e) => e.scope === 'text');
 
-const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, text: renderTextInput };
+const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, text: renderTextInput, control: renderControlPaint };
 `;
 
 // ===== Payload assembly =====
@@ -5118,6 +5470,9 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  collectLanguage,
+  escapeSingleQuotedAttr,
+  buildLanguageAttribute,
   normalizeFontFamily,
   normalizeOverflow,
   normalizeBorderRadius,
@@ -5171,9 +5526,14 @@ const HELPER_FNS = [
   restoreEmptyImagePlaceholders,
   imgAlt,
   syntheticText,
+  needsNativeControlPaint,
+  renderControlPaint,
   applyTextTransform,
   classify,
   appendStyleProp,
+  snapshotFontFamily,
+  fontMatchRange,
+  fontMatchCompare,
   appendBorder,
   appendBoxShadow,
   appendAnimation,
@@ -5196,8 +5556,15 @@ const HELPER_FNS = [
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,
+  replacedImageStyle,
   isSvgSource,
   freezeSvg,
+  textFragmentStyle,
+  mapLayoutText,
+  initialLayoutForText,
+  textLayoutWarning,
+  measuredTextFragments,
+  snapshotTextFragments,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
   isInlineLevelSibling,
@@ -5214,10 +5581,6 @@ const HELPER_FNS = [
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
-  backgroundBandDescriptor,
-  resolveBandSizeAxis,
-  resolveBandPosAxis,
-  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   renderInlineTextLeaf,
@@ -5256,11 +5619,16 @@ const HELPER_FNS = [
   prepareBodyForSnapshot,
   visibleContentExtent,
   measureCanvas,
+  cssQuotedString,
+  fontFaceRuleCss,
+  normalizeFontFaceWeight,
+  normalizeFontFaceStyle,
+  collectCarryOverFontFaces,
   snapshotMainImpl,
   snapshotMain,
 ];
 
-const HELPERS_SRC = HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
+const HELPERS_SRC = PAINT_PLAN_HELPERS_SRC + '\n\n' + HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
 // Single-shot browser-side payload. `page.evaluate` accepts a string and
 // will return whatever the expression evaluates to, so the IIFE simply
@@ -5464,6 +5832,21 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // Resource pixels and CSS natural size are different for density-selected sources. Read
+  // selected resources without srcset once, using the browser's decoded-resource cache.
+  const pixelSizes = new Map();
+  await Promise.all(imgs.map(async img => {
+    if (!(img.getAttribute('srcset') || '').trim() && img.parentElement?.tagName !== 'PICTURE') return;
+    const selected = img.currentSrc;
+    if (!selected || !img.naturalWidth) return;
+    if (!pixelSizes.has(selected)) pixelSizes.set(selected, (async () => {
+      const probe = new Image();
+      probe.src = selected;
+      try { await probe.decode(); return probe.naturalWidth; } catch (_) { return 0; }
+    })());
+    const width = await pixelSizes.get(selected);
+    if (width > 0) img.setAttribute('data-snapshot-image-pixel-width', String(width));
+  }));
   // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
   // data URI the page authored) and only needs normalising.
   const pending = [];
@@ -5479,7 +5862,8 @@ async function inlineExternalImages(cachedMap) {
     // skipped outright.
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
-    if (!rawSrc && !rawSrcset) continue;
+    const pictureSource = img.parentElement?.tagName === 'PICTURE' && img.currentSrc;
+    if (!rawSrc && !rawSrcset && !pictureSource) continue;
     // Skip images an earlier pass already inlined (a `data:` URI or local path
     // stamped on `data-snapshot-src`). This function may run more than once on
     // a JS-driven page — components can mount fresh <img>s after the first pass
@@ -5555,61 +5939,43 @@ async function inlineExternalImages(cachedMap) {
   // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
   // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
   // `background-image` with a `data:` URI so the walker emits a self-contained reference.
-  function firstCssUrl(value) {
-    const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
-    return m ? m[2] : '';
+  function cssUrls(value) {
+    return Array.from(value.matchAll(/url\(\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^)]*)\s*\)/gi));
   }
-
-  // A stack that mixes a colour wash with a photo — `linear-gradient(...), url(photo.jpg)`, the
-  // usual "tinted card" pattern — is inlined layer by layer. Replacing the whole declaration
-  // would throw the gradient away, and leaving the photo remote makes the importer emit an
-  // `<Image source="https://…">` the renderer cannot fetch, so the card renders as bare text.
-  // Only a single-url stack is handled: `url(...), url(...)` has no gradient to preserve and
-  // keeps the previous whole-declaration replacement.
-  function hasGradientLayer(value) {
-    return /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value || '');
-  }
-
-  // Replaces just the `url(...)` token, leaving every other background layer in place. The data
-  // URI is emitted single-quoted because `normalizeBackgroundImage` passes a gradient-bearing
-  // value through verbatim: the value lands inside the double-quoted `style="…"` attribute the
-  // walker writes, where a double-quoted url() would close the attribute early.
-  function replaceFirstCssUrl(value, replacement) {
-    const token = `url('${replacement.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
-    return value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/i, () => token);
-  }
-
   const bgPending = [];
   const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    const layered = hasGradientLayer(bg) && (bg.match(/url\(/gi) || []).length === 1;
-    if (!bg || (!/^url\(/i.test(bg) && !layered)) continue;
-    const url = firstCssUrl(bg);
-    if (!url || /^file:/i.test(url)) continue;
-    if (url.startsWith('data:')) {
-      bgInlinePending.push({ el, src: url, current: url, bg, layered });
-      continue;
+    const matches = cssUrls(bg);
+    // Each element owns one mutable token list. Concurrent downloads replace their own token;
+    // writing from the original string on each completion would erase previously inlined layers.
+    const state = { el, bg, matches, replacements: matches.map(m => m[0]) };
+    for (let index = 0; index < matches.length; index++) {
+      const token = matches[index][0];
+      let url = token.slice(token.indexOf('(') + 1, -1).trim();
+      if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+      url = url.replace(/\\(['"\\])/g, '$1');
+      if (!url || /^file:/i.test(url)) continue;
+      if (url.startsWith('data:')) {
+        bgInlinePending.push({ state, index, src: url, current: url });
+      } else if (/^https?:/i.test(url)) {
+        if (cache[url]) bgInlinePending.push({ state, index, src: cache[url], current: url });
+        else bgPending.push({ state, index, url });
+      }
     }
-    if (!/^https?:/i.test(url)) continue;
-    const cached = cache[url];
-    if (cached) {
-      // `current` records what the element still declares: a cache hit has to be written back even
-      // when the cached bytes already are in a portable format, because the element is carrying
-      // the remote URL that entry replaces.
-      bgInlinePending.push({ el, src: cached, current: url, bg, layered });
-      continue;
-    }
-    bgPending.push({ el, url, bg, layered });
   }
 
-  // The inline declaration a fetched/cached url layer is written back into: a layered stack gets
-  // only its url token swapped, anything else keeps the whole-declaration replacement.
   function writeInlinedBackground(entry, value) {
-    entry.el.style.backgroundImage = entry.layered
-      ? replaceFirstCssUrl(entry.bg, value)
-      : `url("${value.replace(/"/g, '\\"')}")`;
+    const state = entry.state;
+    state.replacements[entry.index] = `url('${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+    let at = 0, result = '';
+    for (let i = 0; i < state.matches.length; i++) {
+      const match = state.matches[i];
+      result += state.bg.slice(at, match.index) + state.replacements[i];
+      at = match.index + match[0].length;
+    }
+    state.el.style.backgroundImage = result + state.bg.slice(at);
   }
 
   async function processOneBg(entry) {
@@ -5644,75 +6010,6 @@ async function inlineExternalImages(cachedMap) {
     await Promise.all(slice.map(processOneBg));
   }
 
-  // Top-level comma split of a CSS value list. Commas nested inside `rgb(...)`,
-  // `linear-gradient(...)` or a quoted `url('…')` argument — a `data:` URI in particular — must
-  // not split the list. Mirrors the importer's `SplitTopLevelCommas`.
-  function splitTopLevelCommas(value) {
-    const out = [];
-    let depth = 0;
-    let cur = '';
-    for (const ch of String(value || '')) {
-      if (ch === '(') depth++;
-      else if (ch === ')') depth = Math.max(0, depth - 1);
-      if (ch === ',' && depth === 0) {
-        if (cur.trim() !== '') out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-      cur += ch;
-    }
-    if (cur.trim() !== '') out.push(cur.trim());
-    return out;
-  }
-
-  // A stack that layers a colour wash over a photo cannot be expressed as one PAGX background:
-  // the importer paints either the gradient layers or the image, never both. Split it into two
-  // boxes that the existing paths already handle — the element keeps the photo as a lone url()
-  // background (so its `background-size` / `-position` / `-repeat` apply as usual), and a
-  // synthesized full-bleed child carries the wash on top of it. Only backdrop boxes are split:
-  // an element with content of its own would need the wash slotted between its background and
-  // that content, which the flattened subset has no way to express.
-  function splitTintedBackgrounds() {
-    for (const el of Array.from(document.querySelectorAll('*'))) {
-      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
-      const computed = getComputedStyle(el);
-      // The wash child is positioned against the element, so the element has to be its own
-      // containing block; on a static box the inset would resolve against some distant ancestor.
-      if (computed.position === 'static') continue;
-      const bg = (computed.getPropertyValue('background-image') || '').trim();
-      if (!hasGradientLayer(bg)) continue;
-      const layers = splitTopLevelCommas(bg);
-      const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
-      if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
-      const wash = layers.filter((layer, index) => index !== urlIndex);
-      if (wash.length === 0) continue;
-      // Each fitting property is a per-layer list; the element now carries a single layer, so it
-      // needs that layer's own entry rather than the list. A one-entry value is already shared by
-      // every layer and passes through unchanged.
-      const entryFor = (value, fallback) => {
-        const entries = splitTopLevelCommas(value);
-        const picked = entries.length > 1 ? entries[urlIndex] : entries[0];
-        return picked || fallback;
-      };
-      const size = entryFor(computed.getPropertyValue('background-size'), 'auto');
-      const position = entryFor(computed.getPropertyValue('background-position'), '0% 0%');
-      const repeat = entryFor(computed.getPropertyValue('background-repeat'), 'repeat');
-      el.style.backgroundImage = layers[urlIndex];
-      el.style.backgroundSize = size;
-      el.style.backgroundPosition = position;
-      el.style.backgroundRepeat = repeat;
-      const tint = document.createElement('div');
-      tint.setAttribute('data-pagx-tint', '');
-      tint.setAttribute(
-        'style',
-        'position:absolute;left:0;top:0;width:100%;height:100%;background-image:' +
-          wash.join(', ') +
-          ';'
-      );
-      el.appendChild(tint);
-    }
-  }
-  splitTintedBackgrounds();
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
@@ -5762,28 +6059,17 @@ async function inlineCanvases() {
 // codepoint) but emits nothing for pseudos whose `content` resolves to an
 // empty string and whose visible box comes from width/height/background.
 //
-// This pass walks every element on the live page, asks Chromium for the
-// resolved style of each pseudo, and — when the pseudo carries a
-// `content` value but that value is the empty string — appends a real
-// `<div>` child to the host whose inline style mirrors the pseudo's own
-// box. The synthetic node carries `data-snapshot-pseudo` so authors can
+// This pass first collects each eligible pseudo's resolved style, then inserts a real
+// `<div>` child whose inline style mirrors the pseudo's own box. Collecting before any
+// DOM writes prevents newly matched selectors from changing later pseudos' source styles.
+// The synthetic node carries `data-snapshot-pseudo` so authors can
 // trace the emission, and a `data-snapshot-pseudo-host=""` attribute is
 // added to the host to suppress the `renderPseudoTextLeaf` fallback (which
 // would otherwise still try to emit the now-empty pseudo as inline text).
 //
-// Two scopes deliberately stay out:
-//
-//   - text-bearing pseudos (`content: "→"`, `content: "\\e123"`): handled
-//     by `renderPseudoTextLeaf`, which sizes the glyph against its own
-//     font metrics. Materialising those would double-paint the text.
-//
-//   - in-flow decorative pseudos (`position: static / relative / sticky`):
-//     pseudos in the host's flow take main/cross-axis space; injecting a
-//     real sibling would shift the host's other children. The pseudos that
-//     actually need this fix in practice are absolutely / fixed-positioned
-//     boxes (toggles, radios, checkboxes, dividers anchored with `inset`),
-//     so we limit materialisation to that case and skip the rest with a
-//     `data-snapshot-pseudo-skipped=in-flow` marker for diagnosability.
+// Text and decorative pseudos share the same layout stand-in, so generated text
+// also survives hosts with ordinary text/children. Disable the original in-flow
+// pseudo before measuring, to avoid taking its layout slot twice.
 //
 // The properties copied onto the synthetic div cover the ones the snapshot
 // walker (`STYLE_SCHEMA_BOX` + the `position/inset/transform/box-shadow`
@@ -5791,7 +6077,15 @@ async function inlineCanvases() {
 // actually consults; copying every CSS property would balloon the inline
 // style attribute without adding visible information. Border longhands are
 // emitted per side so asymmetric borders survive.
-async function materializeDecorativePseudoElements() {
+async function materializeDecorativePseudoElements(resolvedContents) {
+  const contents = new WeakMap();
+  for (const entry of resolvedContents || []) {
+    let node = document;
+    for (const index of entry.path) node = node && node.childNodes[index];
+    if (!node) continue;
+    if (!contents.has(node)) contents.set(node, {});
+    contents.get(node)[entry.pseudo] = entry.text;
+  }
   // Helper functions duplicated locally so this function stays self-contained
   // when shipped through `page.evaluate`. The Node-side helpers are not in
   // scope inside the browser context — Puppeteer/Playwright serialise the
@@ -5831,7 +6125,7 @@ async function materializeDecorativePseudoElements() {
     'z-index',
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
-    'line-height', 'letter-spacing', 'text-align',
+    'line-height', 'letter-spacing', 'text-align', 'white-space',
     // Animation longhands are forwarded so an *animated* decorative pseudo
     // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
     // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
@@ -5847,47 +6141,6 @@ async function materializeDecorativePseudoElements() {
     'animation-delay', 'animation-iteration-count', 'animation-direction',
     'animation-fill-mode',
   ];
-
-  // Defaults emitted by Chromium for properties that don't change anything.
-  // Suppressing them keeps the inline style readable and lines up with the
-  // snapshot walker's own default-skipping logic.
-  const DEFAULTS = new Map([
-    ['position', 'static'],
-    ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
-    // `display` is intentionally NOT default-suppressed: a `div` stand-in
-    // defaults to block, and an in-flow pseudo with `inline` / `inline-block`
-    // participation must keep it or the flow slot changes.
-    ['flex-grow', '0'], ['flex-shrink', '1'], ['flex-basis', 'auto'],
-    ['align-self', 'auto'], ['order', '0'],
-    ['min-width', 'auto'], ['min-height', 'auto'],
-    ['max-width', 'none'], ['max-height', 'none'],
-    ['margin-top', '0px'], ['margin-right', '0px'],
-    ['margin-bottom', '0px'], ['margin-left', '0px'],
-    ['padding-top', '0px'], ['padding-right', '0px'],
-    ['padding-bottom', '0px'], ['padding-left', '0px'],
-    ['background-color', 'rgba(0, 0, 0, 0)'],
-    ['background-image', 'none'],
-    ['background-clip', 'border-box'],
-    ['background-blend-mode', 'normal'],
-    ['background-size', 'auto'],
-    ['background-repeat', 'repeat'],
-    ['background-position', '0% 0%'],
-    ['border-top-width', '0px'], ['border-right-width', '0px'],
-    ['border-bottom-width', '0px'], ['border-left-width', '0px'],
-    ['border-top-style', 'none'], ['border-right-style', 'none'],
-    ['border-bottom-style', 'none'], ['border-left-style', 'none'],
-    ['border-top-left-radius', '0px'], ['border-top-right-radius', '0px'],
-    ['border-bottom-left-radius', '0px'], ['border-bottom-right-radius', '0px'],
-    ['box-shadow', 'none'], ['opacity', '1'], ['mix-blend-mode', 'normal'],
-    ['filter', 'none'], ['backdrop-filter', 'none'], ['overflow', 'visible'],
-    ['transform', 'none'],
-    ['z-index', 'auto'],
-    ['box-sizing', 'content-box'],
-    ['animation-name', 'none'], ['animation-duration', '0s'],
-    ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
-    ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
-    ['animation-fill-mode', 'none'],
-  ]);
 
   // A pseudo's `content` value reaches us with quotes preserved
   // ("\"\"" for content: ""). Strip surrounding ASCII quotes so the
@@ -5924,26 +6177,9 @@ async function materializeDecorativePseudoElements() {
     return text;
   }
 
-  // Decide whether a pseudo with the given resolved style should be
-  // materialised. A pseudo with no visible box (no width / height) is
-  // skipped — there's nothing to render anyway. Out-of-flow pseudos
-  // (absolute/fixed) become detached synthetic siblings exactly as before.
-  // In-flow pseudos (static/relative) are materialised as layout-equivalent
-  // stand-ins: the synthetic div joins the same flow (flex item, inline
-  // block, …) with the pseudo's copied layout styles and the original pseudo
-  // is switched off via an injected `content: none` rule, so the host's
-  // measured layout is unchanged while the decorative box survives the
-  // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
-  // at the current scroll position and lose the sticky semantics.
-  //
-  // A *text*-bearing pseudo normally stays on `renderPseudoTextLeaf`, which re-emits the glyphs
-  // inside the host's own flow — the right approximation while the glyphs really do ride that
-  // flow. An out-of-flow pseudo carries a box of its own instead (`position` / `inset` /
-  // `width` / `height` / `background` / `transform`), and the text-only path drops every one of
-  // those: baidu-pan's "current device" badge is `position:absolute;bottom:-3px;width:90px;
-  // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
-  // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
-  // Such a pseudo materialises like any other box, with its text carried on the stand-in.
+  // Text contributes intrinsic size even when CSS width/height are auto.
+  // In-flow stand-ins replace the original pseudo's slot; out-of-flow ones
+  // preserve its positioning and stacking identity. Sticky is not flattened.
   function shouldMaterialise(cs, pseudoText) {
     const position = (cs.getPropertyValue('position') || '').trim();
     if (position !== 'absolute' && position !== 'fixed' &&
@@ -5951,24 +6187,33 @@ async function materializeDecorativePseudoElements() {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
-      return { ok: false, reason: 'text-content' };
-    }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    if (widthPx <= 0 && heightPx <= 0 && pseudoText === '') {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };
   }
 
-  function emitInlineStyle(cs) {
+  // Computed style declarations are live. Copy strings while the original DOM is still
+  // intact, rather than retaining a CSSStyleDeclaration for the insertion phase.
+  function copyStyle(cs) {
+    const properties = {};
+    for (const prop of COPY_PROPS) {
+      properties[prop] = (cs.getPropertyValue(prop) || '').trim();
+    }
+    return properties;
+  }
+
+  function emitInlineStyle(properties) {
     const parts = [];
     for (const prop of COPY_PROPS) {
-      const raw = (cs.getPropertyValue(prop) || '').trim();
+      const raw = properties[prop];
       if (!raw) continue;
-      const def = DEFAULTS.get(prop);
-      if (def !== undefined && raw === def) continue;
+      // Keep defaults here: the stand-in still lives under the author's stylesheet.
+      // Omitting e.g. z-index:auto or opacity:1 lets a div/descendant rule replace it.
+      // Output serialization can compact defaults after the original CSS is gone.
+      // Normal priority also lets forwarded keyframes animate these resting values.
       // Rewrite embedded double quotes (e.g. `filter: url("#blur")`,
       // `font-family: "Inter"`) as single quotes — CSS treats them equivalently
       // — so the value embeds safely inside the surrounding style="…" attribute
@@ -6023,6 +6268,7 @@ async function materializeDecorativePseudoElements() {
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
   const pseudoOffRules = [];
+  const pendingHosts = [];
   const all = document.querySelectorAll('*');
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -6058,7 +6304,9 @@ async function materializeDecorativePseudoElements() {
     for (const pseudo of PSEUDO_TYPES) {
       const cs = getComputedStyle(el, pseudo);
       const contentRaw = (cs.getPropertyValue('content') || '').trim();
-      const pseudoText = unquoteContent(contentRaw);
+      const resolved = contents.get(el);
+      const pseudoText = resolved && Object.prototype.hasOwnProperty.call(resolved, pseudo)
+        ? resolved[pseudo] : unquoteContent(contentRaw);
       if (pseudoText === null) {
         // content: none / normal — pseudo not generated.
         pseudoData.push(null);
@@ -6080,37 +6328,52 @@ async function materializeDecorativePseudoElements() {
       if (textLeftBehind) continue;
     }
 
-    let materialisedAny = false;
+    const pending = { el, pseudos: [], skippedReason: '' };
     for (let i = 0; i < pseudoData.length; i++) {
       const slot = pseudoData[i];
       if (!slot) continue;
       const decision = decisions[i];
       if (!decision.ok) {
         if (decision.reason !== 'text-content') {
-          el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
+          pending.skippedReason = decision.reason;
         }
         continue;
       }
 
-      const div = document.createElement('div');
-      div.setAttribute('data-snapshot-pseudo', slot.pseudo);
       // Read the pseudo's resting style (cancelling its own animation) so an
       // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
       // forwarded `animation-*` longhands (see COPY_PROPS) keep the motion.
       const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
-      const style = emitInlineStyle(restingCs);
+      pending.pseudos.push({
+        pseudo: slot.pseudo,
+        inFlow: decision.inFlow,
+        properties: copyStyle(restingCs),
+        text: applyPseudoTextTransform(slot.pseudoText, restingCs),
+      });
+    }
+    if (pending.pseudos.length > 0 || pending.skippedReason) pendingHosts.push(pending);
+  }
+
+  for (const pending of pendingHosts) {
+    const el = pending.el;
+    if (pending.skippedReason) {
+      el.setAttribute('data-snapshot-pseudo-skipped', pending.skippedReason);
+    }
+    for (const slot of pending.pseudos) {
+      const div = document.createElement('div');
+      div.setAttribute('data-snapshot-pseudo', slot.pseudo);
+      const style = emitInlineStyle(slot.properties);
       if (style) div.setAttribute('style', style);
-      // A text-bearing pseudo (see shouldMaterialise) rides the stand-in as its text content, so
-      // the glyphs inherit the pseudo's own box and text styles instead of the host's flow.
-      // `white-space` is not part of COPY_PROPS, so it is appended only when the pseudo states
-      // something other than the default — a box sized by the page for one line must not rewrap.
-      if (slot.pseudoText) {
-        div.textContent = applyPseudoTextTransform(slot.pseudoText, restingCs);
-        const whiteSpace = (restingCs.getPropertyValue('white-space') || '').trim();
-        if (whiteSpace && whiteSpace !== 'normal') {
-          const base = div.getAttribute('style') || '';
-          div.setAttribute('style', base ? base + '; white-space: ' + whiteSpace : 'white-space: ' + whiteSpace);
-        }
+      // Private JS metadata, shared with renderChildrenInto even when the materializer and
+      // walker are installed by separate page.evaluate calls. It is not an HTML attribute.
+      Object.defineProperty(div, '__pagxSnapshotPseudoPaintStyle', {
+        value: Object.freeze({
+          position: slot.properties.position,
+          zIndex: slot.properties['z-index'],
+        }),
+      });
+      if (slot.text) {
+        div.textContent = slot.text;
       }
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
@@ -6131,14 +6394,13 @@ async function materializeDecorativePseudoElements() {
       // inject all rules after the walk — injecting mid-walk would be safe
       // too (already-read styles are unaffected), but batching keeps the
       // DOM mutation profile flat and the markers deterministic.
-      if (decision.inFlow) {
+      if (slot.inFlow) {
         const marker = 'data-snapshot-pseudo-off-' + pseudoOffRules.length;
         el.setAttribute(marker, '');
         pseudoOffRules.push('[' + marker + ']' + slot.pseudo + ' { content: none !important; }');
       }
-      materialisedAny = true;
     }
-    if (materialisedAny) {
+    if (pending.pseudos.length > 0) {
       el.setAttribute('data-snapshot-pseudo-host', '');
     }
   }
@@ -6403,7 +6665,6 @@ export {
   materializeDecorativePseudoElements,
   expandStickyScrollytelling,
   mergeRectsOnSameLine,
-  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   flexCharCarriesReveal,
@@ -6420,6 +6681,11 @@ export {
   readRootScrollOffset,
   resetRootScroll,
   canvasRootRect,
+  cssQuotedString,
+  collectCarryOverFontFaces,
+  fontMatchRange,
+  fontMatchCompare,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
+  snapshotFontFamily,
 };
