@@ -1785,6 +1785,9 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->matrix3D.isIdentity()) {
     xml.addAttribute("matrix3D", FloatListToString(node->matrix3D.values, 16));
   }
+  if (node->anchor.x != 0.0f || node->anchor.y != 0.0f) {
+    xml.addAttribute("anchor", PointToString(node->anchor));
+  }
   xml.addAttribute("preserve3D", node->preserve3D, Default<Layer>().preserve3D);
   xml.addAttribute("antiAlias", node->antiAlias, Default<Layer>().antiAlias);
   xml.addAttribute("groupOpacity", node->groupOpacity, Default<Layer>().groupOpacity);
