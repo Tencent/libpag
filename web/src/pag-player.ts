@@ -427,13 +427,11 @@ export class PAGPlayer {
                     }
                     if (this.compositionVersion !== compositionVersion) return false;
                     plan = manager.captureTargets();
-                    const prepared = await manager.prepareTargets(plan);
+                    const preparation = await manager.prepareTargets(plan);
                     if (this.compositionVersion !== compositionVersion) return false;
                     if (version !== this.frameVersion || !manager.matchesTargets(plan)) continue;
-                    if (!prepared) {
-                        if (operation === 'prepare') throw new Error('Video frame preparation failed');
-                        return false;
-                    }
+                    if (preparation === 'cancelled') return false;
+                    // Frame failures must still reach native rendering so other layers and its fallback path can run.
                 }
             }
             const result = await PAGModule.webAssemblyQueue.exec<boolean | undefined>(this.invokeNative, this,

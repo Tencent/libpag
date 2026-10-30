@@ -1,6 +1,8 @@
 import { PAGModule } from './pag-module';
 import type { VideoReader, VideoReaderOwner } from './interfaces';
 
+export type VideoPreparationResult = 'ready' | 'failed' | 'cancelled';
+
 export interface VideoFrameTarget {
   id: number;
   frame: number;
@@ -75,17 +77,24 @@ export class VideoReaderManager {
     return true;
   }
 
-  /** Prepares a captured plan without treating failed or cancelled frames as ready. */
-  public async prepareTargets(plan: VideoFrameTarget[]): Promise<boolean> {
+  /** Prepares all videos despite individual failures, but stops when the request is cancelled. */
+  public async prepareTargets(plan: VideoFrameTarget[]): Promise<VideoPreparationResult> {
     const version = this.prepareVersion;
+    let failed = false;
     for (const target of plan) {
-      if (this.isDestroyed || version !== this.prepareVersion) return false;
+      if (this.isDestroyed || version !== this.prepareVersion) return 'cancelled';
       const reader = this.videoReaderMap.get(target.id);
-      if (!reader) return false;
+      if (!reader) {
+        failed = true;
+        continue;
+      }
       reader.isPlaying = this.owner.isVideoPlaying();
-      if (!await reader.prepare(target.frame, target.playbackRate)) return false;
+      const prepared = await reader.prepare(target.frame, target.playbackRate);
+      if (this.isDestroyed || version !== this.prepareVersion) return 'cancelled';
+      if (!prepared) failed = true;
     }
-    return !this.isDestroyed && version === this.prepareVersion;
+    if (this.isDestroyed || version !== this.prepareVersion) return 'cancelled';
+    return failed ? 'failed' : 'ready';
   }
 
   /** Supplies the reader to the native decoder during the owner's WASM call. */

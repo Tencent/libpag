@@ -57,6 +57,55 @@ describe('PAGPlayer', () => {
     expect(await pagPlayer.flush()).to.be.eq(false);
   });
 
+  it('Keeps other layers rendering when video preparation fails', async () => {
+    const composition = PAG.PAGComposition.make(300, 300);
+    const matrix = PAG.Matrix.makeTrans(100, 0);
+    const solid = PAG.PAGSolidLayer.make(20000000, 40, 40, { red: 255, green: 0, blue: 0 }, 255);
+    resources.push(composition, matrix, solid);
+    pagPlayer.setComposition(null);
+    pagFile.setMatrix(matrix);
+    composition.addLayer(pagFile);
+    composition.addLayer(solid);
+    pagPlayer.setComposition(composition);
+    pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.None);
+
+    async function readMarkerPixel(): Promise<number[]> {
+      const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
+      const image = await global.createImageBitmap(canvas);
+      try {
+        const probe = global.document.createElement('canvas');
+        probe.width = 300;
+        probe.height = 300;
+        const context = probe.getContext('2d')!;
+        context.drawImage(image, 0, 0);
+        return Array.from(context.getImageData(10, 10, 1, 1).data);
+      } finally {
+        image.close();
+      }
+    }
+
+    expect(await pagPlayer.flush()).to.equal(true);
+    expect(await readMarkerPixel()).to.deep.equal([255, 0, 0, 255]);
+    expect(pagPlayer.videoReaders.length).to.equal(1);
+    const reader = pagPlayer.videoReaders[0];
+    const failedPreparation = cy.stub(reader, 'prepare').resolves(false);
+    const readError = cy.stub(reader, 'getError').resolves(new Error('Video preparation failed'));
+    try {
+      solid.setSolidColor({ red: 0, green: 255, blue: 0 });
+      expect(await pagPlayer.flush()).to.equal(true);
+      expect(failedPreparation.callCount).to.equal(1);
+      expect(await readMarkerPixel()).to.deep.equal([0, 255, 0, 255]);
+      expect(await reader.getError()).to.be.an('error');
+    } finally {
+      failedPreparation.restore();
+      readError.restore();
+    }
+    pagPlayer.setProgress(0.5);
+    expect(await pagPlayer.flush()).to.equal(true);
+    expect(await reader.getError()).to.equal(null);
+    expect(await pagPlayer.flush()).to.equal(false);
+  });
+
   it('Prepares a nonzero video frame without starting playback', async () => {
     pagPlayer.setProgress(0.5);
     const progress = pagPlayer.getProgress();

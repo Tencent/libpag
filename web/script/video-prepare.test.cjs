@@ -34,13 +34,14 @@ function CreateHarness() {
   const module = { _useSoftwareDecoder: false, currentPlayer: null, videoReaderManager: undefined };
   const queue = LoadSource('utils/queue.ts', {});
   module.webAssemblyQueue = new queue.WebAssemblyQueue();
-  const options = { block: false, failFrame: false, failCreate: false, failNative: false, createGate: null };
+  const options = { block: false, failFrame: false, failCreate: false, failNative: false, createGate: null,
+    videoIDs: [1], failedVideoIDs: new Set() };
   module.VideoReader = { async create(data, width, height, frameRate, ranges, owner) {
     if (options.failCreate) throw new Error('reader creation failed');
     if (options.createGate) await options.createGate.promise;
     const reader = {
       owner, isPlaying: !owner.isDestroyed && owner.isVideoPlaying(), isSought: false, isDestroyed: false, frame: -1,
-      attempts: [], gate: null,
+      id: data[0], attempts: [], gate: null,
       async prepare(frame, rate) {
         this.attempts.push({ frame, rate });
         calls.push(['video', owner, frame]);
@@ -48,7 +49,7 @@ function CreateHarness() {
           this.gate = Deferred();
           if (!await this.gate.promise) return false;
         }
-        if (this.isDestroyed || options.failFrame) return false;
+        if (this.isDestroyed || options.failFrame || options.failedVideoIDs.has(this.id)) return false;
         this.frame = frame;
         return true;
       },
@@ -56,7 +57,7 @@ function CreateHarness() {
       pause() { this.isPlaying = false; this.cancelPrepare(); },
       stop() { this.pause(); },
       async play() { this.isPlaying = true; },
-      getError() { return options.failFrame ? new Error('frame failure') : null; },
+      getError() { return options.failFrame || options.failedVideoIDs.has(this.id) ? new Error('frame failure') : null; },
       getVideo() { return { frame: this.frame }; },
       getCurrentFrame() { return this.frame; },
       onDestroy() {
@@ -73,20 +74,20 @@ function CreateHarness() {
   module._videoInfoManager = {
     _HasVideo(composition) { return composition.video; },
     _Make(composition) {
-      let previous = -1;
+      const previous = new Map();
       const manager = {
         deleted: false,
-        _getVideoIDs() { return [1]; },
+        _getVideoIDs() { return options.videoIDs; },
         _hasTimeRangeOverlap() { return false; },
-        _getMp4DataByID() { return new Uint8Array([1, 2, 3]); },
+        _getMp4DataByID(id) { return new Uint8Array([id, 2, 3]); },
         _getWidthByID() { return 65; }, _getHeightByID() { return 3; },
         _getFrameRateByID() { return 30; }, _getStaticTimeRangesByID() { return []; },
         _getPlaybackRateByID() { assert.equal(this.deleted, false); return 1; },
-        _getTargetFrameByID() {
+        _getTargetFrameByID(id) {
           assert.equal(this.deleted, false);
-          if (previous === composition.frame) return -1;
-          previous = composition.frame;
-          return previous;
+          if (previous.get(id) === composition.frame) return -1;
+          previous.set(id, composition.frame);
+          return composition.frame;
         },
         delete() { assert.equal(this.deleted, false); this.deleted = true; },
       };
@@ -130,9 +131,15 @@ function CreateHarness() {
       assert.equal(deleted, false, 'native object must remain live');
       assert.equal(module.currentPlayer, player);
       if (enabled && content?.video && module._useSoftwareDecoder === false) {
-        const reader = module.videoReaderManager.getVideoReaderByID(1);
-        assert.equal(reader.owner, player, 'correct owner bound at every native call');
-        assert.equal(reader.frame, content.frame, 'video ready before native work');
+        for (const id of options.videoIDs) {
+          const reader = module.videoReaderManager.getVideoReaderByID(id);
+          assert.equal(reader.owner, player, 'correct owner bound at every native call');
+          if (reader.getError() === null) {
+            assert.equal(reader.frame, content.frame, 'successful video must be ready before native work');
+          } else {
+            assert.equal(options.failFrame || options.failedVideoIDs.has(id), true);
+          }
+        }
       } else {
         assert.equal(module.videoReaderManager, undefined);
       }
@@ -204,11 +211,76 @@ test('failed target remains retryable even when the native target query deduplic
   const h = CreateHarness();
   const player = h.Player(h.Composition(true, 9));
   h.options.failFrame = true;
-  await assert.rejects(player.prepare(), /Video frame preparation failed/);
-  assert.equal(h.calls.some(function native(call) { return call[0] === 'prepare'; }), false);
+  await player.prepare();
+  assert.equal(h.calls.some(function native(call) { return call[0] === 'prepare'; }), true);
+  assert.equal(h.readers[0].frame, -1, 'failure is not recorded as a prepared frame');
+  assert.ok(h.readers[0].getError());
   h.options.failFrame = false;
   await player.prepare();
   assert.deepEqual(h.readers[0].attempts.map(function frame(attempt) { return attempt.frame; }), [9, 9]);
+  assert.equal(h.readers[0].frame, 9);
+  assert.equal(h.readers[0].getError(), null);
+  player.destroy();
+});
+
+test('a failed video does not stop subsequent videos or native rendering', async function () {
+  const h = CreateHarness();
+  h.options.videoIDs = [1, 2];
+  h.options.failedVideoIDs.add(1);
+  const player = h.Player(h.Composition(true, 9));
+  assert.equal(await player.flush(), true);
+  assert.equal(h.readers[0].frame, -1);
+  assert.equal(h.readers[1].frame, 9);
+  assert.equal(h.readers[1].attempts.length, 1);
+  assert.equal(h.calls.filter(function native(call) { return call[0] === 'flush'; }).length, 1);
+  h.options.failedVideoIDs.clear();
+  await player.flush();
+  assert.equal(h.readers[0].frame, 9);
+  assert.equal(h.readers[0].attempts.length, 2);
+  player.destroy();
+});
+
+test('all video failures still execute the native flush and canvas composition callback', async function (t) {
+  const h = CreateHarness();
+  const player = h.Player();
+  h.options.failFrame = true;
+  const warnings = t.mock.method(console, 'warn');
+  let composites = 0;
+  function Composite(result) {
+    assert.equal(h.module.currentPlayer, player);
+    assert.equal(result, true);
+    composites++;
+  }
+  assert.equal(await player.flushInternal(Composite), true);
+  assert.equal(composites, 1);
+  assert.equal(warnings.mock.calls.length, 1);
+  player.destroy();
+});
+
+test('manager cancellation is distinct from a failed frame and prevents native work', async function () {
+  const h = CreateHarness();
+  const player = h.Player();
+  h.options.block = true;
+  const pending = player.flush();
+  await Tick();
+  player.videoReaderManager.cancelPrepare();
+  assert.equal(await pending, false);
+  assert.equal(h.calls.some(function native(call) { return call[0] === 'flush'; }), false);
+  player.destroy();
+});
+
+test('manager reports failure and cancellation without conflating them with readiness', async function () {
+  const h = CreateHarness();
+  const player = h.Player();
+  await player.prepare();
+  const manager = player.videoReaderManager;
+  let plan = manager.captureTargets();
+  assert.equal(await manager.prepareTargets(plan), 'ready');
+  h.options.failFrame = true;
+  assert.equal(await manager.prepareTargets(plan), 'failed');
+  manager.destroy();
+  plan = manager.captureTargets();
+  assert.equal(await manager.prepareTargets(plan), 'cancelled');
   player.destroy();
 });
 
