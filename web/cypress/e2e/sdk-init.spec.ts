@@ -10,6 +10,14 @@ describe('SDK initialization', () => {
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       const module = await window.libpag.PAGInit();
       expect(module.Matrix).to.be.a('function');
+      expect(module._IsWebGPUBackend(), 'actual WASM backend').to.equal(isWebGPU);
+      if (isWebGPU) {
+        const device = module.preinitializedWebGPUDevice;
+        if (!device || !('destroy' in device) || typeof device.destroy !== 'function') {
+          throw new Error('The initialized WebGPU device must support explicit destruction');
+        }
+        device.destroy();
+      }
     });
     cy.wait('@wasm').then(({ request, response }) => {
       expect(new URL(request.url).pathname).to.equal(isWebGPU ? '/lib-webgpu/libpag.wasm' : '/lib/libpag.wasm');

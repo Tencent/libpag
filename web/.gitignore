@@ -21,6 +21,7 @@ demo/index.html
 demo/index-*.html
 cypress/videos
 cypress/screenshots
+cypress/results/
 demo/wechat-miniprogram/utils/libpag.js
 demo/wechat-miniprogram/utils/libpag.wasm.br
 demo/wasm

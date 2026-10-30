@@ -1,53 +1,53 @@
-/* eslint-disable @typescript-eslint/no-invalid-this */
+/* eslint prefer-arrow-callback: ["error", { "allowNamedFunctions": true }] */
 /* global describe it expect */
 import { WebAssemblyQueue } from '../../src/utils/queue';
 
 describe('Queue', () => {
-  const webAssemblyQueue = new WebAssemblyQueue();
-
   it('Sequence exec', async () => {
-    const list = [];
-    const fn = (arg) => {
+    const webAssemblyQueue = new WebAssemblyQueue();
+    const list: number[] = [];
+    function append(arg: number) {
       list.push(arg);
-    };
-    webAssemblyQueue.exec(fn, this, 1);
-    webAssemblyQueue.exec(fn, this, 2);
-    webAssemblyQueue.exec(fn, this, 3).then(() => {
-      expect(list).to.eql([1, 2, 3]);
-    });
+    }
+    await Promise.all([
+      webAssemblyQueue.exec(append, null, 1),
+      webAssemblyQueue.exec(append, null, 2),
+      webAssemblyQueue.exec(append, null, 3),
+    ]);
+    expect(list).to.eql([1, 2, 3]);
   });
 
   it('Await exec', async () => {
-    const list = [];
-    const fn = (arg) => {
+    const webAssemblyQueue = new WebAssemblyQueue();
+    const list: number[] = [];
+    function append(arg: number) {
       list.push(arg);
       return arg;
-    };
-    webAssemblyQueue.exec(fn, this, 1);
-    const res = await webAssemblyQueue.exec(fn, this, 2);
-    expect(res).to.eq(2);
+    }
+    const first = webAssemblyQueue.exec(append, null, 1);
+    const second = webAssemblyQueue.exec(append, null, 2);
+    expect(await Promise.all([first, second])).to.eql([1, 2]);
     expect(list).to.eql([1, 2]);
-    webAssemblyQueue.exec(fn, this, 3).then(() => {
-      expect(list).to.eql([1, 2, 3]);
-    });
+    expect(await webAssemblyQueue.exec(append, null, 3)).to.eq(3);
+    expect(list).to.eql([1, 2, 3]);
   });
 
   it('Promise exec', async () => {
-    const list = [];
-    const fn = (arg) => {
-      return new Promise((resolve) => {
-        list.push(arg);
-        setTimeout(() => {
+    const webAssemblyQueue = new WebAssemblyQueue();
+    const list: number[] = [];
+    function append(arg: number) {
+      return new Promise<number>(function completeTask(resolve) {
+        setTimeout(function finishTask() {
+          list.push(arg);
           resolve(arg);
-        }, 100);
+        }, (4 - arg) * 10);
       });
-    };
-    webAssemblyQueue.exec(fn, this, 1);
-    const res = await webAssemblyQueue.exec(fn, this, 2);
-    expect(res).to.eq(2);
+    }
+    const first = webAssemblyQueue.exec(append, null, 1);
+    const second = webAssemblyQueue.exec(append, null, 2);
+    expect(await Promise.all([first, second])).to.eql([1, 2]);
     expect(list).to.eql([1, 2]);
-    webAssemblyQueue.exec(fn, this, 3).then(() => {
-      expect(list).to.eql([1, 2, 3]);
-    });
+    expect(await webAssemblyQueue.exec(append, null, 3)).to.eq(3);
+    expect(list).to.eql([1, 2, 3]);
   });
 });

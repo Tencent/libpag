@@ -3,7 +3,11 @@
  * The lane is selected by the BACKEND cypress env: `cypress run --env BACKEND=webgpu`
  * switches every spec to the lib-webgpu build and enables the WebGPU-only tests.
  */
-export const isWebGPU = Cypress.env('BACKEND') === 'webgpu';
+const backend = Cypress.env('BACKEND') ?? 'webgl';
+if (backend !== 'webgl' && backend !== 'webgpu') {
+  throw new Error(`Unsupported Cypress backend: ${backend}`);
+}
+export const isWebGPU = backend === 'webgpu';
 
 /**
  * Registers a test that only runs on the WebGL lane (skipped when BACKEND=webgpu).

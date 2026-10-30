@@ -1,6 +1,6 @@
 /* eslint-disable max-nested-callbacks  */
 /* eslint-disable @typescript-eslint/no-invalid-this */
-/* global describe it expect cy Cypress beforeEach */
+/* global describe it expect cy Cypress beforeEach afterEach */
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGPlayer } from '../../src/pag-player';
@@ -12,61 +12,79 @@ describe('PAGPlayer', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   let pagPlayer: PAGPlayer;
+  let pagFile: PAGFile;
+  let resources: { destroy: () => void }[] = [];
 
   beforeEach(() => {
+    resources = [];
     visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
+      const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
+      pagFile = await PAG.PAGFile.load(buffer);
+      resources.push(pagFile);
+      const pagSurface = PAG.PAGSurface.fromCanvas('#pag');
+      resources.push(pagSurface);
+      pagPlayer = PAG.PAGPlayer.create();
+      resources.push(pagPlayer);
+      pagPlayer.setComposition(pagFile);
+      pagPlayer.setSurface(pagSurface);
+      pagPlayer.setProgress(0);
     });
   });
 
-  const createPAGPlayer = () => {
-    const pagPlayer = PAG.PAGPlayer.create();
-    expect(pagPlayer.wasmIns).to.be.a('Object');
-    return pagPlayer;
-  };
-
-  const getPAGFile = async () => {
-    const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
-    const pagFile = await PAG.PAGFile.load(buffer);
-    expect(pagFile.wasmIns).to.be.a('Object');
-    return pagFile;
-  };
+  afterEach(() => {
+    for (const resource of resources.reverse()) {
+      resource.destroy();
+    }
+    resources = [];
+  });
 
   it('Create PAGPlayer', () => {
-    createPAGPlayer();
+    expect(pagPlayer.wasmIns).to.be.a('Object');
+    expect(pagPlayer.isDestroyed).to.be.eq(false);
   });
 
   it('PAGPlayer flush', async () => {
-    pagPlayer = createPAGPlayer();
-    pagPlayer.prepare();
-    const res = await pagPlayer.flush();
-    expect(res).to.be.eq(false);
+    await pagPlayer.prepare();
+    expect(await pagPlayer.flush()).to.be.eq(true);
+    expect(await pagPlayer.flush()).to.be.eq(false);
+    pagPlayer.setComposition(null);
+    await pagPlayer.prepare();
+    await pagPlayer.flush();
+    expect(await pagPlayer.flush()).to.be.eq(false);
   });
 
   it('Get/Set PAGComposition', async () => {
-    pagPlayer = createPAGPlayer();
-    const pagFile = await getPAGFile();
-    pagPlayer.setComposition(pagFile);
-    const compositon = pagPlayer.getComposition() as PAGFile;
-    expect(compositon.wasmIns).to.be.a('Object');
+    const replacement = pagFile.copyOriginal();
+    resources.push(replacement);
+    expect(replacement.uniqueID()).not.to.be.eq(pagFile.uniqueID());
+    pagPlayer.setComposition(replacement);
+    const composition = pagPlayer.getComposition() as PAGFile;
+    resources.push(composition);
+    expect(composition.uniqueID()).to.be.eq(replacement.uniqueID());
+    expect(pagPlayer.duration()).to.be.eq(replacement.duration());
 
     const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
     const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
+    resources.push(pagImage);
     expect(pagImage.wasmIns).to.be.a('object');
-    compositon.replaceImage(1, pagImage);
+    composition.replaceImage(1, pagImage);
   });
 
-  it('Get/Set PAGSurface', async () => {
-    pagPlayer = createPAGPlayer();
-    const pagFile = await getPAGFile();
-    pagPlayer.setComposition(pagFile);
+  it('Get/Set PAGSurface', () => {
+    pagPlayer.setSurface(null);
     const pagSurface = PAG.PAGSurface.fromCanvas('#pag');
+    resources.push(pagSurface);
     expect(pagSurface.wasmIns).to.be.a('Object');
     pagPlayer.setSurface(pagSurface);
-    expect(pagPlayer.getSurface().wasmIns).to.be.a('Object');
+    const actualSurface = pagPlayer.getSurface();
+    resources.push(actualSurface);
+    expect(actualSurface.wasmIns).to.be.a('Object');
+    expect(actualSurface.width()).to.be.eq(300);
+    expect(actualSurface.height()).to.be.eq(300);
   });
 
   it('Get duration', async () => {
@@ -110,19 +128,27 @@ describe('PAGPlayer', () => {
   });
 
   it('Get/Set matrix', () => {
-    let matrix = pagPlayer.matrix();
+    pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.Stretch);
+    const matrix = pagPlayer.matrix();
+    resources.push(matrix);
     expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([
       0.4166666567325592, 0, 0, 0.234375, 0, 0,
     ]);
     matrix.set(PAGTypes.MatrixIndex.a, 2);
     pagPlayer.setMatrix(matrix);
-    matrix = pagPlayer.matrix();
-    expect(matrix.a).to.be.eq(2);
+    const updatedMatrix = pagPlayer.matrix();
+    resources.push(updatedMatrix);
+    expect(updatedMatrix.a).to.be.eq(2);
+    expect(pagPlayer.scaleMode()).to.be.eq(PAGTypes.PAGScaleMode.None);
   });
 
-  it('Next Frame', () => {
+  it('Next Frame', async () => {
+    expect(pagPlayer.currentFrame()).to.be.eq(0);
+    const progress = pagPlayer.getProgress();
     pagPlayer.nextFrame();
-    pagPlayer.prepare();
+    await pagPlayer.prepare();
+    expect(pagPlayer.currentFrame()).to.be.eq(1);
+    expect(pagPlayer.getProgress()).to.be.greaterThan(progress);
   });
 
   it('Get/Set autoClear', () => {
@@ -132,22 +158,35 @@ describe('PAGPlayer', () => {
   });
 
   it('Get bounds', () => {
-    const pagLayer = pagPlayer.getComposition().getLayerAt(0);
+    pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.Stretch);
+    pagPlayer.setProgress(0.5);
+    const pagLayer = pagFile.getLayerAt(0);
+    resources.push(pagLayer);
     expect(pagPlayer.getBounds(pagLayer)).to.be.eql({
       left: 0,
       top: 0,
-      right: 1440,
+      right: 300,
       bottom: 300,
     });
   });
 
   it('Get layers under point', () => {
-    expect(pagPlayer.getLayersUnderPoint(0, 0).size()).to.be.eq(3);
+    pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.Stretch);
+    pagPlayer.setProgress(0.5);
+    const layers = pagPlayer.getLayersUnderPoint(0, 0);
+    resources.push(...layers);
+    const count = layers.size();
+    layers.delete();
+    expect(count).to.be.eq(3);
   });
 
   it('Hit test point', () => {
-    const pagLayer = pagPlayer.getComposition().getLayerAt(0);
+    pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.Stretch);
+    pagPlayer.setProgress(0.5);
+    const pagLayer = pagFile.getLayerAt(0);
+    resources.push(pagLayer);
     expect(pagPlayer.hitTestPoint(pagLayer, 0, 0)).to.be.eq(true);
+    expect(pagPlayer.hitTestPoint(pagLayer, -1, -1)).to.be.eq(false);
   });
 
   it('Get renderingTime', () => {

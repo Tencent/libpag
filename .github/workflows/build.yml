@@ -173,6 +173,12 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
+      - name: Set Up Node
+        id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: WeChat Risk Check Test
         run: |
           cd pagx/wechat
@@ -187,15 +193,15 @@ jobs:
           key: emsdk-web-linux-20251212
           restore-keys: emsdk-web-linux-
 
-      - name: Get node_modules Cache
+      - name: Get npm and Cypress Download Cache
         id: node-cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            web/node_modules
-            web/package-lock.json
-          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
-          restore-keys: node-modules-web-linux-
+            ~/.npm
+            ~/.cache/Cypress
+          key: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-${{ hashFiles('web/package.json') }}
+          restore-keys: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -221,11 +227,12 @@ jobs:
           ./emsdk install 3.1.71
           ./emsdk activate 3.1.71
 
-      - name: Install node_modules
-        if: ${{ (steps.node-cache.outputs.cache-hit != 'true') }}
+      - name: Install npm Dependencies and Cypress
+        working-directory: web
         run: |
-          cd web
-          npm install
+          CYPRESS_INSTALL_BINARY=0 npm install --no-package-lock
+          npx --no-install cypress install
+          npx --no-install cypress verify
 
       - name: Run depsync
         run: |
@@ -242,8 +249,9 @@ jobs:
         uses: cypress-io/github-action@v8
         with:
           working-directory: web
+          install: false
           start: npm run server:cypress
-          wait-on: 'http://localhost:8080'
+          wait-on: 'http://127.0.0.1:8080'
           command: npm run cypress
 
       - name: Save emsdk Cache
@@ -253,14 +261,14 @@ jobs:
           path: web/emsdk
           key: emsdk-web-linux-20251212
 
-      - name: Save node_modules Cache
+      - name: Save npm and Cypress Download Cache
         if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: |
-            web/node_modules
-            web/package-lock.json
-          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
+            ~/.npm
+            ~/.cache/Cypress
+          key: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-${{ hashFiles('web/package.json') }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -269,6 +277,16 @@ jobs:
           path: |
             third_party
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Upload Cypress WebGL Diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-webgl-results
+          path: |
+            web/cypress/results/webgl/
+            web/cypress/screenshots/
+          if-no-files-found: warn
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -292,6 +310,12 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
+      - name: Set Up Node
+        id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Get emsdk Cache
         id: emsdk-cache
         uses: actions/cache/restore@v4
@@ -300,15 +324,15 @@ jobs:
           key: emsdk-webgpu-linux-20261027
           restore-keys: emsdk-webgpu-linux-
 
-      - name: Get node_modules Cache
+      - name: Get npm and Cypress Download Cache
         id: node-cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            web/node_modules
-            web/package-lock.json
-          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
-          restore-keys: node-modules-web-linux-
+            ~/.npm
+            ~/.cache/Cypress
+          key: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-${{ hashFiles('web/package.json') }}
+          restore-keys: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -326,11 +350,12 @@ jobs:
           npm install depsync -g
           depsync
 
-      - name: Install node_modules
-        if: ${{ (steps.node-cache.outputs.cache-hit != 'true') }}
+      - name: Install npm Dependencies and Cypress
+        working-directory: web
         run: |
-          cd web
-          npm install
+          CYPRESS_INSTALL_BINARY=0 npm install --no-package-lock
+          npx --no-install cypress install
+          npx --no-install cypress verify
 
       - name: Install emsdk
         if: ${{ (steps.emsdk-cache.outputs.cache-hit != 'true') }}
@@ -351,8 +376,9 @@ jobs:
         uses: cypress-io/github-action@v8
         with:
           working-directory: web
+          install: false
           start: npm run server:cypress
-          wait-on: 'http://localhost:8080'
+          wait-on: 'http://127.0.0.1:8080'
           browser: chrome
           command: npm run cypress:webgpu
 
@@ -363,14 +389,14 @@ jobs:
           path: web/emsdk
           key: emsdk-webgpu-linux-20261027
 
-      - name: Save node_modules Cache
+      - name: Save npm and Cypress Download Cache
         if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: |
-            web/node_modules
-            web/package-lock.json
-          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
+            ~/.npm
+            ~/.cache/Cypress
+          key: npm-cypress-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.node.outputs.node-version }}-${{ hashFiles('web/package.json') }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -379,6 +405,16 @@ jobs:
           path: |
             third_party
           key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Upload Cypress WebGPU Diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-webgpu-results
+          path: |
+            web/cypress/results/webgpu/
+            web/cypress/screenshots/
+          if-no-files-found: warn
 
       - name: Job Failed
         if: ${{ failure() }}

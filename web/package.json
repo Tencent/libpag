@@ -42,16 +42,18 @@
     "prettier": "prettier --check \"src/**/*.ts\"",
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "UnitTest": "node ./script/UnitTest.js",
-    "cypress": "cypress run --browser electron --headless ",
+    "cypress": "cypress run --browser electron --headless --env BACKEND=webgl",
     "cypress:webgpu": "cypress run --browser chrome --headless --env BACKEND=webgpu",
     "test:bundle": "node --test script/bundle-format.test.cjs",
+    "test:cypress-runner": "node --test script/UnitTest.test.cjs script/cypress-config.test.cjs",
+    "typecheck:cypress": "tsc --noEmit -p cypress/tsconfig.json",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm",
     "server:mt": "node server.js wasm-mt",
     "server:st": "node server.js wasm",
     "server:webgpu:mt": "node server.js wasm-mt webgpu",
     "server:webgpu:st": "node server.js wasm webgpu",
-    "server:cypress": "http-server -p 8080"
+    "server:cypress": "http-server -a 127.0.0.1 -p 8080 -c-1"
   },
   "repository": {
     "type": "git",

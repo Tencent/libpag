@@ -1,134 +1,175 @@
+/* eslint prefer-arrow-callback: ["error", { "allowNamedFunctions": true }] */
 /* eslint-disable max-nested-callbacks  */
 /* eslint-disable @typescript-eslint/no-invalid-this */
-/* global describe it expect cy Cypress beforeEach */
+/* global describe it expect cy Cypress beforeEach afterEach */
 import type * as Libpag from '../../src/pag';
 import type { PAGComposition } from '../../src/pag-composition';
 import type { PAGLayer } from '../../src/pag-layer';
-import type { PAG } from '../../src/types';
+import type { PAG, Vector } from '../../src/types';
 import { visitTestPage } from './lane';
 
-describe('PAGComposition', () => {
+describe('PAGComposition', function compositionTests() {
   let PAG: PAG;
-  let global: Cypress.AUTWindow;
-  beforeEach(() => {
+  let pagComposition: PAGComposition;
+  let ownedLayers: PAGLayer[];
+  let ownedVectors: { delete: () => void }[];
+
+  function ownLayer<T extends PAGLayer>(layer: T): T {
+    for (const ownedLayer of ownedLayers) {
+      if (ownedLayer.wasmIns === layer.wasmIns) return layer;
+    }
+    ownedLayers.push(layer);
+    return layer;
+  }
+
+  function ownLayerVector<T extends Vector<PAGLayer>>(layers: T): T {
+    ownedVectors.push(layers);
+    for (let index = 0; index < layers.size(); index += 1) {
+      ownLayer(layers.get(index));
+    }
+    return layers;
+  }
+
+  beforeEach(function setupComposition() {
+    ownedLayers = [];
+    ownedVectors = [];
     visitTestPage();
-    cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
-      global = window;
+    cy.window().then(async function loadComposition(window: Cypress.AUTWindow & { libpag: typeof Libpag }) {
       PAG = await window.libpag.PAGInit();
+      const response = await window.fetch('/demo/assets/AudioMarker.pag');
+      pagComposition = ownLayer(await PAG.PAGFile.load(await response.arrayBuffer()));
     });
   });
 
-  let pagComposition: PAGComposition;
-  it('Make', async () => {
-    pagComposition = PAG.PAGComposition.make(100, 100);
-    expect(pagComposition.wasmIns).to.be.a('object');
+  afterEach(function destroyComposition() {
+    for (const vector of ownedVectors) {
+      vector.delete();
+    }
+    for (const layer of ownedLayers.reverse()) {
+      layer.destroy();
+    }
   });
 
-  it('Get size', async () => {
-    const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
-    pagComposition = (await PAG.PAGFile.load(buffer)) as PAGComposition;
+  it('Make', function makeComposition() {
+    const composition = ownLayer(PAG.PAGComposition.make(100, 100));
+    expect(composition.wasmIns).to.be.a('object');
+    expect(composition.width()).to.be.eq(100);
+    expect(composition.height()).to.be.eq(100);
+  });
+
+  it('Get size', function getSize() {
     expect(pagComposition.wasmIns).to.be.a('object');
     expect(pagComposition.width()).to.be.eq(720);
     expect(pagComposition.height()).to.be.eq(1280);
   });
 
-  it('Set content size', async () => {
+  it('Set content size', function setContentSize() {
     pagComposition.setContentSize(1000, 1000);
     expect(pagComposition.width()).to.be.eq(1000);
     expect(pagComposition.height()).to.be.eq(1000);
   });
 
-  let numChildren: number;
-  it('Get children number', async () => {
-    numChildren = pagComposition.numChildren();
+  it('Get children number', function getChildrenNumber() {
     expect(pagComposition.numChildren()).to.be.eq(3);
   });
 
-  let pagLayer: PAGLayer;
-  it('Get layer at index', async () => {
-    pagLayer = pagComposition.getLayerAt(0);
-    expect(pagLayer.wasmIns).to.be.a('Object');
+  it('Get layer at index', function getLayerAtIndex() {
+    const layer = ownLayer(pagComposition.getLayerAt(0));
+    expect(layer.wasmIns).to.be.a('object');
   });
 
-  it('Get layer index', async () => {
-    expect(pagComposition.getLayerIndex(pagLayer)).to.be.eq(0);
+  it('Get layer index', function getLayerIndex() {
+    const layer = ownLayer(pagComposition.getLayerAt(0));
+    expect(pagComposition.getLayerIndex(layer)).to.be.eq(0);
   });
 
-  it('Set layer index', async () => {
-    pagComposition.setLayerIndex(pagLayer, 1);
-    expect(pagComposition.getLayerIndex(pagLayer)).to.be.eq(1);
+  it('Set layer index', function setLayerIndex() {
+    const layer = ownLayer(pagComposition.getLayerAt(0));
+    pagComposition.setLayerIndex(layer, 1);
+    expect(pagComposition.getLayerIndex(layer)).to.be.eq(1);
   });
 
-  let pagLayerDelete: PAGLayer | null;
-  it('Remove layer', async () => {
-    pagLayerDelete = pagComposition.removeLayer(pagLayer);
-    pagLayerDelete.destroy();
-    pagLayerDelete = null;
+  it('Remove layer', function removeLayer() {
+    const numChildren = pagComposition.numChildren();
+    const layer = ownLayer(pagComposition.getLayerAt(0));
+    const removedLayer = ownLayer(pagComposition.removeLayer(layer));
+    expect(removedLayer.uniqueID()).to.be.eq(layer.uniqueID());
+    expect(pagComposition.numChildren()).to.be.eq(numChildren - 1);
+    expect(pagComposition.contains(layer)).to.be.eq(false);
+  });
+
+  it('Add layer', function addLayer() {
+    const numChildren = pagComposition.numChildren();
+    const layer = ownLayer(pagComposition.removeLayerAt(0));
+    expect(pagComposition.numChildren()).to.be.eq(numChildren - 1);
+    expect(pagComposition.addLayer(layer)).to.be.eq(true);
+    expect(pagComposition.numChildren()).to.be.eq(numChildren);
+    expect(pagComposition.contains(layer)).to.be.eq(true);
+  });
+
+  it('Remove layer at index', function removeLayerAtIndex() {
+    const numChildren = pagComposition.numChildren();
+    const layer = ownLayer(pagComposition.getLayerAt(2));
+    const removedLayer = ownLayer(pagComposition.removeLayerAt(2));
+    expect(removedLayer.uniqueID()).to.be.eq(layer.uniqueID());
     expect(pagComposition.numChildren()).to.be.eq(numChildren - 1);
   });
 
-  it('Add layer', async () => {
-    pagComposition.addLayer(pagLayer);
-    expect(pagComposition.numChildren()).to.be.eq(numChildren);
-  });
-
-  it('Remove layer at index', async () => {
-    pagLayerDelete = pagComposition.removeLayerAt(2);
-    pagLayerDelete.destroy();
-    pagLayerDelete = null;
+  it('Add layer at index', function addLayerAtIndex() {
+    const numChildren = pagComposition.numChildren();
+    const layer = ownLayer(pagComposition.removeLayerAt(2));
     expect(pagComposition.numChildren()).to.be.eq(numChildren - 1);
-  });
-
-  it('Add layer', async () => {
-    pagComposition.addLayerAt(pagLayer, 1);
+    expect(pagComposition.addLayerAt(layer, 1)).to.be.eq(true);
     expect(pagComposition.numChildren()).to.be.eq(numChildren);
+    expect(pagComposition.getLayerIndex(layer)).to.be.eq(1);
   });
 
-  it('Get contains', async () => {
-    expect(pagComposition.contains(pagLayer)).to.be.eq(true);
+  it('Get contains', function getContains() {
+    const layer = ownLayer(pagComposition.getLayerAt(0));
+    expect(pagComposition.contains(layer)).to.be.eq(true);
   });
 
-  let pagLayer_1: PAGLayer | null;
-  let pagLayer_2: PAGLayer | null;
-  it('Swap layer', async () => {
-    pagLayer_1 = pagComposition.getLayerAt(0);
-    pagLayer_2 = pagComposition.getLayerAt(1);
-    pagComposition.swapLayer(pagLayer_1, pagLayer_2);
-    expect(pagComposition.getLayerIndex(pagLayer_1)).to.be.eq(1);
-    expect(pagComposition.getLayerIndex(pagLayer_2)).to.be.eq(0);
+  it('Swap layer', function swapLayer() {
+    const firstLayer = ownLayer(pagComposition.getLayerAt(0));
+    const secondLayer = ownLayer(pagComposition.getLayerAt(1));
+    pagComposition.swapLayer(firstLayer, secondLayer);
+    expect(pagComposition.getLayerIndex(firstLayer)).to.be.eq(1);
+    expect(pagComposition.getLayerIndex(secondLayer)).to.be.eq(0);
   });
 
-  it('Swap layer AtIndex', async () => {
+  it('Swap layer AtIndex', function swapLayerAtIndex() {
+    const firstLayer = ownLayer(pagComposition.getLayerAt(0));
+    const secondLayer = ownLayer(pagComposition.getLayerAt(1));
     pagComposition.swapLayerAt(0, 1);
-    expect(pagComposition.getLayerIndex(pagLayer_1)).to.be.eq(0);
-    expect(pagComposition.getLayerIndex(pagLayer_2)).to.be.eq(1);
+    expect(pagComposition.getLayerIndex(firstLayer)).to.be.eq(1);
+    expect(pagComposition.getLayerIndex(secondLayer)).to.be.eq(0);
   });
-  pagLayer_1?.destroy();
-  pagLayer_1 = null;
-  pagLayer_2?.destroy();
-  pagLayer_2 = null;
 
-  it('Get audio bytes', async () => {
+  it('Get audio bytes', function getAudioBytes() {
     expect(ArrayBuffer.isView(pagComposition.audioBytes())).to.be.eq(true);
   });
 
-  it('Get audio markers', async () => {
-    expect(pagComposition.audioMarkers().size()).to.be.eq(2);
+  it('Get audio markers', function getAudioMarkers() {
+    const markers = pagComposition.audioMarkers();
+    ownedVectors.push(markers);
+    expect(markers.size()).to.be.eq(2);
   });
 
-  it('Get audio startTime', async () => {
+  it('Get audio startTime', function getAudioStartTime() {
     expect(pagComposition.audioStartTime()).to.be.eq(0);
   });
 
-  it('Get layers by name', async () => {
-    expect(pagComposition.getLayersByName('ImageLayer1').size()).to.be.eq(1);
+  it('Get layers by name', function getLayersByName() {
+    const layers = ownLayerVector(pagComposition.getLayersByName('ImageLayer1'));
+    expect(layers.size()).to.be.eq(1);
   });
 
-  it('Get layers under point', async () => {
-    expect(pagComposition.getLayersUnderPoint(1, 1).size()).to.be.eq(2);
+  it('Get layers under point', function getLayersUnderPoint() {
+    const layers = ownLayerVector(pagComposition.getLayersUnderPoint(1, 1));
+    expect(layers.size()).to.be.eq(2);
   });
 
-  it('Remove all layers', async () => {
+  it('Remove all layers', function removeAllLayers() {
     pagComposition.removeAllLayers();
     expect(pagComposition.numChildren()).to.be.eq(0);
   });

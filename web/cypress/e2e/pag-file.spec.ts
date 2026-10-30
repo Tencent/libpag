@@ -1,9 +1,12 @@
+/* eslint prefer-arrow-callback: ["error", { "allowNamedFunctions": true }] */
 /* eslint-disable max-nested-callbacks  */
 /* eslint-disable @typescript-eslint/no-invalid-this */
-/* global describe it expect cy Cypress beforeEach */
+/* global describe it expect cy Cypress beforeEach afterEach */
 import type * as Libpag from '../../src/pag';
-import type { PAG } from '../../src/types';
+import type { PAG, TextDocument, Vector } from '../../src/types';
 import type { PAGFile } from '../../src/pag-file';
+import type { PAGImage } from '../../src/pag-image';
+import type { PAGLayer } from '../../src/pag-layer';
 import type { PAGTextLayer } from '../../src/pag-text-layer';
 import { visitTestPage } from './lane';
 
@@ -51,92 +54,140 @@ const textDataBaseline = {
   direction: 0,
 };
 
-describe('PAGFile', () => {
+describe('PAGFile', function fileTests() {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
-  beforeEach(() => {
+  let pagFile: PAGFile;
+  let ownedLayers: PAGLayer[];
+  let ownedImages: PAGImage[];
+  let ownedTextData: TextDocument[];
+  let ownedVectors: Vector<PAGLayer>[];
+
+  function ownLayer<T extends PAGLayer>(layer: T): T {
+    for (const ownedLayer of ownedLayers) {
+      if (ownedLayer.wasmIns === layer.wasmIns) return layer;
+    }
+    ownedLayers.push(layer);
+    return layer;
+  }
+
+  function ownLayerVector<T extends Vector<PAGLayer>>(layers: T): T {
+    ownedVectors.push(layers);
+    for (let index = 0; index < layers.size(); index += 1) {
+      ownLayer(layers.get(index));
+    }
+    return layers;
+  }
+
+  beforeEach(function setupFile() {
+    ownedLayers = [];
+    ownedImages = [];
+    ownedTextData = [];
+    ownedVectors = [];
     visitTestPage();
-    cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
+    cy.window().then(async function loadFile(window: Cypress.AUTWindow & { libpag: typeof Libpag }) {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
+      const response = await window.fetch('/demo/assets/test2.pag');
+      pagFile = ownLayer(await PAG.PAGFile.load(await response.arrayBuffer()));
     });
   });
 
-  it('Get maxSupportedTagLevel', () => {
+  afterEach(function destroyFile() {
+    for (const vector of ownedVectors) {
+      vector.delete();
+    }
+    for (const textData of ownedTextData) {
+      textData.delete();
+    }
+    for (const layer of ownedLayers.reverse()) {
+      layer.destroy();
+    }
+    for (const image of ownedImages.reverse()) {
+      image.destroy();
+    }
+  });
+
+  it('Get maxSupportedTagLevel', function getMaxSupportedTagLevel() {
     expect(PAG.PAGFile.maxSupportedTagLevel()).to.be.greaterThan(83);
   });
 
-  let pagFile: PAGFile;
-  it('Load from arrayBuffer', async () => {
-    const buffer = await global.fetch('/demo/assets/test2.pag').then((res) => res.arrayBuffer());
-    pagFile = await PAG.PAGFile.load(buffer);
+  it('Load from arrayBuffer', function loadFromArrayBuffer() {
     expect(pagFile.wasmIns).to.be.a('object');
   });
 
-  it('Get tagLevel', async () => {
+  it('Get tagLevel', function getTagLevel() {
     expect(pagFile.tagLevel()).to.be.eq(52);
   });
 
-  it('Get layer number', async () => {
+  it('Get layer number', function getLayerNumber() {
     expect(pagFile.numTexts()).to.be.eq(1);
     expect(pagFile.numImages()).to.be.eq(0);
     expect(pagFile.numVideos()).to.be.eq(0);
   });
 
-  let textData: Libpag.types.TextDocument;
-  it('Get textData', async () => {
-    textData = pagFile.getTextData(0);
-    Object.keys(textDataBaseline).forEach((key) => {
+  it('Get textData', function getTextData() {
+    const textData = pagFile.getTextData(0);
+    ownedTextData.push(textData);
+    for (const key of Object.keys(textDataBaseline)) {
       expect(textData[`${key}`]).to.be.eql(textDataBaseline[`${key}`]);
-    });
+    }
   });
 
-  let pagLayers: Libpag.types.Vector<PAGTextLayer>;
-  it('Get layers by editableIndex', () => {
-    pagLayers = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text) as Libpag.types.Vector<PAGTextLayer>;
-    expect(pagLayers.size()).to.be.eq(1);
+  it('Get layers by editableIndex', function getLayersByEditableIndex() {
+    const layers = ownLayerVector(pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text));
+    expect(layers.size()).to.be.eq(1);
   });
 
-  it('Replace text', () => {
+  it('Replace text', function replaceText() {
+    const textData = pagFile.getTextData(0);
+    ownedTextData.push(textData);
+    const layers = ownLayerVector(pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text));
+    const layer = layers.get(0) as PAGTextLayer;
     textData.text = 'test';
     pagFile.replaceText(0, textData);
-    const pagLayer = pagLayers.get(0);
-    expect(pagLayer.text()).to.be.eq('test');
+    expect(layer.text()).to.be.eq('test');
   });
 
-  it('Replace Image', async () => {
-    const buffer = await global.fetch('/demo/assets/test.pag').then((res) => res.arrayBuffer());
-    const pagFileImage = await PAG.PAGFile.load(buffer);
-    expect(pagFileImage.wasmIns).to.be.a('object');
-
-    const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
-    const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
-    expect(pagImage.wasmIns).to.be.a('object');
-
-    pagFileImage.replaceImage(0, pagImage);
+  it('Replace Image', async function replaceImage() {
+    const response = await global.fetch('/demo/assets/test.pag');
+    const imageFile = ownLayer(await PAG.PAGFile.load(await response.arrayBuffer()));
+    expect(imageFile.wasmIns).to.be.a('object');
+    const imageResponse = await global.fetch('/demo/assets/cat.png');
+    const imageBlob = await imageResponse.blob();
+    const image = await PAG.PAGImage.fromFile(new global.File([imageBlob], 'cat.png'));
+    ownedImages.push(image);
+    expect(image.wasmIns).to.be.a('object');
+    imageFile.replaceImage(0, image);
   });
 
-  it('Get Layers By EditableIndex', () => {
-    expect(pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text).size()).to.be.eq(1);
+  it('Get Layers By EditableIndex', function getEditableTextLayers() {
+    const layers = ownLayerVector(pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text));
+    expect(layers.size()).to.be.eq(1);
   });
 
-  it('Get editable indices', () => {
+  it('Get editable indices', function getEditableIndices() {
     expect(pagFile.getEditableIndices(PAGTypes.LayerType.Text)).to.be.eql([0]);
   });
 
-  it('Set/Get timeStretchMode', () => {
+  it('Set/Get timeStretchMode', function setTimeStretchMode() {
     pagFile.setTimeStretchMode(PAGTypes.PAGTimeStretchMode.Scale);
     expect(pagFile.timeStretchMode()).to.be.eq(PAGTypes.PAGTimeStretchMode.Scale);
   });
 
-  it('Set/Get duration', () => {
+  it('Set/Get duration', function setDuration() {
     pagFile.setDuration(1000000);
     expect(pagFile.duration()).to.be.eq(1000000);
   });
 
-  it('Copy original', () => {
-    expect(pagFile.copyOriginal().wasmIns).to.be.a('object');
+  it('Copy original', function copyOriginal() {
+    const originalDuration = pagFile.duration();
+    pagFile.setDuration(1000000);
+    const original = ownLayer(pagFile.copyOriginal());
+    expect(original.wasmIns).to.be.a('object');
+    expect(original.duration()).to.be.eq(originalDuration);
+    expect(pagFile.duration()).to.be.eq(1000000);
   });
 });
