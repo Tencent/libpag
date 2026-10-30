@@ -120,9 +120,13 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       out.addAttr("style", s);
       out.closeTagStart();
       renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
+      // Animation export can defer SVG emission. Flush before closing this copy so its
+      // transform and opacity apply to the SVG, while the child-layer offset is still zero.
+      flushPendingSVGDraws(out);
       out.closeTag();
     } else {
       renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
+      flushPendingSVGDraws(out);
     }
   }
   _ctx->savedChildLayerOffsetX = savedOffX;
