@@ -1006,6 +1006,10 @@ static bool AnimationNeedsTrailingBaseline(const AnimationSpec& spec) {
   return !spec.iterationInfinite && (spec.fillMode == "none" || spec.fillMode == "backwards");
 }
 
+static bool AnimationSuppressesPlayback(const AnimationSpec& spec) {
+  return !spec.iterationInfinite && spec.iterationCount <= 0.0f;
+}
+
 static Frame AnimationGroupingLength(LoopMode loop, Frame cycle, Frame delay, bool trailing) {
   return loop == LoopMode::Once ? cycle + delay + (trailing ? 1 : 0) : cycle;
 }
@@ -1026,7 +1030,7 @@ void HTMLAnimationBuilder::prepareTiming(const std::unordered_map<std::string, s
     ParseAnimationShorthand(entry, spec, multiple);
     if (entries.size() == 1) ApplyAnimationLonghands(style, spec, multiple);
     if (spec.durationSeconds <= 0 || spec.name.empty() || _keyframes->count(spec.name) == 0 ||
-        (!spec.iterationInfinite && spec.iterationCount <= 0)) {
+        AnimationSuppressesPlayback(spec)) {
       continue;
     }
     Frame cycle = std::llround(spec.durationSeconds * kFrameRate);
@@ -1073,7 +1077,10 @@ void HTMLAnimationBuilder::finalizeTiming() {
     auto delay = _originalDelays.find(animation);
     if (delay == _originalDelays.end()) continue;
     auto key = std::make_pair(animation->loop, coalescingLength(animation));
-    Frame excessShift = emittedStarts.at(key) - _groupStarts.at(key);
+    auto emitted = emittedStarts.find(key);
+    auto planned = _groupStarts.find(key);
+    if (emitted == emittedStarts.end() || planned == _groupStarts.end()) continue;
+    Frame excessShift = emitted->second - planned->second;
     if (excessShift == 0) continue;
     animation->duration -= excessShift;
     for (auto* object : animation->objects) {
@@ -1556,7 +1563,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // CSS `animation-iteration-count: 0` (or any non-positive value) suppresses playback entirely.
   // Negative values are invalid per spec; reject them upfront so the rest of the pipeline does
   // not have to reason about empty playback windows.
-  if (!spec.iterationInfinite && spec.iterationCount <= 0.0f) {
+  if (AnimationSuppressesPlayback(spec)) {
     _diagnostics.warn(
         "html: animation-iteration-count <= 0 suppresses playback; dropped "
         "[subset:animation-finite-count]");
@@ -2032,6 +2039,12 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
     if (spec.name.empty() || spec.durationSeconds <= 0.0f) continue;
+    if (AnimationSuppressesPlayback(spec)) {
+      _diagnostics.warn(
+          "html: animation-iteration-count <= 0 suppresses playback; dropped "
+          "[subset:animation-finite-count]");
+      continue;
+    }
 
     auto kfIt = _keyframes->find(spec.name);
     if (kfIt == _keyframes->end()) {

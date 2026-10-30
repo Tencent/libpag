@@ -513,6 +513,23 @@ describe('pagxCollectCSS', () => {
     expect(seen.has(el)).toBe(true);
   });
 
+  test('keeps a computed animation-iteration-count of zero', () => {
+    const el = installSheetAndEl();
+    global.getComputedStyle = () => ({
+      animationName: 'fadein',
+      animationDuration: '1s',
+      animationDelay: '0s',
+      animationIterationCount: '0',
+      animationDirection: 'normal',
+      animationTimingFunction: 'linear',
+    });
+    const captured = [];
+    pagxCollectCSS(captured, new Set(), 100);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].el).toBe(el);
+    expect(captured[0].iterations).toBe(0);
+  });
+
   test('returns early (captures nothing) when the keyframes index is empty', () => {
     global.document = {
       styleSheets: [],

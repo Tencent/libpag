@@ -7947,6 +7947,37 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgZeroIterationsDoesNotCrashImporter) {
       ::testing::ExitedWithCode(0), "");
 }
 
+// A zero-iteration SVG shape must also be dropped when another element creates the same timing
+// group; otherwise the missing group lookup is masked and the SVG animation plays by mistake.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgZeroIterationsDoNotJoinPlayableSibling) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(90deg); }
+      }
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="sib" style="width:10px;height:10px;animation:fade 1s linear forwards"></div>
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none"
+                style="animation-name:spin;animation-duration:1s;
+                       animation-iteration-count:0"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  ASSERT_EQ(animation->objects.size(), 1u);
+  EXPECT_NE(FindObjectByTarget(animation, "sib"), nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:animation-finite-count"));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
