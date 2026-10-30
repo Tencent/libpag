@@ -605,8 +605,39 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // "Production" labels) symptom: button background renders, label text disappears.
         if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
             _ctx->animatedElementIds.count(group) > 0) {
+          std::vector<Element*> propagatedPainters = {};
+          if (_ctx->animatedElementIds.count(group) > 0 && !hasPainter && !hasText && !hasTextBox &&
+              !group->elements.empty()) {
+            bool shapeOnly = true;
+            for (auto* child : group->elements) {
+              auto childType = child->nodeType();
+              if (childType != NodeType::Rectangle && childType != NodeType::Ellipse &&
+                  childType != NodeType::Path && childType != NodeType::Polystar) {
+                shapeOnly = false;
+                break;
+              }
+            }
+            if (shapeOnly) {
+              bool foundFill = false;
+              bool foundStroke = false;
+              for (size_t painterIndex = elemIndex + 1; painterIndex < elements.size();
+                   ++painterIndex) {
+                auto* painter = elements[painterIndex];
+                if (painter->nodeType() == NodeType::Fill && !foundFill) {
+                  propagatedPainters.push_back(painter);
+                  foundFill = true;
+                } else if (painter->nodeType() == NodeType::Stroke && !foundStroke) {
+                  propagatedPainters.push_back(painter);
+                  foundStroke = true;
+                }
+                if (foundFill && foundStroke) {
+                  break;
+                }
+              }
+            }
+          }
           flushPendingSVGDraws(out);
-          writeGroup(out, group, alpha, distribute);
+          writeGroup(out, group, alpha, distribute, {}, &propagatedPainters);
         } else {
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
                        curTextBox, state);
