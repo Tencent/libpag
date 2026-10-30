@@ -576,7 +576,11 @@ timeline emit a channel.
   `subset:animation-timeline-shifted`. For example, a 60-frame cycle with delays -30, 0 and 15
   becomes keyframe intervals 0–60, 30–90 and 45–105; `Animation.duration` is 105 and HTML
   `t=0` corresponds to PAGX frame 30. `once` animations with `none` / `backwards` fill extend
-  one frame past the shifted active end to sample the trailing baseline.
+  one frame past the shifted active end to sample the trailing baseline. Each timing group shifts
+  independently: animations in different groups keep separate playback windows, so their HTML
+  `t=0` can land on different PAGX frames and their absolute start times may no longer align.
+  Shifting the entire document for one group's negative delay would unnecessarily move every
+  unrelated animation.
   - **Looping animations (deliberate trade-off).** CSS applies the delay to the first iteration
     only and then loops seamlessly. A PAGX `Animation` repeats its whole `[0, duration]` window,
     so a nonzero delay changes repeated playback and warns with

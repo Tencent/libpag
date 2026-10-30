@@ -521,6 +521,8 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   `subset:animation-timeline-shifted` 告警。例如，60 帧周期、延迟分别为 -30、0、15 帧时，三个关键帧
   区间依次是 0–60、30–90、45–105，`Animation.duration=105`，HTML 的 `t=0` 对应 PAGX 第 30 帧。
   `once` 动画若采用 `none` / `backwards` 填充，还会在平移后活动区间末尾多留一帧以显示基线值。
+  各时序组独立平移：不同组的动画保留各自的播放窗口，HTML 的 `t=0` 可能落在不同的 PAGX 帧上，
+  组间绝对起点不再对齐。不为一个组的负延迟统一平移整个文档，以免无关动画也受到影响。
   - **循环动画（有意的取舍）。** CSS 只在第一次迭代前应用延迟，之后无缝循环；PAGX 的 `Animation`
     每次重复整个 `[0, duration]` 窗口，因此非零延迟会改变循环播放，并告警
     `subset:animation-delay-replayed`。正延迟使每轮出现停顿；负延迟可能只改变起始相位而不增加停顿。
