@@ -2,14 +2,17 @@ import {PAGModule} from './pag-module';
 import {PAGFile} from './pag-file';
 import {PAGSurface} from './pag-surface';
 import {destroyVerify} from './utils/decorators';
-import {getWasmIns, layer2typeLayer, proxyVector} from './utils/type-utils';
+import {getWasmIns, layer2typeLayer} from './utils/type-utils';
 import {Matrix} from './core/matrix';
 
 import {PAGComposition} from './pag-composition';
 import type {PAGLayer} from './pag-layer';
 import {type PAGScaleMode, type Rect, VecArray} from './types';
 import type {VideoReader} from './interfaces';
-import {VideoReaderManager} from "./video-reader-manager";
+import {VideoReaderManager, type VideoFrameTarget} from './video-reader-manager';
+import {WebAssemblyQueue} from './utils/queue';
+
+type PlayerOperation = 'prepare' | 'flush';
 
 @destroyVerify
 export class PAGPlayer {
@@ -19,12 +22,22 @@ export class PAGPlayer {
         return new PAGPlayer(wasmIns);
     }
 
+    private static ExecuteQueuedOperation(this: PAGPlayer, operation: PlayerOperation,
+        callback: ((res: boolean) => void) | null, version: number): Promise<boolean> | boolean {
+        if (this.isDestroyed) return false;
+        return this.executeOperation(operation, callback, version);
+    }
+
     public wasmIns;
     public isDestroyed = false;
     public videoReaders: VideoReader[] = [];
 
     protected pagComposition: PAGComposition | null = null;
     protected videoReaderManager: VideoReaderManager | null = null;
+    private operationQueue = new WebAssemblyQueue();
+    private compositionVersion = 0;
+    private frameVersion = 0;
+    private videoPlaying = false;
 
     public constructor(wasmIns: any) {
         this.wasmIns = wasmIns;
@@ -34,21 +47,17 @@ export class PAGPlayer {
      * Set the progress of play position, the value is from 0.0 to 1.0.
      */
     public setProgress(progress: number): void {
+        const previous = this.wasmIns._currentFrame();
         this.wasmIns._setProgress(progress);
+        if (previous !== this.wasmIns._currentFrame()) this.invalidateVideoFrame();
     }
 
     /**
      * Apply all pending changes to the target surface immediately. Returns true if the content has
      * changed.
      */
-    public async flush() {
-        PAGModule.currentPlayer = this;
-        await this.prepareVideoFrame();
-        return PAGModule.webAssemblyQueue.exec<boolean>(async () => {
-            const res = await this.wasmIns._flush();
-            PAGModule.currentPlayer = null;
-            return res;
-        }, this.wasmIns);
+    public flush(): Promise<boolean> {
+        return this.enqueueOperation('flush', null);
     }
 
     /**
@@ -56,14 +65,7 @@ export class PAGPlayer {
      * changed.
      */
     public async flushInternal(callback: (res: boolean) => void) {
-        PAGModule.currentPlayer = this;
-        await this.prepareVideoFrame();
-        const res = await PAGModule.webAssemblyQueue.exec<boolean>(async () => {
-            const res = await this.wasmIns._flush();
-            PAGModule.currentPlayer = null;
-            callback(res);
-            return res;
-        }, this.wasmIns);
+        const res = await this.enqueueOperation('flush', callback);
         // Log video reader errors but don't throw - video decoding failures shouldn't stop playback
         for (const videoReader of this.videoReaders) {
             const error = await videoReader.getError();
@@ -106,7 +108,11 @@ export class PAGPlayer {
      * Set the value of videoEnabled property.
      */
     public setVideoEnabled(enabled: boolean): void {
+        if (this.videoEnabled() !== enabled) this.invalidateVideoFrame();
         this.wasmIns._setVideoEnabled(enabled);
+        if (!enabled) {
+            for (const reader of this.videoReaders) reader.pause();
+        }
     }
 
     /**
@@ -236,6 +242,7 @@ export class PAGPlayer {
      */
     public nextFrame() {
         this.wasmIns._nextFrame();
+        this.invalidateVideoFrame();
     }
 
     /**
@@ -244,6 +251,7 @@ export class PAGPlayer {
      */
     public preFrame() {
         this.wasmIns._preFrame();
+        this.invalidateVideoFrame();
     }
 
     /**
@@ -326,16 +334,11 @@ export class PAGPlayer {
     }
 
     /**
-     * Prepares the player for the next flush() call. It collects all CPU tasks from the current
-     * progress of the composition and runs them asynchronously in parallel. It is usually used for
-     * speeding up the first frame rendering.
+     * Prepares video frames and native resources at the current progress without presenting a frame.
+     * Initial video loading may take time. Invalidated requests finish without using stale resources.
      */
-    public prepare(): Promise<void> {
-        return PAGModule.webAssemblyQueue.exec(async () => {
-            PAGModule.currentPlayer = this;
-            await this.wasmIns._prepare();
-            PAGModule.currentPlayer = null;
-        }, this.wasmIns);
+    public async prepare(): Promise<void> {
+        await this.enqueueOperation('prepare', null);
     }
 
     public destroy() {
@@ -361,33 +364,106 @@ export class PAGPlayer {
         }
     }
 
-    /**
-     * Prepares the video frame for the current composition before rendering.
-     */
-    private async prepareVideoFrame() {
-        if (PAGModule._useSoftwareDecoder !== undefined && !PAGModule._useSoftwareDecoder) {
-            if (this.pagComposition !== null) {
-                if (this.videoReaderManager === null && VideoReaderManager.HasVideo(this.pagComposition?.wasmIns)) {
-                    this.videoReaderManager = await VideoReaderManager.make(this.pagComposition?.wasmIns);
-                    PAGModule.videoReaderManager = this.videoReaderManager;
-                }
-                if (this.videoReaderManager !== null) {
-                    await this.videoReaderManager.prepareTargetFrame();
-                }
-            } else {
-                console.error("PAGComposition is null. A valid PAG file is missing.");
-            }
+    /** Returns the playback intent inherited by newly created video readers. */
+    public isVideoPlaying(): boolean {
+        return this.videoPlaying;
+    }
+
+    /** Applies playback intent to current readers and readers created by future preparation. */
+    public setVideoPlaying(playing: boolean): void {
+        if (this.videoPlaying !== playing) this.invalidateVideoFrame();
+        this.videoPlaying = playing;
+        for (const reader of this.videoReaders) {
+            reader.isPlaying = playing;
+            if (!playing) reader.pause();
         }
     }
 
-    /**
-     * Destroys the video reader manager and releases all associated resources.
-     */
-    public destroyVideoReaderManager() {
-        if (this.videoReaderManager !== null) {
-            this.videoReaderManager.destroy();
-            this.videoReaderManager = null;
-            PAGModule.videoReaderManage = null;
+    /** Cancels pending composition work and releases all associated video resources. */
+    public destroyVideoReaderManager(): void {
+        this.compositionVersion++;
+        this.frameVersion++;
+        const manager = this.videoReaderManager;
+        this.videoReaderManager = null;
+        if (manager) {
+            if (PAGModule.videoReaderManager === manager) PAGModule.videoReaderManager = undefined;
+            manager.destroy();
+        }
+    }
+
+    private invalidateVideoFrame(): void {
+        this.frameVersion++;
+        this.videoReaderManager?.cancelPrepare();
+    }
+
+    private needsVideoPreparation(): boolean {
+        return PAGModule._useSoftwareDecoder === false && this.videoEnabled() && this.pagComposition !== null;
+    }
+
+    private enqueueOperation(operation: PlayerOperation, callback: ((res: boolean) => void) | null): Promise<boolean> {
+        return this.operationQueue.exec(PAGPlayer.ExecuteQueuedOperation, this,
+            operation, callback, this.compositionVersion);
+    }
+
+    private async executeOperation(operation: PlayerOperation, callback: ((res: boolean) => void) | null,
+        compositionVersion: number): Promise<boolean> {
+        while (!this.isDestroyed && this.compositionVersion === compositionVersion) {
+            const version = this.frameVersion;
+            const needsVideo = this.needsVideoPreparation();
+            let manager: VideoReaderManager | null = null;
+            let plan: VideoFrameTarget[] = [];
+            if (needsVideo) {
+                if (!this.videoReaderManager && VideoReaderManager.HasVideo(this.pagComposition!.wasmIns)) {
+                    this.videoReaderManager = new VideoReaderManager(this.pagComposition!.wasmIns, this);
+                }
+                manager = this.videoReaderManager;
+                if (manager) {
+                    try {
+                        if (!await manager.initialize()) return false;
+                    } catch (error) {
+                        if (this.videoReaderManager === manager) this.videoReaderManager = null;
+                        if (this.compositionVersion !== compositionVersion) return false;
+                        throw error;
+                    }
+                    if (this.compositionVersion !== compositionVersion) return false;
+                    plan = manager.captureTargets();
+                    const prepared = await manager.prepareTargets(plan);
+                    if (this.compositionVersion !== compositionVersion) return false;
+                    if (version !== this.frameVersion || !manager.matchesTargets(plan)) continue;
+                    if (!prepared) {
+                        if (operation === 'prepare') throw new Error('Video frame preparation failed');
+                        return false;
+                    }
+                }
+            }
+            const result = await PAGModule.webAssemblyQueue.exec<boolean | undefined>(this.invokeNative, this,
+                operation, callback, compositionVersion, version, manager, plan, needsVideo);
+            if (result !== undefined) return result;
+        }
+        return false;
+    }
+
+    private invokeNative(operation: PlayerOperation, callback: ((res: boolean) => void) | null,
+        compositionVersion: number, frameVersion: number, manager: VideoReaderManager | null,
+        plan: VideoFrameTarget[], needsVideo: boolean): boolean | undefined {
+        if (this.isDestroyed || this.compositionVersion !== compositionVersion) return false;
+        if (frameVersion !== this.frameVersion || needsVideo !== this.needsVideoPreparation() ||
+            (manager && !manager.matchesTargets(plan))) return undefined;
+        const previousPlayer = PAGModule.currentPlayer;
+        const previousManager = PAGModule.videoReaderManager;
+        PAGModule.currentPlayer = this;
+        PAGModule.videoReaderManager = manager ?? undefined;
+        try {
+            if (operation === 'prepare') {
+                this.wasmIns._prepare();
+                return true;
+            }
+            const result = this.wasmIns._flush() as boolean;
+            if (callback) callback(result);
+            return result;
+        } finally {
+            PAGModule.currentPlayer = previousPlayer;
+            PAGModule.videoReaderManager = previousManager;
         }
     }
 

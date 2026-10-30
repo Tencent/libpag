@@ -46,6 +46,7 @@
     "cypress:webgpu": "cypress run --browser chrome --headless --env BACKEND=webgpu",
     "test:bundle": "node --test script/bundle-format.test.cjs",
     "test:cypress-runner": "node --test script/UnitTest.test.cjs script/cypress-config.test.cjs",
+    "test:video": "node --test script/video-prepare.test.cjs script/video-reader.test.cjs script/wechat-video-reader.test.cjs",
     "typecheck:cypress": "tsc --noEmit -p cypress/tsconfig.json",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm",

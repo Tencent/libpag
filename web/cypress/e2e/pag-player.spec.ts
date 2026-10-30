@@ -13,7 +13,7 @@ describe('PAGPlayer', () => {
   let PAGTypes: typeof Libpag.types;
   let pagPlayer: PAGPlayer;
   let pagFile: PAGFile;
-  let resources: { destroy: () => void }[] = [];
+  let resources: { destroy: () => void; isDestroyed?: boolean }[] = [];
 
   beforeEach(() => {
     resources = [];
@@ -37,7 +37,7 @@ describe('PAGPlayer', () => {
 
   afterEach(() => {
     for (const resource of resources.reverse()) {
-      resource.destroy();
+      if (!resource.isDestroyed) resource.destroy();
     }
     resources = [];
   });
@@ -55,6 +55,50 @@ describe('PAGPlayer', () => {
     await pagPlayer.prepare();
     await pagPlayer.flush();
     expect(await pagPlayer.flush()).to.be.eq(false);
+  });
+
+  it('Prepares a nonzero video frame without starting playback', async () => {
+    pagPlayer.setProgress(0.5);
+    const progress = pagPlayer.getProgress();
+    await pagPlayer.prepare();
+    expect(pagPlayer.videoReaders.length).to.equal(pagFile.numVideos());
+    expect(pagPlayer.isVideoPlaying()).to.equal(false);
+    for (const reader of pagPlayer.videoReaders) {
+      expect(reader.isPlaying).to.equal(false);
+      expect(await reader.getError()).to.equal(null);
+    }
+    expect(pagPlayer.getProgress()).to.equal(progress);
+    expect(await pagPlayer.flush()).to.equal(true);
+    expect(await pagPlayer.flush()).to.equal(false);
+  });
+
+  it('Serializes simultaneous prepare and flush without duplicating video readers', async () => {
+    const results = await Promise.all([pagPlayer.prepare(), pagPlayer.flush(), pagPlayer.flush()]);
+    expect(results).to.deep.equal([undefined, true, false]);
+    expect(pagPlayer.videoReaders.length).to.equal(pagFile.numVideos());
+  });
+
+  it('Cancels preparation when its composition is replaced', async () => {
+    const pending = pagPlayer.prepare();
+    const replacement = PAG.PAGComposition.make(300, 300);
+    const solid = PAG.PAGSolidLayer.make(1000000, 300, 300, { red: 255, green: 0, blue: 0 }, 255);
+    resources.push(replacement, solid);
+    replacement.addLayer(solid);
+    pagPlayer.setComposition(replacement);
+    await pending;
+    await pagPlayer.prepare();
+    expect(pagPlayer.videoReaders.length).to.equal(0);
+    expect(await pagPlayer.flush()).to.equal(true);
+    expect(await pagPlayer.flush()).to.equal(false);
+  });
+
+  it('Settles active and queued operations when destroyed', async () => {
+    const preparing = pagPlayer.prepare();
+    const flushing = pagPlayer.flush();
+    pagPlayer.destroy();
+    await preparing;
+    expect(await flushing).to.equal(false);
+    expect(pagPlayer.isDestroyed).to.equal(true);
   });
 
   it('Get/Set PAGComposition', async () => {
