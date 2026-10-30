@@ -880,7 +880,7 @@ Layers are the fundamental organizational units for PAGX content. Each Layer ser
 
 ### 5.1 Core Concepts
 
-This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
+This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, layer geometry, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
 
 #### Layer Rendering Pipeline
 
@@ -908,6 +908,15 @@ Layer styles compute their effects based on layer content. For example, when fil
 3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
 
 Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
+
+#### Layer Geometry
+
+**Layer geometry** is the outline the layer itself covers: the outline of every shape the layer's own fills and strokes draw, including paints that are fully transparent, plus the outline of geometry that no painter draws. It differs from layer contour in two ways:
+
+1. **Descendants never contribute.** Child layers belong to layer content and to the subtree contour, but not to the layer geometry.
+2. **Unpainted geometry is included.** A standalone Rectangle or Ellipse that carries no fill or stroke contributes its outline, even though it adds nothing to the contour.
+
+A layer that records no geometry has none to mask with; a style that needs one falls back as its own section describes (§5.3.5 for GlassStyle).
 
 #### Layer Background
 
@@ -1013,9 +1022,9 @@ Layer styles add visual effects above or below layer content without modifying t
 
 **Input Sources for Layer Styles**:
 
-All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
+All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills. GlassStyle is the exception: it uses the layer's own geometry instead of the opaque layer content (see §5.3.5).
 
-Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in §5.1.
+Some layer styles additionally use **layer geometry**, **layer contour**, or **layer background** as input (see individual style descriptions). Definitions of these concepts are in §5.1.
 
 > [Sample](samples/layer_styles.pagx)
 
@@ -1026,7 +1035,7 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 | `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
 | `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
 
-**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
+**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included. GlassStyle is the exception: its mask is the layer's own geometry, so child rendering results never contribute — children only enter through the subtree-contour fallback used when the layer records no geometry (see §5.3.5).
 
 #### 5.3.1 DropShadowStyle
 
@@ -1101,7 +1110,7 @@ Overlays procedural Perlin noise above the layer content. Three noise modes are 
 
 #### 5.3.5 GlassStyle
 
-Simulates the physical behavior of light passing through a glass surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. Computes the effect based on **layer background**, using opaque layer content as the shape mask. The background comes implicitly from the complete PAGX layer tree below the layer; no background reference attribute is used. All seven parameters are animatable float channels matching `tgfx::GlassStyle`.
+Simulates the physical behavior of light passing through a glass surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. Computes the effect based on **layer background**, masked by the layer's **own geometry**: the geometry recorded by the layer's own painters — including geometry drawn by painters with alpha = 0 and geometry covered by a `SolidColor` fill whose color alpha is 0 — plus geometry that no painter draws, regardless of whether the layer has any visible fill. If the layer records no geometry, the mask falls back to the layer contour of the subtree: it includes the descendants and paints with alpha = 0, but not geometry that no painter draws. When the layer has neither, nothing is rendered for the style. The mask follows the contour's color rules: solid and gradient fills become opaque white, while an image fill keeps its own transparent pixels. The background comes implicitly from the complete PAGX layer tree below the layer; no background reference attribute is used. All seven parameters are animatable float channels matching `tgfx::GlassStyle`.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1115,7 +1124,7 @@ Simulates the physical behavior of light passing through a glass surface, produc
 
 **Rendering Steps**:
 1. Get layer background below the layer (implicit backdrop of the full PAGX layer tree)
-2. Apply frosted blur (`frost`), refraction (`refraction`, `depth`, `splay`), and chromatic dispersion (`dispersion`) to the layer background, shaped by the opaque layer content
+2. Apply frosted blur (`frost`), refraction (`refraction`, `depth`, `splay`), and chromatic dispersion (`dispersion`) to the layer background, masked by the layer's own geometry
 3. Add specular edge highlights using `lightAngle` and `lightIntensity`
 
 ### 5.4 Layer Filters
