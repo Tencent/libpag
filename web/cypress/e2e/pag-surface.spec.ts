@@ -86,7 +86,7 @@ describe('PAGSurface', () => {
 
   function MakePlayer(surface: PAGSurface) {
     const composition = Own(PAG.PAGComposition.make(65, 3));
-    const layer = Own(PAG.PAGSolidLayer.make(1000000, 65, 3, { red: 255, green: 0, blue: 0 }));
+    const layer = Own(PAG.PAGSolidLayer.make(1000000, 65, 3, { red: 255, green: 0, blue: 0 }, 255));
     composition.addLayer(layer);
     const player = Own(PAG.PAGPlayer.create());
     player.setSurface(surface);
