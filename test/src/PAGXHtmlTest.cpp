@@ -3484,15 +3484,19 @@ CLI_TEST(PAGXHtmlTest, AnimationKeyframeBoundaryHold) {
   ASSERT_FALSE(onceTag.empty());
   EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
 
-  EXPECT_NE(html.find("@keyframes pagx_slider_1 {\n"
-                      "  0% { transform: translate(80px, 0px); }\n"
-                      "  25% { transform: translate(80px, 0px); }\n"
-                      "  75% { transform: translate(280px, 0px); }\n"
-                      "  100% { transform: translate(280px, 0px); }\n"
-                      "}"),
-            std::string::npos);
   auto sliderTag = FindTagContaining(html, "id=\"slider\"");
   ASSERT_FALSE(sliderTag.empty());
+  // In the source PAGX, left=20 is the layout slot, while the animated x keys are 100 and 300.
+  // Their rendered x positions are therefore 120 and 320, not 100 and 300. The 0%/100% stops
+  // extend the first/last key values; they do not subtract the layout slot from either value.
+  EXPECT_NE(sliderTag.find("left:20px"), std::string::npos) << sliderTag;
+  EXPECT_NE(html.find("@keyframes pagx_slider_1 {\n"
+                      "  0% { transform: translate(100px, 0px); }\n"
+                      "  25% { transform: translate(100px, 0px); }\n"
+                      "  75% { transform: translate(300px, 0px); }\n"
+                      "  100% { transform: translate(300px, 0px); }\n"
+                      "}"),
+            std::string::npos);
   EXPECT_NE(sliderTag.find("2s linear infinite"), std::string::npos);
 }
 
@@ -3529,10 +3533,92 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationXY) {
   EXPECT_NE(sliderTag.find("left:20px"), std::string::npos);
   EXPECT_NE(sliderTag.find("top:50px"), std::string::npos);
 
-  EXPECT_NE(html.find("0% { transform: translate(0px, 0px); }"), std::string::npos);
-  EXPECT_NE(html.find("25% { transform: translate(170px, 30px); }"), std::string::npos);
-  EXPECT_NE(html.find("50% { transform: translate(340px, 0px); }"), std::string::npos);
-  EXPECT_NE(html.find("100% { transform: translate(0px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("0% { transform: translate(20px, 50px); }"), std::string::npos);
+  EXPECT_NE(html.find("25% { transform: translate(190px, 80px); }"), std::string::npos);
+  EXPECT_NE(html.find("50% { transform: translate(360px, 50px); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(20px, 50px); }"), std::string::npos);
+}
+
+// With a layout constraint, CSS left is the generated layout slot. Keyframe translation must
+// carry the complete authored x value, not subtract the resolved layout position.
+CLI_TEST(PAGXHtmlTest, AnimationLayerXWithLayoutConstraintKeepsAuthoredPosition) {
+  const char* xml = R"(<pagx width="320" height="160">
+    <Layer id="constrained" left="100" top="40" x="20" width="40" height="40">
+      <Rectangle position="20,20" size="40,40"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="slide" duration="60" frameRate="60" loop="once">
+        <Object target="constrained">
+          <Channel name="x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="60"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"constrained\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("left:100px"), std::string::npos) << tag;
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) translate(20px,0px); }"),
+            std::string::npos)
+      << html;
+  EXPECT_NE(html.find("100% { transform: translate(40px, 0px) translate(20px,0px); }"),
+            std::string::npos)
+      << html;
+}
+
+// The runtime applies Group/TextBox position channels to the rendered transform even when the
+// static layout resolved a left constraint; exported keyframes must preserve that movement.
+CLI_TEST(PAGXHtmlTest, AnimationConstrainedGroupAndTextBoxPositionKeepsMovement) {
+  const char* xml = R"(<pagx width="320" height="160">
+    <Layer width="320" height="160">
+      <Group id="fixedGroup" left="100" position="20,30">
+        <Rectangle size="40,40"/>
+        <Fill color="#2563EB"/>
+      </Group>
+      <TextBox id="fixedTextBox" left="180" position="20,60" width="100" height="30">
+        <Text text="T" fontFamily="Arial" fontSize="20"/>
+        <Fill color="#F97316"/>
+      </TextBox>
+    </Layer>
+    <Animations>
+      <Animation id="slide" duration="60" frameRate="60" loop="once">
+        <Object target="fixedGroup">
+          <Channel name="position.x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="70"/>
+          </Channel>
+          <Channel name="position.y" type="float">
+            <Key time="0" value="30" interpolation="linear"/>
+            <Key time="60" value="50"/>
+          </Channel>
+        </Object>
+        <Object target="fixedTextBox">
+          <Channel name="position.x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="70"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto group = FindTagContaining(html, "id=\"fixedGroup\"");
+  auto textBox = FindTagContaining(html, "id=\"fixedTextBox\"");
+  ASSERT_FALSE(group.empty());
+  ASSERT_FALSE(textBox.empty());
+  EXPECT_NE(html.find("100% { transform: translate(70px, 50px); }"), std::string::npos) << html;
+  EXPECT_NE(textBox.find("left:180px"), std::string::npos) << textBox;
+  EXPECT_NE(html.find("100% { transform: translate(-110px, 0px); }"), std::string::npos) << html;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationLayerMatrixAndRotationScale) {
