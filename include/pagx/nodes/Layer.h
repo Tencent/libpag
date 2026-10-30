@@ -172,6 +172,18 @@ class Layer : public Node, public LayoutNode {
   Matrix3D matrix3D = {};
 
   /**
+   * The pivot of the local transform in layer-local pixels. The transform rotates and scales around
+   * this point, and the translation is applied afterwards:
+   *
+   *   M = T(translate) * T(anchor) * L * T(-anchor)
+   *
+   * where L is the linear part of matrix / matrix3D. A zero anchor reproduces the legacy meaning of
+   * matrix as the complete transform, so existing documents keep their behavior. The anchor is not
+   * scaled by width / height and does not affect layout.
+   */
+  Point anchor = {};
+
+  /**
    * Whether to preserve 3D transformations for child layers. The default value is false.
    */
   bool preserve3D = false;

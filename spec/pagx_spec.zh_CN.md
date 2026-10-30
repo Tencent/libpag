@@ -967,6 +967,7 @@ Layer 的子元素按类型自动归类为五个集合：
 | `perspective` | float | 0 | 透视距离 `d`；0 表示无透视，负数无效 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | 单位矩阵 | 3D 变换（16 个值，列优先）；必须有限且可逆 |
+| `anchor` | Point | 0,0 | 局部变换的支点 "x,y"（图层本地像素，不随尺寸缩放，不参与布局） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | true | 组透明度 |
@@ -992,6 +993,16 @@ Layer 的子元素按类型自动归类为五个集合：
 - 设置 `matrix3D`：`matrix3D` 覆盖 `matrix`、`x`/`y`/`z` 和变换分量
 
 剪切角为 ±90° 或 `perspective` 为负数时无法组合，此时忽略变换分量，只应用 `x`/`y`/`z`。
+
+**anchor（局部变换支点）**：`anchor` 指定局部变换的旋转 / 缩放支点，平移在支点变换之后叠加：
+
+```text
+M = T(translate) * T(anchor) * L * T(-anchor)
+```
+
+其中 `L` 是 `matrix` / `matrix3D` 的线性部分，`translate` 是其平移量。`anchor` 为 `0,0`（默认）时退化为“矩阵即完整变换”，与既有文档完全兼容；`anchor` 非零时，`matrix` 的 `tx`/`ty` 只表示纯平移，不应再包含支点补偿。同一份数据里不允许同时存在“烘焙进 tx/ty 的支点补偿”和 `anchor`，两者叠加会导致整体偏移。
+
+SVG 的 `rotate(θ, cx, cy)` 对应 `anchor="cx,cy"` 加只含线性部分（`tx = ty = 0`）的矩阵关键帧。
 
 约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
 

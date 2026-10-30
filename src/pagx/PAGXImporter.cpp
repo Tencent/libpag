@@ -548,6 +548,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       layer->matrix = parsed;
     }
   }
+  layer->anchor = GetPointAttribute(node, "anchor", Default<Layer>().anchor, doc);
   auto matrix3DStr = GetAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
     auto floats = ParseFloatList(matrix3DStr);
