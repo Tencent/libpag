@@ -18,6 +18,7 @@
 
 #include "RadialBlurFilter.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -85,15 +86,16 @@ std::vector<tgfx::BindingEntry> RadialBlurFilter::uniformBlocks() const {
 void RadialBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                         const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                         const tgfx::Point&) const {
-  // std140 rounds the `Args` block up to the vec2 member's alignment (8 bytes), so the block is
-  // 16 bytes: pad the struct to match, otherwise the bound size fails WebGPU validation.
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float centerX = 0.0f;
     float centerY = 0.0f;
     float amount = 0.0f;
-    float padding = 0.0f;
   };
-  static_assert(sizeof(Uniforms) == 16, "Uniforms must match the std140 size of the Args block");
+
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(), "Args must match the std140 layout.");
+  static_assert(offsetof(Uniforms, centerX) == 0 && offsetof(Uniforms, centerY) == 4 &&
+                    offsetof(Uniforms, amount) == 8,
+                "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.amount = static_cast<float>(amount);

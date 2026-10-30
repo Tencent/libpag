@@ -20,6 +20,7 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/utils/BlurTypes.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -187,20 +188,22 @@ void SolidStrokeFilter::onUpdateUniforms(
   spreadSizeX = std::min(spreadSizeX, STROKE_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, STROKE_MAX_SPREAD_SIZE);
 
-  // std140 rounds the `FilterUniforms` block up to the vec3 member's alignment (16 bytes), so
-  // the block is 48 bytes: pad the struct to match, otherwise the bound size fails WebGPU
-  // validation.
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float color[3] = {};
     float isUseOriginalTexture = 0.0f;
     float size[2] = {};
     float isOutside = 0.0f;
     float isCenter = 0.0f;
     float isInside = 0.0f;
-    float padding[3] = {};
   };
-  static_assert(sizeof(Uniforms) == 48,
-                "Uniforms must match the std140 size of the FilterUniforms block");
+
+  static_assert(HasStd140UniformLayout<Uniforms, 48>(),
+                "FilterUniforms must match the std140 layout.");
+  static_assert(offsetof(Uniforms, color) == 0 && offsetof(Uniforms, isUseOriginalTexture) == 12 &&
+                    offsetof(Uniforms, size) == 16 && offsetof(Uniforms, isOutside) == 24 &&
+                    offsetof(Uniforms, isCenter) == 28 && offsetof(Uniforms, isInside) == 32,
+                "FilterUniforms member offsets must match the shader declaration.");
+
   Uniforms uniforms = {};
   uniforms.color[0] = color.red;
   uniforms.color[1] = color.green;

@@ -366,28 +366,28 @@ CLI_TEST(PAGXCliTest, Bounds_IdAndXPathMutuallyExclusive) {
 // Render tests — Verify rendered output matches baseline screenshots
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, Render_Basic) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Basic) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderBasic"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Gradient) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Gradient) {
   auto inputPath = TestResourcePath("render_gradient.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderGradient"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Scale) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Scale) {
   auto inputPath = TestResourcePath("render_scale.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2.0", inputPath}, "PAGXCliTest/RenderScale"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Crop) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Crop) {
   auto inputPath = TestResourcePath("render_crop.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--crop", "50,50,100,100", inputPath}, "PAGXCliTest/RenderCrop"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Background) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Background) {
   auto inputPath = TestResourcePath("render_background.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--background", "#0088FF", inputPath},
                                "PAGXCliTest/RenderBackground"));
@@ -449,7 +449,7 @@ CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
   EXPECT_LT(switched.getColor(250, 50).red, 0.1f);
 }
 
-CLI_TEST(PAGXCliTest, Render_WebpFormat) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_WebpFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderWebpFormat.webp";
   auto ret =
@@ -458,7 +458,7 @@ CLI_TEST(PAGXCliTest, Render_WebpFormat) {
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderWebpFormat"));
 }
 
-CLI_TEST(PAGXCliTest, Render_JpgFormat) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_JpgFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderJpgFormat.jpg";
   auto ret =
@@ -477,14 +477,14 @@ CLI_TEST(PAGXCliTest, Render_Quality) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Render_CombinedOptions) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_CombinedOptions) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   EXPECT_TRUE(RenderAndCompare(
       {"render", "--scale", "2.0", "--crop", "0,0,200,200", "--background", "#FFFF00", inputPath},
       "PAGXCliTest/RenderCombinedOptions"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Text) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Text) {
   auto inputPath = TestResourcePath("render_text.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderText"));
 }
@@ -535,47 +535,47 @@ CLI_TEST(PAGXCliTest, Render_UnsupportedFormat) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Render_IdFull) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdFull) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderIdFull"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdBadge) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdBadge) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "badge", inputPath}, "PAGXCliTest/RenderIdBadge"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdCard) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdCard) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "card", inputPath}, "PAGXCliTest/RenderIdCard"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdBanner) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdBanner) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "banner", inputPath}, "PAGXCliTest/RenderIdBanner"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdNestedIcon) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdNestedIcon) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "icon", inputPath}, "PAGXCliTest/RenderIdNestedIcon"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdWithScale) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdWithScale) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--scale", "2", inputPath},
                                "PAGXCliTest/RenderIdWithScale"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdWithCrop) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdWithCrop) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--crop", "60,0,120,80", inputPath},
                                "PAGXCliTest/RenderIdWithCrop"));
 }
 
-CLI_TEST(PAGXCliTest, Render_XPathLayer) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_XPathLayer) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--xpath", "//Layer[@id='badge']", inputPath},
                                "PAGXCliTest/RenderXPathLayer"));
@@ -900,7 +900,21 @@ CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCostGlassStyle) {
 }
 
 CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
+  // The mask is 100x50 while the layer frame is 150x75, so replacing it with clipToBounds would
+  // change the rendered area and no such advice may be emitted.
   auto inputPath = TestResourcePath("verify_c13_simple_rect_mask.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(oss.str().empty());
+  EXPECT_EQ(oss.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_RectMaskMatchingFrameSuggestsClipToBounds) {
+  auto inputPath = TestResourcePath("verify_rect_mask_matching_frame.pagx");
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
@@ -909,6 +923,99 @@ CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_MaskWithAuthoredOffsetDoesNotSuggestBoundsClip) {
+  auto inputPath = TempDir() + "/mask_authored_offset.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"200\" height=\"100\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"100,50\" size=\"200,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer left=\"0\" top=\"0\" x=\"20\" width=\"200\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"100,50\" size=\"200,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(output.str().empty());
+  EXPECT_EQ(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+  EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_RectMaskInDifferentAncestorSpaceDoesNotSuggestClip) {
+  auto inputPath = TempDir() + "/mask_different_ancestor_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer x=\"120\"><Layer id=\"owner\" width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  const std::vector<std::vector<std::string>> commands = {
+      {"verify", "--skip-render", "--skip-layout", inputPath},
+      {"verify", "--skip-render", "--skip-layout", "--id", "owner", inputPath}};
+  for (const auto& command : commands) {
+    std::ostringstream output;
+    auto* old = std::cerr.rdbuf(output.rdbuf());
+    CallRun(pagx::cli::RunVerify, command);
+    std::cerr.rdbuf(old);
+    EXPECT_EQ(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+    EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
+  }
+  std::vector<std::string> renderArgs = {"render", inputPath};
+  std::vector<char*> argv = {renderArgs[0].data(), renderArgs[1].data()};
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_FLOAT_EQ(bitmap.getColor(150, 50).alpha, 0);
+}
+
+CLI_TEST(PAGXCliTest, Verify_RectMaskInSharedTransformedSpaceSuggestsClip) {
+  auto inputPath = TempDir() + "/mask_shared_transformed_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\"><Layer x=\"120\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  EXPECT_NE(output.str().find("rectangular alpha mask can use clipToBounds"), std::string::npos);
+  std::vector<std::string> renderArgs = {"render", inputPath};
+  std::vector<char*> argv = {renderArgs[0].data(), renderArgs[1].data()};
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_FLOAT_EQ(bitmap.getColor(150, 50).alpha, 1);
+}
+
+CLI_TEST(PAGXCliTest, Verify_FullCanvasMaskInTransformedSpaceIsNotRedundant) {
+  auto inputPath = TempDir() + "/mask_transformed_canvas_space.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"240\" height=\"100\"><Layer x=\"120\">"
+            "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"120,50\" size=\"240,100\"/>"
+            "<Fill color=\"#FFFFFF\"/></Layer>"
+            "<Layer width=\"100\" height=\"100\" mask=\"@m\">"
+            "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+            "</Layer></Layer></pagx>";
+  }
+  std::ostringstream output;
+  auto* old = std::cerr.rdbuf(output.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  // A fully clean run returns 0 with no diagnostics.
+  EXPECT_EQ(ret, 0);
+  EXPECT_EQ(output.str().find("mask covers entire canvas"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_ValidFile) {
@@ -1177,7 +1284,7 @@ CLI_TEST(PAGXCliTest, Verify_FullCanvasClipMask) {
   std::cerr.rdbuf(old);
   auto output = oss.str();
   EXPECT_NE(ret, 0);
-  EXPECT_TRUE(output.find("rectangular alpha mask can use clipToBounds") != std::string::npos);
+  EXPECT_TRUE(output.find("mask covers entire canvas") != std::string::npos);
 }
 
 //==============================================================================
@@ -3058,7 +3165,7 @@ CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
+CLI_PIXEL_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
   // Resolving an inline SVG with two sibling paths must preserve their common source depth:
   // each path and its painter live in a separate peer Group. Flattening only the first path while
   // grouping the second would make the output asymmetric and can change painter accumulation.

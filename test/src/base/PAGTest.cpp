@@ -17,18 +17,48 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTest.h"
+#include <set>
+#include <string>
+#include <utility>
 #include "utils/DevicePool.h"
+#if defined(TGFX_USE_METAL)
+#include "utils/MetalTestSupport.h"
+#endif
 
 namespace pag {
 static bool hasFailure = false;
+
+static std::set<std::pair<std::string, std::string>>& PixelComparisons() {
+  static std::set<std::pair<std::string, std::string>> tests;
+  return tests;
+}
+
+bool PAGTest::RegisterPixelComparison(const char* testSuite, const char* testName) {
+  return PixelComparisons().emplace(testSuite, testName).second;
+}
 
 bool PAGTest::HasFailure() {
   return hasFailure;
 }
 
+bool PAGTest::IsPixelComparison() {
+  const auto* test = testing::UnitTest::GetInstance()->current_test_info();
+  return test != nullptr && PixelComparisons().count({test->test_suite_name(), test->name()}) != 0;
+}
+
 void PAGTest::SetUp() {
+#if defined(__EMSCRIPTEN__)
   // Pure CPU tests must still run when a GPU is unavailable.
   DevicePool::ResetAtlasForComparison();
+#elif defined(TGFX_USE_METAL)
+  if (!IsPixelComparison()) {
+    return;
+  }
+  // Pixel tests opt into tgfx's atlas-isolation workaround before rendering. This intentionally
+  // excludes cross-test atlas reuse from baseline coverage; unmarked behavior tests retain it.
+  ASSERT_TRUE(ResetMetalAtlasForComparison())
+      << "Cannot prepare pixel comparison: failed to create or lock the Metal device.";
+#endif
 }
 
 void PAGTest::TearDown() {

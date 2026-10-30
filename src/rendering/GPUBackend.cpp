@@ -31,8 +31,8 @@ BackendTexture::BackendTexture(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
 
-BackendTexture::BackendTexture(const WgpuTextureInfo& wgpuInfo, int width, int height)
-    : _backend(Backend::WEBGPU), _width(width), _height(height), wgpuInfo(wgpuInfo) {
+BackendTexture::BackendTexture(const WebGPUTextureInfo& webGPUInfo, int width, int height)
+    : _backend(Backend::WEBGPU), _width(width), _height(height), webGPUInfo(webGPUInfo) {
 }
 
 BackendTexture::BackendTexture(const BackendTexture& that) {
@@ -58,7 +58,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       vkInfo = that.vkInfo;
       break;
     case Backend::WEBGPU:
-      wgpuInfo = that.wgpuInfo;
+      webGPUInfo = that.webGPUInfo;
       break;
     default:
       break;
@@ -90,11 +90,11 @@ bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   return true;
 }
 
-bool BackendTexture::getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const {
+bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
   if (!isValid() || _backend != Backend::WEBGPU) {
     return false;
   }
-  *wgpuTextureInfo = wgpuInfo;
+  *webGPUTextureInfo = webGPUInfo;
   return true;
 }
 
@@ -108,10 +108,6 @@ BackendRenderTarget::BackendRenderTarget(const MtlTextureInfo& mtlInfo, int widt
 
 BackendRenderTarget::BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
-}
-
-BackendRenderTarget::BackendRenderTarget(const WgpuTextureInfo& wgpuInfo, int width, int height)
-    : _backend(Backend::WEBGPU), _width(width), _height(height), wgpuInfo(wgpuInfo) {
 }
 
 BackendRenderTarget::BackendRenderTarget(const BackendRenderTarget& that) {
@@ -135,9 +131,6 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
-      break;
-    case Backend::WEBGPU:
-      wgpuInfo = that.wgpuInfo;
       break;
     default:
       break;
@@ -166,14 +159,6 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
     return false;
   }
   *vkImageInfo = vkInfo;
-  return true;
-}
-
-bool BackendRenderTarget::getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const {
-  if (!isValid() || _backend != Backend::WEBGPU) {
-    return false;
-  }
-  *wgpuTextureInfo = wgpuInfo;
   return true;
 }
 

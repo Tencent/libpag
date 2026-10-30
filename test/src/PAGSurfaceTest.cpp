@@ -19,6 +19,7 @@
 #include <chrono>
 #include <thread>
 #include "base/utils/Log.h"
+#include "rendering/PAGSurfaceReadback.h"
 #include "rendering/drawables/TextureDrawable.h"
 #include "utils/TestUtils.h"
 
@@ -79,7 +80,7 @@ uint32_t GetGLVersion(const char* versionString) {
  * and native builds keep it.
  */
 #ifndef PAG_WEBGL_ONLY
-PAG_TEST(PAGSurfaceTest, FromTexture) {
+PAG_PIXEL_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
@@ -136,7 +137,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
 /**
  * 用例描述: 遮罩使用屏幕坐标系时origin不一致的情况
  */
-PAG_TEST(PAGSurfaceTest, Mask) {
+PAG_PIXEL_TEST(PAGSurfaceTest, Mask) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
@@ -251,7 +252,7 @@ PAG_TEST(PAGSurfaceTest, GLRestorer) {
 /**
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
  */
-PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
+PAG_PIXEL_TEST(PAGSurfaceTest, BottomLeftScissor) {
   auto pagFile = LoadPAGFile("assets/test.pag");
   auto width = pagFile->width();
   auto height = pagFile->height() * 2;
@@ -324,7 +325,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixels) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   EXPECT_EQ(readback->width(), pagFile->width());
   EXPECT_EQ(readback->height(), pagFile->height());
@@ -357,7 +358,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsInvalidArgsAndFormat) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   const auto width = readback->width();
   const auto height = readback->height();
@@ -400,7 +401,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadPixelsOutlivesSurface) {
     pagPlayer->setSurface(pagSurface);
     pagPlayer->setProgress(0.5);
     ASSERT_TRUE(pagPlayer->flush());
-    readback = pagSurface->asyncReadPixels();
+    readback = AsyncReadPixels(pagSurface);
     ASSERT_TRUE(readback != nullptr);
   }
 
@@ -427,7 +428,7 @@ PAG_TEST(PAGSurfaceTest, AsyncReadbackStatus) {
   pagPlayer->setProgress(0.5);
   ASSERT_TRUE(pagPlayer->flush());
 
-  auto readback = pagSurface->asyncReadPixels();
+  auto readback = AsyncReadPixels(pagSurface);
   ASSERT_TRUE(readback != nullptr);
   auto status = readback->status();
   EXPECT_TRUE(status == ReadbackStatus::Ready || status == ReadbackStatus::Pending);

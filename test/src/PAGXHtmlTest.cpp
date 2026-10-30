@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -28,6 +29,7 @@
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -337,16 +339,250 @@ CLI_TEST(PAGXHtmlTest, LayerTransformMatrix3D) {
               html.find("transform-style:preserve-3d") != std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
-  auto html =
-      LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/layer_transform_priority.pagx"));
+CLI_TEST(PAGXHtmlTest, LayerStaticZUsesMatrix3DTransform) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("zLayer");
+  layer->z = 30;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto html = ConvertToHTML(doc);
   ASSERT_FALSE(html.empty());
-  // The first layer should use translate (no matrix/matrix3D)
-  EXPECT_NE(html.find("translate(10px,10px)"), std::string::npos);
-  // The second layer: matrix overrides x/y, should use matrix() not translate(999,999)
-  EXPECT_EQ(html.find("translate(999px,999px)"), std::string::npos);
-  // The third layer: matrix3D overrides both matrix and x/y
-  EXPECT_NE(html.find("matrix3d("), std::string::npos);
+  EXPECT_NE(html.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,30,1)"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, LayerTransformComponentsUseMatrix3DTransform) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
+  layer->x = 10;
+  layer->scaleX = 2;
+  layer->scaleY = 3;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto html = ConvertToHTML(doc);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("matrix3d(2,0,0,0,0,3,0,0,0,0,1,0,10,0,0,1)"), std::string::npos);
+  EXPECT_EQ(html.find("left:10px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, LayerAuthoredXYAddsToConstraintPosition) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* parent = doc->makeNode<pagx::Layer>("parent");
+  parent->width = 200;
+  parent->height = 100;
+  auto* layer = doc->makeNode<pagx::Layer>("localPosition");
+  layer->x = 20;
+  layer->y = 10;
+  layer->width = 20;
+  layer->height = 20;
+  layer->left = 100;
+  layer->top = 30;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  parent->children.push_back(layer);
+  doc->layers.push_back(parent);
+
+  auto html = ConvertToHTML(doc, options);
+  auto tag = FindTagContaining(html, "id=\"localPosition\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("left:100px"), std::string::npos);
+  EXPECT_NE(tag.find("top:30px"), std::string::npos);
+  EXPECT_NE(tag.find("transform:translate(20px,10px)"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, FlexLayerAuthoredXYAddsToFlowSlotWithoutEncodingSlot) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* parent = doc->makeNode<pagx::Layer>("flexParent");
+  parent->width = 200;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  auto* leading = doc->makeNode<pagx::Layer>("leading");
+  leading->width = 20;
+  leading->height = 20;
+  parent->children.push_back(leading);
+  auto* layer = doc->makeNode<pagx::Layer>("flexLocal");
+  layer->x = 5;
+  layer->y = 3;
+  layer->width = 20;
+  layer->height = 20;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  parent->children.push_back(layer);
+  doc->layers.push_back(parent);
+
+  auto html = ConvertToHTML(doc, options);
+  auto tag = FindTagContaining(html, "id=\"flexLocal\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.find("left:"), std::string::npos);
+  EXPECT_EQ(tag.find("top:"), std::string::npos);
+  EXPECT_NE(tag.find("transform:translate(5px,3px)"), std::string::npos);
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeMatrix3DPositionDocument(bool constrained) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* parent = doc->makeNode<pagx::Layer>("parent");
+  parent->width = 200;
+  parent->height = 200;
+  auto* layer = doc->makeNode<pagx::Layer>("matrix3DLayer");
+  layer->x = 50;
+  layer->y = 60;
+  layer->width = 30;
+  layer->height = 40;
+  if (constrained) {
+    layer->left = 5;
+    layer->top = 7;
+    parent->children.push_back(layer);
+    doc->layers.push_back(parent);
+  } else {
+    doc->layers.push_back(layer);
+  }
+  layer->matrix3D.values[12] = 10;
+  layer->matrix3D.values[13] = 20;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  return doc;
+}
+
+CLI_TEST(PAGXHtmlTest, LayerMatrix3DOverridesAuthoredXYAndKeepsLayoutPosition) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+
+  auto authoredDoc = MakeMatrix3DPositionDocument(false);
+  auto authoredHtml = ConvertToHTML(authoredDoc, options);
+  auto authoredTag = FindTagContaining(authoredHtml, "matrix3d(");
+  ASSERT_FALSE(authoredTag.empty());
+  EXPECT_NE(authoredTag.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,10,20,0,1)"), std::string::npos);
+  EXPECT_EQ(authoredTag.find("translate("), std::string::npos);
+  EXPECT_EQ(authoredHtml.find("left:50px"), std::string::npos);
+  EXPECT_EQ(authoredHtml.find("left: 50px"), std::string::npos);
+  EXPECT_EQ(authoredHtml.find("top:60px"), std::string::npos);
+  EXPECT_EQ(authoredHtml.find("top: 60px"), std::string::npos);
+
+  auto constrainedDoc = MakeMatrix3DPositionDocument(true);
+  auto constrainedHtml = ConvertToHTML(constrainedDoc, options);
+  auto constrainedTag = FindTagContaining(constrainedHtml, "matrix3d(");
+  ASSERT_FALSE(constrainedTag.empty());
+  EXPECT_NE(constrainedTag.find("left:5px"), std::string::npos);
+  EXPECT_NE(constrainedTag.find("top:7px"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, FlexMatrix3DKeepsFlowSlotWithoutAddingSlotToTransform) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* parent = doc->makeNode<pagx::Layer>("flexParent");
+  parent->width = 200;
+  parent->height = 100;
+  parent->layout = pagx::LayoutMode::Horizontal;
+  auto* leading = doc->makeNode<pagx::Layer>("leadingFlexItem");
+  leading->width = 20;
+  leading->height = 40;
+  parent->children.push_back(leading);
+  auto* layer = doc->makeNode<pagx::Layer>("flexMatrix3D");
+  layer->x = 50;
+  layer->y = 60;
+  layer->width = 30;
+  layer->height = 40;
+  layer->matrix3D.values[12] = 10;
+  layer->matrix3D.values[13] = 20;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  parent->children.push_back(layer);
+  doc->layers.push_back(parent);
+
+  auto html = ConvertToHTML(doc, options);
+  auto tag = FindTagContaining(html, "matrix3d(");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.find("left:"), std::string::npos);
+  EXPECT_EQ(tag.find("top:"), std::string::npos);
+  EXPECT_NE(tag.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,10,20,0,1)"), std::string::npos);
+  auto layoutPosition = layer->layoutPosition();
+  EXPECT_FLOAT_EQ(layoutPosition.x, 20);
+  EXPECT_FLOAT_EQ(layoutPosition.y, 0);
+}
+
+static pagx::Layer* AddEllipseLayer(pagx::PAGXDocument* doc, const std::string& id) {
+  auto* layer = doc->makeNode<pagx::Layer>(id);
+  layer->width = 40;
+  layer->height = 40;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  return layer;
+}
+
+CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* positionLayer = AddEllipseLayer(doc.get(), "positionLayer");
+  positionLayer->x = 10;
+  positionLayer->y = 10;
+  auto* matrixLayer = AddEllipseLayer(doc.get(), "matrixLayer");
+  matrixLayer->x = 999;
+  matrixLayer->y = 999;
+  matrixLayer->matrix = pagx::Matrix::Translate(10, 10);
+  auto* matrix3DLayer = AddEllipseLayer(doc.get(), "matrix3DLayer");
+  matrix3DLayer->x = 999;
+  matrix3DLayer->y = 999;
+  matrix3DLayer->matrix = pagx::Matrix::Translate(40, 50);
+  matrix3DLayer->matrix3D.values[12] = 30;
+  matrix3DLayer->matrix3D.values[13] = 40;
+
+  auto html = ConvertToHTML(doc, options);
+  ASSERT_FALSE(html.empty());
+  auto positionTag = FindTagContaining(html, "id=\"positionLayer\"");
+  auto matrixTag = FindTagContaining(html, "id=\"matrixLayer\"");
+  auto matrix3DTag = FindTagContaining(html, "id=\"matrix3DLayer\"");
+  ASSERT_FALSE(positionTag.empty());
+  ASSERT_FALSE(matrixTag.empty());
+  ASSERT_FALSE(matrix3DTag.empty());
+  EXPECT_NE(positionTag.find("left:10px"), std::string::npos);
+  EXPECT_NE(positionTag.find("top:10px"), std::string::npos);
+  EXPECT_EQ(html.find("left:999px"), std::string::npos);
+  EXPECT_EQ(html.find("left: 999px"), std::string::npos);
+  EXPECT_EQ(html.find("top:999px"), std::string::npos);
+  EXPECT_EQ(html.find("top: 999px"), std::string::npos);
+  EXPECT_NE(matrixTag.find("translate(10px,10px)"), std::string::npos);
+  EXPECT_NE(matrix3DTag.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,30,40,0,1)"), std::string::npos);
+  EXPECT_EQ(html.find("translate(40px,50px)"), std::string::npos);
+  EXPECT_EQ(matrix3DTag.find("left:999px"), std::string::npos);
+  EXPECT_EQ(matrix3DTag.find("top:999px"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerBlendModes) {
@@ -1659,7 +1895,7 @@ CLI_TEST(PAGXHtmlTest, MaskLayerMatrixTransposesGeometry) {
   std::string xml =
       "<pagx width=\"200\" height=\"200\">"
       "  <Layer width=\"200\" height=\"200\">"
-      "    <Layer id=\"m\" visible=\"false\" matrix=\"0,1,1,0,0,0\">"
+      "    <Layer id=\"m\" visible=\"false\" x=\"10\" matrix=\"0,1,1,0,0,0\">"
       "      <Rectangle position=\"20,10\" size=\"40,20\"/>"
       "      <Fill color=\"#FFFFFF\"/>"
       "    </Layer>"
@@ -2979,6 +3215,32 @@ CLI_TEST(PAGXHtmlTest, Woff2HostWinsWhenBothMarkersPresent) {
   ASSERT_EQ(texts.size(), 1u);
   EXPECT_EQ(texts[0]->text, "Both");
   EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+// The projection row of a perspective distance d holds -1/d, which four decimals would round to 0
+// for d >= 40000 and silently drop the perspective.
+PAGX_TEST(PAGXHtmlWriterTest, Matrix3DToCSSKeepsSmallPerspectiveTerms) {
+  pagx::Matrix3D matrix = {};
+  matrix.values[11] = -2.5e-05f;
+  auto css = pagx::Matrix3DToCSS(matrix);
+  const std::string prefix = "matrix3d(";
+  ASSERT_EQ(css.rfind(prefix, 0), 0u);
+  ASSERT_EQ(css.back(), ')');
+  auto body = css.substr(prefix.size(), css.size() - prefix.size() - 1);
+  std::vector<std::string> parts = {};
+  size_t start = 0;
+  while (true) {
+    auto comma = body.find(',', start);
+    parts.push_back(
+        body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  ASSERT_EQ(parts.size(), 16u);
+  EXPECT_FLOAT_EQ(std::strtof(parts[0].c_str(), nullptr), 1.0f);
+  EXPECT_FLOAT_EQ(std::strtof(parts[11].c_str(), nullptr), -2.5e-05f);
 }
 
 }  // namespace pag

@@ -150,7 +150,7 @@ PAG_TEST(PAGLayerTest, markers) {
 /**
  * 用例描述: 测试trackMatte的渲染结果。
  */
-PAG_TEST(PAGLayerTest, trackMatte) {
+PAG_PIXEL_TEST(PAGLayerTest, trackMatte) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   // from 0.52s-10s
   TestPAGFile->setCurrentTime(800 * 1000);
@@ -162,7 +162,7 @@ PAG_TEST(PAGLayerTest, trackMatte) {
 /**
  * 用例描述: PAGLayerTest测试visible接口
  */
-PAG_TEST(PAGLayerTest, visible) {
+PAG_PIXEL_TEST(PAGLayerTest, visible) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   TestPAGFile->setCurrentTime(5 * 1000000);
@@ -177,7 +177,7 @@ PAG_TEST(PAGLayerTest, visible) {
 /**
  * 用例描述: PAGLayerTest测试matrix接口
  */
-PAG_TEST(PAGLayerTest, matrix) {
+PAG_PIXEL_TEST(PAGLayerTest, matrix) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
@@ -200,7 +200,7 @@ PAG_TEST(PAGLayerTest, matrix) {
 /**
  * 用例描述: PAGLayerTest测试nextFrame接口
  */
-PAG_TEST(PAGLayerTest, nextFrame) {
+PAG_PIXEL_TEST(PAGLayerTest, nextFrame) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(1960000ll);
   TestPAGFile->nextFrame();
@@ -211,7 +211,7 @@ PAG_TEST(PAGLayerTest, nextFrame) {
 /**
  * 用例描述: PAGLayerTest测试preFrame接口
  */
-PAG_TEST(PAGLayerTest, preFrame) {
+PAG_PIXEL_TEST(PAGLayerTest, preFrame) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(1960000ll);
   TestPAGFile->nextFrame();
@@ -239,7 +239,7 @@ PAG_TEST(PAGLayerFrameTest, goToFrame) {
 /**
  * 用例描述: alpha 遮罩
  */
-PAG_TEST(PAGLayerTest, AlphaMask) {
+PAG_PIXEL_TEST(PAGLayerTest, AlphaMask) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   TestPAGPlayer->setComposition(pagFile);
@@ -251,7 +251,7 @@ PAG_TEST(PAGLayerTest, AlphaMask) {
 /**
  * 用例描述: 文字缩放
  */
-PAG_TEST(PAGLayerTest, TextScale) {
+PAG_PIXEL_TEST(PAGLayerTest, TextScale) {
   auto pagFile = LoadPAGFile("resources/apitest/TEXT04.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "耶";
@@ -278,7 +278,7 @@ PAG_TEST(PAGLayerTest, TextScale) {
 /**
  * 用例描述: 透明度设置
  */
-PAG_TEST(PAGLayerTest, LayerAlpha) {
+PAG_PIXEL_TEST(PAGLayerTest, LayerAlpha) {
   auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->setAlpha(0.5f);
@@ -296,7 +296,7 @@ PAG_TEST(PAGLayerTest, LayerAlpha) {
 /**
  * 用例描述: trackMatte-luma
  */
-PAG_TEST(PAGLayerTest, trackMatte_luma) {
+PAG_PIXEL_TEST(PAGLayerTest, trackMatte_luma) {
   auto pagFile = LoadPAGFile("resources/apitest/LumaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());

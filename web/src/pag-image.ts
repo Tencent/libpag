@@ -3,6 +3,8 @@ import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
 import {
+  clearWebGPUTextureHandle,
+  getWebGPUTextureHandle,
   unregisterWebGPUTexture,
   untrackWebGPUTextureHandle,
   WebGPUTextureLike,
@@ -75,19 +77,10 @@ export class PAGImage {
   public wasmIns;
   public isDestroyed = false;
 
-  private webGPUTextureHandle = 0;
-
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
 
-  /**
-   * Attaches the WebGPU texture handle registered by fromTexture() so destroy() can release it.
-   * WebGPU backend only; called internally by the factory, do not invoke directly.
-   */
-  public attachWebGPUTextureHandle(handle: number): void {
-    this.webGPUTextureHandle = handle;
-  }
   /**
    * Returns the width in pixels.
    */
@@ -133,10 +126,11 @@ export class PAGImage {
    */
   public destroy(): void {
     this.wasmIns.delete();
-    if (this.webGPUTextureHandle > 0) {
-      unregisterWebGPUTexture(this.webGPUTextureHandle);
+    const webGPUTextureHandle = getWebGPUTextureHandle(this.wasmIns);
+    if (webGPUTextureHandle > 0) {
+      clearWebGPUTextureHandle(this.wasmIns);
+      unregisterWebGPUTexture(webGPUTextureHandle);
       untrackWebGPUTextureHandle(this);
-      this.webGPUTextureHandle = 0;
     }
     this.isDestroyed = true;
   }

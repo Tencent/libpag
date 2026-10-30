@@ -29,7 +29,7 @@ using nlohmann::json;
 /**
  * 用例描述: 测试 shader 绘制椭圆
  */
-PAG_TEST(PAGSimplePathTest, TestRect) {
+PAG_PIXEL_TEST(PAGSimplePathTest, TestRect) {
   auto pagFile = LoadPAGFile("resources/apitest/ellipse.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();

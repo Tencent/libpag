@@ -31,13 +31,18 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
+#if defined(TGFX_USE_METAL)
+#include "utils/MetalTestSupport.h"
+#endif
 
 namespace pag {
 using namespace tgfx;
 using nlohmann::json;
 
 static constexpr float MAX_FRAME_SIZE = 360.0f;
+#if !defined(TGFX_USE_METAL)
 static constexpr int MAX_THREADS = 6;
+#endif
 static constexpr bool PrintPerformance = false;
 
 struct RenderCost {
@@ -151,7 +156,7 @@ static void CompareFileFrames(const std::string& pagPath) {
 /**
  * 用例描述: 校验 compare 文件夹中各个文件渲染结果
  */
-PAG_TEST(PAGFrameCompareTest, RenderFiles) {
+PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
 #if defined(__EMSCRIPTEN__)
   // The single-threaded web build has no pthreads: run the corpus serially like the Metal path
@@ -160,17 +165,14 @@ PAG_TEST(PAGFrameCompareTest, RenderFiles) {
     ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
     CompareFileFrames(file);
   }
-  return;
-#endif
-  if (Devices::SupportsBackend(tgfx::Backend::Metal)) {
-    // Metal deduplicates devices by native GPU, so worker threads share one glyph atlas. Keep
-    // pixel comparisons independent of interleaving; concurrency is covered by separate tests.
-    for (const auto& file : files) {
-      ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
-      CompareFileFrames(file);
-    }
-    return;
+#elif defined(TGFX_USE_METAL)
+  // Metal workers share one glyph atlas; interleaving can change Linear-sampled text pixels.
+  // Keep independent baseline files serial and clear atlas history before each file.
+  for (const auto& file : files) {
+    ASSERT_TRUE(ResetMetalAtlasForComparison());
+    CompareFileFrames(file);
   }
+#else
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {
@@ -183,6 +185,7 @@ PAG_TEST(PAGFrameCompareTest, RenderFiles) {
   for (auto& thread : threads) {
     thread.join();
   }
+#endif
 }
 }  // namespace pag
 #endif

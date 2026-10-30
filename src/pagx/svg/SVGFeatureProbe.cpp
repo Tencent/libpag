@@ -22,12 +22,14 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
 
 static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextPath |= src.hasTextPath;
   dst->hasTextModifier |= src.hasTextModifier;
+  dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
 }
@@ -91,6 +93,17 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   // output size and turns surrounding native content into non-editable raster. Composition
   // layers and child layers are visited separately by writeLayer, each running its own probe.
   Merge(&out, ProbeElementsFeaturesForSVG(layer->contents));
+  // Mirrors tgfx Layer::canPreserve3D(): effects, a mask or a scrollRect flatten the subtree, so
+  // such a layer keeps its vector output.
+  out.hasPreserve3D = layer->preserve3D && layer->filters.empty() && layer->styles.empty() &&
+                      layer->mask == nullptr && !layer->hasScrollRect;
+  // Same narrowing as the PPT probe: only an x/y-varying perspective cannot flatten into the 2D
+  // affine SVG output; a pure z-axis perspective matches tgfx's flattening (a constant w divide)
+  // and preserve3D subtrees bake through hasPreserve3D.
+  const auto localTransform = BuildLayerLocalMatrix3D(layer);
+  out.hasPerspectiveTransform = localTransform.getRowColumn(3, 0) != 0 ||
+                                localTransform.getRowColumn(3, 1) != 0 ||
+                                localTransform.getRowColumn(3, 3) <= 0;
   return out;
 }
 

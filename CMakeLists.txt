@@ -314,8 +314,13 @@ if (PAG_BUILD_PAGX)
     file(GLOB_RECURSE PAGX_UTILS_SOURCES CONFIGURE_DEPENDS src/pagx/utils/*.*)
     list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "src/pagx/utils/MemZip\\.cpp$")
     file(GLOB_RECURSE PAGX_XML_SOURCES CONFIGURE_DEPENDS src/pagx/xml/*.*)
-    # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
-    list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
+    # SVG transform/path parsers and CSS class rules are shared with pagx HTML import.
+    list(APPEND PAGX_CORE_SOURCES
+        src/pagx/svg/SVGPathParser.cpp
+        src/pagx/svg/SVGTransformParser.cpp
+        src/pagx/svg/SVGCssRules.cpp
+        src/pagx/svg/SVGCssRules.h
+    )
     list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES})
     # renderer module (text layout, font embedding, etc.)
     file(GLOB_RECURSE RENDERER_FILES CONFIGURE_DEPENDS src/renderer/*.*)
@@ -952,6 +957,19 @@ if (WEB)
             # segfault. 1MB mirrors tgfx's own web builds (tgfx/web/demo/CMakeLists.txt).
             list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1 -sSTACK_SIZE=1MB
                     -sEXPORTED_RUNTIME_METHODS=['HEAPU8','WebGPU'])
+            # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
+            # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
+            # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
+            # without this line the target is never built and the final link fails on tint
+            # symbols.
+            if (TARGET libtint)
+                list(APPEND PAG_STATIC_LIBS libtint)
+            else ()
+                message(FATAL_ERROR
+                        "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
+                        "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
+                        "the final link would fail on tint symbols.")
+            endif ()
         else ()
             list(APPEND PAG_LINK_OPTIONS -sMAX_WEBGL_VERSION=2
                     -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'])
@@ -1193,13 +1211,14 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture)|CocoaSurface(Header)?)Test\\.mm$")
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
         if (NOT PAG_USE_METAL)
-            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture)Test\\.mm$")
+            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture|Atlas)Test\\.mm$")
         endif ()
     endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
@@ -1274,6 +1293,22 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    if (PAG_USE_METAL)
+        # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
+        # replace this private API when tgfx provides a supported test-reset hook.
+        add_library(pag-metal-test-support OBJECT test/src/utils/MetalTestSupport.cpp)
+        add_dependencies(pag-metal-test-support ${PAG_DEPEND_TARGETS})
+        target_include_directories(pag-metal-test-support PRIVATE ${PAG_INCLUDES}
+                ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        target_compile_definitions(pag-metal-test-support PRIVATE ${PAG_TEST_DEFINES})
+        target_compile_options(pag-metal-test-support PRIVATE ${PAG_TEST_COMPILE_OPTIONS})
+        foreach (METAL_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_sources(${METAL_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-metal-test-support>)
+            add_dependencies(${METAL_TEST_TARGET} pag-metal-test-support)
+        endforeach ()
+    endif ()
 
     if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
         # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros
