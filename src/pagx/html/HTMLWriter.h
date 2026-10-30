@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -279,6 +280,61 @@ class HTMLWriterContext {
   // emission-site tag ("chain:", "dss:", "iss:", "issb:") so different sites never collide.
   std::unordered_map<std::string, std::string> filterDefIds = {};
 
+  // Populated by HTMLAnimationSession when keyframe animations are active. Maps an animated
+  // non-Layer element (Group, Fill, Stroke, Text, or geometry Element) to the DOM id that
+  // should be emitted on its corresponding HTML/SVG tag so the post-weaving pass can attach
+  // `animation` declarations. Empty when no animations are exported.
+  std::unordered_map<const Node*, std::string> animatedElementIds = {};
+  // Initially hidden Layers need their contents emitted when a visible channel may show them later.
+  std::unordered_set<const Layer*> animatedVisibleLayers = {};
+
+  struct AnimationInstance {
+    const Composition* composition = nullptr;
+    const Layer* slot = nullptr;
+    size_t scope = 0;
+    size_t parentScope = 0;
+  };
+  struct AnimatedDomTag {
+    const Node* node = nullptr;
+    size_t scope = 0;
+    std::string id = {};
+  };
+  size_t animationScope = 0;
+  size_t nextAnimationScope = 1;
+  std::vector<AnimationInstance> animationInstances = {};
+  std::vector<AnimatedDomTag> animatedDomTags = {};
+
+  // Number of tags already emitted for each animated base id.
+  std::unordered_map<std::string, size_t> animatedDomIdUseCount = {};
+
+  /**
+   * Returns the DOM id for the next tag rendering an animated node, or an empty string when none
+   * of the candidates is animated. The candidates are checked in order and the first one found in
+   * animatedElementIds supplies the base id. One node can render into several tags (Repeater
+   * copies, per-geometry SVG shapes, a Fill shared by shapes and text, every Text under one
+   * TextBox), so the first tag gets the base id and later tags get "<base>__1", "<base>__2", and
+   * so on, which keeps ids unique and lets the weaving pass reach every copy.
+   */
+  std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
+    if (animatedElementIds.empty()) {
+      return {};
+    }
+    for (auto* node : candidates) {
+      if (node == nullptr) {
+        continue;
+      }
+      auto it = animatedElementIds.find(node);
+      if (it == animatedElementIds.end()) {
+        continue;
+      }
+      size_t index = animatedDomIdUseCount[it->second]++;
+      auto id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      animatedDomTags.push_back({node, animationScope, id});
+      return id;
+    }
+    return {};
+  }
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -389,6 +445,20 @@ class HTMLWriter {
     // left/top/width/height already reflect PAGX's padding-inset layout resolution.
     const Padding* parentPadding = nullptr;
   };
+
+  struct PendingSVGDraw {
+    std::vector<GeoInfo> geos = {};
+    const Fill* fill = nullptr;
+    const Stroke* stroke = nullptr;
+    float alpha = 1.0f;
+    const TrimPath* trim = nullptr;
+  };
+  std::vector<PendingSVGDraw> _pendingSVGDraws = {};
+  bool _coalesceSVGDraws = false;
+  void flushPendingSVGDraws(HTMLBuilder& out);
+  void emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                      const Stroke* stroke, float alpha, const TrimPath* trim, float x0, float y0,
+                      float sw, float sh);
 
   struct ElementDispatchState {
     std::vector<GeoInfo> geos = {};
@@ -627,6 +697,8 @@ class HTMLWriter {
   static bool ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                      bool useModifiedPathData, float& outX, float& outY,
                                      float& outW, float& outH);
+  static void ExpandStrokePaddedExtent(const std::vector<Element*>& elems, const Matrix& parentMat,
+                                       float& maxRight, float& maxBottom);
 };
 
 }  // namespace pagx

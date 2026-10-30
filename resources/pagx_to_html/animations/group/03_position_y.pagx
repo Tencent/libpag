@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group position.y slides the group contents downwards.
+     Target: Group  Channel: position.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="moveGroupY" position="120,20">
+      <Rectangle size="80,80" roundness="8"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="groupSlideY" duration="60" frameRate="60" loop="once">
+      <Object target="moveGroupY">
+        <Channel name="position.y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

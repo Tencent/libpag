@@ -69,6 +69,13 @@ struct HTMLExportOptions {
    * The default is true.
    */
   bool extractStyleSheet = true;
+
+  /**
+   * When true (default), keyframe animations (<Animation>) in the document are exported
+   * as CSS @keyframes rules and inline `animation` declarations on the target elements.
+   * When false, animations are ignored and a pure static frame is exported.
+   */
+  bool exportAnimations = true;
 };
 
 /**

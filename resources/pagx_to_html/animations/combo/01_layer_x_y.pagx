@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer x and y animate together so the box travels diagonally.
+     Target: Layer  Channel: x,y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="diagonalBox" x="40" y="40" width="80" height="80">
+    <Rectangle position="40,40" size="80,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="diagonalSlide" duration="60" frameRate="60" loop="once">
+      <Object target="diagonalBox">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="200" interpolation="linear"/>
+        </Channel>
+        <Channel name="y" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="120" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

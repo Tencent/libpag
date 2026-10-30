@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: under pingPong the evaluationOffset is applied to the raw timeline before the triangle
+     wave fold, so the mirrored phase is offset as well.
+     Target: Layer  Channel: alpha  Type: float
+     Expect: supported
+     Ref: test/src/PAGXTest.cpp:7035 -->
+<pagx width="320" height="200">
+  <Resources>
+    <Composition id="card" width="120" height="120">
+      <Layer id="cardChild" width="120" height="120">
+        <Rectangle position="60,60" size="120,120" roundness="8"/>
+        <Fill>
+          <SolidColor id="cardFill" color="#FF0000"/>
+        </Fill>
+      </Layer>
+      <Animations>
+        <Animation id="cardEnter" duration="60" frameRate="60" loop="pingPong">
+          <Object target="cardChild">
+            <Channel name="alpha" type="float">
+              <Key time="0" value="0" interpolation="linear"/>
+              <Key time="60" value="1" interpolation="linear"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+    </Composition>
+  </Resources>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="slot" x="100" y="40" width="120" height="120" composition="@card">
+    <Timelines>
+      <Animation ref="@cardEnter" evaluationOffset="15" playing="true"/>
+    </Timelines>
+  </Layer>
+</pagx>

@@ -3243,4 +3243,1537 @@ PAGX_TEST(PAGXHtmlWriterTest, Matrix3DToCSSKeepsSmallPerspectiveTerms) {
   EXPECT_FLOAT_EQ(std::strtof(parts[11].c_str(), nullptr), -2.5e-05f);
 }
 
+// =============================================================================
+// Keyframe Animation Export Tests
+// =============================================================================
+
+CLI_TEST(PAGXHtmlTest, AnimationSwitchOffIsolation) {
+  auto samplePath = ProjectPath::Absolute("spec/samples/animation.pagx");
+  auto docWithAnim = pagx::PAGXImporter::FromFile(samplePath);
+  ASSERT_NE(docWithAnim, nullptr);
+  ASSERT_FALSE(docWithAnim->animations.empty());
+
+  pagx::HTMLExportOptions offOptions;
+  offOptions.exportAnimations = false;
+  auto htmlWithFlagOff = ConvertToHTML(docWithAnim, offOptions);
+  ASSERT_FALSE(htmlWithFlagOff.empty());
+  EXPECT_EQ(htmlWithFlagOff.find("@keyframes"), std::string::npos);
+  EXPECT_EQ(htmlWithFlagOff.find("animation:"), std::string::npos);
+
+  auto docWithoutAnim = pagx::PAGXImporter::FromFile(samplePath);
+  ASSERT_NE(docWithoutAnim, nullptr);
+  docWithoutAnim->animations.clear();
+  auto htmlWithoutAnim = ConvertToHTML(docWithoutAnim);
+  EXPECT_EQ(htmlWithFlagOff, htmlWithoutAnim);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerAlphaLinearAndLoop) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="box" width="100" height="100">
+      <Rectangle width="100" height="100"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+    <Animations>
+      <Animation id="fade" duration="120" frameRate="60" loop="loop">
+        <Object target="box">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1" interpolation="linear"/>
+            <Key time="120" value="0.2"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@keyframes pagx_box_0"), std::string::npos);
+  EXPECT_NE(html.find("0% { opacity: 0.2; }"), std::string::npos);
+  EXPECT_NE(html.find("50% { opacity: 1; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { opacity: 0.2; }"), std::string::npos);
+
+  auto boxTag = FindTagContaining(html, "id=\"box\"");
+  ASSERT_FALSE(boxTag.empty());
+  EXPECT_NE(boxTag.find("animation:pagx_box_0 2s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationInterpolationBezierAndHold) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="holdDot" width="20" height="20">
+      <Ellipse width="20" height="20"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+    <Layer id="bezierDot" left="50" width="20" height="20">
+      <Ellipse width="20" height="20"/>
+      <Fill color="#0000FF"/>
+    </Layer>
+    <Animations>
+      <Animation id="easeAnim" duration="120" frameRate="60" loop="loop">
+        <Object target="holdDot">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="hold"/>
+            <Key time="60" value="0.2" interpolation="hold"/>
+            <Key time="120" value="1"/>
+          </Channel>
+        </Object>
+        <Object target="bezierDot">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.1" interpolation="bezier" bezierOut="0.42,0"/>
+            <Key time="60" value="1" interpolation="bezier" bezierIn="0.58,1" bezierOut="0.42,0"/>
+            <Key time="120" value="0.1" bezierIn="0.58,1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("animation-timing-function: steps(1, end)"), std::string::npos);
+  EXPECT_NE(html.find("animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1)"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLoopModesAndDelay) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="onceBox" width="40" height="40">
+      <Rectangle width="40" height="40"/>
+      <Fill color="#FF0000"/>
+      <Timelines>
+        <Animation ref="@onceAnim" evaluationOffset="30"/>
+      </Timelines>
+    </Layer>
+    <Layer id="pongBox" left="60" width="40" height="40">
+      <Rectangle width="40" height="40"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+    <Animations>
+      <Animation id="onceAnim" duration="120" frameRate="60" loop="once">
+        <Object target="onceBox">
+          <Channel name="alpha" type="float">
+            <Key time="30" value="0.2" interpolation="linear"/>
+            <Key time="120" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+      <Animation id="pongAnim" duration="60" frameRate="60" loop="pingPong">
+        <Object target="pongBox">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.3" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
+                      "  0% { opacity: 0.2; }\n"
+                      "  25% { opacity: 0.2; }\n"
+                      "  100% { opacity: 1; }\n"
+                      "}"),
+            std::string::npos);
+
+  auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
+  ASSERT_FALSE(onceTag.empty());
+  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
+
+  auto pongTag = FindTagContaining(html, "id=\"pongBox\"");
+  ASSERT_FALSE(pongTag.empty());
+  EXPECT_NE(pongTag.find("1s linear infinite alternate"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationKeyframeBoundaryHold) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/keyframe_boundary_hold.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
+                      "  0% { opacity: 0.2; }\n"
+                      "  25% { opacity: 0.2; }\n"
+                      "  100% { opacity: 1; }\n"
+                      "}"),
+            std::string::npos);
+  auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
+  ASSERT_FALSE(onceTag.empty());
+  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
+
+  EXPECT_NE(html.find("@keyframes pagx_slider_1 {\n"
+                      "  0% { transform: translate(80px, 0px); }\n"
+                      "  25% { transform: translate(80px, 0px); }\n"
+                      "  75% { transform: translate(280px, 0px); }\n"
+                      "  100% { transform: translate(280px, 0px); }\n"
+                      "}"),
+            std::string::npos);
+  auto sliderTag = FindTagContaining(html, "id=\"slider\"");
+  ASSERT_FALSE(sliderTag.empty());
+  EXPECT_NE(sliderTag.find("2s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationXY) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer id="slider" left="20" top="50" width="24" height="24">
+      <Rectangle width="24" height="24"/>
+      <Fill color="#22D3EE"/>
+    </Layer>
+    <Animations>
+      <Animation id="slideAnim" duration="120" frameRate="60" loop="loop">
+        <Object target="slider">
+          <Channel name="x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="360" interpolation="linear"/>
+            <Key time="120" value="20"/>
+          </Channel>
+          <Channel name="y" type="float">
+            <Key time="0" value="50" interpolation="linear"/>
+            <Key time="30" value="80" interpolation="linear"/>
+            <Key time="60" value="50" interpolation="linear"/>
+            <Key time="120" value="50"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto sliderTag = FindTagContaining(html, "id=\"slider\"");
+  ASSERT_FALSE(sliderTag.empty());
+  EXPECT_NE(sliderTag.find("left:20px"), std::string::npos);
+  EXPECT_NE(sliderTag.find("top:50px"), std::string::npos);
+
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("25% { transform: translate(170px, 30px); }"), std::string::npos);
+  EXPECT_NE(html.find("50% { transform: translate(340px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(0px, 0px); }"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerMatrixAndRotationScale) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="matLayer" width="50" height="50">
+      <Rectangle width="50" height="50"/>
+      <Fill color="#FF8800"/>
+    </Layer>
+    <Layer id="hostLayer" left="100" width="60" height="60">
+      <Group id="rotGrp">
+        <Rectangle width="60" height="60"/>
+        <Fill color="#8800FF"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="tfAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="matLayer">
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+            <Key time="60" value="2,0,0,2,10,20"/>
+          </Channel>
+        </Object>
+        <Object target="rotGrp">
+          <Channel name="rotation" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="180"/>
+          </Channel>
+          <Channel name="scale.x" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="1.5"/>
+          </Channel>
+          <Channel name="scale.y" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="1.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { transform: matrix(1,0,0,1,0,0); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: matrix(2,0,0,2,10,20); }"), std::string::npos);
+  EXPECT_NE(html.find("0% { transform: rotate(0deg) scale(1); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { transform: rotate(180deg) scale(1.5); }"), std::string::npos);
+
+  auto matTag = FindTagContaining(html, "id=\"matLayer\"");
+  ASSERT_FALSE(matTag.empty());
+  EXPECT_NE(matTag.find("transform-origin:0 0"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationKeepsStaticTransform) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/layer/05_x_with_static_rotation.pagx"),
+                     opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tag = FindTagContaining(html, "id=\"tiltBox\"");
+  ASSERT_FALSE(tag.empty());
+  auto rotatePos = tag.find("transform:rotate(");
+  ASSERT_NE(rotatePos, std::string::npos);
+  auto rotateEnd = tag.find(')', rotatePos);
+  ASSERT_NE(rotateEnd, std::string::npos);
+  auto staticTransform = tag.substr(rotatePos + 10, rotateEnd - rotatePos - 9);
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) " + staticTransform + "; }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(120px, 0px) " + staticTransform + "; }"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationWithMatrixChannel) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="mixLayer" width="50" height="50" matrix="0,1,-1,0,0,0">
+      <Rectangle width="50" height="50"/>
+      <Fill color="#FF8800"/>
+    </Layer>
+    <Animations>
+      <Animation id="mixAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="mixLayer">
+          <Channel name="x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="1,0,0,1,0,0" interpolation="linear"/>
+            <Key time="60" value="2,0,0,2,0,0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) matrix(1,0,0,1,0,0); }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { transform: translate(40px, 0px) matrix(2,0,0,2,0,0); }"),
+            std::string::npos);
+  EXPECT_EQ(html.find("matrix(0,1,-1,0,0,0); }"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillInRepeaterAnimatesEveryCopy) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute(
+          "resources/pagx_to_html/animations/sharing/02_animated_fill_in_repeater.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(CountOccurrences(html, "id=\"repeatedFill\""), static_cast<size_t>(1));
+  const char* copyIds[] = {"repeatedFill", "repeatedFill__1", "repeatedFill__2", "repeatedFill__3"};
+  for (const char* id : copyIds) {
+    auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
+    ASSERT_FALSE(tag.empty()) << id;
+    EXPECT_NE(tag.find("animation:pagx_repeatedFill_0 "), std::string::npos) << id;
+  }
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), static_cast<size_t>(1));
+}
+
+static std::string AnimationNameOfTag(const std::string& tag) {
+  auto pos = tag.find("animation:");
+  if (pos == std::string::npos) {
+    return "";
+  }
+  pos += 10;
+  auto end = tag.find(' ', pos);
+  return end == std::string::npos ? "" : tag.substr(pos, end - pos);
+}
+
+static std::string KeyframesRuleNamed(const std::string& html, const std::string& name) {
+  auto start = html.find("@keyframes " + name + " {\n");
+  if (start == std::string::npos) {
+    return "";
+  }
+  auto end = html.find("\n}", start);
+  return end == std::string::npos ? "" : html.substr(start, end - start + 2);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextUsesPerTagKeyframes) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/sharing/03_fill_on_rect_and_text.pagx"),
+                     opts);
+  ASSERT_FALSE(html.empty());
+
+  auto rectTag = FindTagContaining(html, "id=\"sharedPainter\"");
+  auto textTag = FindTagContaining(html, "id=\"sharedPainter__1\"");
+  ASSERT_FALSE(rectTag.empty());
+  ASSERT_FALSE(textTag.empty());
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedPainter\""), static_cast<size_t>(1));
+  EXPECT_EQ(rectTag.rfind("<div", 0), static_cast<size_t>(0));
+  EXPECT_EQ(textTag.rfind("<span", 0), static_cast<size_t>(0));
+
+  // A box paints the Fill as its background, while text paints it as the glyph color, so the two
+  // tags need different keyframes even though they share one animated Fill.
+  auto rectName = AnimationNameOfTag(rectTag);
+  auto textName = AnimationNameOfTag(textTag);
+  ASSERT_FALSE(rectName.empty());
+  ASSERT_FALSE(textName.empty());
+  EXPECT_NE(rectName, textName);
+  auto rectRule = KeyframesRuleNamed(html, rectName);
+  auto textRule = KeyframesRuleNamed(html, textName);
+  EXPECT_NE(rectRule.find("0% { background-color: #2563EB; }"), std::string::npos) << rectRule;
+  EXPECT_NE(rectRule.find("100% { background-color: #F97316; }"), std::string::npos) << rectRule;
+  EXPECT_NE(textRule.find("0% { color: #2563EB; }"), std::string::npos) << textRule;
+  EXPECT_NE(textRule.find("100% { color: #F97316; }"), std::string::npos) << textRule;
+  EXPECT_EQ(textRule.find("background-color"), std::string::npos) << textRule;
+}
+
+// Returns the keyframe stop line ("  <percent> { ...; }") of the animation attached to the tag that
+// contains `idMarker`, or an empty string when the tag, its animation or the stop is missing.
+static std::string KeyframeStopOf(const std::string& html, const std::string& idMarker,
+                                  const std::string& percent) {
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, idMarker)));
+  auto start = rule.find("\n  " + percent + " { ");
+  if (start == std::string::npos) {
+    return "";
+  }
+  auto end = rule.find('\n', start + 1);
+  return end == std::string::npos ? "" : rule.substr(start + 1, end - start - 1);
+}
+
+// Repeated timestamps encode an instantaneous jump: the first key is the value just before the
+// boundary, and the last one is the value from that frame onward. The preceding ramp must still
+// reach the first key instead of fading across the entire previous interval.
+// A zero horizontal scale makes matrix(0,0,0,1,...) singular. Browsers cannot interpolate
+// between that matrix and an invertible one, while PAGX interpolates decomposed components.
+CLI_TEST(PAGXHtmlTest, AnimationSingularMatrixProgressBarInterpolates) {
+  const char* xml = R"(<pagx width="320" height="100">
+    <Layer id="progress" x="0" y="10" width="280" height="8">
+      <Rectangle position="140,4" size="280,8"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="120" frameRate="60" loop="once">
+        <Object target="progress">
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="0,0,0,1,280,0" interpolation="linear"/>
+            <Key time="120" value="1,0,0,1,0,0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto rule =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"progress\"")));
+  EXPECT_NE(rule.find("translate(280px, 0px)"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("scale(0, 1)"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("scale(1, 1)"), std::string::npos) << rule;
+  EXPECT_EQ(rule.find("matrix(0,0,0,1,280,0)"), std::string::npos) << rule;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationDuplicateAlphaKeysPreserveInstantSceneSwitches) {
+  const char* xml = R"(<pagx width="100" height="100">
+    <Layer id="scene" width="100" height="100">
+      <Rectangle width="100" height="100"/>
+      <Fill color="#050507"/>
+    </Layer>
+    <Animations>
+      <Animation id="switch" duration="1260" frameRate="60" loop="loop">
+        <Object target="scene">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1"/>
+            <Key time="236" value="1"/>
+            <Key time="236" value="0"/>
+            <Key time="1235" value="0"/>
+            <Key time="1235" value="1"/>
+            <Key time="1260" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"scene\"")));
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("18.7302% { opacity: 0;"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("98.0159% { opacity: 1;"), std::string::npos) << rule;
+  // Both pre-jump stops must retain the outgoing value instead of interpolating toward the
+  // post-jump value over hundreds of frames.
+  EXPECT_NE(rule.find("opacity: 1; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+  EXPECT_NE(rule.find("opacity: 0; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationDuplicateAlphaKeysKeepPrecedingRamp) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/boundary/04_duplicate_key_time.pagx"),
+                     options);
+  ASSERT_FALSE(html.empty());
+  auto rule =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"dupKeyBox\"")));
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("opacity: 0.8; animation-timing-function: steps(1, end);"), std::string::npos)
+      << rule;
+  EXPECT_NE(rule.find("50% { opacity: 1;"), std::string::npos) << rule;
+}
+
+// The effective painter opacity in PAGX is the color alpha multiplied by the painter alpha. Each
+// keyframe stop replaces the element's static paint, so it must carry that product, taking the
+// static value for whichever factor is not animated.
+CLI_TEST(PAGXHtmlTest, AnimationFillColorKeepsStaticPainterAlphaOnBox) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/fill/03_color_with_alpha.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"tintedFill\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"tintedFill\"", "100%");
+  EXPECT_NE(first.find("background-color: rgba(37,99,235,0.251)"), std::string::npos) << first;
+  EXPECT_NE(last.find("background-color: rgba(249,115,22,0.251)"), std::string::npos) << last;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillAlphaMultipliesColorAlphaOnBox) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer width="200" height="200">
+      <Rectangle position="50,50" size="80,80"/>
+      <Fill id="boxFill" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="boxFade" duration="60" frameRate="60" loop="once">
+        <Object target="boxFill">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"boxFill\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"boxFill\"", "100%");
+  EXPECT_NE(first.find("background-color: rgba(37,99,235,0.502)"), std::string::npos) << first;
+  EXPECT_NE(last.find("background-color: rgba(37,99,235,0.251)"), std::string::npos) << last;
+  // Element opacity would also fade the box's children and stack with an animated Layer alpha.
+  EXPECT_EQ(first.find(" opacity:"), std::string::npos) << first;
+  EXPECT_EQ(last.find(" opacity:"), std::string::npos) << last;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillColorAndAlphaCompositeOnText) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer width="200" height="100">
+      <Text text="AB" fontFamily="Arial" fontSize="32" position="20,60"/>
+      <Fill id="tintText" color="#2563EB80" alpha="0.5"/>
+    </Layer>
+    <Layer y="100" width="200" height="100">
+      <Text text="AB" fontFamily="Arial" fontSize="32" position="20,60"/>
+      <Fill id="fadeText" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="textPaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintText">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F9731680"/>
+          </Channel>
+        </Object>
+        <Object target="fadeText">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  ASSERT_EQ(FindTagContaining(html, "id=\"tintText\"").rfind("<span", 0), static_cast<size_t>(0));
+  ASSERT_EQ(FindTagContaining(html, "id=\"fadeText\"").rfind("<span", 0), static_cast<size_t>(0));
+
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintText\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintText\"", "100%");
+  EXPECT_NE(tintFirst.find("color: rgba(37,99,235,0.251)"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("color: rgba(249,115,22,0.251)"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadeText\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadeText\"", "100%");
+  EXPECT_NE(fadeFirst.find("color: rgba(37,99,235,0.502)"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("color: rgba(37,99,235,0.251)"), std::string::npos) << fadeLast;
+  // Element opacity on a span would also fade its text stroke.
+  EXPECT_EQ(fadeFirst.find(" opacity:"), std::string::npos) << fadeFirst;
+  EXPECT_EQ(fadeLast.find(" opacity:"), std::string::npos) << fadeLast;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationFillColorAndAlphaCompositeOnSvg) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Fill id="tintPath" color="#2563EB80" alpha="0.5"/>
+    </Layer>
+    <Layer x="200" width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Fill id="fadePath" color="#2563EB80"/>
+    </Layer>
+    <Animations>
+      <Animation id="pathPaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintPath">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F97316FF"/>
+          </Channel>
+        </Object>
+        <Object target="fadePath">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  ASSERT_EQ(FindTagContaining(html, "id=\"tintPath\"").rfind("<path", 0), static_cast<size_t>(0));
+  ASSERT_EQ(FindTagContaining(html, "id=\"fadePath\"").rfind("<path", 0), static_cast<size_t>(0));
+
+  // The color key's own alpha changes from 0x80 to 0xFF, so fill-opacity must follow it.
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintPath\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintPath\"", "100%");
+  EXPECT_NE(tintFirst.find("fill: #2563EB"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintFirst.find("fill-opacity: 0.251"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("fill: #F97316"), std::string::npos) << tintLast;
+  EXPECT_NE(tintLast.find("fill-opacity: 0.5;"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadePath\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadePath\"", "100%");
+  EXPECT_NE(fadeFirst.find("fill-opacity: 0.502"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("fill-opacity: 0.251"), std::string::npos) << fadeLast;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationStrokeColorAndAlphaCompositeOnSvg) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Stroke id="tintStroke" color="#2563EB80" alpha="0.5" width="8"/>
+    </Layer>
+    <Layer x="200" width="200" height="200">
+      <Path data="M 20 20 L 180 20 L 100 180 Z"/>
+      <Stroke id="fadeStroke" color="#2563EB80" width="8"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokePaint" duration="60" frameRate="60" loop="once">
+        <Object target="tintStroke">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB80" interpolation="linear"/>
+            <Key time="60" value="#F97316FF"/>
+          </Channel>
+        </Object>
+        <Object target="fadeStroke">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tintFirst = KeyframeStopOf(html, "id=\"tintStroke\"", "0%");
+  auto tintLast = KeyframeStopOf(html, "id=\"tintStroke\"", "100%");
+  EXPECT_NE(tintFirst.find("stroke: #2563EB"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintFirst.find("stroke-opacity: 0.251"), std::string::npos) << tintFirst;
+  EXPECT_NE(tintLast.find("stroke: #F97316"), std::string::npos) << tintLast;
+  EXPECT_NE(tintLast.find("stroke-opacity: 0.5;"), std::string::npos) << tintLast;
+
+  auto fadeFirst = KeyframeStopOf(html, "id=\"fadeStroke\"", "0%");
+  auto fadeLast = KeyframeStopOf(html, "id=\"fadeStroke\"", "100%");
+  EXPECT_NE(fadeFirst.find("stroke-opacity: 0.502"), std::string::npos) << fadeFirst;
+  EXPECT_NE(fadeLast.find("stroke-opacity: 0.251"), std::string::npos) << fadeLast;
+}
+
+// Returns the opening tag of the innermost <svg> that encloses the tag containing `idMarker`, or an
+// empty string when that tag is not inside an <svg>.
+static std::string EnclosingSvgTag(const std::string& html, const std::string& idMarker) {
+  auto idPos = html.find(idMarker);
+  if (idPos == std::string::npos) {
+    return "";
+  }
+  auto svgStart = html.rfind("<svg", idPos);
+  if (svgStart == std::string::npos) {
+    return "";
+  }
+  auto closePos = html.find("</svg>", svgStart);
+  if (closePos == std::string::npos || closePos < idPos) {
+    return "";
+  }
+  auto svgEnd = html.find('>', svgStart);
+  return svgEnd == std::string::npos ? "" : html.substr(svgStart, svgEnd - svgStart + 1);
+}
+
+// The SVG viewport is sized for the static paint, so a stroke animated wider than its static width
+// would be clipped by the viewport. Only a stroke-width animation changes the painted extent of an
+// SVG shape, so only the <svg> hosting one lifts its clipping; SVGs animating paint that keeps the
+// extent (such as stroke color) and static SVGs keep their viewport clipping.
+CLI_TEST(PAGXHtmlTest, AnimationSvgHostingAnimatedShapeDoesNotClip) {
+  const char* xml = R"(<pagx width="480" height="200">
+    <Layer width="160" height="200">
+      <Rectangle position="80,100" size="100,100"/>
+      <Stroke id="growStroke" color="#2563EB" width="4"/>
+    </Layer>
+    <Layer x="160" width="160" height="200">
+      <Rectangle position="80,100" size="100,100"/>
+      <Stroke id="staticStroke" color="#F97316" width="4"/>
+    </Layer>
+    <Layer x="320" width="160" height="200">
+      <Rectangle position="80,100" size="100,100"/>
+      <Stroke id="tintStroke" color="#16A34A" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
+        <Object target="growStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="4" interpolation="linear"/>
+            <Key time="60" value="24"/>
+          </Channel>
+        </Object>
+        <Object target="tintStroke">
+          <Channel name="color" type="color">
+            <Key time="0" value="#16A34A" interpolation="linear"/>
+            <Key time="60" value="#DC2626"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto widthSvg = EnclosingSvgTag(html, "id=\"growStroke\"");
+  ASSERT_FALSE(widthSvg.empty());
+  EXPECT_NE(widthSvg.find("overflow:visible"), std::string::npos) << widthSvg;
+
+  auto colorSvg = EnclosingSvgTag(html, "id=\"tintStroke\"");
+  ASSERT_FALSE(colorSvg.empty());
+  EXPECT_EQ(colorSvg.find("overflow:visible"), std::string::npos) << colorSvg;
+
+  // The static stroke carries no animated id, so locate its <svg> through its stroke color.
+  auto staticSvg = EnclosingSvgTag(html, "stroke=\"#F97316\"");
+  ASSERT_FALSE(staticSvg.empty());
+  EXPECT_EQ(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
+
+  pagx::HTMLExportOptions offOpts;
+  offOpts.extractStyleSheet = false;
+  offOpts.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, offOpts);
+  ASSERT_FALSE(staticHtml.empty());
+  EXPECT_EQ(staticHtml.find("overflow:visible"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/stroke/03_width.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto svgTag = EnclosingSvgTag(html, "id=\"widthStroke\"");
+  ASSERT_FALSE(svgTag.empty());
+  EXPECT_NE(svgTag.find("overflow:visible"), std::string::npos) << svgTag;
+  // The viewport itself stays sized for the static stroke; only the clipping is lifted.
+  EXPECT_NE(svgTag.find("viewBox=\"76 36 168 128\""), std::string::npos) << svgTag;
+}
+
+// A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
+// keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
+// an animation that would play empty stops.
+CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  const char* cases[] = {
+      "timing/05_offset_positive_once.pagx",
+      "timing/06_offset_positive_loop.pagx",
+      "timing/07_offset_negative_once.pagx",
+      "timing/08_offset_ping_pong.pagx",
+  };
+  for (const auto* name : cases) {
+    auto html = LoadAndConvert(
+        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
+    ASSERT_FALSE(html.empty()) << name;
+    EXPECT_NE(html.find("@keyframes"), std::string::npos) << name;
+    EXPECT_NE(html.find("animation:"), std::string::npos) << name;
+  }
+  auto negative =
+      LoadAndConvert(ProjectPath::Absolute(
+                         "resources/pagx_to_html/animations/timing/07_offset_negative_once.pagx"),
+                     opts);
+  EXPECT_NE(negative.find("-0.1667s"), std::string::npos);
+  auto negativeRule = KeyframesRuleNamed(
+      negative, AnimationNameOfTag(FindTagContaining(negative, "id=\"cardColor\"")));
+  EXPECT_NE(negativeRule.find("75% { background-color: #0000FF;"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute(
+          "resources/pagx_to_html/animations/timing/09_offset_shared_animation.pagx"),
+      opts);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@keyframes"), std::string::npos);
+  auto slotA = FindTagContaining(html, "id=\"cardChild\"");
+  auto slotB = FindTagContaining(html, "id=\"cardChild__1\"");
+  ASSERT_FALSE(slotA.empty());
+  ASSERT_FALSE(slotB.empty());
+  EXPECT_NE(slotA.find("animation:"), std::string::npos);
+  EXPECT_NE(slotB.find("animation:"), std::string::npos);
+  EXPECT_NE(slotB.find("0.5s"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationCompositionLayerVisibleWindow) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/layer/06_visible.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tag = FindTagContaining(html, "id=\"visChild\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "0%"),
+            "  0% { visibility: hidden; animation-timing-function: steps(1, end); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "50%"),
+            "  50% { visibility: visible; animation-timing-function: steps(1, end); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"visChild\"", "100%"), "  100% { visibility: hidden; }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationVisibleRetainsInitiallyHiddenLayerContents) {
+  const char* xml = R"(<pagx width="200" height="120">
+    <Layer id="hiddenBox" visible="false" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="reveal" duration="60" frameRate="60" loop="once">
+        <Object target="hiddenBox">
+          <Channel name="visible" type="bool">
+            <Key time="0" value="false" interpolation="hold"/>
+            <Key time="30" value="true" interpolation="hold"/>
+            <Key time="60" value="true" interpolation="hold"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"hiddenBox\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("visibility:hidden"), std::string::npos) << tag;
+  EXPECT_EQ(tag.find("display:none"), std::string::npos) << tag;
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  EXPECT_NE(html.find("background-color:#2563EB"), std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"hiddenBox\"", "50%").find("visibility: visible"),
+            std::string::npos);
+
+  opts.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(staticHtml.empty());
+  auto staticTag = FindTagContaining(staticHtml, "id=\"hiddenBox\"");
+  EXPECT_NE(staticTag.find("display:none"), std::string::npos);
+  EXPECT_EQ(staticHtml.find("background-color:#2563EB"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGeometryCorpus) {
+  struct GeometryCase {
+    const char* file;
+    const char* target;
+    const char* first;
+    const char* last;
+  };
+  const GeometryCase cases[] = {
+      {"01_rectangle_size_width", "growRect", "left: 120px; width: 80px",
+       "left: 40px; width: 240px"},
+      {"02_rectangle_roundness", "roundRect", "border-radius: 0px", "border-radius: 60px"},
+      {"03_ellipse_size_width", "growEllipse", "left: 120px; width: 80px",
+       "left: 40px; width: 240px"},
+  };
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const auto& geometry : cases) {
+    std::string path = "resources/pagx_to_html/animations/geometry/";
+    path += geometry.file;
+    path += ".pagx";
+    auto html = LoadAndConvert(ProjectPath::Absolute(path), options);
+    ASSERT_FALSE(html.empty()) << geometry.file;
+    std::string marker = std::string("id=\"") + geometry.target + "\"";
+    auto tag = FindTagContaining(html, marker);
+    ASSERT_FALSE(tag.empty()) << geometry.file;
+    EXPECT_EQ(tag.rfind("<div", 0), 0u) << geometry.file;
+    EXPECT_NE(tag.find("animation:"), std::string::npos) << geometry.file;
+    EXPECT_NE(KeyframeStopOf(html, marker, "0%").find(geometry.first), std::string::npos)
+        << geometry.file;
+    EXPECT_NE(KeyframeStopOf(html, marker, "100%").find(geometry.last), std::string::npos)
+        << geometry.file;
+
+    options.exportAnimations = false;
+    auto withoutAnimation = LoadAndConvert(ProjectPath::Absolute(path), options);
+    EXPECT_EQ(withoutAnimation.find("@keyframes"), std::string::npos) << geometry.file;
+    EXPECT_EQ(withoutAnimation.find("animation:"), std::string::npos) << geometry.file;
+    options.exportAnimations = true;
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGeometryWidthSvgDoesNotClip) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Rectangle id="outlinedRect" position="160,100" size="80,120"/>
+      <Stroke color="#2563EB" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="60" frameRate="60" loop="once">
+        <Object target="outlinedRect">
+          <Channel name="size.width" type="float">
+            <Key time="0" value="80" interpolation="linear"/>
+            <Key time="60" value="240"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"outlinedRect\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.rfind("<rect", 0), 0u);
+  EXPECT_NE(tag.find("animation:"), std::string::npos);
+  EXPECT_NE(EnclosingSvgTag(html, "id=\"outlinedRect\"").find("overflow:visible"),
+            std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"outlinedRect\"", "100%").find("x: 40px; width: 240px"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationTrimPathEndCorpus) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/geometry/04_trim_path_end.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto pathTag = FindTagContaining(html, "id=\"trimPath\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_EQ(pathTag.rfind("<path", 0), 0u);
+  EXPECT_NE(pathTag.find("pathLength=\"1\""), std::string::npos);
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos);
+  EXPECT_NE(KeyframeStopOf(html, "id=\"trimPath\"", "0%").find("stroke-dasharray: 1 0"),
+            std::string::npos);
+  auto last = KeyframeStopOf(html, "id=\"trimPath\"", "100%");
+  EXPECT_NE(last.find("stroke-dasharray: 0 1"), std::string::npos) << last;
+  EXPECT_NE(last.find("visibility: hidden"), std::string::npos) << last;
+  options.exportAnimations = false;
+  auto withoutAnimation = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/geometry/04_trim_path_end.pagx"),
+      options);
+  EXPECT_EQ(withoutAnimation.find("@keyframes"), std::string::npos);
+  EXPECT_EQ(withoutAnimation.find("pathLength=\"1\""), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
+  const char* cases[] = {
+      "layer/07_blend_mode.pagx",
+      "stroke/05_miter_limit.pagx",
+  };
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  for (const char* name : cases) {
+    auto html = LoadAndConvert(
+        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
+    ASSERT_FALSE(html.empty()) << name;
+    EXPECT_EQ(html.find("@keyframes"), std::string::npos) << name;
+    EXPECT_EQ(html.find("animation:"), std::string::npos) << name;
+    EXPECT_EQ(html.find("{ ; }"), std::string::npos) << name;
+  }
+}
+
+// Returns the `animation:` declaration value on the tag containing `idMarker`.
+static std::string AnimationDeclOfTag(const std::string& html, const std::string& idMarker) {
+  auto tag = FindTagContaining(html, idMarker);
+  auto pos = tag.find("animation:");
+  if (pos == std::string::npos) {
+    return "";
+  }
+  auto end = tag.find_first_of(";\"", pos);
+  return end == std::string::npos ? "" : tag.substr(pos, end - pos);
+}
+
+// Exports `animatedXml` twice: as is, and with `unsupportedChannelXml` removed. The supported
+// channels must produce identical keyframes and animation timing in both, so an unsupported channel
+// on the same object neither splits the supported keyframes nor overrides their easing.
+static void ExpectUnsupportedChannelIgnored(const std::string& animatedXml,
+                                            const std::string& unsupportedChannelXml,
+                                            const std::string& idMarker) {
+  auto pos = animatedXml.find(unsupportedChannelXml);
+  ASSERT_NE(pos, std::string::npos);
+  std::string supportedOnlyXml = animatedXml;
+  supportedOnlyXml.erase(pos, unsupportedChannelXml.size());
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto mixedHtml = LoadXMLAndConvert(animatedXml, opts);
+  auto supportedHtml = LoadXMLAndConvert(supportedOnlyXml, opts);
+  ASSERT_FALSE(mixedHtml.empty());
+  ASSERT_FALSE(supportedHtml.empty());
+
+  auto supportedDecl = AnimationDeclOfTag(supportedHtml, idMarker);
+  ASSERT_FALSE(supportedDecl.empty());
+  EXPECT_EQ(AnimationDeclOfTag(mixedHtml, idMarker), supportedDecl);
+  auto supportedRule = KeyframesRuleNamed(
+      supportedHtml, AnimationNameOfTag(FindTagContaining(supportedHtml, idMarker)));
+  ASSERT_FALSE(supportedRule.empty());
+  EXPECT_EQ(
+      KeyframesRuleNamed(mixedHtml, AnimationNameOfTag(FindTagContaining(mixedHtml, idMarker))),
+      supportedRule);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerAlphaLinear) {
+  const char* blendChannel = R"(
+        <Channel name="blendMode" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="30" value="1" interpolation="hold"/>
+          <Key time="60" value="1" interpolation="hold"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer id="mixLayer" x="40" y="40" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="layerMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixLayer">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1" interpolation="linear"/>
+          </Channel>)") +
+                    blendChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixLayer\"");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
+  const char* blendChannel = R"(
+        <Channel name="blendMode" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="20" value="1" interpolation="hold"/>
+          <Key time="40" value="0" interpolation="hold"/>
+          <Key time="60" value="0"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer id="mixSlide" x="40" y="60" width="80" height="80">
+      <Rectangle position="40,40" size="80,80"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="slideMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixSlide">
+          <Channel name="x" type="float">
+            <Key time="0" value="40" interpolation="bezier" bezierOut="0.42,0" bezierIn="0.58,1"/>
+            <Key time="60" value="200"/>
+          </Channel>)") +
+                    blendChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixSlide\"");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
+  const char* miterChannel = R"(
+        <Channel name="miterLimit" type="float">
+          <Key time="0" value="4" interpolation="hold"/>
+          <Key time="45" value="1" interpolation="hold"/>
+          <Key time="60" value="1"/>
+        </Channel>)";
+  std::string xml = std::string(R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Path data="M 40 160 L 160 40 L 280 160"/>
+      <Stroke id="mixStroke" color="#2563EB" width="8" join="miter"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeMix" duration="60" frameRate="60" loop="once">
+        <Object target="mixStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="8" interpolation="linear"/>
+            <Key time="60" value="16"/>
+          </Channel>)") +
+                    miterChannel + R"(
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  ExpectUnsupportedChannelIgnored(xml, miterChannel, "id=\"mixStroke\"");
+}
+
+// PAGX composes a Group transform as
+//   T(position) * R(rotation) * R(-skewAxis) * Shear(tan(-skew)) * R(skewAxis) * S(scale) * T(-anchor)
+// (see BuildGroupMatrix). Each animated factor maps to its own CSS transform function in the same
+// order, so the browser interpolates every factor independently, as the runtime does.
+CLI_TEST(PAGXHtmlTest, AnimationGroupAnchorCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/08_anchor_x.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"anchorGroupX\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"anchorGroupX\"", "100%");
+  EXPECT_EQ(first, "  0% { transform: translate(180px, 60px) translate(0px, 0px); }");
+  EXPECT_EQ(last, "  100% { transform: translate(180px, 60px) translate(-80px, 0px); }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/09_skew.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"skewGroup\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"skewGroup\"", "100%");
+  EXPECT_EQ(first, "  0% { transform: translate(120px, 60px) skewX(0deg); }");
+  EXPECT_EQ(last, "  100% { transform: translate(120px, 60px) skewX(-45deg); }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewAxisCorpus) {
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/group/10_skew_axis.pagx"), opts);
+  ASSERT_FALSE(html.empty());
+
+  auto first = KeyframeStopOf(html, "id=\"skewAxisGroup\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"skewAxisGroup\"", "100%");
+  EXPECT_EQ(first,
+            "  0% { transform: translate(120px, 40px) rotate(0deg) skewX(-30deg) rotate(0deg); }");
+  EXPECT_EQ(
+      last,
+      "  100% { transform: translate(120px, 40px) rotate(-90deg) skewX(-30deg) rotate(90deg); }");
+}
+
+// The anchor is the pivot for rotation and scale, so an animated anchor under a static rotation
+// must stay inside the rotated frame rather than becoming a plain screen-space translation.
+CLI_TEST(PAGXHtmlTest, AnimationGroupAnchorKeepsRotationPivot) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Group id="pivotGroup" position="160,100" rotation="90">
+        <Rectangle size="80,80"/>
+        <Fill color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="pivotShift" duration="60" frameRate="60" loop="once">
+        <Object target="pivotGroup">
+          <Channel name="anchor.x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"pivotGroup\"", "0%"),
+            "  0% { transform: translate(160px, 100px) rotate(90deg) translate(0px, 0px); }");
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"pivotGroup\"", "100%"),
+            "  100% { transform: translate(160px, 100px) rotate(90deg) translate(-40px, 0px); }");
+}
+
+// Every static factor stays in its slot while skew and anchor.y animate, which pins the full
+// function order against BuildGroupMatrix.
+CLI_TEST(PAGXHtmlTest, AnimationGroupSkewKeepsTransformOrder) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer width="320" height="200">
+      <Group id="orderGroup" position="100,100" rotation="30" skewAxis="15" scale="2,2"
+             anchor="10,20">
+        <Rectangle size="40,40"/>
+        <Fill color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="orderShift" duration="60" frameRate="60" loop="once">
+        <Object target="orderGroup">
+          <Channel name="skew" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="20"/>
+          </Channel>
+          <Channel name="anchor.y" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="0"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(KeyframeStopOf(html, "id=\"orderGroup\"", "0%"),
+            "  0% { transform: translate(100px, 100px) rotate(30deg) rotate(-15deg) skewX(0deg) "
+            "rotate(15deg) scale(2) translate(-10px, -20px); }");
+  EXPECT_EQ(
+      KeyframeStopOf(html, "id=\"orderGroup\"", "100%"),
+      "  100% { transform: translate(100px, 100px) rotate(30deg) rotate(-15deg) skewX(-20deg) "
+      "rotate(15deg) scale(2) translate(-10px, 0px); }");
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSolidColorFillAndText) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="rectLayer" width="80" height="80">
+      <Rectangle width="80" height="80"/>
+      <Fill>
+        <SolidColor id="bgCol" color="#FF0000"/>
+      </Fill>
+    </Layer>
+    <Layer id="txtLayer" top="100" width="200" height="40">
+      <TextBox width="200" height="40">
+        <Text text="ColorText" fontFamily="Arial" fontSize="20"/>
+        <Fill>
+          <SolidColor id="txtCol" color="#00FF00"/>
+        </Fill>
+      </TextBox>
+    </Layer>
+    <Animations>
+      <Animation id="colAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="bgCol">
+          <Channel name="color" type="color">
+            <Key time="0" value="#FF0000" interpolation="linear"/>
+            <Key time="60" value="#0000FF"/>
+          </Channel>
+        </Object>
+        <Object target="txtCol">
+          <Channel name="color" type="color">
+            <Key time="0" value="#00FF00" interpolation="linear"/>
+            <Key time="60" value="#FFFF00"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("0% { background-color: #FF0000; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { background-color: #0000FF; }"), std::string::npos);
+  EXPECT_NE(html.find("0% { color: #00FF00; }"), std::string::npos);
+  EXPECT_NE(html.find("100% { color: #FFFF00; }"), std::string::npos);
+
+  auto bgTag = FindTagContaining(html, "id=\"bgCol\"");
+  ASSERT_FALSE(bgTag.empty());
+  EXPECT_NE(bgTag.find("animation:"), std::string::npos);
+
+  auto txtTag = FindTagContaining(html, "id=\"txtCol\"");
+  ASSERT_FALSE(txtTag.empty());
+  EXPECT_NE(txtTag.find("animation:"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSVGStrokeAndDashOffset) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="strokeLayer" width="200" height="200">
+      <Path data="M 10 10 L 190 10 L 190 190"/>
+      <Stroke id="st" color="#00FF00" width="4" dashes="10,5"/>
+    </Layer>
+    <Animations>
+      <Animation id="dashAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="st">
+          <Channel name="dashOffset" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="30"/>
+          </Channel>
+          <Channel name="color" type="color">
+            <Key time="0" value="#00FF00" interpolation="linear"/>
+            <Key time="60" value="#FF00FF"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto pathTag = FindTagContaining(html, "id=\"st\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_EQ(pathTag.rfind("<path", 0), 0u);
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos);
+
+  EXPECT_NE(html.find("0% { stroke: #00FF00; stroke-opacity: 1; stroke-dashoffset: 0; }"),
+            std::string::npos);
+  EXPECT_NE(html.find("100% { stroke: #FF00FF; stroke-opacity: 1; stroke-dashoffset: 30; }"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupPreservation) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="parentLayer" width="200" height="200">
+      <Group id="grp">
+        <Rectangle width="60" height="60"/>
+        <Fill color="#FF0000"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="grpAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="grp">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  auto grpTag = FindTagContaining(html, "id=\"grp\"");
+  ASSERT_FALSE(grpTag.empty());
+  EXPECT_NE(grpTag.find("pagx-group"), std::string::npos);
+  EXPECT_NE(grpTag.find("animation:pagx_grp_0 1s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSampleFileExport) {
+  auto samplePath = ProjectPath::Absolute("spec/samples/animation.pagx");
+  auto html = LoadAndConvert(samplePath);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 6u);
+  EXPECT_NE(html.find("@keyframes pagx_pulseCircle_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot1_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot2_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_dot3_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_slidingBar_"), std::string::npos);
+  EXPECT_NE(html.find("@keyframes pagx_labelText_"), std::string::npos);
+
+  for (const char* id : {"pulseCircle", "dot1", "dot2", "dot3", "slidingBar", "labelText"}) {
+    auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
+    EXPECT_FALSE(tag.empty()) << "Missing element id=" << id;
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSVGMultiGeometryPainterUniqueIds) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="multiGeoLayer" width="200" height="200">
+      <Rectangle position="40,40" size="40,40"/>
+      <Ellipse position="120,120" size="40,40"/>
+      <Stroke id="sharedStroke" color="#00FF00" width="4"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="sharedStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="2" interpolation="linear"/>
+            <Key time="60" value="8"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  // No duplicate id="sharedStroke" in DOM; the second shape receives id="sharedStroke__1".
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedStroke\""), 1u);
+  EXPECT_EQ(CountOccurrences(html, "id=\"sharedStroke__1\""), 1u);
+
+  auto firstTag = FindTagContaining(html, "id=\"sharedStroke\"");
+  auto secondTag = FindTagContaining(html, "id=\"sharedStroke__1\"");
+  ASSERT_FALSE(firstTag.empty());
+  ASSERT_FALSE(secondTag.empty());
+  EXPECT_NE(firstTag.find("animation:pagx_sharedStroke_0 1s linear infinite"), std::string::npos);
+  EXPECT_NE(secondTag.find("animation:pagx_sharedStroke_0 1s linear infinite"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationPrecompTimelineEvaluationOffset) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="rootLayer" composition="@comp1" width="200" height="200"/>
+    <Resources>
+      <Composition id="comp1" width="200" height="200">
+        <Layer id="innerLayer" width="100" height="100">
+          <Rectangle width="100" height="100"/>
+          <Fill color="#FF0000"/>
+          <Timelines>
+            <Animation ref="@innerAnim" evaluationOffset="18"/>
+          </Timelines>
+        </Layer>
+      </Composition>
+    </Resources>
+    <Animations>
+      <Animation id="innerAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="innerLayer">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto innerTag = FindTagContaining(html, "id=\"innerLayer\"");
+  ASSERT_FALSE(innerTag.empty());
+  // evaluationOffset="18" at 60fps -> 0.3s delay
+  EXPECT_NE(innerTag.find("animation:pagx_innerLayer_0 1s linear 0.3s infinite"),
+            std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationTextBoxContainerProps) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="txtLayer" width="200" height="200">
+      <TextBox id="tb1" left="20" top="30" width="120" height="40">
+        <Text text="Hello" fontFamily="Arial" fontSize="16"/>
+        <Fill color="#112233"/>
+      </TextBox>
+    </Layer>
+    <Animations>
+      <Animation id="tbAnim" duration="60" frameRate="60" loop="loop">
+        <Object target="tb1">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+          <Channel name="position.x" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="70"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tbTag = FindTagContaining(html, "id=\"tb1\"");
+  ASSERT_FALSE(tbTag.empty());
+  EXPECT_NE(tbTag.find("animation:pagx_tb1_0 1s linear infinite"), std::string::npos);
+  EXPECT_NE(html.find("0% { opacity: 0.2; transform: translate(0px, 0px); }"), std::string::npos);
+  EXPECT_NE(html.find("100% { opacity: 1; transform: translate(50px, 0px); }"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
+  const char* xml = R"(<pagx width="200" height="160">
+    <Layer matrix="2.66667,0,0,2.66667,0,0">
+      <Group>
+        <Path data="M2 8.5C7.66601 3.43217 16.334 3.43217 22 8.5"/>
+        <Path data="M5.5 12.5C9.22606 9.31296 14.7739 9.31296 18.5 12.5"/>
+        <Path data="M9 16.5C10.7726 15.1705 13.2274 15.1705 15 16.5"/>
+        <Stroke id="wavesStroke" color="#60A5FA" width="2" cap="round"/>
+      </Group>
+      <Group>
+        <Ellipse position="12,20" size="3.2,3.2"/>
+        <Fill color="#60A5FA"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
+        <Object target="wavesStroke">
+          <Channel name="width" type="float">
+            <Key time="0" value="2" interpolation="linear"/>
+            <Key time="60" value="3"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+
+  // Un-authored non-flex Layer width must expand from path control bounds (22) to stroke-padded
+  // bounds (24).
+  EXPECT_NE(html.find("width:24px;height:21.6px"), std::string::npos);
+
+  // Both Groups render via SVG and should coalesce into a single <svg> element with an
+  // integer-snapped viewBox so round-trip flex inference does not split them into stacked flex
+  // children.
+  size_t firstSvg = html.find("<svg");
+  ASSERT_NE(firstSvg, std::string::npos);
+  EXPECT_EQ(html.find("<svg", firstSvg + 4), std::string::npos);
+  EXPECT_NE(html.find("viewBox=\"0 1 24 21\""), std::string::npos);
+
+  pagx::HTMLExportOptions staticOptions;
+  staticOptions.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, staticOptions);
+  EXPECT_EQ(CountOccurrences(staticHtml, "<svg"), 2u);
+  EXPECT_EQ(staticHtml.find("@keyframes"), std::string::npos);
+}
+
 }  // namespace pag

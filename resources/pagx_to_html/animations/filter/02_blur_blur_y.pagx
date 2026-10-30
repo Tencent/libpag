@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: BlurFilter blurY grows from the static zero value so the box smears vertically only.
+     Target: BlurFilter  Channel: blurY  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer x="100" y="60" width="120" height="80">
+    <Rectangle position="60,40" size="120,80" roundness="8"/>
+    <Fill color="#2563EB"/>
+    <BlurFilter id="blurYFilter" blurX="0" blurY="0"/>
+  </Layer>
+  <Animations>
+    <Animation id="blurYGrow" duration="60" frameRate="60" loop="once">
+      <Object target="blurYFilter">
+        <Channel name="blurY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="24" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
