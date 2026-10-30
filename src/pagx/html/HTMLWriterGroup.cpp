@@ -34,7 +34,8 @@ namespace pagx {
 using pag::FloatNearlyZero;
 
 void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
-                            const Matrix& parentMatrix) {
+                            const Matrix& parentMatrix,
+                            const std::vector<Element*>* propagatedPainters) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
@@ -61,13 +62,23 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
   out.addAttr("style", style);
   out.closeTagStart();
   const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
-  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background, groupPadding);
+  const auto* elements = &group->elements;
+  std::vector<Element*> paintedElements = {};
+  if (propagatedPainters != nullptr && !propagatedPainters->empty()) {
+    // These shape-only children normally propagate to the parent Fill/Stroke. Keep their authored
+    // coordinates inside the animated wrapper and append only their parent's matching painters.
+    paintedElements = group->elements;
+    paintedElements.insert(paintedElements.end(), propagatedPainters->begin(),
+                           propagatedPainters->end());
+    elements = &paintedElements;
+  }
+  writeElements(out, *elements, 1.0f, false, LayerPlacement::Background, groupPadding);
   // Recurse through nested Group / TextBox containers so a foreground painter inside a child
   // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
   // suppressed by both passes' filters.
-  bool hasForegroundPainter = HasForegroundPainter(group->elements);
+  bool hasForegroundPainter = HasForegroundPainter(*elements);
   if (hasForegroundPainter) {
-    writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
+    writeElements(out, *elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
   }
   out.closeTag();
 }

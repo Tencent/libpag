@@ -1569,6 +1569,57 @@ CLI_TEST(PAGXHtmlTest, Group) {
   EXPECT_NE(html.find("#F59E0B"), std::string::npos) << "Propagation fill missing";
 }
 
+// A shape-only Group propagates geometry to the parent's Fill. Animating its position must not
+// isolate that unpainted geometry in a wrapper and leave the parent's Fill with nothing to paint.
+CLI_TEST(PAGXHtmlTest, AnimatedGroupPositionKeepsParentFill) {
+  const char* xml = R"(<pagx width="240" height="140">
+    <Layer width="240" height="140">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F8FAFC"/>
+    </Layer>
+    <Layer width="240" height="140">
+      <Group id="moveGroup" position="40,20">
+        <Rectangle position="40,40" size="50,50"/>
+      </Group>
+      <Fill color="#F59E0B"/>
+    </Layer>
+    <Animations>
+      <Animation id="groupMove" duration="60" frameRate="60" loop="once">
+        <Object target="moveGroup">
+          <Channel name="position.x" type="float">
+            <Key time="0" value="40" interpolation="linear"/>
+            <Key time="60" value="120"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  options.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(staticHtml.empty());
+  ASSERT_NE(staticHtml.find("#F59E0B"), std::string::npos);
+
+  options.exportAnimations = true;
+  auto animatedHtml = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(animatedHtml.empty());
+  EXPECT_NE(animatedHtml.find("100% { transform: translate(120px, 20px); }"), std::string::npos);
+  auto groupTag = FindTagContaining(animatedHtml, "id=\"moveGroup\"");
+  ASSERT_FALSE(groupTag.empty());
+  EXPECT_NE(groupTag.find("animation:"), std::string::npos);
+  auto groupStart = animatedHtml.find(groupTag);
+  auto groupEnd = animatedHtml.find("</div>", groupStart);
+  ASSERT_NE(groupEnd, std::string::npos);
+  auto paintedShape = animatedHtml.find("background-color:#F59E0B", groupStart);
+  EXPECT_NE(paintedShape, std::string::npos)
+      << "The parent's Fill must still paint the Group geometry while it moves";
+  if (paintedShape != std::string::npos) {
+    EXPECT_LT(paintedShape, groupEnd) << "Paint must move inside the animated Group";
+  }
+}
+
 // =============================================================================
 // Clipping and masking
 // =============================================================================
