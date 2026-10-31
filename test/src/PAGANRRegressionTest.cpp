@@ -135,7 +135,7 @@ static std::shared_ptr<PAGAnimator> MakeANRAnimator(
 }
 
 static void RunANRAnimatorUpdate(PAGAnimator* animator) {
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
 }
 
 class ANRVideoDemuxer : public VideoDemuxer {
@@ -464,7 +464,7 @@ PAG_TEST(PAGANRRegressionTest, EndWaitsUntilFinalUpdateIsSubmitted) {
   EXPECT_EQ(updateEvents.size(), 1U);
   EXPECT_TRUE(animator->doAdvance().empty());
 
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
   ASSERT_TRUE(listener->waitForUpdateCount(1));
   std::vector<int> endEvents = {};
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
@@ -567,7 +567,7 @@ PAG_TEST(PAGANRRegressionTest, EndingUpdateStaysAsynchronousAfterSyncChange) {
   animator->isEnding = true;
   animator->setSync(true);
 
-  animator->doUpdate(true);
+  animator->doUpdate(true, true);
 
   ASSERT_TRUE(listener->waitForUpdateCount(1));
   EXPECT_NE(listener->firstUpdateThread(), callingThread);
@@ -612,6 +612,32 @@ PAG_TEST(PAGANRRegressionTest, TimedOutUpdateRemainsSerialized) {
 
   ASSERT_TRUE(listener->waitForUpdateCount(2));
   EXPECT_EQ(listener->maximumConcurrentUpdates(), 1);
+}
+
+PAG_TEST(PAGANRRegressionTest, TickerUpdateDuringAsyncFlushIsThrottled) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  listener->blockFirstUpdate();
+  auto animator = MakeANRAnimator(listener);
+  animator->_isRunning = true;
+
+  animator->doUpdate(true, true);
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+
+  // Ticker-driven updates arriving while the first flush is still running are dropped instead of
+  // being merged into an immediate re-flush. Merging used to keep the renderer 100% busy without
+  // idle time once a single flush took longer than one vsync period (issue #3738).
+  RunANRAnimatorUpdate(animator.get());
+  RunANRAnimatorUpdate(animator.get());
+  EXPECT_EQ(listener->updateCount(), 1U);
+
+  listener->releaseFirstUpdate();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  EXPECT_EQ(listener->updateCount(), 1U);
+
+  // The next ticker tick re-drives the flush once the previous task has exited.
+  animator->doUpdate(true, true);
+  ASSERT_TRUE(listener->waitForUpdateCount(2));
+  animator->cancel();
 }
 
 PAG_TEST(PAGANRRegressionTest, StalledDecoderFallsBackOnNextRequest) {
