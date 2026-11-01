@@ -132,7 +132,8 @@
         "platforms": [
           "mac",
           "win",
-          "linux"
+          "linux",
+          "web"
         ]
       }
     }

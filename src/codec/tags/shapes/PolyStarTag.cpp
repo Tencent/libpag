@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PolyStar.h"
+#include "PolyStarTag.h"
 
 namespace pag {
 std::unique_ptr<BlockConfig> PolyStarTag(PolyStarElement* shape) {

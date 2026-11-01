@@ -20,6 +20,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include "utils/DevicePool.h"
 #if defined(TGFX_USE_METAL)
 #include "utils/MetalTestSupport.h"
 #endif
@@ -46,7 +47,10 @@ bool PAGTest::IsPixelComparison() {
 }
 
 void PAGTest::SetUp() {
-#if defined(TGFX_USE_METAL)
+#if defined(__EMSCRIPTEN__)
+  // Pure CPU tests must still run when a GPU is unavailable.
+  DevicePool::ResetAtlasForComparison();
+#elif defined(TGFX_USE_METAL)
   if (!IsPixelComparison()) {
     return;
   }

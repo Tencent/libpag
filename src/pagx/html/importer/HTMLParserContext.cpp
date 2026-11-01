@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <utility>
 #include "pagx/FontConfig.h"
 #include "pagx/SystemFonts.h"
@@ -177,9 +178,14 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
-  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
-  bool available =
-      typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
+  // Probe through SystemFonts::FindFont rather than Typeface::MakeFromName: on web,
+  // MakeFromName unconditionally returns a WebTypeface that echoes the requested family name
+  // verbatim, so the FontNamesMatch comparison below would succeed for any name (including
+  // families the renderer will silently substitute). FindFont is backed by the real platform
+  // font manager (empty on web, where browser fonts cannot be probed synchronously), so an
+  // unavailable family yields an empty location and the stack falls through to the next entry.
+  auto location = SystemFonts::FindFont(family, "");
+  bool available = !location.path.empty();
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }

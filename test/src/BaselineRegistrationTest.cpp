@@ -86,6 +86,56 @@ CLI_PIXEL_TEST(BaselineCliRegistrationTest, RegisteredCommandIsRecognizedBeforeC
   EXPECT_TRUE(Baseline::CheckPixelComparison("BaselineCliRegistrationTest/registered"));
 }
 
+#ifndef UPDATE_BASELINE
+PAG_TEST(BaselineRegistrationTest, CountsComparisonsWithoutChangingExpectedValues) {
+  Baseline instance("/missing/baseline", "/missing/cache", "/missing/output");
+  instance.baselineVersions = {{"suite", {{"image", "v1"}}}};
+  instance.cacheVersions = instance.baselineVersions;
+  instance.cacheMD5 = {{"suite", {{"image", "expected"}}}};
+  auto expected = instance.cacheMD5;
+  EXPECT_TRUE(instance.compareMd5("suite/image", "expected"));
+  EXPECT_FALSE(instance.compareMd5("suite/image", "actual"));
+  EXPECT_EQ(instance.cacheMD5, expected);
+  auto stats = instance.comparisonStats();
+  EXPECT_EQ(stats.compared, 2u);
+  EXPECT_EQ(stats.versionSkipped, 0u);
+  EXPECT_EQ(stats.missingBaseline, 0u);
+}
+
+PAG_TEST(BaselineRegistrationTest, CountsAcceptedVersionChangesSeparately) {
+  Baseline instance("/missing/baseline", "/missing/cache", "/missing/output");
+  instance.baselineVersions = {{"suite", {{"image", "v2"}}}};
+  instance.cacheVersions = {{"suite", {{"image", "v1"}}}};
+  instance.cacheMD5 = {{"suite", {{"image", "expected"}}}};
+  EXPECT_TRUE(instance.compareMd5("suite/image", "actual"));
+  auto stats = instance.comparisonStats();
+  EXPECT_EQ(stats.compared, 0u);
+  EXPECT_EQ(stats.versionSkipped, 1u);
+  EXPECT_EQ(stats.missingBaseline, 0u);
+}
+
+PAG_TEST(BaselineRegistrationTest, RejectsMissingRegisteredBaseline) {
+  Baseline instance("/missing/baseline", "/missing/cache", "/missing/output");
+  EXPECT_FALSE(instance.compareMd5("suite/image", "actual"));
+  EXPECT_EQ(instance.comparisonStats().missingBaseline, 1u);
+}
+
+PAG_TEST(BaselineRegistrationTest, MissingCacheIsNotAnAcceptedWebVersionChange) {
+  Baseline instance("/missing/baseline", "/missing/cache", "/missing/output");
+  instance.baselineVersions = {{"suite", {{"image", "v2"}}}};
+#if defined(__EMSCRIPTEN__)
+  EXPECT_FALSE(instance.compareMd5("suite/image", "actual"));
+  EXPECT_EQ(instance.comparisonStats().missingBaseline, 1u);
+#else
+  EXPECT_TRUE(instance.compareMd5("suite/image", "actual"));
+  EXPECT_EQ(instance.comparisonStats().versionSkipped, 1u);
+#endif
+  instance.cacheVersions = instance.baselineVersions;
+  EXPECT_FALSE(instance.compareMd5("suite/image", "actual"));
+  EXPECT_EQ(instance.comparisonStats().compared, 0u);
+}
+#endif
+
 #if defined(TGFX_USE_METAL)
 PAG_TEST(BaselineRegistrationTest, RejectsUnregisteredPixmapBeforeMd5) {
   tgfx::Bitmap bitmap(1, 1, false, false);

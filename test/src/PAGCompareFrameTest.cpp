@@ -40,7 +40,7 @@ using namespace tgfx;
 using nlohmann::json;
 
 static constexpr float MAX_FRAME_SIZE = 360.0f;
-#if !defined(TGFX_USE_METAL)
+#if !defined(TGFX_USE_METAL) && !defined(__EMSCRIPTEN__)
 static constexpr int MAX_THREADS = 6;
 #endif
 static constexpr bool PrintPerformance = false;
@@ -158,7 +158,14 @@ static void CompareFileFrames(const std::string& pagPath) {
  */
 PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
-#if defined(TGFX_USE_METAL)
+#if defined(__EMSCRIPTEN__)
+  // The single-threaded web build has no pthreads: run the corpus serially like the Metal path
+  // below, so pixel comparisons stay independent of interleaving.
+  for (const auto& file : files) {
+    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
+    CompareFileFrames(file);
+  }
+#elif defined(TGFX_USE_METAL)
   // Metal workers share one glyph atlas; interleaving can change Linear-sampled text pixels.
   // Keep independent baseline files serial and clear atlas history before each file.
   for (const auto& file : files) {

@@ -17,7 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Baseline.h"
+#if defined(__EMSCRIPTEN__)
+// CommonCrypto is Apple-only; under Emscripten reuse tgfx's portable MD5, which the web build
+// enables through TGFX_USE_FALLBACK_MD5.
+#include "core/utils/MD5.h"
+#else
 #include <CommonCrypto/CommonCrypto.h>
+#endif
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -61,13 +67,25 @@ static void RemoveEmptyFolder(const std::filesystem::path& path) {
   }
 }
 
+static Baseline::ComparisonStats CompletedComparisonStats = {};
+
 void Baseline::SetUp() {
+  CompletedComparisonStats = {};
   baseline = std::make_unique<Baseline>(BASELINE_ROOT, CACHE_ROOT, OUT_ROOT);
 }
 
 void Baseline::TearDown() {
   baseline->saveData();
+  CompletedComparisonStats = baseline->comparisonStats();
   baseline = nullptr;
+}
+
+Baseline::ComparisonStats Baseline::GetComparisonStats() {
+  return baseline ? baseline->comparisonStats() : CompletedComparisonStats;
+}
+
+Baseline::ComparisonStats Baseline::comparisonStats() const {
+  return {compared.load(), versionSkipped.load(), missingBaseline.load()};
 }
 
 bool Baseline::Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
@@ -146,11 +164,19 @@ bool Baseline::compare(const Bitmap& bitmap, const std::string& key) {
 }
 
 std::string DumpMD5(const void* bytes, size_t size) {
+#if defined(__EMSCRIPTEN__)
+  auto digestArray = tgfx::MD5::Calculate(bytes, size);
+  unsigned char digest[16];
+  for (size_t i = 0; i < 16; ++i) {
+    digest[i] = digestArray[i];
+  }
+#else
   unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   CC_MD5(bytes, static_cast<int>(size), digest);
 #pragma clang diagnostic pop
+#endif
   char buffer[33];
   char* position = buffer;
   for (unsigned char i : digest) {
@@ -327,8 +353,24 @@ bool Baseline::compareMd5(const std::string& key, const std::string& md5) {
 #endif
   auto baselineVersion = getJSONValue(baselineVersions, key);
   auto cacheVersion = getJSONValue(cacheVersions, key);
-  if (baselineVersion.empty() ||
-      (baselineVersion == cacheVersion && getJSONValue(cacheMD5, key) != md5)) {
+  auto expectedMD5 = getJSONValue(cacheMD5, key);
+  auto missing = baselineVersion.empty();
+#if defined(__EMSCRIPTEN__)
+  missing = missing || cacheVersion.empty() || expectedMD5.empty();
+#else
+  missing = missing || (baselineVersion == cacheVersion && expectedMD5.empty());
+#endif
+  bool matches = false;
+  if (missing) {
+    ++missingBaseline;
+  } else if (baselineVersion != cacheVersion) {
+    ++versionSkipped;
+    matches = true;
+  } else {
+    ++compared;
+    matches = expectedMD5 == md5;
+  }
+  if (!matches) {
     setJSONValue(outputVersions, key, currentVersion);
     setJSONValue(outputMD5, key, md5);
     return false;
