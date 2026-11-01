@@ -245,6 +245,12 @@ jobs:
           source emsdk/emsdk_env.sh
           npm run build:st
 
+      - name: Run Node Test Suites
+        # Gates the UnitTest.js runner and the video reader logic, which the Cypress lanes
+        # below do not exercise (CI invokes `npm run cypress` directly).
+        working-directory: web
+        run: npm run test:cypress-runner && npm run test:video
+
       - name: Cypress run:st
         uses: cypress-io/github-action@v8
         with:
