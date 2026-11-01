@@ -1,9 +1,6 @@
 import { defineConfig } from 'cypress';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as brotli from 'brotli';
-
-const baselinesDir = 'cypress/baselines/';
 
 export default defineConfig({
   e2e: {
@@ -47,22 +44,7 @@ export default defineConfig({
         }
       });
 
-      on('task', {
-        readData(filename: string) {
-          const filePath = path.join(baselinesDir, filename);
-          if (fs.existsSync(filePath)) {
-            const buffer = brotli.decompress(fs.readFileSync(filePath));
-            return buffer;
-          }
-          return null;
-        },
-        saveData({ filename, data }: { filename: string; data: number[] }) {
-          const buffer = Buffer.from(data);
-          const output = brotli.compress(buffer);
-          fs.writeFileSync(path.join(baselinesDir, filename), Buffer.from(output.buffer));
-          return null;
-        },
-      });
+      on('task', {});
 
       on('before:browser:launch', (browser, launchOptions) => {
         if (backend !== 'webgpu') return launchOptions;
