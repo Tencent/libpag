@@ -1,7 +1,7 @@
 import { PAGModule } from './pag-module';
 import { PAGLayer } from './pag-layer';
 import { destroyVerify } from './utils/decorators';
-import { proxyVector } from './utils/type-utils';
+import { getWasmIns, proxyVector } from './utils/type-utils';
 
 import type { PAGImage } from './pag-image';
 import type { PAGVideoRange } from './types';
@@ -37,20 +37,20 @@ export class PAGImageLayer extends PAGLayer {
    * The replaceImage() method modifies all associated PAGImageLayers that have the same
    * editableIndex to this layer.
    *
-   * @param image The PAGImage object to replace with.
+   * @param image The PAGImage object to replace with, or null to reset to the default image content.
    */
-  public replaceImage(pagImage: PAGImage) {
-    this.wasmIns._replaceImage(pagImage.wasmIns);
+  public replaceImage(pagImage: PAGImage | null) {
+    this.wasmIns._replaceImage(getWasmIns(pagImage));
   }
   /**
    * Replace the original image content with the specified PAGImage object.
    * Passing in null for the image parameter resets the layer to its default image content.
    * The setImage() method only modifies the content of the calling PAGImageLayer.
    *
-   * @param image The PAGImage object to replace with.
+   * @param image The PAGImage object to replace with, or null to reset to the default image content.
    */
-  public setImage(pagImage: PAGImage) {
-    this.wasmIns._setImage(pagImage.wasmIns);
+  public setImage(pagImage: PAGImage | null) {
+    this.wasmIns._setImage(getWasmIns(pagImage));
   }
   /**
    * Converts the time from the PAGImageLayer's timeline to the replacement content's timeline. The
