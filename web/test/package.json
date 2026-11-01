@@ -1,0 +1,34 @@
+{
+  "name": "libpag-web-test",
+  "version": "1.0.0",
+  "description": "libpag Web Test Runner",
+  "scripts": {
+    "build": "npm run build:webgl",
+    "build:webgl": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Release -DPAG_USE_WEBGPU=OFF -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
+    "build:webgpu": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Release -DPAG_USE_WEBGPU=ON -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
+    "build:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgl -DCMAKE_BUILD_TYPE=Debug -DPAG_USE_WEBGPU=OFF -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgl -- -j 8' && npm run copy:webgl",
+    "build:webgpu:debug": "sh -c 'if [ -f ../emsdk/emsdk_env.sh ]; then . ../emsdk/emsdk_env.sh; fi; emcmake cmake -G Ninja -B build-webgpu -DCMAKE_BUILD_TYPE=Debug -DPAG_USE_WEBGPU=ON -DPAG_UPDATE_BASELINE=OFF -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON && cmake --build build-webgpu -- -j 8' && npm run copy:webgpu",
+    "copy:webgl": "node artifacts.js webgl compare build-webgl",
+    "copy:webgpu": "node artifacts.js webgpu compare build-webgpu",
+    "test:harness": "node --test harness.test.js",
+    "test:harness:browser": "PAG_HARNESS_BROWSER=1 node --test harness.test.js",
+    "test": "npm run test:webgl",
+    "test:webgl": "npm run build:webgl && node run_test.js --backend=webgl",
+    "test:webgpu": "npm run build:webgpu && node run_test.js --backend=webgpu",
+    "autotest": "npm run autotest:webgl",
+    "autotest:webgl": "node run_test.js --backend=webgl",
+    "autotest:webgpu": "node run_test.js --backend=webgpu",
+    "clean": "rm -rf build-webgl build-webgpu build-baseline-webgl build-baseline-webgpu dist results"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.38.0"
+  },
+  "keywords": [
+    "libpag",
+    "webgl",
+    "webgpu",
+    "testing"
+  ],
+  "author": "Tencent",
+  "license": "Apache-2.0"
+}

@@ -1,6 +1,6 @@
-import { DebugData, PAGScaleMode, PAGViewEventMap, PAGViewListenerEvent } from './types';
-import { PAGPlayer } from './pag-player';
-import { EventManager, Listener } from './utils/event-manager';
+import type { DebugData, PAGScaleMode, PAGViewEventMap } from './types';
+import type { PAGPlayer } from './pag-player';
+import { EventManager, type Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
 import { BackendContext, isWebGPUBackend } from './core/backend-context';
@@ -146,6 +146,7 @@ export class PAGView {
   protected canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
   protected timer: number | null = null;
   protected flushingNextFrame = false;
+  protected playbackVersion = 0;
   protected playTime = 0;
   protected startTime = 0;
   protected repeatedTimes = 0;
@@ -193,12 +194,12 @@ export class PAGView {
   public async play() {
     if (this.isPlaying) return;
     this.isPlaying = true;
+    const version = ++this.playbackVersion;
     this.startTime = this.getNowTime() * 1000 - this.playTime;
-    for (const videoReader of this.player.videoReaders) {
-      videoReader.isPlaying = true;
-    }
+    this.player.setVideoPlaying(true);
     const playTime = this.playTime;
     await this.flushLoop(true);
+    if (this.isDestroyed || version !== this.playbackVersion || !this.isPlaying) return;
     if (playTime === 0) {
       this.eventManager.emit('onAnimationStart', this);
     }
@@ -213,9 +214,8 @@ export class PAGView {
   public pause() {
     if (!this.isPlaying) return;
     this.clearTimer();
-    for (const videoReader of this.player.videoReaders) {
-      videoReader.pause();
-    }
+    this.playbackVersion++;
+    this.player.setVideoPlaying(false);
     this.isPlaying = false;
     this.eventManager.emit('onAnimationPause', this);
   }
@@ -224,14 +224,17 @@ export class PAGView {
    */
   public async stop(notification = true) {
     this.clearTimer();
+    const version = ++this.playbackVersion;
+    this.isPlaying = false;
+    this.player.setVideoPlaying(false);
     this.playTime = 0;
     this.player.setProgress(0);
     this.playFrame = 0;
     await this.flush();
+    if (this.isDestroyed || version !== this.playbackVersion) return;
     for (const videoReader of this.player.videoReaders) {
       videoReader.stop();
     }
-    this.isPlaying = false;
     if (notification) {
       this.eventManager.emit('onAnimationCancel', this);
     }
@@ -260,6 +263,7 @@ export class PAGView {
    * Set the progress of play position, the value is from 0.0 to 1.0.
    */
   public setProgress(progress: number): number {
+    this.playbackVersion++;
     this.playTime = progress * this.duration();
     this.startTime = this.getNowTime() * 1000 - this.playTime;
     if (!this.isPlaying) {
@@ -340,6 +344,7 @@ export class PAGView {
    * called, there is no need to call it. Returns true if the content has changed.
    */
   public async flush() {
+    const version = this.playbackVersion;
     const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
       const sourceCanvas = isWebGPUBackend() ? this.canvas2DSource : PAGModule.globalCanvas.canvas;
@@ -382,6 +387,7 @@ export class PAGView {
       this.setDebugData({ flushTime: clock.measure('', 'flush') });
       this.updateFPS();
     });
+    if (this.isDestroyed || version !== this.playbackVersion) return false;
     this.eventManager.emit('onAnimationUpdate', this);
     if (res) {
       this.eventManager.emit('onAnimationFlushed', this);
@@ -406,6 +412,7 @@ export class PAGView {
    * the previous PAGView.
    */
   public setComposition(pagComposition: PAGComposition) {
+    this.playbackVersion++;
     this.player.setComposition(pagComposition);
   }
   /**
@@ -451,9 +458,8 @@ export class PAGView {
     this.pagSurface = pagSurface;
   }
   /**
-   * Prepares the player for the next flush() call. It collects all CPU tasks from the current
-   * progress of the composition and runs them asynchronously in parallel. It is usually used for
-   * speeding up the first frame rendering.
+   * Prepares video frames and native resources at the current progress without presenting a frame.
+   * Initial video loading may take time. Use flush() to present the prepared content.
    */
   public prepare() {
     return this.player.prepare();
@@ -468,6 +474,8 @@ export class PAGView {
 
   public destroy() {
     this.clearTimer();
+    this.playbackVersion++;
+    this.isPlaying = false;
     this.player.destroy();
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
@@ -502,12 +510,14 @@ export class PAGView {
     }
     this.setTimer();
     if (this.flushingNextFrame) return;
+    const version = this.playbackVersion;
     try {
       this.flushingNextFrame = true;
       await this.flushNextFrame(force);
       this.flushingNextFrame = false;
     } catch (e: any) {
       this.flushingNextFrame = false;
+      if (this.isDestroyed || version !== this.playbackVersion) return;
       if (e.message !== 'The play() request was interrupted because the document was hidden!') {
         this.clearTimer();
       }
@@ -516,14 +526,17 @@ export class PAGView {
   }
 
   protected async flushNextFrame(force = false) {
+    const version = this.playbackVersion;
     const duration = this.duration();
     this.playTime = this.getNowTime() * 1000 - this.startTime;
     const playFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
     if (!force && this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
+      this.player.setVideoPlaying(false);
       this.player.setProgress(1);
       await this.flush();
+      if (this.isDestroyed || version !== this.playbackVersion) return false;
       this.playTime = 0;
       this.isPlaying = false;
       this.repeatedTimes = 0;
@@ -538,6 +551,7 @@ export class PAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
+    if (this.isDestroyed || version !== this.playbackVersion) return false;
     if (this.needResetStartTime()) {
       // Decoding BMP takes too much time and makes the video reader seek repeatedly.
       this.startTime = this.getNowTime() * 1000 - this.playTime;
@@ -605,7 +619,7 @@ export class PAGView {
     }
     try {
       this.canvas2DSource = new OffscreenCanvas(this.rawWidth, this.rawHeight);
-    } catch (error) {
+    } catch {
       const canvas = document.createElement('canvas');
       canvas.width = this.rawWidth;
       canvas.height = this.rawHeight;

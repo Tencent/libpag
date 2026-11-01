@@ -85,9 +85,14 @@ for (const filename of ['libpag.umd.js', 'libpag.min.js']) {
   });
 }
 
-test('the Cypress page loads the UMD bundle as a classic script', () => {
-  const page = fs.readFileSync(path.resolve(__dirname, '../cypress/index.html'), 'utf8');
-  const script = page.match(/<script\b([^>]*\bsrc=["']\.\.\/lib\/libpag\.umd\.js["'][^>]*)>/i);
-  assert.ok(script, 'Cypress must load the WebGL UMD bundle');
-  assert.doesNotMatch(script[1], /\btype\s*=\s*["']module["']/i);
-});
+for (const backend of ['webgl', 'webgpu']) {
+  test(`the ${backend} Cypress page loads the UMD bundle as a classic script`, () => {
+    const filename = backend === 'webgpu' ? 'index-webgpu.html' : 'index.html';
+    const directory = backend === 'webgpu' ? 'lib-webgpu' : 'lib';
+    const page = fs.readFileSync(path.resolve(__dirname, '../cypress', filename), 'utf8');
+    const script = page.match(/<script\b([^>]*\bsrc=["']([^"']*libpag\.umd\.js)["'][^>]*)>/i);
+    assert.ok(script, `Cypress must load the ${backend} UMD bundle`);
+    assert.equal(script[2], `../${directory}/libpag.umd.js`);
+    assert.doesNotMatch(script[1], /\btype\s*=\s*["']module["']/i);
+  });
+}

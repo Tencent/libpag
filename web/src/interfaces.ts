@@ -1,14 +1,23 @@
-import type { ctor, Point, Rect, Vector } from './types';
+import type { ctor, Rect } from './types';
 
 export interface TimeRange {
   start: number;
   end: number;
 }
 
+/** Explicit reader ownership and playback intent, independent of the active WASM call. */
+export interface VideoReaderOwner {
+  isDestroyed: boolean;
+  linkVideoReader: (reader: VideoReader) => void;
+  unlinkVideoReader: (reader: VideoReader) => void;
+  isVideoPlaying: () => boolean;
+}
+
 export interface VideoReader {
   isSought: boolean;
   isPlaying: boolean;
-  prepare: (targetFrame: number, playbackRate: number) => Promise<void>;
+  prepare: (targetFrame: number, playbackRate: number) => Promise<boolean>;
+  cancelPrepare: () => void;
   getError: () => Promise<any>;
   onDestroy: () => void;
   play: () => Promise<void>;
@@ -23,11 +32,12 @@ export interface VideoReaderManager{
 
 export interface VideoDecoderConstructor {
   create: (
-      mp4Data: Uint8Array,
-      width: number,
-      height: number,
-      frameRate: number,
-      staticTimeRanges: TimeRange[],
+    mp4Data: Uint8Array,
+    width: number,
+    height: number,
+    frameRate: number,
+    staticTimeRanges: TimeRange[],
+    owner: VideoReaderOwner,
   ) => Promise<VideoReader>;
 }
 
