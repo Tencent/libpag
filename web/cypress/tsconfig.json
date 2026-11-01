@@ -1,8 +1,10 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
-    "target": "ES2017",
-    "types": ["cypress"]
+    "lib": ["ES2020", "ES2021.WeakRef", "DOM", "DOM.Iterable"],
+    "types": ["cypress", "node", "emscripten"],
+    "strict": false,
+    "noEmit": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../cypress.config.ts"]
 }
