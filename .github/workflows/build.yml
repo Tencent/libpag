@@ -252,7 +252,7 @@ jobs:
         run: npm run test:cypress-runner && npm run test:video
 
       - name: Cypress run:st
-        uses: cypress-io/github-action@v8
+        uses: cypress-io/github-action@v7.4.9
         with:
           working-directory: web
           install: false
@@ -379,7 +379,7 @@ jobs:
         # Chrome is required instead of the bundled Electron: Electron ignores browser launch
         # args, so the --use-webgpu-adapter=swiftshader fallback for the GPU-less Linux runners
         # would never be applied (see cypress.config.ts).
-        uses: cypress-io/github-action@v8
+        uses: cypress-io/github-action@v7.4.9
         with:
           working-directory: web
           install: false
