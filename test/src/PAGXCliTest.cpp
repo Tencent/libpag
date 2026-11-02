@@ -1251,8 +1251,34 @@ CLI_TEST(PAGXCliTest, Verify_UnknownAttribute) {
   EXPECT_TRUE(output.find("attribute 'rotation' is not allowed") != std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {
+CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutWithoutFlexLayout) {
   auto inputPath = TestResourcePath("verify_include_in_layout_no_parent.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* parent = doc->findNode<pagx::Layer>("noLayout");
+  ASSERT_NE(parent, nullptr);
+  EXPECT_FLOAT_EQ(parent->layoutBounds().width, 0);
+  EXPECT_FLOAT_EQ(parent->layoutBounds().height, 0);
+  for (const auto* id : {"", "excluded"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", inputPath};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+  }
+}
+
+CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutAtRoot) {
+  auto inputPath = TempDir() + "/verify_root_include_in_layout.pagx";
+  std::ofstream(inputPath) << R"(<pagx width="100" height="100">
+    <Layer includeInLayout="false">
+      <Rectangle size="50,50"/><Fill color="#FF0000"/>
+    </Layer>
+  </pagx>)";
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
@@ -2686,6 +2712,122 @@ CLI_TEST(PAGXCliTest, Layout_ChildExceedsClippedParent) {
   EXPECT_TRUE(output.find("child extends beyond parent bounds") == std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Layout_OffsetChildInContentMeasuredParent) {
+  auto path = TempDir() + "/verify_content_measured_offset.pagx";
+  std::ofstream(path) << R"(<pagx width="200" height="200">
+    <Layer id="wrapper">
+      <Layer id="offset" x="100" y="100" width="50" height="50">
+        <Rectangle size="50,50"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  VerifyFile(path, "content-measured wrapper with an authored child offset");
+}
+
+CLI_TEST(PAGXCliTest, Layout_ChildBoundsCheckAssignedAxes) {
+  struct Case {
+    const char* parentAttrs;
+    const char* wrapperAttrs;
+    const char* childAttrs;
+    bool exceeds;
+  };
+  const Case cases[] = {
+      {"width=\"1000\" height=\"1000\"", "width=\"100\"", "y=\"150\"", false},
+      {"width=\"1000\" height=\"1000\"", "height=\"100\"", "x=\"150\"", false},
+      {"width=\"1000\" height=\"1000\"", "width=\"100\"", "x=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"horizontal\"", "", "y=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"vertical\"", "", "x=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"horizontal\"", "flex=\"1\"", "x=\"150\"", true},
+      {"width=\"1000\" height=\"1000\"", "width=\"50%\"", "x=\"600\"", true},
+      {"width=\"1000\" height=\"1000\"", "left=\"10\" right=\"10\"", "x=\"990\"", true},
+  };
+  auto path = TempDir() + "/verify_assigned_axis_bounds.pagx";
+  for (const auto& testCase : cases) {
+    SCOPED_TRACE(testCase.parentAttrs);
+    SCOPED_TRACE(testCase.wrapperAttrs);
+    SCOPED_TRACE(testCase.childAttrs);
+    std::ofstream(path) << "<pagx width=\"2000\" height=\"2000\"><Layer id=\"outer\" "
+                        << testCase.parentAttrs << "><Layer id=\"wrapper\" "
+                        << testCase.wrapperAttrs
+                        << "><Layer id=\"child\" width=\"50\" height=\"50\" " << testCase.childAttrs
+                        << "><Rectangle size=\"50,50\"/><Fill color=\"#FF0000\"/>"
+                           "</Layer></Layer></Layer></pagx>";
+    for (const auto* id : {"", "wrapper"}) {
+      SCOPED_TRACE(id);
+      std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+      if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+      std::ostringstream output;
+      auto* previous = std::cerr.rdbuf(output.rdbuf());
+      auto status = CallRun(pagx::cli::RunVerify, args);
+      std::cerr.rdbuf(previous);
+      EXPECT_EQ(status, testCase.exceeds ? 1 : 0) << output.str();
+      EXPECT_EQ(output.str().find("child extends beyond parent bounds") != std::string::npos,
+                testCase.exceeds)
+          << output.str();
+    }
+  }
+}
+
+CLI_TEST(PAGXCliTest, Layout_MaskBoundsAreIndependentOfParent) {
+  auto path = TempDir() + "/verify_mask_bounds.pagx";
+  // A mask's visibility flag is ignored while it is referenced. Its region and descendants
+  // need not fit inside the wrapper, and a retained hidden mask is not visible overflow either.
+  std::ofstream(path) << R"(<pagx width="100" height="100">
+    <Layer id="wrapper" width="50" height="50">
+      <Layer id="mask" includeInLayout="false" width="200" height="200">
+        <Layer id="maskContent" x="150" width="100" height="100">
+          <Ellipse size="100,100"/><Fill color="#FFFFFF"/>
+        </Layer>
+      </Layer>
+      <Layer id="retainedMask" visible="false" includeInLayout="false" width="200" height="200">
+        <Ellipse size="200,200"/><Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer id="owner" mask="@mask" maskType="luminance" width="50" height="50">
+        <Rectangle size="50,50"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  for (const auto* id : {"", "mask", "maskContent", "wrapper"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+  }
+}
+
+CLI_TEST(PAGXCliTest, Layout_MaskAndHiddenConstraintsRemainChecked) {
+  auto path = TempDir() + "/verify_hidden_constraints.pagx";
+  for (bool isMask : {false, true}) {
+    SCOPED_TRACE(isMask);
+    std::ofstream(path) << R"(<pagx width="100" height="100">
+      <Layer id="wrapper" width="100" height="100">
+        <Layer id="hidden" visible="false" includeInLayout="false" width="100" height="100">
+          <Rectangle left="80" right="80" height="10"/><Fill color="#FFFFFF"/>
+        </Layer>
+        <Layer id="owner" width="100" height="100" )"
+                        << (isMask ? "mask=\"@hidden\"" : "") << R"(>
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </pagx>)";
+    for (const auto* id : {"", "hidden"}) {
+      SCOPED_TRACE(id);
+      std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+      if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+      std::ostringstream output;
+      auto* previous = std::cerr.rdbuf(output.rdbuf());
+      auto status = CallRun(pagx::cli::RunVerify, args);
+      std::cerr.rdbuf(previous);
+      EXPECT_EQ(status, 1);
+      EXPECT_NE(output.str().find("negative derived size"), std::string::npos) << output.str();
+    }
+  }
+}
+
 CLI_TEST(PAGXCliTest, Layout_InvisibleInClippedContainer) {
   auto path = TestResourcePath("verify_invisible.pagx");
   std::streambuf* old = std::cerr.rdbuf();
@@ -3050,6 +3192,27 @@ CLI_TEST(PAGXCliTest, Verify_CompositionIdNameDiff) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_CompositionPreservesDescendantIdentity) {
+  auto path = TempDir() + "/verify_composition_descendant_identity.pagx";
+  std::ofstream(path) << R"(<pagx width="200" height="100">
+    <Layer id="first" width="100" height="100">
+      <Layer id="firstChild" width="100" height="100">
+        <Layer id="firstLeaf" width="100" height="100">
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </Layer>
+    <Layer id="second" x="100" width="100" height="100">
+      <Layer id="secondChild" width="100" height="100">
+        <Layer id="secondLeaf" width="100" height="100">
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  VerifyFile(path, "composition candidates with independently addressable descendants");
 }
 
 // Layers with different layout mode should NOT be detected as identical.

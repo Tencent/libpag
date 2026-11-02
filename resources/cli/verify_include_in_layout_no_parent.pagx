@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Test: includeInLayout=false on child Layer without parent container layout -->
+<!-- Test: includeInLayout=false excludes a child from measurement without parent flex layout -->
 <pagx width="400" height="300">
   <Layer id="noLayout">
     <Layer id="excluded" left="10" top="10" includeInLayout="false">
