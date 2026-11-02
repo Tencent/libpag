@@ -44,14 +44,7 @@ export default defineConfig({
         }
       });
 
-      // Temporary: lets the video upload probe print module.videoUploadStats to the terminal,
-      // since cy.log output is not visible in run mode. Remove with the probe spec.
-      on('task', {
-        print: (message: string) => {
-          console.log(message);
-          return null;
-        },
-      });
+      on('task', {});
 
       on('before:browser:launch', (browser, launchOptions) => {
         if (backend !== 'webgpu') return launchOptions;
