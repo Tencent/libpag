@@ -38,9 +38,21 @@
 
 namespace pag {
 
-static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
-  auto document = pagx::PAGXDocument::Make(300, 300);
+// The seven parameters every glass fixture shares, so a change lands in one place.
+static pagx::GlassStyle* MakeGlassStyle(pagx::PAGXDocument* document) {
+  auto glass = document->makeNode<pagx::GlassStyle>();
+  glass->refraction = 80.0f;
+  glass->depth = 20.0f;
+  glass->frost = 40.0f;
+  glass->dispersion = 50.0f;
+  glass->splay = 0.0f;
+  glass->lightAngle = 45.0f;
+  glass->lightIntensity = 80.0f;
+  return glass;
+}
 
+// A flat 300x300 red backdrop. Glass refracts the content below it, so every fixture needs one.
+static void AppendBackdropLayer(pagx::PAGXDocument* document) {
   auto backgroundLayer = document->makeNode<pagx::Layer>();
   auto backgroundRect = document->makeNode<pagx::Rectangle>();
   backgroundRect->size = {300.0f, 300.0f};
@@ -51,6 +63,11 @@ static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
   backgroundFill->color = backgroundColor;
   backgroundLayer->contents = {backgroundRect, backgroundFill};
   document->layers.push_back(backgroundLayer);
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
+  auto document = pagx::PAGXDocument::Make(300, 300);
+  AppendBackdropLayer(document.get());
 
   auto detailLayer = document->makeNode<pagx::Layer>();
   auto detailRect = document->makeNode<pagx::Rectangle>();
@@ -73,15 +90,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
   glassFill->color = glassColor;
   glassLayer->contents = {glassRect, glassFill};
   if (withGlass) {
-    auto glass = document->makeNode<pagx::GlassStyle>();
-    glass->refraction = 80.0f;
-    glass->depth = 20.0f;
-    glass->frost = 40.0f;
-    glass->dispersion = 50.0f;
-    glass->splay = 0.0f;
-    glass->lightAngle = 45.0f;
-    glass->lightIntensity = 80.0f;
-    glassLayer->styles.push_back(glass);
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
   }
   document->layers.push_back(glassLayer);
 
@@ -240,17 +249,7 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleOrphanDirectDrawMatchesDisplayList) {
 // stops short leaves a visibly unchanged region. They sit below the glass layer, as the backdrop.
 static std::shared_ptr<pagx::PAGXDocument> MakeStripedBackdropDocument() {
   auto document = pagx::PAGXDocument::Make(300, 300);
-
-  auto backgroundLayer = document->makeNode<pagx::Layer>();
-  auto backgroundRect = document->makeNode<pagx::Rectangle>();
-  backgroundRect->size = {300.0f, 300.0f};
-  backgroundRect->position = {150.0f, 150.0f};
-  auto backgroundFill = document->makeNode<pagx::Fill>();
-  auto backgroundColor = document->makeNode<pagx::SolidColor>();
-  backgroundColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  backgroundFill->color = backgroundColor;
-  backgroundLayer->contents = {backgroundRect, backgroundFill};
-  document->layers.push_back(backgroundLayer);
+  AppendBackdropLayer(document.get());
 
   const float stripeCenters[] = {70.0f, 150.0f, 230.0f};
   for (const auto centerX : stripeCenters) {
@@ -285,15 +284,7 @@ static void AppendGlassLayer(pagx::PAGXDocument* document, bool withGlass, bool 
     glassLayer->contents.push_back(glassFill);
   }
   if (withGlass) {
-    auto glass = document->makeNode<pagx::GlassStyle>();
-    glass->refraction = 80.0f;
-    glass->depth = 20.0f;
-    glass->frost = 40.0f;
-    glass->dispersion = 50.0f;
-    glass->splay = 0.0f;
-    glass->lightAngle = 45.0f;
-    glass->lightIntensity = 80.0f;
-    glassLayer->styles.push_back(glass);
+    glassLayer->styles.push_back(MakeGlassStyle(document));
   }
   document->layers.push_back(glassLayer);
 }
@@ -372,6 +363,18 @@ static pagx::Layer* FindStyledLayer(pagx::PAGXDocument* document) {
   return nullptr;
 }
 
+// A control fixture carries no style, so its tested layer is located by the 200x200 frame it is
+// authored with rather than by index, which merging could shift.
+static pagx::Layer* FindLayerByFrame(pagx::PAGXDocument* document, float x, float y) {
+  for (auto& layer : document->layers) {
+    if (std::fabs(layer->x - x) < 0.01f && std::fabs(layer->y - y) < 0.01f &&
+        std::fabs(layer->width - 200.0f) < 0.01f && std::fabs(layer->height - 200.0f) < 0.01f) {
+      return layer;
+    }
+  }
+  return nullptr;
+}
+
 PAGX_TEST(PAGXGlassRenderTest, GlassStyleCoversUnpaintedGeometryAfterRoundTrip) {
   pag::DeviceLockScope deviceLock;
   ASSERT_TRUE(static_cast<bool>(deviceLock));
@@ -431,15 +434,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeAbsorbableChildDocument(bool with
   glassLayer->children.push_back(child);
 
   if (withGlass) {
-    auto glass = document->makeNode<pagx::GlassStyle>();
-    glass->refraction = 80.0f;
-    glass->depth = 20.0f;
-    glass->frost = 40.0f;
-    glass->dispersion = 50.0f;
-    glass->splay = 0.0f;
-    glass->lightAngle = 45.0f;
-    glass->lightIntensity = 80.0f;
-    glassLayer->styles.push_back(glass);
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
   }
   document->layers.push_back(glassLayer);
   return document;
@@ -478,6 +473,137 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleKeepsItsMaskThroughTheOptimizer) {
   ASSERT_NE(styled, nullptr);
   ASSERT_EQ(styled->children.size(), 1u);
   ASSERT_EQ(styled->contents.size(), 1u);
+
+  // The same document without the style must still be absorbed, otherwise the assertions above
+  // would pass for a fixture the rule no longer matches instead of for the guard.
+  auto absorbable = MakeAbsorbableChildDocument(false);
+  auto absorbableResult = pagx::PAGXOptimizer::Optimize(absorbable.get());
+  EXPECT_TRUE(absorbableResult.converged);
+  auto* absorbed = FindLayerByFrame(absorbable.get(), 50.0f, 50.0f);
+  ASSERT_NE(absorbed, nullptr) << "the unstyled fixture's own layer must survive the optimizer";
+  EXPECT_TRUE(absorbed->children.empty()) << "the child was not absorbed, so this fixture cannot "
+                                             "show that the guard rejected it";
+  ASSERT_EQ(absorbed->contents.size(), 2u);
+  EXPECT_EQ(absorbed->contents[1]->nodeType(), pagx::NodeType::Rectangle);
+}
+
+// The layer's own geometry is a 100x100 rectangle at 50..150; its child carries an opaque square at
+// 200..300 plus an unpainted rectangle at 200..300 x 70..130. Glass masks with the own geometry
+// only, so neither child region may change, and nothing covers the unpainted one to hide a leak.
+static std::shared_ptr<pagx::PAGXDocument> MakeOversizedChildDocument(bool withGlass) {
+  auto document = MakeStripedBackdropDocument();
+  auto glassLayer = document->makeNode<pagx::Layer>();
+  glassLayer->x = 50.0f;
+  glassLayer->y = 50.0f;
+  glassLayer->width = 100.0f;
+  glassLayer->height = 100.0f;
+  auto glassRect = document->makeNode<pagx::Rectangle>();
+  glassRect->size = {100.0f, 100.0f};
+  glassRect->position = {50.0f, 50.0f};
+  glassLayer->contents = {glassRect};
+
+  auto child = document->makeNode<pagx::Layer>();
+  auto paintedRect = document->makeNode<pagx::Rectangle>();
+  paintedRect->size = {100.0f, 100.0f};
+  paintedRect->position = {200.0f, 200.0f};
+  auto paintedFill = document->makeNode<pagx::Fill>();
+  auto paintedColor = document->makeNode<pagx::SolidColor>();
+  paintedColor->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  paintedFill->color = paintedColor;
+  // The bare rectangle follows the painter, so the fill only paints the geometry before it. This
+  // one stays invisible while still extending the subtree's contour.
+  auto bareRect = document->makeNode<pagx::Rectangle>();
+  bareRect->size = {100.0f, 60.0f};
+  bareRect->position = {200.0f, 50.0f};
+  child->contents = {paintedRect, paintedFill, bareRect};
+  glassLayer->children.push_back(child);
+
+  if (withGlass) {
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
+  }
+  document->layers.push_back(glassLayer);
+  return document;
+}
+
+PAGX_TEST(PAGXGlassRenderTest, GlassStyleDoesNotCoverChildGeometry) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto glassDocument = MakeOversizedChildDocument(true);
+  auto controlDocument = MakeOversizedChildDocument(false);
+  auto glass = RenderViaDisplayList(glassDocument.get(), context);
+  auto control = RenderViaDisplayList(controlDocument.get(), context);
+  ASSERT_FALSE(glass.isEmpty());
+  ASSERT_FALSE(control.isEmpty());
+
+  const int interior = CountDifferentPixelsInRect(glass, control, 60, 60, 140, 140);
+  ASSERT_GE(interior, 0) << "a rect count must not be an error code";
+  EXPECT_GT(interior, 500) << "the glass must be active inside its own geometry, got " << interior;
+
+  const int paintedChild = CountDifferentPixelsInRect(glass, control, 205, 205, 295, 295);
+  ASSERT_GE(paintedChild, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(paintedChild, 0) << "the glass must not reach the painted child square, got "
+                             << paintedChild;
+  const int bareChild = CountDifferentPixelsInRect(glass, control, 205, 75, 295, 125);
+  ASSERT_GE(bareChild, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(bareChild, 0) << "the glass must not reach the unpainted child rectangle, got "
+                          << bareChild;
+
+  // Containment in full: outside the own geometry plus the 2px AA margin nothing may change.
+  const int total = CountDifferentPixels(glass, control);
+  ASSERT_GE(total, 0) << "the bitmaps must be comparable";
+  const int inside = CountDifferentPixelsInRect(glass, control, 48, 48, 152, 152);
+  ASSERT_GE(inside, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(total - inside, 0) << "the glass must paint inside its own geometry only, got "
+                               << total - inside << " stray pixels";
+}
+
+// A glass layer that owns no geometry at all: tgfx then hands the style the subtree contour instead
+// of an own-geometry mask, so the child's rectangle is what the glass covers.
+static std::shared_ptr<pagx::PAGXDocument> MakeChildContourDocument(bool withGlass,
+                                                                    float fillAlpha) {
+  auto document = MakeStripedBackdropDocument();
+  auto glassLayer = document->makeNode<pagx::Layer>();
+  glassLayer->x = 50.0f;
+  glassLayer->y = 50.0f;
+  glassLayer->width = 200.0f;
+  glassLayer->height = 200.0f;
+
+  auto child = document->makeNode<pagx::Layer>();
+  auto childRect = document->makeNode<pagx::Rectangle>();
+  childRect->size = {200.0f, 200.0f};
+  childRect->position = {100.0f, 100.0f};
+  auto childFill = document->makeNode<pagx::Fill>();
+  auto childColor = document->makeNode<pagx::SolidColor>();
+  childColor->color = {0.0f, 0.0f, 1.0f, fillAlpha};
+  childFill->color = childColor;
+  child->contents = {childRect, childFill};
+  glassLayer->children.push_back(child);
+
+  if (withGlass) {
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
+  }
+  document->layers.push_back(glassLayer);
+  return document;
+}
+
+// The child's fill is fully transparent, which the contour keeps and the rendered content drops, so
+// the glass paints that area and nothing hides it. An opaque child would hide this fallback, since
+// GlassStyle draws below the layer content. The rectangle spans 50..250, like the other fixtures.
+PAGX_TEST(PAGXGlassRenderTest, GlassStyleCoversTheSubtreeContourFallback) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto glassDocument = MakeChildContourDocument(true, 0.0f);
+  auto controlDocument = MakeChildContourDocument(false, 0.0f);
+  auto glass = RenderViaDisplayList(glassDocument.get(), context);
+  auto control = RenderViaDisplayList(controlDocument.get(), context);
+  ASSERT_FALSE(glass.isEmpty());
+  ASSERT_FALSE(control.isEmpty());
+
+  ExpectCoversGeometry(glass, control);
 }
 
 }  // namespace pag

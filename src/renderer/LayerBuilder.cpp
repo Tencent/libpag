@@ -2729,6 +2729,10 @@ class LayerBuilderContext {
     for (const auto& style : node->styles) {
       auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
+        // Drift guard: only GlassStyle opts into the layer's own geometry in tgfx, and the
+        // optimizer / verify predicates (UsesOwnGeometryMask) rely on that one-to-one mapping.
+        DEBUG_ASSERT((tgfxStyle->contentSource() == tgfx::LayerStyleContentSource::Geometry) ==
+                     (style->nodeType() == NodeType::GlassStyle));
         if (style->excludeChildEffects) {
           tgfxStyle->setExcludeChildEffects(true);
         }

@@ -975,18 +975,6 @@ bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer,
   return changed;
 }
 
-// Glass masks with the layer's own geometry, which excludes its children, so a rule that moves
-// geometry between a layer and its children changes what the glass covers. This mirrors
-// LayerStyleContentSource::Geometry in tgfx; extend the check when another style opts in.
-bool UsesOwnGeometryMask(const Layer* layer) {
-  for (const auto* style : layer->styles) {
-    if (style != nullptr && style->nodeType() == NodeType::GlassStyle) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // ----------------------------------------------------------------------------
 // Downgrade-shell-children: when a parent Layer has no contents, no layout,
 // and ALL children are shell+downgradable Layers without further children,

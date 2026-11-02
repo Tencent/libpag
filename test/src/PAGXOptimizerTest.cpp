@@ -93,6 +93,7 @@ using pagx::Rectangle;
 using pagx::SolidColor;
 using pagx::Stroke;
 using pagx::Text;
+using pagx::UsesOwnGeometryMask;
 
 // ---------------------------------------------------------------------------
 // Builders kept tiny so each test stays focused on the rule under inspection.
@@ -1686,6 +1687,46 @@ CLI_TEST(VerifyUtilsTest, IsLayerShellCenterYConstraintSet) {
 }
 
 // ---------------------------------------------------------------------------
+// VerifyUtils: UsesOwnGeometryMask — GlassStyle is the only style that masks with
+// the layer's own geometry, so the predicate must key off the style type alone.
+// ---------------------------------------------------------------------------
+
+CLI_TEST(VerifyUtilsTest, UsesOwnGeometryMaskWithoutStylesIsFalse) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  EXPECT_FALSE(UsesOwnGeometryMask(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, UsesOwnGeometryMaskIgnoresOtherStyles) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->styles.push_back(doc->makeNode<DropShadowStyle>());
+  EXPECT_FALSE(UsesOwnGeometryMask(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, UsesOwnGeometryMaskGlassStyleIsTrue) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->styles.push_back(doc->makeNode<GlassStyle>());
+  EXPECT_TRUE(UsesOwnGeometryMask(layer));
+}
+
+// A nullptr in the style list must not be dereferenced, and the glass entry anywhere in the list
+// must still be found.
+CLI_TEST(VerifyUtilsTest, UsesOwnGeometryMaskSkipsNullAndScansWholeList) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* nullOnly = MakeDefaultLayer(doc.get());
+  nullOnly->styles.push_back(nullptr);
+  EXPECT_FALSE(UsesOwnGeometryMask(nullOnly));
+
+  auto* mixed = MakeDefaultLayer(doc.get());
+  mixed->styles.push_back(nullptr);
+  mixed->styles.push_back(doc->makeNode<DropShadowStyle>());
+  mixed->styles.push_back(doc->makeNode<GlassStyle>());
+  EXPECT_TRUE(UsesOwnGeometryMask(mixed));
+}
+
+// ---------------------------------------------------------------------------
 // VerifyUtils: HasPainter / IsPainter
 // ---------------------------------------------------------------------------
 
@@ -1750,16 +1791,7 @@ CLI_TEST(VerifyUtilsTest, HasPainterPainterAsFirstElement) {
 // Only the collapse rule enabled, so a test observes it in isolation from the other structural
 // passes (which could otherwise downgrade/merge the same layers).
 static PAGXOptimizerOptions CollapseOnly() {
-  PAGXOptimizerOptions options;
-  options.pruneEmpty = false;
-  options.downgradeShellChildren = false;
-  options.mergeAdjacentShellLayers = false;
-  options.unwrapRedundantFirstGroup = false;
-  options.mergeAdjacentGroups = false;
-  options.canonicalizePaths = false;
-  options.rectMaskToScrollRect = false;
-  options.dedupPathData = false;
-  options.pruneUnreferencedResources = false;
+  auto options = OnlyRuleOptions();
   options.collapseSingleChildLayers = true;
   return options;
 }
@@ -2089,18 +2121,9 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsPaintedChildWhenParentHasGeometry) {
 // its children must leave such a layer's subtree alone.
 
 // Only the downgrade rule is enabled, so no other pass can explain the control cases below:
-// collapseShellChildren would drop the shell parent before the downgrade is observable.
+// collapseSingleChildLayers would drop the shell parent before the downgrade is observable.
 static PAGXOptimizerOptions DowngradeOnly() {
-  PAGXOptimizerOptions options;
-  options.pruneEmpty = false;
-  options.mergeAdjacentShellLayers = false;
-  options.collapseSingleChildLayers = false;
-  options.unwrapRedundantFirstGroup = false;
-  options.mergeAdjacentGroups = false;
-  options.canonicalizePaths = false;
-  options.rectMaskToScrollRect = false;
-  options.dedupPathData = false;
-  options.pruneUnreferencedResources = false;
+  auto options = OnlyRuleOptions();
   options.downgradeShellChildren = true;
   return options;
 }

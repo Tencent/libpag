@@ -1441,6 +1441,11 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
   if (!parentLayer->contents.empty()) {
     return;
   }
+  // Following this advice would move the children's geometry into the parent, which changes what a
+  // style masked with the parent's own geometry covers (see PAGXOptimizer's guard).
+  if (pagx::UsesOwnGeometryMask(parentLayer)) {
+    return;
+  }
   // All children must be downgradable — partial downgrade changes paint order.
   for (auto* child : parentLayer->children) {
     if (!CanDowngradeLayerToGroup(child)) {
