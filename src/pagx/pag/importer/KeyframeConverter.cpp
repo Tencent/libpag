@@ -1100,4 +1100,93 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
   }
 }
 
+// Channels for the outer glow style's animated properties. Opacity normalizes into the separate
+// alpha channel, size passes through in layer units, and the percent-typed spread/range scale to
+// the node's 0-100 percent space with their interpolation and easing preserved. The legacy
+// renderer never reads the noise, jitter or gradient color type, so those stay unmigrated.
+void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
+                                    PAGXDocument* document, AnimationObject* object) {
+  (void)frameRate;
+  if (style == nullptr || object == nullptr) {
+    return;
+  }
+  auto* opacity = style->opacity;
+  if (opacity != nullptr) {
+    auto staticOpaque = opacity->getValueAt(0) >= 255;
+    if (opacity->animatable() || !staticOpaque) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "alpha";
+      if (opacity->animatable()) {
+        ConvertOpacityChannel(opacity, frameRate, channel);
+      } else {
+        Keyframe<float> keyframe = {};
+        keyframe.time = 0;
+        keyframe.value = opacity->getValueAt(0) / 255.0f;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+  if (style->size != nullptr && style->size->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "size";
+    ConvertFloatChannel(style->size, frameRate, channel);
+    if (!channel->keyframes.empty()) {
+      object->channels.push_back(channel);
+    }
+  }
+  pag::Property<pag::Percent>* percentProperties[2] = {style->spread, style->range};
+  const char* percentNames[2] = {"spread", "range"};
+  for (int i = 0; i < 2; i++) {
+    auto* legacy = percentProperties[i];
+    if (legacy == nullptr || !legacy->animatable()) {
+      continue;
+    }
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::Percent>*>(legacy);
+    if (animatable == nullptr || animatable->keyframes.empty()) {
+      continue;
+    }
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = percentNames[i];
+    for (auto* legacyKeyframe : animatable->keyframes) {
+      Keyframe<float> keyframe = {};
+      keyframe.time = legacyKeyframe->startTime;
+      keyframe.value = legacyKeyframe->startValue * 100.0f;
+      keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+      ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+      channel->keyframes.push_back(keyframe);
+    }
+    auto* last = animatable->keyframes.back();
+    if (last->endTime > last->startTime) {
+      Keyframe<float> keyframe = {};
+      keyframe.time = last->endTime;
+      keyframe.value = last->endValue * 100.0f;
+      keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
+  }
+  auto* colorAnimatable = style->color != nullptr && style->color->animatable()
+                              ? dynamic_cast<pag::AnimatableProperty<pag::Color>*>(style->color)
+                              : nullptr;
+  if (colorAnimatable != nullptr && !colorAnimatable->keyframes.empty()) {
+    auto first = colorAnimatable->keyframes.front()->startTime;
+    auto last = colorAnimatable->keyframes.back()->endTime;
+    auto* channel = document->makeNode<TypedChannel<Color>>();
+    channel->name = "color";
+    for (auto frame = first; frame < last; frame++) {
+      auto color = style->color->getValueAt(frame);
+      Keyframe<Color> keyframe = {};
+      keyframe.time = frame;
+      keyframe.value = {color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, 1.0f,
+                        ColorSpace::SRGB};
+      keyframe.interpolation = KeyframeInterpolationType::Linear;
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
+  }
+}
+
 }  // namespace pagx

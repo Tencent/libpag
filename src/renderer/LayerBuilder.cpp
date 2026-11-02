@@ -99,6 +99,7 @@
 #include "renderer/LevelsIndividualLayerFilter.h"
 #include "renderer/MosaicLayerFilter.h"
 #include "renderer/MotionTileLayerFilter.h"
+#include "renderer/OuterGlowLayerFilter.h"
 #include "renderer/RadialBlurLayerFilter.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
@@ -2875,6 +2876,29 @@ class LayerBuilderContext {
         filters.push_back(tgfxFilter);
       }
     }
+    // Outer glow styles have no tgfx-native equivalent and ride the layer filter chain ahead
+    // of the over-content styles: the legacy LayerStylesFilter draws blow-position styles
+    // (outer glow) first and the source image last, so the halo composites behind every later
+    // style output.
+    for (const auto& style : node->styles) {
+      if (style == nullptr || style->nodeType() != NodeType::OuterGlowStyle) {
+        continue;
+      }
+      auto* glowNode = static_cast<const OuterGlowStyle*>(style);
+      if (glowNode->size <= 0.0f) {
+        continue;
+      }
+      auto glowFilter = std::make_shared<OuterGlowLayerFilter>();
+      glowFilter->setColor(ToTGFX(glowNode->color));
+      glowFilter->setSize(glowNode->size);
+      glowFilter->setAlpha(glowNode->alpha);
+      glowFilter->setSpread(glowNode->spread);
+      glowFilter->setRange(glowNode->range);
+      glowFilter->setBlendMode(ToTGFX(glowNode->blendMode));
+      filters.push_back(glowFilter);
+      _result.binding.set(glowNode, glowFilter);
+      bindOuterGlowStyleChannels(glowNode);
+    }
     // Gradient overlay styles have no tgfx-native equivalent and ride the layer filter chain,
     // appended after the node filters so they apply over the effect-processed content, matching
     // the legacy FilterRenderer order (styles run after effects).
@@ -3121,6 +3145,66 @@ class LayerBuilderContext {
       return;
     }
     static_cast<GradientOverlayLayerFilter*>(object)->setReverse(*v);
+  }
+
+  static void WriteOuterGlowStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<OuterGlowLayerFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteOuterGlowStyleAlpha(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<OuterGlowLayerFilter*>(object);
+    filter->setAlpha(MixFloat(filter->alpha(), *v, mix));
+  }
+
+  static void WriteOuterGlowStyleSize(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<OuterGlowLayerFilter*>(object);
+    filter->setSize(MixFloat(filter->size(), *v, mix));
+  }
+
+  static void WriteOuterGlowStyleSpread(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<OuterGlowLayerFilter*>(object);
+    filter->setSpread(MixFloat(filter->spread(), *v, mix));
+  }
+
+  static void WriteOuterGlowStyleRange(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<OuterGlowLayerFilter*>(object);
+    filter->setRange(MixFloat(filter->range(), *v, mix));
+  }
+
+  void bindOuterGlowStyleChannels(const OuterGlowStyle* node) {
+    _result.binding.setAccessor(
+        node, "color", WriteOuterGlowStyleColor,
+        ReadColorChannel<OuterGlowLayerFilter, &OuterGlowLayerFilter::color>);
+    _result.binding.setAccessor(node, "alpha", WriteOuterGlowStyleAlpha,
+                                ReadScalar<OuterGlowLayerFilter, &OuterGlowLayerFilter::alpha>);
+    _result.binding.setAccessor(node, "size", WriteOuterGlowStyleSize,
+                                ReadScalar<OuterGlowLayerFilter, &OuterGlowLayerFilter::size>);
+    _result.binding.setAccessor(node, "spread", WriteOuterGlowStyleSpread,
+                                ReadScalar<OuterGlowLayerFilter, &OuterGlowLayerFilter::spread>);
+    _result.binding.setAccessor(node, "range", WriteOuterGlowStyleRange,
+                                ReadScalar<OuterGlowLayerFilter, &OuterGlowLayerFilter::range>);
   }
 
   void bindGradientOverlayStyleChannels(const GradientOverlayStyle* node) {

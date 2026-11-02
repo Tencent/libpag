@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="720" height="1280" viewModel="@pag-editable-vm">
+  <Layer width="720" height="1280" composition="@pag-legacy-comp-1"/>
+  <Animations>
+    <Animation id="pag-legacy-root" duration="4500" frameRate="30" loop="once">
+    </Animation>
+  </Animations>
+  <Resources>
+    <Composition id="pag-legacy-comp-1" width="720" height="1280">
+      <Layer id="pag-legacy-10" x="360" y="640" anchor="360,640">
+        <Rectangle position="360,640" size="720,1280"/>
+        <Fill color="#000000"/>
+      </Layer>
+      <Layer id="pag-legacy-8" x="354" y="172">
+        <TextBox>
+          <Text id="pag-editable-text-0" text="拓展0大小50&#10;范围50" fontFamily="PingFang SC" fontStyle="Regular" fontSize="70" fauxBold="true"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <OuterGlowStyle id="pag-legacy-outer-glow-9" blendMode="normal" color="#55FF00" size="50" alpha="0.74902"/>
+      </Layer>
+      <Layer id="pag-legacy-6" x="354" y="438">
+        <TextBox>
+          <Text id="pag-editable-text-1" text="拓展50大小50&#10;范围50" fontFamily="PingFang SC" fontStyle="Regular" fontSize="70" fauxBold="true"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <OuterGlowStyle id="pag-legacy-outer-glow-7" blendMode="normal" color="#55FF00" size="50" alpha="0.74902" spread="50"/>
+      </Layer>
+      <Layer id="pag-legacy-4" x="354" y="714">
+        <TextBox>
+          <Text id="pag-editable-text-2" text="拓展75大小5&#10;范围75" fontFamily="PingFang SC" fontStyle="Regular" fontSize="70" fauxBold="true"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <OuterGlowStyle id="pag-legacy-outer-glow-5" blendMode="normal" color="#55FF00" alpha="0.74902" spread="75" range="75"/>
+      </Layer>
+      <Layer id="pag-legacy-2" x="354" y="966">
+        <TextBox>
+          <Text id="pag-editable-text-3" text="拓展0大小50&#10;范围100" fontFamily="PingFang SC" fontStyle="Regular" fontSize="70" fauxBold="true"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <OuterGlowStyle id="pag-legacy-outer-glow-3" blendMode="normal" color="#55FF00" size="50" alpha="0.74902" range="100"/>
+      </Layer>
+      <Animations>
+        <Animation id="pag-legacy-anim-1" duration="150" frameRate="30" loop="once">
+          <Object target="pag-legacy-10">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="150" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-outer-glow-9">
+            <Channel name="alpha" type="float">
+              <Key time="0" value="0.74902" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-8">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="150" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-outer-glow-7">
+            <Channel name="alpha" type="float">
+              <Key time="0" value="0.74902" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-6">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="150" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-outer-glow-5">
+            <Channel name="alpha" type="float">
+              <Key time="0" value="0.74902" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-4">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="150" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-outer-glow-3">
+            <Channel name="alpha" type="float">
+              <Key time="0" value="0.74902" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-2">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="150" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+      <DataBind source="$vm.text0" target="@pag-editable-text-3" channel="text"/>
+      <DataBind source="$vm.text1" target="@pag-editable-text-2" channel="text"/>
+      <DataBind source="$vm.text2" target="@pag-editable-text-1" channel="text"/>
+      <DataBind source="$vm.text3" target="@pag-editable-text-0" channel="text"/>
+    </Composition>
+    <ViewModel id="pag-editable-vm">
+      <Property name="text0" type="String" default="拓展0大小50&#10;范围100"/>
+      <Property name="text1" type="String" default="拓展75大小5&#10;范围75"/>
+      <Property name="text2" type="String" default="拓展50大小50&#10;范围50"/>
+      <Property name="text3" type="String" default="拓展0大小50&#10;范围50"/>
+    </ViewModel>
+  </Resources>
+</pagx>

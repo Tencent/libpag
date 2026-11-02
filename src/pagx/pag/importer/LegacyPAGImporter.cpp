@@ -99,6 +99,8 @@ void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, floa
                                           PAGXDocument* document, AnimationObject* object);
 void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRate,
                                      PAGXDocument* document, AnimationObject* object);
+void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
+                                    PAGXDocument* document, AnimationObject* object);
 
 namespace {
 
@@ -1026,6 +1028,38 @@ void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* lay
         object->target = overlay->id;
         MigrateGradientOverlayStyleAnimation(legacy, state->currentFrameRate, state->document,
                                              object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (style->type() == pag::LayerStyleType::OuterGlow) {
+      auto* legacy = static_cast<pag::OuterGlowStyle*>(style);
+      auto startFrame = legacyLayer->startTime;
+      auto glow = state->document->makeNode<OuterGlowStyle>("pag-legacy-outer-glow-" +
+                                                            std::to_string(style->uniqueID));
+      glow->color = ConvertColor(PropertyValueAtStart(legacy->color, startFrame, nullptr));
+      glow->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
+      glow->size = PropertyValueAtStart(legacy->size, startFrame, nullptr);
+      glow->spread = PropertyValueAtStart(legacy->spread, startFrame, nullptr) * 100.0f;
+      glow->range = PropertyValueAtStart(legacy->range, startFrame, nullptr) * 100.0f;
+      glow->blendMode =
+          ConvertBlendMode(PropertyValueAtStart(legacy->blendMode, startFrame, nullptr));
+      layer->styles.push_back(glow);
+      // The legacy renderer only reads the solid color, spread, size and range: the gradient
+      // color type, noise and jitter inputs never reach its shader, so the migrated render
+      // degrades exactly the way the legacy one does.
+      if (PropertyValueAtStart(legacy->colorType, startFrame, nullptr) ==
+          pag::GlowColorType::Gradient) {
+        state->warn(PAGExportWarning::UnsupportedColorSource,
+                    "gradient outer glow approximated as solid color");
+      }
+      if (legacy->blendMode != nullptr && legacy->blendMode->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "animated outer glow blend mode");
+      }
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = glow->id;
+        MigrateOuterGlowStyleAnimation(legacy, state->currentFrameRate, state->document, object);
         if (!object->channels.empty()) {
           state->currentAnimation->objects.push_back(object);
         }
