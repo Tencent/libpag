@@ -413,4 +413,31 @@ PAGX_TEST(PAGXAnchorTest, ExportReparseThreeAxes) {
   EXPECT_NEAR(layer->anchorZ, 30.0f, 1e-4f);
 }
 
+PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorMatchesBakedMatrix) {
+  // rotationY=30, perspective=500, anchor=(100,50): the pivot is the affine 45-degree-free pivot
+  // a - R*a = (13.39746, 0, 50), and the projection row stays unchanged. The baked document spells
+  // that matrix out, so both must produce the same local transform.
+  auto anchored =
+      ParseDoc(MakeRectDoc("id=\"layer\" rotationY=\"30\" perspective=\"500\" "
+                           "anchor=\"100,50\""));
+  auto baked = ParseDoc(
+      MakeRectDoc("id=\"layer\" matrix3D=\"0.866025,0,-0.5,0.001,0,1,0,0,0.5,0,0.866025,-0.001732,"
+                  "13.39746,0,50,0.9\""));
+  ASSERT_TRUE(anchored != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  auto* anchoredLayer = static_cast<pagx::Layer*>(anchored->findNode("layer"));
+  auto* bakedLayer = static_cast<pagx::Layer*>(baked->findNode("layer"));
+  ASSERT_TRUE(anchoredLayer != nullptr);
+  ASSERT_TRUE(bakedLayer != nullptr);
+  const auto anchoredMatrix = pagx::BuildLayerLocalMatrix3D(anchoredLayer);
+  const auto bakedMatrix = pagx::BuildLayerLocalMatrix3D(bakedLayer);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_NEAR(anchoredMatrix.getRowColumn(row, column), bakedMatrix.getRowColumn(row, column),
+                  1e-3f)
+          << "row " << row << " column " << column;
+    }
+  }
+}
+
 }  // namespace pag
