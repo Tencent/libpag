@@ -1022,9 +1022,11 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
     } else if (anim->duration > timing.bundleShiftFrames) {
       timing.effectiveDuration = anim->duration - timing.bundleShiftFrames;
     }
-  } else if (maxKeyTime > timing.effectiveDuration) {
-    timing.effectiveDuration = maxKeyTime;
   }
+  // A key past the duration is only an interpolation target: the runtime never advances beyond
+  // anim->duration, so entering the window at that boundary already yields the interpolated value.
+  // Extending the CSS duration to reach such a key would both slow the animation down and change
+  // the loop period, so the window stays anim->duration long and the key itself is dropped.
 
   bool sawFirstEasing = false;
   for (const auto& kv : chSet.stopEasings) {
@@ -1517,9 +1519,19 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
   // PAGX holds the first/last key value outside the key range, whereas CSS synthesizes missing
   // 0%/100% stops from the element's static style. Always emit both boundary stops so the browser
   // holds the key values instead of interpolating from the static style.
-  std::set<Frame> stopTimes = chSet.keyTimes;
-  stopTimes.insert(timing.bundleShiftFrames);
-  stopTimes.insert(timing.bundleShiftFrames + timing.effectiveDuration);
+  // Keys outside the playback window cannot become CSS stops: a percentage past 100% is invalid,
+  // and a key before the window start is unreachable. The boundary stops below already carry the
+  // value the runtime shows there, interpolated toward those keys.
+  const Frame windowStart = timing.bundleShiftFrames;
+  const Frame windowEnd = timing.bundleShiftFrames + timing.effectiveDuration;
+  std::set<Frame> stopTimes = {};
+  for (Frame t : chSet.keyTimes) {
+    if (t >= windowStart && t <= windowEnd) {
+      stopTimes.insert(t);
+    }
+  }
+  stopTimes.insert(windowStart);
+  stopTimes.insert(windowEnd);
   for (Frame t : stopTimes) {
     if (chSet.alphaCh != nullptr && chSet.alphaCh->valueType() == ChannelValueType::Float &&
         t > timing.bundleShiftFrames && timing.effectiveDuration > 0) {

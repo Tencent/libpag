@@ -3848,6 +3848,39 @@ CLI_TEST(PAGXHtmlTest, AnimationSingularMatrixProgressBarInterpolates) {
   EXPECT_EQ(rule.find("matrix(0,0,0,1,280,0)"), std::string::npos) << rule;
 }
 
+// A key past the duration is only an interpolation target. The playback window keeps the PAGX
+// duration, and its final stop carries the value the runtime shows at that boundary, so the ramp
+// neither slows down nor wraps on a longer period.
+CLI_TEST(PAGXHtmlTest, AnimationKeysBeyondDurationKeepPlaybackWindow) {
+  struct OverKeyCase {
+    const char* file;
+    const char* target;
+    const char* shorthand;
+    const char* lastStop;
+  };
+  const OverKeyCase cases[] = {
+      {"05_keys_beyond_duration.pagx", "overKeyBox", " 2s linear 1 both", "opacity: 0.7333;"},
+      {"06_keys_beyond_duration_loop.pagx", "loopOverKeyBox", " 1s linear infinite",
+       "opacity: 0.3333;"},
+  };
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const auto& overKey : cases) {
+    std::string path = "resources/pagx_to_html/animations/boundary/";
+    path += overKey.file;
+    auto html = LoadAndConvert(ProjectPath::Absolute(path), options);
+    ASSERT_FALSE(html.empty()) << overKey.file;
+    std::string marker = std::string("id=\"") + overKey.target + "\"";
+    auto tag = FindTagContaining(html, marker);
+    ASSERT_FALSE(tag.empty()) << overKey.file;
+    EXPECT_NE(tag.find(overKey.shorthand), std::string::npos) << tag;
+    auto last = KeyframeStopOf(html, marker, "100%");
+    EXPECT_NE(last.find(overKey.lastStop), std::string::npos) << last;
+    // A stop past 100% is invalid CSS and used to appear when the duration covered the key.
+    EXPECT_EQ(html.find("150%"), std::string::npos) << overKey.file;
+  }
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationDuplicateAlphaKeysPreserveInstantSceneSwitches) {
   const char* xml = R"(<pagx width="100" height="100">
     <Layer id="scene" width="100" height="100">
