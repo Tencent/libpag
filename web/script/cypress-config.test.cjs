@@ -10,7 +10,7 @@ const Source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../cypre
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
 
-function CreateHarness(backend, platform = 'linux') {
+function CreateHarness(backend, platform = 'linux', env = {}) {
   const files = new Map();
   const handlers = new Map();
   const mockFS = {
@@ -24,7 +24,7 @@ function CreateHarness(backend, platform = 'linux') {
     if (name === 'brotli') return {};
     throw new Error(`Unexpected dependency: ${name}`);
   }
-  const context = { exports: {}, require: MockRequire, process: { platform }, Buffer };
+  const context = { exports: {}, require: MockRequire, process: { platform, env }, Buffer };
   new vm.Script(Source, { filename: 'cypress.config.ts' }).runInNewContext(context);
   const definition = context.exports.default;
   function Register(event, handler) { handlers.set(event, handler); }
@@ -64,6 +64,10 @@ test('Linux WebGPU uses a software adapter without changing the WebGL lane', fun
   const macLaunch = { args: [] };
   mac.handlers.get('before:browser:launch')({ name: 'chrome', family: 'chromium' }, macLaunch);
   assert.deepEqual(macLaunch.args, ['--enable-unsafe-webgpu']);
+  const forced = CreateHarness('webgpu', 'darwin', { CYPRESS_WEBGPU_SWIFTSHADER: '1' });
+  const forcedLaunch = { args: [] };
+  forced.handlers.get('before:browser:launch')({ name: 'chrome', family: 'chromium' }, forcedLaunch);
+  assert.deepEqual(forcedLaunch.args, ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader']);
 });
 
 test('WebGPU rejects unsupported launchers before running tests', function () {

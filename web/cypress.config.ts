@@ -55,8 +55,9 @@ export default defineConfig({
         // in-process via BrowserWindow, not as a separate browser process), so the WebGPU lane
         // must run on Chrome/Chromium/Edge for these flags to take effect.
         launchOptions.args.push('--enable-unsafe-webgpu');
-        if (process.platform === 'linux') {
-          // CI runners have no GPU hardware; fall back to the SwiftShader WebGPU adapter.
+        // CI runners have no GPU hardware; fall back to the SwiftShader WebGPU adapter.
+        // Set CYPRESS_WEBGPU_SWIFTSHADER=1 to reproduce the CI adapter on any platform.
+        if (process.platform === 'linux' || process.env.CYPRESS_WEBGPU_SWIFTSHADER === '1') {
           launchOptions.args.push('--use-webgpu-adapter=swiftshader');
         }
         return launchOptions;
