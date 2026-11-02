@@ -90,6 +90,27 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
     return matrix;
   }
   Matrix3D result = matrix;
+  const bool hasPerspective =
+      matrix.getRowColumn(3, 0) != 0.0f || matrix.getRowColumn(3, 1) != 0.0f ||
+      matrix.getRowColumn(3, 2) != 0.0f || matrix.getRowColumn(3, 3) != 1.0f;
+  if (hasPerspective) {
+    // A perspective matrix cannot be re-pivoted by touching the translation column alone: the w row
+    // and m33 change as well. Apply the full conjugation T(a) * M * T(-a) instead of the affine
+    // shortcut so the pivot stays put.
+    for (int column = 0; column < 4; ++column) {
+      const float w = matrix.getRowColumn(3, column);
+      result.setRowColumn(0, column, matrix.getRowColumn(0, column) + anchor.x * w);
+      result.setRowColumn(1, column, matrix.getRowColumn(1, column) + anchor.y * w);
+      result.setRowColumn(2, column, matrix.getRowColumn(2, column) + anchorZ * w);
+    }
+    for (int row = 0; row < 4; ++row) {
+      const float shift = result.getRowColumn(row, 0) * anchor.x +
+                          result.getRowColumn(row, 1) * anchor.y +
+                          result.getRowColumn(row, 2) * anchorZ;
+      result.setRowColumn(row, 3, result.getRowColumn(row, 3) - shift);
+    }
+    return result;
+  }
   const float linearX = matrix.getRowColumn(0, 0) * anchor.x +
                         matrix.getRowColumn(0, 1) * anchor.y + matrix.getRowColumn(0, 2) * anchorZ;
   const float linearY = matrix.getRowColumn(1, 0) * anchor.x +
@@ -122,6 +143,32 @@ Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer) {
 }
 
 Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
+  const bool hasAnchor =
+      layer->anchor.x != 0.0f || layer->anchor.y != 0.0f || layer->anchorZ != 0.0f;
+  if (!hasAnchor) {
+    return ComposeLayerLocalMatrix3D(layer);
+  }
+  // Component path: the composition puts the perspective matrix outermost (M = P * T * R * K * S),
+  // so the pivot only belongs to the affine chain: M = P * T(a) * L * T(-a). Building the affine
+  // part without perspective, folding the anchor there and recomposing keeps the projection fixed
+  // while the pivot still decides the visual centre.
+  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity()) {
+    Matrix3DComponents components = {};
+    Matrix3D composed = {};
+    LayerTransformComponents(layer, &components, &composed);
+    Matrix3DComponents flat = components;
+    flat.perspective = 0;
+    Matrix3D affine = {};
+    if (ComposeMatrix3DComponents(flat, &affine)) {
+      const Matrix3D anchored = ApplyAnchorToMatrix(affine, layer->anchor, layer->anchorZ);
+      components.translate[0] = anchored.getRowColumn(0, 3);
+      components.translate[1] = anchored.getRowColumn(1, 3);
+      components.translate[2] = anchored.getRowColumn(2, 3);
+      if (ComposeMatrix3DComponents(components, &composed)) {
+        return composed;
+      }
+    }
+  }
   return ApplyAnchorToMatrix(ComposeLayerLocalMatrix3D(layer), layer->anchor, layer->anchorZ);
 }
 
