@@ -380,6 +380,10 @@ jobs:
         # args, so the --use-webgpu-adapter=swiftshader fallback for the GPU-less Linux runners
         # would never be applied (see cypress.config.ts).
         uses: cypress-io/github-action@v7.4.9
+        # Chrome restricts adapter info fields on some versions, so the software adapter is
+        # declared explicitly to let the specs skip tests that software WebGPU cannot run.
+        env:
+          CYPRESS_WEBGPU_SOFTWARE: '1'
         with:
           working-directory: web
           install: false

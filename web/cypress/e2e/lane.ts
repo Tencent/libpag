@@ -19,9 +19,15 @@ export const itGL = isWebGPU ? it.skip : it;
  */
 export const itWebGPU = isWebGPU ? it : it.skip;
 
+interface AdapterInfoLike {
+  vendor?: string;
+  architecture?: string;
+  isFallbackAdapter?: boolean;
+}
+
 interface AdapterWithInfo {
-  info?: { isFallbackAdapter?: boolean };
-  requestAdapterInfo?: () => Promise<{ isFallbackAdapter?: boolean }>;
+  info?: AdapterInfoLike;
+  requestAdapterInfo?: () => Promise<AdapterInfoLike>;
 }
 
 interface NavigatorWithGPU {
@@ -32,17 +38,22 @@ let softwareWebGPUAdapter: boolean | undefined;
 
 /**
  * Resolves whether the WebGPU lane runs on a software adapter such as SwiftShader. Always
- * false on the WebGL lane. The adapter type is browser-level, so it is cached across tests.
+ * false on the WebGL lane. CI declares the software adapter explicitly through the
+ * CYPRESS_WEBGPU_SOFTWARE environment variable because adapter info fields are restricted in
+ * some Chrome versions; the adapter info probe is only a best-effort fallback for local runs.
  */
 export const isSoftwareWebGPU = async (): Promise<boolean> => {
   if (!isWebGPU) return false;
+  const declared = Cypress.env('WEBGPU_SOFTWARE');
+  if (declared === true || declared === '1') return true;
   if (softwareWebGPUAdapter === undefined) {
     // Cypress chainables are thenable at runtime but do not satisfy the Promise type.
     softwareWebGPUAdapter = await (cy.window().then(async (win) => {
       const gpu = (win.navigator as NavigatorWithGPU).gpu;
       const adapter = await gpu?.requestAdapter();
       const info = adapter?.info ?? (await adapter?.requestAdapterInfo?.());
-      return info?.isFallbackAdapter === true;
+      const signature = `${info?.vendor ?? ''} ${info?.architecture ?? ''}`.toLowerCase();
+      return info?.isFallbackAdapter === true || signature.includes('swiftshader');
     }) as unknown as Promise<boolean>);
   }
   return softwareWebGPUAdapter;
