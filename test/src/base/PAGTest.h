@@ -27,6 +27,10 @@ class PAGTest : public testing::Test {
  public:
   static bool HasFailure();
 
+  static bool RegisterPixelComparison(const char* testSuite, const char* testName);
+
+  static bool IsPixelComparison();
+
   void SetUp() override;
 
   void TearDown() override;
@@ -35,6 +39,15 @@ class PAGTest : public testing::Test {
 #define PAG_TEST(test_case_name, test_name)            \
   GTEST_TEST_(test_case_name, test_name, pag::PAGTest, \
               ::testing::internal::GetTypeId<pag::PAGTest>())
+
+// Keep the fixture type unchanged: one suite may mix pixel and non-pixel tests.
+#define PAG_REGISTER_PIXEL_TEST(test_case_name, test_name)                            \
+  [[maybe_unused]] static const bool test_case_name##_##test_name##_pixelComparison = \
+      pag::PAGTest::RegisterPixelComparison(#test_case_name, #test_name);
+
+#define PAG_PIXEL_TEST(test_case_name, test_name)    \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
+  PAG_TEST(test_case_name, test_name)
 
 #define PAG_SETUP(pagSurface, pagPlayer, pagFile)                                \
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");                      \
@@ -67,6 +80,9 @@ class PAGXTest : public PAGTest {
  public:
   void SetUp() override {
     PAGTest::SetUp();
+    if (HasFatalFailure()) {
+      return;
+    }
     // Probe that the default device can be created and locked, then release it immediately:
     // the test body must be free to run code that locks the device (directly or through
     // libpag's internal renderers). Since tgfx deduplicates devices per native GPU object
@@ -81,10 +97,18 @@ class PAGXTest : public PAGTest {
   GTEST_TEST_(test_case_name, test_name, pag::PAGXTest, \
               ::testing::internal::GetTypeId<pag::PAGXTest>())
 
-class CLITest : public testing::Test {};
+#define PAGX_PIXEL_TEST(test_case_name, test_name)   \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
+  PAGX_TEST(test_case_name, test_name)
+
+class CLITest : public PAGTest {};
 
 #define CLI_TEST(test_case_name, test_name)            \
   GTEST_TEST_(test_case_name, test_name, pag::CLITest, \
               ::testing::internal::GetTypeId<pag::CLITest>())
+
+#define CLI_PIXEL_TEST(test_case_name, test_name)    \
+  PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
+  CLI_TEST(test_case_name, test_name)
 
 }  // namespace pag

@@ -375,7 +375,7 @@ PAG_TEST(PAGFileLoadTest, loadTest) {
 /**
  * 用例描述: PAGFile children编辑测试
  */
-PAG_TEST(PAGFileContainerTest, ContainerEditing) {
+PAG_PIXEL_TEST(PAGFileContainerTest, ContainerEditing) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->removeAllLayers();
   ASSERT_EQ(TestPAGFile->numChildren(), 0);
@@ -474,7 +474,7 @@ PAG_TEST(PAGFileContainerTest, ContainerEditing) {
 /**
  * 用例描述: PAGFile时间伸缩属性-Repeat测试
  */
-PAG_TEST(PAGFileTimeStretchTest, Repeat) {
+PAG_PIXEL_TEST(PAGFileTimeStretchTest, Repeat) {
   auto pagFile = LoadPAGFile("resources/apitest/test_repeat.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
@@ -494,7 +494,7 @@ PAG_TEST(PAGFileTimeStretchTest, Repeat) {
 /**
  * 用例描述: PAGFile时间伸缩属性-RepeatInverted测试
  */
-PAG_TEST(PAGFileTimeStretchTest, RepeatInverted) {
+PAG_PIXEL_TEST(PAGFileTimeStretchTest, RepeatInverted) {
   auto pagFile = LoadPAGFile("resources/apitest/test_repeatInverted.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
@@ -515,7 +515,7 @@ PAG_TEST(PAGFileTimeStretchTest, RepeatInverted) {
 /**
  * 用例描述: PAGFile时间伸缩属性-Scale测试
  */
-PAG_TEST(PAGFileTimeStretchTest, Scale) {
+PAG_PIXEL_TEST(PAGFileTimeStretchTest, Scale) {
   auto pagFile = LoadPAGFile("resources/apitest/test_scale.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
@@ -582,7 +582,7 @@ PAG_TEST(PAGFileVerticalTextCodec, VerticalTextCodec) {
 /**
  * 用例描述: ShapeType测试
  */
-PAG_TEST(PAGFileTest, ShapeType) {
+PAG_PIXEL_TEST(PAGFileTest, ShapeType) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
@@ -648,7 +648,7 @@ PAG_TEST(PAGFileTest, ChildFrameToLocalAdvanced) {
 /**
  * 用例描述: 测试椭圆转path，iOS14圆角badcase
  */
-PAG_TEST(PAGFileTest, EllipseToPath_ID80701969) {
+PAG_PIXEL_TEST(PAGFileTest, EllipseToPath_ID80701969) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/ellipse_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
@@ -660,7 +660,7 @@ PAG_TEST(PAGFileTest, EllipseToPath_ID80701969) {
 /**
  * 用例描述: 测试矩形转path，iOS14badcase
  */
-PAG_TEST(PAGFileTest, RectToPath) {
+PAG_PIXEL_TEST(PAGFileTest, RectToPath) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
@@ -672,7 +672,7 @@ PAG_TEST(PAGFileTest, RectToPath) {
 /**
  * 用例描述: 测试圆角矩形转path,iOS14badCase
  */
-PAG_TEST(PAGFileTest, RoundRectToPath) {
+PAG_PIXEL_TEST(PAGFileTest, RoundRectToPath) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/round_rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
@@ -684,7 +684,7 @@ PAG_TEST(PAGFileTest, RoundRectToPath) {
 /**
  * 用例描述: PAGFile设置开始时间
  */
-PAG_TEST(PAGFileTest, SetStartTime) {
+PAG_PIXEL_TEST(PAGFileTest, SetStartTime) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/replacement.pag");
   TestPAGPlayer->setComposition(pagFile);

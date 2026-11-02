@@ -192,7 +192,7 @@ static void CheckMetalPAGXSurface(bool renderTarget) {
 /**
  * Covers copy-destination blending into an external BottomLeft Metal texture.
  */
-PAG_TEST(PAGBlendMetalTest, CopyDstTexture) {
+PAG_PIXEL_TEST(PAGBlendMetalTest, CopyDstTexture) {
   const int width = 400;
   const int height = 400;
   auto texture = MetalTestTexture::Make(width, height);
@@ -214,7 +214,7 @@ PAG_TEST(PAGBlendMetalTest, CopyDstTexture) {
 /**
  * Covers a BottomLeft texture-backed replacement image rendered into a TopLeft Metal surface.
  */
-PAG_TEST(PAGBlendMetalTest, TextureBottomLeft) {
+PAG_PIXEL_TEST(PAGBlendMetalTest, TextureBottomLeft) {
   const int width = 720;
   const int height = 1280;
   auto replacement = GetBottomLeftMetalImage(width, height);
@@ -241,7 +241,7 @@ PAG_TEST(PAGBlendMetalTest, TextureBottomLeft) {
 /**
  * Covers BottomLeft origin handling for both the external render target and replacement image.
  */
-PAG_TEST(PAGBlendMetalTest, BothBottomLeft) {
+PAG_PIXEL_TEST(PAGBlendMetalTest, BothBottomLeft) {
   const int width = 720;
   const int height = 1280;
   auto replacement = GetBottomLeftMetalImage(width, height);
@@ -287,7 +287,7 @@ PAG_TEST(PAGBlendMetalTest, TextureFormatFromRealTexture) {
 /**
  * Covers masking when the external Metal render target uses BottomLeft origin.
  */
-PAG_TEST(PAGSurfaceMetalTest, Mask) {
+PAG_PIXEL_TEST(PAGSurfaceMetalTest, Mask) {
   auto file = LoadPAGFile("assets/test2.pag");
   ASSERT_TRUE(file != nullptr);
   auto texture = MetalTestTexture::Make(file->width(), file->height());
@@ -307,7 +307,7 @@ PAG_TEST(PAGSurfaceMetalTest, Mask) {
 /**
  * Verifies scissor orientation on an external BottomLeft Metal render target.
  */
-PAG_TEST(PAGSurfaceMetalTest, BottomLeftScissor) {
+PAG_PIXEL_TEST(PAGSurfaceMetalTest, BottomLeftScissor) {
   auto file = LoadPAGFile("assets/test.pag");
   ASSERT_TRUE(file != nullptr);
   const int width = file->width();
@@ -329,14 +329,14 @@ PAG_TEST(PAGSurfaceMetalTest, BottomLeftScissor) {
 /**
  * Renders an animated PAGX scene into an external Metal texture and checks its pixels.
  */
-PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
   CheckMetalPAGXSurface(false);
 }
 
 /**
  * Renders an animated PAGX scene into an external Metal render target and checks its pixels.
  */
-PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
+PAGX_PIXEL_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
   CheckMetalPAGXSurface(true);
 }
 

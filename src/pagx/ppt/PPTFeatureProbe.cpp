@@ -37,6 +37,7 @@
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
@@ -93,6 +94,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasDiamondGradient |= src.hasDiamondGradient;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
+  dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
   dst->hasBackdropStyle |= src.hasBackdropStyle;
 }
 
@@ -200,9 +202,23 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   if (!IsSupportedPaintBlendMode(layer->blendMode)) {
     out.hasUnsupportedBlend = true;
   }
-  if (!layer->matrix.isIdentity() && MatrixHasShear(layer->matrix)) {
+  // Probe the complete Layer transform (matrix3D, matrix, or x / y / z with the rotation / scale /
+  // skew / perspective components) projected to 2D, which is what PPTExporter decomposes.
+  if (MatrixHasShear(BuildLayerMatrix(layer))) {
     out.hasShearTransform = true;
   }
+  // Mirrors tgfx Layer::canPreserve3D(): effects, a mask or a scrollRect flatten the subtree, so
+  // such a layer keeps its vector output.
+  out.hasPreserve3D = layer->preserve3D && layer->filters.empty() && layer->styles.empty() &&
+                      layer->mask == nullptr && !layer->hasScrollRect;
+  // Only an x/y-varying perspective ((3,0) or (3,1)) cannot flatten into an affine. A pure
+  // z-axis perspective on flat content matches what tgfx renders (asMatrix keeps the x/y
+  // perspective terms and drops the z column, so a constant w divide is exact), and depth-shared
+  // subtrees bake through hasPreserve3D instead. A non-positive w is not a valid projection.
+  const auto localTransform = BuildLayerLocalMatrix3D(layer);
+  out.hasPerspectiveTransform = localTransform.getRowColumn(3, 0) != 0 ||
+                                localTransform.getRowColumn(3, 1) != 0 ||
+                                localTransform.getRowColumn(3, 3) <= 0;
   for (const auto* filter : layer->filters) {
     if (filter == nullptr) {
       continue;

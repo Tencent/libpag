@@ -45,6 +45,8 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
       return LerpKeyframeValue<Matrix>(std::get<Matrix>(a), std::get<Matrix>(b), t);
     case ChannelValueType::PAGImage:
       return std::get<std::shared_ptr<PAGImage>>(a);
+    case ChannelValueType::Matrix3D:
+      return LerpKeyframeValue<Matrix3D>(std::get<Matrix3D>(a), std::get<Matrix3D>(b), t);
   }
   return a;
 }

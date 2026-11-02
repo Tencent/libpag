@@ -1,6 +1,35 @@
-import { PAGModule } from '../pag-module';
+import { getPAGModule, PAGModule } from '../pag-module';
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { isInstanceOf } from '../utils/type-utils';
+
+import type { PAG } from '../types';
+
+// The backend is fixed per wasm build, so the result is cached after the first successful read
+// to avoid a cross-wasm call on every query (flush() asks once per frame).
+let cachedIsWebGPUBackend: boolean | null = null;
+
+/**
+ * Returns whether the given module is a WebGPU-backend build, or null when the module does not
+ * carry the backend query entry (not initialized yet or not a pag module). Used by PAGInit before
+ * the module is registered; everywhere else use isWebGPUBackend().
+ */
+export const isModuleWebGPUBackend = (module: PAG | undefined): boolean | null => {
+  if (!module || typeof module._IsWebGPUBackend !== 'function') return null;
+  return module._IsWebGPUBackend();
+};
+
+/**
+ * Returns true when the loaded wasm module is built with the WebGPU backend. Internal helper
+ * for branching backend-specific behavior in the TS layer.
+ */
+export const isWebGPUBackend = (): boolean => {
+  if (cachedIsWebGPUBackend === null) {
+    const result = isModuleWebGPUBackend(getPAGModule());
+    if (result === null) return false;
+    cachedIsWebGPUBackend = result;
+  }
+  return cachedIsWebGPUBackend;
+};
 
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {

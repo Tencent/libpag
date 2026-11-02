@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstring>
 #include <string>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
@@ -42,6 +43,11 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/VerifyUtils.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Surface.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
@@ -237,6 +243,7 @@ CLI_TEST(PAGXOptimizerTest, CanonicalizePathToRectangle) {
 CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRect) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* mask = AddTopLayer(doc.get());
+  mask->visible = false;
   auto* maskRect = doc->makeNode<Rectangle>();
   maskRect->position = {25, 25};
   maskRect->size = {50, 50};
@@ -256,6 +263,187 @@ CLI_TEST(PAGXOptimizerTest, RectMaskToScrollRect) {
   EXPECT_FLOAT_EQ(user->scrollRect.y, 0.0f);
   EXPECT_FLOAT_EQ(user->scrollRect.width, 50.0f);
   EXPECT_FLOAT_EQ(user->scrollRect.height, 50.0f);
+}
+
+// A mask layer that is not hidden renders as regular content once its mask reference is detached,
+// so the rewrite keeps it.
+CLI_TEST(PAGXOptimizerTest, RectMaskVisibleMaskIsKept) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->position = {25, 25};
+  maskRect->size = {50, 50};
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_FALSE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, mask);
+}
+
+// The rewrite reads the measured geometry: authored width/height override the intrinsic size and
+// an omitted position means the origin, and a size-dependent child (here a right constraint)
+// blocks pinning the owner's frame.
+CLI_TEST(PAGXOptimizerTest, RectMaskUsesMeasuredGeometryAndRejectsSizeDependentContent) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  mask->visible = false;
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->width = 100;
+  maskRect->height = 50;
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_TRUE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, nullptr);
+  EXPECT_FLOAT_EQ(user->scrollRect.width, 100);
+  EXPECT_FLOAT_EQ(user->scrollRect.height, 50);
+  // An omitted position places the rect's top-left at the origin, not its center.
+  EXPECT_FLOAT_EQ(user->scrollRect.x, 0);
+  EXPECT_FLOAT_EQ(user->scrollRect.y, 0);
+  EXPECT_FLOAT_EQ(user->x, 0);
+  EXPECT_FLOAT_EQ(user->y, 0);
+  EXPECT_FLOAT_EQ(user->width, 100);
+  EXPECT_FLOAT_EQ(user->height, 50);
+
+  auto doc2 = PAGXDocument::Make(100, 100);
+  auto* mask2 = AddTopLayer(doc2.get());
+  mask2->visible = false;
+  auto* maskRect2 = doc2->makeNode<Rectangle>();
+  maskRect2->size = {50, 50};
+  mask2->contents.push_back(maskRect2);
+  mask2->contents.push_back(MakeSolidFill(doc2.get(), 1, 1, 1));
+  auto* user2 = AddTopLayer(doc2.get());
+  user2->mask = mask2;
+  user2->maskType = MaskType::Alpha;
+  auto* badge = doc2->makeNode<Layer>();
+  badge->right = 0;
+  badge->width = 20;
+  badge->height = 20;
+  badge->contents.push_back(MakeSolidFill(doc2.get(), 0, 0, 1));
+  user2->children.push_back(badge);
+  user2->contents.push_back(MakeFilledRectGroup(doc2.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc2.get());
+
+  EXPECT_FALSE(user2->hasScrollRect);
+  EXPECT_EQ(user2->mask, mask2);
+}
+
+// scrollRect clips in the owner's own space while the mask is evaluated in the parent space, so a
+// translated owner moves the window and the rewrite is not equivalent.
+CLI_TEST(PAGXOptimizerTest, RectMaskWithTranslatedOwnerIsKept) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* mask = AddTopLayer(doc.get());
+  auto* maskRect = doc->makeNode<Rectangle>();
+  maskRect->position = {25, 25};
+  maskRect->size = {50, 50};
+  mask->contents.push_back(maskRect);
+  mask->contents.push_back(MakeSolidFill(doc.get(), 1, 1, 1));
+
+  auto* user = AddTopLayer(doc.get());
+  user->x = 20;
+  user->mask = mask;
+  user->maskType = MaskType::Alpha;
+  user->contents.push_back(MakeFilledRectGroup(doc.get(), 100, 100, 0, 1, 0));
+
+  PAGXOptimizer::Optimize(doc.get());
+
+  EXPECT_FALSE(user->hasScrollRect);
+  EXPECT_EQ(user->mask, mask);
+  EXPECT_FLOAT_EQ(user->x, 20);
+}
+
+static tgfx::Bitmap RenderMaskLayoutDocument(PAGXDocument* doc, tgfx::Context* context) {
+  doc->applyLayout();
+  auto root = pagx::LayerBuilder::Build(doc);
+  auto surface = tgfx::Surface::Make(context, 200, 100);
+  if (root == nullptr || surface == nullptr) {
+    return {};
+  }
+  root->draw(surface->getCanvas());
+  tgfx::Bitmap bitmap(200, 100, false, false);
+  tgfx::Pixmap pixels(bitmap);
+  if (!surface->readPixels(pixels.info(), pixels.writablePixels())) {
+    return {};
+  }
+  return bitmap;
+}
+
+PAGX_TEST(PAGXMaskLayoutTest, ParentPaddingPreservesMaskPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  const std::string xml =
+      "<pagx width=\"200\" height=\"100\">"
+      "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "<Fill color=\"#FFFFFF\"/></Layer>"
+      "<Layer layout=\"horizontal\" width=\"200\" height=\"100\" padding=\"20,0,0,0\">"
+      "<Layer id=\"owner\" mask=\"@m\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#FF0000\"/></Layer></Layer></pagx>";
+  auto reference = PAGXImporter::FromXML(xml);
+  auto optimized = PAGXImporter::FromXML(xml);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(optimized, nullptr);
+  auto options = OnlyRuleOptions();
+  options.rectMaskToScrollRect = true;
+  pagx::OptimizeWithOptions(optimized.get(), options);
+  auto* owner = static_cast<Layer*>(optimized->findNode("owner"));
+  ASSERT_NE(owner, nullptr);
+  EXPECT_NE(owner->mask, nullptr);
+  EXPECT_FALSE(owner->hasScrollRect);
+  auto before = RenderMaskLayoutDocument(reference.get(), context);
+  auto after = RenderMaskLayoutDocument(optimized.get(), context);
+  ASSERT_FALSE(before.isEmpty());
+  ASSERT_FALSE(after.isEmpty());
+  tgfx::Pixmap beforePixels(before);
+  tgfx::Pixmap afterPixels(after);
+  EXPECT_EQ(
+      std::memcmp(beforePixels.pixels(), afterPixels.pixels(), beforePixels.info().byteSize()), 0);
+}
+
+PAGX_TEST(PAGXMaskLayoutTest, ChildMaskPaddingPreservesPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  const std::string xml =
+      "<pagx width=\"200\" height=\"100\"><Layer id=\"owner\" padding=\"20\" mask=\"@m\">"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/>"
+      "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "<Fill color=\"#FFFFFF\"/></Layer></Layer></pagx>";
+  auto reference = PAGXImporter::FromXML(xml);
+  auto optimized = PAGXImporter::FromXML(xml);
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(optimized, nullptr);
+  auto options = OnlyRuleOptions();
+  options.rectMaskToScrollRect = true;
+  pagx::OptimizeWithOptions(optimized.get(), options);
+  auto* owner = static_cast<Layer*>(optimized->findNode("owner"));
+  ASSERT_NE(owner, nullptr);
+  EXPECT_NE(owner->mask, nullptr);
+  auto before = RenderMaskLayoutDocument(reference.get(), context);
+  auto after = RenderMaskLayoutDocument(optimized.get(), context);
+  ASSERT_FALSE(before.isEmpty());
+  ASSERT_FALSE(after.isEmpty());
+  tgfx::Pixmap beforePixels(before);
+  tgfx::Pixmap afterPixels(after);
+  EXPECT_EQ(
+      std::memcmp(beforePixels.pixels(), afterPixels.pixels(), beforePixels.info().byteSize()), 0);
 }
 
 CLI_TEST(PAGXOptimizerTest, RectMaskWithRoundnessIsKept) {
@@ -1044,6 +1232,7 @@ CLI_TEST(PAGXOptimizerTest, RectMaskConversionRejectsSemanticAndGeometryChanges)
     Fixture f;
     f.doc = PAGXDocument::Make(100, 100);
     f.mask = AddTopLayer(f.doc.get());
+    f.mask->visible = false;
     f.rect = f.doc->makeNode<Rectangle>();
     f.rect->position = {25, 25};
     f.rect->size = {50, 50};
@@ -1236,6 +1425,20 @@ CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesMatrix3DNonIdentity) {
   EXPECT_TRUE(HasLayerOnlyFeatures(layer));
 }
 
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesTransformComponents) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->rotationY = 30;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesZNonZero) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->z = 1;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
 CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesPreserve3D) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = MakeDefaultLayer(doc.get());
@@ -1386,6 +1589,13 @@ CLI_TEST(VerifyUtilsTest, IsLayerShellYSet) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = MakeDefaultLayer(doc.get());
   layer->y = 5.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellZSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->z = 1;
   EXPECT_FALSE(IsLayerShell(layer));
 }
 
@@ -1642,6 +1852,28 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithAlpha) {
   child->width = 16;
   child->height = 16;
   child->alpha = 0.5f;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
+// A child's depth is a rendering transform and cannot be preserved by absorbing its content into
+// the parent.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithZ) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->z = 1;
   AddRectFill(doc.get(), child, 16, 16);
   parent->children.push_back(child);
 

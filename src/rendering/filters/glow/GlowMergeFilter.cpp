@@ -18,6 +18,7 @@
 
 #include "GlowMergeFilter.h"
 #include <utility>
+#include "rendering/filters/utils/Std140Uniforms.h"
 
 namespace pag {
 static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
@@ -68,9 +69,14 @@ std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::textureSamplers() const 
 void GlowMergeRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                               const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                               const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float progress = 0.0f;
   };
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(),
+                "FilterUniforms must match the std140 layout.");
+  static_assert(offsetof(Uniforms, progress) == 0,
+                "FilterUniforms member offsets must match the shader declaration.");
+
   Uniforms uniforms = {};
   uniforms.progress = progress;
   auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);

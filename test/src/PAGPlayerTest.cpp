@@ -42,7 +42,7 @@ PAG_TEST(PAGPlayerTest, setComposition) {
 /**
  * 用例描述: PAGPlayerTest基础功能
  */
-PAG_TEST(PAGPlayerTest, pagPlayer) {
+PAG_PIXEL_TEST(PAGPlayerTest, pagPlayer) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto container = PAGComposition::Make(720, 1080);
   TestPAGPlayer->setComposition(container);
@@ -73,7 +73,7 @@ PAG_TEST(PAGPlayerTest, pagPlayer) {
 /**
  * 用例描述: PAGPlayerTest 切换PAGSurface
  */
-PAG_TEST(PAGPlayerTest, switchPAGSurface) {
+PAG_PIXEL_TEST(PAGPlayerTest, switchPAGSurface) {
   auto pagFile1 = LoadPAGFile("resources/apitest/test.pag");
   auto pagSurface1 = OffscreenSurface::Make(pagFile1->width(), pagFile1->height());
   auto pagPlayer1 = std::make_unique<PAGPlayer>();
@@ -97,7 +97,7 @@ PAG_TEST(PAGPlayerTest, switchPAGSurface) {
 /**
  * 用例描述: PAGPlayerTest基础功能
  */
-PAG_TEST(PAGPlayerTest, autoClear) {
+PAG_PIXEL_TEST(PAGPlayerTest, autoClear) {
   auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_TRUE(pagSurface != nullptr);

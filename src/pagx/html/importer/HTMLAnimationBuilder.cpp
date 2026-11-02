@@ -44,6 +44,7 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTransformParser.h"
 
 namespace pagx {
 
@@ -986,11 +987,167 @@ HTMLAnimationBuilder::HTMLAnimationBuilder(HTMLDiagnosticSink& sink, HTMLValuePa
 
 void HTMLAnimationBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+  _coalescingLengths.clear();
+  _originalDelays.clear();
+  _groupStarts.clear();
 }
 
 void HTMLAnimationBuilder::setKeyframes(
     const std::unordered_map<std::string, html::CssKeyframesRule>* keyframes) {
   _keyframes = keyframes;
+}
+
+static LoopMode AnimationLoopMode(const AnimationSpec& spec) {
+  if (!spec.iterationInfinite) return LoopMode::Once;
+  return spec.direction == "alternate" || spec.direction == "alternate-reverse" ? LoopMode::PingPong
+                                                                                : LoopMode::Loop;
+}
+
+static bool AnimationNeedsTrailingBaseline(const AnimationSpec& spec) {
+  return !spec.iterationInfinite && (spec.fillMode == "none" || spec.fillMode == "backwards");
+}
+
+static bool AnimationSuppressesPlayback(const AnimationSpec& spec) {
+  return !spec.iterationInfinite && spec.iterationCount <= 0.0f;
+}
+
+static Frame AnimationGroupingLength(LoopMode loop, Frame cycle, Frame delay, bool trailing) {
+  return loop == LoopMode::Once ? cycle + delay + (trailing ? 1 : 0) : cycle;
+}
+
+void HTMLAnimationBuilder::prepareTiming(const std::unordered_map<std::string, std::string>& style,
+                                         bool inlineSvg) {
+  auto shorthand = style.find("animation");
+  std::vector<std::string> entries;
+  if (inlineSvg && shorthand != style.end()) {
+    entries = SplitTopLevelCommas(shorthand->second);
+  }
+  if (entries.empty()) {
+    entries.push_back(shorthand != style.end() ? shorthand->second : std::string());
+  }
+  for (const auto& entry : entries) {
+    AnimationSpec spec = {};
+    bool multiple = false;
+    ParseAnimationShorthand(entry, spec, multiple);
+    if (entries.size() == 1) ApplyAnimationLonghands(style, spec, multiple);
+    if (spec.durationSeconds <= 0 || spec.name.empty() || _keyframes->count(spec.name) == 0 ||
+        AnimationSuppressesPlayback(spec)) {
+      continue;
+    }
+    Frame cycle = std::llround(spec.durationSeconds * kFrameRate);
+    Frame delay = std::llround(spec.delaySeconds * kFrameRate);
+    auto loop = AnimationLoopMode(spec);
+    Frame length =
+        AnimationGroupingLength(loop, cycle, delay, AnimationNeedsTrailingBaseline(spec));
+    auto key = std::make_pair(loop, length);
+    // The default zero preserves the HTML origin when every member's delay is positive.
+    _groupStarts[key] = std::min(_groupStarts[key], delay);
+  }
+}
+
+template <typename T>
+static void CorrectGroupOrigin(TypedChannel<T>* channel, Frame excessShift) {
+  auto& keys = channel->keyframes;
+  if (keys.empty()) return;
+  // A baseline hold inserted at frame 0 must remain at the playback origin. Every authored key
+  // starts at or after excessShift; if its new time becomes 0, the baseline is no longer needed.
+  bool hasLeadingBaseline = keys.size() > 1 && keys.front().time == 0 && excessShift > 0;
+  for (size_t index = hasLeadingBaseline ? 1 : 0; index < keys.size(); index++) {
+    keys[index].time -= excessShift;
+  }
+  if (hasLeadingBaseline && keys[1].time == 0) {
+    keys.erase(keys.begin());
+  }
+}
+
+void HTMLAnimationBuilder::finalizeTiming() {
+  // The provisional group origin can include a discarded animation (unsupported properties,
+  // invalid values or missing SVG targets). Only emitted animations may move the final origin.
+  std::map<std::pair<LoopMode, Frame>, Frame> emittedStarts;
+  for (auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+    auto* animation = static_cast<Animation*>(node);
+    auto delay = _originalDelays.find(animation);
+    if (delay == _originalDelays.end()) continue;
+    auto key = std::make_pair(animation->loop, coalescingLength(animation));
+    emittedStarts[key] = std::min(emittedStarts[key], delay->second);
+  }
+  for (auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+    auto* animation = static_cast<Animation*>(node);
+    auto delay = _originalDelays.find(animation);
+    if (delay == _originalDelays.end()) continue;
+    auto key = std::make_pair(animation->loop, coalescingLength(animation));
+    auto emitted = emittedStarts.find(key);
+    auto planned = _groupStarts.find(key);
+    if (emitted == emittedStarts.end() || planned == _groupStarts.end()) continue;
+    Frame excessShift = emitted->second - planned->second;
+    if (excessShift == 0) continue;
+    animation->duration -= excessShift;
+    for (auto* object : animation->objects) {
+      for (auto* channel : object->channels) {
+        if (channel->valueType() == ChannelValueType::Float) {
+          CorrectGroupOrigin(static_cast<TypedChannel<float>*>(channel), excessShift);
+        } else if (channel->valueType() == ChannelValueType::Color) {
+          CorrectGroupOrigin(static_cast<TypedChannel<Color>*>(channel), excessShift);
+        } else if (channel->valueType() == ChannelValueType::Matrix) {
+          CorrectGroupOrigin(static_cast<TypedChannel<Matrix>*>(channel), excessShift);
+        }
+      }
+    }
+  }
+}
+
+Frame HTMLAnimationBuilder::coalescingLength(const Animation* animation) const {
+  auto it = _coalescingLengths.find(animation);
+  return it != _coalescingLengths.end() ? it->second : animation->duration;
+}
+
+Frame HTMLAnimationBuilder::resolveDelayFrames(float delaySeconds, Frame durationFrames,
+                                               LoopMode loopMode, bool needsTrailingBaseline) {
+  Frame delay = std::llround(delaySeconds * kFrameRate);
+  Frame length = AnimationGroupingLength(loopMode, durationFrames, delay, needsTrailingBaseline);
+  auto it = _groupStarts.find(std::make_pair(loopMode, length));
+  Frame start = it != _groupStarts.end() ? it->second : std::min<Frame>(0, delay);
+  return delay - start;
+}
+
+void HTMLAnimationBuilder::setAnimationTiming(Animation* animation, LoopMode loopMode,
+                                              Frame durationFrames, Frame delayFrames,
+                                              bool needsTrailingBaseline,
+                                              Frame originalDelayFrames) {
+  animation->frameRate = kFrameRate;
+  animation->loop = loopMode;
+  // The group origin is the earliest negative delay (or CSS t=0 when every delay is nonnegative).
+  // Shift keyframes and the playback end by the same amount, so the window starts at frame 0 and
+  // covers each member's last keyframe. A shorter window wraps before delayed keyframes finish.
+  // Once extends by one more frame when fill-mode requires a trailing baseline sample because
+  // LoopMode::Once clamps currentTime to `animation->duration` after playback ends.
+  //
+  // Deliberate trade-off for Loop / PingPong: CSS delays only the first iteration and then loops
+  // seamlessly, but a PAGX Animation repeats its whole [0, duration] window, so the delay is
+  // replayed as a pause on every pass. Seamless looping would need either a first-iteration offset
+  // in the PAGX model or keyframes rotated by the delay and split at the cycle seam. Both were
+  // rejected: the imported keyframes must stay a plain, readable offset of the CSS @keyframes that
+  // animators can edit on the canvas. A visible pause is acceptable there; truncation is not.
+  animation->duration = durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0);
+  _coalescingLengths[animation] =
+      AnimationGroupingLength(loopMode, durationFrames, originalDelayFrames, needsTrailingBaseline);
+}
+
+void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDelayFrames) {
+  _document->animations.push_back(animation);
+  _originalDelays[animation] = originalDelayFrames;
+  if (originalDelayFrames < 0) {
+    _diagnostics.warn(
+        "html: negative animation-delay shifts the imported timeline; playback begins before "
+        "CSS t=0 [subset:animation-timeline-shifted]");
+  }
+  if (animation->loop != LoopMode::Once && originalDelayFrames != 0) {
+    _diagnostics.warn(
+        "html: animation-delay on an infinite animation changes the repeated playback window "
+        "instead of affecting only initial playback [subset:animation-delay-replayed]");
+  }
 }
 
 bool HTMLAnimationBuilder::buildForElement(
@@ -1082,14 +1239,9 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
-  long long delayFrames = 0;
-  if (spec.delaySeconds < 0.0f) {
-    _diagnostics.warn(
-        "html: negative animation-delay is not supported; clamped to 0 "
-        "[subset:animation-unsupported-property]");
-  } else {
-    delayFrames = std::llround(spec.delaySeconds * kFrameRate);
-  }
+  long long delayFrames =
+      resolveDelayFrames(spec.delaySeconds, durationFrames, AnimationLoopMode(spec),
+                         AnimationNeedsTrailingBaseline(spec));
 
   // Per-channel keyframe collection.
   std::vector<Keyframe<float>> alphaKeys;
@@ -1271,17 +1423,19 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
-  // Lower the collected transform matrices onto the playable channel(s). A pure-translation
-  // animation keeps the existing `x`/`y` path (it preserves the layout-assigned position through
-  // the inner-wrapper split below, and avoids matrix-decompose interpolation entirely). Any
-  // scale / rotate / skew (or a non-translation `matrix(...)`) routes the *full* affine through a
-  // single `matrix` channel, pivoted around the element's transform-origin exactly like the static
-  // `HTMLLayerBuilder::applyBoxTransform` path so the animated and static transforms agree.
+  // Lower transform keyframes onto the runtime channel matching their CSS composition. A pure
+  // translation uses x/y when there is no static transform; if a static transform exists, the
+  // animation replaces that transform property, so emit complete matrix samples instead of x/y
+  // channels that the matrix priority would suppress. Other affine transforms use a matrix channel.
   if (!transformStops.empty()) {
-    if (transformAllPureTranslate) {
+    if (transformAllPureTranslate && layer->matrix.isIdentity()) {
       for (const auto& ts : transformStops) {
         xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
         yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
+      }
+    } else if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
       }
     } else {
       float cx = 0.0f;
@@ -1381,7 +1535,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // ends (when fill-mode is `none` or `backwards`).
   //   alpha: the layer's resolved opacity, already populated from CSS by the layer importer.
   //   x / y: zero — translate-animated layers route their channels onto an inner wrapper whose
-  //          layoutBounds origin is (0, 0); the CSS keyframe values stack on top of that.
+  //          local position starts at (0, 0); the wrapper remains inside the outer layout slot.
   //   color: the SolidColor's current color, populated from CSS background-color/color before
   //          this method runs. The fill must be located before SplitForTransformAnimation moves
   //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
@@ -1412,7 +1566,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // CSS `animation-iteration-count: 0` (or any non-positive value) suppresses playback entirely.
   // Negative values are invalid per spec; reject them upfront so the rest of the pipeline does
   // not have to reason about empty playback windows.
-  if (!spec.iterationInfinite && spec.iterationCount <= 0.0f) {
+  if (AnimationSuppressesPlayback(spec)) {
     _diagnostics.warn(
         "html: animation-iteration-count <= 0 suppresses playback; dropped "
         "[subset:animation-finite-count]");
@@ -1464,19 +1618,8 @@ bool HTMLAnimationBuilder::buildForElement(
       loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
 
   auto* animation = _document->makeNode<Animation>(layer->id + "_anim");
-  animation->frameRate = kFrameRate;
-  // Loop/PingPong: CSS animation-delay only delays the first iteration, so the looped duration
-  // must not include delayFrames (the runtime would otherwise re-play the delay gap each cycle).
-  // Once: include delayFrames to keep the baseline visible during the gap, and extend by one
-  // frame when fill-mode requires a trailing baseline sample (LoopMode::Once clamps currentTime
-  // to `animation->duration` once playback ends, so the trailing hold needs to live within it).
-  if (loopOnce) {
-    animation->duration =
-        static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
-  } else {
-    animation->duration = static_cast<Frame>(durationFrames);
-  }
-  animation->loop = loopMode;
+  setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline,
+                     std::llround(spec.delaySeconds * kFrameRate));
   if (!spec.iterationInfinite && spec.iterationCount != 1.0f) {
     std::ostringstream count;
     count << spec.iterationCount;
@@ -1491,11 +1634,9 @@ bool HTMLAnimationBuilder::buildForElement(
         "[subset:animation-finite-count]");
   }
 
-  // CSS `transform: translate(...)` is an offset on top of the layout-assigned position, but
-  // the runtime `x` / `y` channels overwrite the matrix translation absolutely. To keep the
-  // CSS semantics under any positioning mode (absolute, flex child, padding-anchored child),
-  // wrap the layer once and route x/y onto a fully-visual inner layer whose layoutBounds are
-  // always (0, 0). Done lazily so layers without transform animations stay flat.
+  // Preserve the element's parent-facing layout slot while keeping CSS translate keyframes on a
+  // fully-visual inner layer. The outer layer retains absolute/flex positioning; the inner layer
+  // fills it and owns the local animated transform. Done lazily so static elements stay flat.
   Layer* xyTarget = nullptr;
   if (!xKeys.empty() || !yKeys.empty()) {
     xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
@@ -1846,9 +1987,10 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   if (animation->objects.empty()) {
+    _coalescingLengths.erase(animation);
     return false;
   }
-  _document->animations.push_back(animation);
+  addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
   return true;
 }
 
@@ -1898,6 +2040,12 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
     if (spec.name.empty() || spec.durationSeconds <= 0.0f) continue;
+    if (AnimationSuppressesPlayback(spec)) {
+      _diagnostics.warn(
+          "html: animation-iteration-count <= 0 suppresses playback; dropped "
+          "[subset:animation-finite-count]");
+      continue;
+    }
 
     auto kfIt = _keyframes->find(spec.name);
     if (kfIt == _keyframes->end()) {
@@ -1924,17 +2072,19 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
 
     long long durationFrames = std::llround(spec.durationSeconds * kFrameRate);
     long long delayFrames =
-        spec.delaySeconds > 0.0f ? std::llround(spec.delaySeconds * kFrameRate) : 0;
+        resolveDelayFrames(spec.delaySeconds, durationFrames, AnimationLoopMode(spec),
+                           AnimationNeedsTrailingBaseline(spec));
 
     std::vector<Keyframe<Color>> fillColorKeys;
     std::vector<Keyframe<float>> fillAlphaKeys;
     std::vector<Keyframe<Color>> strokeColorKeys;
     std::vector<Keyframe<float>> strokeAlphaKeys;
     std::vector<Keyframe<float>> dashKeys;
-    // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure-translate `transform`
-    // -> `x` / `y`; scale / skew -> the full affine `matrix` channel. A pure rotation uses the
-    // scalar `rotation` channel on the resolver-created Group so its pivot stays fixed. The shape
-    // Layer sits at layout origin in SVG user (view-box) space, so captured values map verbatim.
+    // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure translation -> `x`/`y`
+    // when no static transform is present, otherwise a complete `matrix` sample replaces it. Pure
+    // rotations without a static transform may use the resolver-created Group's scalar `rotation`
+    // channel so their pivot stays fixed. The shape Layer sits at layout origin in SVG user
+    // (view-box) space.
     std::vector<Keyframe<float>> alphaKeys;
     std::vector<Keyframe<float>> xKeys;
     std::vector<Keyframe<float>> yKeys;
@@ -1994,21 +2144,33 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
 
-    // Keep translations as x/y so they compose with SVG layout. Any other valid 2D affine routes
-    // through a single matrix channel, pivoted about the computed transform-origin captured on the
-    // shape. Invalid 3D / perspective values drop the complete transform track so a partial set of
-    // keyframes can never produce a discontinuous animation.
+    Matrix baselineShapeMatrix = Matrix::Identity();
+    auto staticTransform = style.find("transform");
+    if (staticTransform != style.end()) {
+      baselineShapeMatrix = MatrixFromSVGTransform(staticTransform->second);
+    }
+
+    // Lower a pure translation to x/y, and a pure rotation to the Group rotation channel, only
+    // when no static transform owns the Layer matrix. Otherwise the animated CSS transform
+    // replaces the full transform property, so use matrix samples. The fill-mode baseline is the
+    // raw static SVG matrix; SVG static import does not apply CSS transform-origin to that matrix.
+    // Invalid 3D / perspective keyframes drop the complete track.
     if (transformInvalid) {
       transformStops.clear();
-    } else if (transformAllPureTranslate) {
+    } else if (!rotationTargetId.empty() && !transformAllPureTranslate &&
+               baselineShapeMatrix.isIdentity() &&
+               BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
+      // The SVG resolver has already applied the captured transform-origin as the Group's static
+      // anchor/position. Only the authored angle remains animated.
+    } else if (transformAllPureTranslate && baselineShapeMatrix.isIdentity()) {
       for (const auto& ts : transformStops) {
         xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
         yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
       }
-    } else if (!rotationTargetId.empty() &&
-               BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
-      // The SVG resolver has already applied the captured transform-origin as the Group's static
-      // anchor/position. Only the authored angle remains animated.
+    } else if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
+      }
     } else if (!transformStops.empty()) {
       float cx = 0.0f;
       float cy = 0.0f;
@@ -2067,7 +2229,6 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
     bool loopOnce = (loopMode == LoopMode::Once);
     Frame activeEnd = static_cast<Frame>(delayFrames + durationFrames);
-
     // The shape's static painter value shows outside the active window. The capture bakes an
     // explicit 0% stop carrying the resting value, so the first keyframe is a faithful per-channel
     // baseline for `animation-fill-mode` forwards / backwards.
@@ -2091,10 +2252,6 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     if (!alphaKeys.empty()) {
       ApplyFillMode(alphaKeys, spec.fillMode, alphaKeys.front().value, loopOnce, activeEnd);
     }
-    // The shape Layer sits at layout origin, so its static (pre-animation) translate is (0, 0) —
-    // the same baseline `buildForElement` uses for translate-animated layers. The captured keyframe
-    // values stack on top of that origin, so `fill-mode: none` / `backwards` must revert to 0, not
-    // to the first keyframe (which is the off-screen start of the slide).
     if (!xKeys.empty()) {
       ApplyFillMode(xKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
@@ -2105,7 +2262,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       ApplyFillMode(rotationKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
     if (!matrixKeys.empty()) {
-      ApplyFillMode(matrixKeys, spec.fillMode, Matrix::Identity(), loopOnce, activeEnd);
+      ApplyFillMode(matrixKeys, spec.fillMode, baselineShapeMatrix, loopOnce, activeEnd);
     }
 
     bool needsTrailingBaseline =
@@ -2116,16 +2273,10 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
                              : (!fillTargetId.empty() ? fillTargetId : shapeTargetId);
     std::string animId = idBase + "_" + spec.name + "_anim";
     auto* animation = _document->makeNode<Animation>(animId);
-    animation->frameRate = kFrameRate;
-    if (loopOnce) {
-      animation->duration =
-          static_cast<Frame>(durationFrames + delayFrames + (needsTrailingBaseline ? 1 : 0));
-    } else {
-      animation->duration = static_cast<Frame>(durationFrames);
-    }
-    animation->loop = loopMode;
+    setAnimationTiming(animation, loopMode, durationFrames, delayFrames, needsTrailingBaseline,
+                       std::llround(spec.delaySeconds * kFrameRate));
 
-    // Layer-space channels (opacity / translate) target the shape's own `Layer`.
+    // Layer-space channels (opacity / transform) target the shape's own `Layer`.
     if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty() || !matrixKeys.empty()) {
       if (shapeTargetId.empty()) {
         _diagnostics.warn(
@@ -2226,8 +2377,11 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
 
-    if (animation->objects.empty()) continue;
-    _document->animations.push_back(animation);
+    if (animation->objects.empty()) {
+      _coalescingLengths.erase(animation);
+      continue;
+    }
+    addAnimation(animation, std::llround(spec.delaySeconds * kFrameRate));
     builtAny = true;
   }
   return builtAny;

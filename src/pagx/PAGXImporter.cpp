@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <cctype>
 #include <cerrno>
 #include <climits>
 #include <cmath>
@@ -81,9 +82,11 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -479,6 +482,45 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   layer->x = GetFloatAttribute(node, "x", Default<Layer>().x, doc);
   layer->y = GetFloatAttribute(node, "y", Default<Layer>().y, doc);
+  layer->z = GetFloatAttribute(node, "z", Default<Layer>().z, doc);
+  layer->rotationX = GetFloatAttribute(node, "rotationX", Default<Layer>().rotationX, doc);
+  layer->rotationY = GetFloatAttribute(node, "rotationY", Default<Layer>().rotationY, doc);
+  layer->rotationZ = GetFloatAttribute(node, "rotationZ", Default<Layer>().rotationZ, doc);
+  layer->scaleX = GetFloatAttribute(node, "scaleX", Default<Layer>().scaleX, doc);
+  layer->scaleY = GetFloatAttribute(node, "scaleY", Default<Layer>().scaleY, doc);
+  layer->scaleZ = GetFloatAttribute(node, "scaleZ", Default<Layer>().scaleZ, doc);
+  layer->skewX = GetFloatAttribute(node, "skewX", Default<Layer>().skewX, doc);
+  layer->skewY = GetFloatAttribute(node, "skewY", Default<Layer>().skewY, doc);
+  layer->perspective = GetFloatAttribute(node, "perspective", Default<Layer>().perspective, doc);
+  // Rotation and scale accept any finite value; NaN / inf cannot compose into a transform.
+  if (!std::isfinite(layer->rotationX) || !std::isfinite(layer->rotationY) ||
+      !std::isfinite(layer->rotationZ)) {
+    ReportError(doc, node, "Rotation attributes must be finite numbers.");
+    layer->rotationX = Default<Layer>().rotationX;
+    layer->rotationY = Default<Layer>().rotationY;
+    layer->rotationZ = Default<Layer>().rotationZ;
+  }
+  if (!std::isfinite(layer->scaleX) || !std::isfinite(layer->scaleY) ||
+      !std::isfinite(layer->scaleZ)) {
+    ReportError(doc, node, "Scale attributes must be finite numbers.");
+    layer->scaleX = Default<Layer>().scaleX;
+    layer->scaleY = Default<Layer>().scaleY;
+    layer->scaleZ = Default<Layer>().scaleZ;
+  }
+  // A skew of exactly +/-90 degrees has no finite tangent and a negative viewing distance is not a
+  // projection, so both are rejected here instead of silently rendering a fallback transform.
+  if (!std::isfinite(layer->skewX) || std::abs(layer->skewX) >= 90.0f) {
+    ReportError(doc, node, "'skewX' must be within (-90, 90) degrees.");
+    layer->skewX = Default<Layer>().skewX;
+  }
+  if (!std::isfinite(layer->skewY) || std::abs(layer->skewY) >= 90.0f) {
+    ReportError(doc, node, "'skewY' must be within (-90, 90) degrees.");
+    layer->skewY = Default<Layer>().skewY;
+  }
+  if (!std::isfinite(layer->perspective) || layer->perspective < 0.0f) {
+    ReportError(doc, node, "'perspective' must be zero or a positive distance.");
+    layer->perspective = Default<Layer>().perspective;
+  }
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
@@ -497,19 +539,28 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->centerY = GetFloatAttributeOrNaN(node, "centerY", doc);
   auto matrixStr = GetAttribute(node, "matrix");
   if (!matrixStr.empty()) {
+    auto parsed = MatrixFromString(matrixStr);
     if (ParseFloatList(matrixStr).size() < 6) {
       ReportError(doc, node, "Invalid value '" + matrixStr + "' for 'matrix' attribute.");
+    } else if (!IsFiniteMatrix(parsed)) {
+      ReportError(doc, node, "'matrix' must contain finite values.");
     } else {
-      layer->matrix = MatrixFromString(matrixStr);
+      layer->matrix = parsed;
     }
   }
   auto matrix3DStr = GetAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
     auto floats = ParseFloatList(matrix3DStr);
-    if (floats.size() == 16) {
-      memcpy(layer->matrix3D.values, floats.data(), 16 * sizeof(float));
-    } else {
+    Matrix3D parsed = {};
+    for (size_t i = 0; i < 16 && i < floats.size(); ++i) {
+      parsed.values[i] = floats[i];
+    }
+    if (floats.size() != 16) {
       ReportError(doc, node, "Invalid 'matrix3D' value (expected 16 numbers).");
+    } else if (!IsInvertibleMatrix3D(parsed)) {
+      ReportError(doc, node, "'matrix3D' must be finite and invertible.");
+    } else {
+      layer->matrix3D = parsed;
     }
   }
   layer->preserve3D = GetBoolAttribute(node, "preserve3D", Default<Layer>().preserve3D, doc);
@@ -1623,6 +1674,47 @@ static bool LooksLikeFloat(const std::string& value) {
   return false;
 }
 
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values) {
+  values->clear();
+  const char* current = text.c_str();
+  const char* end = current + text.size();
+  while (current < end) {
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      ++current;
+    }
+    if (current == end) {
+      return false;
+    }
+    char* valueEnd = nullptr;
+    float value = std::strtof(current, &valueEnd);
+    if (valueEnd == current || !std::isfinite(value)) {
+      return false;
+    }
+    values->push_back(value);
+    current = valueEnd;
+    bool hadWhitespace = false;
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      hadWhitespace = true;
+      ++current;
+    }
+    if (current == end) {
+      return true;
+    }
+    if (*current == ',') {
+      ++current;
+      while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+        ++current;
+      }
+      if (current == end || *current == ',') {
+        return false;
+      }
+    } else if (!hadWhitespace) {
+      return false;
+    }
+  }
+  return false;
+}
+
 // Parses a keyframe value string into the typed representation T. Numeric, bool and color
 // specializations are strict: any malformed or out-of-range input is reported via ReportError and
 // falls back to a zero/default value, so a typo never silently produces a misleading animation.
@@ -1701,6 +1793,25 @@ Matrix ParseTypedValue<Matrix>(const std::string& value, PAGXDocument*, const DO
   return MatrixFromString(value);
 }
 
+template <>
+Matrix3D ParseTypedValue<Matrix3D>(const std::string& value, PAGXDocument* doc,
+                                   const DOMNode* node) {
+  std::vector<float> values = {};
+  if (!ParseFiniteFloatList(value, &values) || values.size() != 16) {
+    ReportError(doc, node, "Invalid matrix3D keyframe value (expected 16 finite numbers).");
+    return {};
+  }
+  Matrix3D result = {};
+  for (size_t i = 0; i < 16; ++i) {
+    result.values[i] = values[i];
+  }
+  if (!IsInvertibleMatrix3D(result)) {
+    ReportError(doc, node, "matrix3D keyframe value must be invertible.");
+    return {};
+  }
+  return result;
+}
+
 template <typename T>
 static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
                            PAGXDocument* doc) {
@@ -1761,8 +1872,9 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     // run most-specific to least-specific so a value that is valid for several types resolves to
     // the narrowest interpretation: color (#RGB / named) is checked before bool/int because some
     // color tokens could otherwise be misread; bool ("true"/"false") before image; image ("@id")
-    // before the numeric probes; integer before float (every integer also parses as a float); and
-    // string is the final catch-all that always succeeds.
+    // before the numeric probes; a list of exactly 16 finite numbers as matrix3D before the scalar
+    // probes; integer before float (every integer also parses as a float); and string is the final
+    // catch-all that always succeeds.
     bool colorValid = false;
     if (!firstValue.empty()) {
       ParseColor(firstValue, &colorValid);
@@ -1773,12 +1885,17 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
       type = "bool";
     } else if (!firstValue.empty() && firstValue[0] == '@') {
       type = "image";
-    } else if (LooksLikeInteger(firstValue)) {
-      type = "int";
-    } else if (LooksLikeFloat(firstValue)) {
-      type = "float";
     } else {
-      type = "string";
+      std::vector<float> matrix3DValues = {};
+      if (ParseFiniteFloatList(firstValue, &matrix3DValues) && matrix3DValues.size() == 16) {
+        type = "matrix3D";
+      } else if (LooksLikeInteger(firstValue)) {
+        type = "int";
+      } else if (LooksLikeFloat(firstValue)) {
+        type = "float";
+      } else {
+        type = "string";
+      }
     }
   }
 
@@ -1809,6 +1926,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "matrix") {
     auto ch = makeNodeFromXML<TypedChannel<Matrix>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "matrix3D") {
+    auto ch = makeNodeFromXML<TypedChannel<Matrix3D>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {

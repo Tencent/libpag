@@ -31,3 +31,9 @@ export const VIDEO_PLAYBACK_RATE_MIN = 0.125;
 export const VIDEO_PLAYBACK_RATE_MAX = 4;
 
 export const CANVAS_POOL_MAX_SIZE = 10;
+
+/**
+ * GPUTextureUsage.COPY_SRC bit, as defined by the WebGPU spec. Declared locally because
+ * lib.dom of TypeScript ~5.0 does not ship WebGPU declarations.
+ */
+export const GPU_TEXTURE_USAGE_COPY_SRC = 0x01;

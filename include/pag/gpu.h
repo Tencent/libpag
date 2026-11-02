@@ -59,6 +59,7 @@ enum class Backend {
   OPENGL,
   METAL,
   VULKAN,
+  WEBGPU,
 };
 
 /**
@@ -136,6 +137,27 @@ struct VkImageInfo {
   void* image = nullptr;
 };
 
+/**
+ * Types for interacting with WebGPU textures created externally to PAG. The WGPUTexture is held
+ * as an opaque void* handle. The texture must be created from the same GPUDevice that drives PAG
+ * rendering (the device passed to PAGInit as preinitializedWebGPUDevice) — WGPUTexture carries
+ * no device back-reference, so a mismatched device cannot be detected at runtime and leads to
+ * undefined behavior.
+ */
+struct WebGPUTextureInfo {
+  /**
+   * Pointer to a WGPUTexture. On Web this is the numeric handle registered in Emscripten's
+   * WebGPU runtime (Module.WebGPU.mgrTexture).
+   */
+  void* texture = nullptr;
+
+  /**
+   * The pixel format of this texture, as a WGPUTextureFormat value (e.g. the value of
+   * WGPUTextureFormat_BGRA8Unorm). Must be explicitly set; 0 means unspecified and is rejected.
+   */
+  uint32_t format = 0;
+};
+
 class PAG_API BackendTexture {
  public:
   /**
@@ -158,6 +180,11 @@ class PAG_API BackendTexture {
    * Creates a Vulkan backend texture.
    */
   BackendTexture(const VkImageInfo& vkInfo, int width, int height);
+
+  /**
+   * Creates a WebGPU backend texture.
+   */
+  BackendTexture(const WebGPUTextureInfo& webGPUInfo, int width, int height);
 
   BackendTexture(const BackendTexture& that);
 
@@ -209,6 +236,13 @@ class PAG_API BackendTexture {
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the
+   * passed in pointer and returns true. Otherwise, returns false if the backend API is not
+   * WebGPU.
+   */
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -218,6 +252,7 @@ class PAG_API BackendTexture {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    WebGPUTextureInfo webGPUInfo;
   };
 };
 

@@ -145,7 +145,9 @@ export class VideoReader {
   }
 
   public onDestroy() {
-    this.isDestroyed = true;
+    // The destroyVerify decorator blocks all prototype method calls once isDestroyed is true,
+    // so the flag must be set after cleanup is done, otherwise clearFrameDataLoop()
+    // below is intercepted and the setInterval timer leaks.
     if (this.getFrameDataResolve) {
       this.getFrameDataResolve({ id: -1, data: new ArrayBuffer(0), width: 0, height: 0 });
       this.getFrameDataResolve = null;
@@ -159,6 +161,7 @@ export class VideoReader {
     if (this.mp4Path) {
       removeFile(this.mp4Path);
     }
+    this.isDestroyed = true;
   }
 
   private getFrameData() {

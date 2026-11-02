@@ -42,6 +42,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MergePathMode.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -50,6 +51,19 @@
 namespace pagx {
 
 using pag::FloatNearlyZero;
+
+static Point LayerPositionForCSS(const Layer* layer) {
+  // Mirror the finite checks LayerTransformCSS applies, so a non-finite matrix is treated as absent
+  // on both sides and the authored position still reaches left / top.
+  bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
+  bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
+  if (!hasMatrix3D && !hasMatrix && !HasLayerTransformComponents(layer)) {
+    return layer->renderPosition();
+  }
+  auto layoutPosition = layer->layoutPosition();
+  return {std::isnan(layoutPosition.x) ? 0 : layoutPosition.x,
+          std::isnan(layoutPosition.y) ? 0 : layoutPosition.y};
+}
 
 // Sentinel large value used to seed min/max accumulators when computing axis-aligned bounds.
 // Any realistic layer coordinate is many orders of magnitude smaller, so the first observation
@@ -1490,12 +1504,13 @@ static ContourMaskBox ContourMaskBorderRadius(const Layer* layer) {
   if (mask == nullptr || !mask->children.empty() || mask->composition != nullptr) {
     return {};
   }
-  // writeClipContent folds the mask layer's own transform into the clip geometry, so only an
-  // untransformed mask leaves the shape bounds directly comparable to the layer's border box.
-  Matrix maskMatrix = mask->matrix;
-  if (mask->x != 0 || mask->y != 0) {
-    maskMatrix = Matrix::Translate(mask->x, mask->y) * maskMatrix;
+  // writeClipContent folds the mask layer's local transform and generated layout slot into the
+  // clip geometry, so only an identity 2D mask transform leaves the shape bounds comparable to
+  // this box. A 2D border-radius cannot represent a full 3D transform.
+  if (HasLayer3DTransform(mask)) {
+    return {};
   }
+  Matrix maskMatrix = BuildLayerMatrix(mask);
   if (!maskMatrix.isIdentity()) {
     return {};
   }
@@ -2047,7 +2062,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
-    auto renderPos = layer->renderPosition();
+    auto renderPos = LayerPositionForCSS(layer);
     // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
     // the inverse shift added to their own left/top so they still paint at the correct document
     // position. Consume and clear the offset so it is not applied to grandchild layers.

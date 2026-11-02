@@ -36,6 +36,26 @@
 #endif
 
 namespace pag {
+/**
+ * Unregisters a test font when the scope exits, including early returns from fatal assertions.
+ * Use only with font aliases that are not already registered by another owner.
+ */
+class ScopedFontRegistration {
+ public:
+  explicit ScopedFontRegistration(const PAGFont& font) : font(font) {
+  }
+
+  ~ScopedFontRegistration() {
+    PAGFont::UnregisterFont(font);
+  }
+
+  ScopedFontRegistration(const ScopedFontRegistration&) = delete;
+  ScopedFontRegistration& operator=(const ScopedFontRegistration&) = delete;
+
+ private:
+  PAGFont font;
+};
+
 std::string ToString(Frame frame);
 
 #ifdef TGFX_USE_OPENGL

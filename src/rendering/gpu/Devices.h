@@ -74,9 +74,11 @@ class Devices {
    * the CLI, and internal helpers.
    *   OpenGL: GLDevice::MakeWithFallback()
    *   Metal:  MetalDevice::Make()
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails during CMake
-   *           configuration.
-   */
+*   WebGPU: WebGPUDevice::Make() — reads the GPUDevice preinitialized on the JS side; only
+*           callable on the main runtime thread.
+*   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
+*           configuration.
+*/
   static std::shared_ptr<tgfx::Device> MakeDefault();
 
   /**
@@ -172,8 +174,13 @@ class Devices {
    *                texture's creating context is current. The texture parameter is unused on this
    *                backend but kept for signature parity.
    *   Metal:       Reads MTLTexture.device and wraps it via MetalDevice::MakeFrom().
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails during CMake
-   *                configuration.
+   *   WebGPU:      Returns MakeDefault(); WGPUTexture carries no device back-reference, but Web
+   *                runs on a single shared GPUDevice, so the default device is always the one
+   *                that created the caller's texture.
+   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
+   *                configuration. Their texture types do not carry a device
+   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
+   *                first of them lands.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -182,7 +189,8 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; CMake rejects selection of the remaining, unimplemented backends.
+   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; CMake
+   * rejects selection of the remaining, unimplemented backends.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);

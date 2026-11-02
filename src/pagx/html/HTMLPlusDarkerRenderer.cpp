@@ -26,6 +26,7 @@
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
@@ -70,7 +71,7 @@ bool CanHandle(const Layer* layer) {
   if (layer->hasScrollRect) {
     return false;
   }
-  if (!layer->matrix3D.isIdentity()) {
+  if (HasLayer3DTransform(layer)) {
     return false;
   }
   // Only pure translation is supported; rotation/scale/skew would require transforming the filter
@@ -83,9 +84,9 @@ bool CanHandle(const Layer* layer) {
   return true;
 }
 
-// Walks from `target` up its parent chain (using parentMap), accumulating layoutBounds offsets and
-// pure-translation matrix components to produce the target's top-left in screen-space CSS pixels.
-// Returns false when any ancestor carries a non-translation matrix (caller should fall back).
+// Walks from `target` up its parent chain (using parentMap), accumulating each Layer's resolved
+// local transform and generated layout slot to produce screen-space CSS pixels. Returns false when
+// any ancestor carries a non-translation matrix (caller should fall back).
 bool ComputeScreenBounds(const Layer* target,
                          const std::unordered_map<const Layer*, const Layer*>& parentMap,
                          Rect* outBounds) {
@@ -93,32 +94,23 @@ bool ComputeScreenBounds(const Layer* target,
   if (local.width <= 0 || local.height <= 0) {
     return false;
   }
-  float x = local.x;
-  float y = local.y;
-  // Layer's own matrix contributes pure translation (rotation/scale was already rejected by
-  // CanHandle); add it to the screen offset.
-  if (!target->matrix.isIdentity()) {
-    x += target->matrix.tx;
-    y += target->matrix.ty;
-  }
+  auto targetMatrix = BuildLayerMatrix(target);
+  float x = targetMatrix.tx;
+  float y = targetMatrix.ty;
   auto it = parentMap.find(target);
   const Layer* cur = it != parentMap.end() ? it->second : nullptr;
   while (cur != nullptr) {
-    Rect pb = cur->layoutBounds();
-    x += pb.x;
-    y += pb.y;
     const auto& m = cur->matrix;
-    if (!m.isIdentity()) {
-      if (!FloatNearlyZero(m.a - 1.0f) || !FloatNearlyZero(m.d - 1.0f) || !FloatNearlyZero(m.b) ||
-          !FloatNearlyZero(m.c)) {
-        return false;
-      }
-      x += m.tx;
-      y += m.ty;
-    }
-    if (!cur->matrix3D.isIdentity()) {
+    if (!m.isIdentity() && (!FloatNearlyZero(m.a - 1.0f) || !FloatNearlyZero(m.d - 1.0f) ||
+                            !FloatNearlyZero(m.b) || !FloatNearlyZero(m.c))) {
       return false;
     }
+    if (HasLayer3DTransform(cur)) {
+      return false;
+    }
+    auto parentMatrix = BuildLayerMatrix(cur);
+    x += parentMatrix.tx;
+    y += parentMatrix.ty;
     auto pit = parentMap.find(cur);
     cur = pit != parentMap.end() ? pit->second : nullptr;
   }

@@ -29,7 +29,7 @@ namespace pag {
 /**
  * 用例描述: 测试图层对时间的输入输出是否一致
  */
-PAG_TEST(PAGTimeUtilsTest, ConvertProgressAndFrame) {
+PAG_PIXEL_TEST(PAGTimeUtilsTest, ConvertProgressAndFrame) {
   auto pagSurface = OffscreenSurface::Make(320, 180);
   ASSERT_TRUE(pagSurface != nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();

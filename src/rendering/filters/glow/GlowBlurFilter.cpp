@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlowBlurFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 
 namespace pag {
 static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
@@ -78,10 +79,15 @@ std::vector<tgfx::BindingEntry> GlowBlurRuntimeFilter::uniformBlocks() const {
 void GlowBlurRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                              const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                              const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float textureOffsetH = 0.0f;
     float textureOffsetV = 0.0f;
   };
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(),
+                "VertexUniforms must match the std140 layout.");
+  static_assert(offsetof(Uniforms, textureOffsetH) == 0 && offsetof(Uniforms, textureOffsetV) == 4,
+                "VertexUniforms member offsets must match the shader declaration.");
+
   Uniforms uniforms = {};
   uniforms.textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
   uniforms.textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;

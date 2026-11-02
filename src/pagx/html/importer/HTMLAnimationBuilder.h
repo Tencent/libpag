@@ -18,8 +18,11 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include "pagx/nodes/Animation.h"
 
 namespace pagx {
 
@@ -70,29 +73,46 @@ class HTMLAnimationBuilder {
    * (keyed by the shape's DOM `id`, passed here as `shapeTargetId`) whose `Fill` / `Stroke` painters
    * get the derived ids `<id>__fill` / `<id>__stroke`. Painter-space properties (`fill`,
    * `fill-opacity`, `stroke`, `stroke-opacity`, `stroke-dashoffset`) target those painter ids;
-   * layer-space properties (`opacity` -> `alpha`, a pure-translate `transform` -> `x` / `y`, and
-   * scale / skew transforms -> `matrix`) target the shape's `Layer` directly. A pure fixed-origin
-   * rotation targets `rotationTargetId`, a Group synthesised by the SVG resolver, through its
-   * scalar `rotation` channel so matrix interpolation cannot move the pivot. The shape layer sits
-   * at layout origin in SVG user (view-box) space, so translate keyframes — captured in that same
-   * space via `transform-box: view-box` — map onto `x` / `y` verbatim; remaining affine transforms
-   * are pivoted around the captured `transform-origin`. Honours the full comma-separated
-   * `animation` list (each entry becomes its own `Animation`). `dashScale` (real path length /
-   * author `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the
-   * static dash scaling the SVG importer applies. Returns true when at least one channel was
-   * emitted.
+   * layer-space properties (`opacity` -> `alpha`, pure translations -> `x` / `y` when the static
+   * transform is identity, otherwise `matrix`) target the shape's `Layer` directly. A pure
+   * fixed-origin rotation without a static transform targets `rotationTargetId`, a Group
+   * synthesised by the SVG resolver, through its scalar `rotation` channel so matrix interpolation
+   * cannot move the pivot. Captured transform matrices map in SVG user (view-box) space; other
+   * animated transforms apply the captured `transform-origin`, while fill-mode restores the raw
+   * static SVG transform. Honours the full comma-separated `animation` list (each entry becomes
+   * its own `Animation`). `dashScale` (real path length / author `pathLength`) rescales
+   * `stroke-dashoffset` keyframes into user units, mirroring the static dash scaling the SVG
+   * importer applies. Returns true when at least one channel was emitted.
    */
   bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
                               const std::string& shapeTargetId, const std::string& rotationTargetId,
                               const std::string& fillTargetId, const std::string& strokeTargetId,
                               float dashScale);
 
+  /** Collects provisional group origins before building channels, including SVG animation lists. */
+  void prepareTiming(const std::unordered_map<std::string, std::string>& style, bool inlineSvg);
+
+  /** Removes any excess shift caused by candidates that emitted no playable objects. */
+  void finalizeTiming();
+
+  /** Returns the original grouping length, before the timeline is shifted to remove negative times. */
+  Frame coalescingLength(const Animation* animation) const;
+
  private:
+  Frame resolveDelayFrames(float delaySeconds, Frame durationFrames, LoopMode loopMode,
+                           bool needsTrailingBaseline);
+  void setAnimationTiming(Animation* animation, LoopMode loopMode, Frame durationFrames,
+                          Frame delayFrames, bool needsTrailingBaseline, Frame originalDelayFrames);
+  void addAnimation(Animation* animation, Frame originalDelayFrames);
+
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
   const std::unordered_map<std::string, html::CssKeyframesRule>* _keyframes = nullptr;
+  std::unordered_map<const Animation*, Frame> _coalescingLengths;
+  std::unordered_map<const Animation*, Frame> _originalDelays;
+  std::map<std::pair<LoopMode, Frame>, Frame> _groupStarts;
 };
 
 }  // namespace pagx

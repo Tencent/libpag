@@ -24,7 +24,7 @@ namespace pag {
 /**
  * 用例描述: PAGSolidLayerTest基础功能
  */
-PAG_TEST(PAGSolidLayerTest, SolidColor) {
+PAG_PIXEL_TEST(PAGSolidLayerTest, SolidColor) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int targetIndex = 0;
   TestPAGFile->setCurrentTime(1.5 * 1000000);

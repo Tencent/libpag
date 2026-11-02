@@ -1,5 +1,5 @@
 import { DEFAULT_CANVAS_SIZE, WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
-import { BackendContext } from './backend-context';
+import { BackendContext, isWebGPUBackend } from './backend-context';
 
 export class GlobalCanvas {
   private _canvas: HTMLCanvasElement | OffscreenCanvas | null = null;
@@ -18,9 +18,13 @@ export class GlobalCanvas {
       this._canvas.width = this.width;
       this._canvas.height = this.height;
 
-      const gl = this._canvas.getContext('webgl2', WEBGL_CONTEXT_ATTRIBUTES) as WebGL2RenderingContext;
-      if (!gl) throw new Error('Canvas context is not WebGL2!');
-      this._glContext = BackendContext.from(gl);
+      if (!isWebGPUBackend()) {
+        // On the WebGPU backend the canvas is configured by the C++ WebGPUWindow when a
+        // PAGSurface wraps it, so no context is created here.
+        const gl = this._canvas.getContext('webgl2', WEBGL_CONTEXT_ATTRIBUTES) as WebGL2RenderingContext;
+        if (!gl) throw new Error('Canvas context is not WebGL2!');
+        this._glContext = BackendContext.from(gl);
+      }
     }
     this.retainCount += 1;
   }
@@ -28,9 +32,10 @@ export class GlobalCanvas {
   public release() {
     this.retainCount -= 1;
     if (this.retainCount === 0) {
-      if (!this._glContext) return;
-      this._glContext.destroy();
-      this._glContext = null;
+      if (this._glContext) {
+        this._glContext.destroy();
+        this._glContext = null;
+      }
       this._canvas = null;
     }
   }
@@ -46,7 +51,7 @@ export class GlobalCanvas {
   public setCanvasSize(width = DEFAULT_CANVAS_SIZE, height = DEFAULT_CANVAS_SIZE) {
     this.width = width;
     this.height = height;
-    if (this._glContext && this._canvas) {
+    if (this._canvas) {
       this._canvas.width = width;
       this._canvas.height = height;
     }

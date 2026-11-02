@@ -42,8 +42,9 @@ static std::vector<size_t> CharStartOffsets(const std::string& text) {
  * 字符一一对应：名字非空、对齐到字符边界、且全部名字的字节数恰好等于原文（不重叠不遗漏）。
  */
 PAG_TEST(TextShaperTest, glyphNamesCoverRtlText) {
-  PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
-                        "TextShaperTest", "Regular");
+  ScopedFontRegistration registration(
+      PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                            "TextShaperTest", "Regular"));
   auto typeface = FontManager::GetTypefaceWithoutFallback("TextShaperTest", "Regular");
   ASSERT_NE(typeface, nullptr);
   tgfx::Font font(typeface, 24);

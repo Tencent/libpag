@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "base/utils/Log.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
@@ -379,10 +380,10 @@ class XMLBuilder {
     }
   }
 
+  // Shares FloatToString so scalar attributes get full float precision, fixed-notation output
+  // that always matches the schema's decimal type, and "0" for non-finite values.
   static std::string formatFloat(float value) {
-    char buf[32] = {};
-    snprintf(buf, sizeof(buf), "%g", value);
-    return buf;
+    return FloatToString(value);
   }
 };
 
