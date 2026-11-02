@@ -251,7 +251,12 @@ static void ArcToCubics(PathData& path, float x1, float y1, float rx, float ry, 
 }
 
 PathData PathDataFromSVGString(const std::string& d) {
+  return PathDataFromSVGString(d, nullptr);
+}
+
+PathData PathDataFromSVGString(const std::string& d, std::vector<size_t>* commandEnds) {
   PathData path;
+  if (commandEnds != nullptr) commandEnds->clear();
   if (d.empty()) {
     return path;
   }
@@ -274,6 +279,7 @@ PathData PathDataFromSVGString(const std::string& d) {
     }
 
     const char* prevPtr = ptr;
+    auto previousVerbCount = path.verbs().size();
 
     char command = *ptr;
     if (std::isalpha(command)) {
@@ -464,6 +470,9 @@ PathData PathDataFromSVGString(const std::string& d) {
       default:
         ++ptr;
         break;
+    }
+    if (commandEnds != nullptr && path.verbs().size() > previousVerbCount) {
+      commandEnds->push_back(path.verbs().size());
     }
     if (ptr == prevPtr) {
       // ParseNumber or ParseFlag failed — skip to the next command letter or end of string.

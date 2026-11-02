@@ -1251,8 +1251,34 @@ CLI_TEST(PAGXCliTest, Verify_UnknownAttribute) {
   EXPECT_TRUE(output.find("attribute 'rotation' is not allowed") != std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {
+CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutWithoutFlexLayout) {
   auto inputPath = TestResourcePath("verify_include_in_layout_no_parent.pagx");
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+  auto* parent = doc->findNode<pagx::Layer>("noLayout");
+  ASSERT_NE(parent, nullptr);
+  EXPECT_FLOAT_EQ(parent->layoutBounds().width, 0);
+  EXPECT_FLOAT_EQ(parent->layoutBounds().height, 0);
+  for (const auto* id : {"", "excluded"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", inputPath};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+  }
+}
+
+CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutAtRoot) {
+  auto inputPath = TempDir() + "/verify_root_include_in_layout.pagx";
+  std::ofstream(inputPath) << R"(<pagx width="100" height="100">
+    <Layer includeInLayout="false">
+      <Rectangle size="50,50"/><Fill color="#FF0000"/>
+    </Layer>
+  </pagx>)";
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());
@@ -1261,6 +1287,31 @@ CLI_TEST(PAGXCliTest, Verify_IncludeInLayoutNoParent) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_TRUE(output.find("includeInLayout=\"false\" has no effect") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_SiblingMaskIsExcludedFromIneffectiveLayoutWarning) {
+  auto path = TempDir() + "/verify_sibling_mask.pagx";
+  std::ofstream(path) << R"(<pagx width="100" height="100">
+    <Layer id="wrapper">
+      <Layer id="mask" visible="false" includeInLayout="false">
+        <Ellipse position="30,30" size="40,40"/><Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer id="owner" mask="@mask" maskType="alpha">
+        <Rectangle position="50,50" size="100,100"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  for (const auto* id : {"", "mask", "wrapper"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+    EXPECT_EQ(output.str().find("includeInLayout=\"false\" has no effect"), std::string::npos);
+  }
 }
 
 CLI_TEST(PAGXCliTest, Verify_FlexNoParentLayout) {
@@ -1537,9 +1588,39 @@ CLI_TEST(PAGXCliTest, Import_SvgOptions) {
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
-CLI_TEST(PAGXCliTest, Import_UnexpectedArgument) {
+CLI_TEST(PAGXCliTest, Import_MissingPositionalFile) {
   auto ret = CallRun(pagx::cli::RunImport, {"import", "somefile.svg"});
   EXPECT_NE(ret, 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_PositionalAndDirectoryOutput) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "positional.svg");
+  auto dir = TempDir() + "/import-directory";
+  EXPECT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "--output-dir", dir, "--output-name", "renamed"}),
+            0);
+  EXPECT_TRUE(std::filesystem::is_regular_file(dir + "/renamed.pagx"));
+  EXPECT_NE(CallRun(pagx::cli::RunImport, {"import", svgPath, "--input", svgPath}), 0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "-o", dir + "/a.pagx", "--output-dir", dir}),
+            0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", svgPath, "--output-dir", dir, "--output-name", "../outside"}),
+            0);
+  EXPECT_NE(CallRun(pagx::cli::RunImport, {"import", svgPath, "--html-no-snapshot"}), 0);
+}
+
+CLI_TEST(PAGXCliTest, Import_SubsetResolvesNestedSvg) {
+  auto input = TempDir() + "/subset.html";
+  std::ofstream(input) << "<html><body style=\"width:20px;height:20px\"><svg width=\"20\" "
+                          "height=\"20\"><rect width=\"20\" height=\"20\" fill=\"red\"/>"
+                          "</svg></body></html>";
+  auto output = TempDir() + "/subset.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", input, "--html-no-snapshot", "-o", output}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("<Rectangle"), std::string::npos);
+  EXPECT_EQ(xml.find("import="), std::string::npos);
 }
 
 //==============================================================================
@@ -1611,15 +1692,7 @@ CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
     out << "<html><body style=\"width:20px;height:20px\"><div "
            "style=\"width:20px;height:20px;background:#0F0\"></div></body></html>";
   }
-  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
-  std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "0", 1);
-  auto result = pagx::cli::ImportFile(htmPath, "", {});
-  if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
+  auto result = pagx::cli::ImportFile(htmPath, "", {}, NAN, NAN, pagx::cli::HTMLSource::Subset);
   EXPECT_TRUE(result.error.empty());
   ASSERT_NE(result.document, nullptr);
 }
@@ -1632,18 +1705,10 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
     std::ofstream out(htmlPath);
     out << "<html><body style=\"width:20px;height:20px\"></body></html>";
   }
-  const char* previousEnabled = std::getenv("PAGX_HTML_SNAPSHOT");
   const char* previousBin = std::getenv("PAGX_HTML_SNAPSHOT_BIN");
-  std::string savedEnabled = previousEnabled ? previousEnabled : "";
   std::string savedBin = previousBin ? previousBin : "";
-  setenv("PAGX_HTML_SNAPSHOT", "1", 1);
   setenv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js", 1);
   auto result = pagx::cli::ImportFile(htmlPath, "", {});
-  if (previousEnabled) {
-    setenv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
   if (previousBin) {
     setenv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str(), 1);
   } else {
@@ -1656,15 +1721,8 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
 // A URL input while the snapshot pre-pass is disabled is rejected: the importers cannot fetch
 // http(s) themselves.
 CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
-  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
-  std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "off", 1);
-  auto result = pagx::cli::ImportFile("https://example.com/demo", "", {});
-  if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
-  } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
-  }
+  auto result = pagx::cli::ImportFile("https://example.com/demo", "", {}, NAN, NAN,
+                                      pagx::cli::HTMLSource::Subset);
   EXPECT_FALSE(result.error.empty());
   EXPECT_EQ(result.document, nullptr);
 }
@@ -1714,6 +1772,45 @@ CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
                      {"import", "--input", svgPath, "--output", outputPath, "--images", "embed"});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementUsesExactFace) {
+  auto input = TempDir() + "/font-replacement.html";
+  auto output = TempDir() + "/font-replacement.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style='font-family:Source;font-size:20px;font-weight:600'>A</span>"
+                          "</body></html>";
+  ASSERT_EQ(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--html-no-snapshot",
+                     "--font-replacement", "Source", "600", "normal", "Target", "Bold"}),
+            0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
+  EXPECT_EQ(xml.find("font-request"), std::string::npos);
+  EXPECT_NE(CallRun(pagx::cli::RunImport,
+                    {"import", "--input", input, "--output", output, "--html-no-snapshot",
+                     "--font-replacement", "Source", "NaN", "normal", "Target", "Bold"}),
+            0);
+}
+
+// A CSS font stack can start with a hyphenated family (-apple-system), which the positional value
+// rule reads as an option; binding it with '=' keeps the stack verbatim.
+CLI_TEST(PAGXCliTest, Import_HTMLFontReplacementAcceptsHyphenatedStack) {
+  auto input = TempDir() + "/font-replacement-stack.html";
+  auto output = TempDir() + "/font-replacement-stack.pagx";
+  std::ofstream(input) << "<html><body style='width:100px;height:50px'>"
+                          "<span style=\"font-family:-apple-system, LongCang;font-size:20px;"
+                          "font-weight:600\">A</span>"
+                          "</body></html>";
+  ASSERT_EQ(
+      CallRun(pagx::cli::RunImport,
+              {"import", "--input", input, "--output", output, "--html-no-snapshot",
+               "--font-replacement=-apple-system, LongCang", "600", "normal", "Target", "Bold"}),
+      0);
+  auto xml = ReadFile(output);
+  EXPECT_NE(xml.find("fontFamily=\"Target\""), std::string::npos);
+  EXPECT_NE(xml.find("fontStyle=\"Bold\""), std::string::npos);
 }
 
 // An invalid --images value is rejected during option parsing.
@@ -2615,6 +2712,122 @@ CLI_TEST(PAGXCliTest, Layout_ChildExceedsClippedParent) {
   EXPECT_TRUE(output.find("child extends beyond parent bounds") == std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Layout_OffsetChildInContentMeasuredParent) {
+  auto path = TempDir() + "/verify_content_measured_offset.pagx";
+  std::ofstream(path) << R"(<pagx width="200" height="200">
+    <Layer id="wrapper">
+      <Layer id="offset" x="100" y="100" width="50" height="50">
+        <Rectangle size="50,50"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  VerifyFile(path, "content-measured wrapper with an authored child offset");
+}
+
+CLI_TEST(PAGXCliTest, Layout_ChildBoundsCheckAssignedAxes) {
+  struct Case {
+    const char* parentAttrs;
+    const char* wrapperAttrs;
+    const char* childAttrs;
+    bool exceeds;
+  };
+  const Case cases[] = {
+      {"width=\"1000\" height=\"1000\"", "width=\"100\"", "y=\"150\"", false},
+      {"width=\"1000\" height=\"1000\"", "height=\"100\"", "x=\"150\"", false},
+      {"width=\"1000\" height=\"1000\"", "width=\"100\"", "x=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"horizontal\"", "", "y=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"vertical\"", "", "x=\"150\"", true},
+      {"width=\"100\" height=\"100\" layout=\"horizontal\"", "flex=\"1\"", "x=\"150\"", true},
+      {"width=\"1000\" height=\"1000\"", "width=\"50%\"", "x=\"600\"", true},
+      {"width=\"1000\" height=\"1000\"", "left=\"10\" right=\"10\"", "x=\"990\"", true},
+  };
+  auto path = TempDir() + "/verify_assigned_axis_bounds.pagx";
+  for (const auto& testCase : cases) {
+    SCOPED_TRACE(testCase.parentAttrs);
+    SCOPED_TRACE(testCase.wrapperAttrs);
+    SCOPED_TRACE(testCase.childAttrs);
+    std::ofstream(path) << "<pagx width=\"2000\" height=\"2000\"><Layer id=\"outer\" "
+                        << testCase.parentAttrs << "><Layer id=\"wrapper\" "
+                        << testCase.wrapperAttrs
+                        << "><Layer id=\"child\" width=\"50\" height=\"50\" " << testCase.childAttrs
+                        << "><Rectangle size=\"50,50\"/><Fill color=\"#FF0000\"/>"
+                           "</Layer></Layer></Layer></pagx>";
+    for (const auto* id : {"", "wrapper"}) {
+      SCOPED_TRACE(id);
+      std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+      if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+      std::ostringstream output;
+      auto* previous = std::cerr.rdbuf(output.rdbuf());
+      auto status = CallRun(pagx::cli::RunVerify, args);
+      std::cerr.rdbuf(previous);
+      EXPECT_EQ(status, testCase.exceeds ? 1 : 0) << output.str();
+      EXPECT_EQ(output.str().find("child extends beyond parent bounds") != std::string::npos,
+                testCase.exceeds)
+          << output.str();
+    }
+  }
+}
+
+CLI_TEST(PAGXCliTest, Layout_MaskBoundsAreIndependentOfParent) {
+  auto path = TempDir() + "/verify_mask_bounds.pagx";
+  // A mask's visibility flag is ignored while it is referenced. Its region and descendants
+  // need not fit inside the wrapper, and a retained hidden mask is not visible overflow either.
+  std::ofstream(path) << R"(<pagx width="100" height="100">
+    <Layer id="wrapper" width="50" height="50">
+      <Layer id="mask" includeInLayout="false" width="200" height="200">
+        <Layer id="maskContent" x="150" width="100" height="100">
+          <Ellipse size="100,100"/><Fill color="#FFFFFF"/>
+        </Layer>
+      </Layer>
+      <Layer id="retainedMask" visible="false" includeInLayout="false" width="200" height="200">
+        <Ellipse size="200,200"/><Fill color="#FFFFFF"/>
+      </Layer>
+      <Layer id="owner" mask="@mask" maskType="luminance" width="50" height="50">
+        <Rectangle size="50,50"/><Fill color="#FF0000"/>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  for (const auto* id : {"", "mask", "maskContent", "wrapper"}) {
+    SCOPED_TRACE(id);
+    std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+    if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+    std::ostringstream output;
+    auto* previous = std::cerr.rdbuf(output.rdbuf());
+    auto status = CallRun(pagx::cli::RunVerify, args);
+    std::cerr.rdbuf(previous);
+    EXPECT_EQ(status, 0) << output.str();
+  }
+}
+
+CLI_TEST(PAGXCliTest, Layout_MaskAndHiddenConstraintsRemainChecked) {
+  auto path = TempDir() + "/verify_hidden_constraints.pagx";
+  for (bool isMask : {false, true}) {
+    SCOPED_TRACE(isMask);
+    std::ofstream(path) << R"(<pagx width="100" height="100">
+      <Layer id="wrapper" width="100" height="100">
+        <Layer id="hidden" visible="false" includeInLayout="false" width="100" height="100">
+          <Rectangle left="80" right="80" height="10"/><Fill color="#FFFFFF"/>
+        </Layer>
+        <Layer id="owner" width="100" height="100" )"
+                        << (isMask ? "mask=\"@hidden\"" : "") << R"(>
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </pagx>)";
+    for (const auto* id : {"", "hidden"}) {
+      SCOPED_TRACE(id);
+      std::vector<std::string> args = {"verify", "--skip-render", "--skip-layout", path};
+      if (std::string(id).size() > 0) args.insert(args.end(), {"--id", id});
+      std::ostringstream output;
+      auto* previous = std::cerr.rdbuf(output.rdbuf());
+      auto status = CallRun(pagx::cli::RunVerify, args);
+      std::cerr.rdbuf(previous);
+      EXPECT_EQ(status, 1);
+      EXPECT_NE(output.str().find("negative derived size"), std::string::npos) << output.str();
+    }
+  }
+}
+
 CLI_TEST(PAGXCliTest, Layout_InvisibleInClippedContainer) {
   auto path = TestResourcePath("verify_invisible.pagx");
   std::streambuf* old = std::cerr.rdbuf();
@@ -2979,6 +3192,27 @@ CLI_TEST(PAGXCliTest, Verify_CompositionIdNameDiff) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);
   EXPECT_NE(output.find("structurally identical Layers"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_CompositionPreservesDescendantIdentity) {
+  auto path = TempDir() + "/verify_composition_descendant_identity.pagx";
+  std::ofstream(path) << R"(<pagx width="200" height="100">
+    <Layer id="first" width="100" height="100">
+      <Layer id="firstChild" width="100" height="100">
+        <Layer id="firstLeaf" width="100" height="100">
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </Layer>
+    <Layer id="second" x="100" width="100" height="100">
+      <Layer id="secondChild" width="100" height="100">
+        <Layer id="secondLeaf" width="100" height="100">
+          <Rectangle size="100,100"/><Fill color="#FF0000"/>
+        </Layer>
+      </Layer>
+    </Layer>
+  </pagx>)";
+  VerifyFile(path, "composition candidates with independently addressable descendants");
 }
 
 // Layers with different layout mode should NOT be detected as identical.

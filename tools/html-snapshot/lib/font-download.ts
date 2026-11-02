@@ -58,6 +58,7 @@ export interface FontMeta {
 
 export interface SavedFont {
   url: string;
+  urls?: string[];
   path: string;
   family: string;
   style: string;
@@ -155,9 +156,49 @@ export function readFontMeta(sfnt: Buffer): FontMeta {
   } catch (_) {
     /* fall back to the signature sniff below */
   }
+  // Reading names must not depend on parsing outlines/GSUB. Valid subset and
+  // variable fonts can contain tables unsupported by opentype.js.
+  const names = readSfntNames(sfnt);
+  family = names.get(16) || names.get(1) || family;
+  style = names.get(17) || names.get(2) || style;
   const sig = sfnt.length >= 4 ? sfnt.slice(0, 4).toString('binary') : '';
   const ext: 'ttf' | 'otf' = isCFF || sig === 'OTTO' ? 'otf' : 'ttf';
   return { family: family || 'font', style: style || 'Regular', ext };
+}
+
+export function readSfntNames(sfnt: Buffer): Map<number, string> {
+  const result = new Map<number, string>();
+  if (sfnt.length < 12) return result;
+  const count = sfnt.readUInt16BE(4);
+  if (12 + count * 16 > sfnt.length) return result;
+  for (let i = 0; i < count; i++) {
+    const table = 12 + i * 16;
+    if (sfnt.toString('ascii', table, table + 4) !== 'name') continue;
+    const offset = sfnt.readUInt32BE(table + 8);
+    const length = sfnt.readUInt32BE(table + 12);
+    if (offset + length > sfnt.length || length < 6) return result;
+    const data = sfnt.subarray(offset, offset + length);
+    const records = data.readUInt16BE(2);
+    const strings = data.readUInt16BE(4);
+    if (6 + records * 12 > data.length) return result;
+    const scores = new Map<number, number>();
+    for (let j = 0; j < records; j++) {
+      const p = 6 + j * 12;
+      const platform = data.readUInt16BE(p);
+      const language = data.readUInt16BE(p + 4);
+      const id = data.readUInt16BE(p + 6);
+      if (![1, 2, 16, 17].includes(id) || ![0, 1, 3].includes(platform)) continue;
+      const size = data.readUInt16BE(p + 8), start = strings + data.readUInt16BE(p + 10);
+      if (start + size > data.length || (platform !== 1 && size % 2)) continue;
+      const score = (platform === 3 ? 20 : platform === 0 ? 10 : 0) +
+        (language === 0x409 || language === 0 ? 5 : 0);
+      if ((scores.get(id) ?? -1) >= score) continue;
+      const bytes = Buffer.from(data.subarray(start, start + size));
+      const value = platform === 1 ? bytes.toString('latin1') : bytes.swap16().toString('utf16le');
+      if (value) { result.set(id, value); scores.set(id, score); }
+    }
+  }
+  return result;
 }
 
 // Filesystem-safe slug. Collapses any run of disallowed characters to a
@@ -193,7 +234,7 @@ export function makeFontCaptureListener(
   cache: Map<string, Buffer>,
   log: CaptureLogger | null,
 ): CaptureResponseListener {
-  return makeCaptureListener<Buffer>({
+  const capture = makeCaptureListener<Buffer>({
     resourceType: 'font',
     engine,
     cache,
@@ -203,6 +244,62 @@ export function makeFontCaptureListener(
     timeoutMessage: 'timed out reading font body',
     skipEmptyBody: true,
   });
+  return async (resp) => {
+    const req = resp.request();
+    const url = req.url();
+    if (req.resourceType() === 'font' && url.startsWith('data:')) {
+      try {
+        cache.set(url, decodeDataFont(url));
+      } catch (err) {
+        if (log) log(`font capture skipped: ${errMessage(err)}`);
+      }
+      return;
+    }
+    await capture(resp);
+  };
+}
+
+export function decodeDataFont(url: string): Buffer {
+  const comma = url.indexOf(',');
+  if (!url.startsWith('data:') || comma < 0) throw new Error('invalid font data URL');
+  const header = url.slice(5, comma);
+  const payload = url.slice(comma + 1);
+  return /;base64(?:;|$)/i.test(header)
+    ? Buffer.from(decodeURIComponent(payload), 'base64')
+    : Buffer.from(payload.replace(/%([0-9a-f]{2})/gi,
+      (_, hex) => String.fromCharCode(parseInt(hex, 16))), 'latin1');
+}
+
+// Self-contained browser function. Walk nested rules and imports too; font-face
+// declarations inside supports/layer blocks are legal and commonly generated.
+export function collectWebFontFaces(): Record<string, string>[] {
+  const out: Record<string, string>[] = [];
+  const seen = new Set<CSSStyleSheet>();
+  const visit = (sheet: CSSStyleSheet) => {
+    if (seen.has(sheet)) return;
+    seen.add(sheet);
+    const walk = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        if (rule instanceof CSSFontFaceRule) {
+          const style = rule.style;
+          const entry: Record<string, string> = {};
+          for (const prop of ['font-family', 'font-style', 'font-weight', 'font-stretch',
+            'font-feature-settings', 'font-variation-settings', 'unicode-range', 'src']) {
+            entry[prop] = style.getPropertyValue(prop);
+          }
+          entry.base = sheet.href || document.baseURI;
+          out.push(entry);
+        } else if (rule instanceof CSSImportRule && rule.styleSheet) {
+          visit(rule.styleSheet);
+        } else if ('cssRules' in rule) {
+          walk((rule as CSSGroupingRule).cssRules);
+        }
+      }
+    };
+    try { walk(sheet.cssRules); } catch (_) { /* Network capture still collects opaque sheets. */ }
+  };
+  for (const sheet of [...Array.from(document.styleSheets), ...document.adoptedStyleSheets]) visit(sheet);
+  return out;
 }
 
 // Convert the captured `url -> Buffer` map into on-disk SFNT files under
@@ -224,9 +321,8 @@ export async function saveDownloadedFonts(
 
   await fsp.mkdir(outDir, { recursive: true });
 
-  // Decompress + hash in parallel: WOFF2 → SFNT decoding is non-trivial CPU
-  // work and the original loop did it one at a time. Each entry is wrapped
-  // in its own try so a single bad font doesn't poison the batch.
+  // Decode requests share the codec's serialized WASM queue; file writes below
+  // can still run concurrently. A bad font must not poison the batch.
   type Decoded = { url: string; sfnt: Buffer; hash: string; meta: ReturnType<typeof readFontMeta> };
   const decoded = await Promise.all(entries.map(async ([url, raw]): Promise<Decoded | null> => {
     try {
@@ -243,28 +339,30 @@ export async function saveDownloadedFonts(
 
   // Dedupe by content hash sequentially so the order in which fonts win the
   // unique slot is deterministic (mirrors the previous loop's behaviour).
-  type Pending = { url: string; sfnt: Buffer; filePath: string; meta: ReturnType<typeof readFontMeta> };
-  const seenHashes = new Set<string>();
+  type Pending = { url: string; urls: string[]; sfnt: Buffer; filePath: string; meta: ReturnType<typeof readFontMeta> };
+  const seenHashes = new Map<string, Pending>();
   const pending: Pending[] = [];
   for (const item of decoded) {
     if (!item) continue;
-    if (seenHashes.has(item.hash)) continue;
-    seenHashes.add(item.hash);
+    const existing = seenHashes.get(item.hash);
+    if (existing) { existing.urls.push(item.url); continue; }
     const fileName = contentFileName(item.meta, item.hash);
     const filePath = path.join(outDir, fileName);
-    pending.push({ url: item.url, sfnt: item.sfnt, filePath, meta: item.meta });
+    const entry = { url: item.url, urls: [item.url], sfnt: item.sfnt, filePath, meta: item.meta };
+    pending.push(entry);
+    seenHashes.set(item.hash, entry);
   }
 
   // Content-addressed name ⇒ an existing file with this name already holds
   // the same bytes, so skip the rewrite (and the duplicate download cost on
   // disk). Otherwise stage + atomically rename so parallel cases never
   // observe a partial file.
-  const results = await Promise.all(pending.map(async ({ url, sfnt, filePath, meta }) => {
+  const results = await Promise.all(pending.map(async ({ url, urls, sfnt, filePath, meta }) => {
     try {
       if (!fs.existsSync(filePath)) {
         await writeFileAtomic(filePath, sfnt);
       }
-      return { url, path: filePath, family: meta.family, style: meta.style } as SavedFont;
+      return { url, urls, path: filePath, family: meta.family, style: meta.style } as SavedFont;
     } catch (err) {
       log(`failed to save font ${url}: ${errMessage(err)}`);
       return null;

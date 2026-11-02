@@ -24,6 +24,8 @@
 namespace pagx {
 
 PathData PathDataFromSVGString(const std::string& d);
+// An authored arc can expand into several cubic verbs but contributes only one marker vertex.
+PathData PathDataFromSVGString(const std::string& d, std::vector<size_t>* commandEnds);
 
 std::string PathDataToSVGString(const PathData& path);
 

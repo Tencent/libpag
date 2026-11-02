@@ -128,6 +128,18 @@ describe('saveDownloadedImages', () => {
     expect(fs.readFileSync(first[0].path, 'utf8')).toBe('REPLACED');
   });
 
+  test('a malformed cache entry does not prevent other images from being saved', async () => {
+    const log = jest.fn();
+    const map = new Map([
+      ['https://x/broken', { get buffer() { throw new Error('unavailable bytes'); } }],
+      ['https://x/valid.png', PNG],
+    ]);
+    const saved = await saveDownloadedImages(map, outDir, log);
+    expect(saved.map(entry => entry.url)).toEqual(['https://x/valid.png']);
+    expect(fs.readFileSync(saved[0].path)).toEqual(PNG);
+    expect(log).toHaveBeenCalledWith('failed to save image https://x/broken: unavailable bytes');
+  });
+
   test('logs and drops images whose write fails', async () => {
     const logs = [];
     fs.mkdirSync(outDir, { recursive: true });

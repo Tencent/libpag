@@ -19,6 +19,9 @@
 // (declared in `optionalDependencies`), so the default install footprint and
 // the existing puppeteer-only workflow are unchanged.
 
+import * as fs from 'fs';
+import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
+
 export const SUPPORTED_ENGINES = ['puppeteer', 'playwright'] as const;
 export type EngineName = (typeof SUPPORTED_ENGINES)[number];
 export const DEFAULT_ENGINE: EngineName = 'puppeteer';
@@ -61,8 +64,22 @@ export function resolveEngine(name?: string | null): EngineName {
 }
 
 interface EngineLauncher {
+  executablePath(): string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   launch(opts: Record<string, any>): Promise<Browser>;
+}
+
+// Resolve the actual installed module and executable, including NODE_PATH caches
+// used by the npm bundle. Do not assume a repository node_modules/cache layout.
+export function checkBrowserRuntime(name?: string): void {
+  const engine = resolveEngine(name);
+  const launcher = loadEngine(engine);
+  const executable = (engine === 'playwright' ? process.env.PLAYWRIGHT_EXECUTABLE_PATH
+    : process.env.PUPPETEER_EXECUTABLE_PATH) || launcher.executablePath();
+  if (!executable || !fs.existsSync(executable)) {
+    throw new Error(`${engine} browser executable not found: ${executable || '(unset)'}. `
+      + `Install the browser with ${engine === 'playwright' ? 'playwright install chromium' : 'puppeteer browsers install chrome'}.`);
+  }
 }
 
 // Lazy-require the engine package and return its launcher. We unify the two
@@ -110,6 +127,7 @@ export interface LaunchOptions {
 // directly so callers don't have to remember to thread the engine name
 // alongside the browser handle.
 export async function launchBrowser(opts?: LaunchOptions): Promise<EngineWrapper> {
+  throwIfCancelled();
   const engine = resolveEngine(opts && opts.engine);
   const launcher = loadEngine(engine);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -152,6 +170,9 @@ export async function launchBrowser(opts?: LaunchOptions): Promise<EngineWrapper
     if (exe) launchOpts.executablePath = exe;
   }
   const browser = await launcher.launch(launchOpts);
+  const release = trackCliResource(() => browser.close());
+  browser.once?.('disconnected', release);
+  throwIfCancelled();
   return { browser, engine };
 }
 

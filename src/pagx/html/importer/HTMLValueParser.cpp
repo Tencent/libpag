@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/nodes/ConicGradient.h"
@@ -40,6 +41,18 @@ namespace pagx {
 using namespace pagx::html;
 
 namespace {
+
+bool ParseGradientAngle(const std::string& token, float& degrees) {
+  char* end = nullptr;
+  float number = std::strtof(token.c_str(), &end);
+  if (end == token.c_str() || !std::isfinite(number)) return false;
+  auto unit = ToLower(Trim(end));
+  if (unit != "deg" && unit != "rad" && unit != "grad" && unit != "turn" &&
+      !(unit.empty() && number == 0))
+    return false;
+  degrees = ParseAngle(token);
+  return std::isfinite(degrees);
+}
 
 constexpr float HtmlPi = 3.14159265358979323846f;
 
@@ -404,9 +417,7 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
       s.offsetX = lengths[0];
       s.offsetY = lengths[1];
       if (lengths.size() >= 3) s.blur = lengths[2];
-      if (lengths.size() >= 4 && lengths[3] != 0) {
-        _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
-      }
+      if (lengths.size() >= 4) s.spread = lengths[3];
     } else {
       _diagnostics.warn("html: malformed box-shadow '" + item + "'");
       continue;
@@ -564,6 +575,7 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   bool tiled = false;
   if (repeating && boxKnown && lineLength > 0.0f) {
     tiled = buildRepeatingLinearStops(parts, stopStart, lineLength, stops);
+    if (!tiled) return nullptr;
   }
   if (!tiled) {
     stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, lineLength);
@@ -739,27 +751,17 @@ ColorSource* HTMLValueParser::parseRepeatingLinearGradientPattern(const std::str
   if (period.size() < 2) return nullptr;
   if (std::isnan(period.front().first)) period.front().first = 0.0f;
   if (std::isnan(period.back().first)) period.back().first = lineLength;
-  for (size_t i = 1; i + 1 < period.size(); ++i) {
-    if (!std::isnan(period[i].first)) continue;
-    size_t next = i + 1;
-    while (next < period.size() && std::isnan(period[next].first)) ++next;
-    float prev = period[i - 1].first;
-    float nxt = next < period.size() ? period[next].first : lineLength;
-    float steps = static_cast<float>(next - (i - 1));
-    period[i].first = prev + (nxt - prev) / steps;
-  }
-  for (size_t i = 1; i < period.size(); ++i) {
-    if (period[i].first < period[i - 1].first) period[i].first = period[i - 1].first;
-  }
+  if (!finaliseGradientStops(period)) return nullptr;
   float firstPos = period.front().first;
   float periodPx = period.back().first - firstPos;
-  if (!(periodPx > 0.0f)) return nullptr;
+  if (!(periodPx > 0.0f) || !std::isfinite(periodPx)) return nullptr;
 
   // One-period tile at native resolution. Reject a period coarser than the box (no visible repeat;
   // the gradient path renders it faithfully) or absurdly large to bound the embedded image.
+  constexpr int kMaxTile = 4096;
+  if (periodPx > kMaxTile) return nullptr;
   int tileN = static_cast<int>(std::lround(periodPx));
   if (tileN < 1) tileN = 1;
-  constexpr int kMaxTile = 4096;
   if (tileN > kMaxTile || static_cast<float>(tileN) > lineLength) return nullptr;
 
   // Covering-corner start of the gradient line, so the tile's baked phase matches CSS (positions
@@ -777,7 +779,7 @@ ColorSource* HTMLValueParser::parseRepeatingLinearGradientPattern(const std::str
   int tileH = vertical ? tileN : 1;
   std::vector<uint8_t> rgba(static_cast<size_t>(tileW) * static_cast<size_t>(tileH) * 4, 0);
   for (int idx = 0; idx < tileN; ++idx) {
-    float devicePos = static_cast<float>(idx) * tileScale;
+    float devicePos = (static_cast<float>(idx) + .5f) * tileScale;
     float linePos = (devicePos - startAxis) * dir;
     Color c = SampleRepeatingPeriod(period, firstPos, periodPx, linePos);
     uint8_t* px = rgba.data() + static_cast<size_t>(idx) * 4;
@@ -848,55 +850,75 @@ bool HTMLValueParser::buildRepeatingLinearStops(const std::vector<std::string>& 
 }
 
 bool HTMLValueParser::tileRepeatingStops(GradientStops& stops) {
-  if (stops.size() < 2) return false;
-  if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
-  if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
-  for (size_t i = 1; i + 1 < stops.size(); ++i) {
-    if (!std::isnan(stops[i].first)) continue;
-    size_t next = i + 1;
-    while (next < stops.size() && std::isnan(stops[next].first)) ++next;
-    float prev = stops[i - 1].first;
-    float nxt = next < stops.size() ? stops[next].first : 1.0f;
-    float steps = static_cast<float>(next - (i - 1));
-    stops[i].first = prev + (nxt - prev) / steps;
+  if (stops.size() < 2 || !finaliseGradientStops(stops)) return false;
+  double origin = stops.front().first;
+  double span = stops.back().first - origin;
+  if (!(span > 0)) {
+    // CSS Images: a zero-length period has the average premultiplied color of the same stops
+    // spaced equally apart. End stops carry half the weight of an interior stop.
+    Color color = {0, 0, 0, 0, stops.front().second.colorSpace};
+    for (size_t i = 0; i < stops.size(); ++i) {
+      float weight = (i == 0 || i + 1 == stops.size() ? .5f : 1.0f) / (stops.size() - 1);
+      const auto& c = stops[i].second;
+      color.red += c.red * c.alpha * weight;
+      color.green += c.green * c.alpha * weight;
+      color.blue += c.blue * c.alpha * weight;
+      color.alpha += c.alpha * weight;
+    }
+    if (color.alpha > 0) {
+      color.red /= color.alpha;
+      color.green /= color.alpha;
+      color.blue /= color.alpha;
+    }
+    stops = {{0, color}, {1, color}};
+    return true;
   }
-  for (size_t i = 1; i < stops.size(); ++i) {
-    if (stops[i].first < stops[i - 1].first) stops[i].first = stops[i - 1].first;
+  // Keep the authored phase, including negative first stops. Include one neighboring period
+  // at each boundary so interpolation at 0 and 1 does not replace a partial ramp by a flat color.
+  double first = std::floor(-origin / span) - 1;
+  double last = std::ceil((1 - origin) / span);
+  constexpr size_t kMaxStops = 4096;
+  if (!std::isfinite(first) || !std::isfinite(last) ||
+      (last - first + 1) * stops.size() > kMaxStops) {
+    _diagnostics.warn("html: repeating gradient exceeds the 4096-stop budget; omitted");
+    stops.clear();
+    return false;
   }
-  float origin = stops.front().first;
-  float span = stops.back().first - origin;
-  if (!(span > 0.0f)) return false;
-  GradientStops period = stops;
-  for (auto& stop : period) stop.first -= origin;
-
   GradientStops out;
-  constexpr size_t kMaxStops = 1024;
-  bool truncated = false;
-  bool done = false;
-  for (int k = 0; !done; ++k) {
-    float base = static_cast<float>(k) * span;
-    if (base > 1.0f) break;
-    for (const auto& stop : period) {
-      float pos = base + stop.first;
-      if (pos >= 1.0f) {
-        out.emplace_back(1.0f, stop.second);
-        done = true;
-        break;
-      }
-      out.emplace_back(pos, stop.second);
-      if (out.size() >= kMaxStops) {
-        truncated = true;
-        done = true;
-        break;
-      }
+  for (double k = first; k <= last; ++k) {
+    for (const auto& stop : stops) {
+      out.emplace_back(static_cast<float>(stop.first + k * span), stop.second);
     }
   }
-  if (out.empty()) return false;
-  if (out.back().first < 1.0f) out.emplace_back(1.0f, out.back().second);
-  stops = std::move(out);
-  if (truncated) {
-    _diagnostics.warn("html: repeating gradient truncated (too many repetitions)");
+  // Retain the enclosing ramp endpoints (not every off-screen period). Conic gradients clip
+  // these to the visible turn; linear/radial gradients need normalized endpoints as well.
+  auto sample = [&](float t) {
+    auto next = std::upper_bound(out.begin(), out.end(), t,
+                                 [](float value, const auto& stop) { return value < stop.first; });
+    if (next == out.begin()) return next->second;
+    if (next == out.end()) return out.back().second;
+    const auto& a = *(next - 1);
+    const auto& b = *next;
+    float f = (t - a.first) / (b.first - a.first);
+    float alpha = a.second.alpha * (1 - f) + b.second.alpha * f;
+    Color c = {0, 0, 0, alpha, a.second.colorSpace};
+    if (alpha > 0) {
+      c.red = (a.second.red * a.second.alpha * (1 - f) + b.second.red * b.second.alpha * f) / alpha;
+      c.green =
+          (a.second.green * a.second.alpha * (1 - f) + b.second.green * b.second.alpha * f) / alpha;
+      c.blue =
+          (a.second.blue * a.second.alpha * (1 - f) + b.second.blue * b.second.alpha * f) / alpha;
+    }
+    return c;
+  };
+  GradientStops visible = {{0, sample(0)}};
+  for (const auto& stop : out) {
+    if (stop.first >= 0 && stop.first <= 1) visible.push_back(stop);
   }
+  // At exactly 1 a hard edge must keep its left-hand color; otherwise a terminal duplicated
+  // stop can leak the next period's color into the last interpolation interval.
+  if (visible.back().first < 1) visible.emplace_back(1, sample(1));
+  stops = std::move(visible);
   return true;
 }
 
@@ -963,6 +985,7 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, f
   bool tiled = false;
   if (repeating && std::isfinite(radiusPx) && radiusPx > 0.0f) {
     tiled = buildRepeatingLinearStops(parts, stopStart, radiusPx, stops);
+    if (!tiled) return nullptr;
   }
   if (!tiled) {
     stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, radiusPx);
@@ -1125,33 +1148,98 @@ float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAx
   return px / boxAxis;
 }
 
-ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value, bool repeating) {
+ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value, bool repeating,
+                                                   float boxWidth, float boxHeight) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
   float cssAngle = 0.0f;
   std::string first = ToLower(Trim(parts[0]));
-  if (first.compare(0, 5, "from ") == 0) {
-    cssAngle = ParseAngle(first.substr(5));
+  std::string position = "center";
+  auto tokens = SplitTopLevelWhitespace(first);
+  if (!tokens.empty() && (tokens[0] == "from" || tokens[0] == "at")) {
     stopStart = 1;
+    for (size_t i = 0; i < tokens.size();) {
+      if (tokens[i] == "from" && i + 1 < tokens.size()) {
+        if (!ParseGradientAngle(tokens[i + 1], cssAngle)) {
+          _diagnostics.warn("html: malformed conic-gradient angle '" + tokens[i + 1] + "'");
+          return nullptr;
+        }
+        i += 2;
+      } else if (tokens[i] == "at") {
+        position.clear();
+        for (++i; i < tokens.size() && tokens[i] != "from"; ++i) {
+          if (!position.empty()) position += ' ';
+          position += tokens[i];
+        }
+      } else {
+        _diagnostics.warn("html: unsupported conic-gradient descriptor '" + first + "'");
+        return nullptr;
+      }
+    }
   }
   GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/true);
   // `repeating-conic-gradient` tiles the authored angular period across the full turn; the stop
   // offsets are already normalised (angle / 360), so the shared normalised tiler applies directly.
   if (repeating) {
     if (!tileRepeatingStops(stops)) {
-      if (!finaliseGradientStops(stops)) return nullptr;
-      _diagnostics.warn(
-          "html: repeating-conic-gradient approximated as a single non-repeating period");
+      return nullptr;
     }
   } else if (!finaliseGradientStops(stops)) {
     return nullptr;
   }
 
   auto grad = _document->makeNode<ConicGradient>();
-  grad->center = {0.5f, 0.5f};
-  grad->startAngle = CssToPagxAngle(cssAngle);
-  grad->endAngle = grad->startAngle + 360.0f;
+  bool pixels =
+      std::isfinite(boxWidth) && boxWidth > 0 && std::isfinite(boxHeight) && boxHeight > 0;
+  float cx = .5f, cy = .5f;
+  if (!ResolveBackgroundPosition(position, pixels ? boxWidth : 1, pixels ? boxHeight : 1, *this, cx,
+                                 cy)) {
+    _diagnostics.warn("html: unsupported conic-gradient position '" + position + "'");
+    return nullptr;
+  }
+  grad->center = {cx, cy};
+  grad->fitsToGeometry = !pixels;
+  // TGFX clamps partial sweeps after applying angle bias. A negative startAngle therefore
+  // clamps an entire quadrant. CSS rotates a complete turn: express that rotation in the
+  // gradient's coordinate transform, preserving native PAGX partial-sweep semantics.
+  grad->startAngle = 0;
+  grad->endAngle = 360;
+  grad->matrix = Matrix::Translate(cx, cy) * Matrix::Rotate(CssToPagxAngle(cssAngle)) *
+                 Matrix::Translate(-cx, -cy);
+  // Clip the visible turn only after stop fixup. Clamping authored offsets individually
+  // changes interpolated boundary colors when a stop lies outside 0..360 degrees.
+  auto boundaryColor = [&](float t) {
+    if (t <= stops.front().first) return stops.front().second;
+    for (size_t i = 1; i < stops.size(); ++i) {
+      if (t >= stops[i].first) continue;
+      const auto& a = stops[i - 1];
+      const auto& b = stops[i];
+      float f = (t - a.first) / (b.first - a.first);
+      float alpha = a.second.alpha * (1 - f) + b.second.alpha * f;
+      Color c = {0, 0, 0, alpha, a.second.colorSpace};
+      if (alpha > 0) {
+        c.red =
+            (a.second.red * a.second.alpha * (1 - f) + b.second.red * b.second.alpha * f) / alpha;
+        c.green =
+            (a.second.green * a.second.alpha * (1 - f) + b.second.green * b.second.alpha * f) /
+            alpha;
+        c.blue =
+            (a.second.blue * a.second.alpha * (1 - f) + b.second.blue * b.second.alpha * f) / alpha;
+      }
+      return c;
+    }
+    return stops.back().second;
+  };
+  GradientStops visible;
+  if (std::none_of(stops.begin(), stops.end(), [](const auto& s) { return s.first == 0; })) {
+    visible.emplace_back(0, boundaryColor(0));
+  }
+  for (const auto& stop : stops) {
+    if (stop.first >= 0 && stop.first <= 1) visible.push_back(stop);
+  }
+  if (visible.empty() || visible.back().first < 1) visible.emplace_back(1, boundaryColor(1));
+  stops = std::move(visible);
   emitColorStops(grad->colorStops, stops);
   return grad;
 }
@@ -1165,9 +1253,12 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
     auto tokens = SplitTopLevelWhitespace(parts[i]);
     if (tokens.empty()) continue;
     Color color = parseColor(tokens[0]);
-    float offset = NAN;
-    if (tokens.size() >= 2) {
-      const std::string& off = tokens[1];
+    if (tokens.size() == 1) {
+      stops.emplace_back(NAN, color);
+    }
+    for (size_t j = 1; j < tokens.size() && j <= 2; ++j) {
+      float offset = NAN;
+      const std::string& off = tokens[j];
       if (!off.empty() && off.back() == '%') {
         // Validate the percent token end-to-end so '50%' parses while 'abc%' is rejected.
         // strtof silently returns 0 on a leading non-digit, which would otherwise be treated
@@ -1179,8 +1270,12 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
           _diagnostics.warn("html: malformed gradient stop offset '" + off +
                             "'; inferring position");
         }
-      } else if (interpretAngularOffset && !off.empty() && off.find("deg") != std::string::npos) {
-        offset = ParseAngle(off) / 360.0f;
+      } else if (interpretAngularOffset) {
+        float angle = 0;
+        if (ParseGradientAngle(off, angle)) offset = angle / 360.0f;
+        else
+          _diagnostics.warn("html: malformed gradient stop offset '" + off +
+                            "'; inferring position");
       } else if (!interpretAngularOffset) {
         float v = parseAbsoluteLengthPx(off);
         if (!std::isnan(v)) {
@@ -1192,16 +1287,25 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
           offset = normalisePx ? v / pxOffsetScale : v;
         }
       }
+      stops.emplace_back(offset, color);
     }
-    stops.emplace_back(offset, color);
   }
   return stops;
 }
 
 bool HTMLValueParser::finaliseGradientStops(GradientStops& stops) {
   if (stops.empty()) return false;
+  for (const auto& stop : stops)
+    if (std::isinf(stop.first)) return false;
   if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
   if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
+  // CSS fixes decreasing specified positions before distributing unspecified stops.
+  float previous = stops.front().first;
+  for (auto& stop : stops) {
+    if (std::isnan(stop.first)) continue;
+    stop.first = std::max(previous, stop.first);
+    previous = stop.first;
+  }
   // Walk left-to-right and resolve any NaN offset by interpolating from the previous known
   // anchor to the next known anchor. Because `stops[i]` is updated in place, the next
   // iteration's `prev` is the value we just wrote — that's intentional: filling a run of

@@ -9,7 +9,7 @@
  *                         → render) → out/<case>.subset.html / .pagx / .png
  *     3. compare.js                → metrics row
  *
- * Step 2 shares its implementation with the html2pagx CLI through
+ * Step 2 shares its implementation with the pagx import CLI through
  * tools/html-snapshot/lib/pipeline.js. Anything this script does on top of
  * that pipeline (baseline rendering, pixel/flex metrics, shared font/image
  * caches across cases, concurrency) lives in this file.
@@ -354,8 +354,9 @@ async function processCase(entry, outDir, opts, browser) {
   // 3. import
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
     const r = await runPagxImportToFile({
+      resolve: false,
       pagxBin: opts.pagxBin,
-      subsetHtml,
+      input: subsetHtml,
       pagxFile: subsetPagx,
       stderrPath: importStderr,
     });

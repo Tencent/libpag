@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "viewport": { "width": 640, "height": 480 },
+  "steps": [
+    { "type": "capture", "name": "initial" },
+    { "type": "click", "target": { "testId": "open" } },
+    { "type": "waitFor", "target": { "css": "#dialog" }, "state": "visible" },
+    { "type": "click", "target": { "css": "#tab" } },
+    { "type": "fill", "target": { "css": "#query" }, "value": "PAGX" },
+    { "type": "waitFor", "target": { "css": "#result" }, "text": "Result: PAGX" },
+    { "type": "capture", "name": "advanced" }
+  ]
+}

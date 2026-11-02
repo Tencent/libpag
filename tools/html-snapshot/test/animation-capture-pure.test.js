@@ -3,6 +3,8 @@
 const {
   PAGX_ANIM_PREFIX,
   pagxExtractTransform,
+  pagxExtractTranslate,
+  pagxResolveCapturedTransformOrigin,
   pagxTransformToMatrix6,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
@@ -14,6 +16,26 @@ const {
   pagxElementUsesStepTiming,
   pagxClipNormalizeD,
 } = require('../dist/lib/animation-capture');
+
+test.each(['matrix(1, 2)', 'matrix(1, 0, 0, 1, NaN, 0)', 'matrix3d(1, 0)'])('rejects malformed transform %s', value => {
+  expect(pagxExtractTranslate(value)).toBeNull();
+  expect(pagxExtractTransform(value)).toBeNull();
+  expect(pagxTransformToMatrix6(value)).toBeNull();
+});
+
+test.each(['center', '50% 50%', '1e999px 2px', '1px 2px'])('retains an unresolved SVG origin: %s', transformOrigin => {
+  const element = {
+    namespaceURI: 'http://www.w3.org/2000/svg',
+    getBBox: () => { throw new Error('detached SVG'); },
+  };
+  expect(pagxResolveCapturedTransformOrigin(element, {
+    transformOrigin, getPropertyValue: () => 'fill-box',
+  })).toBe(transformOrigin);
+  element.getBBox = () => ({ x: NaN, y: 0 });
+  expect(pagxResolveCapturedTransformOrigin(element, {
+    transformOrigin, transformBox: 'fill-box',
+  })).toBe(transformOrigin);
+});
 
 describe('pagxExtractTransform', () => {
   // The compound-string branch resolves the chain via a throwaway element, so it

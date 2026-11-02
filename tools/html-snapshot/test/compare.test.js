@@ -92,14 +92,14 @@ afterEach(() => {
 });
 
 // Write a solid-colour PNG of the given size to `name` inside the temp dir.
-function writePng(name, width, height, [r, g, b]) {
+function writePng(name, width, height, [r, g, b, a = 255]) {
   const png = new PNG({ width, height });
   for (let i = 0; i < width * height; i++) {
     const j = i * 4;
     png.data[j] = r;
     png.data[j + 1] = g;
     png.data[j + 2] = b;
-    png.data[j + 3] = 255;
+    png.data[j + 3] = a;
   }
   const file = path.join(dir, name);
   fs.writeFileSync(file, PNG.sync.write(png));
@@ -107,6 +107,14 @@ function writePng(name, width, height, [r, g, b]) {
 }
 
 describe('pixelMetrics', () => {
+  test.each([
+    [[0, 0, 0, 0], [255, 255, 255]],
+    [[255, 0, 0, 128], [255, 127, 127]],
+  ])('composites transparent pixels over white before comparing: %j', (source, expected) => {
+    const a = writePng('alpha.png', 4, 4, source);
+    const b = writePng('opaque.png', 4, 4, expected);
+    expect(pixelMetrics(a, b)).toMatchObject({ pixelDiffRatio: 0, meanRgbDelta: 0, ssim: 1 });
+  });
   test('identical images: zero diff, perfect structural match', () => {
     const a = writePng('a.png', 20, 20, [255, 255, 255]);
     const b = writePng('b.png', 20, 20, [255, 255, 255]);

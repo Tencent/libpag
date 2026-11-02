@@ -34,9 +34,30 @@ describe('loadFontCodec', () => {
     expect(second.wawoff2).toBe(first.wawoff2);
   });
 
-  test('matches a direct require of the underlying packages', () => {
+  test('retains the parser and compression API while wrapping decompression', () => {
     const { opentype, wawoff2 } = loadFontCodec();
     expect(opentype).toBe(require('opentype.js'));
-    expect(wawoff2).toBe(require('wawoff2'));
+    expect(wawoff2.compress).toBe(require('wawoff2').compress);
+  });
+
+  test('copies shared WASM memory before another decode can overwrite it', async () => {
+    jest.resetModules();
+    const shared = Buffer.alloc(8);
+    jest.doMock('wawoff2', () => ({
+      decompress: async (input) => {
+        shared.fill(input[0]);
+        return shared.subarray(0, 4);
+      },
+    }));
+    try {
+      const codec = require('../dist/lib/font-codec').loadFontCodec().wawoff2;
+      const outputs = await Promise.all([1, 2, 3].map((n) => codec.decompress(Buffer.from([n]))));
+      expect(outputs.map((out) => [...out])).toEqual([[1, 1, 1, 1], [2, 2, 2, 2], [3, 3, 3, 3]]);
+      shared.fill(9);
+      expect(outputs[0][0]).toBe(1);
+    } finally {
+      jest.dontMock('wawoff2');
+      jest.resetModules();
+    }
   });
 });

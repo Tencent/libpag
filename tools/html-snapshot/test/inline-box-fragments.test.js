@@ -11,7 +11,7 @@
 // browser-only style schema so it is unit-testable); `emitInlineBoxFragments`
 // is the thin `buildStyle` wrapper exercised end-to-end by the eval pipeline.
 
-const { inlineBoxLineRects, bandInsetRect } = require('../dist/lib/browser-snapshot');
+const { inlineBoxLineRects } = require('../dist/lib/browser-snapshot');
 
 const GRADIENT =
   'linear-gradient(120deg, rgba(100, 200, 120, 0.5) 0%, rgba(100, 200, 120, 0.5) 100%)';
@@ -102,98 +102,27 @@ describe('inlineBoxLineRects', () => {
     expect(rects[0]).toEqual({ left: 290, top: 80, width: 60, height: 22 });
   });
 
-  test('applies the highlighter band to a single-line inline gradient box', () => {
-    // `background-size: 100% 10px; background-position: 0 50%; no-repeat` on a
-    // single-line mark still takes the fragment path so the band is honoured.
+  test('leaves single-line background sizing to the importer', () => {
     const el = mockEl([{ left: 20, top: 20, width: 100, height: 20 }]);
-    const computed = mockComputed({
-      props: {
-        'background-image': GRADIENT,
-        'background-size': '100% 10px',
-        'background-position': '0% 50%',
-        'background-repeat': 'no-repeat',
-      },
-    });
-    const rects = inlineBoxLineRects(el, parentRect, computed);
-    expect(rects).toHaveLength(1);
-    // band height = 10; top offset = (20 - 10) * 0.5 = 5.
-    expect(rects[0].width).toBe(100);
-    expect(rects[0].height).toBe(10);
-    expect(rects[0].top).toBe(20 - parentRect.top + 5);
-    expect(rects[0].left).toBe(20 - parentRect.left);
-  });
-});
-
-describe('bandInsetRect', () => {
-  const rect = { left: 10, top: 20, width: 100, height: 20 };
-
-  function computed(props) {
-    return { getPropertyValue: (p) => (p in props ? props[p] : '') };
-  }
-
-  test('insets a no-repeat gradient band near the baseline', () => {
-    const band = bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-size': '100% 10px',
-      'background-position': '0% 50%',
-      'background-repeat': 'no-repeat',
-    }));
-    expect(band.left).toBe(10);
-    expect(band.width).toBe(100);
-    expect(band.height).toBe(10);
-    expect(band.top).toBe(20 + (20 - 10) * 0.5);
+    const computed = mockComputed({ props: {
+      'background-image': GRADIENT, 'background-size': '100% 10px',
+      'background-position': '0% 50%', 'background-repeat': 'no-repeat',
+    } });
+    expect(inlineBoxLineRects(el, parentRect, computed)).toBeNull();
   });
 
-  test('resolves a percentage height and bottom position', () => {
-    const band = bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-size': '100% 50%',
-      'background-position': '0% 100%',
-      'background-repeat': 'no-repeat',
-    }));
-    expect(band.height).toBe(10);
-    expect(band.top).toBe(20 + 10); // bottom-aligned: (20-10)*100%
-  });
-
-  test('returns null when the axis repeats (band tiles to fill the box)', () => {
-    expect(bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-size': '100% 10px',
-      'background-position': '0% 50%',
-      'background-repeat': 'repeat-y',
-    }))).toBeNull();
-  });
-
-  test('returns null without an explicit background-size', () => {
-    expect(bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-repeat': 'no-repeat',
-    }))).toBeNull();
-  });
-
-  test('returns null when a border or background-color needs the full box', () => {
-    expect(bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-size': '100% 10px',
-      'background-position': '0% 50%',
-      'background-repeat': 'no-repeat',
-      'border-top-width': '1px',
-    }))).toBeNull();
-    expect(bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-color': 'rgb(255, 255, 0)',
-      'background-size': '100% 10px',
-      'background-position': '0% 50%',
-      'background-repeat': 'no-repeat',
-    }))).toBeNull();
-  });
-
-  test('returns null when the size fills the whole box', () => {
-    expect(bandInsetRect(rect, computed({
-      'background-image': GRADIENT,
-      'background-size': '100% 100%',
-      'background-position': '0% 0%',
-      'background-repeat': 'no-repeat',
-    }))).toBeNull();
+  test('retains full fragment geometry when a multiline highlighter has background-size', () => {
+    const el = mockEl([
+      { left: 20, top: 20, width: 100, height: 20 },
+      { left: 20, top: 40, width: 60, height: 20 },
+    ]);
+    const computed = mockComputed({ props: {
+      'background-image': GRADIENT, 'background-size': '100% 10px',
+      'background-position': '0% 50%', 'background-repeat': 'no-repeat',
+    } });
+    expect(inlineBoxLineRects(el, parentRect, computed)).toEqual([
+      { left: 10, top: 0, width: 100, height: 20 },
+      { left: 10, top: 20, width: 60, height: 20 },
+    ]);
   });
 });

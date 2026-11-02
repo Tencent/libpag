@@ -360,6 +360,11 @@ bool ReorderElementChildrenToMainAxis(const std::shared_ptr<DOMNode>& parent,
 
 void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
   if (!parent || parent->type != DOMNodeType::Element) return;
+  // The snapshot has already compiled CSS painting order, including overflow descendants and
+  // shadows that are not represented by these layout rectangles. Geometry alone cannot prove
+  // that reordering these fragments (or changing their containing boxes) preserves painting.
+  const auto* paintOrder = parent->findAttribute("data-pagx-paint-order");
+  if (paintOrder != nullptr && ToLower(Trim(*paintOrder)) == "fixed") return;
   const std::string& tag = parent->name;
   if (!IsContainerTag(tag)) return;
 

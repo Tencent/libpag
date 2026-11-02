@@ -2,7 +2,7 @@
 // Lives here so the main DOM walk (lib/browser-snapshot.ts) and the icon
 // font pre-pass (lib/icon-font.ts) consult one list instead of maintaining
 // independent copies — the previous arrangement had already drifted
-// (`form`, `details`, `summary` were in one list but missing from the
+// (`details`, `summary` were in one list but missing from the
 // other), causing icon detection to walk into subtrees that the snapshot
 // proper would have skipped.
 //
@@ -19,8 +19,9 @@ export const DROP_TAG_NAMES: readonly string[] = [
   'head', 'title', 'base',
   'template', 'slot', 'dialog', 'details', 'summary',
   'map', 'area', 'source', 'track', 'param',
-  'form',
 ];
+// Forms are ordinary painted containers. Keep their boxes and descendants;
+// the snapshot rewrites them to divs and captures their controls separately.
 
 // Pre-serialised forms of `DROP_TAG_NAMES`. The browser-side payload of both
 // the snapshot pipeline and the icon-font pre-pass reconstructs the set from

@@ -35,6 +35,8 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/types/Data.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -68,6 +70,24 @@ HTMLTextFragmentBuilder::HTMLTextFragmentBuilder(HTMLDiagnosticSink& sink,
 
 void HTMLTextFragmentBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
+}
+
+// Every face also joins the fallback chain: a family split across several @font-face rules
+// (unicode-range subsets) registers each file under the same (family, style) key, which holds only
+// the last one, and the chain is what keeps the earlier subsets reachable.
+bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path,
+                                               std::string* internalFamily) {
+  if (RegisterFontFileFaces(&_document->fontConfig(), path, true, family, internalFamily) == 0) {
+    return false;
+  }
+  return true;
+}
+
+bool HTMLTextFragmentBuilder::registerFontData(const std::string& family, const Data& fontData) {
+  if (RegisterFontDataFaces(&_document->fontConfig(), fontData.bytes(), fontData.size(), true,
+                            family) == 0)
+    return false;
+  return true;
 }
 
 Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
@@ -464,8 +484,15 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
       _valueParser.resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
   bool hasRealLineHeight =
       (!std::isnan(leafLineHeightPx) && leafLineHeightPx > 0) || fragmentHasExplicitLineHeight;
+  const bool constrainedInlineSize =
+      isVertical ? (!std::isnan(box.heightPx) || !std::isnan(box.heightPct) ||
+                    (!std::isnan(box.topPx) && !std::isnan(box.bottomPx)))
+                 : (!std::isnan(box.widthPx) || !std::isnan(box.widthPct) ||
+                    (!std::isnan(box.leftPx) && !std::isnan(box.rightPx)));
+  const bool needsWrapping =
+      !hasNoWrap && (constrainedInlineSize || (box.flexGrowSet && box.flexGrow > 0));
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() || box.clipOverflow ||
-                      isVertical || hasRealLineHeight;
+                      isVertical || hasRealLineHeight || needsWrapping;
 
   // CSS shrink-to-fit for inline text. The html-snapshot pipeline bakes the *browser's*
   // measured px width/height onto every text `<span>` (it flattens each run into an

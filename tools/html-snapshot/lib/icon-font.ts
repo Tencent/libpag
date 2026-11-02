@@ -36,9 +36,18 @@ import * as fs from 'fs';
 import { DROP_TAGS_UPPER_JSON } from './dom-tags';
 import { errMessage } from './common';
 import { loadFontCodec } from './font-codec';
+import {
+  FONT_FACE_HELPERS_SRC, fontFaceHelpers,
+  normalizeFontFaceStyle, normalizeFontFaceWeight, selectFontFace,
+} from './font-face-pass';
+import type { FontFaceEntry } from './font-face-pass';
 import type { Page } from './browser-engine';
 
 const fsp = fs.promises;
+
+// The payload-scope table the serialized bodies below call the shared `@font-face`
+// helpers through; `FONT_FACE_HELPERS_SRC` declares the same table in the page.
+const FONT_FACE_HELPERS = fontFaceHelpers();
 
 // ===== Browser-side helpers =====
 //
@@ -100,95 +109,8 @@ export function parseSrcList(srcRaw: string, sheetBase: string): ParsedSrc | nul
   return { url: absUrl, format: best.format };
 }
 
-interface FontFaceEntry {
-  family: string;
-  url: string;
-  format: string;
-  weight: string;
-  style: string;
-}
-
-// Normalise the two @font-face descriptors that affect which physical face
-// Chromium selects. Computed `font-weight` is normally numeric while
-// @font-face commonly uses the `normal` / `bold` keywords, so canonicalise
-// those keywords before comparing. Variable-font ranges (for example
-// `100 900`) are deliberately kept intact for the distance matcher below.
-export function normalizeFontFaceWeight(value: string): string {
-  const v = String(value || '').trim().toLowerCase();
-  if (!v || v === 'normal') return '400';
-  if (v === 'bold') return '700';
-  return v;
-}
-
-export function normalizeFontFaceStyle(value: string): string {
-  const v = String(value || '').trim().toLowerCase();
-  if (v.startsWith('italic')) return 'italic';
-  if (v.startsWith('oblique')) return 'oblique';
-  return 'normal';
-}
-
-// Return the CSS Fonts weight-search phase and distance for a face range. The
-// phase captures the spec's directional preference: below 400 search downward
-// first, from 400 through 500 search upward to 500 then downward, and above 500
-// search upward first. This also makes equidistant choices independent of
-// @font-face declaration order (for example 650 chooses 900 over 400).
-function fontWeightPreference(requested: number, lo: number, hi: number): [number, number] {
-  if (requested >= lo && requested <= hi) return [0, 0];
-  if (requested < 400) {
-    return hi < requested ? [1, requested - hi] : [2, lo - requested];
-  }
-  if (requested > 500) {
-    return lo > requested ? [1, lo - requested] : [2, requested - hi];
-  }
-  if (lo > requested && lo <= 500) return [1, lo - requested];
-  if (hi < requested) return [2, requested - hi];
-  return [3, lo - requested];
-}
-
-// Pick the @font-face that best matches a pseudo-element's computed style.
-// A family may expose several physical files under one name (Font Awesome's
-// "Font Awesome 6 Free" uses Regular/400 and Solid/900). Treating a family as
-// a single URL silently chooses the first declaration and makes every glyph
-// that exists only in another weight disappear.
-export function selectFontFace(
-  faces: FontFaceEntry[] | null | undefined,
-  requestedWeight: string,
-  requestedStyle: string,
-): FontFaceEntry | null {
-  if (!faces || faces.length === 0) return null;
-  const reqWeightText = normalizeFontFaceWeight(requestedWeight);
-  const reqWeightMatch = reqWeightText.match(/\d+(?:\.\d+)?/);
-  const reqWeight = reqWeightMatch ? Number(reqWeightMatch[0]) : 400;
-  const reqStyle = normalizeFontFaceStyle(requestedStyle);
-  let best: FontFaceEntry | null = null;
-  let bestPreference: [number, number, number] | null = null;
-  for (const face of faces) {
-    if (!face) continue;
-    const nums = normalizeFontFaceWeight(face.weight).match(/\d+(?:\.\d+)?/g) || [];
-    let lo = nums.length > 0 ? Number(nums[0]) : 400;
-    let hi = nums.length > 1 ? Number(nums[1]) : lo;
-    if (lo > hi) { const tmp = lo; lo = hi; hi = tmp; }
-    const [weightPhase, weightDistance] = fontWeightPreference(reqWeight, lo, hi);
-    // Style should dominate weight preference: an italic face at the exact
-    // weight is a worse match than a nearby upright face for normal text.
-    const preference: [number, number, number] = [
-      normalizeFontFaceStyle(face.style) === reqStyle ? 0 : 1,
-      weightPhase,
-      weightDistance,
-    ];
-    if (
-      bestPreference === null ||
-      preference[0] < bestPreference[0] ||
-      (preference[0] === bestPreference[0] && preference[1] < bestPreference[1]) ||
-      (preference[0] === bestPreference[0] && preference[1] === bestPreference[1] &&
-        preference[2] < bestPreference[2])
-    ) {
-      best = face;
-      bestPreference = preference;
-    }
-  }
-  return best;
-}
+// The descriptor normalisation and face selection live in font-face-pass so the
+// carry-over pass and the catalog matcher read the same cut of a family.
 
 // Parse `@font-face { ... }` blocks out of a raw CSS string. Used as a
 // fallback when `cssRules` is denied by CORS — Chromium still loaded and
@@ -217,8 +139,8 @@ export function parseFontFaceFromText(cssText: string, sheetBase: string): FontF
         family: family,
         url: parsed.url,
         format: parsed.format,
-        weight: normalizeFontFaceWeight(wm ? wm[1] : ''),
-        style: normalizeFontFaceStyle(stm ? stm[1] : ''),
+        weight: FONT_FACE_HELPERS.normalizeFontFaceWeight(wm ? wm[1] : ''),
+        style: FONT_FACE_HELPERS.normalizeFontFaceStyle(stm ? stm[1] : ''),
       });
     }
   }
@@ -277,8 +199,10 @@ async function collectFontFaceMap(): Promise<Record<string, FontFaceEntry[]>> {
           family: family,
           url: parsed.url,
           format: parsed.format,
-          weight: normalizeFontFaceWeight(r.style.getPropertyValue('font-weight') || ''),
-          style: normalizeFontFaceStyle(r.style.getPropertyValue('font-style') || ''),
+          weight: FONT_FACE_HELPERS.normalizeFontFaceWeight(
+            r.style.getPropertyValue('font-weight') || ''),
+          style: FONT_FACE_HELPERS.normalizeFontFaceStyle(
+            r.style.getPropertyValue('font-style') || ''),
         });
       }
     }
@@ -401,7 +325,7 @@ async function browserCollectIconFontTargets(): Promise<IconFontTarget[]> {
       let entry: FontFaceEntry | null = null;
       let matchedFamily = '';
       for (const fam of families) {
-        const matched = selectFontFace(fontFaceMap[fam], fontWeight, fontStyle);
+        const matched = FONT_FACE_HELPERS.selectFontFace(fontFaceMap[fam], fontWeight, fontStyle);
         if (matched) { entry = matched; matchedFamily = fam; break; }
       }
       if (!entry) continue;
@@ -475,9 +399,6 @@ function browserApplyIconFontSvgs(results: IconFontResult[] | null | undefined):
 const ICON_FONT_HELPER_FNS: Function[] = [
   formatRank,
   parseSrcList,
-  normalizeFontFaceWeight,
-  normalizeFontFaceStyle,
-  selectFontFace,
   parseFontFaceFromText,
   collectFontFaceMap,
   isPuaCodepoint,
@@ -490,8 +411,12 @@ const ICON_FONT_HELPER_FNS: Function[] = [
 // reconstructing it on every call.
 const ICON_FONT_DROP_TAGS_SRC =
   'const DROP_TAGS_UPPER = new Set(' + DROP_TAGS_UPPER_JSON + ');';
+// The `@font-face` descriptor helpers come from font-face-pass, shared with the
+// carry-over pass and the catalog matcher. They are emitted as source plus the
+// `FONT_FACE_HELPERS` table the serialised bodies call through, because an
+// `import` would compile to a module reference the payload scope cannot resolve.
 export const ICON_FONT_HELPERS_SRC =
-  ICON_FONT_DROP_TAGS_SRC + '\n\n' +
+  ICON_FONT_DROP_TAGS_SRC + '\n\n' + FONT_FACE_HELPERS_SRC + '\n\n' +
   ICON_FONT_HELPER_FNS.map((fn) => fn.toString()).join('\n\n');
 
 // `page.evaluate(string)` evaluates the string and awaits its result, so an
@@ -523,6 +448,9 @@ const COLLECT_ICON_FONT_TARGETS_EXPR = '(async () => await window.__pagxIconFont
 // Re-export for module consumers that need to embed the browser-side
 // helpers into their own page contexts (the standalone browser bundle).
 export { browserCollectFontFaceMap, browserCollectIconFontTargets, browserApplyIconFontSvgs };
+// The face-selection helpers moved to font-face-pass; keep them on this module's
+// surface because icon-font consumers (and their tests) import them from here.
+export { normalizeFontFaceWeight, normalizeFontFaceStyle, selectFontFace };
 // Suppress unused-payload lint until the build-browser-bundle.js consumes it.
 void COLLECT_ICON_FONT_TARGETS_PAYLOAD;
 

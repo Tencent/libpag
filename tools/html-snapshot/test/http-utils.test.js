@@ -32,6 +32,8 @@ describe('safeQueryParam', () => {
 
   test('returns null for an unparseable URL', () => {
     expect(safeQueryParam({ url: '%' }, 'url')).toBeNull();
+    expect(safeQueryParam({ url: 'http://[invalid' }, 'url')).toBeNull();
+    expect(safeQueryParam({}, 'url')).toBeNull();
   });
 });
 

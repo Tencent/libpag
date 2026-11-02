@@ -1,69 +1,70 @@
 # Authoring HTML that converts cleanly to PAGX
 
-Read this before writing the design HTML in Step 2. The converter renders the page in a real
-headless browser and then flattens the rendered result into PAGX, so almost any modern HTML/CSS
-works. These rules keep the conversion faithful and the output clean. They are guidelines for the
-**source design**, not the strict importer subset (the browser snapshot handles the translation);
-the authoritative subset reference is `spec/html_subset.md`.
+Read this before designing HTML for PAGX. The browser executes the source page before the
+native importer consumes its prepared subset. Modern layout and scripting can work through
+that preprocessing, but arbitrary CSS, browser-native widgets and resources are not guaranteed
+to convert faithfully. The native input contract is [HTML subset](../spec/html_subset.md).
 
-## TL;DR checklist
+## Authoring checklist
 
-- [ ] One self-contained `.html` file (no local relative assets).
-- [ ] `body` has an explicit pixel `width` and `height` = the target canvas, and `margin:0`.
-- [ ] Web fonts loaded via a Google Fonts `<link>` (embed with `pagx font embed` if text renders in the wrong typeface).
-- [ ] Icons are inline `<svg>` or an icon webfont — never typed glyphs.
-- [ ] Real, selectable text for all copy (not text baked into images).
-- [ ] No interactive widgets, no scrolling content, no video/iframe.
-- [ ] Any motion auto-plays and stays inside the playable channels — `opacity`, `transform`
-      (translate/scale/rotate/skew), `color` / `background-color`, `filter` (drop-shadow/blur),
-      `clip-path` (see §8 + `references/animation.md`).
+- [ ] Choose static, playable animation, or interaction-state output before conversion.
+- [ ] Give a new fixed-size design explicit `body` dimensions and `margin:0`; match the viewport.
+- [ ] Keep resources available to the browser and choose how required fonts/images will be delivered.
+- [ ] Use real text for copy and SVG/icon assets where vector icons are needed.
+- [ ] For motion, use supported channels and explicitly enable `--html-capture-animations`.
+- [ ] For a state reached through interaction, write a scenario with explicit readiness checks.
 
 ---
 
 ## 1. Canvas size
 
-The PAGX canvas size comes from the `body` box. Always pin it:
+For a new fixed-size design, declare the `body` dimensions that determine the PAGX canvas.
+For an existing application, select the intended viewport/state without unnecessarily changing
+its layout:
 
 ```html
 <body style="margin: 0; width: 1080px; height: 1440px;">
 ```
 
-- Match the converter's `--viewport-width` (and `--viewport-height` for tall designs) to these
-  numbers so the page is not clipped or letterboxed.
+- Match `pagx import --html-viewport-width/--html-viewport-height` to those dimensions. In scenario
+  mode set `viewport` inside the scenario instead; those CLI viewport options are rejected.
 - Design at 1× (real pixels). For crisp previews, render the PNG at a higher scale instead of
   inflating the canvas.
 
-## 2. Make the file self-contained
+## 2. Resources
 
-For a local `.html` file, relative resources (`<img src="logo.png">`, local CSS) will **not**
-resolve when the page is rendered. Inline or absolutize everything:
+A self-contained HTML file is convenient for a new design. Existing local HTML is loaded through
+a `file:` URL, so relative assets can resolve against that file; file-origin/CORS restrictions
+and missing resources can still break loading. Use a local HTTP URL for apps that require an
+HTTP origin. Preserve working source assets rather than rewriting them without need.
 
-- **Images**: inline as `data:` URIs, or reference an absolute `https://` URL. The snapshot inlines
-  external images into the output automatically.
-- **CSS**: put it in a `<style>` block or inline `style=""` attributes. A Tailwind CDN `<script>`
-  works because the page runs in a browser, but plain inline CSS is the most predictable.
-- **Fonts**: load via a Google Fonts (or other CDN) `<link rel="stylesheet">` so the browser fetches
-  them and the snapshot captures the right glyphs. PAGX resolves fonts by name at render time, so if
-  that typeface is not installed on the render host, install it there or embed it into the `.pagx`
-  with `pagx font embed --file <font>` (the optional `html2pagx` wrapper can do this in one step with
-  `--embed-fonts`). URL inputs resolve their own relative resources, so this caveat applies mainly to
-  local files.
+- **Images**: inline as data URIs or use reachable files/URLs. Check downloaded or external
+  resources when delivering the PAGX; see [Pipeline resources](pipeline.md#resources).
+- **CSS**: inline styles or a `<style>` block make a new design easier to reproduce. Existing
+  linked stylesheets and runtime CSS may also work through the browser pass.
+- **Fonts**: load the intended fonts before capture. A browser font is not automatically available
+  to native rendering. `pagx import --html-embed-fonts` downloads and embeds the captured fonts when
+  possible; inspect typography and warnings. For existing PAGX font handling use `pagx embed`
+  with the correct document fonts/fallbacks, not the removed `pagx font embed` command.
 
 ## 3. Layout
 
-Use ordinary CSS — the converter flattens it to absolute boxes and then re-infers flex:
+Use ordinary CSS. The browser measures layout; ordinary snapshots can recover flex from absolute
+boxes. Interaction-state snapshots retain their measured positions without flex inference:
 
 - Prefer **flexbox** (`display:flex`, `flex-direction`, `gap`, `align-items`, `justify-content`,
   `flex: N`) and `padding` for spacing. These map most directly to PAGX containers.
 - `position: absolute` with `left/top/right/bottom` is fine for overlays and precise placement.
 - Rounded corners (`border-radius`), shadows (`box-shadow`), opacity, gradients
-  (`linear-/radial-/conic-gradient`), and `transform` all convert.
+  (`linear-/radial-/conic-gradient`), and supported transforms can convert. Inspect complex
+  effects for approximations or rasterization.
 - Avoid CSS Grid where flexbox suffices; grid is not modeled and is approximated from the rendered
   positions only.
 
 ## 4. Text
 
-- Write real text in `<h1>`–`<h6>`, `<p>`, `<span>`. It becomes editable PAGX text.
+- Write real text in `<h1>`–`<h6>`, `<p>`, `<span>` so the converter can retain text structure.
+  Check font handling and any embedding/rasterization before promising further text editing.
 - Set `font-family`, `font-size`, `font-weight`, `color`, `line-height`, `text-align`,
   `letter-spacing` as normal.
 - For gradient-filled text use `background: linear-gradient(...)` + `-webkit-background-clip: text`
@@ -72,13 +73,13 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 
 ## 5. Icons and illustrations
 
-- **Inline `<svg>`** is the best icon source: it is preserved as vector PAGX. Paste the icon's SVG
-  markup directly.
+- **Inline `<svg>`** is preferred for vector icons: supported geometry resolves into PAGX nodes.
+  Inspect complex SVG effects for approximations or rasterization.
 - **Icon webfonts** (Phosphor, Material Icons, Font Awesome, Lucide, Remix, Tabler) used via
   `::before { content: "\eXXX" }` are automatically converted to inline `<svg>` during conversion,
   so the result does not depend on the icon font being installed.
-- **Never** use typed characters as icons (`+`, `×`, `→`, `★`); they render as plain text and look
-  wrong. Use an SVG or icon font instead.
+- Use SVG/icon assets when consistent icon geometry matters. Characters such as `+`, `×` or `→`
+  remain font-dependent text; retain them when they are intentionally part of the typography.
 
 ## 6. Images and photos
 
@@ -91,43 +92,40 @@ Use ordinary CSS — the converter flattens it to absolute boxes and then re-inf
 
 - Chart libraries that draw on `<canvas>` (ECharts, Chart.js, D3-canvas) are captured as a static
   bitmap, so charts survive as a picture. If the chart animates in, give the page enough settle time
-  by raising the converter's `--wait-ms` option.
+  with `--html-wait-ms`/`--html-selector`, or a scenario `waitFor` condition.
 - SVG-based charts (many D3 setups) convert as vectors, which is sharper — prefer them when
   available.
 
-## 8. Animation
+## 8. Animation and interaction states
 
-Motion is captured, not flattened: animations the page runs (CSS `@keyframes` + `animation`, GSAP,
-anime.js, the Web Animations API) become a real PAGX animation timeline, automatically. Keep it
-faithful by animating the channels the runtime can play — `opacity`, `transform` (translate, scale,
-rotate, skew), `color` / `background-color`, `filter: drop-shadow(...)` / `blur(...)`, and
-`clip-path` reveals; inline SVG shapes also animate `fill` / `stroke` and the `stroke-dashoffset`
-line-draw — and by making the animation auto-play and `infinite`. Only layout/size changes
-(`width`, `height`, `margin`, …) and 3D transforms (`matrix3d`/`rotate3d`/`perspective`) are not
-animatable and convert to a static element. Full rules, playable-channel table, preview
-instructions, and warnings live in `references/animation.md` — read it before authoring any
-animation.
+Ordinary capture is static unless `--html-capture-animations` is supplied. For a playable timeline,
+use supported CSS `@keyframes`, WAAPI, GSAP or anime.js motion that is still attached at capture
+time. [Animation](animation.md) defines supported channels and playback checks; read it before
+writing motion. Do not assume all CSS properties, canvas redraws or app events become animation.
 
-## What to avoid
+For a dropdown, selected tab, filled form, hover state or scrolled view, use
+[Interaction capture](interaction.md). Write actual controls and the needed source behavior,
+then drive them with a scenario. Checkpoints record their visible state; they do not preserve
+JavaScript handlers in the PAGX. Keep essential content visible at the selected checkpoint.
 
-These either drop out or convert poorly. Design around them:
+## Conversion boundaries
 
-- **Hidden content**: `display:none`, `visibility:hidden`, `opacity:0` elements are dropped (by
-  design — PAGX has no hidden nodes). Don't hide-then-reveal; just include what should show.
-- **Interactive / stateful widgets**: `<form>`, `<input>`, `<button>`, `<select>`, `<textarea>`
-  are reduced to their visible label/value only. Style a `<div>`/`<span>` to *look* like a button
-  instead of relying on a real control.
-- **Scrolling regions**: only the visible frame is captured. Lay content out to fit the canvas;
-  don't rely on overflow scrolling to reveal more.
-- **Interaction-triggered motion**: hover, focus, and click states are captured in whatever frame
-  the snapshot lands on (no interaction fires), so don't depend on them. Auto-playing animations
-  *are* captured, though — see §Animation below.
-- **No static visual**: `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`, `<map>` are
-  dropped. Use a poster image (`<img>`) instead of a `<video>`.
-- **Tainted/WebGL canvas**: a `<canvas>` drawn from a cross-origin image without CORS, or a WebGL
-  canvas without `preserveDrawingBuffer`, captures empty. Use same-origin/CORS-enabled sources.
-- **Per-side / dashed-dotted borders**: asymmetric borders become thin overlay rectangles and
-  dashed/dotted per-side borders may coerce to solid. Prefer uniform borders.
+- **Forms and controls**: form containers and supported text-bearing controls retain their painted
+  content; labels, current values, placeholders and selected options can become static text.
+  Browser-native non-text inputs have additional limitations. Do not replace working controls
+  solely to avoid interaction capture.
+- **Scrolling**: ordinary capture does not replay arbitrary actions. A scenario can explicitly
+  scroll the page or a container before capture. Document extent captures materialized content,
+  not content that has never been loaded.
+- **Hidden content**: a state capture records what is currently visible. Reveal content through
+  the intended source action when it belongs in the output; this is distinct from whether PAGX
+  itself can represent visibility or opacity.
+- **Unsupported browser surfaces**: ordinary snapshots may omit native media, dialogs or frames.
+  Structured interaction capture reports unsupported surfaces; an explicit viewport raster
+  fallback is available when a bitmap meets the task. See the interaction reference for limits.
+- **Canvas and complex effects**: unreadable/tainted canvas, WebGL surfaces and unsupported CSS
+  may be missing or approximated. Inspect the result; use a suitable image only when that matches
+  the requested editability and appearance.
 
 ## Minimal template
 
@@ -160,11 +158,13 @@ These either drop out or convert poorly. Design around them:
 </html>
 ```
 
-Convert it in-repo with the locally built `pagx`. If the design fits the default snapshot viewport,
-`pagx import --input page.html --output page.pagx` is enough; to pin the 640px width, snapshot first
-then import the subset:
+Use the selected CLI build and a viewport matching the design:
 
 ```bash
-node tools/html-snapshot/snapshot.js page.html --viewport-width 640 -o page.subset.html
-PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
+pagx import page.html --output-dir out --render \
+  --html-viewport-width 640 --html-viewport-height 400 --html-embed-fonts
 ```
+
+A simple `pagx import --input page.html --output page.pagx` is sufficient when default viewport
+and locally available fonts meet the task. See [Pipeline](pipeline.md) for resource portability
+and manual subset debugging.

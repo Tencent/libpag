@@ -96,6 +96,40 @@
 
 `<link rel="stylesheet">` 一律禁止。转换器不执行任何网络 I/O。
 
+### 3.5 Web 字体（`@font-face`）
+
+`<style>` 块中的 `@font-face` 规则会被采纳，无论 `src` 指向本地字体文件还是内联的 `data:` URI：
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- 读取 `font-family`、`src`、`font-weight` 与 `font-style` 四个描述符。按顺序扫描 `src` 中的
+  `url()` 源，取第一个可用源：本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；
+  `local()` 名称、`format()` 提示及其他描述符均被忽略。
+- `font-weight` / `font-style` 指明该规则声明的是哪一面：单个字重（`700`）、可变范围
+  （`400 900`），以及 `normal` / `italic` / `oblique` 斜体轴。字重是 `[1, 1000]` 的 CSS 数值，
+  允许小数，区间端点按该精度比较；`oblique` 的角度必须带 CSS 角度单位，且须落在
+  `[-90, 90]` 度内。两个描述符都不写即为 Regular 正体面；不符合 CSS 语法的取值按浏览器的做法
+  丢弃。同一族名分散在多条规则时，每处文本请求
+  按浏览器的字体匹配选面——先比斜体轴，再按 CSS 字重优先顺序——`Text.fontStyle` 取「请求字重」
+  与「该面字重」中较重的一方；当该族在请求的斜体轴上没有面时，再取所选面自己的斜体轴。因此只
+  提供 `font-weight: 700` 的族名，即使文本计算值为 400 也导出 `Bold`，而不会写出该族并不存在
+  的 Regular；唯一面声明为 `font-weight: 700; font-style: italic` 时导出 `Bold Italic`；而只有
+  Regular 面的族名用于 700 标题时仍导出 `Bold`，因为浏览器是合成粗体而不是退回 Regular。
+- 只有导入器实际加载成功的规则才能改写导出样式。所有源都是远程或无法加载的 `@font-face`
+  声明的是产物里永远不会出现的面，文本保持平台解析出的样式；同一族名既有已加载面又有远程
+  规则时，只按已加载面参与选面。
+- 两种源都按规则声明的 CSS 族名注册，用于导入时的字体匹配与排版，因此 CSS 族名与文件内部
+  的族名不必一致。这些注册不会序列化为字体资源；加载导出文档的宿主需通过自己的字体配置提供
+  所选字体。
+- 多条规则可以声明同一族名（例如中文字体按 unicode-range 拆成的分片）。每条规则的源都会注册：
+  最后一条规则的文件作为该族的主字体，其余文件加入回退链，主字体缺少的字符仍会用包含它的分片
+  整形。
+- 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
+  会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
+  丢弃。
+
 ## 4. 允许的 CSS 属性
 
 长度均为像素；百分比仅在 `width`/`height` 上接受（按 PAGX 语义参考父节点的内 padding
@@ -174,6 +208,7 @@
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
+| `isolation: isolate \| auto` | `isolate` 设置 `Layer.passThroughBackground = false`；`auto` 保留默认的背景穿透 |
 | `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
@@ -189,6 +224,12 @@
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
 `matrix3d` 的 3D `transform`。
 
+导入器按文档顺序绘制同级图层，不解析 CSS `z-index`。`tools/html-snapshot` 会先计算源页面的
+层叠上下文和绘制阶段，再生成子集；通过 `isolation: isolate` 保留合成分组，并用
+`data-pagx-paint-order="fixed"` 标记已规划的容器。flex 推断必须保留这些容器的绝对定位
+子元素及其顺序：仅凭布局矩形互不相交，无法证明后代、阴影和溢出内容可以安全重排。
+显式 flex 布局仍受支持。
+
 ### 4.5 文本
 
 | CSS | PAGX |
@@ -197,8 +238,9 @@
 | `text-decoration-color: <color>` | 下划线/删除线叠加矩形的颜色（继承,见 §6） |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
-| `font-weight: bold` / `600+` | 粗体（`bold` 或数值 ≥ 600）映射为粗体样式；当解析到的字体没有原生粗体时，导入器施加合成 `fauxBold`，使字重仍能呈现 |
-| `font-style: italic | oblique` | `Text.fontStyle = "Italic"`（与粗体组合为 `"Bold Italic"`） |
+| `font-weight: normal | bold | N` | CSS 数值字重（1–1000，不做取整）在宽度与倾斜匹配之后选择可用字体面；实际字体面名写入 `Text.fontStyle`，不添加合成粗体。对 `@font-face` 声明的族名，更重的源面可以提升导出字重，但不会降低原本更重的 CSS 请求（见 §3.5） |
+| `font-style: normal | italic | oblique` | 先按倾斜选择字体面，再匹配字重；合成斜体仍作为正体面的兜底 |
+| `font-stretch: <keyword> | N%` | 最先按宽度选择字体面（normal 为 100%）；可继承，包括快照文本 run |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `-webkit-text-stroke: W C`（或 `-webkit-text-stroke-width` / `-webkit-text-stroke-color` 长写） | 为字形 run 添加文本 `<Stroke color="C" width="W"/>` |
 | `text-align: start | left | center | right | justify` | `TextBox.textAlign = "start|center|end|justify"`（`left` → `start`，`right` → `end`） |
@@ -210,7 +252,12 @@
 | `text-overflow: ellipsis` | 告警（PAGX 暂未实现） |
 
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
-`unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写、web fonts (`@font-face`)。
+`unicode-bidi`、`font-variant`、`font` 缩写。Web 字体仅支持通过本地文件的 `@font-face`
+引入（见 §3.5）。
+
+字体匹配对已安装与已注册的静态字体面使用平台/字体元数据。精确的 PAGX 面名仍按精确名请求。缺失的字体
+面在同一族内按 CSS 的宽度、倾斜、字重搜索顺序选择。快照 Web 字体使用其 `@font-face` 描述符并保留有序
+的 Unicode 子集。任意可变轴实例化不在本子集范围内。
 
 **行内文本自适应宽度。** 不换行的行内文本叶子（`<span>` / `<a>`，且 `white-space: nowrap`
 或 `pre`）会丢弃其内联轴上的显式尺寸，改由排版后的文本撑起盒子，对应 CSS 的 shrink-to-fit。
@@ -351,9 +398,9 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | Pass | 静默改写 | 警告并丢弃 |
 |------|----------|------------|
 | DocumentSkeleton | 合并重复的 `<head>` / `<body>`、小写化标签、去掉注释与处理指令、丢弃 `<head>` 中除 `<title>` / `<meta>` / `<style>` 之外的元素 | `<script>` 等不允许的 `<head>` 内容（`subset:unsupported-tag`）；外部 `<link rel="stylesheet">`（`subset:external-stylesheet`）；`<html>` 与 `<body>` 之间的多余顶层元素（`subset:unsupported-tag`） |
-| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
+| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身，再重新输出一个只包含 `@keyframes`（§13）与 `@font-face`（§3.5）规则的 `<style>` | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、没有 `url()` 源的 `@font-face` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style；把 `-webkit-` 前缀声明合并到标准名（如 `-webkit-background-clip` → `background-clip`） | — |
-| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
+| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | MarginToGapPromotion | 当 `display: flex` 容器的在流子元素带有统一的逐子主轴 margin（leading 或 trailing 模式）时，把该 margin 提升到容器的 `gap` 并清除逐子 margin（`subset:margin-promoted-to-gap`） | 容器换行、已有正 `gap`、参与子元素少于两个、子元素带 `flex` grow、或 margin 非 px 时跳过（margin 留给 `wrapForMargin` 折叠） |
 | SpaceJustifyOverflowCollapse | 当使用 `space-between` / `space-around` / `space-evenly` 的 `display: flex` 容器子元素在主轴溢出时，把 `justify-content` 改写为 `flex-start`，避免 PAGX flex 引擎重叠（`subset:space-justify-collapsed-on-overflow`） | 尺寸数据不全（无显式 px 主轴尺寸、padding/gap 非 px、子元素尺寸无法解析、或子元素带 `flex` grow）时保持原样 |

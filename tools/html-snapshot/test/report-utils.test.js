@@ -151,6 +151,15 @@ describe('cpu accessors', () => {
     expect(cpuTotalSec({})).toBeNull();
     expect(cpuPctOfOneCore({})).toBeNull();
     expect(cpuUserSec(null)).toBeNull();
+    expect(cpuSystemSec(null)).toBeNull();
+    expect(cpuTotalSec(null)).toBeNull();
+    expect(cpuPctOfOneCore(null)).toBeNull();
+  });
+
+  test('keeps a partial cgroup measurement rather than substituting unrelated proc totals', () => {
+    expect(cpuTotalSec({ cgroup_cpu_system_sec: 1.235, proc_tree_cpu_total_sec: 99 })).toBe(1.24);
+    expect(cpuTotalSec({ cgroup_cpu_user_sec: 2.345 })).toBe(2.35);
+    expect(cpuTotalSec({ cgroup_cpu_user_sec: 0, cgroup_cpu_system_sec: 0 })).toBe(0);
   });
 });
 

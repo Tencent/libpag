@@ -104,6 +104,49 @@ CSS rule precedence (effective): `inline style` > `class rules` > `element rules
 
 External `<link rel="stylesheet">` is forbidden. The importer never performs HTTP I/O.
 
+### 3.5 Web fonts (`@font-face`)
+
+`@font-face` rules inside a `<style>` block are honoured whether `src` names a font file on
+local disk or inlines the font as a `data:` URI:
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- The `font-family`, `src`, `font-weight` and `font-style` descriptors are read. `src` is
+  scanned for `url()` sources in order, and the first usable one is taken: a local path (relative
+  paths resolve against the HTML file's directory) or a `data:` URI. `local()` names, `format()`
+  hints and every other descriptor are ignored.
+- `font-weight` / `font-style` say which face the rule declares: one weight (`700`), a variable
+  range (`400 900`), and `normal` / `italic` / `oblique` for the slant. Weights are CSS numbers in
+  `[1, 1000]` and may be fractional, and the range endpoints are compared at that precision. An
+  `oblique` angle needs a CSS angle unit and has to fall within `[-90, 90]` degrees. A rule that
+  omits both declares a Regular upright face, and a descriptor value that is not valid CSS is
+  dropped the way a browser drops it. When a family is split over several rules, each text request
+  resolves
+  to the face the browser's font matching picks — the slant first, then the CSS weight preference
+  order — and `Text.fontStyle` names the heavier of the request and that face's weight, plus the
+  face's own slant when the family has no face on the requested axis. A family that only ships
+  `font-weight: 700` therefore exports `Bold` even for text that computes to 400, instead of
+  naming a Regular face the family does not have; a family whose only face is
+  `font-weight: 700; font-style: italic` exports `Bold Italic`; and a Regular-only family used for
+  a 700 heading keeps `Bold`, because that is the weight the browser synthesises rather than
+  dropping back to Regular.
+- Only a rule whose source the importer loaded can redirect the exported style. A `@font-face`
+  whose sources are all remote or unloadable declares a face the document never renders with, so the
+  text keeps the style the platform resolves; inside a family split between a loaded face and a
+  remote one, only the loaded face counts.
+- Both kinds of source are registered under the CSS family the rule declares for import-time
+  matching and layout, so the CSS name need not match the font file's internal name. These
+  registrations are not serialized as font resources; a host loading the exported document
+  must supply the selected fonts through its own font configuration.
+- Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
+  source is registered: the last rule's file is the family's primary face, and the others join the
+  fallback chain, so a character the primary face lacks still shapes with the subset that has it.
+- Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
+  cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
+  source is dropped like any other unsupported at-rule.
+
 ## 4. Allowed CSS Properties
 
 Lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
@@ -176,10 +219,11 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-color: <color>` | `<Rectangle width="100%" height="100%" roundness="…"/>` + `<Fill color="…"/>` (background pair, see §5) |
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | inline `<LinearGradient>` inside `<Fill>` (`startPoint`/`endPoint` derived from angle) |
 | `background-image: radial-gradient(…)` | inline `<RadialGradient>` (center/radius derived from `circle at … N%`) |
-| `background-image: conic-gradient(from angle, …)` | inline `<ConicGradient>` (CSS 0° = top, PAGX 0° = right; angle shifted by −90°) |
+| `background-image: conic-gradient(from angle at position, …)` | a full `0..360°` `<ConicGradient>` with a rotation matrix of `angle − 90°` about its center; resolved tiles use pixel coordinates and `fitsToGeometry="false"` |
 | `background-clip: text` (alias `-webkit-background-clip: text`) | routes the element's background onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient, or the solid colour when no gradient layer is present) and suppresses the rectangle that would otherwise paint behind the text. This mirrors CSS, where the inherited transparent `text-fill-color` leaves the clipped background as the only glyph paint, so the background outranks `color`. A gradient `background-image` wins over a solid `background-color` (CSS paints the colour below the image layers). A fully transparent `background-color` carries no paint: the property is a no-op for that element. |
-| `background-image: url(...)` | recovered as an `<ImagePattern>` fill on the background rectangle (the inverse of `HTMLWriter`'s url-background emission). `background-size` / `background-repeat` / `background-position` drive the pattern's `scaleMode` / tile modes / matrix |
-| `background-blend-mode: <mode>` | sets `Fill.blendMode` on the gradient / image fill so it composites against the `background-color`, which is kept as a solid `<Fill>` underneath (the backdrop the blend needs). `normal` (the default) is a no-op and the opaque gradient/image keeps hiding the colour |
+| `background-image: url(...)` | raster images use tile-sized `<ImagePattern>` fills; SVG tiles remain vector import directives |
+| `background-size`, `background-position`, `background-repeat`, `background-origin`, `background-clip` | per-image layout for both URLs and gradients on resolved pixel boxes; supports `auto`, lengths/percentages, `contain`/`cover`, position keywords and edge offsets, and two-axis `repeat`/`no-repeat`/`space`/`round` |
+| `background-blend-mode: <mode>, …` | each background layer blends against preceding background layers in an isolated background stack, below the element's content and border |
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
 | `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
@@ -187,6 +231,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
+| `isolation: isolate \| auto` | `isolate` sets `Layer.passThroughBackground = false`; `auto` keeps the default background pass-through |
 | `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
@@ -194,14 +239,31 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
-`background-clip: text` fills the glyphs (see the row above). `border-box` is the default and
-collapses silently. `padding-box` / `content-box` are kept: each gradient layer carrying one is
-rebuilt as an inset child layer, which is how CSS paints gradient borders (a plain
-`background-color` still paints the border box). Any other value is dropped with a diagnostic.
+`background-clip: text` fills the glyphs (see the row above). Box clips use rounded contour
+masks independently from `background-origin` (default `padding-box`). The background color
+uses the bottom image layer's clip. Short property lists cycle; `none` image entries retain
+their indices. The `background` shorthand preserves these per-layer descriptors.
+
+Generated gradients have no intrinsic dimensions or aspect ratio: `20px auto` uses a 20px
+tile width and the positioning area's height. Gradient repetition describes colors within a
+tile; background repetition places tiles. Repeated vector tiles use `Repeater`, with shared
+internal edges drawn without per-tile antialiasing and outer edges clipped separately.
+The importer limits a background image to 65,536 visible tiles (4,096 SVG tiles), and expanded
+gradient periods to 4,096 color stops; exceeding a limit emits a diagnostic and omits that
+image. Unsupported layout syntax also emits a diagnostic. Position `calc()` supports sums
+of absolute lengths and percentages.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
 `outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
 `path`), and compound / non-`matrix3d` 3D `transform` chains.
+
+The importer paints sibling layers in document order; it does not resolve CSS `z-index`.
+`tools/html-snapshot` resolves the source page's stacking contexts and paint phases before
+emitting this subset. It retains compositing groups with `isolation: isolate`, and marks
+planned containers `data-pagx-paint-order="fixed"`. Flex inference must leave these containers'
+absolute children in their emitted order: geometric separation alone does not prove that
+descendants, shadows or overflowing content can be reordered safely. Explicit flex layouts
+remain supported.
 
 ### 4.5 Text
 
@@ -211,8 +273,9 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-decoration-color: <color>` | colour of the underline / strike overlay rectangle (inherited; see §6) |
 | `font-family: name` | `Text.fontFamily` |
 | `font-size: N px` | `Text.fontSize` |
-| `font-weight: bold` / `600+` | bold weights (`bold` or numeric ≥ 600) map to the bold style; when the resolved typeface has no native bold face the importer applies synthetic `fauxBold` so the weight still shows |
-| `font-style: italic | oblique` | `Text.fontStyle = "Italic"` (combined with bold into `"Bold Italic"`) |
+| `font-weight: normal | bold | N` | CSS numeric weight (1–1000, without rounding) selects an available face after width and slant matching; the actual face name is written to `Text.fontStyle`, without synthetic bold. For an `@font-face` family, a heavier declared face can raise the exported weight, but a heavier CSS request is not lowered (see §3.5) |
+| `font-style: normal | italic | oblique` | selects the face slant before weight matching; synthetic italic remains a fallback for an upright face |
+| `font-stretch: <keyword> | N%` | selects the face width first (normal is 100%); inherited, including captured text runs |
 | `letter-spacing: N px` | `Text.letterSpacing` |
 | `-webkit-text-stroke: W C` (or the `-webkit-text-stroke-width` / `-webkit-text-stroke-color` longhands) | adds a text `<Stroke color="C" width="W"/>` to the glyph run |
 | `text-align: start | left | center | right | justify` | `TextBox.textAlign = "start|center|end|justify"` (`left` → `start`, `right` → `end`) |
@@ -224,7 +287,10 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
-`unicode-bidi`, `font-variant`, `font-stretch`, `font` shorthand, web fonts (`@font-face`).
+`unicode-bidi`, `font-variant`, `font` shorthand. Web fonts are accepted through local
+or inline `@font-face` sources (see §3.5).
+
+Font matching uses platform/font metadata for installed and registered static faces. Exact PAGX face names remain exact-name requests. Missing faces use the CSS width, slant and weight search order within the same family. Snapshot web fonts use their declared `@font-face` descriptors and preserve ordered Unicode subsets. Arbitrary variable-axis instantiation is outside this subset.
 
 **Inline text shrink-to-fit.** A non-wrapping inline text leaf (`<span>` / `<a>` with
 `white-space: nowrap` or `pre`) drops its authored inline-axis size and lets the shaped text
@@ -278,9 +344,26 @@ to isolate its `<Fill>`.
   URI accepted; relative paths are resolved against the input file's directory) and emits
   `<Rectangle width="100%" height="100%"/>` filled with `<ImagePattern image="@id"/>`.
   `border-radius` set directly on the `<img>` rounds that rectangle.
-- `object-fit` on the `<img>` sets `ImagePattern.scaleMode`: `fill`→`Stretch`,
-  `contain`→`LetterBox`, `cover`→`Zoom`. `none` and `scale-down` are downgraded to
-  `contain` with a warning. Omitting `object-fit` defaults to `Stretch` (CSS `fill`).
+- All five `object-fit` values are supported. The default is `fill`. `none` uses natural
+  CSS dimensions; `scale-down` selects the smaller of `none` and `contain`.
+- `object-position` defaults to `50% 50%`. Keywords, percentages, absolute lengths,
+  four-token edge offsets, and affine `calc()` expressions are supported. Percentages resolve
+  against **content-box size minus concrete object size**, including negative space for `cover`.
+  The generic one/two/four-token position grammar is distinct from background's three-token form.
+- Simple centered raster images retain `Stretch` / `LetterBox` / `Zoom` fills. Other images use
+  a positioned content layer, sized after percentage/flex layout, with a content-box clip. Border,
+  padding, rounded content corners, backgrounds and shadows remain independent of image fitting.
+  The resulting geometry captures the import-time layout; editing the outer size or replacing
+  a resource later does not re-run CSS object sizing.
+- Snapshot images carry private `data-pagx-image-width` / `data-pagx-image-height` metadata
+  for the browser's natural CSS dimensions, separately from encoded resource pixels. This preserves
+  density-selected sources and browser fallback viewports for dimensionless SVG without changing
+  a shared resource. The metadata is consumed by the importer and is not exported as custom data.
+  Direct SVG import treats `viewBox` as an aspect ratio, not a natural size; its concrete object
+  rectangle becomes the SVG viewport, with native `preserveAspectRatio` semantics.
+- The object sizing algorithm follows CSS Images. Chromium currently applies the `scale-down`
+  no-enlargement limit to encoded pixels for density-selected raster images; those browser captures
+  can differ from the CSS-correct result. `none` uses density-corrected natural dimensions in both.
 - Inline `<svg>...</svg>` is captured verbatim and stored as the host `Layer`'s
   `<svg>` import directive. The SVG is resolved during `pagx verify` / `pagx resolve`.
 - `<img src="path.svg"/>` is converted into an external import directive
@@ -309,7 +392,8 @@ rounded `Rectangle` directly when **all** of the following hold:
 - the wrapper has exactly one element child, which is an `<img>` (no other elements; only
   whitespace text), and
 - that `<img>` exactly covers the wrapper's content box (matching `width` / `height`,
-  anchored at `(0, 0)`).
+  anchored at `(0, 0)`), has no independent effects, padding, border or animation, and uses
+  centered `fill`, `contain` or `cover`. Other cases retain separate geometry and clipping.
 
 The importer walks through up to three nested layout-only wrapper `<div>`s (wrappers that only
 pass layout through, with no paint of their own) to find the `<img>`, so common
@@ -333,8 +417,8 @@ through their own external-import directive path.
 
 - All HTML coordinates are converted to PAGX's top-left origin (y-down).
 - CSS gradient angles are measured from the top going clockwise. PAGX gradient angles are
-  measured from the +X axis. The importer converts as `pagx_angle = css_angle − 90°` for
-  `linear-gradient` and `conic-gradient`.
+  measured from the +X axis. Linear directions use `css_angle − 90°`. Conic gradients rotate
+  a canonical full turn by that angle, instead of changing the native sweep endpoints.
 - `linear-gradient` `to bottom right` style keywords are converted to numeric angles.
 
 ## 9. Pitfalls
@@ -385,9 +469,9 @@ Behaviour:
 | Pass | Silently rewrites | Warns and drops |
 |------|-------------------|-----------------|
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
-| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
+| StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element, re-emitting a `<style>` that carries only the `@keyframes` (§13) and `@font-face` (§3.5) rules | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face` without a `url()` source and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `writing-mode`, `background-image` + `background-size`/`background-repeat`/`background-position` (url backgrounds), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `object-position` (including affine `calc()`), `writing-mode`, `background-image` + per-layer `background-size`/`background-repeat`/`background-position`/`background-origin` (URLs and gradients), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |

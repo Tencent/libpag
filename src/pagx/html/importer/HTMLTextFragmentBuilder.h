@@ -28,6 +28,7 @@
 namespace pagx {
 
 struct DOMNode;
+class Data;
 class Fill;
 class HTMLDiagnosticSink;
 class HTMLIdAllocator;
@@ -113,6 +114,16 @@ class HTMLTextFragmentBuilder {
 
   /** Wires the document handle. Must be called once after the document has been constructed. */
   void bindDocument(PAGXDocument* document);
+
+  /** Registers a local @font-face source used by rendered text hosts. Returns false when the file
+   *  holds no usable face. @param internalFamily when not null, receives the family name stored
+   *  inside the file. */
+  bool registerFontFile(const std::string& family, const std::string& path,
+                        std::string* internalFamily = nullptr);
+
+  /** Registers the bytes of a @font-face source that the document inlines as a `data:` URI, under
+   *  the CSS family the rule declares. Returns false when the bytes hold no usable face. */
+  bool registerFontData(const std::string& family, const Data& fontData);
 
   /** Converts a text-leaf element (`<p>`, `<h1..6>`, `<span>`, `<a>`) into a Layer subtree. */
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,

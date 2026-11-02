@@ -138,6 +138,20 @@ static std::string FormatBounds(float x, float y, float w, float h) {
   return oss.str();
 }
 
+static const Layer* FindParentLayer(const PAGXDocument* doc, const Layer* child) {
+  if (child == nullptr) {
+    return nullptr;
+  }
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() != NodeType::Layer) continue;
+    auto* layer = static_cast<const Layer*>(node.get());
+    if (std::find(layer->children.begin(), layer->children.end(), child) != layer->children.end()) {
+      return layer;
+    }
+  }
+  return nullptr;
+}
+
 // ============================================================================
 // Static Detection: Empty Nodes
 // ============================================================================
@@ -710,13 +724,20 @@ static void StripCommonAttrsRecursive(xmlNodePtr node) {
 }
 
 static std::string GenerateNodeSignature(xmlNodePtr node,
-                                         const std::vector<const char*>& extraStripAttrs) {
+                                         const std::vector<const char*>& extraStripAttrs,
+                                         bool stripChildIdentity = true) {
   auto* copy = xmlCopyNode(node, 1);
   if (copy == nullptr) {
     return {};
   }
   ReorderAttributesRecursive(copy);
-  StripCommonAttrsRecursive(copy);
+  if (stripChildIdentity) {
+    StripCommonAttrsRecursive(copy);
+  } else {
+    StripAttribute(copy, "id");
+    StripAttribute(copy, "name");
+    StripDataAttributes(copy);
+  }
   for (auto* attr : extraStripAttrs) {
     StripAttribute(copy, attr);
   }
@@ -1154,7 +1175,9 @@ static std::string GenerateLayerSignature(const LineNodeMap& lineNodeMap, int so
   if (xmlNode == nullptr) {
     return {};
   }
-  return GenerateNodeSignature(xmlNode, LAYER_ROOT_STRIP_ATTRS);
+  // The instance can retain the root's identity, but sharing a Composition would merge the
+  // identities of its descendants. Keep those attributes when comparing candidate subtrees.
+  return GenerateNodeSignature(xmlNode, LAYER_ROOT_STRIP_ATTRS, false);
 }
 
 // Count total Layer nodes in a subtree (including the root).
@@ -1382,17 +1405,19 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
 }
 
 // ============================================================================
-// Static Detection: includeInLayout/flex Without Parent Layout,
+// Static Detection: includeInLayout Without Parent, flex Without Parent Layout,
 //                   gap/alignment/arrangement Without Self Layout
 // ============================================================================
 
-static void DetectIneffectiveLayoutAttrs(const Layer* layer, bool parentHasLayout,
+static void DetectIneffectiveLayoutAttrs(const Layer* layer, const Layer* parentLayer,
                                          std::vector<VerifyDiagnostic>& diagnostics) {
-  if (!parentHasLayout) {
-    if (!layer->includeInLayout) {
+  if (parentLayer == nullptr || parentLayer->layout == LayoutMode::None) {
+    // Even without flex layout, includeInLayout excludes a child from the parent's content
+    // measurement. It is ineffective only when there is no parent Layer.
+    if (parentLayer == nullptr && !layer->includeInLayout) {
       AddDiagnostic(diagnostics, layer->sourceLine,
-                    "includeInLayout=\"false\" has no effect, parent has no layout. "
-                    "Fix: check if includeInLayout or parent layout is missing");
+                    "includeInLayout=\"false\" has no effect, no parent Layer. "
+                    "Fix: remove includeInLayout or place this Layer in a parent Layer");
     }
     if (layer->flex > 0) {
       AddDiagnostic(diagnostics, layer->sourceLine,
@@ -1820,17 +1845,18 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 }
 
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
-                                      bool parentHasLayout, const LineNodeMap& lineNodeMap,
+                                      const Layer* parentLayer, const LineNodeMap& lineNodeMap,
                                       const LayerMatrixMap& matrices,
                                       std::vector<VerifyDiagnostic>& diagnostics,
-                                      bool isMaskLayer = false) {
+                                      const std::unordered_set<const Layer*>& maskLayers) {
+  bool parentHasLayout = parentLayer != nullptr && parentLayer->layout != LayoutMode::None;
   DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, matrices, diagnostics);
   // A mask layer is a synthetic, layout-excluded construct attached to its owner; its
   // `includeInLayout="false"` is required regardless of the owner's layout mode, so the
   // "ineffective layout attr" lint does not apply to it.
-  if (!isMaskLayer) {
-    DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  if (maskLayers.count(layer) == 0) {
+    DetectIneffectiveLayoutAttrs(layer, parentLayer, diagnostics);
   }
   DetectDowngradableLayers(layer, diagnostics);
   // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
@@ -1858,10 +1884,9 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
 
   RunStaticDetectionOnElements(layer->contents, lineNodeMap, diagnostics);
 
-  bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
-    RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
-                              matrices, diagnostics, /*isMaskLayer=*/child == layer->mask);
+    RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, layer, lineNodeMap, matrices,
+                              diagnostics, maskLayers);
   }
 }
 
@@ -1907,6 +1932,7 @@ static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
 
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics,
+                               const std::unordered_set<const Layer*>& maskLayers,
                                const Layer* targetLayer = nullptr) {
   LayerMatrixMap matrices;
   CollectLayerMatrices(doc->layers, Matrix::Identity(), matrices);
@@ -1920,12 +1946,13 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
     // does not run at root level.
     DetectMergeableAdjacentLayers(doc->layers, false, false, diagnostics);
     for (auto* layer : doc->layers) {
-      RunStaticDetectionOnLayer(layer, doc->width, doc->height, false, lineNodeMap, matrices,
-                                diagnostics);
+      RunStaticDetectionOnLayer(layer, doc->width, doc->height, nullptr, lineNodeMap, matrices,
+                                diagnostics, maskLayers);
     }
   } else {
-    RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, false, lineNodeMap, matrices,
-                              diagnostics);
+    auto* parentLayer = FindParentLayer(doc, targetLayer);
+    RunStaticDetectionOnLayer(targetLayer, doc->width, doc->height, parentLayer, lineNodeMap,
+                              matrices, diagnostics, maskLayers);
   }
 
   for (const auto& err : doc->errors) {
@@ -1982,11 +2009,13 @@ static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
          a.y + a.height > b.y + LAYOUT_SNAP_TOLERANCE;
 }
 
-static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
-  return (child.x + LAYOUT_SNAP_TOLERANCE) >= parent.x &&
-         (child.y + LAYOUT_SNAP_TOLERANCE) >= parent.y &&
-         (child.x + child.width) <= (parent.x + parent.width + LAYOUT_SNAP_TOLERANCE) &&
-         (child.y + child.height) <= (parent.y + parent.height + LAYOUT_SNAP_TOLERANCE);
+static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child, bool checkWidth,
+                             bool checkHeight) {
+  bool containedX = (child.x + LAYOUT_SNAP_TOLERANCE) >= parent.x &&
+                    (child.x + child.width) <= (parent.x + parent.width + LAYOUT_SNAP_TOLERANCE);
+  bool containedY = (child.y + LAYOUT_SNAP_TOLERANCE) >= parent.y &&
+                    (child.y + child.height) <= (parent.y + parent.height + LAYOUT_SNAP_TOLERANCE);
+  return (!checkWidth || containedX) && (!checkHeight || containedY);
 }
 
 static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);
@@ -2480,9 +2509,31 @@ static void DetectStretchFillAffectedByPadding(const std::vector<Element*>& elem
   }
 }
 
-static void DetectChildExceedingParent(const Layer* parentLayer,
+static bool HasConstrainedSize(const Layer* layer, const Layer* parentLayer, bool horizontal) {
+  if (layer->composition != nullptr || !std::isnan(horizontal ? layer->width : layer->height) ||
+      !std::isnan(horizontal ? layer->percentWidth : layer->percentHeight)) {
+    return true;
+  }
+  if (parentLayer != nullptr && parentLayer->layout != LayoutMode::None && layer->includeInLayout) {
+    bool parentHorizontal = parentLayer->layout == LayoutMode::Horizontal;
+    return horizontal == parentHorizontal ? layer->flex > 0
+                                          : parentLayer->alignment == Alignment::Stretch;
+  }
+  return horizontal ? (!std::isnan(layer->left) && !std::isnan(layer->right))
+                    : (!std::isnan(layer->top) && !std::isnan(layer->bottom));
+}
+
+static void DetectChildExceedingParent(const Layer* parentLayer, const Layer* grandparentLayer,
+                                       const std::unordered_set<const Layer*>& maskLayers,
                                        std::vector<VerifyDiagnostic>& diagnostics) {
   if (parentLayer->clipToBounds || parentLayer->hasScrollRect || parentLayer->mask != nullptr) {
+    return;
+  }
+  // Content-measured axes do not include authored x/y or matrix offsets. Only compare against
+  // axes whose size was authored or assigned by constraints, percentages, flex or stretch.
+  bool checkWidth = HasConstrainedSize(parentLayer, grandparentLayer, true);
+  bool checkHeight = HasConstrainedSize(parentLayer, grandparentLayer, false);
+  if (!checkWidth && !checkHeight) {
     return;
   }
   auto parentBounds = parentLayer->layoutBounds();
@@ -2491,12 +2542,16 @@ static void DetectChildExceedingParent(const Layer* parentLayer,
   }
   SpatialRect parent = {0, 0, parentBounds.width, parentBounds.height};
   for (auto* child : parentLayer->children) {
+    // Masks are evaluated in the owner's coordinate space, independently of their tree parent.
+    if (!child->visible || maskLayers.count(child) != 0) {
+      continue;
+    }
     auto childBounds = child->layoutBounds();
     if (childBounds.width <= 0 || childBounds.height <= 0) {
       continue;
     }
     SpatialRect childRect = {childBounds.x, childBounds.y, childBounds.width, childBounds.height};
-    if (!IsFullyContained(parent, childRect)) {
+    if (!IsFullyContained(parent, childRect, checkWidth, checkHeight)) {
       AddDiagnostic(
           diagnostics, child->sourceLine,
           "child extends beyond parent bounds " +
@@ -2910,11 +2965,16 @@ static void RunSpatialDetectionOnElements(const std::vector<Element*>& elements,
 
 static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLayer,
                                        const Layer* grandparentLayer, const SpatialRect& clipRect,
-                                       std::vector<VerifyDiagnostic>& diagnostics) {
+                                       const std::unordered_set<const Layer*>& maskLayers,
+                                       std::vector<VerifyDiagnostic>& diagnostics,
+                                       bool checkVisibleBounds = true) {
+  // Mask subtrees have a separate rendering context; hidden subtrees have no visible overflow.
+  // Keep validating their layout constraints even when viewport/bounds comparisons do not apply.
+  checkVisibleBounds = checkVisibleBounds && layer->visible && maskLayers.count(layer) == 0;
   auto layerBounds = layer->layoutBounds();
 
   // Check if this layer is completely outside the inherited clip region.
-  if (layerBounds.width > 0 && layerBounds.height > 0 && clipRect.width > 0 &&
+  if (checkVisibleBounds && layerBounds.width > 0 && layerBounds.height > 0 && clipRect.width > 0 &&
       clipRect.height > 0 && HasLeafContent(layer)) {
     SpatialRect layerRect = {layerBounds.x, layerBounds.y, layerBounds.width, layerBounds.height};
     if (!RectsOverlap(layerRect, clipRect)) {
@@ -2934,7 +2994,9 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   DetectExplicitSizeShadowedByOppositeEdge(layer, layer->sourceLine, diagnostics);
   DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
   DetectStretchFillAffectedByPadding(layer->contents, layer->padding, diagnostics);
-  DetectChildExceedingParent(layer, diagnostics);
+  if (checkVisibleBounds) {
+    DetectChildExceedingParent(layer, parentLayer, maskLayers, diagnostics);
+  }
   DetectContainerOverflow(layer, diagnostics);
 
   auto parentBounds = parentLayer != nullptr ? parentLayer->layoutBounds() : Rect{0, 0, 0, 0};
@@ -2966,18 +3028,31 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   }
 
   for (auto* child : layer->children) {
-    RunSpatialDetectionOnLayer(child, layer, parentLayer, childClip, diagnostics);
+    RunSpatialDetectionOnLayer(child, layer, parentLayer, childClip, maskLayers, diagnostics,
+                               checkVisibleBounds);
   }
 }
 
 static void RunSpatialDetection(const PAGXDocument* doc, std::vector<VerifyDiagnostic>& diagnostics,
+                                const std::unordered_set<const Layer*>& maskLayers,
                                 const Layer* targetLayer = nullptr) {
   SpatialRect canvasClip = {0, 0, static_cast<float>(doc->width), static_cast<float>(doc->height)};
   if (targetLayer != nullptr) {
-    RunSpatialDetectionOnLayer(targetLayer, nullptr, nullptr, canvasClip, diagnostics);
+    auto* parentLayer = FindParentLayer(doc, targetLayer);
+    auto* grandparentLayer = FindParentLayer(doc, parentLayer);
+    bool checkVisibleBounds = true;
+    for (auto* ancestor = parentLayer; ancestor != nullptr;
+         ancestor = FindParentLayer(doc, ancestor)) {
+      if (!ancestor->visible || maskLayers.count(ancestor) != 0) {
+        checkVisibleBounds = false;
+        break;
+      }
+    }
+    RunSpatialDetectionOnLayer(targetLayer, parentLayer, grandparentLayer, canvasClip, maskLayers,
+                               diagnostics, checkVisibleBounds);
   } else {
     for (auto* layer : doc->layers) {
-      RunSpatialDetectionOnLayer(layer, nullptr, nullptr, canvasClip, diagnostics);
+      RunSpatialDetectionOnLayer(layer, nullptr, nullptr, canvasClip, maskLayers, diagnostics);
     }
   }
 }
@@ -3141,11 +3216,19 @@ int RunVerify(int argc, char* argv[]) {
   }
 
   std::vector<VerifyDiagnostic> diagnostics;
+  // Imported SVG masks share a parent with their owners. Determine mask roles by references,
+  // including when --id selects only the mask, rather than by the traversal parent.
+  std::unordered_set<const Layer*> maskLayers;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() != NodeType::Layer) continue;
+    auto* layer = static_cast<const Layer*>(node.get());
+    if (layer->mask != nullptr) maskLayers.insert(layer->mask);
+  }
   if (xmlDoc != nullptr) {
     RunXsdValidation(xmlDoc, diagnostics);
   }
-  RunStaticDetection(doc.get(), lineNodeMap, diagnostics, targetLayer);
-  RunSpatialDetection(doc.get(), diagnostics, targetLayer);
+  RunStaticDetection(doc.get(), lineNodeMap, diagnostics, maskLayers, targetLayer);
+  RunSpatialDetection(doc.get(), diagnostics, maskLayers, targetLayer);
 
   if (xmlDoc != nullptr) {
     xmlFreeDoc(xmlDoc);

@@ -24,6 +24,7 @@
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace tgfx {
 class Typeface;
@@ -43,6 +44,10 @@ class LayoutContext {
   // then falls back to system font lookup via MakeFromName.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle);
+  // CSS selection returns a document registration key when one exists, preserving aliases.
+  std::shared_ptr<tgfx::Typeface> matchTypeface(const std::string& family,
+                                                const CSSFontStyle& request,
+                                                std::string* resolvedStyle = nullptr);
 
   // Finds a fallback typeface that contains the given codepoint. Searches user fallback
   // fonts first, then system fallback fonts. Typefaces are created on demand.
