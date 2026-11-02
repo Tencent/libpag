@@ -94,20 +94,28 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
       matrix.getRowColumn(3, 0) != 0.0f || matrix.getRowColumn(3, 1) != 0.0f ||
       matrix.getRowColumn(3, 2) != 0.0f || matrix.getRowColumn(3, 3) != 1.0f;
   if (hasPerspective) {
-    // A perspective matrix cannot be re-pivoted by touching the translation column alone: the w row
-    // and m33 change as well. Apply the full conjugation T(a) * M * T(-a) instead of the affine
-    // shortcut so the pivot stays put.
-    for (int column = 0; column < 4; ++column) {
-      const float w = matrix.getRowColumn(3, column);
-      result.setRowColumn(0, column, matrix.getRowColumn(0, column) + anchor.x * w);
-      result.setRowColumn(1, column, matrix.getRowColumn(1, column) + anchor.y * w);
-      result.setRowColumn(2, column, matrix.getRowColumn(2, column) + anchorZ * w);
+    // A perspective matrix is P * A with P built from the bottom row (the projection) and A affine.
+    // The pivot belongs to the affine chain only, mirroring how DCC tools keep the pivot inside the
+    // object transform and apply the camera last: M = P * T(a) * A * T(-a). Touching the translation
+    // column alone would leave the w row inconsistent, hence the split.
+    const float w = matrix.getRowColumn(3, 3);
+    if (w == 0.0f) {
+      return matrix;
     }
-    for (int row = 0; row < 4; ++row) {
-      const float shift = result.getRowColumn(row, 0) * anchor.x +
-                          result.getRowColumn(row, 1) * anchor.y +
-                          result.getRowColumn(row, 2) * anchorZ;
-      result.setRowColumn(row, 3, result.getRowColumn(row, 3) - shift);
+    const float p0 = matrix.getRowColumn(3, 0) / w;
+    const float p1 = matrix.getRowColumn(3, 1) / w;
+    const float p2 = matrix.getRowColumn(3, 2) / w;
+    Matrix3D affine = matrix;
+    affine.setRowColumn(3, 0, 0.0f);
+    affine.setRowColumn(3, 1, 0.0f);
+    affine.setRowColumn(3, 2, 0.0f);
+    affine.setRowColumn(3, 3, 1.0f);
+    const Matrix3D anchored = ApplyAnchorToMatrix(affine, anchor, anchorZ);
+    for (int column = 0; column < 4; ++column) {
+      result.setRowColumn(
+          3, column,
+          p0 * anchored.getRowColumn(0, column) + p1 * anchored.getRowColumn(1, column) +
+              p2 * anchored.getRowColumn(2, column) + anchored.getRowColumn(3, column));
     }
     return result;
   }

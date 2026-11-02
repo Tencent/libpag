@@ -967,6 +967,7 @@ Layer child elements are automatically categorized into five collections by type
 | `perspective` | float | 0 | Perspective viewing distance `d`; 0 means none, negative values are invalid |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | identity matrix | 3D transform (16 values, column-major); must be finite and invertible |
+| `anchor` | Point | 0,0 | Pivot of the local transform in layer-local pixels: `"x,y"` or `"x,y,z"`; applies as `M = T(t) * P * T(anchor) * L * T(-anchor)`, so the perspective projection stays outside the pivot. Values must be finite. Not animatable |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Group opacity |
