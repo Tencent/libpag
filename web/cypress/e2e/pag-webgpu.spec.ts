@@ -4,7 +4,7 @@ import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGSurface } from '../../src/pag-surface';
 import type { WebGPUTextureLike } from '../../src/core/webgpu-texture';
-import { itWebGPU, visitTestPage } from './lane';
+import { itWebGPU, skipOnSoftwareWebGPU, visitTestPage } from './lane';
 
 interface GPUTexture extends WebGPUTextureLike {
   destroy: () => void;
@@ -265,7 +265,8 @@ describe('PAGWebGPU', () => {
     ExpectPixels(await Read(surface), expected);
   });
 
-  itWebGPU('PAGView renders exact pixels through canvas2D compositing', async () => {
+  itWebGPU('PAGView renders exact pixels through canvas2D compositing', async function () {
+    await skipOnSoftwareWebGPU(this);
     const canvas = global.document.createElement('canvas');
     canvas.width = 65;
     canvas.height = 3;

@@ -5,7 +5,7 @@ import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGPlayer } from '../../src/pag-player';
 import type { PAGFile } from '../../src/pag-file';
-import { visitTestPage } from './lane';
+import { skipOnSoftwareWebGPU, visitTestPage } from './lane';
 
 describe('PAGPlayer', () => {
   let PAG: PAG;
@@ -57,7 +57,8 @@ describe('PAGPlayer', () => {
     expect(await pagPlayer.flush()).to.be.eq(false);
   });
 
-  it('Keeps other layers rendering when video preparation fails', async () => {
+  it('Keeps other layers rendering when video preparation fails', async function () {
+    await skipOnSoftwareWebGPU(this);
     const composition = PAG.PAGComposition.make(300, 300);
     const matrix = PAG.Matrix.makeTrans(100, 0);
     const solid = PAG.PAGSolidLayer.make(20000000, 40, 40, { red: 255, green: 0, blue: 0 }, 255);

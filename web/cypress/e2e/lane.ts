@@ -19,6 +19,47 @@ export const itGL = isWebGPU ? it.skip : it;
  */
 export const itWebGPU = isWebGPU ? it : it.skip;
 
+interface AdapterWithInfo {
+  info?: { isFallbackAdapter?: boolean };
+  requestAdapterInfo?: () => Promise<{ isFallbackAdapter?: boolean }>;
+}
+
+interface NavigatorWithGPU {
+  gpu?: { requestAdapter: () => Promise<AdapterWithInfo | null> };
+}
+
+let softwareWebGPUAdapter: boolean | undefined;
+
+/**
+ * Resolves whether the WebGPU lane runs on a software adapter such as SwiftShader. Always
+ * false on the WebGL lane. The adapter type is browser-level, so it is cached across tests.
+ */
+export const isSoftwareWebGPU = async (): Promise<boolean> => {
+  if (!isWebGPU) return false;
+  if (softwareWebGPUAdapter === undefined) {
+    // Cypress chainables are thenable at runtime but do not satisfy the Promise type.
+    softwareWebGPUAdapter = await (cy.window().then(async (win) => {
+      const gpu = (win.navigator as NavigatorWithGPU).gpu;
+      const adapter = await gpu?.requestAdapter();
+      const info = adapter?.info ?? (await adapter?.requestAdapterInfo?.());
+      return info?.isFallbackAdapter === true;
+    }) as unknown as Promise<boolean>);
+  }
+  return softwareWebGPUAdapter;
+};
+
+/**
+ * Skips the current test on software WebGPU adapters. Reading canvas content back
+ * (createImageBitmap on a WebGPU canvas, canvas2D compositing) is unavailable there and can
+ * even crash the Dawn instance, so such tests are limited to hardware adapters.
+ */
+export const skipOnSoftwareWebGPU = async (context: Mocha.Context): Promise<void> => {
+  if (await isSoftwareWebGPU()) {
+    cy.log('skipped: requires a hardware WebGPU adapter');
+    context.skip();
+  }
+};
+
 /**
  * Visits the host page that loads the libpag build of the current lane.
  */
