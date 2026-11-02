@@ -1560,6 +1560,33 @@ std::vector<BundleElement> FindBundleElements(const std::string& bodyHtml,
   return elements;
 }
 
+// Resolves the tags a bundle must be woven into. A node can render into several tags (Repeater
+// copies, a Fill shared by a box and a span), and one tag can be shared by several animated nodes
+// (a shape, its Fill, its Stroke and its TrimPath), so resolve through the ids recorded for the
+// node when a claim was made: searching only for its own base id would miss the tag that a sibling
+// candidate claimed. Layers, layer filters and mask paths keep their own id instead.
+std::vector<BundleElement> FindBundleElementsForNode(const std::string& bodyHtml,
+                                                     const HTMLWriterContext& ctx,
+                                                     const DomTargetBundle& bundle, size_t scope) {
+  std::vector<BundleElement> elements = {};
+  std::set<std::string> addedIds = {};
+  for (const auto& tag : ctx.animatedDomTags) {
+    if (tag.scope != scope || tag.node != bundle.primaryHost || !addedIds.insert(tag.id).second) {
+      continue;
+    }
+    size_t tagStart = 0;
+    size_t tagEnd = 0;
+    std::string tagName = {};
+    if (FindElementOpeningTagById(bodyHtml, tag.id, tagStart, tagEnd, tagName)) {
+      elements.push_back({tag.id, tagName});
+    }
+  }
+  if (elements.empty() && scope == 0) {
+    return FindBundleElements(bodyHtml, bundle.domId);
+  }
+  return elements;
+}
+
 }  // namespace
 
 HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext& ctx, bool enabled)
@@ -1759,21 +1786,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
     for (const auto& bundle : bundles) {
-      auto elements = mount.scope == 0 ? FindBundleElements(bodyHtml, bundle.domId)
-                                       : std::vector<BundleElement>{};
-      if (mount.scope != 0) {
-        for (const auto& tag : _ctx.animatedDomTags) {
-          if (tag.scope != mount.scope || tag.node != bundle.primaryHost) {
-            continue;
-          }
-          size_t start = 0;
-          size_t end = 0;
-          std::string tagName = {};
-          if (FindElementOpeningTagById(bodyHtml, tag.id, start, end, tagName)) {
-            elements.push_back({tag.id, tagName});
-          }
-        }
-      }
+      auto elements = FindBundleElementsForNode(bodyHtml, _ctx, bundle, mount.scope);
       if (elements.empty()) {
         continue;
       }
