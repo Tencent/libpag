@@ -3115,6 +3115,8 @@ Layer / Group
 
 旋转/缩放/剪切/透视通道驱动 §5.2 所述的 Layer 变换分量，可以像 `x`/`y`/`z` 一样做动画和数据绑定。组合后剪切角为 ±90° 或 `perspective` 为负数的写入会被拒绝。
 
+`anchor` 不是动画通道：它没有注册在 `PAGXNodeChannel.cpp` 中，写进 `<Channel>` 不会生效。锚点属于文档的静态姿态，动画只驱动 §5.2 的变换分量与 `matrix` / `matrix3D`。
+
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 
 | 通道 | 值类型 | 适用节点 | 说明 |

@@ -3113,6 +3113,8 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 
 The rotation/scale/skew/perspective channels drive the Layer transform components described in §5.2 and can be animated and data-bound like `x`/`y`/`z`. A write that would compose a skew of ±90° or a negative `perspective` is rejected.
 
+`anchor` is not an animation channel: it is not registered in `PAGXNodeChannel.cpp`, so writing it into a `<Channel>` has no effect. The pivot belongs to the document's static pose; animations only drive the transform components described in §5.2 plus `matrix` / `matrix3D`.
+
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 
 | Channel | Value Type | Nodes | Description |
