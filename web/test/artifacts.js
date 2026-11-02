@@ -72,6 +72,7 @@ function Publish(backend, mode, buildDirectory, webDirectory = __dirname) {
   const backup = `${stage}.previous`;
   try {
     const binding = fs.readFileSync(path.join(buildDirectory, 'tgfx-binding-path.txt'), 'utf8').trim();
+    if (path.basename(binding) !== 'tgfx.esm.js') throw new Error('Invalid TGFX binding path');
     for (const name of ArtifactNames) {
       const source = name === 'tgfx.esm.js' ? binding :
         path.join(name.startsWith('pag-test.') ? buildDirectory : webDirectory, name);

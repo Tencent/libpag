@@ -56,6 +56,12 @@ function StartServer(directory) {
       return;
     }
     const file = path.join(directory, name);
+    // The allowlist above already rejects traversal sequences; keep this containment check
+    // explicit so the request URL can never reach the file system unsanitized.
+    if (path.dirname(file) !== directory) {
+      response.writeHead(404).end();
+      return;
+    }
     const types = { '.js': 'text/javascript', '.html': 'text/html', '.json': 'application/json',
       '.wasm': 'application/wasm' };
     response.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
