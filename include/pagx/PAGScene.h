@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,6 +29,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/Rect.h"
 
 namespace tgfx {
 class Context;
@@ -129,7 +131,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
-   * callers must advance the scene (or its timelines) beforehand.
+   * callers must advance the scene (or its timelines) beforehand. When the document declares a
+   * default target view, only the target layer is rendered into the outputBounds rectangle; size
+   * the surface from getOutputBounds() so the window maps 1:1 to the surface.
    * This method manages the surface device's context lock internally. Callers must not already
    * hold that lock; use pagx::Record() from pagx/tgfx.h to render with an explicitly locked context.
    * @param surface    the destination surface.
@@ -149,6 +153,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Returns the document canvas height.
    */
   float height() const;
+
+  /**
+   * Returns the output rectangle, in document-root coordinates, that draw() renders when the
+   * document declares a default static output view (the paired `targetLayer` / `outputBounds` root
+   * attributes). Returns std::nullopt when the document has no target view and draw() renders the
+   * whole canvas. Callers use this to size the destination surface: the pixel size is
+   * ceil(width * scale) by ceil(height * scale) with the same rounding rules as other exporters.
+   */
+  std::optional<Rect> getOutputBounds() const;
 
   /**
    * Returns the display options used when drawing this PAGScene. The returned object is owned by
@@ -178,6 +191,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
    * testing does not require a prior draw(). Accepts surface coordinates (with zoom and content
    * offset applied) instead of the composition's local coordinates.
+   * Hit testing is not supported for documents with a default target view; this method returns an
+   * empty array for such scenes.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
@@ -212,6 +227,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // tree first. Used at creation and when an embedded external document changes (an external
   // composition is built into the tree once and cannot be patched in place).
   void buildRuntimeTree();
+  // Resolves and caches the document's default output target after a tree build or edit. Cached so
+  // renderTo() does not walk the authored layer tree on every frame.
+  void resolveOutputTarget();
   void buildViewModels();
   void buildNestedViewModels(PAGComposition* parentComp);
   static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(
@@ -252,6 +270,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<const Node*, std::shared_ptr<PAGTimeline>> instantiatedTimelines = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
+
+  // Authored layer that the document declares as its default static output target, or nullptr.
+  const Layer* outputTargetNode = nullptr;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 

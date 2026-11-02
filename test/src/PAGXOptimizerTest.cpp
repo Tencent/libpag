@@ -151,6 +151,21 @@ CLI_TEST(PAGXOptimizerTest, PruneEmptyLayer) {
   EXPECT_EQ(doc->layers[0], good);
 }
 
+CLI_TEST(PAGXOptimizerTest, PruneEmptyKeepsOutputTarget) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  doc->layers.push_back(target);
+  auto* other = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(other);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+
+  PAGXOptimizer::Optimize(doc.get());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0], target);
+  EXPECT_NE(doc->findNode("target"), nullptr);
+}
+
 CLI_TEST(PAGXOptimizerTest, PruneEmptyGroup) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = AddTopLayer(doc.get());

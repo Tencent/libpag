@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -29,6 +30,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -64,6 +66,26 @@ class PAGXDocument : public Node {
    * Canvas height.
    */
   float height = 0;
+
+  /**
+   * The id (without the leading '@') of the Layer that the document renders as its default static
+   * output, or empty when the document renders the whole canvas. Declared by the `targetLayer`
+   * root attribute, which must be paired with `outputBounds`.
+   */
+  std::string targetLayerId = {};
+
+  /**
+   * The output rectangle in document-root coordinates used when `targetLayerId` is set. Declared by
+   * the `outputBounds` root attribute. Empty when the document renders the whole canvas.
+   */
+  std::optional<Rect> outputBounds = std::nullopt;
+
+  /**
+   * Diagnostic recorded by the importer when the target view root attributes are present but
+   * invalid. Empty when the attributes are absent or valid. Consumers of the default static output
+   * must reject the document when this is non-empty instead of silently rendering the whole canvas.
+   */
+  std::string outputViewError = {};
 
   /**
    * Top-level layers (raw pointers, owned by nodes).

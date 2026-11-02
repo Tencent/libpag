@@ -270,10 +270,14 @@ PAGX uses a standard 2D Cartesian coordinate system:
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 | `viewModel` | idref | — | ViewModel reference `"@id"` |
+| `targetLayer` | idref | — | Default static output target Layer reference `"@id"`; must be paired with `outputBounds` |
+| `outputBounds` | rect | — | Default static output window `x,y,width,height` in document-root coordinates; must be paired with `targetLayer` |
 
 **Canvas Clipping**: The canvas defined by `width` and `height` acts as the rendering boundary. Any content extending beyond the canvas area is clipped and not rendered.
 
 **Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
+
+**Default Static Output View**: `targetLayer` and `outputBounds` together declare a static snapshot of one Layer as the document's default output. `width` and `height` remain the layout canvas; the output surface is the `outputBounds` rectangle, which may have a negative origin. Consumers that support the view render only the target Layer: its ancestors and earlier siblings supply coordinate context and backdrop pixels for backdrop-dependent styles (for example Glass and BackgroundBlur) but are not delivered as output, and later siblings are excluded. A target Layer inside a Composition resource is not addressable. Both attributes must be present; specifying only one is an error. The target must be a unique Layer reachable through the document's top-level layer tree. This round supports static snapshots only: documents that combine the target view with animations, state machines, or data binds are rejected. Consumers that do not support the view must reject the document explicitly instead of rendering the whole canvas.
 
 ### 3.3 Resources
 

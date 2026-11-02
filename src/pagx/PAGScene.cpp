@@ -40,6 +40,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/OutputView.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -84,6 +85,15 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
       LOGE("PAGScene::Make() aborted: %s", error.c_str());
       return nullptr;
     }
+  }
+  // A document with a broken default target view must not fall back to rendering the whole
+  // canvas: the output would silently include ancestor and surrounding content.
+  const Layer* outputTarget = nullptr;
+  std::string outputViewError;
+  if (ResolveOutputView(document.get(), &outputTarget, &outputViewError) ==
+      OutputViewStatus::Invalid) {
+    LOGE("PAGScene::Make() aborted: %s", outputViewError.c_str());
+    return nullptr;
   }
   auto scene = std::shared_ptr<PAGScene>(new PAGScene());
   scene->document = document;
@@ -141,6 +151,16 @@ void PAGScene::buildRuntimeTree() {
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
+  resolveOutputTarget();
+}
+
+void PAGScene::resolveOutputTarget() {
+  outputTargetNode = nullptr;
+  const Layer* resolved = nullptr;
+  std::string error;
+  if (ResolveOutputView(document.get(), &resolved, &error) == OutputViewStatus::Valid) {
+    outputTargetNode = resolved;
+  }
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -544,9 +564,48 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
   if (tgfxSurface == nullptr) {
     return false;
   }
+  if (document != nullptr && !document->targetLayerId.empty()) {
+    if (!document->outputBounds.has_value() || outputTargetNode == nullptr) {
+      return false;
+    }
+    auto* root = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
+    auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
+                      ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
+                      : nullptr;
+    if (root == nullptr || target == nullptr) {
+      return false;
+    }
+    auto zoomScale = displayList->zoomScale();
+    if (zoomScale <= 0.0f) {
+      return false;
+    }
+    auto canvas = tgfxSurface->getCanvas();
+    const auto& background = displayList->backgroundColor();
+    if (autoClear) {
+      canvas->clear(background);
+    } else if (background.alpha > 0.0f) {
+      canvas->drawColor(background);
+    }
+    const auto& contentOffset = displayList->contentOffset();
+    const auto& bounds = *document->outputBounds;
+    canvas->translate(contentOffset.x, contentOffset.y);
+    canvas->scale(zoomScale, zoomScale);
+    canvas->translate(-bounds.x, -bounds.y);
+    DrawOutputTarget(canvas, _rootComposition->runtimeLayer, target);
+    clearAllViewModelsDirty();
+    return true;
+  }
   displayList->render(tgfxSurface.get(), autoClear);
   clearAllViewModelsDirty();
   return true;
+}
+
+std::optional<Rect> PAGScene::getOutputBounds() const {
+  if (document == nullptr || document->targetLayerId.empty() ||
+      !document->outputBounds.has_value()) {
+    return std::nullopt;
+  }
+  return document->outputBounds;
 }
 
 float PAGScene::width() const {
@@ -657,6 +716,11 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
+  // Target-view scenes render only a cropped window, so surface coordinates no longer map to the
+  // document root through the display-list transform. Hit testing is not supported in this mode.
+  if (outputTargetNode != nullptr) {
+    return {};
+  }
   float rootX = 0;
   float rootY = 0;
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
@@ -755,6 +819,9 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
     // binding state.
     collectTextHolders();
+    // In-place refreshes can also change the layer tree shape, so the cached default output target
+    // must be resolved again instead of leaving a stale or dangling pointer behind.
+    resolveOutputTarget();
     // An incremental refresh adds or removes layers, changing binding membership in place without
     // recreating the reused timelines or their binding. Mark every timeline's resolved target cache
     // stale so the next apply() re-resolves; no other signal covers this case. Top-level

@@ -18,6 +18,7 @@
 
 #include <string>
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "utils/TestUtils.h"
 
@@ -144,6 +145,154 @@ PAGX_TEST(PAGXImporterValidationTest, AnimatingColorMatrixRejected) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_TRUE(HasError(doc, "Animating a ColorMatrixFilter is not supported"));
+}
+
+/**
+ * Test case: the paired targetLayer/outputBounds root attributes round-trip through import and
+ * export, and the parsed model stores the bare target id plus the document-space window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRoundTrip) {
+  std::string xml =
+      "<pagx width=\"300\" height=\"500\" targetLayer=\"@target\" outputBounds=\"0,280,80,40\">\n"
+      "  <Layer id=\"container\">\n"
+      "    <Layer id=\"preceding\"/>\n"
+      "    <Layer id=\"target\">\n"
+      "      <Rectangle position=\"40,20\" size=\"80,40\"/>\n"
+      "      <Fill color=\"#3366FF\"/>\n"
+      "    </Layer>\n"
+      "    <Layer id=\"later\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_EQ(doc->targetLayerId, "target");
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, 0.0f);
+  EXPECT_EQ(doc->outputBounds->y, 280.0f);
+  EXPECT_EQ(doc->outputBounds->width, 80.0f);
+  EXPECT_EQ(doc->outputBounds->height, 40.0f);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("targetLayer=\"@target\""), std::string::npos);
+  EXPECT_NE(exported.find("outputBounds=\"0,280,80,40\""), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(exported);
+  ASSERT_TRUE(reloaded != nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  EXPECT_EQ(reloaded->targetLayerId, "target");
+  ASSERT_TRUE(reloaded->outputBounds.has_value());
+  EXPECT_EQ(reloaded->outputBounds->y, 280.0f);
+}
+
+/**
+ * Test case: a single target view attribute is rejected instead of guessing a default window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRequiresPairedAttributes) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "must be specified together"));
+  EXPECT_FALSE(doc->outputViewError.empty());
+
+  std::string boundsOnly =
+      "<pagx width=\"100\" height=\"100\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto boundsDoc = pagx::PAGXImporter::FromXML(boundsOnly);
+  ASSERT_TRUE(boundsDoc != nullptr);
+  EXPECT_TRUE(HasError(boundsDoc, "must be specified together"));
+}
+
+/**
+ * Test case: invalid outputBounds values (non-positive size, non-numeric, trailing junk) are
+ * rejected rather than producing a zero-sized or partially parsed window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidBoundsRejected) {
+  const char* bounds[] = {"0,0,0,40", "0,0,80,-1", "0,0,80,40x", "a,b,c,d", "0,0,inf,40"};
+  for (const auto* value : bounds) {
+    std::string xml =
+        "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+        "outputBounds=\"" +
+        std::string(value) + "\">\n  <Layer id=\"target\"/>\n</pagx>\n";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr) << value;
+    EXPECT_TRUE(HasError(doc, "Invalid value")) << value;
+  }
+}
+
+/**
+ * Test case: the target must be a unique Layer reachable from the document layer tree. A missing
+ * node, a non-Layer node, a duplicated id, and a Target inside a Composition resource are all
+ * rejected with distinct diagnostics.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsInvalidTargets) {
+  std::string missing =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@nope\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto missingDoc = pagx::PAGXImporter::FromXML(missing);
+  ASSERT_TRUE(missingDoc != nullptr);
+  EXPECT_TRUE(HasError(missingDoc, "does not match any node"));
+
+  std::string notLayer =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@shape\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\">\n"
+      "    <Rectangle id=\"shape\" position=\"5,5\" size=\"10,10\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto notLayerDoc = pagx::PAGXImporter::FromXML(notLayer);
+  ASSERT_TRUE(notLayerDoc != nullptr);
+  EXPECT_TRUE(HasError(notLayerDoc, "does not resolve to a Layer"));
+
+  std::string unreachable =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@inner\" outputBounds=\"0,0,10,10\">\n"
+      "  <Resources>\n"
+      "    <Composition id=\"comp\">\n"
+      "      <Layer id=\"inner\"/>\n"
+      "    </Composition>\n"
+      "  </Resources>\n"
+      "  <Layer id=\"host\" composition=\"@comp\"/>\n"
+      "</pagx>\n";
+  auto unreachableDoc = pagx::PAGXImporter::FromXML(unreachable);
+  ASSERT_TRUE(unreachableDoc != nullptr);
+  EXPECT_TRUE(HasError(unreachableDoc, "not reachable"));
+
+  std::string duplicate =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto duplicateDoc = pagx::PAGXImporter::FromXML(duplicate);
+  ASSERT_TRUE(duplicateDoc != nullptr);
+  EXPECT_TRUE(HasError(duplicateDoc, "not uniquely reachable"));
+}
+
+/**
+ * Test case: target view documents are static-only this round. Declaring animations or data binds
+ * alongside the target fields is rejected at parse time so consumers never silently ignore motion.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsDynamicContent) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"target\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "animations"));
 }
 
 }  // namespace pag

@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <string>
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
@@ -37,6 +38,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
+#include "pagx/utils/OutputView.h"
 #include "renderer/LayerBuilder.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
@@ -351,13 +353,27 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   }
   document->applyLayout(&fontConfig);
 
+  const pagx::Layer* documentTarget = nullptr;
+  std::string outputViewError;
+  auto outputViewStatus =
+      pagx::ResolveOutputView(document.get(), &documentTarget, &outputViewError);
+  if (outputViewStatus == pagx::OutputViewStatus::Invalid) {
+    std::cerr << "pagx render: error: " << outputViewError << "\n";
+    return {};
+  }
+  if (options.hasTime && outputViewStatus == pagx::OutputViewStatus::Valid) {
+    std::cerr << "pagx render: error: --time cannot be combined with a document target view\n";
+    return {};
+  }
+
   // Animated frame requested: evaluate the timelines at the requested playback time and render
   // through the runtime scene. PAGScene::Make() reuses the already-applied layout.
   if (options.hasTime) {
     return RenderAnimatedFrame(document, options);
   }
 
-  bool hasTarget = !options.id.empty() || !options.xpath.empty();
+  bool hasExplicitTarget = !options.id.empty() || !options.xpath.empty();
+  bool hasTarget = hasExplicitTarget || outputViewStatus == pagx::OutputViewStatus::Valid;
   std::shared_ptr<tgfx::Layer> rootLayer = nullptr;
   std::shared_ptr<tgfx::Layer> targetTgfxLayer = nullptr;
   LayerBuildResult buildResult = {};
@@ -386,7 +402,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
         return {};
       }
       targetPagxLayer = static_cast<const Layer*>(node);
-    } else {
+    } else if (!options.xpath.empty()) {
       xmlDocPtr xmlDoc = xmlReadFile(options.inputFile.c_str(), nullptr, XML_PARSE_NONET);
       if (xmlDoc == nullptr) {
         std::cerr << "pagx render: failed to parse XML from '" << options.inputFile << "'\n";
@@ -398,6 +414,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
         std::cerr << "pagx render: no matching Layer found\n";
         return {};
       }
+    } else {
+      targetPagxLayer = documentTarget;
     }
     targetTgfxLayer = buildResult.getLayer(targetPagxLayer);
     if (targetTgfxLayer == nullptr) {
@@ -416,17 +434,25 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   displayList.root()->addChild(rootLayer);
 
   if (targetTgfxLayer != nullptr) {
-    auto globalBounds = targetTgfxLayer->getBounds(rootLayer.get(), true);
-    if (options.hasCrop) {
-      sourceWidth = options.cropWidth;
-      sourceHeight = options.cropHeight;
-      offsetX = globalBounds.left + options.cropX;
-      offsetY = globalBounds.top + options.cropY;
+    if (hasExplicitTarget || options.hasCrop) {
+      auto globalBounds = targetTgfxLayer->getBounds(rootLayer.get(), true);
+      if (options.hasCrop) {
+        sourceWidth = options.cropWidth;
+        sourceHeight = options.cropHeight;
+        offsetX = globalBounds.left + options.cropX;
+        offsetY = globalBounds.top + options.cropY;
+      } else {
+        sourceWidth = globalBounds.width();
+        sourceHeight = globalBounds.height();
+        offsetX = globalBounds.left;
+        offsetY = globalBounds.top;
+      }
     } else {
-      sourceWidth = globalBounds.width();
-      sourceHeight = globalBounds.height();
-      offsetX = globalBounds.left;
-      offsetY = globalBounds.top;
+      const auto& bounds = *document->outputBounds;
+      sourceWidth = bounds.width;
+      sourceHeight = bounds.height;
+      offsetX = bounds.x;
+      offsetY = bounds.y;
     }
   } else {
     sourceWidth = options.hasCrop ? options.cropWidth : document->width;
@@ -437,12 +463,17 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     }
   }
 
-  int outputWidth = static_cast<int>(ceilf(sourceWidth * options.scale));
-  int outputHeight = static_cast<int>(ceilf(sourceHeight * options.scale));
-  if (outputWidth <= 0 || outputHeight <= 0) {
-    std::cerr << "pagx render: output dimensions are zero\n";
+  double pixelWidth = std::ceil(static_cast<double>(sourceWidth) * options.scale);
+  double pixelHeight = std::ceil(static_cast<double>(sourceHeight) * options.scale);
+  constexpr double maxDimension = static_cast<double>(std::numeric_limits<int>::max());
+  if (!std::isfinite(pixelWidth) || !std::isfinite(pixelHeight) || pixelWidth < 1.0 ||
+      pixelHeight < 1.0 || pixelWidth > maxDimension || pixelHeight > maxDimension) {
+    std::cerr << "pagx render: output dimensions are not renderable (" << pixelWidth << "x"
+              << pixelHeight << ")\n";
     return {};
   }
+  int outputWidth = static_cast<int>(pixelWidth);
+  int outputHeight = static_cast<int>(pixelHeight);
 
   auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
@@ -472,8 +503,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     auto canvas = surface->getCanvas();
     canvas->scale(options.scale, options.scale);
     canvas->translate(-offsetX, -offsetY);
-    canvas->concat(targetTgfxLayer->getRelativeMatrix(rootLayer.get()));
-    targetTgfxLayer->draw(canvas);
+    pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer);
   } else {
     displayList.setZoomScale(options.scale);
     if (offsetX != 0.0f || offsetY != 0.0f) {

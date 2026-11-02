@@ -45,6 +45,7 @@
 #include "pagx/types/Data.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/MemZip.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
@@ -988,7 +989,7 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
   slides.reserve(documents.size());
   int imageBase = 0;
   for (auto* doc : documents) {
-    if (doc == nullptr || doc->hasUnresolvedImports()) {
+    if (doc == nullptr || doc->hasUnresolvedImports() || HasDeclaredOutputView(*doc)) {
       return {};
     }
     auto errorCount = doc->errors.size();
@@ -1121,6 +1122,14 @@ bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std:
 
 std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
                                           const Options& options, std::string* errorMsg) {
+  for (auto* doc : documents) {
+    if (doc != nullptr && HasDeclaredOutputView(*doc)) {
+      if (errorMsg != nullptr) {
+        *errorMsg = "PPT export does not support documents with targetLayer/outputBounds.";
+      }
+      return nullptr;
+    }
+  }
   auto slides = BuildSlides(documents, options);
   if (slides.empty()) {
     if (errorMsg) {

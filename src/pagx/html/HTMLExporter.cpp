@@ -30,6 +30,7 @@
 #include "pagx/html/HTMLZipWriter.h"
 #endif
 #include "pagx/nodes/Font.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 
@@ -310,6 +311,12 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
 std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
                                  HTMLOutputMode mode, const Options& options,
                                  std::string* errorMsg) {
+  if (HasDeclaredOutputView(doc)) {
+    if (errorMsg != nullptr) {
+      *errorMsg = "HTML export does not support documents with targetLayer/outputBounds.";
+    }
+    return {};
+  }
   if (resourceDir.empty()) {
     if (errorMsg) {
       *errorMsg = "resourceDir must not be empty.";

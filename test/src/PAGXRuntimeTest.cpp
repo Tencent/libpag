@@ -76,6 +76,17 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
 /**
  * Test case: PAGScene timeline lookup by name and identity sharing.
  */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneRejectsInvalidOutputView) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  doc->targetLayerId = "missing";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+  EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+
+  auto incomplete = pagx::PAGXDocument::Make(100, 100);
+  incomplete->targetLayerId = "missing";
+  EXPECT_EQ(pagx::PAGScene::Make(incomplete), nullptr);
+}
+
 PAGX_TEST(PAGXRuntimeTest, PAGSceneTimelineLookup) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 

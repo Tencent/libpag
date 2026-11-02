@@ -270,10 +270,14 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 | `width` | float | (必填) | 画布宽度 |
 | `height` | float | (必填) | 画布高度 |
 | `viewModel` | idref | — | ViewModel 引用 `"@id"` |
+| `targetLayer` | idref | — | 默认静态输出目标 Layer 引用 `"@id"`，必须与 `outputBounds` 成对出现 |
+| `outputBounds` | rect | — | 文档根坐标下的默认静态输出窗口 `x,y,width,height`，必须与 `targetLayer` 成对出现 |
 
 **画布裁剪**：由 `width` 和 `height` 定义的画布作为渲染边界，超出画布区域的内容会被裁剪，不参与渲染。
 
 **图层渲染顺序**：图层按文档顺序依次渲染，文档中靠前的图层先渲染（位于下方），靠后的图层后渲染（位于上方）。
+
+**默认静态输出视图**：`targetLayer` 与 `outputBounds` 共同声明以某个 Layer 的静态快照作为文档默认输出。`width` 与 `height` 仍然是布局画布；输出 Surface 是 `outputBounds` 矩形，允许负原点。支持该视图的消费者只渲染目标 Layer：其祖先与前序兄弟仅提供坐标上下文和背景采样像素（供 Glass、BackgroundBlur 等依赖背景的样式使用），不作为输出交付；后序兄弟不参与。Composition 资源内部的 Layer 不可寻址。两个属性必须同时出现，只指定其一是错误。目标必须是可通过文档顶层图层树唯一到达的 Layer。本期仅支持静态快照：目标视图与动画、状态机或数据绑定同时出现的文档会被拒绝。不支持该视图的消费者必须显式拒绝该文档，不能退化为渲染整页。
 
 ### 3.3 资源区（Resources）
 
