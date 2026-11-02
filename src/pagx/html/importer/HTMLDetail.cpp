@@ -290,8 +290,34 @@ void ParseStyleString(const std::string& styleStr,
   }
 }
 
+namespace {
+
+std::string StripSurroundingQuotes(const std::string& s) {
+  if (s.size() < 2) return s;
+  char first = s.front();
+  char last = s.back();
+  if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+    return s.substr(1, s.size() - 2);
+  }
+  return s;
+}
+
+}  // namespace
+
 std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
-  return ParseCSSFontFamilyList(raw);
+  std::vector<std::string> out;
+  if (Trim(raw).empty()) return out;
+  auto tokens = SplitTopLevelCommas(raw);
+  out.reserve(tokens.size());
+  for (auto& token : tokens) {
+    auto trimmed = Trim(token);
+    if (trimmed.empty()) continue;
+    auto stripped = Trim(StripSurroundingQuotes(trimmed));
+    if (!stripped.empty()) {
+      out.push_back(std::move(stripped));
+    }
+  }
+  return out;
 }
 
 FontFamilyToken ClassifyFontFamilyToken(const std::string& name) {

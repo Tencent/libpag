@@ -40,36 +40,6 @@ std::string MatchCSSFontStyle(const std::vector<std::string>& styles,
   return best < 0 ? std::string() : faces[best].name;
 }
 
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value) {
-  std::vector<std::string> families;
-  std::string current;
-  char quote = 0;
-  bool escaped = false;
-  for (size_t i = 0; i <= value.size(); ++i) {
-    char c = i == value.size() ? ',' : value[i];
-    if (escaped) {
-      current += c;
-      escaped = false;
-    } else if (c == '\\') {
-      escaped = true;
-    } else if (quote != 0) {
-      if (c == quote) quote = 0;
-      else
-        current += c;
-    } else if (c == '"' || c == '\'') {
-      quote = c;
-    } else if (c == ',') {
-      auto start = current.find_first_not_of(" \t\r\n");
-      auto end = current.find_last_not_of(" \t\r\n");
-      if (start != std::string::npos) families.push_back(current.substr(start, end - start + 1));
-      current.clear();
-    } else {
-      current += c;
-    }
-  }
-  return families;
-}
-
 std::string ResolveCSSGenericFontFamily(const std::string& name) {
   std::string lower = name;
   for (auto& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));

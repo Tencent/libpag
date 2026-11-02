@@ -49,7 +49,6 @@ int CompareCSSFontStyles(const CSSFontStyle& request, const CSSFontStyle& a, con
 int MatchCSSFontFace(const std::vector<CSSFontFace>& faces, const CSSFontStyle& request);
 double CSSFontWidthFromClass(int widthClass);
 
-std::vector<std::string> ParseCSSFontFamilyList(const std::string& value);
 std::string ResolveCSSGenericFontFamily(const std::string& name);
 // True when `name` is a CSS generic font keyword (including the ones this platform has no face
 // for). Callers that classify a font-family stack use it to tell a generic keyword apart from an

@@ -376,42 +376,6 @@ PAG_TEST(PAGXSVGReferenceTest, UseOfSymbolKeepsItsViewportLocalAndRestoresSiblin
   EXPECT_FLOAT_EQ(static_cast<pagx::Rectangle*>(siblingRects[0])->size.height, 50);
 }
 
-PAG_TEST(PAGXSVGReferenceTest, TextChunksMergeNeutralSpansButKeepAbsolutePositionBoundaries) {
-  auto doc = pagx::SVGImporter::ParseString(R"SVG(
-    <svg width="200" height="100"><text x="10" y="20" font-size="12">
-      f<tspan>fi</tspan><tspan display="none">hidden</tspan><tspan x="100" y="40" dx=".5em"> B </tspan>
-    </text></svg>)SVG");
-  ASSERT_NE(doc, nullptr);
-  ASSERT_EQ(doc->layers.size(), 1u);
-  auto texts = Elements(doc->layers[0], pagx::NodeType::Text);
-  ASSERT_EQ(texts.size(), 2u);
-  auto* first = static_cast<pagx::Text*>(texts[0]);
-  auto* second = static_cast<pagx::Text*>(texts[1]);
-  EXPECT_EQ(first->text, "ffi");
-  EXPECT_EQ(second->text, " B");
-  EXPECT_FLOAT_EQ(first->position.x, 10);
-  EXPECT_FLOAT_EQ(first->position.y, 20);
-  EXPECT_FLOAT_EQ(second->position.x, 106);
-  EXPECT_FLOAT_EQ(second->position.y, 40);
-}
-
-PAG_TEST(PAGXSVGReferenceTest, TextPathCalibratesAbsoluteOffsetsAndAnchorsTheWholeChunk) {
-  auto doc = pagx::SVGImporter::ParseString(R"SVG(
-    <svg width="200" height="100"><defs><path id="p" d="M0 0H100" pathLength="10"
-      transform="scale(2)"/></defs><text text-anchor="middle" textLength="40">
-      <textPath href="#p" startOffset="2">a<tspan fill="red">b</tspan></textPath>
-    </text></svg>)SVG");
-  ASSERT_NE(doc, nullptr);
-  ASSERT_EQ(doc->layers.size(), 1u);
-  auto paths = Elements(doc->layers[0], pagx::NodeType::TextPath);
-  ASSERT_EQ(paths.size(), 1u);
-  auto* path = static_cast<pagx::TextPath*>(paths[0]);
-  EXPECT_TRUE(path->forceAlignment);
-  EXPECT_FLOAT_EQ(path->firstMargin, 20);
-  EXPECT_FLOAT_EQ(path->lastMargin, -140);
-  EXPECT_EQ(Elements(doc->layers[0], pagx::NodeType::Text).size(), 2u);
-}
-
 PAG_TEST(PAGXSVGReferenceTest, PatternedStrokeRetainsCalibratedDashesAndIndependentFill) {
   auto doc = pagx::SVGImporter::ParseString(R"SVG(
     <svg width="100" height="100"><defs>

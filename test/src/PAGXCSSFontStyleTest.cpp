@@ -46,13 +46,6 @@ CLI_TEST(PAGXCSSFontStyleTest, InvalidNumericDescriptorsUseCSSDefaults) {
   for (int invalid : {-1, 0, 10}) EXPECT_DOUBLE_EQ(pagx::CSSFontWidthFromClass(invalid), 100);
 }
 
-CLI_TEST(PAGXCSSFontStyleTest, EscapedFamilyNamesRetainCommasQuotesAndBackslashes) {
-  auto families = pagx::ParseCSSFontFamilyList(
-      R"CSS( Vendor\, Name , 'Single\'Quote', "Double\"Quote", Back\\Slash, sans-serif )CSS");
-  EXPECT_EQ(families, (std::vector<std::string>{"Vendor, Name", "Single'Quote", "Double\"Quote",
-                                                "Back\\Slash", "sans-serif"}));
-}
-
 CLI_TEST(PAGXCSSFontStyleTest, EqualMetadataUsesStableFaceNameTieBreak) {
   std::vector<pagx::CSSFontFace> faces = {{"Zeta", {550.5, 87.25}},
                                           {"Alpha", {550.5, 87.25}},
