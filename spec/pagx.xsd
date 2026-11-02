@@ -30,6 +30,13 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- Anchor: "x,y" or "x,y,z" - two or three comma-separated floats -->
+  <xs:simpleType name="AnchorType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="-?[0-9]*\.?[0-9]+,-?[0-9]*\.?[0-9]+(,-?[0-9]*\.?[0-9]+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- Point: "x,y" - two comma-separated floats -->
   <xs:simpleType name="PointType">
     <xs:restriction base="xs:string">
@@ -1005,6 +1012,7 @@
     <xs:attribute name="composition" type="IdRefType"/>
     <xs:attribute name="matrix" type="MatrixType"/>
     <xs:attribute name="matrix3D" type="Matrix3DType"/>
+    <xs:attribute name="anchor" type="AnchorType" default="0,0"/>
     <xs:attribute name="preserve3D" type="BoolType" default="false"/>
     <xs:attribute name="antiAlias" type="BoolType" default="true"/>
     <xs:attribute name="groupOpacity" type="BoolType" default="true"/>

@@ -104,8 +104,11 @@ Matrix BuildLayerMatrix(const Layer* layer) {
   // as if it were not set here as well; the same flags also skip an identity matrix.
   bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
   bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
+  // An anchor makes the plain 2D matrix branch wrong: the pivot must still be folded in, so route
+  // it through BuildLayerLocalMatrix3D as well.
+  bool hasAnchor = layer->anchor.x != 0 || layer->anchor.y != 0 || layer->anchorZ != 0;
   Matrix m = hasMatrix ? layer->matrix : Matrix::Identity();
-  if (hasMatrix3D || (!hasMatrix && HasLayerTransformComponents(layer))) {
+  if (hasMatrix3D || hasAnchor || (!hasMatrix && HasLayerTransformComponents(layer))) {
     auto local = BuildLayerLocalMatrix3D(layer);
     const float* v = local.values;
     float w = 1.0f;

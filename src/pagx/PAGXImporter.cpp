@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <climits>
@@ -552,8 +553,10 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   auto anchorStr = GetAttribute(node, "anchor");
   if (!anchorStr.empty()) {
     auto anchorValues = ParseFloatList(anchorStr);
-    if (anchorValues.size() != 2 && anchorValues.size() != 3) {
-      ReportError(doc, node, "Invalid 'anchor' value (expected 'x,y' or 'x,y,z').");
+    const bool allFinite = std::all_of(anchorValues.begin(), anchorValues.end(),
+                                       [](float value) { return std::isfinite(value); });
+    if ((anchorValues.size() != 2 && anchorValues.size() != 3) || !allFinite) {
+      ReportError(doc, node, "Invalid anchor '" + anchorStr + "' (expected 'x,y' or 'x,y,z').");
     } else {
       layer->anchor = {anchorValues[0], anchorValues[1]};
       layer->anchorZ = (anchorValues.size() == 3) ? anchorValues[2] : 0.0f;
