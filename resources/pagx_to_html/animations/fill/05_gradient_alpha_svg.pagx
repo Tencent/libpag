@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Fill alpha fades a gradient-painted SVG path between 0.35 and fully opaque. The keyframe
+     must keep the gradient paint (fill-opacity only) instead of replacing it with a solid black
+     fill. The small swatch in the top-right corner is an unanimated copy of the same gradient, and
+     the gradient stays bright, so a black fill on the large triangle is visible at a glance.
+     Target: Fill  Channel: alpha  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Path data="M30 175 L160 25 L290 175 Z"/>
+    <Fill id="gradPathFill" alpha="0.35">
+      <LinearGradient startPoint="30,175" endPoint="290,25">
+        <ColorStop offset="0" color="#FDE047"/>
+        <ColorStop offset="1" color="#F97316"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="288,34" size="36,36"/>
+    <Fill id="gradPathRef">
+      <LinearGradient startPoint="270,16" endPoint="306,52">
+        <ColorStop offset="0" color="#FDE047"/>
+        <ColorStop offset="1" color="#F97316"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="gradientFade" duration="120" frameRate="60" loop="loop">
+      <Object target="gradPathFill">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.35" interpolation="linear"/>
+          <Key time="60" value="1" interpolation="linear"/>
+          <Key time="120" value="0.35"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

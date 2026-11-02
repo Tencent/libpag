@@ -3950,6 +3950,53 @@ CLI_TEST(PAGXHtmlTest, AnimationFillAlphaMultipliesColorAlphaOnBox) {
   EXPECT_EQ(last.find(" opacity:"), std::string::npos) << last;
 }
 
+// A gradient or image painter has no solid color, so a keyframe that re-emits a solid color
+// replaces the paint: an SVG path turns opaque black and a CSS box gets a black background behind
+// its gradient. Only the alpha channel may be written; the paint itself must stay untouched.
+CLI_TEST(PAGXHtmlTest, AnimationGradientFillAlphaKeepsGradientOnSvg) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/fill/05_gradient_alpha_svg.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto pathTag = FindTagContaining(html, "id=\"gradPathFill\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_NE(pathTag.find("fill=\"url(#grad"), std::string::npos) << pathTag;
+  auto first = KeyframeStopOf(html, "id=\"gradPathFill\"", "0%");
+  auto middle = KeyframeStopOf(html, "id=\"gradPathFill\"", "50%");
+  auto last = KeyframeStopOf(html, "id=\"gradPathFill\"", "100%");
+  // The gradient survives; only its opacity fades.
+  EXPECT_NE(first.find("fill-opacity: 0.35"), std::string::npos) << first;
+  EXPECT_NE(middle.find("fill-opacity: 1"), std::string::npos) << middle;
+  EXPECT_NE(last.find("fill-opacity: 0.35"), std::string::npos) << last;
+  EXPECT_EQ(first.find("fill: #"), std::string::npos) << first;
+  EXPECT_EQ(middle.find("fill: #"), std::string::npos) << middle;
+  EXPECT_EQ(last.find("fill: #"), std::string::npos) << last;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGradientFillAlphaKeepsGradientOnDiv) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/fill/06_gradient_alpha_div.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto divTag = FindTagContaining(html, "id=\"gradBoxFill\"");
+  ASSERT_FALSE(divTag.empty());
+  EXPECT_NE(divTag.find("background:linear-gradient("), std::string::npos) << divTag;
+  auto first = KeyframeStopOf(html, "id=\"gradBoxFill\"", "0%");
+  auto middle = KeyframeStopOf(html, "id=\"gradBoxFill\"", "50%");
+  auto last = KeyframeStopOf(html, "id=\"gradBoxFill\"", "100%");
+  // A black background-color would paint behind the gradient; the box must fade as a whole instead.
+  EXPECT_EQ(first.find("background-color"), std::string::npos) << first;
+  EXPECT_EQ(middle.find("background-color"), std::string::npos) << middle;
+  EXPECT_EQ(last.find("background-color"), std::string::npos) << last;
+  EXPECT_NE(first.find("opacity: 1"), std::string::npos) << first;
+  EXPECT_NE(middle.find("opacity: 0.1"), std::string::npos) << middle;
+  EXPECT_NE(last.find("opacity: 1"), std::string::npos) << last;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationFillColorAndAlphaCompositeOnText) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer width="200" height="100">
