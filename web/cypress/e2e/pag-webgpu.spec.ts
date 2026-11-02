@@ -110,7 +110,7 @@ describe('PAGWebGPU', () => {
           }
         }
       }
-      expect(gpuErrors, 'unexpected GPU errors').to.deep.equal([]);
+      expect(gpuErrors, `unexpected GPU errors:\n${gpuErrors.join('\n')}`).to.deep.equal([]);
     } finally {
       device?.destroy();
     }
