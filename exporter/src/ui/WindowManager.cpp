@@ -52,7 +52,7 @@ void WindowManager::showExportPanelWindow() {
     exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
   }
   exportPanelWindow->show();
-  runEventLoopIfNeeded();
+  runEventLoop();
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -61,7 +61,7 @@ void WindowManager::showPAGConfigWindow() {
     configWindow = std::make_unique<ConfigWindow>(app.get());
   }
   configWindow->show();
-  runEventLoopIfNeeded();
+  runEventLoop();
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -71,7 +71,7 @@ void WindowManager::showExportPreviewWindow() {
     previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
   }
   previewWindow->show();
-  runEventLoopIfNeeded();
+  runEventLoop();
 }
 
 void WindowManager::showExportWindow() {
@@ -80,7 +80,7 @@ void WindowManager::showExportWindow() {
     exportWindow = std::make_unique<ExportWindow>(app.get());
   }
   exportWindow->show();
-  runEventLoopIfNeeded();
+  runEventLoop();
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
@@ -112,7 +112,7 @@ bool WindowManager::showSimpleError(const QString& errorMessage) {
 
 bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
   PAGViewerInstallModel installModel;
-  return installModel.showInstallDialog(pagFilePath);
+  return installModel.showInstallDialog(app.get(), pagFilePath);
 }
 
 void WindowManager::initializeQtEnvironment() {
@@ -168,18 +168,28 @@ void WindowManager::init() {
   AlertInfoManager::GetInstance().saveWarnings.clear();
 }
 
-void WindowManager::runEventLoopIfNeeded() {
+WindowManager::EventLoopScope::EventLoopScope() {
+  WindowManager::GetInstance().eventLoopDepth++;
+}
+
+WindowManager::EventLoopScope::~EventLoopScope() {
+  WindowManager::GetInstance().eventLoopDepth--;
+}
+
+void WindowManager::runEventLoop() {
   // Re-entered menu clicks while a plugin window is already open must not stack nested exec()
   // loops, because closing the last window only quits the innermost loop and the leaked layers
-  // would keep the After Effects main thread inside the plugin forever. The "_eventLoopRunning"
-  // property is shared with PAGViewerInstallModel::showInstallDialog() for the same purpose.
-  auto coreApp = QCoreApplication::instance();
-  if (coreApp == nullptr || coreApp->property("_eventLoopRunning").toBool()) {
+  // would keep the After Effects main thread inside the plugin forever. Returning early keeps a
+  // single loop pumping events for every open window.
+  if (isEventLoopRunning()) {
     return;
   }
-  coreApp->setProperty("_eventLoopRunning", true);
+  EventLoopScope scope;
   app->exec();
-  coreApp->setProperty("_eventLoopRunning", false);
+}
+
+bool WindowManager::isEventLoopRunning() const {
+  return eventLoopDepth > 0;
 }
 
 }  // namespace exporter

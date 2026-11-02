@@ -42,7 +42,7 @@ class PAGViewerInstallModel : public QObject {
   explicit PAGViewerInstallModel(QObject* parent = nullptr);
   ~PAGViewerInstallModel();
 
-  bool showInstallDialog(const std::string& pagFilePath);
+  bool showInstallDialog(QApplication* app, const std::string& pagFilePath);
 
   Q_INVOKABLE void onConfirmInstall();
   Q_INVOKABLE void onCancel();
@@ -84,7 +84,6 @@ class PAGViewerInstallModel : public QObject {
   QString buttonText;
   bool showCancelButton = true;
   std::string pendingFilePath = "";
-  std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
   QQuickWindow* window = nullptr;
   bool dialogResult = false;

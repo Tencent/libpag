@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QQmlContext>
 #include <QThread>
+#include "ui/WindowManager.h"
 
 namespace exporter {
 
@@ -58,6 +59,9 @@ bool AlertWindow::showErrors(const std::vector<AlertInfo>& infos, const QString&
 void AlertWindow::onWindowClosing() {
   cancel = true;
   BaseWindow::onWindowClosing();
+  if (eventLoop != nullptr) {
+    eventLoop->quit();
+  }
 }
 
 void AlertWindow::continueExport() {
@@ -77,10 +81,16 @@ void AlertWindow::init(const std::vector<AlertInfo>& infos) {
   context->setContextProperty("alertInfoModel", alertInfoModel.get());
 }
 
-void AlertWindow::wait() const {
-  while (!continue_ && !cancel) {
-    QApplication::processEvents();
-  }
+void AlertWindow::wait() {
+  // Pump events on a nested QEventLoop instead of busy-waiting with processEvents(), which burned
+  // 100% CPU. Every button path and the window's close event route through onWindowClosing(),
+  // which quits this loop. The scope keeps WindowManager::isEventLoopRunning() true so a
+  // re-entrant menu click does not start a second, nested exec() loop while the alert is modal.
+  QEventLoop loop;
+  eventLoop = &loop;
+  WindowManager::EventLoopScope scope;
+  loop.exec();
+  eventLoop = nullptr;
 }
 
 }  // namespace exporter
