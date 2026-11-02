@@ -314,11 +314,17 @@ class HTMLWriterContext {
    * copies, per-geometry SVG shapes, a Fill shared by shapes and text, every Text under one
    * TextBox), so the first tag gets the base id and later tags get "<base>__1", "<base>__2", and
    * so on, which keeps ids unique and lets the weaving pass reach every copy.
+   *
+   * Several candidates can be animated for the same tag (a shape, its Fill, its Stroke and its
+   * TrimPath all paint one element). Only one id fits on the tag, so the id chosen above is
+   * recorded for every animated candidate; the weaving pass resolves each animated node through
+   * those records, which keeps the animations of the other candidates instead of dropping them.
    */
   std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
     if (animatedElementIds.empty()) {
       return {};
     }
+    std::string id = {};
     for (auto* node : candidates) {
       if (node == nullptr) {
         continue;
@@ -327,12 +333,13 @@ class HTMLWriterContext {
       if (it == animatedElementIds.end()) {
         continue;
       }
-      size_t index = animatedDomIdUseCount[it->second]++;
-      auto id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      if (id.empty()) {
+        size_t index = animatedDomIdUseCount[it->second]++;
+        id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      }
       animatedDomTags.push_back({node, animationScope, id});
-      return id;
     }
-    return {};
+    return id;
   }
 
   std::string nextId(const std::string& prefix) {

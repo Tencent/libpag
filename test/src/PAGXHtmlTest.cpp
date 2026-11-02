@@ -4388,6 +4388,47 @@ CLI_TEST(PAGXHtmlTest, AnimationTrimPathEndCorpus) {
   EXPECT_EQ(withoutAnimation.find("pathLength=\"1\""), std::string::npos);
 }
 
+// One HTML/SVG tag can only carry one id, but it may be the rendering of several animated nodes:
+// the Fill, the Stroke, a TrimPath and the shape itself all resolve to the same tag. Every animated
+// node on it must keep its own keyframe rule, otherwise the later ones silently lose their animation.
+CLI_TEST(PAGXHtmlTest, AnimationSharedSvgTagKeepsTrimAndStrokeWidth) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/stroke/06_trim_end_with_width.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 2u) << html;
+  // The trim keyframes must still drive the dash pattern, and the width keyframes the stroke.
+  EXPECT_NE(html.find("stroke-dasharray: 0 1"), std::string::npos) << html;
+  EXPECT_NE(html.find("stroke-width: 24px"), std::string::npos) << html;
+  // Both rules must be attached to the same <path>, which is the tag they both paint.
+  auto pathTag = FindTagContaining(html, "id=\"strokeBoth\"");
+  ASSERT_FALSE(pathTag.empty());
+  EXPECT_EQ(CountOccurrences(pathTag, "animation:"), 1u) << pathTag;
+  EXPECT_NE(pathTag.find("pagx_trimBoth_"), std::string::npos) << pathTag;
+  EXPECT_NE(pathTag.find("pagx_strokeBoth_"), std::string::npos) << pathTag;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationSharedDivKeepsGeometryAndFill) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/animations/geometry/"
+                                                   "05_size_width_with_fill.pagx"),
+                             options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 2u) << html;
+  // Geometry widens the box, the fill recolors it; both must survive on the single div.
+  EXPECT_NE(html.find("width: 240px"), std::string::npos) << html;
+  EXPECT_NE(html.find("background-color: #F97316"), std::string::npos) << html;
+  // Both rules must be attached to the single div, which is the tag they both paint.
+  auto divTag = FindTagContaining(html, "id=\"growRectFill\"");
+  ASSERT_FALSE(divTag.empty());
+  EXPECT_EQ(CountOccurrences(divTag, "animation:"), 1u) << divTag;
+  EXPECT_NE(divTag.find("pagx_growRect_"), std::string::npos) << divTag;
+  EXPECT_NE(divTag.find("pagx_growRectFill_"), std::string::npos) << divTag;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",

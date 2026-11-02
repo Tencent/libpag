@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a Rectangle whose size.width and Fill color animate at the same time. Both channels drive
+     the same CSS div, so it must carry both keyframe rules instead of only the first resolved one.
+     Target: Rectangle  Channel: size.width  Type: float
+     Target: Fill  Channel: color  Type: color
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="growRect" position="160,100" size="80,120" roundness="8"/>
+    <Fill id="growRectFill" color="#2563EB"/>
+  </Layer>
+  <Animations>
+    <Animation id="growAndTint" duration="60" frameRate="60" loop="once">
+      <Object target="growRect">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="80" interpolation="linear"/>
+          <Key time="60" value="240"/>
+        </Channel>
+      </Object>
+      <Object target="growRectFill">
+        <Channel name="color" type="color">
+          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="60" value="#F97316"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
