@@ -1191,6 +1191,12 @@ Color StaticPainterColor(const ColorSource* source) {
   return Color{};
 }
 
+// A gradient or image painter paints from a URL instead of a solid color. Re-emitting a solid color
+// in a keyframe stop would replace that paint, so only the alpha may be animated for such painters.
+bool HasSolidPaint(const ColorSource* source) {
+  return source != nullptr && source->nodeType() == NodeType::SolidColor;
+}
+
 void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
                          std::string& decls) {
   bool isSvgShape =
@@ -1202,26 +1208,40 @@ void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagNa
   // collide with an animated Layer alpha.
   if (chSet.fillColorCh != nullptr || chSet.fillAlphaCh != nullptr) {
     const Fill* fill = chSet.fillPainter;
-    Color staticColor = fill != nullptr ? StaticPainterColor(fill->color) : Color{};
-    Color color = EvalColorChannel(chSet.fillColorCh, t, staticColor);
+    const ColorSource* source = fill != nullptr ? fill->color : nullptr;
     float painterAlpha =
         EvalFloatChannel(chSet.fillAlphaCh, t, fill != nullptr ? fill->alpha : 1.0f);
-    if (isSvgShape) {
-      AppendCssDecl(decls, "fill", ColorToSVGHex(color));
-      AppendCssDecl(decls, "fill-opacity", CssFloatToString(color.alpha * painterAlpha));
+    if (HasSolidPaint(source)) {
+      Color color = EvalColorChannel(chSet.fillColorCh, t, StaticPainterColor(source));
+      if (isSvgShape) {
+        AppendCssDecl(decls, "fill", ColorToSVGHex(color));
+        AppendCssDecl(decls, "fill-opacity", CssFloatToString(color.alpha * painterAlpha));
+      } else {
+        AppendCssDecl(decls, tagName == "span" ? "color" : "background-color",
+                      ColorToRGBA(color, painterAlpha));
+      }
+    } else if (isSvgShape) {
+      // Keep fill="url(#…)" and fade the referenced paint server instead of replacing it.
+      AppendCssDecl(decls, "fill-opacity", CssFloatToString(painterAlpha));
     } else {
-      AppendCssDecl(decls, tagName == "span" ? "color" : "background-color",
-                    ColorToRGBA(color, painterAlpha));
+      // A CSS box paints the gradient as its own background, so a background-color would only add a
+      // black layer underneath it. The box is a leaf that paints nothing else, so fading the box as
+      // a whole matches the painter alpha.
+      AppendCssDecl(decls, "opacity", CssFloatToString(painterAlpha));
     }
   }
   if (chSet.strokeColorCh != nullptr || chSet.strokeAlphaCh != nullptr) {
     const Stroke* stroke = chSet.strokePainter;
-    Color staticColor = stroke != nullptr ? StaticPainterColor(stroke->color) : Color{};
-    Color color = EvalColorChannel(chSet.strokeColorCh, t, staticColor);
+    const ColorSource* source = stroke != nullptr ? stroke->color : nullptr;
     float painterAlpha =
         EvalFloatChannel(chSet.strokeAlphaCh, t, stroke != nullptr ? stroke->alpha : 1.0f);
-    AppendCssDecl(decls, "stroke", ColorToSVGHex(color));
-    AppendCssDecl(decls, "stroke-opacity", CssFloatToString(color.alpha * painterAlpha));
+    if (HasSolidPaint(source)) {
+      Color color = EvalColorChannel(chSet.strokeColorCh, t, StaticPainterColor(source));
+      AppendCssDecl(decls, "stroke", ColorToSVGHex(color));
+      AppendCssDecl(decls, "stroke-opacity", CssFloatToString(color.alpha * painterAlpha));
+    } else {
+      AppendCssDecl(decls, "stroke-opacity", CssFloatToString(painterAlpha));
+    }
   }
   if (chSet.strokeWidthCh != nullptr) {
     float sw = EvalFloatChannel(chSet.strokeWidthCh, t, 1.0f);
