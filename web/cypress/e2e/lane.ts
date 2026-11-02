@@ -44,17 +44,17 @@ let softwareWebGPUAdapter: boolean | undefined;
  */
 export const isSoftwareWebGPU = async (): Promise<boolean> => {
   if (!isWebGPU) return false;
+  // Cypress coerces env values, so CYPRESS_WEBGPU_SOFTWARE=1 arrives as the number 1.
   const declared = Cypress.env('WEBGPU_SOFTWARE');
-  if (declared === true || declared === '1') return true;
+  if (declared === true || declared === 1 || declared === '1') return true;
   if (softwareWebGPUAdapter === undefined) {
-    // Cypress chainables are thenable at runtime but do not satisfy the Promise type.
-    softwareWebGPUAdapter = await (cy.window().then(async (win) => {
-      const gpu = (win.navigator as NavigatorWithGPU).gpu;
-      const adapter = await gpu?.requestAdapter();
-      const info = adapter?.info ?? (await adapter?.requestAdapterInfo?.());
-      const signature = `${info?.vendor ?? ''} ${info?.architecture ?? ''}`.toLowerCase();
-      return info?.isFallbackAdapter === true || signature.includes('swiftshader');
-    }) as unknown as Promise<boolean>);
+    // Probe from the spec frame directly: awaiting a Cypress chainable does not yield the
+    // callback's return value, so cy.window() cannot be used for this.
+    const gpu = (navigator as NavigatorWithGPU).gpu;
+    const adapter = await gpu?.requestAdapter();
+    const info = adapter?.info ?? (await adapter?.requestAdapterInfo?.());
+    const signature = `${info?.vendor ?? ''} ${info?.architecture ?? ''}`.toLowerCase();
+    softwareWebGPUAdapter = info?.isFallbackAdapter === true || signature.includes('swiftshader');
   }
   return softwareWebGPUAdapter;
 };
