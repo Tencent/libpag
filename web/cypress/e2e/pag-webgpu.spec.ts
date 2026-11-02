@@ -1,4 +1,5 @@
 /* eslint-disable max-nested-callbacks */
+/* eslint-disable @typescript-eslint/no-invalid-this */
 /* global describe expect cy Cypress beforeEach afterEach */
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
@@ -283,7 +284,8 @@ describe('PAGWebGPU', () => {
     expect(await Read(surface)).to.equal(null);
   });
 
-  itWebGPU('Renders to a detached canvas without an id and reinitializes after destroy', async () => {
+  itWebGPU('Renders to a detached canvas without an id and reinitializes after destroy', async function () {
+    await skipOnSoftwareWebGPU(this);
     const canvas = global.document.createElement('canvas');
     canvas.width = 65;
     canvas.height = 3;
@@ -299,7 +301,8 @@ describe('PAGWebGPU', () => {
     await ExpectSnapshot(recreated!, ExpectedPattern());
   });
 
-  itWebGPU('Resizing and destroying one view does not affect another view', async () => {
+  itWebGPU('Resizing and destroying one view does not affect another view', async function () {
+    await skipOnSoftwareWebGPU(this);
     const firstCanvas = global.document.createElement('canvas');
     const secondCanvas = global.document.createElement('canvas');
     firstCanvas.width = 65;
