@@ -316,4 +316,101 @@ PAGX_TEST(PAGXAnchorTest, LayoutPositionStaysOutsideAnchor) {
   EXPECT_EQ(CountDifferentPixels(movedPixels, bakedPixels), 0u);
 }
 
+/**
+ * Test case: only one axis carries a pivot; the other axis stays at the layer origin.
+ */
+PAGX_TEST(PAGXAnchorTest, SingleAxisAnchor) {
+  auto anchored = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"0,50\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(anchored != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(anchored->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  EXPECT_FLOAT_EQ(layer->anchor.x, 0.0f);
+  EXPECT_FLOAT_EQ(layer->anchor.y, 50.0f);
+
+  // a = (0,50), L = rotate(90) → L*a = (-50,0) → t' = a - L*a = (50,50).
+  const auto matrix = pagx::BuildLayerLocalMatrix3D(layer);
+  EXPECT_NEAR(matrix.getRowColumn(0, 3), 50.0f, 1e-4f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 3), 50.0f, 1e-4f);
+
+  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" matrix=\"0,1,-1,0,50,50\""));
+  ASSERT_TRUE(baked != nullptr);
+  const auto anchoredPixels = RenderFrame(anchored);
+  const auto bakedPixels = RenderFrame(baked);
+  ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+}
+
+/**
+ * Test case: negative and fractional anchor values survive parsing and a text round-trip.
+ */
+PAGX_TEST(PAGXAnchorTest, NegativeDecimalAnchor) {
+  auto doc = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"-10.5,20.25\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  EXPECT_FLOAT_EQ(layer->anchor.x, -10.5f);
+  EXPECT_FLOAT_EQ(layer->anchor.y, 20.25f);
+
+  // The text form is not asserted literally: only that re-parsing reproduces the same numbers.
+  auto reparsed = ParseDoc(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_TRUE(reparsed != nullptr);
+  auto* roundTrip = static_cast<pagx::Layer*>(reparsed->findNode("layer"));
+  ASSERT_TRUE(roundTrip != nullptr);
+  EXPECT_NEAR(roundTrip->anchor.x, -10.5f, 1e-4f);
+  EXPECT_NEAR(roundTrip->anchor.y, 20.25f, 1e-4f);
+  EXPECT_NEAR(roundTrip->anchorZ, 0.0f, 1e-4f);
+}
+
+/**
+ * Test case: malformed anchor text is rejected as a whole, leaving the layer at the default origin
+ * instead of silently keeping the values that happened to parse.
+ */
+PAGX_TEST(PAGXAnchorTest, MalformedAnchorFallsBackToOrigin) {
+  const std::vector<std::string> values = {"a,b", "10,", ",20", "10,20,30,40"};
+  for (const auto& value : values) {
+    auto doc = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"" + value + "\""));
+    ASSERT_TRUE(doc != nullptr) << value;
+    auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+    ASSERT_TRUE(layer != nullptr) << value;
+    EXPECT_FLOAT_EQ(layer->anchor.x, 0.0f) << value;
+    EXPECT_FLOAT_EQ(layer->anchor.y, 0.0f) << value;
+    EXPECT_FLOAT_EQ(layer->anchorZ, 0.0f) << value;
+  }
+}
+
+/**
+ * Test case: an animated 2D rotation ignores a non-zero anchorZ, matching the static behaviour.
+ */
+PAGX_TEST(PAGXAnchorTest, AnimatedAnchorIgnoresAnchorZ) {
+  const std::string identity = "1,0,0,1,0,0";
+  const std::string rotate90 = "0,1,-1,0";
+  const std::string keys = "          <Key time=\"0\" value=\"" + identity +
+                           "\"/>\n          <Key time=\"60\" value=\"" + rotate90 + ",0,0\"/>\n";
+  auto flat = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50\"", keys));
+  auto deep = ParseDoc(MakeAnimatedRotateDoc("id=\"rotated\" anchor=\"100,50,40\"", keys));
+  ASSERT_TRUE(flat != nullptr);
+  ASSERT_TRUE(deep != nullptr);
+  const auto flatPixels = RenderFrame(flat, 500'000);
+  const auto deepPixels = RenderFrame(deep, 500'000);
+  ASSERT_FALSE(flatPixels.empty());
+  EXPECT_EQ(CountDifferentPixels(flatPixels, deepPixels), 0u);
+}
+
+/**
+ * Test case: a three-value anchor round-trips through the exporter without losing the depth.
+ */
+PAGX_TEST(PAGXAnchorTest, ExportReparseThreeAxes) {
+  auto doc =
+      ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"10,20,30\" matrix3D=\""
+                           "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto reparsed = ParseDoc(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_TRUE(reparsed != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(reparsed->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  EXPECT_NEAR(layer->anchor.x, 10.0f, 1e-4f);
+  EXPECT_NEAR(layer->anchor.y, 20.0f, 1e-4f);
+  EXPECT_NEAR(layer->anchorZ, 30.0f, 1e-4f);
+}
+
 }  // namespace pag
