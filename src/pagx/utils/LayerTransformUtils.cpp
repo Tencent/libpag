@@ -158,18 +158,18 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
   return result;
 }
 
-Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer) {
+Matrix3D ComposeLayerTransform3DWithoutAnchor(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     if (IsFiniteMatrix3D(layer->matrix3D)) {
       return layer->matrix3D;
     }
-    LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix3D.");
+    LOGE("BuildLayerTransform3DWithAnchor: ignored a non-finite matrix3D.");
   }
   if (!layer->matrix.isIdentity()) {
     if (IsFiniteMatrix(layer->matrix)) {
       return LiftMatrixToMatrix3D(layer->matrix, layer->z);
     }
-    LOGE("BuildLayerLocalMatrix3D: ignored a non-finite matrix.");
+    LOGE("BuildLayerTransform3DWithAnchor: ignored a non-finite matrix.");
   }
   Matrix3DComponents components = {};
   Matrix3D result = {};
@@ -177,11 +177,11 @@ Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer) {
   return result;
 }
 
-Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
+Matrix3D BuildLayerTransform3DWithAnchor(const Layer* layer) {
   const bool hasAnchor =
       layer->anchor.x != 0.0f || layer->anchor.y != 0.0f || layer->anchorZ != 0.0f;
   if (!hasAnchor) {
-    return ComposeLayerLocalMatrix3D(layer);
+    return ComposeLayerTransform3DWithoutAnchor(layer);
   }
   // Component path: the composition puts the perspective matrix outermost (M = P * T * R * K * S),
   // so the pivot only belongs to the affine chain: M = P * T(a) * L * T(-a). Building the affine
@@ -204,7 +204,8 @@ Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
       }
     }
   }
-  return ApplyAnchorToMatrix(ComposeLayerLocalMatrix3D(layer), layer->anchor, layer->anchorZ);
+  return ApplyAnchorToMatrix(ComposeLayerTransform3DWithoutAnchor(layer), layer->anchor,
+                             layer->anchorZ);
 }
 
 }  // namespace pagx

@@ -100,16 +100,16 @@ Matrix BuildLayerMatrix(const Layer* layer) {
   auto layoutPosition = layer->layoutPosition();
   float layoutX = std::isnan(layoutPosition.x) ? 0 : layoutPosition.x;
   float layoutY = std::isnan(layoutPosition.y) ? 0 : layoutPosition.y;
-  // A non-finite matrix is ignored by the renderer (see BuildLayerLocalMatrix3D), so it is treated
+  // A non-finite matrix is ignored by the renderer (see BuildLayerTransform3DWithAnchor), so it is treated
   // as if it were not set here as well; the same flags also skip an identity matrix.
   bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
   bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
   // An anchor makes the plain 2D matrix branch wrong: the pivot must still be folded in, so route
-  // it through BuildLayerLocalMatrix3D as well.
+  // it through BuildLayerTransform3DWithAnchor as well.
   bool hasAnchor = layer->anchor.x != 0 || layer->anchor.y != 0 || layer->anchorZ != 0;
   Matrix m = hasMatrix ? layer->matrix : Matrix::Identity();
   if (hasMatrix3D || hasAnchor || (!hasMatrix && HasLayerTransformComponents(layer))) {
-    auto local = BuildLayerLocalMatrix3D(layer);
+    auto local = BuildLayerTransform3DWithAnchor(layer);
     const float* v = local.values;
     float w = 1.0f;
     if (v[3] == 0 && v[7] == 0 && std::isfinite(v[15]) && v[15] != 0) {

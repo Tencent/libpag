@@ -35,7 +35,7 @@
 namespace pag {
 namespace {
 
-constexpr int kDocSize = 200;
+constexpr int DocSize = 200;
 
 std::shared_ptr<pagx::PAGXDocument> ParseDoc(const std::string& xml) {
   return pagx::PAGXImporter::FromXML(xml);
@@ -63,11 +63,11 @@ std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
     }
   }
   scene->advanceAndApply(timeUs);
-  auto surface = pagx::PAGSurface::MakeOffscreen(kDocSize, kDocSize);
+  auto surface = pagx::PAGSurface::MakeOffscreen(DocSize, DocSize);
   if (surface == nullptr || !scene->draw(surface)) {
     return {};
   }
-  tgfx::Bitmap bitmap(kDocSize, kDocSize, false, false);
+  tgfx::Bitmap bitmap(DocSize, DocSize, false, false);
   if (bitmap.isEmpty()) {
     return {};
   }
@@ -76,8 +76,18 @@ std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
     return {};
   }
   const auto* src = reinterpret_cast<const uint8_t*>(pixmap.writablePixels());
-  pixels.assign(src, src + static_cast<size_t>(pixmap.rowBytes()) * kDocSize);
+  pixels.assign(src, src + static_cast<size_t>(pixmap.rowBytes()) * DocSize);
   return pixels;
+}
+
+size_t CountOpaquePixels(const std::vector<uint8_t>& pixels) {
+  size_t opaque = 0;
+  for (size_t i = 3; i < pixels.size(); i += 4) {
+    if (pixels[i] != 0) {
+      ++opaque;
+    }
+  }
+  return opaque;
 }
 
 size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
@@ -93,7 +103,7 @@ size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uin
   return different;
 }
 
-std::string MakeRectDoc(const std::string& layerAttributes) {
+std::string MakeDoc(const std::string& layerAttributes, const std::string& animations) {
   return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
          "<pagx width=\"200\" height=\"200\">\n"
          "  <Layer>\n"
@@ -103,31 +113,25 @@ std::string MakeRectDoc(const std::string& layerAttributes) {
          "      <Rectangle position=\"100,50\" size=\"60,20\"/>\n"
          "      <Fill color=\"#FF0000\"/>\n"
          "    </Layer>\n"
-         "  </Layer>\n"
-         "</pagx>\n";
+         "  </Layer>\n" +
+         animations + "</pagx>\n";
+}
+
+std::string MakeRectDoc(const std::string& layerAttributes) {
+  return MakeDoc(layerAttributes, "");
 }
 
 std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std::string& keys) {
-  return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-         "<pagx width=\"200\" height=\"200\">\n"
-         "  <Layer>\n"
-         "    <Layer " +
-         layerAttributes +
-         ">\n"
-         "      <Rectangle position=\"100,50\" size=\"60,20\"/>\n"
-         "      <Fill color=\"#FF0000\"/>\n"
-         "    </Layer>\n"
-         "  </Layer>\n"
-         "  <Animations>\n"
-         "    <Animation id=\"rotate\" duration=\"60\">\n"
-         "      <Object target=\"rotated\">\n"
-         "        <Channel name=\"matrix\" type=\"matrix\">\n" +
-         keys +
-         "        </Channel>\n"
-         "      </Object>\n"
-         "    </Animation>\n"
-         "  </Animations>\n"
-         "</pagx>\n";
+  return MakeDoc(layerAttributes,
+                 "  <Animations>\n"
+                 "    <Animation id=\"rotate\" duration=\"60\">\n"
+                 "      <Object target=\"rotated\">\n"
+                 "        <Channel name=\"matrix\" type=\"matrix\">\n" +
+                     keys +
+                     "        </Channel>\n"
+                     "      </Object>\n"
+                     "    </Animation>\n"
+                     "  </Animations>\n");
 }
 
 }  // namespace
@@ -205,7 +209,7 @@ PAGX_TEST(PAGXAnchorTest, LocalMatrixAppliesAnchor) {
   ASSERT_TRUE(doc != nullptr);
   auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
   ASSERT_TRUE(layer != nullptr);
-  const auto matrix = pagx::BuildLayerLocalMatrix3D(layer);
+  const auto matrix = pagx::BuildLayerTransform3DWithAnchor(layer);
   // t' = t + anchor - L * anchor, with L = rotate(90): (100,50) -> (-50,100).
   EXPECT_NEAR(matrix.getRowColumn(0, 3), 150.0f, 1e-4f);
   EXPECT_NEAR(matrix.getRowColumn(1, 3), -50.0f, 1e-4f);
@@ -214,7 +218,7 @@ PAGX_TEST(PAGXAnchorTest, LocalMatrixAppliesAnchor) {
   ASSERT_TRUE(baked != nullptr);
   auto* bakedLayer = static_cast<pagx::Layer*>(baked->findNode("layer"));
   ASSERT_TRUE(bakedLayer != nullptr);
-  const auto bakedMatrix = pagx::BuildLayerLocalMatrix3D(bakedLayer);
+  const auto bakedMatrix = pagx::BuildLayerTransform3DWithAnchor(bakedLayer);
   EXPECT_NEAR(bakedMatrix.getRowColumn(0, 3), matrix.getRowColumn(0, 3), 1e-4f);
   EXPECT_NEAR(bakedMatrix.getRowColumn(1, 3), matrix.getRowColumn(1, 3), 1e-4f);
 }
@@ -231,6 +235,7 @@ PAGX_TEST(PAGXAnchorTest, RenderAnchorMatchesBaked2D) {
   const auto anchoredPixels = RenderFrame(anchored);
   const auto bakedPixels = RenderFrame(baked);
   ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
 }
 
@@ -264,6 +269,7 @@ PAGX_TEST(PAGXAnchorTest, RenderAnchorZMatchesBaked3D) {
   const auto anchoredPixels = RenderFrame(anchored);
   const auto bakedPixels = RenderFrame(baked);
   ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
 }
 
@@ -294,6 +300,7 @@ PAGX_TEST(PAGXAnchorTest, RenderAnimatedAnchorMatchesBaked) {
   const auto anchoredPixels = RenderFrame(anchored, 500'000);
   const auto bakedPixels = RenderFrame(baked, 500'000);
   ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
 }
 
@@ -304,16 +311,23 @@ PAGX_TEST(PAGXAnchorTest, RenderAnimatedAnchorMatchesBaked) {
 PAGX_TEST(PAGXAnchorTest, LayoutPositionStaysOutsideAnchor) {
   // Same rotation as RenderAnchorMatchesBaked2D, shifted right by 40px through the layout x.
   auto anchored =
-      ParseDoc(MakeRectDoc("id=\"layer\" x=\"40\" anchor=\"100,50\" "
+      ParseDoc(MakeRectDoc("id=\"layer\" left=\"40\" anchor=\"100,50\" "
                            "matrix=\"0,1,-1,0,0,0\""));
   ASSERT_TRUE(anchored != nullptr);
   const auto movedPixels = RenderFrame(anchored);
   ASSERT_FALSE(movedPixels.empty());
 
-  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" x=\"40\" matrix=\"0,1,-1,0,150,-50\""));
+  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" left=\"40\" matrix=\"0,1,-1,0,150,-50\""));
   ASSERT_TRUE(baked != nullptr);
   const auto bakedPixels = RenderFrame(baked);
+  EXPECT_GT(CountOpaquePixels(movedPixels), 100u);
   EXPECT_EQ(CountDifferentPixels(movedPixels, bakedPixels), 0u);
+  // The layout position must actually move the frame, otherwise the case compares two identical
+  // documents and proves nothing.
+  auto staticDoc = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(staticDoc != nullptr);
+  EXPECT_GT(CountDifferentPixels(movedPixels, RenderFrame(staticDoc)), 0u)
+      << "the layout position must shift the rendered frame";
 }
 
 /**
@@ -328,7 +342,7 @@ PAGX_TEST(PAGXAnchorTest, SingleAxisAnchor) {
   EXPECT_FLOAT_EQ(layer->anchor.y, 50.0f);
 
   // a = (0,50), L = rotate(90) → L*a = (-50,0) → t' = a - L*a = (50,50).
-  const auto matrix = pagx::BuildLayerLocalMatrix3D(layer);
+  const auto matrix = pagx::BuildLayerTransform3DWithAnchor(layer);
   EXPECT_NEAR(matrix.getRowColumn(0, 3), 50.0f, 1e-4f);
   EXPECT_NEAR(matrix.getRowColumn(1, 3), 50.0f, 1e-4f);
 
@@ -337,6 +351,7 @@ PAGX_TEST(PAGXAnchorTest, SingleAxisAnchor) {
   const auto anchoredPixels = RenderFrame(anchored);
   const auto bakedPixels = RenderFrame(baked);
   ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
 }
 
@@ -429,8 +444,8 @@ PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorMatchesBakedMatrix) {
   auto* bakedLayer = static_cast<pagx::Layer*>(baked->findNode("layer"));
   ASSERT_TRUE(anchoredLayer != nullptr);
   ASSERT_TRUE(bakedLayer != nullptr);
-  const auto anchoredMatrix = pagx::BuildLayerLocalMatrix3D(anchoredLayer);
-  const auto bakedMatrix = pagx::BuildLayerLocalMatrix3D(bakedLayer);
+  const auto anchoredMatrix = pagx::BuildLayerTransform3DWithAnchor(anchoredLayer);
+  const auto bakedMatrix = pagx::BuildLayerTransform3DWithAnchor(bakedLayer);
   for (int row = 0; row < 4; ++row) {
     for (int column = 0; column < 4; ++column) {
       EXPECT_NEAR(anchoredMatrix.getRowColumn(row, column), bakedMatrix.getRowColumn(row, column),
@@ -456,6 +471,7 @@ PAGX_TEST(PAGXAnchorTest, RenderPerspectiveAnchorMatchesBaked) {
   const auto anchoredPixels = RenderFrame(anchored);
   const auto bakedPixels = RenderFrame(baked);
   ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
 }
 

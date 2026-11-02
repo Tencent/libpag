@@ -60,11 +60,12 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
 // non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
 // z and the components. Runtime renderers keep the pose unanchored and apply ApplyAnchorToMatrix
 // once, when the pose is published.
-Matrix3D ComposeLayerLocalMatrix3D(const Layer* layer);
+Matrix3D ComposeLayerTransform3DWithoutAnchor(const Layer* layer);
 
 // Returns the Layer's local transform without the layout position, with the anchor applied: the
 // non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
-// z and the components, then ApplyAnchorToMatrix.
-Matrix3D BuildLayerLocalMatrix3D(const Layer* layer);
+// z and the components, then ApplyAnchorToMatrix. The projection stays outside the pivot
+// (M = P * T(anchor) * L * T(-anchor)), so the anchor never moves the projection centre.
+Matrix3D BuildLayerTransform3DWithAnchor(const Layer* layer);
 
 }  // namespace pagx

@@ -257,7 +257,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   // otherwise x / y / z and the transform components are composed. The authored transform that
   // takes precedence also masks the channels it overrides.
   void initTransform(const Layer* node) {
-    // A non-finite matrix is ignored by BuildLayerLocalMatrix3D, so it must not mask the channels
+    // A non-finite matrix is ignored by BuildLayerTransform3DWithAnchor, so it must not mask the channels
     // it would have overridden either.
     hasStaticMatrix3D = !node->matrix3D.isIdentity() && IsFiniteMatrix3D(node->matrix3D);
     hasStaticMatrix = !node->matrix.isIdentity() && IsFiniteMatrix(node->matrix);
@@ -270,7 +270,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (hasComponents) {
       LayerTransformComponents(node, &components, &pose);
     } else {
-      pose = ComposeLayerLocalMatrix3D(node);
+      pose = ComposeLayerTransform3DWithoutAnchor(node);
     }
     publish();
   }
