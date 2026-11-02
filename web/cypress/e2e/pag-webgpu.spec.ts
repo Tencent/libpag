@@ -156,10 +156,20 @@ describe('PAGWebGPU', () => {
     expect(actual, 'pixel data').to.not.equal(null);
     expect(actual!.length, 'pixel byte count').to.equal(expected.length);
     let mismatches = 0;
+    let first = '';
     for (let i = 0; i < expected.length; i++) {
-      if (Math.abs(actual![i] - expected[i]) > 1) mismatches++;
+      if (Math.abs(actual![i] - expected[i]) > 1) {
+        mismatches++;
+        if (!first) {
+          const pixel = i - (i % 4);
+          const at = `(${Math.floor(pixel / 4) % 65}, ${Math.floor(pixel / 260)})`;
+          const actualRGBA = Array.from(actual!.subarray(pixel, pixel + 4)).join(',');
+          const expectedRGBA = Array.from(expected.subarray(pixel, pixel + 4)).join(',');
+          first = ` First mismatch at ${at}: actual [${actualRGBA}] expected [${expectedRGBA}].`;
+        }
+      }
     }
-    expect(mismatches, 'RGBA values, alpha, origin and row layout').to.equal(0);
+    expect(mismatches, `RGBA values, alpha, origin and row layout.${first}`).to.equal(0);
   }
 
   async function Read(surface: PAGSurface): Promise<Uint8Array | null> {
