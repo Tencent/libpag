@@ -34,6 +34,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Keyframe.h"
+#include "pagx/nodes/StrokeLayerStyle.h"
 
 namespace pagx {
 namespace {
@@ -1167,6 +1168,98 @@ void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
       channel->keyframes.push_back(keyframe);
     }
     object->channels.push_back(channel);
+  }
+  auto* colorAnimatable = style->color != nullptr && style->color->animatable()
+                              ? dynamic_cast<pag::AnimatableProperty<pag::Color>*>(style->color)
+                              : nullptr;
+  if (colorAnimatable != nullptr && !colorAnimatable->keyframes.empty()) {
+    auto first = colorAnimatable->keyframes.front()->startTime;
+    auto last = colorAnimatable->keyframes.back()->endTime;
+    auto* channel = document->makeNode<TypedChannel<Color>>();
+    channel->name = "color";
+    for (auto frame = first; frame < last; frame++) {
+      auto color = style->color->getValueAt(frame);
+      Keyframe<Color> keyframe = {};
+      keyframe.time = frame;
+      keyframe.value = {color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, 1.0f,
+                        ColorSpace::SRGB};
+      keyframe.interpolation = KeyframeInterpolationType::Linear;
+      channel->keyframes.push_back(keyframe);
+    }
+    object->channels.push_back(channel);
+  }
+}
+
+// Channels for the stroke style's animated properties. Opacity normalizes into the alpha
+// channel, size passes through in layer units, color samples per frame, and the position rides
+// an Int Hold channel (the legacy codec stores the DiscreteProperty in uint8 storage, so the
+// keyframes are read through that type and mapped into the PAGX enum order).
+void MigrateStrokeStyleAnimation(pag::StrokeStyle* style, float frameRate, PAGXDocument* document,
+                                 AnimationObject* object) {
+  (void)frameRate;
+  if (style == nullptr || object == nullptr) {
+    return;
+  }
+  auto* opacity = style->opacity;
+  if (opacity != nullptr) {
+    auto staticOpaque = opacity->getValueAt(0) >= 255;
+    if (opacity->animatable() || !staticOpaque) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "alpha";
+      if (opacity->animatable()) {
+        ConvertOpacityChannel(opacity, frameRate, channel);
+      } else {
+        Keyframe<float> keyframe = {};
+        keyframe.time = 0;
+        keyframe.value = opacity->getValueAt(0) / 255.0f;
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
+  }
+  if (style->size != nullptr && style->size->animatable()) {
+    auto* channel = document->makeNode<TypedChannel<float>>();
+    channel->name = "size";
+    ConvertFloatChannel(style->size, frameRate, channel);
+    if (!channel->keyframes.empty()) {
+      object->channels.push_back(channel);
+    }
+  }
+  if (style->position != nullptr && style->position->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<uint8_t>*>(
+        reinterpret_cast<pag::Property<uint8_t>*>(static_cast<void*>(style->position)));
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto mapPosition = [](uint8_t value) {
+        switch (static_cast<pag::StrokePosition>(value)) {
+          case pag::StrokePosition::Center:
+            return static_cast<int>(StrokePosition::Center);
+          case pag::StrokePosition::Inside:
+            return static_cast<int>(StrokePosition::Inside);
+          case pag::StrokePosition::Outside:
+          default:
+            return static_cast<int>(StrokePosition::Outside);
+        }
+      };
+      auto* channel = document->makeNode<TypedChannel<int>>();
+      channel->name = "position";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<int> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = mapPosition(legacyKeyframe->startValue);
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      auto* last = animatable->keyframes.back();
+      if (last->endTime > last->startTime) {
+        Keyframe<int> keyframe = {};
+        keyframe.time = last->endTime;
+        keyframe.value = mapPosition(last->endValue);
+        keyframe.interpolation = KeyframeInterpolationType::Hold;
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
+    }
   }
   auto* colorAnimatable = style->color != nullptr && style->color->animatable()
                               ? dynamic_cast<pag::AnimatableProperty<pag::Color>*>(style->color)

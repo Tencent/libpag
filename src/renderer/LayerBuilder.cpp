@@ -101,6 +101,7 @@
 #include "renderer/MotionTileLayerFilter.h"
 #include "renderer/OuterGlowLayerFilter.h"
 #include "renderer/RadialBlurLayerFilter.h"
+#include "renderer/StrokeLayerFilter.h"
 #include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -2899,6 +2900,27 @@ class LayerBuilderContext {
       _result.binding.set(glowNode, glowFilter);
       bindOuterGlowStyleChannels(glowNode);
     }
+    // Stroke styles replace the content with the stroked composite (the legacy draws
+    // above-position styles instead of the source image), riding the filter chain after the
+    // blow-position styles and before the gradient overlay.
+    for (const auto& style : node->styles) {
+      if (style == nullptr || style->nodeType() != NodeType::StrokeLayerStyle) {
+        continue;
+      }
+      auto* strokeNode = static_cast<const StrokeLayerStyle*>(style);
+      if (strokeNode->size <= 0.0f) {
+        continue;
+      }
+      auto strokeFilter = std::make_shared<StrokeLayerFilter>();
+      strokeFilter->setColor(ToTGFX(strokeNode->color));
+      strokeFilter->setSize(strokeNode->size);
+      strokeFilter->setAlpha(strokeNode->alpha);
+      strokeFilter->setPosition(strokeNode->position);
+      strokeFilter->setBlendMode(ToTGFX(strokeNode->blendMode));
+      filters.push_back(strokeFilter);
+      _result.binding.set(strokeNode, strokeFilter);
+      bindStrokeLayerStyleChannels(strokeNode);
+    }
     // Gradient overlay styles have no tgfx-native equivalent and ride the layer filter chain,
     // appended after the node filters so they apply over the effect-processed content, matching
     // the legacy FilterRenderer order (styles run after effects).
@@ -3191,6 +3213,58 @@ class LayerBuilderContext {
     }
     auto* filter = static_cast<OuterGlowLayerFilter*>(object);
     filter->setRange(MixFloat(filter->range(), *v, mix));
+  }
+
+  static void WriteStrokeLayerStyleColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<StrokeLayerFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteStrokeLayerStyleAlpha(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<StrokeLayerFilter*>(object);
+    filter->setAlpha(MixFloat(filter->alpha(), *v, mix));
+  }
+
+  static void WriteStrokeLayerStyleSize(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<StrokeLayerFilter*>(object);
+    filter->setSize(MixFloat(filter->size(), *v, mix));
+  }
+
+  static void WriteStrokeLayerStylePosition(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<int>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto position = static_cast<StrokePosition>(*v);
+    if (position != StrokePosition::Outside && position != StrokePosition::Center &&
+        position != StrokePosition::Inside) {
+      return;
+    }
+    static_cast<StrokeLayerFilter*>(object)->setPosition(position);
+  }
+
+  void bindStrokeLayerStyleChannels(const StrokeLayerStyle* node) {
+    _result.binding.setAccessor(node, "color", WriteStrokeLayerStyleColor,
+                                ReadColorChannel<StrokeLayerFilter, &StrokeLayerFilter::color>);
+    _result.binding.setAccessor(node, "alpha", WriteStrokeLayerStyleAlpha,
+                                ReadScalar<StrokeLayerFilter, &StrokeLayerFilter::alpha>);
+    _result.binding.setAccessor(node, "size", WriteStrokeLayerStyleSize,
+                                ReadScalar<StrokeLayerFilter, &StrokeLayerFilter::size>);
+    _result.binding.setAccessor(node, "position", WriteStrokeLayerStylePosition,
+                                ReadInteger<StrokeLayerFilter, &StrokeLayerFilter::position>);
   }
 
   void bindOuterGlowStyleChannels(const OuterGlowStyle* node) {

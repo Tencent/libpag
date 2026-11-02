@@ -76,7 +76,7 @@ std::shared_ptr<tgfx::ImageFilter> OuterGlowLayerFilter::makeHaloFilter(float sc
   // The stroke mode switches on the raw (layer-unit) size, matching the legacy update(); the
   // stroke keeps the Invalid position so it paints a pure dilated silhouette.
   auto mode = _size < STROKE_SPREAD_MIN_THICK_SIZE ? pag::SolidStrokeMode::Normal
-                                                    : pag::SolidStrokeMode::Thick;
+                                                   : pag::SolidStrokeMode::Thick;
   auto strokeOption = pag::SolidStrokeOption();
   strokeOption.color = _color;
   strokeOption.spreadSizeX = spread * sizeX / range;

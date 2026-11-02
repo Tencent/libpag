@@ -101,6 +101,8 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
                                      PAGXDocument* document, AnimationObject* object);
 void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
                                     PAGXDocument* document, AnimationObject* object);
+void MigrateStrokeStyleAnimation(pag::StrokeStyle* style, float frameRate, PAGXDocument* document,
+                                 AnimationObject* object);
 
 namespace {
 
@@ -1060,6 +1062,42 @@ void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* lay
         auto* object = state->document->makeNode<AnimationObject>();
         object->target = glow->id;
         MigrateOuterGlowStyleAnimation(legacy, state->currentFrameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    } else if (style->type() == pag::LayerStyleType::Stroke) {
+      auto* legacy = static_cast<pag::StrokeStyle*>(style);
+      auto startFrame = legacyLayer->startTime;
+      auto stroke = state->document->makeNode<StrokeLayerStyle>("pag-legacy-stroke-" +
+                                                                std::to_string(style->uniqueID));
+      stroke->color = ConvertColor(PropertyValueAtStart(legacy->color, startFrame, nullptr));
+      stroke->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
+      stroke->size = PropertyValueAtStart(legacy->size, startFrame, nullptr);
+      // The legacy and PAGX stroke position enums order their values differently (legacy:
+      // Outside/Inside/Center, PAGX: Outside/Center/Inside), so map by name rather than value.
+      switch (PropertyValueAtStart(legacy->position, startFrame, nullptr)) {
+        case pag::StrokePosition::Center:
+          stroke->position = StrokePosition::Center;
+          break;
+        case pag::StrokePosition::Inside:
+          stroke->position = StrokePosition::Inside;
+          break;
+        case pag::StrokePosition::Outside:
+        default:
+          stroke->position = StrokePosition::Outside;
+          break;
+      }
+      stroke->blendMode =
+          ConvertBlendMode(PropertyValueAtStart(legacy->blendMode, startFrame, nullptr));
+      layer->styles.push_back(stroke);
+      if (legacy->blendMode != nullptr && legacy->blendMode->animatable()) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "animated stroke blend mode");
+      }
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = stroke->id;
+        MigrateStrokeStyleAnimation(legacy, state->currentFrameRate, state->document, object);
         if (!object->channels.empty()) {
           state->currentAnimation->objects.push_back(object);
         }
