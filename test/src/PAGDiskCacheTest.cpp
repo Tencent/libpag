@@ -25,8 +25,10 @@
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/sequences/SequenceRetryPolicy.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/Directory.h"
+#include "tgfx/core/Clock.h"
 #include "utils/TestUtils.h"
 
 #ifdef TGFX_USE_OPENGL
@@ -726,6 +728,48 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
   cacheCleaner.join();
 
   EXPECT_GT(successFrames.load(), 0);
+  pag::PAGDiskCache::RemoveAll();
+}
+
+/**
+ * Mechanism 2 regression (issue #3738): a failed render marks the whole decoder with a cooldown so
+ * looped playback of a failing sequence stops re-rendering every frame. The cooldown uses the same
+ * graduated backoff as RenderCache, so a transient failure recovers quickly instead of freezing for
+ * the full ceiling.
+ */
+PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
+  EXPECT_EQ(SequenceRetryDelay(0), SEQUENCE_RETRY_INITIAL_DELAY);
+  EXPECT_EQ(SequenceRetryDelay(1), SEQUENCE_RETRY_INITIAL_DELAY * 2);
+  EXPECT_EQ(SequenceRetryDelay(2), SEQUENCE_RETRY_INITIAL_DELAY * 4);
+  EXPECT_EQ(SequenceRetryDelay(4), SEQUENCE_RETRY_INITIAL_DELAY * 16);
+  EXPECT_EQ(SequenceRetryDelay(5), SEQUENCE_RETRY_MAX_DELAY);
+  EXPECT_EQ(SequenceRetryDelay(100), SEQUENCE_RETRY_MAX_DELAY);
+  EXPECT_LT(SEQUENCE_RETRY_INITIAL_DELAY, SEQUENCE_RETRY_MAX_DELAY);
+}
+
+PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
+  pag::PAGDiskCache::RemoveAll();
+  auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
+  ASSERT_TRUE(decoder != nullptr);
+  tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
+  tgfx::Pixmap pixmap(bitmap);
+
+  decoder->failedRenderRetryTime = tgfx::Clock::Now() + SEQUENCE_RETRY_MAX_DELAY * 5;
+  auto success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_FALSE(success);
+  EXPECT_TRUE(decoder->reader == nullptr);
+
+  decoder->failedRenderRetryTime = 0;
+  success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(decoder->reader != nullptr);
+  EXPECT_EQ(decoder->failedRenderRetryTime, 0);
+  EXPECT_EQ(decoder->failedRenderCount, 0u);
+
+  success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
   pag::PAGDiskCache::RemoveAll();
 }
 
