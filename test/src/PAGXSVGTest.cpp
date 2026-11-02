@@ -746,8 +746,9 @@ PAGX_TEST(PAGXSVGTest, SVGImport_CSSFontWidthAndWeight) {
 #ifdef __APPLE__
   auto doc = pagx::SVGImporter::ParseString(R"SVG(
     <svg width="600" height="100"><g font-family="Helvetica Neue" font-weight="800"
-      font-stretch="75%"><text y="50">Narrow<tspan font-stretch="normal">Wide</tspan>
-      <tspan>Again</tspan></text></g></svg>)SVG");
+      font-stretch="75%"><text y="50">Narrow</text>
+      <text y="50" font-stretch="normal">Wide</text>
+      <text y="50">Again</text></g></svg>)SVG");
   ASSERT_NE(doc, nullptr);
   std::vector<pagx::Element*> texts;
   for (auto layer : doc->layers) CollectElementsByType(layer, pagx::NodeType::Text, texts);
