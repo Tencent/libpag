@@ -1,0 +1,9 @@
+# Single source of truth for the emsdk version policy. Read by the root CMakeLists.txt
+# (configure-time window check for WebGPU builds) and web/script/setup.emsdk.js (install pin
+# and early-exit validation), so the two can never drift apart.
+# MAX_EXCLUSIVE is the first version that does NOT work: -sUSE_WEBGPU was removed in emsdk
+# 4.0.18 in favor of --use-port=emdawnwebgpu. tgfx carries its own hardcoded copy of this
+# window in third_party/tgfx/web/cmake/check_emscripten.cmake; keep it in sync when bumping.
+PIN=4.0.15
+MIN=4.0.15
+MAX_EXCLUSIVE=4.0.18

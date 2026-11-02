@@ -20,6 +20,7 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/PictureRecorder.h"
 
 namespace pag {
@@ -222,7 +223,7 @@ static bool IsRGB(DisplacementMapSource sel) {
          sel == DisplacementMapSource::Blue;
 }
 
-struct DisplacementMapUniforms {
+struct alignas(16) DisplacementMapUniforms {
   float flags[4] = {};
   float inputMatrix[16] = {};
   float mapMatrix[16] = {};
@@ -232,6 +233,18 @@ struct DisplacementMapUniforms {
   float inputSize[2] = {};
   float effectOpacity = 0.0f;
 };
+
+static_assert(HasStd140UniformLayout<DisplacementMapUniforms, 304>(),
+              "FilterUniforms must match the std140 layout.");
+static_assert(offsetof(DisplacementMapUniforms, flags) == 0 &&
+                  offsetof(DisplacementMapUniforms, inputMatrix) == 16 &&
+                  offsetof(DisplacementMapUniforms, mapMatrix) == 80 &&
+                  offsetof(DisplacementMapUniforms, selectorMatrixRGBA) == 144 &&
+                  offsetof(DisplacementMapUniforms, selectorMatrixHSLA) == 208 &&
+                  offsetof(DisplacementMapUniforms, selectorOffset) == 272 &&
+                  offsetof(DisplacementMapUniforms, inputSize) == 288 &&
+                  offsetof(DisplacementMapUniforms, effectOpacity) == 296,
+              "FilterUniforms member offsets must match the shader declaration.");
 
 static void Matrix3x3ToMat4(const std::array<float, 9>& m3, float* m4) {
   // Convert 3x3 matrix to 4x4 matrix (column-major for std140)

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlphaEdgeDetectFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -63,10 +64,15 @@ void AlphaEdgeDetectLayerEffect::onUpdateUniforms(
     return;
   }
 
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float horizontalStep = 0.0f;
     float verticalStep = 0.0f;
   };
+  static_assert(HasStd140UniformLayout<Uniforms, 16>(),
+                "FilterUniforms must match the std140 layout.");
+  static_assert(offsetof(Uniforms, horizontalStep) == 0 && offsetof(Uniforms, verticalStep) == 4,
+                "FilterUniforms member offsets must match the shader declaration.");
+
   Uniforms uniforms = {};
   uniforms.horizontalStep = 1.0f / inputTextures[0]->width();
   uniforms.verticalStep = 1.0f / inputTextures[0]->height();

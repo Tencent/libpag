@@ -31,6 +31,10 @@ BackendTexture::BackendTexture(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
 
+BackendTexture::BackendTexture(const WebGPUTextureInfo& webGPUInfo, int width, int height)
+    : _backend(Backend::WEBGPU), _width(width), _height(height), webGPUInfo(webGPUInfo) {
+}
+
 BackendTexture::BackendTexture(const BackendTexture& that) {
   *this = that;
 }
@@ -52,6 +56,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
+      break;
+    case Backend::WEBGPU:
+      webGPUInfo = that.webGPUInfo;
       break;
     default:
       break;
@@ -80,6 +87,14 @@ bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
     return false;
   }
   *vkImageInfo = vkInfo;
+  return true;
+}
+
+bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
+  if (!isValid() || _backend != Backend::WEBGPU) {
+    return false;
+  }
+  *webGPUTextureInfo = webGPUInfo;
   return true;
 }
 

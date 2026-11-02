@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HueSaturationFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
@@ -120,7 +121,7 @@ std::vector<tgfx::BindingEntry> HueSaturationFilter::uniformBlocks() const {
 void HueSaturationFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                            const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                            const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float hue = 0.0f;
     float saturation = 0.0f;
     float lightness = 0.0f;
@@ -129,6 +130,14 @@ void HueSaturationFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::G
     float colorizeSaturation = 0.0f;
     float colorizeLightness = 0.0f;
   };
+
+  static_assert(HasStd140UniformLayout<Uniforms, 32>(), "Args must match the std140 layout.");
+  static_assert(offsetof(Uniforms, hue) == 0 && offsetof(Uniforms, saturation) == 4 &&
+                    offsetof(Uniforms, lightness) == 8 && offsetof(Uniforms, colorize) == 12 &&
+                    offsetof(Uniforms, colorizeHue) == 16 &&
+                    offsetof(Uniforms, colorizeSaturation) == 20 &&
+                    offsetof(Uniforms, colorizeLightness) == 24,
+                "Args member offsets must match the shader declaration.");
 
   Uniforms uniforms = {};
   uniforms.hue = hue / 360.f;

@@ -30,6 +30,9 @@
 namespace pag {
 class Baseline {
  public:
+  // Metal-rendered pixels require PAG_PIXEL_TEST, PAGX_PIXEL_TEST or CLI_PIXEL_TEST so atlas
+  // isolation happens before drawing. Bitmap/Pixmap readbacks are checked too; only the explicit
+  // CPU codec/external screenshot cases are exempt. ByteData compares serialized CPU data.
   static bool Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key);
 
   static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
@@ -72,6 +75,10 @@ class Baseline {
   std::string outVersionPath;
   std::string cacheMD5Path;
   std::string outMD5Path;
+
+  static bool IsNonGpuPixelComparison(const std::string& testSuite, const std::string& testName,
+                                      const std::string& key);
+  static bool CheckPixelComparison(const std::string& key, bool allowNonGpu = false);
 
   bool compareMd5(const std::string& key, const std::string& md5);
   std::string getJSONValue(nlohmann::json& target, const std::string& key);

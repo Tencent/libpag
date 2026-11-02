@@ -31,13 +31,18 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
+#if defined(TGFX_USE_METAL)
+#include "utils/MetalTestSupport.h"
+#endif
 
 namespace pag {
 using namespace tgfx;
 using nlohmann::json;
 
 static constexpr float MAX_FRAME_SIZE = 360.0f;
+#if !defined(TGFX_USE_METAL)
 static constexpr int MAX_THREADS = 6;
+#endif
 static constexpr bool PrintPerformance = false;
 
 struct RenderCost {
@@ -47,7 +52,7 @@ struct RenderCost {
   std::string performance;
 };
 
-static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
+static void CompareFileFrames(const std::string& pagPath) {
   Clock fileClock = {};
   auto fileName = pagPath.substr(pagPath.rfind('/') + 1, pagPath.size());
   auto pagFile = PAGFile::Load(pagPath);
@@ -146,23 +151,34 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
       "====================================== %s : %.2fs "
       "======================================\n",
       fileName.c_str(), cost);
-  semaphore->signal();
 }
 
 /**
  * 用例描述: 校验 compare 文件夹中各个文件渲染结果
  */
-PAG_TEST(PAGFrameCompareTest, RenderFiles) {
+PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   auto files = GetAllPAGFiles("resources/compare");
+#if defined(TGFX_USE_METAL)
+  // Metal workers share one glyph atlas; interleaving can change Linear-sampled text pixels.
+  // Keep independent baseline files serial and clear atlas history before each file.
+  for (const auto& file : files) {
+    ASSERT_TRUE(ResetMetalAtlasForComparison());
+    CompareFileFrames(file);
+  }
+#else
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {
     semaphore.wait();
-    threads.emplace_back(CompareFileFrames, &semaphore, file);
+    threads.emplace_back([&semaphore, file] {
+      CompareFileFrames(file);
+      semaphore.signal();
+    });
   }
   for (auto& thread : threads) {
     thread.join();
   }
+#endif
 }
 }  // namespace pag
 #endif

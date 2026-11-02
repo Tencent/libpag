@@ -40,6 +40,8 @@ class Recorder;
 
 class RenderCache;
 
+class PAGSurfaceReadback;
+
 class Drawable;
 
 class Content {
@@ -1183,6 +1185,9 @@ class PAGPlayer;
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
  * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ *
+ * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
+ * by std::shared_ptr.
  */
 class PAG_API PAGSurface {
  public:
@@ -1296,6 +1301,10 @@ class PAG_API PAGSurface {
   friend class FileReporter;
 
   friend class PAGSurfaceExt;
+
+  friend class PAGSurfaceReadback;
+
+  friend std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> surface);
 };
 
 class FileReporter;
@@ -1635,7 +1644,9 @@ class PAG_API PAGDecoder {
   /**
    * Reads pixels of the image frame at the given index into the specified memory address. Returns
    * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
-   * the same throughout every reading call. Otherwise, it may return false.
+   * the same throughout every reading call. Otherwise, it may return false. When a frame render
+   * fails, the decoder enters a cooldown and returns false immediately for any frame not yet
+   * cached on disk until the cooldown elapses, instead of re-rendering on every call.
    */
   bool readFrame(int index, void* pixels, size_t rowBytes,
                  ColorType colorType = ColorType::RGBA_8888,
@@ -1644,7 +1655,9 @@ class PAG_API PAGDecoder {
   /**
    * Reads pixels of the image frame at the given index into the specified HardwareBuffer. Returns
    * false if failed. Reading image frames into HardwareBuffer usually has better performance than
-   * reading into memory.
+   * reading into memory. When a frame render fails, the decoder enters a cooldown and returns false
+   * immediately for any frame not yet cached on disk until the cooldown elapses, instead of
+   * re-rendering on every call.
    */
   bool readFrame(int index, HardwareBufferRef hardwareBuffer);
 
@@ -1663,6 +1676,8 @@ class PAG_API PAGDecoder {
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
   std::shared_ptr<CompositionReader> reader = nullptr;
   std::vector<TimeRange> staticTimeRanges = {};
+  int64_t failedRenderRetryTime = 0;
+  uint32_t failedRenderCount = 0;
   std::function<std::string(PAGDecoder*, std::shared_ptr<PAGComposition>)> cacheKeyGeneratorFun =
       nullptr;
 
