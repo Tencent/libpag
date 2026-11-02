@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdio>
+
 #include "pagx/utils/LayerTransformUtils.h"
 #include <cmath>
 #include "base/utils/Log.h"
@@ -98,13 +100,34 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
     // The pivot belongs to the affine chain only, mirroring how DCC tools keep the pivot inside the
     // object transform and apply the camera last: M = P * T(a) * A * T(-a). Touching the translation
     // column alone would leave the w row inconsistent, hence the split.
-    const float w = matrix.getRowColumn(3, 3);
-    if (w == 0.0f) {
+    // Recover P's bottom row from M = P * A: M.row3.xyz = p0*A.row0 + p1*A.row1 + p2*A.row2 with
+    // A.row3 = (0,0,0,1). Taking M.row3 directly as P would lose the part contributed by A.
+    const float a0[3] = {matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
+                         matrix.getRowColumn(0, 2)};
+    const float a1[3] = {matrix.getRowColumn(1, 0), matrix.getRowColumn(1, 1),
+                         matrix.getRowColumn(1, 2)};
+    const float a2[3] = {matrix.getRowColumn(2, 0), matrix.getRowColumn(2, 1),
+                         matrix.getRowColumn(2, 2)};
+    const float b[3] = {matrix.getRowColumn(3, 0), matrix.getRowColumn(3, 1),
+                        matrix.getRowColumn(3, 2)};
+    const float det = a0[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
+                      a1[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
+                      a2[0] * (a0[1] * a1[2] - a0[2] * a1[1]);
+    if (std::abs(det) < 1e-6f) {
       return matrix;
     }
-    const float p0 = matrix.getRowColumn(3, 0) / w;
-    const float p1 = matrix.getRowColumn(3, 1) / w;
-    const float p2 = matrix.getRowColumn(3, 2) / w;
+    const float p0 = (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
+                      a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
+                      a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
+                     det;
+    const float p1 = (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) -
+                      b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
+                      a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
+                     det;
+    const float p2 = (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) -
+                      a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
+                      b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
+                     det;
     Matrix3D affine = matrix;
     affine.setRowColumn(3, 0, 0.0f);
     affine.setRowColumn(3, 1, 0.0f);
