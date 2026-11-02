@@ -90,12 +90,25 @@ describe('PAGWebGPU', () => {
       for (const resource of resources.reverse()) {
         if (!resource.isDestroyed) resource.destroy();
       }
-      if (device) await device.queue.onSubmittedWorkDone();
-      for (const texture of textures) texture.destroy();
-      while (scopeCount > 0) {
-        scopeCount--;
-        const error = await device!.popErrorScope();
-        if (error) gpuErrors.push(error.message);
+      if (device) {
+        // Device-level waits reject with DOMExceptions whose message is getter-only, which
+        // Cypress cannot rethrow without crashing the whole suite, so normalize every
+        // failure into a plain string before the final assertion.
+        try {
+          await device.queue.onSubmittedWorkDone();
+        } catch (waitError) {
+          gpuErrors.push(`Flush wait failed: ${String(waitError)}`);
+        }
+        for (const texture of textures) texture.destroy();
+        while (scopeCount > 0) {
+          scopeCount--;
+          try {
+            const error = await device.popErrorScope();
+            if (error) gpuErrors.push(error.message);
+          } catch (scopeError) {
+            gpuErrors.push(`Error scope collection failed: ${String(scopeError)}`);
+          }
+        }
       }
       expect(gpuErrors, 'unexpected GPU errors').to.deep.equal([]);
     } finally {
