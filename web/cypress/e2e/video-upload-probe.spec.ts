@@ -148,7 +148,7 @@ describe('VideoUploadProbe', () => {
 
     const stats = (PAG as unknown as { videoUploadStats?: VideoUploadStats }).videoUploadStats;
     expect(stats, 'tgfx instrumentation (module.videoUploadStats)').to.not.equal(undefined);
-    cy.log(`videoUploadStats: ${JSON.stringify(stats)}`);
+    cy.task('print', `videoUploadStats: ${JSON.stringify(stats)}`);
     expect(stats!.calls, 'upload entry').to.be.greaterThan(0);
     expect(stats!.copyAttempts, 'copyExternalImageToTexture reached').to.be.greaterThan(0);
     expect(stats!.asyncErrors, 'failures must never arrive through the async error scope').to.equal(0);
