@@ -59,6 +59,11 @@ export default defineConfig({
         // Set CYPRESS_WEBGPU_SWIFTSHADER=1 to reproduce the CI adapter on any platform.
         if (process.platform === 'linux' || process.env.CYPRESS_WEBGPU_SWIFTSHADER === '1') {
           launchOptions.args.push('--use-webgpu-adapter=swiftshader');
+          if (process.platform === 'darwin') {
+            // SwiftShader is a Vulkan ICD, and Dawn's Vulkan backend sits behind a feature
+            // flag on macOS, so without this the adapter request resolves to null.
+            launchOptions.args.push('--enable-features=Vulkan');
+          }
         }
         return launchOptions;
       });

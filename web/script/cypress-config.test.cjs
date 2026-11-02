@@ -67,7 +67,13 @@ test('Linux WebGPU uses a software adapter without changing the WebGL lane', fun
   const forced = CreateHarness('webgpu', 'darwin', { CYPRESS_WEBGPU_SWIFTSHADER: '1' });
   const forcedLaunch = { args: [] };
   forced.handlers.get('before:browser:launch')({ name: 'chrome', family: 'chromium' }, forcedLaunch);
-  assert.deepEqual(forcedLaunch.args, ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader']);
+  assert.deepEqual(forcedLaunch.args,
+    ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan']);
+  const forcedLinux = CreateHarness('webgpu', 'linux', { CYPRESS_WEBGPU_SWIFTSHADER: '1' });
+  const forcedLinuxLaunch = { args: [] };
+  forcedLinux.handlers.get('before:browser:launch')({ name: 'chrome', family: 'chromium' },
+    forcedLinuxLaunch);
+  assert.deepEqual(forcedLinuxLaunch.args, ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader']);
 });
 
 test('WebGPU rejects unsupported launchers before running tests', function () {
