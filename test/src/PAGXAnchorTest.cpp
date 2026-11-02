@@ -27,6 +27,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "tgfx/core/Bitmap.h"
@@ -473,6 +474,38 @@ PAGX_TEST(PAGXAnchorTest, RenderPerspectiveAnchorMatchesBaked) {
   ASSERT_FALSE(anchoredPixels.empty());
   EXPECT_GT(CountOpaquePixels(anchoredPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+}
+
+/**
+ * Test case: the pivot also applies when the transform comes from components instead of a matrix.
+ */
+PAGX_TEST(PAGXAnchorTest, ComponentPathAppliesAnchor) {
+  auto doc = ParseDoc(MakeRectDoc("id=\"layer\" rotationZ=\"45\" scaleX=\"2\" anchor=\"100,50\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  const auto matrix = pagx::BuildLayerTransform3DWithAnchor(layer);
+  // L = R(45) * S(2, 1) = [[1.41421, -0.70711], [1.41421, 0.70711]]; a - L*a = (-6.066, -126.777).
+  EXPECT_NEAR(matrix.getRowColumn(0, 0), 1.41421f, 1e-3f);
+  EXPECT_NEAR(matrix.getRowColumn(0, 1), -0.70711f, 1e-3f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1.41421f, 1e-3f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 1), 0.70711f, 1e-3f);
+  EXPECT_NEAR(matrix.getRowColumn(0, 3), -6.06602f, 1e-2f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 3), -126.77670f, 1e-2f);
+}
+
+/**
+ * Test case: the HTML export writes the same pivoted matrix as the renderer.
+ */
+PAGX_TEST(PAGXAnchorTest, HtmlExportAppliesAnchor) {
+  auto doc = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  const auto css = pagx::LayerTransformCSS(layer);
+  // rotate(90) around (100,50): the affine pivot moves the translation to a - L*a = (150,-50).
+  EXPECT_NE(css.find("translate(150px,-50px)"), std::string::npos) << css;
+  EXPECT_NE(css.find("rotate(90deg)"), std::string::npos) << css;
 }
 
 }  // namespace pag
