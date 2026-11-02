@@ -16,10 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstdio>
-
 #include "pagx/utils/LayerTransformUtils.h"
 #include <cmath>
+#include <cstdio>
 #include "base/utils/Log.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 
@@ -116,24 +115,29 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
     if (std::abs(det) < 1e-6f) {
       return matrix;
     }
-    const float p0 = (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
-                      a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
-                      a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
-                     det;
-    const float p1 = (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) -
-                      b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
-                      a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
-                     det;
-    const float p2 = (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) -
-                      a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
-                      b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
-                     det;
+    const float p0 =
+        (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) - a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
+         a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
+        det;
+    const float p1 =
+        (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) - b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
+         a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
+        det;
+    const float p2 =
+        (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) - a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
+         b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
+        det;
     Matrix3D affine = matrix;
     affine.setRowColumn(3, 0, 0.0f);
     affine.setRowColumn(3, 1, 0.0f);
     affine.setRowColumn(3, 2, 0.0f);
     affine.setRowColumn(3, 3, 1.0f);
     const Matrix3D anchored = ApplyAnchorToMatrix(affine, anchor, anchorZ);
+    for (int row = 0; row < 3; ++row) {
+      for (int column = 0; column < 4; ++column) {
+        result.setRowColumn(row, column, anchored.getRowColumn(row, column));
+      }
+    }
     for (int column = 0; column < 4; ++column) {
       result.setRowColumn(
           3, column,

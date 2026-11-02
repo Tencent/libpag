@@ -440,4 +440,23 @@ PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorMatchesBakedMatrix) {
   }
 }
 
+/**
+ * Test case: with a perspective projection the pivot still lands on the same place, so the rendered
+ * frame matches a document that spells the resulting matrix out as matrix3D.
+ */
+PAGX_TEST(PAGXAnchorTest, RenderPerspectiveAnchorMatchesBaked) {
+  auto anchored =
+      ParseDoc(MakeRectDoc("id=\"layer\" rotationY=\"30\" perspective=\"500\" "
+                           "anchor=\"100,50\""));
+  auto baked = ParseDoc(
+      MakeRectDoc("id=\"layer\" matrix3D=\"0.866025,0,-0.5,0.001,0,1,0,0,0.5,0,0.866025,-0.001732,"
+                  "13.39746,0,50,0.9\""));
+  ASSERT_TRUE(anchored != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  const auto anchoredPixels = RenderFrame(anchored);
+  const auto bakedPixels = RenderFrame(baked);
+  ASSERT_FALSE(anchoredPixels.empty());
+  EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+}
+
 }  // namespace pag
