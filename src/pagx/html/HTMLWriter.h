@@ -716,6 +716,11 @@ class HTMLWriter {
   // element's own render position and size (Rectangle / Ellipse / Path / Polystar). Returns
   // true with outX / outY / outW / outH set when the resulting box has positive area; returns
   // false when no geo contributed usable bounds (callers should skip emission).
+  // How far a stroke paints beyond the geometry it outlines. A centered stroke paints half its
+  // width on each side, an outside stroke paints its full width, and an inside stroke stays inside
+  // the geometry. The layer box and every SVG viewBox use this same value so they stay consistent.
+  static float StrokeExtentPad(const Stroke* stroke);
+
   static bool ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                      bool useModifiedPathData, float& outX, float& outY,
                                      float& outW, float& outH);
