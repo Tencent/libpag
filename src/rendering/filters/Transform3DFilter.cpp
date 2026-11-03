@@ -227,23 +227,23 @@ std::shared_ptr<tgfx::Image> Transform3DFilter::Apply(
 
   Matrix3D viewMatrix = {};
   if (cameraTransform) {
-    Point3D cameraPositon;
-    Vec3 cameraTransformPositon;
+    Point3D cameraPosition;
+    Vec3 cameraTransformPosition;
     if (cameraTransform->position) {
-      cameraPositon = cameraTransform->position->getValueAt(layerFrame);
+      cameraPosition = cameraTransform->position->getValueAt(layerFrame);
 
     } else {
-      cameraPositon.x = cameraTransform->xPosition->getValueAt(layerFrame);
-      cameraPositon.y = cameraTransform->yPosition->getValueAt(layerFrame);
-      cameraPositon.z = cameraTransform->zPosition->getValueAt(layerFrame);
+      cameraPosition.x = cameraTransform->xPosition->getValueAt(layerFrame);
+      cameraPosition.y = cameraTransform->yPosition->getValueAt(layerFrame);
+      cameraPosition.z = cameraTransform->zPosition->getValueAt(layerFrame);
     }
 
     auto transZ =
-        1.0f * -cameraPositon.z / (scalar / 2.0f) + (cameraPositon.z > 0.0f ? 1.0f : -1.0f);
-    cameraTransformPositon = {cameraPositon.x / scalar * 2.0f - 1.0f,
-                              cameraPositon.y / (scalar * ratio) * 2.0f - 1.0f, transZ};
+        1.0f * -cameraPosition.z / (scalar / 2.0f) + (cameraPosition.z > 0.0f ? 1.0f : -1.0f);
+    cameraTransformPosition = {cameraPosition.x / scalar * 2.0f - 1.0f,
+                              cameraPosition.y / (scalar * ratio) * 2.0f - 1.0f, transZ};
 
-    cameraEye += cameraTransformPositon;
+    cameraEye += cameraTransformPosition;
 
     auto cOrientation = cameraTransform->orientation->getValueAt(layerFrame);
     auto cXRotation = cameraTransform->xRotation->getValueAt(layerFrame);
