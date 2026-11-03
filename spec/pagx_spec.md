@@ -967,6 +967,7 @@ Layer child elements are automatically categorized into five collections by type
 | `perspective` | float | 0 | Perspective viewing distance `d`; 0 means none, negative values are invalid |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | identity matrix | 3D transform (16 values, column-major); must be finite and invertible |
+| `anchor` | Point | 0,0 | Pivot of the local transform in layer-local pixels: `"x,y"` or `"x,y,z"`; conjugates the affine part as `M = P * T(t) * T(anchor) * L * T(-anchor)`, so the perspective projection stays outside the pivot. Values must be finite |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Group opacity |
@@ -992,6 +993,24 @@ Layer child elements are automatically categorized into five collections by type
 - `matrix3D` set: `matrix3D` overrides `matrix`, `x`/`y`/`z`, and the transform components
 
 A skew of ±90° or a negative `perspective` cannot be composed; the transform components are then ignored and only `x`/`y`/`z` apply.
+
+**anchor (local transform pivot)**: `anchor` sets the pivot the local transform rotates and scales around. It conjugates the affine part of the local transform only:
+
+```text
+M = P * T(translate) * T(anchor.x, anchor.y, anchorZ) * L * T(-anchor.x, -anchor.y, -anchorZ)
+```
+
+where `L` is the linear part of `matrix` / `matrix3D` (or the `R * K * S` composed from the components), `translate` is the translation of the same source, and `P` is the projection: the row built from `perspective` (identity when `perspective` is 0), or the projection row split out of a `matrix3D` that carries one. Expanded, only the translation changes, `t' = t + anchor - L * anchor`, and the linear part stays. The projection stays outside the pivot, so a layer whose linear part is the identity keeps its pose even under perspective, and a 2D matrix is just the `P = I` case. This differs from the CSS `transform-origin`, which conjugates `perspective()` along with the rest.
+
+Two values mean `(ax, ay, 0)`, so the pivot lies in the layer plane; a third value is the pivot depth and moves the rotation centre off the plane. The depth only takes effect once the Z row of the linear part differs from `(0, 0, 1)`, i.e. with a `matrix3D` or a Z component such as `rotationX` / `rotationY` and `scaleZ`. For a purely 2D transform that row is `(0, 0, 1)`, so `t_z' = z + anchorZ - anchorZ = z`: the depth cancels out exactly and changes neither the frame nor the depth ordering, which makes it redundant data. An `anchor.z` channel moves the rotation centre in depth under the same condition, so the ordering may change from frame to frame. A zero `anchor` (the default) reproduces the legacy meaning of `matrix` as the complete transform, so existing documents keep their behavior; with a non-zero `anchor`, `matrix` `tx`/`ty` are a pure translation and must not carry a baked pivot. One document must not use both a baked pivot in `tx`/`ty` and `anchor`, since the two add up.
+
+`anchor` is not an input of the transform priority chain: `matrix3D` / `matrix` / components plus `x`/`y`/`z` decide `L` and `translate` first, and the anchor applies once to the chosen result; it does not revive a `matrix` masked by a higher priority source. Unlike `x`/`y`/`z`, a non-identity static `matrix` / `matrix3D` does not mask `anchor`: `x`/`y` added to the translation would count twice, while the anchor redefines the pivot. Note that `Group.anchor` is a different attribute with the same name: a group subtracts its anchor from the content position, so an identity linear part still moves the content by `-anchor`.
+
+The pivot cannot be recovered from the pose: any anchor can be paired with a translation to produce the same matrix, and only `det(I - L) != 0` gives the unique `a = (I - L)⁻¹ * t`. Therefore `anchor` and `matrix` / `matrix3D` never update each other, and each drives its own state when animated (see Appendix D.1).
+
+An SVG `rotate(θ, cx, cy)` maps to `anchor="cx,cy"` plus matrix keyframes that carry only the linear part (`tx = ty = 0`). That is the recommended authoring form; the SVG / HTML importers still bake the transform origin into `matrix` and do not emit `anchor` yet.
+
+**Why this differs from the PAG / Lottie anchor model**: a Layer's local transform is one complete matrix including the translation, while PAG/Lottie model it as two independent attributes, `anchorPoint` and `position`; the abstraction levels differ, so `anchor` does not copy their split. This format makes the pivot a fixed point of the matrix and keeps `tx`/`ty` a pure translation, so matrix keyframes never carry a per-frame pivot compensation and the attribute maps one-to-one onto the CSS `transform-origin` and Ardot's `transformOrigin`. The conversion is `T(t) · T(a) · L · T(-a)`, which equals `T(t + a) · L · T(-a)`, i.e. PAG's and `Group`'s `position = matrix.t + anchor`. Keep the two questions apart: the geometry does not follow PAG, while the animation capability does — `anchorPoint` is a property in PAG too, and so are the `anchor.x` / `anchor.y` / `anchor.z` channels here.
 
 The position generated by constraint or container layout is applied outside the local transform: `T(layoutPosition) * local`.
 
@@ -3109,8 +3128,12 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
 | `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |
 | `perspective` | float | Perspective distance (`perspective`); 0 means none |
+| `anchor.x` / `anchor.y` | float | Local transform pivot in layer-local pixels, interpolated per component |
+| `anchor.z` | float | Pivot depth; needs a Z component, a purely 2D transform cancels it out |
 
 The rotation/scale/skew/perspective channels drive the Layer transform components described in §5.2 and can be animated and data-bound like `x`/`y`/`z`. A write that would compose a skew of ±90° or a negative `perspective` is rejected.
+
+The `anchor` channels drive the pivot itself, which is kept apart from the pose: the pivot cannot be read back from a matrix (different pivots paired with matching translations produce the same matrix, see §5.2), so reading `anchor` returns the pivot state instead of a decomposed value, and `matrix` / `matrix3D` writes do not touch the pivot; a pivot write re-applies the anchor to the current pose. The pivot does not take part in layout, so a write needs no layout pass.
 
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 

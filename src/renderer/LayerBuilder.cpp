@@ -192,7 +192,8 @@ static Matrix3D ApplyLayoutPosition(const Matrix3D& matrix, float x, float y) {
 // Runtime target for a Layer's tgfx::Layer that keeps one local transform pose shared by the x / y
 // / z, transform component (rotation / scale / skew / perspective), matrix and matrix3D channels.
 // Each write mixes only the part of the pose its channel drives (current = Mix(current, target,
-// mix)), so anything no source drives keeps its current value and the latest write wins. While the
+// mix)), so anything no source drives keeps its current value and the latest write wins. The anchor
+// channels keep the pivot in separate state and apply it when the pose is published. While the
 // pose comes from components (authored or written ones), they are kept as values, so a zero scale
 // or a rotation beyond 180 degrees survives later writes; a matrix or matrix3D write replaces the
 // pose with a matrix, which is decomposed again by the next component write. The layout-generated
@@ -209,6 +210,9 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (channel == "matrix3D") {
       return applyMatrix3D(value, mix);
     }
+    if (IsAnchorChannel(channel)) {
+      return applyAnchor(channel, value, mix);
+    }
     auto component = Matrix3DComponent::RotateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
       return applyComponent(component, value, mix);
@@ -219,17 +223,25 @@ struct LayerRuntimeTarget : RuntimeTarget {
   bool hasWriter(const std::string& channel) const override {
     auto component = Matrix3DComponent::RotateX;
     if (channel == "x" || channel == "y" || channel == "z" || channel == "matrix" ||
-        channel == "matrix3D" || Matrix3DComponentFromChannel(channel, &component)) {
+        channel == "matrix3D" || IsAnchorChannel(channel) ||
+        Matrix3DComponentFromChannel(channel, &component)) {
       return true;
     }
     return RuntimeTarget::hasWriter(channel);
   }
 
   // Reads x / y / z and the transform components back from the pose, excluding the layout position.
-  // Other channels fall through to the base reader table.
+  // The anchor is the exception: it is a free parameter of the pose (a different anchor plus a
+  // matching translation renders the same matrix), so it is read from its own state. Other channels
+  // fall through to the base reader table.
   bool read(const std::string& channel, KeyValue* out) const override {
     if (out == nullptr) {
       return false;
+    }
+    if (IsAnchorChannel(channel)) {
+      *out =
+          KeyValue{channel == "anchor.z" ? anchorZ : (channel == "anchor.x" ? anchor.x : anchor.y)};
+      return true;
     }
     if (channel == "x" || channel == "y" || channel == "z") {
       auto axis = TranslationAxis(channel);
@@ -257,7 +269,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   // otherwise x / y / z and the transform components are composed. The authored transform that
   // takes precedence also masks the channels it overrides.
   void initTransform(const Layer* node) {
-    // A non-finite matrix is ignored by BuildLayerLocalMatrix3D, so it must not mask the channels
+    // A non-finite matrix is ignored by BuildLayerTransform3DWithAnchor, so it must not mask the channels
     // it would have overridden either.
     hasStaticMatrix3D = !node->matrix3D.isIdentity() && IsFiniteMatrix3D(node->matrix3D);
     hasStaticMatrix = !node->matrix.isIdentity() && IsFiniteMatrix(node->matrix);
@@ -265,10 +277,12 @@ struct LayerRuntimeTarget : RuntimeTarget {
     layoutX = std::isnan(position.x) ? 0 : position.x;
     layoutY = std::isnan(position.y) ? 0 : position.y;
     hasComponents = !hasStaticMatrix3D && !hasStaticMatrix;
+    anchor = node->anchor;
+    anchorZ = node->anchorZ;
     if (hasComponents) {
       LayerTransformComponents(node, &components, &pose);
     } else {
-      pose = BuildLayerLocalMatrix3D(node);
+      pose = ComposeLayerTransform3DWithoutAnchor(node);
     }
     publish();
   }
@@ -281,11 +295,35 @@ struct LayerRuntimeTarget : RuntimeTarget {
   float layoutY = 0;
   bool hasStaticMatrix = false;
   bool hasStaticMatrix3D = false;
+  Point anchor = {};
+  float anchorZ = 0.0f;
   bool rejectedMaskedWriteLogged = false;
   bool rejectedComponentWriteLogged = false;
 
   static int TranslationAxis(const std::string& channel) {
     return channel == "x" ? 0 : (channel == "y" ? 1 : 2);
+  }
+
+  static bool IsAnchorChannel(const std::string& channel) {
+    return channel == "anchor.x" || channel == "anchor.y" || channel == "anchor.z";
+  }
+
+  // The anchor is not part of the composable pose, so a write only mixes it into its own state and
+  // republishes; it neither masks nor is masked by a static matrix or matrix3D.
+  bool applyAnchor(const std::string& channel, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || !std::isfinite(*v)) {
+      return false;
+    }
+    if (channel == "anchor.z") {
+      anchorZ = MixFloat(anchorZ, *v, mix);
+    } else if (channel == "anchor.x") {
+      anchor.x = MixFloat(anchor.x, *v, mix);
+    } else {
+      anchor.y = MixFloat(anchor.y, *v, mix);
+    }
+    publish();
+    return true;
   }
 
   bool isTranslationMasked(int axis) const {
@@ -457,7 +495,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (layer == nullptr) {
       return;
     }
-    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(pose, layoutX, layoutY)));
+    // The anchor is applied once here, after the pose is final: T(anchor) * pose * T(-anchor).
+    // Layout position stays outside the local transform.
+    const auto anchored = ApplyAnchorToMatrix(pose, anchor, anchorZ);
+    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(anchored, layoutX, layoutY)));
   }
 };
 

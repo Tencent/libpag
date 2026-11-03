@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <climits>
@@ -123,6 +124,7 @@ static Point ParsePoint(const std::string& str, bool* outValid = nullptr);
 static Size ParseSize(const std::string& str, bool* outValid = nullptr);
 static Rect ParseRect(const std::string& str, bool* outValid = nullptr);
 static Color ParseColor(const std::string& str, bool* outValid = nullptr);
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values);
 static Point GetPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc);
 static Size GetSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
@@ -546,6 +548,18 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       ReportError(doc, node, "'matrix' must contain finite values.");
     } else {
       layer->matrix = parsed;
+    }
+  }
+  // "x,y" keeps the pivot in the layer plane; "x,y,z" moves it out of the plane for 3D transforms.
+  auto anchorStr = GetAttribute(node, "anchor");
+  if (!anchorStr.empty()) {
+    std::vector<float> anchorValues = {};
+    if (!ParseFiniteFloatList(anchorStr, &anchorValues) ||
+        (anchorValues.size() != 2 && anchorValues.size() != 3)) {
+      ReportError(doc, node, "Invalid anchor '" + anchorStr + "' (expected 'x,y' or 'x,y,z').");
+    } else {
+      layer->anchor = {anchorValues[0], anchorValues[1]};
+      layer->anchorZ = (anchorValues.size() == 3) ? anchorValues[2] : 0.0f;
     }
   }
   auto matrix3DStr = GetAttribute(node, "matrix3D");

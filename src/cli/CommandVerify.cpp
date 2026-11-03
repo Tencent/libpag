@@ -1143,7 +1143,7 @@ static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnosti
 // These are positional/identity attributes that don't affect the structural content.
 // clang-format off
 static const std::vector<const char*> LAYER_ROOT_STRIP_ATTRS = {
-    "x", "y", "matrix", "matrix3D",
+    "x", "y", "matrix", "matrix3D", "anchor",
     "left", "right", "top", "bottom", "centerX", "centerY",
     "flex", "includeInLayout",
 };

@@ -56,6 +56,7 @@ Basic container for content, child layers, styles, and filters.
 | `y` | float | 0 | Y position (prefer constraint attribute `top`) |
 | `matrix` | Matrix | identity | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | — | 3D transform (16 values, column-major) |
+| `anchor` | Anchor | 0,0 | Pivot of the local transform in layer-local pixels: `"x,y"` or `"x,y,z"`; conjugates the affine part as `M = P · T(t) · T(a) · L · T(-a)`, so the projection stays outside the pivot. Animatable through `anchor.x` / `anchor.y` / `anchor.z` |
 | `preserve3D` | bool | false | Preserve 3D transform space for child layers |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Composite to offscreen buffer before applying alpha |
