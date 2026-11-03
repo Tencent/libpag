@@ -269,8 +269,11 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   }
   std::string bodyStr = body.release();
 
+  // Animation CSS is independent of the font rules: keep it in its own buffer and emit it in its
+  // own <style> so that changing how fonts are written can never drop the keyframes.
+  std::string animationCss;
   if (animSession.isActive()) {
-    fontFaceRules += animSession.emitKeyframesAndWeave(bodyStr);
+    animationCss = animSession.emitKeyframesAndWeave(bodyStr);
   }
 
   // Insert @font-face rules for embedded WOFF2 fonts
@@ -278,6 +281,13 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     html.openTag("style");
     html.closeTagStart();
     html.addRawContent(fontFaceRules);
+    html.closeTag();  // </style>
+  }
+
+  if (!animationCss.empty()) {
+    html.openTag("style");
+    html.closeTagStart();
+    html.addRawContent(animationCss);
     html.closeTag();  // </style>
   }
 
