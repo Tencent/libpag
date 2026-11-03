@@ -29,6 +29,7 @@
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PropertyData.h"
+#include "pagx/utils/ImportFormat.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
@@ -47,6 +48,188 @@
 #include "tgfx/layers/VectorLayer.h"
 
 namespace pagx {
+
+namespace {
+
+using RuntimeLayerMember = std::shared_ptr<tgfx::Layer> PAGLayer::*;
+using ResolvedTargets = std::vector<std::pair<Node*, std::vector<Channel*>>>;
+using CollectChildCompositionsFunction = void (*)(const PAGLayer*, std::vector<PAGComposition*>&);
+
+struct TimelineReplayAccess {
+  std::unique_ptr<RuntimeBinding> PAGComposition::* binding;
+  std::vector<std::shared_ptr<PAGTimeline>> PAGComposition::* timelines;
+  ResolvedTargets PAGAnimation::* targets;
+  CollectChildCompositionsFunction collectChildren;
+};
+
+void UnregisterCompositionDocuments(
+    PAGComposition* root, PAGScene* scene, PAGXDocument* PAGComposition::* documentMember,
+    CollectChildCompositionsFunction collectChildren,
+    void (PAGXDocument::*unregisterScene)(PAGScene*)) {
+  std::vector<PAGComposition*> pending = {root};
+  std::unordered_set<PAGXDocument*> visited = {};
+  while (!pending.empty()) {
+    auto* comp = pending.back();
+    pending.pop_back();
+    if (comp == nullptr) {
+      continue;
+    }
+    auto* document = comp->*documentMember;
+    if (document != nullptr && visited.insert(document).second) {
+      (document->*unregisterScene)(scene);
+    }
+    collectChildren(comp, pending);
+  }
+}
+
+void ReapplyCompositionTreeDataBinds(
+    PAGComposition* comp, const Node* targetNode, RuntimeBinding* scopeBinding,
+    std::unique_ptr<DataBindRuntime> PAGComposition::* runtimeMember,
+    CollectChildCompositionsFunction collectChildren) {
+  if (comp == nullptr) {
+    return;
+  }
+  auto* runtime = (comp->*runtimeMember).get();
+  if (runtime != nullptr && runtime->getBoundBinding() == scopeBinding) {
+    runtime->reapplyForTarget(targetNode);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  collectChildren(comp, childComps);
+  for (auto* childComp : childComps) {
+    ReapplyCompositionTreeDataBinds(childComp, targetNode, scopeBinding, runtimeMember,
+                                   collectChildren);
+  }
+}
+
+bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
+                            float rootY, bool shapeHitTest) {
+  // Composition slots carry the referencing layer's visibility, clip and mask. Check every
+  // intermediate runtime layer, not just the child PAGLayer's own runtime node.
+  auto rootPoint = tgfx::Point::Make(rootX, rootY);
+  for (auto* current = layer; current != nullptr && current != stop; current = current->parent()) {
+    if (!current->visible()) {
+      return false;
+    }
+    auto scrollRect = current->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      auto localPoint = current->globalToLocal(rootPoint);
+      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
+        return false;
+      }
+    }
+    auto mask = current->mask();
+    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY, shapeHitTest)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool OwnContentContainsPoint(PAGLayer* layer, tgfx::Layer* runtimeLayer, float rootX, float rootY,
+                             float surfaceX, float surfaceY, bool shapeHitTest) {
+  if (runtimeLayer == nullptr || runtimeLayer->type() != tgfx::LayerType::Vector ||
+      static_cast<tgfx::VectorLayer*>(runtimeLayer)->contents().empty()) {
+    return false;
+  }
+  // Reject outside the own-content bounds before hitTestPoint can recurse into a subtree whose
+  // children have already missed. Otherwise hovering empty space traverses that subtree twice.
+  auto localPoint = runtimeLayer->globalToLocal(tgfx::Point::Make(rootX, rootY));
+  if (!runtimeLayer->getBounds(runtimeLayer).contains(localPoint.x, localPoint.y)) {
+    return false;
+  }
+  return layer->hitTestPoint(surfaceX, surfaceY, shapeHitTest);
+}
+
+bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer,
+                             RuntimeLayerMember runtimeMember, float rootX, float rootY,
+                             float surfaceX, float surfaceY, bool shapeHitTest,
+                             std::vector<std::shared_ptr<PAGLayer>>* out) {
+  // Prune only by visibility, clip and mask. Gating on an ancestor's shape would repeat the
+  // descendants' shape tests at every level because tgfx's shape test is recursive.
+  bool childHit = false;
+  const auto& children = layer->getChildren();
+  auto* parentRuntime = (layer.get()->*runtimeMember).get();
+  for (auto item = children.rbegin(); item != children.rend(); ++item) {
+    const auto& child = *item;
+    if (child == nullptr) {
+      continue;
+    }
+    auto* childRuntime = (child.get()->*runtimeMember).get();
+    if (childRuntime == nullptr ||
+        !RuntimePathAcceptsPoint(childRuntime, parentRuntime, rootX, rootY, shapeHitTest)) {
+      continue;
+    }
+    if (CollectLayersUnderPoint(child, runtimeMember, rootX, rootY, surfaceX, surfaceY,
+                                shapeHitTest, out)) {
+      childHit = true;
+    }
+  }
+  if (!childHit && !OwnContentContainsPoint(layer.get(), parentRuntime, rootX, rootY, surfaceX,
+                                           surfaceY, shapeHitTest)) {
+    return false;
+  }
+  out->push_back(layer);
+  return true;
+}
+
+bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
+                             const std::unordered_set<const Node*>& dirtySet) {
+  if (binding == nullptr) {
+    return false;
+  }
+  for (const auto* node : dirtySet) {
+    if (node != nullptr && binding->contains(node)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
+                                 ResolvedTargets PAGAnimation::* targetsMember,
+                                 const std::unordered_set<const Node*>& dirtySet) {
+  if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
+    return true;
+  }
+  const auto& resolved = static_cast<const PAGAnimation*>(timeline)->*targetsMember;
+  if (resolved.empty()) {
+    return true;
+  }
+  for (const auto& entry : resolved) {
+    auto* target = entry.first;
+    if (target == nullptr) {
+      continue;
+    }
+    // Content-node edits are collapsed to their owning Layer. A non-Layer target's channel may
+    // therefore have been reset even when the dirty set does not contain the target itself.
+    if (target->nodeType() != NodeType::Layer || dirtySet.find(target) != dirtySet.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ApplyTimelinesForDirtyNodes(PAGComposition* comp, const TimelineReplayAccess& access,
+                                 const std::unordered_set<const Node*>& dirtySet) {
+  if (comp == nullptr) {
+    return;
+  }
+  if (BindingCoversDirtyNodes((comp->*access.binding).get(), dirtySet)) {
+    for (auto& timeline : comp->*access.timelines) {
+      if (timeline != nullptr &&
+          TimelineCanTargetDirtyNodes(timeline.get(), access.targets, dirtySet)) {
+        timeline->apply();
+      }
+    }
+  }
+  std::vector<PAGComposition*> childComps = {};
+  access.collectChildren(comp, childComps);
+  for (auto* childComp : childComps) {
+    ApplyTimelinesForDirtyNodes(childComp, access, dirtySet);
+  }
+}
+
+}  // namespace
 
 // Decodes an <Image> resource node into a PAGImage using the same precedence as the renderer's
 // ImagePattern path: host-injected data first, then an inline data URI, then an external file path.
@@ -73,8 +256,16 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   if (document == nullptr) {
     return nullptr;
   }
+  if (DocumentHasConflictingImportSources(document.get())) {
+    LOGE("Layer cannot declare both 'composition' and 'import' sources.");
+    return nullptr;
+  }
   if (!document->isLayoutApplied()) {
     document->applyLayout();
+  }
+  if (!document->isLayoutApplied() || document->hasUnresolvedImports()) {
+    LOGE("PAGScene::Make() aborted: layout failed or an active import remains unresolved.");
+    return nullptr;
   }
   // A cyclic external composition reference leaves the document partially laid out: applyLayout()
   // aborts the offending subtree but the rest of the tree looks valid. Building a scene on top of
@@ -91,11 +282,26 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   scene->displayList = std::make_unique<tgfx::DisplayList>();
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
   scene->buildRuntimeTree();
-  document->registerLiveScene(scene);
   return scene;
 }
 
 void PAGScene::buildRuntimeTree() {
+  if (!document->isLayoutApplied()) {
+    // A detach must rebuild before releasing its old domain, without mounting that import again.
+    std::unordered_set<const PAGXDocument*> visited = {};
+    document->applyLayout(nullptr, visited, nullptr, false);
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE("PAGScene runtime rebuild aborted: document layout failed.");
+    return;
+  }
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
+  if (buildResult.root == nullptr) {
+    return;
+  }
+  UnregisterCompositionDocuments(_rootComposition.get(), this, &PAGComposition::document,
+                                 &PAGComposition::CollectChildCompositions,
+                                 &PAGXDocument::unregisterLiveScene);
   // Detach any previously built tree (a rebuild after an external-document edit) so the display list
   // and timeline cache do not retain stale runtime layers.
   if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
@@ -111,7 +317,6 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   instantiatedTimelines.clear();
-  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
   *rootComp->binding = std::move(buildResult.binding);
@@ -142,6 +347,7 @@ void PAGScene::buildRuntimeTree() {
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
+  document->registerLiveScene(shared_from_this());
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -394,6 +600,9 @@ void PAGScene::buildViewModels() {
 }
 
 PAGScene::~PAGScene() {
+  UnregisterCompositionDocuments(_rootComposition.get(), this, &PAGComposition::document,
+                                 &PAGComposition::CollectChildCompositions,
+                                 &PAGXDocument::unregisterLiveScene);
   if (document != nullptr) {
     document->unregisterLiveScene(this);
   }
@@ -628,23 +837,9 @@ void PAGScene::reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding*
     return;
   }
   if (_rootComposition != nullptr) {
-    ReapplyCompositionTreeDataBinds(_rootComposition.get(), targetNode, scopeBinding);
-  }
-}
-
-void PAGScene::ReapplyCompositionTreeDataBinds(PAGComposition* comp, const Node* targetNode,
-                                               RuntimeBinding* scopeBinding) {
-  if (comp == nullptr) {
-    return;
-  }
-  if (comp->dataBindRuntime != nullptr &&
-      comp->dataBindRuntime->getBoundBinding() == scopeBinding) {
-    comp->dataBindRuntime->reapplyForTarget(targetNode);
-  }
-  std::vector<PAGComposition*> childComps = {};
-  PAGComposition::CollectChildCompositions(comp, childComps);
-  for (auto* childComp : childComps) {
-    ReapplyCompositionTreeDataBinds(childComp, targetNode, scopeBinding);
+    ReapplyCompositionTreeDataBinds(_rootComposition.get(), targetNode, scopeBinding,
+                                   &PAGComposition::dataBindRuntime,
+                                   &PAGComposition::CollectChildCompositions);
   }
 }
 
@@ -688,83 +883,6 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
-bool PAGScene::RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
-                                       float rootY, bool shapeHitTest) {
-  // Mirrors the per-child gating of tgfx::Layer::getLayersUnderPoint. A PAGComposition's runtime
-  // layer hangs under the referencing layer's slot, which carries that layer's visibility, clip and
-  // mask, so every tgfx layer between the child and its PAGLayer parent is checked.
-  auto rootPoint = tgfx::Point::Make(rootX, rootY);
-  for (auto* current = layer; current != nullptr && current != stop; current = current->parent()) {
-    if (!current->visible()) {
-      return false;
-    }
-    auto scrollRect = current->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      auto localPoint = current->globalToLocal(rootPoint);
-      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
-        return false;
-      }
-    }
-    auto mask = current->mask();
-    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY, shapeHitTest)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool PAGScene::OwnContentContainsPoint(PAGLayer* layer, float rootX, float rootY, float surfaceX,
-                                       float surfaceY, bool shapeHitTest) {
-  // Only a tgfx::VectorLayer carries contents (see LayerBuilder), so a plain container layer has no
-  // content of its own and cannot be hit by itself.
-  auto* runtimeLayer = layer->runtimeLayer.get();
-  if (runtimeLayer == nullptr || runtimeLayer->type() != tgfx::LayerType::Vector ||
-      static_cast<tgfx::VectorLayer*>(runtimeLayer)->contents().empty()) {
-    return false;
-  }
-  // Fast reject before hitTestPoint(): that call recurses into every child layer once this layer's
-  // own content misses, and the caller gets here only after no child was hit, so without this check
-  // hovering empty space would walk the same subtree twice. A point outside this layer's own content
-  // bounds cannot hit its content, so it never needs that walk.
-  auto localPoint = runtimeLayer->globalToLocal(tgfx::Point::Make(rootX, rootY));
-  if (!runtimeLayer->getBounds(runtimeLayer).contains(localPoint.x, localPoint.y)) {
-    return false;
-  }
-  return layer->hitTestPoint(surfaceX, surfaceY, shapeHitTest);
-}
-
-bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
-                                       float rootY, float surfaceX, float surfaceY,
-                                       bool shapeHitTest,
-                                       std::vector<std::shared_ptr<PAGLayer>>* out) {
-  // Subtrees are gated only by visibility, clip and mask, never pruned by an ancestor's shape test:
-  // tgfx's shape test recurses into every descendant, so testing each ancestor before descending
-  // would re-run the descendants' shape tests once per level.
-  bool childHit = false;
-  const auto& children = layer->getChildren();
-  auto* parentRuntime = layer->runtimeLayer.get();
-  // Top-most child first, matching the document's paint order.
-  for (auto item = children.rbegin(); item != children.rend(); ++item) {
-    const auto& child = *item;
-    if (child == nullptr || child->runtimeLayer == nullptr ||
-        !RuntimePathAcceptsPoint(child->runtimeLayer.get(), parentRuntime, rootX, rootY,
-                                 shapeHitTest)) {
-      continue;
-    }
-    if (CollectLayersUnderPoint(child, rootX, rootY, surfaceX, surfaceY, shapeHitTest, out)) {
-      childHit = true;
-    }
-  }
-  if (!childHit &&
-      !OwnContentContainsPoint(layer.get(), rootX, rootY, surfaceX, surfaceY, shapeHitTest)) {
-    return false;
-  }
-  // Descendants are pushed before their parent so the deepest top-most hit ends up at the front,
-  // which is the order callers (editor selection) already rely on.
-  out->push_back(layer);
-  return true;
-}
-
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   return getLayersUnderPoint(surfaceX, surfaceY, false);
@@ -781,8 +899,8 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
     return {};
   }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  CollectLayersUnderPoint(_rootComposition, rootX, rootY, surfaceX, surfaceY, shapeHitTest,
-                          &result);
+  CollectLayersUnderPoint(_rootComposition, &PAGLayer::runtimeLayer, rootX, rootY, surfaceX,
+                          surfaceY, shapeHitTest, &result);
   return result;
 }
 
@@ -923,7 +1041,10 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // the dirty nodes drop out first, then each surviving animation is narrowed by its resolved
     // targets, so a sibling layer that animation does not drive is skipped as well.
     std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
-    ApplyTimelinesForDirtyNodes(_rootComposition.get(), dirtySet);
+    TimelineReplayAccess access = {&PAGComposition::binding, &PAGComposition::timelines,
+                                   &PAGAnimation::resolvedTargets,
+                                   &PAGComposition::CollectChildCompositions};
+    ApplyTimelinesForDirtyNodes(_rootComposition.get(), access, dirtySet);
     // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
     // inside the root composition subtree, so the walk above does not reach them. Re-apply them at
     // their current position so an animated property on a top-level timeline (e.g. slidingBar's x,
@@ -932,75 +1053,13 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // while playing. They resolve against the root binding, so the same coverage test applies.
     if (BindingCoversDirtyNodes(_rootComposition->binding.get(), dirtySet)) {
       for (auto& entry : instantiatedTimelines) {
-        if (entry.second != nullptr && TimelineCanTargetDirtyNodes(entry.second.get(), dirtySet)) {
+        if (entry.second != nullptr &&
+            TimelineCanTargetDirtyNodes(entry.second.get(), access.targets, dirtySet)) {
           entry.second->apply();
         }
       }
     }
   }
-}
-
-bool PAGScene::BindingCoversDirtyNodes(const RuntimeBinding* binding,
-                                       const std::unordered_set<const Node*>& dirtySet) {
-  if (binding == nullptr) {
-    return false;
-  }
-  for (const auto* node : dirtySet) {
-    if (node != nullptr && binding->contains(node)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void PAGScene::ApplyTimelinesForDirtyNodes(PAGComposition* comp,
-                                           const std::unordered_set<const Node*>& dirtySet) {
-  if (comp == nullptr) {
-    return;
-  }
-  // Own timelines before descendants, matching PAGComposition::apply(), which applies its own
-  // timelines and then recurses through PAGLayer::apply().
-  if (BindingCoversDirtyNodes(comp->binding.get(), dirtySet)) {
-    for (auto& timeline : comp->timelines) {
-      if (timeline != nullptr && TimelineCanTargetDirtyNodes(timeline.get(), dirtySet)) {
-        timeline->apply();
-      }
-    }
-  }
-  std::vector<PAGComposition*> childComps = {};
-  PAGComposition::CollectChildCompositions(comp, childComps);
-  for (auto* childComp : childComps) {
-    ApplyTimelinesForDirtyNodes(childComp, dirtySet);
-  }
-}
-
-bool PAGScene::TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
-                                           const std::unordered_set<const Node*>& dirtySet) {
-  if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
-    return true;
-  }
-  const auto& resolved = static_cast<const PAGAnimation*>(timeline)->resolvedTargets;
-  if (resolved.empty()) {
-    return true;
-  }
-  for (const auto& entry : resolved) {
-    auto* target = entry.first;
-    if (target == nullptr) {
-      continue;
-    }
-    // notifyChange collapses an edit on a content node (Fill, Stroke, Rectangle, ...) to the Layer
-    // that owns it, so the dirty set only ever holds Layers while a target can be any node. A Layer
-    // refresh rebuilds that layer's whole content subtree and resets every channel in it, so an
-    // animation driving something other than a Layer cannot be proven unaffected from the dirty set
-    // alone; replay it rather than risk leaving a reset channel unrestored.
-    if (target->nodeType() != NodeType::Layer) {
-      return true;
-    }
-    if (dirtySet.find(target) != dirtySet.end()) {
-      return true;
-    }
-  }
-  return false;
 }
 
 RuntimeBinding* PAGScene::mutableBinding() {

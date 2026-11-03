@@ -176,8 +176,7 @@ static int ExportToSVG(const ExportOptions& options) {
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+  if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx export")) {
     return 1;
   }
 
@@ -205,8 +204,7 @@ static int ExportToHTML(const ExportOptions& options) {
   for (auto& error : document->errors) {
     std::cerr << "pagx export: warning: " << error << "\n";
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+  if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx export")) {
     return 1;
   }
 
@@ -232,9 +230,12 @@ static int ExportToPPT(const ExportOptions& options) {
     for (auto& error : document->errors) {
       std::cerr << "pagx export: warning: " << error << "\n";
     }
-    if (document->hasUnresolvedImports()) {
-      std::cerr << "pagx export: error: unresolved import directive in '" << inputFile
-                << "', run 'pagx resolve' first\n";
+    auto errorCount = document->errors.size();
+    if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx export")) {
+      return 1;
+    }
+    if (document->errors.size() != errorCount) {
+      std::cerr << "pagx export: error: layout failed for '" << inputFile << "'\n";
       return 1;
     }
     documents.emplace_back(std::move(document));

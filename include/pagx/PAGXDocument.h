@@ -99,7 +99,6 @@ class PAGXDocument : public Node {
   T* makeNode(const std::string& id = "") {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
-    result->index = static_cast<int>(nodes.size());
     registerNode(result, id);
     nodeSet.insert(result);
     nodes.push_back(std::move(node));
@@ -129,28 +128,22 @@ class PAGXDocument : public Node {
   /**
    * All nodes in the document (owned by the document). Do not push into this vector directly:
    * use makeNode() for new nodes and adoptNodes() to take over nodes from another document — a
-   * direct push leaves the node's index stale and invisible to ownsNode().
+   * direct push leaves the node invisible to ownsNode().
    */
   std::vector<std::unique_ptr<Node>> nodes = {};
 
   /**
-   * Takes over ownership of nodes created by another document (e.g. an SVG importer run for an
-   * inline import or a mask): appends them to this document's node list, reassigns each node's
-   * index to its new position, registers them in the ownership set so ownsNode() recognizes them
-   * and notifyChange broadcasts their edits, and registers each non-empty id in the id index so
-   * findNode(), data-bind "@id" targets, and deferred mask resolution see the adopted nodes. An
-   * id already registered in this document is reported as a duplicate error and the HOST mapping
-   * is kept (the adopted node stays unindexed), so foreign content cannot hijack the host's
-   * "@id" references. Renaming happens inside this call, so a caller cannot forget the sequence
-   * and merge duplicate ids into the document. Callers must not push into `nodes` directly — a
-   * bypassed node keeps its old index (colliding with existing nodes) and is invisible to
-   * ownsNode(), breaking index-based lookups and any host that resolves a runtime layer back
-   * to a source node.
+   * Transfers ownership of all nodes from another document. Conflicting non-empty ids are renamed
+   * to unique values before transfer. Afterwards, ownsNode() recognizes the adopted nodes, and
+   * findNode() and data-bind "@id" targets resolve every adopted non-empty id without replacing
+   * existing host references.
    *
-   * `other` is drained and invalidated: its node list, ownership set, id index, and the layer and
-   * animation lists that reference the same nodes are all cleared, so it can no longer answer
-   * ownsNode()/findNode() or hand out layers for nodes it has given away. Passing *this is a no-op.
-   * @param other the document to drain; emptied and invalidated on return.
+   * On success, `other` is drained: node ownership, id and image-path indexes, root layer and
+   * animation lists, ViewModel/DataBind references, font configuration and layout state are cleared.
+   * Root lists are not merged into this document; callers attach the adopted nodes before notifying
+   * changes. A source with live scenes is refused and an error is appended to this document without
+   * changing the source. Passing *this is a no-op.
+   * @param other the source document; drained only after a successful transfer.
    */
   void adoptNodes(PAGXDocument& other);
 
@@ -162,15 +155,23 @@ class PAGXDocument : public Node {
   std::vector<std::string> errors = {};
 
   /**
-   * Returns true if any layer in the document has import content that is not mounted. Inline
-   * `<svg>` content is mounted automatically as a sub-document at load time and again at the top of
-   * applyLayout, and then renders through its composition reference, so it does not count — this
-   * requires the SVG importer to be linked (PAG_BUILD_SVG); a build without it leaves every inline
-   * import unmounted and therefore unresolved. An inline import that failed to parse, or an
-   * `import` file attribute (which requires the file to be supplied or resolved), also counts.
-   * `pagx resolve` flattens any import into editable native nodes.
+   * Returns true if any active import directive has not been resolved or mounted. This query does
+   * not parse content. Inline SVG is mounted lazily on first applyLayout() or scene creation, when
+   * the SVG importer is linked (PAG_BUILD_SVG), and then no longer counts as unresolved. A failed or
+   * unsupported inline import and a file import that still needs `pagx resolve` do count. Inline
+   * content ignored in favor of an explicit composition declaration does not count.
+   * @return true if an active import still prevents rendering without resolution or layout.
    */
   bool hasUnresolvedImports() const;
+
+  /**
+   * Returns true if the node is a synthesized wrapper for mounted inline or external-file content.
+   * Such wrappers are runtime adapters, not editable resources. Their content belongs to a separate
+   * document; flatten imports before editing it. The answer does not depend on the wrapper's id.
+   * @param node the node to inspect; null and nodes not owned by this document return false.
+   * @return true for a mounted composition wrapper owned by this document.
+   */
+  bool isMountedComposition(const Node* node) const;
 
   /**
    * Detaches the inline-import sub-document mounted on the given layer (the inverse of the mount
@@ -278,9 +279,8 @@ class PAGXDocument : public Node {
   }
 
   /**
-   * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
-   * The document must have had applyLayout() called first so that Text nodes contain valid
-   * layout run data.
+   * Embeds font data from Text nodes owned by this document after applyLayout(). Mounted composition
+   * domains are left unchanged; flatten imports with `pagx resolve` before embedding their fonts.
    * @return true if embedding succeeded, false if layout has not been applied.
    */
   bool embed();
@@ -345,6 +345,14 @@ class PAGXDocument : public Node {
   PAGXDocument() = default;
 
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
+  void invalidateImageFilePathIndex();
+  void loadFileDataMapInChain(
+      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap,
+      std::unordered_set<const PAGXDocument*>& visited,
+      std::unordered_map<PAGXDocument*, std::vector<Node*>>& dirtyImages);
+  void appendExternalFilePaths(std::vector<std::string>* paths,
+                               std::unordered_set<const PAGXDocument*>& visited,
+                               std::unordered_set<std::string>& chain) const;
 
   // Sets runtimeImage on every Image node matching filePath in this document and its resolved
   // external documents, collecting the touched Image nodes per owning document.
@@ -360,7 +368,7 @@ class PAGXDocument : public Node {
   // the re-layout is appended to it, so notifyChange can auto-refresh siblings that auto layout
   // repositioned without the caller having to list them.
   void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited,
-                   std::vector<Layer*>* changedOut);
+                   std::vector<Layer*>* changedOut, bool mountImports);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
@@ -376,6 +384,10 @@ class PAGXDocument : public Node {
   // PAGScene lifecycle hooks (called from PAGScene::Make / ~PAGScene).
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
+  // True while at least one PAGScene is still rendering from this document. adoptNodes() refuses to
+  // drain such a document: the scene would keep rebuilding its runtime tree from an emptied model
+  // and silently stop drawing, with no error to point at the cause.
+  bool hasLiveScenes() const;
 
   // Rebuilds the runtime tree of every live scene built from this document. Called by operations
   // that remove nodes an existing runtime tree may still reference: the tree is regenerated from
@@ -383,6 +395,7 @@ class PAGXDocument : public Node {
   void rebuildLiveScenes();
 
   FontConfig _fontConfig;
+  std::string sourceDirectory = {};
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.
@@ -392,17 +405,22 @@ class PAGXDocument : public Node {
   void setNodeId(Node* node, const std::string& id);
   void resetLayoutState();
 
-  // Mounts every unmounted inline import directive as a sub-document (see AttachInlineImport).
-  // Called by PAGXImporter::FromXML and at the top of applyLayout (for API-built documents);
-  // idempotent. Parsing the inline content needs the SVG importer, an optional module, so the whole
-  // pass compiles only under PAG_BUILD_SVG and is a no-op without it — such a build keeps inline
-  // imports unmounted, which hasUnresolvedImports() reports.
   void attachInlineImportDocuments();
 
   // Layers whose inline import content failed to parse; they are reported once and skipped by
   // later attach passes so repeated layouts (notifyChange re-runs applyLayout) do not re-append
   // the same error. Cleared by detachInlineImport so a re-parse after a content fix retries.
   std::unordered_set<const Layer*> inlineImportMountFailures = {};
+
+  // Synthesized adapters for inline imports and external composition files. They are not authored
+  // resources and must not be edited or serialized into the owner's resource domain.
+  enum class MountType { InlineImport, ExternalFile };
+  std::unordered_map<const Node*, MountType> mountedCompositions = {};
+
+  // How many setLayoutSize calls the last layout pass skipped through the layout memo. Read by
+  // tests only: without it a memo regression is invisible, because skipping less still produces the
+  // same geometry.
+  int lastLayoutMemoHits = 0;
 
   // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.

@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <set>
+#include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -78,6 +79,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -194,8 +196,10 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node);
 static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options);
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          const PAGXDocument& doc);
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       const PAGXDocument& doc);
 static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
@@ -1500,7 +1504,8 @@ static std::string EscapeEnumOption(const std::string& option) {
   return escaped;
 }
 
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
+static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
+                          const PAGXDocument& doc) {
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -1547,7 +1552,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          WriteLayer(xml, layer, options);
+          WriteLayer(xml, layer, options, doc);
         }
         if (!comp->animations.empty()) {
           xml.openElement("Animations");
@@ -1565,7 +1570,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           xml.closeElement();
         }
         for (const auto& bind : comp->dataBinds) {
-          WriteResource(xml, bind, options);
+          WriteResource(xml, bind, options, doc);
         }
         xml.closeElement();
       }
@@ -1735,7 +1740,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 // Layer writing
 //==============================================================================
 
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options) {
+static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
+                       const PAGXDocument& doc) {
   xml.openElement("Layer");
   xml.addAttribute("id", node->id);
   xml.addAttribute("name", node->name);
@@ -1802,7 +1808,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (node->maskType != Default<Layer>().maskType) {
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
-  if (node->composition != nullptr && !node->composition->id.empty()) {
+  if (node->composition != nullptr && !doc.isMountedComposition(node->composition) &&
+      !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
   } else if (!node->compositionFilePath.empty()) {
     xml.addAttribute("composition", node->compositionFilePath);
@@ -1881,7 +1888,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    WriteLayer(xml, child, options);
+    WriteLayer(xml, child, options, doc);
   }
 
   xml.closeElement();
@@ -1892,6 +1899,10 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 //==============================================================================
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
+  if (DocumentHasConflictingImportSources(&doc)) {
+    LOGE("Layer cannot declare both 'composition' and 'import' sources.");
+    return {};
+  }
   XMLBuilder xml(true);
   xml.appendDeclaration();
 
@@ -1904,7 +1915,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    WriteLayer(xml, layer, options);
+    WriteLayer(xml, layer, options, doc);
   }
   // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
   // definitions parsed from the document's <Animations> block (in declaration order). Animation and
@@ -1978,13 +1989,14 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     xml.closeElement();
   }
   for (const auto& bind : doc.dataBinds) {
-    WriteResource(xml, bind, options);
+    WriteResource(xml, bind, options, doc);
   }
 
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;
   for (const auto& resource : doc.nodes) {
-    if (resource->id.empty() || !IsExportableResource(resource.get())) {
+    if (doc.isMountedComposition(resource.get()) || resource->id.empty() ||
+        !IsExportableResource(resource.get())) {
       continue;
     }
     if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
@@ -1998,8 +2010,9 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     xml.closeElementStart();
 
     for (const auto& resource : doc.nodes) {
-      if (!resource->id.empty() && IsExportableResource(resource.get())) {
-        WriteResource(xml, resource.get(), options);
+      if (!doc.isMountedComposition(resource.get()) && !resource->id.empty() &&
+          IsExportableResource(resource.get())) {
+        WriteResource(xml, resource.get(), options, doc);
       }
     }
 

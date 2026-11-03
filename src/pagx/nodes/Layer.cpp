@@ -204,6 +204,9 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   auto memo = context->layoutTargets.find(this);
   if (memo != context->layoutTargets.end() && SameLayoutInput(targetWidth, memo->second.first) &&
       SameLayoutInput(targetHeight, memo->second.second)) {
+    // Counted only so a test can tell "the memo was hit" from "the geometry happened to match";
+    // nothing in the engine reads it.
+    context->layoutMemoHits++;
     return;
   }
   context->layoutTargets[this] = {targetWidth, targetHeight};

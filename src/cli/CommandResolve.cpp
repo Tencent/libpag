@@ -30,6 +30,8 @@
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/ImportResources.h"
 
 namespace pagx::cli {
 
@@ -189,6 +191,9 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   }
 
   auto& svgDoc = result.document;
+  if (!hasImportSource) {
+    ResolveImportResources(svgDoc.get(), baseDir);
+  }
 
   // A previously applied layout mounts the inline import as a sub-document; detach it before
   // flattening so the layer renders the flattened contents instead of the composition reference.
@@ -309,8 +314,9 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
   for (auto* layer : layers) {
-    bool hasImport =
-        !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
+    bool hasImport = !LayerHasDeclaredComposition(layer, doc) &&
+                     (!layer->importDirective.source.empty() ||
+                      !layer->importDirective.content.empty());
     if (hasImport) {
       if (ResolveOneLayer(layer, baseDir, formatOptions, doc)) {
         resolvedCount++;
@@ -337,6 +343,11 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
     return stats;
   }
 
+  if (DocumentHasConflictingImportSources(doc)) {
+    std::cerr << "pagx resolve: error: Layer cannot declare both 'composition' and 'import' sources\n";
+    stats.errorCount++;
+    return stats;
+  }
   ResolveLayers(doc->layers, baseDir, formatOptions, doc, stats.resolvedCount, stats.errorCount);
 
   // Also resolve in Composition layers.
@@ -347,7 +358,7 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
   // entries that an earlier detach already removed.
   std::vector<Composition*> compositions = {};
   for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !doc->isMountedComposition(node.get())) {
       compositions.push_back(static_cast<Composition*>(node.get()));
     }
   }
@@ -367,7 +378,7 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
 
 static void DropUnresolvedInLayers(const std::vector<Layer*>& layers, int& droppedCount) {
   for (auto* layer : layers) {
-    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+    if (LayerHasUnresolvedImport(layer)) {
       // The directive could not be expanded (e.g. an unreachable external SVG). Clear it so the
       // Layer is a plain, directive-free box instead of a dangling reference that `pagx render`
       // would reject. The Layer's own attributes (size/position/id/data-*) are preserved.
@@ -387,7 +398,7 @@ int DropUnresolvedDirectives(PAGXDocument* doc) {
   int droppedCount = 0;
   DropUnresolvedInLayers(doc->layers, droppedCount);
   for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !doc->isMountedComposition(node.get())) {
       auto* comp = static_cast<Composition*>(node.get());
       DropUnresolvedInLayers(comp->layers, droppedCount);
     }

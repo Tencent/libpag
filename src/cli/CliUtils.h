@@ -205,6 +205,13 @@ inline std::string EscapeJson(const std::string& input) {
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
 
 /**
+ * Applies layout to mount lazy imports, reports newly collected errors, and checks that the document
+ * is ready for rendering. Returns false if layout failed or active imports remain unresolved.
+ */
+bool PrepareDocumentForRendering(PAGXDocument* document, const FontConfig* fontConfig,
+                                 const std::string& command);
+
+/**
  * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
  * given command name as prefix. Returns false on failure.
  */

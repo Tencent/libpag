@@ -86,6 +86,8 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/ImportResources.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -296,14 +298,12 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   if (existing) {
     ParseCustomData(xmlNode, existing);
     existing->sourceLine = xmlNode->line;
-    existing->endLine = xmlNode->endLine;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
     ParseCustomData(xmlNode, node);
     node->sourceLine = xmlNode->line;
-    node->endLine = xmlNode->endLine;
   }
   return node;
 }
@@ -2918,13 +2918,6 @@ static Color GetColorAttribute(const DOMNode* node, const char* name, PAGXDocume
 // Public API implementation
 //==============================================================================
 
-static void ResolveRelativePath(const std::string& basePath, std::string& path) {
-  if (path.empty() || path[0] == '/' || path.find("://") != std::string::npos) {
-    return;
-  }
-  path = basePath + path;
-}
-
 std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
   std::ifstream file(filePath, std::ios::binary | std::ios::ate);
   if (!file) {
@@ -2942,31 +2935,42 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
   }
 
   auto doc = FromXML(content);
-  if (doc) {
-    // Convert relative paths to absolute paths
-    std::string basePath = {};
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      basePath = filePath.substr(0, lastSlash + 1);
-    }
-    if (!basePath.empty()) {
-      for (auto& node : doc->nodes) {
-        if (node->nodeType() == NodeType::Image) {
-          auto* image = static_cast<Image*>(node.get());
-          ResolveRelativePath(basePath, image->filePath);
-        }
-        if (node->nodeType() == NodeType::Font) {
-          auto* font = static_cast<Font*>(node.get());
-          ResolveRelativePath(basePath, font->file);
-        }
-      }
-    }
+  if (doc != nullptr) {
+    doc->sourceDirectory = GetImportSourceDirectory(filePath);
+    ResolveImportResources(doc.get(), doc->sourceDirectory);
   }
   return doc;
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent) {
   return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size());
+}
+
+static bool ValidateLayerSources(const DOMNode* node,
+                                 const std::unordered_set<std::string>& compositionIds) {
+  if (node->name == "svg" || node->name == "html") {
+    return true;
+  }
+  if (node->name == "Layer" &&
+      ImportSourcesConflict(!GetAttribute(node, "composition").empty(),
+                            !GetAttribute(node, "import").empty())) {
+    LOGE("line %d: Layer cannot declare both 'composition' and 'import' sources.", node->line);
+    return false;
+  }
+  auto composition = GetAttribute(node, "composition");
+  if (node->name == "Layer" && !composition.empty() && composition[0] == '@' &&
+      compositionIds.find(composition.substr(1)) == compositionIds.end()) {
+    LOGE("line %d: Resource '%s' not found for 'composition' attribute.", node->line,
+         composition.c_str());
+    return false;
+  }
+  for (auto child = node->firstChild; child != nullptr; child = child->nextSibling) {
+    if (child->type == DOMNodeType::Element &&
+        !ValidateLayerSources(child.get(), compositionIds)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
@@ -2980,11 +2984,15 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   ParseDocument(root.get(), doc.get());
-  // Mount inline import content as sub-documents at load time so hasUnresolvedImports() and
-  // every consumer observe a document whose inline imports are already renderable, without
-  // requiring a layout pass first. Idempotent; API-built documents mount at applyLayout instead.
-  // A no-op when the SVG importer is not linked (PAG_BUILD_SVG).
-  doc->attachInlineImportDocuments();
+  std::unordered_set<std::string> compositionIds = {};
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition && !node->id.empty()) {
+      compositionIds.insert(node->id);
+    }
+  }
+  if (!ValidateLayerSources(root.get(), compositionIds)) {
+    return nullptr;
+  }
   return doc;
 }
 

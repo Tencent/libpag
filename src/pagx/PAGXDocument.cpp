@@ -18,9 +18,6 @@
 
 #include "pagx/PAGXDocument.h"
 #include <algorithm>
-#if defined(PAG_BUILD_SVG)
-#include <cctype>
-#endif
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
@@ -44,6 +41,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/ImportResources.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -68,12 +67,13 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<std::string>* paths,
-                                    std::unordered_set<const PAGXDocument*>& visited) {
-  if (document == nullptr || paths == nullptr || !visited.insert(document).second) {
+void PAGXDocument::appendExternalFilePaths(
+    std::vector<std::string>* paths, std::unordered_set<const PAGXDocument*>& visited,
+    std::unordered_set<std::string>& chain) const {
+  if (paths == nullptr || !visited.insert(this).second) {
     return;
   }
-  for (auto& node : document->nodes) {
+  for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
       if (image->data != nullptr) {
@@ -85,13 +85,27 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
       paths->push_back(image->filePath);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
-      if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
-        paths->push_back(layer->compositionFilePath);
-      } else if (layer->externalDoc != nullptr) {
-        AppendExternalFilePaths(layer->externalDoc.get(), paths, visited);
+      auto mounted = mountedCompositions.find(layer->composition);
+      bool supersededInline = mounted != mountedCompositions.end() &&
+                              mounted->second == MountType::InlineImport &&
+                              (!layer->compositionFilePath.empty() ||
+                               !layer->importDirective.source.empty());
+      if ((layer->composition == nullptr || supersededInline) &&
+          IsExternalFilePath(layer->compositionFilePath)) {
+        if (chain.find(layer->compositionFilePath) == chain.end()) {
+          paths->push_back(layer->compositionFilePath);
+        }
+      } else if (!supersededInline && layer->externalDoc != nullptr) {
+        bool inserted = !layer->compositionFilePath.empty() &&
+                        chain.insert(layer->compositionFilePath).second;
+        layer->externalDoc->appendExternalFilePaths(paths, visited, chain);
+        if (inserted) {
+          chain.erase(layer->compositionFilePath);
+        }
       }
     }
   }
+  visited.erase(this);
 }
 
 static void AppendExternalImagePaths(const PAGXDocument* document, std::vector<std::string>* paths,
@@ -118,6 +132,34 @@ static void AppendExternalImagePaths(const PAGXDocument* document, std::vector<s
   }
 }
 
+static bool DetachSupersededInlineImports(
+    PAGXDocument* document, std::unordered_set<const PAGXDocument*>& visited) {
+  if (document == nullptr || !visited.insert(document).second) {
+    return false;
+  }
+  std::vector<Layer*> layers = {};
+  for (const auto& node : document->nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      layers.push_back(static_cast<Layer*>(node.get()));
+    }
+  }
+  bool detached = false;
+  for (auto* layer : layers) {
+    if (!layer->compositionFilePath.empty() || !layer->importDirective.source.empty()) {
+      detached = document->detachInlineImport(layer) || detached;
+    }
+    detached = DetachSupersededInlineImports(layer->externalDoc.get(), visited) || detached;
+  }
+  return detached;
+}
+
+static void ReportExternalCompositionCycle(PAGXDocument* root, const std::string& filePath) {
+  auto error = "Cyclic external composition reference detected: '" + filePath + "'.";
+  if (std::find(root->errors.begin(), root->errors.end(), error) == root->errors.end()) {
+    root->errors.push_back(error);
+  }
+}
+
 static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, Layer* layer,
                                     const std::string& filePath, std::shared_ptr<Data> data,
                                     const std::unordered_set<std::string>& chain) {
@@ -125,13 +167,10 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
       layer->compositionFilePath != filePath || layer->composition != nullptr) {
     return false;
   }
-  // Cycle guard: if this file path already appears among the ancestor origins on the load chain,
-  // resolving it would nest externalDocs without end across repeated host load passes. Clear the
-  // layer's compositionFilePath so getExternalFilePaths() stops returning it and the host loop
-  // converges, then report the cycle on the root document.
+  // Reject ancestor back-references without erasing the declared origin. Enumeration excludes
+  // these back-edges, while the declaration still overrides inline content and survives export.
   if (chain.find(filePath) != chain.end()) {
-    root->errors.push_back("Cyclic external composition reference detected: '" + filePath + "'.");
-    layer->compositionFilePath = {};
+    ReportExternalCompositionCycle(root, filePath);
     return false;
   }
   auto externalDoc = PAGXImporter::FromXML(data->bytes(), data->size());
@@ -141,6 +180,15 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   for (const auto& error : externalDoc->errors) {
     document->errors.push_back("[" + filePath + "] " + error);
   }
+  for (const auto& node : externalDoc->nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      const auto* child = static_cast<const Layer*>(node.get());
+      const auto& source = child->compositionFilePath;
+      if (!source.empty() && (source == filePath || chain.find(source) != chain.end())) {
+        ReportExternalCompositionCycle(root, source);
+      }
+    }
+  }
   auto* wrapper = document->makeNode<Composition>();
   wrapper->width = externalDoc->width;
   wrapper->height = externalDoc->height;
@@ -148,9 +196,8 @@ static bool LoadExternalComposition(PAGXDocument* root, PAGXDocument* document, 
   wrapper->animations = externalDoc->animations;
   layer->composition = wrapper;
   layer->externalDoc = externalDoc;
-  // compositionFilePath is retained as the origin path of this externalDoc: it identifies the
-  // ancestor source on the load chain for cycle detection, and lets the exporter round-trip the
-  // external reference when the wrapper composition has no id.
+  // Retain the origin path for load-chain cycle detection and round-trip serialization. Mounted
+  // wrappers are runtime adapters, so export writes this path regardless of the wrapper's id.
   return true;
 }
 
@@ -202,12 +249,22 @@ static bool LoadFileDataInChain(
 
 void PAGXDocument::applyLayout(const FontConfig* config) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  applyLayout(config, visited, nullptr);
+  applyLayout(config, visited, nullptr, true);
 }
 
 void PAGXDocument::applyLayout(const FontConfig* config,
                                std::unordered_set<const PAGXDocument*>& visited,
-                               std::vector<Layer*>* changedOut) {
+                               std::vector<Layer*>* changedOut, bool mountImports) {
+  if (DocumentHasConflictingImportSources(this)) {
+    errors.push_back("Layer cannot declare both 'composition' and 'import' sources.");
+    layoutApplied = false;
+    return;
+  }
+  if (mountImports) {
+    std::unordered_set<const PAGXDocument*> sourceVisited = {};
+    DetachSupersededInlineImports(this, sourceVisited);
+  }
+  invalidateImageFilePathIndex();
   if (!visited.insert(this).second) {
     errors.push_back("Cyclic external composition reference detected during layout.");
     return;
@@ -218,52 +275,36 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // Mount inline import content as sub-documents before anything reads the tree: the wrapper
   // compositions join the node list here, so the bounds snapshot below and every layout pass
   // observe the mounted structure. Idempotent — already-mounted layers are skipped.
-  attachInlineImportDocuments();
+  if (mountImports) {
+    attachInlineImportDocuments();
+  }
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
   // When changedOut is requested, snapshot each Layer's layoutBounds here (before resetLayout()
   // clears them to NAN) so the post-layout pass can detect which Layers auto layout repositioned.
   std::unordered_map<Layer*, Rect> beforeBounds = {};
-  if (layoutApplied) {
-    for (auto& node : nodes) {
-      switch (node->nodeType()) {
-        case NodeType::Layer: {
-          auto* layer = static_cast<Layer*>(node.get());
-          if (changedOut != nullptr) {
-            beforeBounds.emplace(layer, layer->layoutBounds());
-          }
-          layer->resetLayout();
-          break;
-        }
-        case NodeType::Rectangle:
-        case NodeType::Ellipse:
-        case NodeType::Path:
-        case NodeType::Polystar:
-        case NodeType::Text:
-        case NodeType::TextPath:
-        case NodeType::Group:
-        case NodeType::TextBox: {
-          auto* layoutNode = LayoutNode::AsLayoutNode(static_cast<Element*>(node.get()));
-          if (layoutNode != nullptr) {
-            layoutNode->resetLayout();
-          }
-          break;
-        }
-        default:
-          break;
+  if (layoutApplied && changedOut != nullptr) {
+    for (const auto& node : nodes) {
+      if (node->nodeType() == NodeType::Layer) {
+        auto* layer = static_cast<Layer*>(node.get());
+        beforeBounds.emplace(layer, layer->layoutBounds());
       }
     }
   }
+  resetLayoutState();
   LayoutContext context(&_fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.
   for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !isMountedComposition(node.get())) {
       auto* comp = static_cast<Composition*>(node.get());
       layoutLayers(comp->layers, comp->width, comp->height, &context);
     }
   }
   layoutLayers(layers, width, height, &context);
+  // Bookkeeping for tests only (see LayoutContext::layoutMemoHits): the memo has to be observable,
+  // otherwise a regression that skips fewer subtrees still passes every geometry assertion.
+  lastLayoutMemoHits = context.layoutMemoHits;
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
@@ -274,7 +315,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
         // consistent across the embedded boundary rather than using the external doc's own config.
         // changedOut is intentionally not forwarded: an external document has its own notifyChange
         // chain, and runtime layers inside it are rebuilt by that document's scenes.
-        layer->externalDoc->applyLayout(&_fontConfig, visited, nullptr);
+        layer->externalDoc->applyLayout(&_fontConfig, visited, nullptr, mountImports);
       }
     }
   }
@@ -321,14 +362,22 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
     // Self-adoption would append nodes to the very vector being iterated.
     return;
   }
+  // A live scene built from `other` would keep rebuilding its runtime tree from a model this call
+  // is about to drain, and would render nothing without reporting anything. Rejecting is the only
+  // safe answer; the caller releases the scene and retries.
+  if (other.hasLiveScenes()) {
+    errors.push_back("Cannot adopt nodes from a document that still has live scenes.");
+    return;
+  }
   // Rename before taking the nodes over: importer auto-generated ids (image1, path1, ...) collide
   // as a matter of course when several inline SVGs merge into one document, and a caller that
   // forgot this step would merge duplicate ids (illegal PAGX on export) with only an error to show
   // for it. Doing it here makes the correct sequence the only one available.
+  other.resetLayoutState();
+  invalidateImageFilePathIndex();
   renameCollidingIds(&other);
   nodes.reserve(nodes.size() + other.nodes.size());
   for (auto& node : other.nodes) {
-    node->index = static_cast<int>(nodes.size());
     nodeSet.insert(node.get());
     // Adopted content is part of this document after the transfer, so its ids join the id index
     // exactly like import-time registration: findNode(), data-bind "@id" targets, and deferred
@@ -342,6 +391,11 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
     }
     nodes.push_back(std::move(node));
   }
+  mountedCompositions.insert(other.mountedCompositions.begin(), other.mountedCompositions.end());
+  inlineImportMountFailures.insert(other.inlineImportMountFailures.begin(),
+                                    other.inlineImportMountFailures.end());
+  other.mountedCompositions.clear();
+  other.inlineImportMountFailures.clear();
   // The nodes now belong to this document. Clearing the source's ownership set and id index
   // alongside its list keeps it from answering ownsNode()/findNode() for memory it no longer owns.
   other.nodes.clear();
@@ -351,6 +405,10 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
   // document that still lists them hands callers a way to reach memory it no longer owns.
   other.layers.clear();
   other.animations.clear();
+  other.viewModel = nullptr;
+  other.dataBinds.clear();
+  other._fontConfig = FontConfig();
+  other.liveScenes.clear();
 }
 
 void PAGXDocument::renameCollidingIds(PAGXDocument* other) {
@@ -394,6 +452,7 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
 }
 
 void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
+  invalidateImageFilePathIndex();
   for (auto it = nodeMap.begin(); it != nodeMap.end();) {
     if (toRemove.count(it->second) > 0) {
       it = nodeMap.erase(it);
@@ -406,13 +465,15 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
     if (toRemove.count(nodes[readIdx].get()) == 0) {
       nodes[writeIdx++] = std::move(nodes[readIdx]);
     } else {
-      nodeSet.erase(nodes[readIdx].get());
+      auto* node = nodes[readIdx].get();
+      nodeSet.erase(node);
+      mountedCompositions.erase(node);
+      if (node->nodeType() == NodeType::Layer) {
+        inlineImportMountFailures.erase(static_cast<const Layer*>(node));
+      }
     }
   }
   nodes.resize(writeIdx);
-  for (size_t i = 0; i < nodes.size(); i++) {
-    nodes[i]->index = static_cast<int>(i);
-  }
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -428,24 +489,39 @@ void PAGXDocument::setNodeId(Node* node, const std::string& id) {
   registerNode(node, id);
 }
 
-void PAGXDocument::resetLayoutState() {
-  layoutApplied = false;
+void PAGXDocument::invalidateImageFilePathIndex() {
+  layersByImageFilePath.clear();
+  layersByImageFilePathBuilt = false;
 }
 
-static bool LayersHaveImports(const std::vector<Layer*>& layers) {
-  for (auto* layer : layers) {
-    // An inline import that has been mounted as a sub-document (applyLayout mounts them) renders
-    // through its composition reference and no longer blocks consumers; only unmounted directives
-    // (inline content that failed to parse, or file-based import sources) count as unresolved.
-    if (layer->composition == nullptr &&
-        (!layer->importDirective.source.empty() || !layer->importDirective.content.empty())) {
-      return true;
-    }
-    if (LayersHaveImports(layer->children)) {
-      return true;
+void PAGXDocument::resetLayoutState() {
+  for (const auto& node : nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      static_cast<Layer*>(node.get())->resetLayout();
+    } else {
+      switch (node->nodeType()) {
+        case NodeType::Rectangle:
+        case NodeType::Ellipse:
+        case NodeType::Path:
+        case NodeType::Polystar:
+        case NodeType::Text:
+        case NodeType::TextPath:
+        case NodeType::Group:
+        case NodeType::TextBox: {
+          auto* layoutNode = LayoutNode::AsLayoutNode(static_cast<Element*>(node.get()));
+          if (layoutNode != nullptr) {
+            layoutNode->resetLayout();
+          }
+          break;
+        }
+        default:
+          break;
+      }
     }
   }
-  return false;
+  layoutApplied = false;
+  lastLayoutMemoHits = 0;
+  invalidateImageFilePathIndex();
 }
 
 // Mounting inline imports needs a parser for the inline format. The SVG importer is an optional
@@ -454,46 +530,24 @@ static bool LayersHaveImports(const std::vector<Layer*>& layers) {
 // and 'pagx resolve' can still flatten.
 #if defined(PAG_BUILD_SVG)
 
-// Returns the lowercased tag name of the first element in the given XML content, mirroring the
-// CLI importer's InferFormatFromContent so an inline import without an explicit importFormat is
-// classified the same way 'pagx resolve' classifies it.
-static std::string FirstContentTagName(const std::string& content) {
-  auto pos = content.find('<');
-  while (pos != std::string::npos) {
-    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
-        content[pos + 1] != '?') {
-      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
-      if (tagEnd != std::string::npos) {
-        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
-        for (auto& ch : tagName) {
-          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        }
-        return tagName;
-      }
-    }
-    pos = content.find('<', pos + 1);
-  }
-  return {};
-}
-
-// True when the layer's inline import content is SVG: an explicit (case-insensitive) svg format
-// wins; an empty format sniffs the content's first tag, exactly like the resolve path.
+// True when the layer's inline import content is SVG. The format is resolved by the same function
+// 'pagx resolve' uses, so a directive can never end up un-renderable here while resolvable there.
 static bool IsInlineSvgImport(const Layer* layer) {
   if (layer->importDirective.content.empty()) {
     return false;
   }
-  std::string format = layer->importDirective.format;
-  for (auto& ch : format) {
-    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-  }
-  if (format.empty()) {
-    format = FirstContentTagName(layer->importDirective.content);
-  }
-  return format == "svg";
+  return ResolveImportFormat(layer->importDirective.format, {}, layer->importDirective.content) ==
+         "svg";
 }
 
 // Collects layers whose inline import content is not mounted yet. Recurses into child layers;
 // the SVG content itself never carries import directives, so mounted subtrees are not scanned.
+//
+// A layer that also declares an explicit source (import="a.svg") or composition file is skipped:
+// that declaration is the author's stated origin, and mounting would swallow it silently — the
+// file would never load, getExternalFilePaths() would stop returning the path, and
+// hasUnresolvedImports() would call the layer resolved. Explicit declarations therefore win, the
+// same precedence 'pagx resolve' applies (source ? ImportFile : ImportString).
 static void CollectLayersWithInlineImports(const std::vector<Layer*>& layers,
                                            std::vector<Layer*>* out) {
   for (auto* layer : layers) {
@@ -501,6 +555,7 @@ static void CollectLayersWithInlineImports(const std::vector<Layer*>& layers,
       continue;
     }
     if (layer->composition == nullptr && layer->externalDoc == nullptr &&
+        layer->compositionFilePath.empty() && layer->importDirective.source.empty() &&
         IsInlineSvgImport(layer)) {
       out->push_back(layer);
     }
@@ -509,18 +564,21 @@ static void CollectLayersWithInlineImports(const std::vector<Layer*>& layers,
 }
 
 // Mounts the layer's inline import content as a sub-document, mirroring LoadExternalComposition:
-// the SVG parses into its own document (own id space and node list), a wrapper Composition with no
-// id registers in the host (layout, binding, and export walks find it; the id-less wrapper is
-// skipped by the exporter's Resources pass), and the layer renders through the composition
-// reference. The import directive is kept — it is the serialization anchor the exporter writes
-// back, and 'pagx resolve' still flattens it on demand. When the layer authors both dimensions,
-// they are passed as the importer's target size so the content is uniformly scaled to fit — the
-// same semantics 'pagx resolve' applies — and the sub-document's size equals the target, keeping
-// the wrapper-size == sub-document-size invariant of external compositions. Content that parses
-// but has no drawable layers (e.g. a defs-only SVG kept as a shared-resource carrier) mounts an
-// empty wrapper, which renders as nothing — exactly what that content should produce. Returns
-// false (leaving the directive unresolved) only when the content cannot be parsed at all.
-static bool AttachInlineImport(PAGXDocument* host, Layer* layer) {
+// the SVG parses into its own document (own id space and node list), a synthetic wrapper
+// Composition registers in the host so layout, binding and export walks find it, and the layer
+// renders through the composition reference. The wrapper is not authored content — the caller
+// records it in mountedCompositions so the exporter writes back the import directive instead of
+// expanding the sub-document into the host's Resources. The import directive is kept — it is the
+// serialization anchor the exporter writes back, and 'pagx resolve' still flattens it on demand.
+// When the layer authors both dimensions, they are passed as the importer's target size so the
+// content is uniformly scaled to fit — the same semantics 'pagx resolve' applies — and the
+// sub-document's size equals the target, keeping the wrapper-size == sub-document-size invariant
+// of external compositions. Content that parses but has no drawable layers (e.g. a defs-only SVG
+// kept as a shared-resource carrier) mounts an empty wrapper, which renders as nothing — exactly
+// what that content should produce. Returns the wrapper, or nullptr when the content cannot be
+// parsed at all (leaving the directive unresolved).
+static Composition* AttachInlineImport(PAGXDocument* host, Layer* layer,
+                                       const std::string& directory) {
   SVGImporter::Options options = {};
   if (!std::isnan(layer->width) && !std::isnan(layer->height)) {
     options.targetWidth = layer->width;
@@ -528,8 +586,9 @@ static bool AttachInlineImport(PAGXDocument* host, Layer* layer) {
   }
   auto svgDoc = SVGImporter::ParseString(layer->importDirective.content, options);
   if (svgDoc == nullptr) {
-    return false;
+    return nullptr;
   }
+  ResolveImportResources(svgDoc.get(), directory);
   auto* wrapper = host->makeNode<Composition>();
   wrapper->width = svgDoc->width;
   wrapper->height = svgDoc->height;
@@ -537,24 +596,13 @@ static bool AttachInlineImport(PAGXDocument* host, Layer* layer) {
   wrapper->animations = svgDoc->animations;
   layer->composition = wrapper;
   layer->externalDoc = svgDoc;
-  return true;
+  return wrapper;
 }
 
 #endif  // PAG_BUILD_SVG
 
 bool PAGXDocument::hasUnresolvedImports() const {
-  if (LayersHaveImports(layers)) {
-    return true;
-  }
-  for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      if (LayersHaveImports(comp->layers)) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return DocumentHasUnresolvedImports(this);
 }
 
 void PAGXDocument::attachInlineImportDocuments() {
@@ -565,7 +613,7 @@ void PAGXDocument::attachInlineImportDocuments() {
   std::vector<Layer*> pending = {};
   CollectLayersWithInlineImports(layers, &pending);
   for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !isMountedComposition(node.get())) {
       CollectLayersWithInlineImports(static_cast<Composition*>(node.get())->layers, &pending);
     }
   }
@@ -575,17 +623,25 @@ void PAGXDocument::attachInlineImportDocuments() {
     if (inlineImportMountFailures.find(layer) != inlineImportMountFailures.end()) {
       continue;
     }
-    if (!AttachInlineImport(this, layer)) {
+    auto* wrapper = AttachInlineImport(this, layer, sourceDirectory);
+    if (wrapper == nullptr) {
       inlineImportMountFailures.insert(layer);
       errors.push_back("Failed to parse inline import content" +
                        (layer->id.empty() ? std::string(".") : " on layer '" + layer->id + "'."));
+      continue;
     }
+    layer->externalDoc->sourceDirectory = sourceDirectory;
+    mountedCompositions.emplace(wrapper, MountType::InlineImport);
   }
 #endif
 }
 
 bool PAGXDocument::detachInlineImport(Layer* layer) {
-  if (layer == nullptr) {
+  if (layer == nullptr || !ownsNode(layer)) {
+    return false;
+  }
+  if (DocumentHasConflictingImportSources(this)) {
+    errors.push_back("Layer cannot declare both 'composition' and 'import' sources.");
     return false;
   }
   // Clear any failure record up front, independently of whether a wrapper is really detached: a
@@ -594,15 +650,13 @@ bool PAGXDocument::detachInlineImport(Layer* layer) {
   // the retry promise in the header - a host fixing importDirective.content and re-parsing would
   // still be skipped, leaving hasUnresolvedImports() permanently true.
   inlineImportMountFailures.erase(layer);
-  // compositionFilePath is the precise discriminator between the two mount kinds: a file-loaded
-  // external composition retains it as its origin (LoadExternalComposition), while an inline
-  // import mount never sets it. A layer carrying BOTH a file composition and leftover inline
-  // content must not have its file wrapper detached here.
-  if (layer->composition == nullptr || layer->externalDoc == nullptr ||
-      !layer->compositionFilePath.empty() || layer->importDirective.content.empty()) {
+  auto mounted = mountedCompositions.find(layer->composition);
+  if (mounted == mountedCompositions.end() || mounted->second != MountType::InlineImport ||
+      layer->externalDoc == nullptr) {
     return false;
   }
   auto* wrapper = layer->composition;
+  invalidateImageFilePathIndex();
   // Take the sub-document off the layer, but keep it alive in a local handle until nothing else
   // references it. A live scene's runtime tree holds nodes owned by the sub-document (PAGLayer::node
   // and PAGComposition::document), so dropping the last reference here would leave them dangling.
@@ -628,7 +682,8 @@ bool PAGXDocument::detachInlineImport(Layer* layer) {
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
   std::vector<std::string> paths = {};
   std::unordered_set<const PAGXDocument*> visited = {};
-  AppendExternalFilePaths(this, &paths, visited);
+  std::unordered_set<std::string> chain = {};
+  appendExternalFilePaths(&paths, visited, chain);
   return paths;
 }
 
@@ -643,6 +698,12 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
   if (filePath.empty() || data == nullptr) {
     return false;
   }
+  if (DocumentHasConflictingImportSources(this)) {
+    errors.push_back("Layer cannot declare both 'composition' and 'import' sources.");
+    return false;
+  }
+  std::unordered_set<const PAGXDocument*> sourceVisited = {};
+  DetachSupersededInlineImports(this, sourceVisited);
   std::unordered_set<std::string> chain = {};
   std::unordered_map<PAGXDocument*, std::vector<Node*>> docDirtyNodes = {};
   std::unordered_set<PAGXDocument*> layoutDirtyDocs = {};
@@ -650,8 +711,27 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
       LoadFileDataInChain(this, this, filePath, data, chain, docDirtyNodes, layoutDirtyDocs);
   if (found) {
     for (auto& entry : docDirtyNodes) {
-      entry.first->notifyChange(entry.second,
-                                layoutDirtyDocs.find(entry.first) != layoutDirtyDocs.end());
+      for (auto* node : entry.second) {
+        if (node->nodeType() == NodeType::Layer) {
+          auto* layer = static_cast<Layer*>(node);
+          if (layer->composition != nullptr && layer->externalDoc != nullptr &&
+              !entry.first->isMountedComposition(layer->composition)) {
+            auto source = ResolveImportResourcePath(entry.first->sourceDirectory,
+                                                    layer->compositionFilePath);
+            auto directory = GetImportSourceDirectory(source);
+            layer->externalDoc->sourceDirectory = directory;
+            ResolveImportResources(layer->externalDoc.get(), directory);
+            entry.first->mountedCompositions.emplace(layer->composition, MountType::ExternalFile);
+          }
+        }
+      }
+    }
+    for (auto& entry : docDirtyNodes) {
+      bool structural = layoutDirtyDocs.find(entry.first) != layoutDirtyDocs.end();
+      if (structural) {
+        entry.second.push_back(entry.first);
+      }
+      entry.first->notifyChange(entry.second, structural);
     }
   }
   return found;
@@ -885,10 +965,12 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (ownedDirty.empty()) {
     return;
   }
-  // Invalidate the filePath -> Layer index so the next query rebuilds it from the (possibly
-  // modified) tree topology. Edits may add/remove Image references or change filePath values.
-  layersByImageFilePathBuilt = false;
-  layersByImageFilePath.clear();
+  std::unordered_set<const PAGXDocument*> sourceVisited = {};
+  if (DetachSupersededInlineImports(this, sourceVisited)) {
+    ownedDirty.push_back(this);
+    layoutChanged = true;
+  }
+  invalidateImageFilePathIndex();
   // Resolve content nodes (Image, SolidColor, Gradient, Fill, Stroke, Group, Filter, Style, etc.)
   // to their owning Layers. refreshNodes only processes Layer nodes directly; non-Layer content
   // nodes are resolved here so callers can pass them to notifyChange without having to find the
@@ -961,7 +1043,7 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   if (layoutChanged) {
     std::vector<Layer*> layoutRepositioned = {};
     std::unordered_set<const PAGXDocument*> visited = {};
-    applyLayout(nullptr, visited, &layoutRepositioned);
+    applyLayout(nullptr, visited, &layoutRepositioned, true);
     if (!layoutRepositioned.empty()) {
       ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
       for (auto* layer : layoutRepositioned) {
@@ -971,7 +1053,8 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
       ownedDirty.erase(std::unique(ownedDirty.begin(), ownedDirty.end()), ownedDirty.end());
     }
   }
-  for (auto& weakScene : liveScenes) {
+  auto scenes = liveScenes;
+  for (auto& weakScene : scenes) {
     auto scene = weakScene.lock();
     if (scene != nullptr) {
       if (!ownedDirty.empty()) {
@@ -1019,9 +1102,24 @@ void PAGXDocument::unregisterLiveScene(PAGScene* scene) {
   }
 }
 
+bool PAGXDocument::hasLiveScenes() const {
+  for (auto& weakScene : liveScenes) {
+    if (!weakScene.expired()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGXDocument::isMountedComposition(const Node* node) const {
+  return node != nullptr && ownsNode(node) &&
+         mountedCompositions.find(node) != mountedCompositions.end();
+}
+
 void PAGXDocument::rebuildLiveScenes() {
   PruneExpiredScenes(&liveScenes);
-  for (auto& weakScene : liveScenes) {
+  auto scenes = liveScenes;
+  for (auto& weakScene : scenes) {
     auto scene = weakScene.lock();
     if (scene != nullptr) {
       // A full rebuild rather than an incremental refresh: the caller is about to destroy nodes the
@@ -1037,14 +1135,15 @@ void PAGXDocument::rebuildLiveScenes() {
 // Mirrors the recursion of AppendExternalImagePaths (read side) and LoadImageInChain (single-image
 // side); without the descent, getExternalImagePaths() collects child-document paths that
 // loadFileDataMap() would silently fail to match.
-static void LoadFileDataMapInChain(
-    PAGXDocument* document,
+void PAGXDocument::loadFileDataMapInChain(
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap,
-    std::unordered_set<const PAGXDocument*>& visited) {
-  if (document == nullptr || !visited.insert(document).second) {
+    std::unordered_set<const PAGXDocument*>& visited,
+    std::unordered_map<PAGXDocument*, std::vector<Node*>>& dirtyImages) {
+  if (!visited.insert(this).second) {
     return;
   }
-  for (auto& node : document->nodes) {
+  invalidateImageFilePathIndex();
+  for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Image) {
       auto* image = static_cast<Image*>(node.get());
       if (image->data != nullptr || image->filePath.empty()) {
@@ -1056,10 +1155,11 @@ static void LoadFileDataMapInChain(
       }
       image->data = it->second;
       image->filePath = {};
+      dirtyImages[this].push_back(image);
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->externalDoc != nullptr) {
-        LoadFileDataMapInChain(layer->externalDoc.get(), fileDataMap, visited);
+        layer->externalDoc->loadFileDataMapInChain(fileDataMap, visited, dirtyImages);
       }
     }
   }
@@ -1068,7 +1168,11 @@ static void LoadFileDataMapInChain(
 void PAGXDocument::loadFileDataMap(
     const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap) {
   std::unordered_set<const PAGXDocument*> visited = {};
-  LoadFileDataMapInChain(this, fileDataMap, visited);
+  std::unordered_map<PAGXDocument*, std::vector<Node*>> dirtyImages = {};
+  loadFileDataMapInChain(fileDataMap, visited, dirtyImages);
+  for (auto& entry : dirtyImages) {
+    entry.first->notifyChange(entry.second, false);
+  }
 }
 
 // Records the Image node filePath referenced by `color` (when it is an ImagePattern) into

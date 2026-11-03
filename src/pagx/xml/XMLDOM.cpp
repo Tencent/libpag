@@ -52,9 +52,6 @@ class DOMParser : public XMLParser {
     _needToFlush = false;
     --_level;
 
-    if (!_parentStack.empty()) {
-      _parentStack.top().node->endLine = currentLine();
-    }
     _parentStack.pop();
     return false;
   }

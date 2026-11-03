@@ -107,8 +107,11 @@
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Padding.h"
+#include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/ImportResources.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
+#include "renderer/ImageEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -143,9 +146,17 @@ using namespace tgfx;
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
   auto doc = pagx::PAGXImporter::FromFile(filePath);
-  if (doc && doc->hasUnresolvedImports()) {
-    CallRun(pagx::cli::RunResolve, {"resolve", filePath});
-    doc = pagx::PAGXImporter::FromFile(filePath);
+  if (doc != nullptr && doc->hasUnresolvedImports()) {
+    doc->applyLayout();
+    if (doc->hasUnresolvedImports()) {
+      pagx::cli::ImportFormatOptions options = {};
+      auto baseDir = std::filesystem::path(filePath).parent_path().string();
+      auto stats = pagx::cli::ResolveDocument(doc.get(), baseDir, options);
+      if (stats.errorCount != 0) {
+        return nullptr;
+      }
+      doc->applyLayout();
+    }
   }
   return doc;
 }
@@ -1518,7 +1529,7 @@ static const char* InlineImportSvgDocument() {
 }
 
 /**
- * Test case: loading a document mounts a layer's inline import content as a sub-document — the SVG
+ * Test case: the first layout mounts a layer's inline import content as a sub-document — the SVG
  * parses into its own document with its own id space, a wrapper Composition registers in the host,
  * and the layer renders through the composition reference without a prior resolve. Content scales
  * to an explicitly-sized layer (mirroring the flatten semantics), the host node list gains only the
@@ -1529,11 +1540,22 @@ PAGX_TEST(PAGXTest, InlineImportMountsAsSubDocument) {
   auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->errors.empty());
-  EXPECT_FALSE(doc->hasUnresolvedImports());
+  EXPECT_TRUE(doc->hasUnresolvedImports());
 
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  auto unmountedNodeCount = doc->nodes.size();
+  auto unmountedXML = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(unmountedXML.find("<svg"), std::string::npos);
+  EXPECT_EQ(doc->nodes.size(), unmountedNodeCount);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  doc->applyLayout();
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  EXPECT_EQ(doc->nodes.size(), unmountedNodeCount + 1);
   ASSERT_NE(host->composition, nullptr);
+  EXPECT_TRUE(doc->isMountedComposition(host->composition));
   ASSERT_NE(host->externalDoc, nullptr);
   // The mount delegates scaling to the SVG importer's target-size path (the same semantics
   // 'pagx resolve' applies), so the sub-document's size equals the layer's authored size and the
@@ -1574,6 +1596,7 @@ PAGX_TEST(PAGXTest, InlineImportMountScalesUniformlyNotStretched) {
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->errors.empty());
 
+  doc->applyLayout();
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
   ASSERT_NE(host->externalDoc, nullptr);
@@ -1602,6 +1625,8 @@ PAGX_TEST(PAGXTest, InlineImportWithoutFormatSniffsSvg) {
 </pagx>)");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->errors.empty());
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  doc->applyLayout();
   EXPECT_FALSE(doc->hasUnresolvedImports());
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
@@ -1610,15 +1635,21 @@ PAGX_TEST(PAGXTest, InlineImportWithoutFormatSniffsSvg) {
 
 /**
  * Test case: a mounted inline import round-trips through the exporter — the import directive and
- * its content are written back (the id-less wrapper is skipped by the Resources pass), so a
- * re-imported document mounts the sub-document again.
+ * its content are written back while the explicitly marked wrapper is excluded from resources
+ * and references, even when it has an id. Re-importing keeps the same lazy mounting behavior.
  */
 PAGX_TEST(PAGXTest, InlineImportExportRoundTrips) {
   auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
   ASSERT_NE(doc, nullptr);
   doc->applyLayout();
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  doc->setNodeId(host->composition, "mountedWrapper");
+  ASSERT_EQ(doc->findNode("mountedWrapper"), host->composition);
 
   auto out = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(out.find("mountedWrapper"), std::string::npos);
   EXPECT_NE(out.find("importFormat=\"svg\""), std::string::npos);
   EXPECT_NE(out.find("<svg"), std::string::npos);
   // The mount itself leaves no visible trace: no Composition resource is written.
@@ -1626,6 +1657,8 @@ PAGX_TEST(PAGXTest, InlineImportExportRoundTrips) {
 
   auto doc2 = pagx::PAGXImporter::FromXML(out);
   ASSERT_NE(doc2, nullptr);
+  EXPECT_TRUE(doc2->hasUnresolvedImports());
+  doc2->applyLayout();
   EXPECT_FALSE(doc2->hasUnresolvedImports());
   auto* host2 = doc2->findNode<pagx::Layer>("host");
   ASSERT_NE(host2, nullptr);
@@ -1633,13 +1666,14 @@ PAGX_TEST(PAGXTest, InlineImportExportRoundTrips) {
 }
 
 /**
- * Test case: detachInlineImport() removes a mount (the inverse of the load-time mount), so a
+ * Test case: detachInlineImport() removes a lazy mount, so a
  * later resolve flattens into the layer instead of leaving the composition reference shadowing
  * the flattened contents. The import directive survives the detach.
  */
 PAGX_TEST(PAGXTest, DetachInlineImportForResolve) {
   auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
   ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
 
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
@@ -1659,22 +1693,21 @@ PAGX_TEST(PAGXTest, DetachInlineImportForResolve) {
 
 /**
  * Test case: detachInlineImport() leaves a file-loaded external composition alone, even when the
- * layer also carries leftover inline import content — the compositionFilePath origin retained by
- * the file mount is the discriminator that keeps our detach from removing a wrapper we did not
- * create.
+ * layer also carries leftover inline content. The explicit mount type prevents detaching the
+ * file wrapper, including when its origin field has been cleared.
  */
 PAGX_TEST(PAGXTest, DetachInlineImportKeepsFileMountedWrapper) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* host = doc->makeNode<pagx::Layer>("host");
   doc->layers.push_back(host);
-  // Simulate a file-loaded external composition mount alongside leftover inline content.
-  auto externalDoc = pagx::PAGXDocument::Make(20, 20);
-  auto* wrapper = doc->makeNode<pagx::Composition>();
-  wrapper->width = 20;
-  wrapper->height = 20;
-  host->composition = wrapper;
-  host->externalDoc = externalDoc;
   host->compositionFilePath = "external.pagx";
+  std::string fileXML = "<pagx version=\"1.0\" width=\"20\" height=\"20\"/>";
+  auto fileContent = pagx::Data::MakeWithCopy(fileXML.data(), fileXML.size());
+  ASSERT_TRUE(doc->loadFileData("external.pagx", fileContent));
+  auto* wrapper = host->composition;
+  auto externalDoc = host->externalDoc;
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(doc->isMountedComposition(wrapper));
   host->importDirective.content =
       "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" "
       "height=\"10\"/>";
@@ -1683,6 +1716,9 @@ PAGX_TEST(PAGXTest, DetachInlineImportKeepsFileMountedWrapper) {
   EXPECT_EQ(host->composition, wrapper);
   EXPECT_EQ(host->externalDoc, externalDoc);
   EXPECT_EQ(host->compositionFilePath, "external.pagx");
+  host->compositionFilePath.clear();
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, wrapper);
   // The wrapper is still a live host node.
   size_t wrapperCount = 0;
   for (const auto& node : doc->nodes) {
@@ -1787,17 +1823,27 @@ PAGX_TEST(PAGXTest, DetachInlineImportWithLiveScene) {
   ASSERT_NE(doc, nullptr);
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
-  ASSERT_NE(host->composition, nullptr);
-  ASSERT_NE(host->externalDoc, nullptr);
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+  auto retiredDocument = host->externalDoc;
+  EXPECT_TRUE(retiredDocument->hasLiveScenes());
+  doc->findLayersByImageFilePath("unused.png");
+  EXPECT_TRUE(doc->layersByImageFilePathBuilt);
   // Build the runtime tree so it references nodes owned by the sub-document.
   scene->advanceAndApply(0);
 
   EXPECT_TRUE(doc->detachInlineImport(host));
   EXPECT_EQ(host->composition, nullptr);
   EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_FALSE(retiredDocument->hasLiveScenes());
+  EXPECT_TRUE(doc->hasLiveScenes());
+  EXPECT_FALSE(doc->layersByImageFilePathBuilt);
+  EXPECT_TRUE(doc->layersByImageFilePath.empty());
 
   // The scene was rebuilt before the release, so it is still usable: every handle below dereferences
   // a node that used to live in the sub-document.
@@ -1814,6 +1860,423 @@ PAGX_TEST(PAGXTest, DetachInlineImportWithLiveScene) {
     // sub-document used to own.
     EXPECT_EQ(child->getNode()->id, "host");
   }
+}
+
+PAGX_TEST(PAGXTest, ImportFormatUsesOnePrecedenceRule) {
+  EXPECT_EQ(pagx::ResolveImportFormat("SVG", "file.html", "<body/>"), "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "file.XHTML", "<svg/>"), "html");
+  EXPECT_EQ(pagx::ResolveImportFormat("htm", "file.svg", "<svg/>"), "html");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<?xml version=\"1.0\"?><!--root--><svg/>"),
+            "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<body/>"), "html");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<g/>"), "g");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<!-- <html> --><svg/>"), "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<?probe <html> ?><svg/>"), "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<![CDATA[<html/>]]><svg/>"), "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<!DOCTYPE svg [<!ENTITY t '<html/>'>]><svg/>"),
+            "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<svg\r\n width=\"20\"/>"), "svg");
+  EXPECT_TRUE(pagx::ResolveImportFormat("", "", "<!-- unfinished <svg/>").empty());
+  EXPECT_TRUE(pagx::ResolveImportFormat("", "", "<?unfinished <svg/>").empty());
+
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->importDirective.format = "xhtml";
+  host->importDirective.content = "<svg/>";
+  doc->layers.push_back(host);
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_TRUE(pagx::LayerHasUnresolvedImport(host));
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+}
+
+PAGX_TEST(PAGXTest, ImportResourceDirectoriesPreserveAuthoredKeys) {
+  EXPECT_TRUE(pagx::GetImportSourceDirectory("child.pagx").empty());
+  EXPECT_EQ(pagx::GetImportSourceDirectory("assets/child.pagx"), "assets/");
+  EXPECT_EQ(pagx::GetImportSourceDirectory("/assets/child.pagx"), "/assets/");
+  EXPECT_EQ(pagx::ResolveImportResourcePath("", "local.png"), "local.png");
+  EXPECT_EQ(pagx::ResolveImportResourcePath("assets", "local.png"), "assets/local.png");
+  EXPECT_EQ(pagx::ResolveImportResourcePath("assets/", "local.png"), "assets/local.png");
+  EXPECT_EQ(pagx::ResolveImportResourcePath("assets/", "/local.png"), "/local.png");
+  EXPECT_EQ(pagx::ResolveImportResourcePath("assets/", "data:image/png;base64,AA=="),
+            "data:image/png;base64,AA==");
+}
+
+PAGX_TEST(PAGXTest, UnresolvedImportsIncludeTheEntireExternalChain) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"outer\" composition=\"first.pagx\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  std::string firstXML =
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"middle\" composition=\"second.pagx\"/></pagx>";
+  ASSERT_TRUE(doc->loadFileData("first.pagx",
+                               pagx::Data::MakeWithCopy(firstXML.data(), firstXML.size())));
+  std::string secondXML = R"(<pagx width="100" height="100">
+  <Resources><Composition id="resource" width="20" height="20">
+    <Layer id="unresolved" import="missing.svg"/>
+  </Composition></Resources>
+  <Layer composition="@resource"/>
+</pagx>)";
+  ASSERT_TRUE(doc->loadFileData("second.pagx",
+                               pagx::Data::MakeWithCopy(secondXML.data(), secondXML.size())));
+  auto* outer = doc->findNode<pagx::Layer>("outer");
+  ASSERT_NE(outer, nullptr);
+  ASSERT_NE(outer->externalDoc, nullptr);
+  auto* middle = outer->externalDoc->findNode<pagx::Layer>("middle");
+  ASSERT_NE(middle, nullptr);
+  ASSERT_NE(middle->externalDoc, nullptr);
+  auto* unresolved = middle->externalDoc->findNode<pagx::Layer>("unresolved");
+  ASSERT_NE(unresolved, nullptr);
+  EXPECT_TRUE(pagx::LayerHasUnresolvedImport(unresolved));
+  EXPECT_TRUE(middle->externalDoc->hasUnresolvedImports());
+  EXPECT_TRUE(outer->externalDoc->hasUnresolvedImports());
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+  unresolved->externalDoc = doc;
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  unresolved->importDirective.source.clear();
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  unresolved->externalDoc.reset();
+}
+
+PAGX_TEST(PAGXTest, ConflictingExplicitSourcesAreRejected) {
+  std::vector<std::string> sources = {"external.pagx", "@missing", "@inner"};
+  for (const auto& source : sources) {
+    auto xml = "<pagx version=\"1.0\" width=\"100\" height=\"100\">"
+               "<Resources><Composition id=\"inner\" width=\"20\" height=\"20\"/></Resources>"
+               "<Layer composition=\"" + source + "\" import=\"file.svg\"/></pagx>";
+    EXPECT_EQ(pagx::PAGXImporter::FromXML(xml), nullptr);
+  }
+
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->compositionFilePath = "external.pagx";
+  host->importDirective.source = "file.svg";
+  doc->layers.push_back(host);
+  doc->applyLayout();
+  EXPECT_FALSE(doc->isLayoutApplied());
+  EXPECT_FALSE(doc->errors.empty());
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_TRUE(pagx::PAGXExporter::ToXML(*doc).empty());
+  EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+  EXPECT_FALSE(pagx::PAGXOptimizer::Optimize(doc.get()).converged);
+  pagx::cli::ImportFormatOptions options = {};
+  auto stats = pagx::cli::ResolveDocument(doc.get(), "", options);
+  EXPECT_EQ(stats.resolvedCount, 0);
+  EXPECT_EQ(stats.errorCount, 1);
+}
+
+PAGX_TEST(PAGXTest, DeclaredCompositionOverridesInlineContent) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" composition="external.pagx">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"/>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  doc->applyLayout();
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  EXPECT_EQ(doc->getExternalFilePaths(), std::vector<std::string>({"external.pagx"}));
+  auto content = host->importDirective.content;
+  pagx::cli::ImportFormatOptions options = {};
+  auto stats = pagx::cli::ResolveDocument(doc.get(), "", options);
+  EXPECT_EQ(stats.resolvedCount, 0);
+  EXPECT_EQ(stats.errorCount, 0);
+  EXPECT_EQ(pagx::cli::DropUnresolvedDirectives(doc.get()), 0);
+  EXPECT_EQ(host->importDirective.content, content);
+
+  std::string fileXML = "<pagx version=\"1.0\" width=\"20\" height=\"20\"/>";
+  ASSERT_TRUE(doc->loadFileData("external.pagx",
+                                  pagx::Data::MakeWithCopy(fileXML.data(), fileXML.size())));
+  ASSERT_NE(host->composition, nullptr);
+  EXPECT_TRUE(doc->isMountedComposition(host->composition));
+  doc->setNodeId(host->composition, "fileWrapper");
+  EXPECT_EQ(doc->findNode("fileWrapper"), host->composition);
+  auto output = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(output.find("fileWrapper"), std::string::npos);
+  EXPECT_NE(output.find("composition=\"external.pagx\""), std::string::npos);
+  EXPECT_FALSE(doc->detachInlineImport(host));
+}
+
+PAGX_TEST(PAGXTest, AdoptNodesRefusesLiveSceneAndTransfersMountFailures) {
+  auto source = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(source, nullptr);
+  auto scene = pagx::PAGScene::Make(source);
+  ASSERT_NE(scene, nullptr);
+  auto nodeCount = source->nodes.size();
+  auto owner = pagx::PAGXDocument::Make(100, 100);
+  owner->adoptNodes(*source);
+  EXPECT_EQ(source->nodes.size(), nodeCount);
+  EXPECT_TRUE(owner->nodes.empty());
+  EXPECT_FALSE(owner->errors.empty());
+  EXPECT_NE(source->findNode("host"), nullptr);
+  scene.reset();
+  owner->adoptNodes(*source);
+  EXPECT_TRUE(source->nodes.empty());
+  EXPECT_EQ(owner->nodes.size(), nodeCount);
+
+  auto failed = pagx::PAGXDocument::Make(100, 100);
+  auto* host = failed->makeNode<pagx::Layer>("failedHost");
+  host->importDirective.format = "svg";
+  host->importDirective.content = "<g/>";
+  failed->layers.push_back(host);
+  failed->applyLayout();
+  ASSERT_FALSE(failed->inlineImportMountFailures.empty());
+  owner->adoptNodes(*failed);
+  owner->layers.push_back(host);
+  EXPECT_TRUE(failed->inlineImportMountFailures.empty());
+  EXPECT_NE(owner->inlineImportMountFailures.find(host), owner->inlineImportMountFailures.end());
+  auto errorCount = owner->errors.size();
+  owner->applyLayout();
+  EXPECT_EQ(owner->errors.size(), errorCount);
+  EXPECT_FALSE(owner->detachInlineImport(host));
+  host->importDirective.content = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
+  owner->applyLayout();
+  EXPECT_NE(host->composition, nullptr);
+}
+
+PAGX_TEST(PAGXTest, MountedCompositionOwnershipMovesAndClears) {
+  auto source = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(source, nullptr);
+  source->applyLayout();
+  auto* host = source->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  auto* wrapper = host->composition;
+  ASSERT_NE(wrapper, nullptr);
+
+  auto owner = pagx::PAGXDocument::Make(100, 100);
+  owner->adoptNodes(*source);
+  owner->layers.push_back(host);
+  EXPECT_TRUE(owner->isMountedComposition(wrapper));
+  EXPECT_FALSE(source->isMountedComposition(wrapper));
+  EXPECT_TRUE(source->mountedCompositions.empty());
+  EXPECT_FALSE(source->detachInlineImport(host));
+  owner->setNodeId(wrapper, "adoptedWrapper");
+  EXPECT_EQ(owner->findNode("adoptedWrapper"), wrapper);
+  EXPECT_EQ(pagx::PAGXExporter::ToXML(*owner).find("adoptedWrapper"), std::string::npos);
+
+  host->importDirective.content.clear();
+  EXPECT_TRUE(owner->detachInlineImport(host));
+  EXPECT_FALSE(owner->ownsNode(wrapper));
+  EXPECT_TRUE(owner->mountedCompositions.empty());
+  EXPECT_EQ(owner->findNode("adoptedWrapper"), nullptr);
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+}
+
+PAGX_TEST(PAGXTest, OptimizerDoesNotEnterMountedCompositionDomain) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" composition="external.pagx"/>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  auto* orphan = doc->makeNode<pagx::PathData>("childOnly");
+  std::string externalXML = R"(<pagx version="1.0" width="20" height="20">
+  <Resources><PathData id="childOnly" data="M0 0 L10 0 L10 10 Z"/></Resources>
+  <Layer id="empty"/>
+  <Layer id="shape">
+    <Path data="@childOnly"/>
+    <Fill><SolidColor color="#FF0000"/></Fill>
+  </Layer>
+</pagx>)";
+  ASSERT_TRUE(doc->loadFileData("external.pagx",
+                                  pagx::Data::MakeWithCopy(externalXML.data(), externalXML.size())));
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  auto foreignDoc = host->externalDoc;
+  ASSERT_NE(foreignDoc, nullptr);
+  auto layers = host->composition->layers;
+  auto before = pagx::PAGXExporter::ToXML(*foreignDoc);
+  auto foreignNodeCount = foreignDoc->nodes.size();
+  EXPECT_TRUE(pagx::PAGXOptimizer::Optimize(doc.get()).converged);
+  EXPECT_EQ(host->composition->layers, layers);
+  EXPECT_EQ(foreignDoc->nodes.size(), foreignNodeCount);
+  EXPECT_EQ(pagx::PAGXExporter::ToXML(*foreignDoc), before);
+  EXPECT_TRUE(orphan->id.empty());
+  EXPECT_NE(foreignDoc->findNode("childOnly"), nullptr);
+}
+
+PAGX_TEST(PAGXTest, InvalidCompositionReferenceDoesNotFallBackToInline) {
+  std::vector<std::string> sources = {"@missing", "@path", "@"};
+  for (const auto& source : sources) {
+    auto xml = "<pagx width=\"100\" height=\"100\">"
+               "<Resources><PathData id=\"path\" data=\"M0 0 L20 0 Z\"/></Resources>"
+               "<Layer composition=\"" + source +
+               "\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\"/>"
+               "</Layer></pagx>";
+    EXPECT_EQ(pagx::PAGXImporter::FromXML(xml), nullptr);
+  }
+  auto valid = pagx::PAGXImporter::FromXML(R"(<pagx width="100" height="100">
+  <Resources>
+    <Composition id="first" width="20" height="20"><Layer composition="@second"/></Composition>
+    <Composition id="second" width="20" height="20"/>
+  </Resources>
+  <Layer composition="@first"><svg xmlns="http://www.w3.org/2000/svg"/></Layer>
+</pagx>)");
+  ASSERT_NE(valid, nullptr);
+  EXPECT_TRUE(valid->errors.empty());
+  valid->applyLayout();
+  EXPECT_TRUE(valid->mountedCompositions.empty());
+}
+
+PAGX_TEST(PAGXTest, MountedInlineSourceSwitchRebuildsLiveScene) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  auto retiredDocument = host->externalDoc;
+  auto root = scene->rootComposition();
+  ASSERT_NE(retiredDocument, nullptr);
+  host->compositionFilePath = "replacement.pagx";
+  EXPECT_EQ(doc->getExternalFilePaths(), std::vector<std::string>({"replacement.pagx"}));
+  std::string replacement = R"(<pagx width="40" height="40">
+  <Layer id="replacement"><Rectangle width="20" height="20"/><Fill color="#00FF00"/></Layer>
+</pagx>)";
+  EXPECT_TRUE(doc->loadFileData("replacement.pagx",
+                               pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
+  ASSERT_NE(host->externalDoc, nullptr);
+  EXPECT_NE(host->externalDoc, retiredDocument);
+  EXPECT_FALSE(retiredDocument->hasLiveScenes());
+  EXPECT_TRUE(host->externalDoc->hasLiveScenes());
+  EXPECT_NE(root, scene->rootComposition());
+  EXPECT_FALSE(scene->getLayersUnderPoint(15, 15).empty());
+  auto output = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(output.find("composition=\"replacement.pagx\""), std::string::npos);
+  EXPECT_FALSE(doc->detachInlineImport(host));
+}
+
+PAGX_TEST(PAGXTest, MountedInlineSourceSwitchAfterFailedLayout) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  auto retiredDocument = host->externalDoc;
+  auto oldRoot = scene->rootComposition();
+  host->compositionFilePath = "replacement.pagx";
+  host->importDirective.source = "conflicting.svg";
+  doc->applyLayout();
+  EXPECT_FALSE(doc->isLayoutApplied());
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->externalDoc, retiredDocument);
+  host->importDirective.source.clear();
+  doc->applyLayout();
+  EXPECT_TRUE(doc->isLayoutApplied());
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_FALSE(retiredDocument->hasLiveScenes());
+  EXPECT_NE(scene->rootComposition(), oldRoot);
+  EXPECT_TRUE(scene->getLayersUnderPoint(30, 30).empty());
+  std::string replacement = R"(<pagx width="40" height="40">
+  <Layer><Rectangle width="20" height="20"/><Fill color="#00FF00"/></Layer>
+</pagx>)";
+  EXPECT_TRUE(doc->loadFileData("replacement.pagx",
+                               pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
+  EXPECT_FALSE(scene->getLayersUnderPoint(15, 15).empty());
+}
+
+PAGX_TEST(PAGXTest, MountedInlineSwitchToImportRetiresOldDomain) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  auto retiredDocument = host->externalDoc;
+  host->importDirective.source = "replacement.svg";
+  doc->notifyChange({host}, true);
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  EXPECT_FALSE(retiredDocument->hasLiveScenes());
+  EXPECT_TRUE(scene->getLayersUnderPoint(30, 30).empty());
+}
+
+PAGX_TEST(PAGXTest, AdoptNodesClearsBorrowedReferencesAndLayout) {
+  auto source = pagx::PAGXDocument::Make(100, 100);
+  auto* host = source->makeNode<pagx::Layer>("host");
+  host->percentWidth = 100;
+  host->height = 20;
+  source->layers.push_back(host);
+  auto* viewModel = source->makeNode<pagx::ViewModel>("model");
+  auto* bind = source->makeNode<pagx::DataBind>();
+  source->viewModel = viewModel;
+  source->dataBinds.push_back(bind);
+  source->applyLayout();
+  source->findLayersByImageFilePath("cached.png");
+  EXPECT_TRUE(source->layersByImageFilePathBuilt);
+  EXPECT_FLOAT_EQ(host->layoutBounds().width, 100);
+  auto owner = pagx::PAGXDocument::Make(200, 100);
+  owner->adoptNodes(*source);
+  owner->layers.push_back(host);
+  EXPECT_FALSE(source->isLayoutApplied());
+  EXPECT_EQ(source->viewModel, nullptr);
+  EXPECT_TRUE(source->dataBinds.empty());
+  EXPECT_FALSE(source->layersByImageFilePathBuilt);
+  EXPECT_TRUE(source->layersByImageFilePath.empty());
+  EXPECT_EQ(owner->findNode("model"), viewModel);
+  EXPECT_TRUE(owner->ownsNode(bind));
+  owner->applyLayout();
+  EXPECT_FLOAT_EQ(host->layoutBounds().width, 200);
+}
+
+PAGX_TEST(PAGXTest, EmbeddingDoesNotMutateMountedDomain) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->compositionFilePath = "text.pagx";
+  doc->layers.push_back(host);
+  std::string textDocument = R"(<pagx width="100" height="100">
+  <Layer id="textLayer"><Text id="text" text="Embed" fontSize="24"/><Fill color="#FF0000"/></Layer>
+</pagx>)";
+  ASSERT_TRUE(doc->loadFileData("text.pagx",
+                               pagx::Data::MakeWithCopy(textDocument.data(), textDocument.size())));
+  auto foreignDoc = host->externalDoc;
+  ASSERT_NE(foreignDoc, nullptr);
+  auto* text = foreignDoc->findNode<pagx::Text>("text");
+  ASSERT_NE(text, nullptr);
+  auto* run = foreignDoc->makeNode<pagx::GlyphRun>();
+  text->glyphRuns.push_back(run);
+  auto imagePath = ProjectPath::Absolute("resources/apitest/image_as_mask.png");
+  auto* image = doc->makeNode<pagx::Image>();
+  image->filePath = imagePath;
+  auto* foreignImage = foreignDoc->makeNode<pagx::Image>();
+  foreignImage->filePath = imagePath;
+  auto nodeCount = doc->nodes.size();
+  auto foreignNodeCount = foreignDoc->nodes.size();
+  EXPECT_TRUE(pagx::FontEmbedder().embed(doc.get()));
+  pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc.get());
+  EXPECT_EQ(doc->nodes.size(), nodeCount);
+  EXPECT_EQ(foreignDoc->nodes.size(), foreignNodeCount);
+  EXPECT_EQ(text->glyphRuns, std::vector<pagx::GlyphRun*>({run}));
+  EXPECT_FALSE(doc->ownsNode(run));
+  EXPECT_TRUE(foreignDoc->ownsNode(run));
+  EXPECT_TRUE(pagx::ImageEmbedder().embed(doc.get()));
+  EXPECT_TRUE(image->filePath.empty());
+  EXPECT_NE(image->data, nullptr);
+  EXPECT_EQ(foreignImage->filePath, imagePath);
+  EXPECT_EQ(foreignImage->data, nullptr);
+}
+
+PAGX_TEST(PAGXTest, DetachedImageDomainDoesNotLeavePathIndex) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  host->importDirective.content = R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+  <image href="inline.png" width="20" height="20"/>
+</svg>)";
+  doc->layers.push_back(host);
+  doc->applyLayout();
+  ASSERT_NE(host->externalDoc, nullptr);
+  EXPECT_FALSE(doc->findLayersByImageFilePath("inline.png").empty());
+  host->importDirective.content.clear();
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_FALSE(doc->layersByImageFilePathBuilt);
+  EXPECT_TRUE(doc->findLayersByImageFilePath("inline.png").empty());
+  std::string data = "unused image data";
+  EXPECT_FALSE(doc->loadFileData("inline.png", pagx::Data::MakeWithCopy(data.data(), data.size())));
 }
 
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
@@ -2834,6 +3297,10 @@ PAGX_TEST(PAGXTest, LayoutMemoDoesNotChangeResolvedGeometry) {
   doc->layers.push_back(chain[0]);
 
   doc->applyLayout();
+  // The memo has to be hit, not merely harmless: deleting it leaves every geometry assertion below
+  // passing while the cost of a nested content-measured chain goes back to exponential, so the
+  // pass reports how many setLayoutSize calls it skipped.
+  EXPECT_GT(doc->lastLayoutMemoHits, 0);
   pagx::Rect firstPass[depth] = {};
   for (int i = 0; i < depth; i++) {
     firstPass[i] = chain[i]->layoutBounds();
@@ -8460,18 +8927,29 @@ PAGX_TEST(PAGXTest, ExternalPAGXCompositionSelfReferenceCycle) {
   ASSERT_EQ(paths.size(), 1u);
   EXPECT_EQ(paths[0], "a.pagx");
 
-  // a.pagx references itself through its only layer.
-  auto selfXML = MakeCompositionRefXML("a.pagx");
-  doc->loadFileData("a.pagx", MakePAGXData(selfXML));
-
-  // First load resolves the root layer's externalDoc; the self-reference inside it is only reached
-  // on the next pass, so drive the host loop until it converges.
-  int guard = 0;
-  while (!doc->getExternalFilePaths().empty() && guard < 10) {
-    doc->loadFileData("a.pagx", MakePAGXData(selfXML));
-    guard++;
-  }
+  std::string selfXML = R"(<pagx width="40" height="40">
+  <Layer id="backReference" composition="a.pagx">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect width="20" height="20" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  EXPECT_TRUE(doc->loadFileData("a.pagx", MakePAGXData(selfXML)));
+  ASSERT_NE(doc->layers[0]->externalDoc, nullptr);
+  auto child = doc->layers[0]->externalDoc;
+  auto* backReference = child->findNode<pagx::Layer>("backReference");
+  ASSERT_NE(backReference, nullptr);
   EXPECT_TRUE(doc->getExternalFilePaths().empty());
+  auto errorCount = doc->errors.size();
+  EXPECT_FALSE(doc->loadFileData("a.pagx", MakePAGXData(selfXML)));
+  EXPECT_EQ(doc->errors.size(), errorCount);
+  doc->applyLayout();
+  EXPECT_EQ(backReference->compositionFilePath, "a.pagx");
+  EXPECT_EQ(backReference->composition, nullptr);
+  EXPECT_EQ(backReference->externalDoc, nullptr);
+  EXPECT_FALSE(child->hasUnresolvedImports());
+  EXPECT_TRUE(child->mountedCompositions.empty());
+  EXPECT_NE(pagx::PAGXExporter::ToXML(*child).find("composition=\"a.pagx\""), std::string::npos);
 
   bool hasCycleError = false;
   for (const auto& error : doc->errors) {

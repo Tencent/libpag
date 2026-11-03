@@ -247,10 +247,11 @@ static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return GlyphType::Spacing;
 }
 
-static void CollectTextFromElements(const std::vector<Element*>& elements,
+static void CollectTextFromElements(PAGXDocument* document,
+                                    const std::vector<Element*>& elements,
                                     std::vector<Text*>& outText) {
   for (auto* element : elements) {
-    if (element == nullptr) {
+    if (element == nullptr || !document->ownsNode(element)) {
       continue;
     }
     switch (element->nodeType()) {
@@ -258,10 +259,10 @@ static void CollectTextFromElements(const std::vector<Element*>& elements,
         outText.push_back(static_cast<Text*>(element));
         break;
       case NodeType::Group:
-        CollectTextFromElements(static_cast<Group*>(element)->elements, outText);
+        CollectTextFromElements(document, static_cast<Group*>(element)->elements, outText);
         break;
       case NodeType::TextBox:
-        CollectTextFromElements(static_cast<TextBox*>(element)->elements, outText);
+        CollectTextFromElements(document, static_cast<TextBox*>(element)->elements, outText);
         break;
       default:
         break;
@@ -269,26 +270,28 @@ static void CollectTextFromElements(const std::vector<Element*>& elements,
   }
 }
 
-static void CollectTextFromLayer(Layer* layer, std::vector<Text*>& outText) {
-  if (layer == nullptr) {
+static void CollectTextFromLayer(PAGXDocument* document, Layer* layer,
+                                 std::vector<Text*>& outText) {
+  if (layer == nullptr || !document->ownsNode(layer)) {
     return;
   }
-  CollectTextFromElements(layer->contents, outText);
+  CollectTextFromElements(document, layer->contents, outText);
   for (auto* child : layer->children) {
-    CollectTextFromLayer(child, outText);
+    CollectTextFromLayer(document, child, outText);
   }
 }
 
 static std::vector<Text*> CollectAllText(PAGXDocument* document) {
   std::vector<Text*> allText = {};
   for (auto* layer : document->layers) {
-    CollectTextFromLayer(layer, allText);
+    CollectTextFromLayer(document, layer, allText);
   }
   for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition &&
+        !document->isMountedComposition(node.get())) {
       auto* comp = static_cast<Composition*>(node.get());
       for (auto* layer : comp->layers) {
-        CollectTextFromLayer(layer, allText);
+        CollectTextFromLayer(document, layer, allText);
       }
     }
   }

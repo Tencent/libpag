@@ -63,6 +63,11 @@ class LayoutContext {
   // pass, so the memo dies with the pass and no cross-pass invalidation convention is needed.
   std::unordered_map<const LayoutNode*, std::pair<float, float>> layoutTargets = {};
 
+  // How many setLayoutSize calls the memo above short-circuited in this pass. The engine never
+  // reads it: it exists so the layout-memo test can assert the memo is actually hit, instead of
+  // only asserting that geometry still matches — which it would even with the memo deleted.
+  int layoutMemoHits = 0;
+
  private:
   void ensureSystemFallbacks();
 

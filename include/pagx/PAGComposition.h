@@ -113,13 +113,11 @@ class PAGComposition : public PAGLayer {
       std::unordered_set<const Composition*>& visited);
 
   // Builds the persistent per-layer runtime node tree into outChildren. Internal static helper used
-  // by BuildChildLayer and buildChildren. parentForChildren is set as the parent of every child
-  // pushed into outChildren, so the runtime tree's parent chain matches the source tree.
+  // by BuildChildLayer and buildChildren.
   static void BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
                             std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                             const std::shared_ptr<PAGScene>& scene,
-                            std::unordered_set<const Composition*>& visited,
-                            const std::shared_ptr<PAGLayer>& parentForChildren);
+                            std::unordered_set<const Composition*>& visited);
 
   // Collects the direct child compositions of a layer into outChildren, transparently descending
   // through plain PAGLayer containers (which may nest compositions) but not into the child

@@ -33,7 +33,6 @@
 namespace tgfx {
 class Context;
 class DisplayList;
-class Layer;
 class Recording;
 }  // namespace tgfx
 
@@ -246,39 +245,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
-  // Re-applies the ViewModel's current values to every data bind whose target is the given node
-  // across the whole composition tree, immediately (mirrors the VM-change immediate-apply path).
-  // Used by PAGScene::getStateMachineTimeline() and PAGComposition::spawnTimelines(): both start
-  // from bound SM inputs dropped back to their declared defaults, and the ViewModel is the truth
-  // source for those values.
-  // scopeBinding restricts the re-apply to runtimes bound against that binding: the same source
-  // node can back several instances (a top-level pre-created one plus composition-spawned ones),
-  // and a reset must only re-push the values of the instance it belongs to, not overwrite the
-  // host-set inputs of unrelated instances. A null scopeBinding is a no-op — the re-apply always
-  // belongs to one concrete instance, so an unspecified scope must not touch every runtime.
   void reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding* scopeBinding);
-  static void ReapplyCompositionTreeDataBinds(PAGComposition* comp, const Node* targetNode,
-                                              RuntimeBinding* scopeBinding);
-
-  // Returns true when the binding holds at least one of the dirty nodes. A timeline resolves its
-  // targets against the binding it lives in and drops everything outside it (see
-  // PAGAnimation::resolveTargets), so a composition whose binding covers none of them has no channel
-  // an incremental refresh could have reset, and re-applying its timelines would be pure work.
-  static bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
-                                      const std::unordered_set<const Node*>& dirtySet);
-  // Narrows an already-covering composition further: an animation only needs re-applying when one of
-  // its resolved targets is dirty, so an edit to a sibling the animation does not drive is skipped.
-  // A state machine does not expose its resolved targets (its inner animations live in regions) and
-  // an animation that has not resolved yet has no target list to narrow by, so both keep the
-  // composition-wide answer instead of risking a replay that is needed.
-  static bool TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
-                                          const std::unordered_set<const Node*>& dirtySet);
-  // Re-applies only the timelines of compositions whose binding covers a dirty node, in the order
-  // PAGComposition::apply() uses (own timelines first, then descendants). Descendants are tested
-  // independently: a parent whose binding covers nothing must not stop a dirty child from being
-  // re-applied.
-  static void ApplyTimelinesForDirtyNodes(PAGComposition* comp,
-                                          const std::unordered_set<const Node*>& dirtySet);
 
   RuntimeBinding* mutableBinding();
 
@@ -293,26 +260,6 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
   // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
-
-  // Hit-testing helpers for getLayersUnderPoint. The tree walk lives here rather than in
-  // tgfx::Layer::getLayersUnderPoint because tgfx tests every layer against content->getBounds(),
-  // which for a text layer is the whole typeface's envelope instead of the glyphs. Everything they
-  // read is runtime state; the source model is never consulted.
-  static bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
-                                      float rootY, float surfaceX, float surfaceY,
-                                      bool shapeHitTest,
-                                      std::vector<std::shared_ptr<PAGLayer>>* out);
-
-  // True when the point passes the visibility, scrollRect clip and mask of every tgfx layer from
-  // layer up to (but excluding) stop. rootX/rootY are in the runtime tree's root space. The mask is
-  // tested with the same shapeHitTest the caller asked for, so both tests agree.
-  static bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
-                                      float rootY, bool shapeHitTest);
-
-  // True when the point falls on the layer's own content, tested per shapeHitTest. Layers whose
-  // runtime layer carries no contents never report a hit of their own.
-  static bool OwnContentContainsPoint(PAGLayer* layer, float rootX, float rootY, float surfaceX,
-                                      float surfaceY, bool shapeHitTest);
 
   // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
   // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
