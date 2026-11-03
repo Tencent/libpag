@@ -118,6 +118,18 @@ bool IsLayerShell(const Layer* layer) {
   return true;
 }
 
+// Glass masks with the layer's own geometry, which excludes its children, so a rule that moves
+// geometry between a layer and its children changes what the glass covers. This mirrors
+// LayerStyleContentSource::Geometry in tgfx; extend the check when another style opts in.
+bool UsesOwnGeometryMask(const Layer* layer) {
+  for (const auto* style : layer->styles) {
+    if (style != nullptr && style->nodeType() == NodeType::GlassStyle) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool HasPainter(const std::vector<Element*>& elements) {
   for (auto* el : elements) {
     if (IsPainter(el->nodeType())) {
