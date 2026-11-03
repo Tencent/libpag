@@ -1666,12 +1666,19 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
 
   IndexLayerTree(doc.layers, _solidToPainter, _filterToLayer, _maskPathToLayer);
 
+  ResolveAnimationTargets(animations);
+}
+
+// Resolves every animated object target to the DOM id its tag will carry. Layer and Group targets
+// may need an id assigned; a Path used by a mask registers as coverage-mask geometry instead.
+void HTMLAnimationSession::ResolveAnimationTargets(
+    const std::vector<const Animation*>& animations) {
   for (auto* anim : animations) {
     for (auto* obj : anim->objects) {
       if (obj == nullptr || obj->channels.empty()) {
         continue;
       }
-      Node* targetNode = ResolveTargetNode(doc, obj->target);
+      Node* targetNode = ResolveTargetNode(_doc, obj->target);
       if (targetNode == nullptr) {
         continue;
       }
@@ -1793,29 +1800,11 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   _ctx.svgMaskIds.clear();
 }
 
-std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
-  if (!_active) {
-    return {};
-  }
-
+std::vector<HTMLAnimationSession::AnimationMount>
+HTMLAnimationSession::CollectAnimationMounts() const {
   std::unordered_map<std::string, int64_t> timelineOffsets = {};
   CollectTimelineOffsets(_doc.layers, timelineOffsets);
 
-  std::string keyframesCss;
-  int animCounter = 0;
-
-  std::vector<std::string> elementIdOrder = {};
-  std::unordered_map<std::string, std::vector<std::string>> elementAnimDecls = {};
-  std::unordered_map<std::string, bool> elementNeedsZeroOrigin = {};
-  std::unordered_map<std::string, bool> elementLiftsSvgClip = {};
-  std::unordered_map<std::string, std::vector<bool>> elementPlayStates = {};
-
-  struct AnimationMount {
-    const Animation* animation = nullptr;
-    size_t scope = 0;
-    int64_t offset = 0;
-    bool playing = true;
-  };
   std::vector<AnimationMount> mounts = {};
   for (auto* node : _doc.animations) {
     if (node == nullptr || node->nodeType() != NodeType::Animation) {
@@ -1847,6 +1836,20 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
     }
   }
+  return mounts;
+}
+
+std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
+  if (!_active) {
+    return {};
+  }
+
+  std::string keyframesCss;
+  int animCounter = 0;
+
+  ElementEdits edits;
+
+  const auto mounts = CollectAnimationMounts();
 
   // Both indexes are built once: resolving every animated tag per bundle would otherwise rescan the
   // whole body for each target.
@@ -1931,31 +1934,37 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           }
           nameIt = keyframesNameByTag.emplace(element.tagName, kfName).first;
         }
-        if (elementAnimDecls.find(element.id) == elementAnimDecls.end()) {
-          elementIdOrder.push_back(element.id);
+        if (edits.animDecls.find(element.id) == edits.animDecls.end()) {
+          edits.idOrder.push_back(element.id);
         }
-        elementAnimDecls[element.id].push_back(
+        edits.animDecls[element.id].push_back(
             BuildAnimationShorthand(anim, nameIt->second, timing, mount.offset, mount.scope != 0));
-        elementPlayStates[element.id].push_back(mount.playing);
+        edits.playStates[element.id].push_back(mount.playing);
       }
       if (needsZeroOrigin) {
         for (const auto& element : elements) {
-          elementNeedsZeroOrigin[element.id] = true;
+          edits.needsZeroOrigin[element.id] = true;
         }
       }
       // Stroke width and shape width can expand SVG paint beyond its static viewBox. Other paint
       // channels (color, opacity, dash offset) do not change the viewport-sized extent.
       if (chSet.strokeWidthCh != nullptr || chSet.geometryWidthCh != nullptr) {
         for (const auto& element : elements) {
-          elementLiftsSvgClip[element.id] = true;
+          edits.liftsSvgClip[element.id] = true;
         }
       }
     }
   }
 
-  // Resolve every pending id with a single scan, then rebuild the body once. Looking each id up from
-  // the start of the body and letting std::string::replace shift the tail every time costs
-  // O(targets x bodyLength) on documents with many animated elements.
+  ApplyElementEdits(bodyHtml, edits);
+
+  return keyframesCss;
+}
+
+// Resolves every recorded id with one scan and rebuilds the body once. Looking an id up from the
+// start of the body and letting std::string::replace shift the tail every time costs
+// O(targets x bodyLength) on documents with many animated elements.
+void HTMLAnimationSession::ApplyElementEdits(std::string& bodyHtml, const ElementEdits& edits) {
   struct TextEdit {
     size_t start = 0;
     size_t end = 0;
@@ -1963,7 +1972,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   };
   std::unordered_map<std::string, std::pair<size_t, size_t>> tagRanges = {};
   {
-    std::unordered_set<std::string> pendingIds(elementIdOrder.begin(), elementIdOrder.end());
+    std::unordered_set<std::string> pendingIds(edits.idOrder.begin(), edits.idOrder.end());
     size_t searchFrom = 0;
     while (!pendingIds.empty()) {
       auto idPos = bodyHtml.find("id=\"", searchFrom);
@@ -1995,14 +2004,18 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
   }
 
-  std::vector<TextEdit> edits = {};
+  std::vector<TextEdit> textEdits = {};
   std::unordered_set<size_t> liftedSvgStarts = {};
-  for (const auto& elementId : elementIdOrder) {
+  for (const auto& elementId : edits.idOrder) {
     auto rangeIt = tagRanges.find(elementId);
     if (rangeIt == tagRanges.end()) {
       continue;
     }
-    const auto& decls = elementAnimDecls[elementId];
+    auto declIt = edits.animDecls.find(elementId);
+    if (declIt == edits.animDecls.end()) {
+      continue;
+    }
+    const auto& decls = declIt->second;
     std::string combined;
     for (size_t i = 0; i < decls.size(); ++i) {
       if (i > 0) {
@@ -2010,7 +2023,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       combined += decls[i];
     }
-    const auto& playStates = elementPlayStates[elementId];
+    std::vector<bool> noPlayStates = {};
+    auto playIt = edits.playStates.find(elementId);
+    const auto& playStates = playIt != edits.playStates.end() ? playIt->second : noPlayStates;
     if (std::find(playStates.begin(), playStates.end(), false) != playStates.end()) {
       combined += ";animation-play-state:";
       for (size_t i = 0; i < playStates.size(); ++i) {
@@ -2020,34 +2035,38 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         combined += playStates[i] ? "running" : "paused";
       }
     }
+    auto zeroIt = edits.needsZeroOrigin.find(elementId);
+    bool needsZeroOrigin = zeroIt != edits.needsZeroOrigin.end() && zeroIt->second;
+    auto liftIt = edits.liftsSvgClip.find(elementId);
+    bool liftsSvgClip = liftIt != edits.liftsSvgClip.end() && liftIt->second;
     size_t tagStart = rangeIt->second.first;
     size_t tagEnd = rangeIt->second.second;
-    edits.push_back({tagStart, tagEnd,
-                     BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined,
-                                   elementNeedsZeroOrigin[elementId])});
+    textEdits.push_back({tagStart, tagEnd,
+                         BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined,
+                                       needsZeroOrigin)});
     // The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
     // extent would be clipped; lift the clipping on the hosting <svg> while keeping its viewport.
-    if (elementLiftsSvgClip[elementId]) {
+    if (liftsSvgClip) {
       auto svgStart = FindEnclosingSvgStart(bodyHtml, tagStart);
       if (svgStart != std::string::npos && liftedSvgStarts.insert(svgStart).second) {
         auto svgEnd = bodyHtml.find('>', svgStart);
         if (svgEnd != std::string::npos) {
           auto liftedTag = BuildLiftedSvgTag(bodyHtml.substr(svgStart, svgEnd - svgStart));
           if (!liftedTag.empty()) {
-            edits.push_back({svgStart, svgEnd, std::move(liftedTag)});
+            textEdits.push_back({svgStart, svgEnd, std::move(liftedTag)});
           }
         }
       }
     }
   }
 
-  if (!edits.empty()) {
-    std::sort(edits.begin(), edits.end(),
+  if (!textEdits.empty()) {
+    std::sort(textEdits.begin(), textEdits.end(),
               [](const TextEdit& a, const TextEdit& b) { return a.start < b.start; });
     std::string rebuilt;
-    rebuilt.reserve(bodyHtml.size() + edits.size() * 64);
+    rebuilt.reserve(bodyHtml.size() + textEdits.size() * 64);
     size_t cursor = 0;
-    for (const auto& edit : edits) {
+    for (const auto& edit : textEdits) {
       if (edit.start < cursor) {
         continue;
       }
@@ -2058,8 +2077,6 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     rebuilt.append(bodyHtml, cursor, std::string::npos);
     bodyHtml = std::move(rebuilt);
   }
-
-  return keyframesCss;
 }
 
 }  // namespace pagx
