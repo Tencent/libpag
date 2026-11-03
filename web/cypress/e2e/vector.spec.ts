@@ -4,6 +4,7 @@
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGImageLayer } from '../../src/pag-image-layer';
+import { visitTestPage } from './lane';
 
 describe('PAGImage', () => {
   let PAG: PAG;
@@ -11,7 +12,7 @@ describe('PAGImage', () => {
   let PAGTypes: typeof Libpag.types;
   let layers: Libpag.types.Vector<PAGImageLayer>;
   beforeEach(() => {
-    cy.visit('/cypress/index.html');
+    visitTestPage();
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

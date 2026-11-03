@@ -170,15 +170,6 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static const std::vector<std::string>& GetFallbackFontPaths() {
-  static const std::vector<std::string> paths = {
-      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
-      ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"),
-      ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"),
-  };
-  return paths;
-}
-
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();
@@ -2618,6 +2609,9 @@ PAGX_TEST(PAGXTest, TextLayoutCanReshapeReadableTextWhenGlyphRunsAreIgnored) {
   text->glyphRuns.push_back(embeddedRun);
 
   pagx::FontConfig fontConfig;
+  // The reshaped pass resolves the empty-family Text through fallback typefaces; web has no
+  // system fonts, so register the repo fixture to keep the shaping non-empty there.
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.boxWidth = 440;

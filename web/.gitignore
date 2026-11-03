@@ -2,6 +2,7 @@
 pag.js
 pag.worker.js
 *.wasm
+!test/ffavc.wasm
 *.data
 package-lock.json
 lib
@@ -20,6 +21,7 @@ demo/index.html
 demo/index-*.html
 cypress/videos
 cypress/screenshots
+cypress/results/
 demo/wechat-miniprogram/utils/libpag.js
 demo/wechat-miniprogram/utils/libpag.wasm.br
 demo/wasm
@@ -33,3 +35,6 @@ src/wasm-webgpu-mt
 src-webgpu-tmp
 demo/wasm-webgpu
 demo/wasm-webgpu-mt
+test/results/
+test/build-baseline-webgl/
+test/build-baseline-webgpu/

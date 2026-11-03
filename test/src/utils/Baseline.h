@@ -23,6 +23,7 @@
 #pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
 #include "nlohmann/json.hpp"
 #pragma clang diagnostic pop
+#include <atomic>
 #include "pag/pag.h"
 #include "pagx/PAGSurface.h"
 #include "tgfx/core/Pixmap.h"
@@ -62,7 +63,20 @@ class Baseline {
 
   void saveData();
 
+  struct ComparisonStats {
+    size_t compared = 0;
+    size_t versionSkipped = 0;
+    size_t missingBaseline = 0;
+  };
+
+  /** Returns comparison counts for the current or most recently completed test run. */
+  static ComparisonStats GetComparisonStats();
+
  private:
+  std::atomic<size_t> compared = 0;
+  std::atomic<size_t> versionSkipped = 0;
+  std::atomic<size_t> missingBaseline = 0;
+  ComparisonStats comparisonStats() const;
   std::mutex locker = {};
   std::string currentVersion;
   nlohmann::json baselineVersions = {};

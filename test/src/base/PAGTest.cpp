@@ -20,8 +20,8 @@
 #include <set>
 #include <string>
 #include <utility>
+#include "utils/DevicePool.h"
 #if defined(TGFX_USE_METAL)
-#include "utils/MetalTestSupport.h"
 #endif
 
 namespace pag {
@@ -52,7 +52,7 @@ void PAGTest::SetUp() {
   }
   // Pixel tests opt into tgfx's atlas-isolation workaround before rendering. This intentionally
   // excludes cross-test atlas reuse from baseline coverage; unmarked behavior tests retain it.
-  ASSERT_TRUE(ResetMetalAtlasForComparison())
+  ASSERT_TRUE(DevicePool::ResetAtlasForComparison())
       << "Cannot prepare pixel comparison: failed to create or lock the Metal device.";
 #endif
 }
