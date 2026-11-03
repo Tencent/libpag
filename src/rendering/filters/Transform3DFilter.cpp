@@ -450,15 +450,6 @@ void Transform3DFilter::onConfigureRenderPass(
       state->depthTexture, loadAction, tgfx::StoreAction::Store, -1.0f, false);
 }
 
-Transform3DResources::CompositionState* Transform3DFilter::findCompositionState(
-    Transform3DResources* resources) const {
-  auto result = resources->compositions.find(compositionID);
-  if (result == resources->compositions.end()) {
-    return nullptr;
-  }
-  return &result->second;
-}
-
 Transform3DResources::CompositionState* Transform3DFilter::getOrCreateCompositionState(
     Transform3DResources* resources, tgfx::GPU* gpu) const {
   auto& state = resources->compositions[compositionID];
