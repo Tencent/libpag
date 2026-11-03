@@ -82,7 +82,7 @@ class Matrix3D {
   /** Post-translates this matrix by x, y and z. */
   Matrix3D& postTranslate(float x, float y, float z = 0);
 
-  /** Post-multiplies this matrix by the given matrix (this = this * matrix) following this class's
+  /** Post-concatenates the given matrix, setting this = matrix * this, following this class's
    * column-major convention. */
   Matrix3D& postConcat(const Matrix3D& matrix);
 
