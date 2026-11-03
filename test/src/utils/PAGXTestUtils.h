@@ -62,8 +62,9 @@ inline static void VerifyFile(const std::string& filePath, const std::string& ke
   for (const auto& fontPath : GetFallbackFontPaths()) {
     args.insert(args.end(), {"--font", fontPath});
   }
-  args.insert(args.end(), {"--font", ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"),
-                           filePath});
+  args.insert(
+      args.end(),
+      {"--font", ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), filePath});
   auto verifyRet = CallRun(pagx::cli::RunVerify, std::move(args));
   std::cerr.rdbuf(oldErr);
   EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
