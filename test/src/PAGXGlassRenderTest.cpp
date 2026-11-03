@@ -487,9 +487,9 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleKeepsItsMaskThroughTheOptimizer) {
   EXPECT_EQ(absorbed->contents[1]->nodeType(), pagx::NodeType::Rectangle);
 }
 
-// The layer's own geometry is a 100x100 rectangle at 50..150; its child carries an opaque square at
+// The layer's own geometry is a 100x100 rectangle at 50..150; its child carries a green square at
 // 200..300 plus an unpainted rectangle at 200..300 x 70..130. Glass masks with the own geometry
-// only, so neither child region may change, and nothing covers the unpainted one to hide a leak.
+// only, so neither child region may change; the square's 50% alpha lets a leak show through.
 static std::shared_ptr<pagx::PAGXDocument> MakeOversizedChildDocument(bool withGlass) {
   auto document = MakeStripedBackdropDocument();
   auto glassLayer = document->makeNode<pagx::Layer>();
@@ -508,7 +508,8 @@ static std::shared_ptr<pagx::PAGXDocument> MakeOversizedChildDocument(bool withG
   paintedRect->position = {200.0f, 200.0f};
   auto paintedFill = document->makeNode<pagx::Fill>();
   auto paintedColor = document->makeNode<pagx::SolidColor>();
-  paintedColor->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  // Semi-transparent so a grown mask would show through; opaque paint would hide the leak.
+  paintedColor->color = {0.0f, 1.0f, 0.0f, 0.5f};
   paintedFill->color = paintedColor;
   // The bare rectangle follows the painter, so the fill only paints the geometry before it. This
   // one stays invisible while still extending the subtree's contour.
@@ -578,7 +579,12 @@ static std::shared_ptr<pagx::PAGXDocument> MakeChildContourDocument(bool withGla
   auto childColor = document->makeNode<pagx::SolidColor>();
   childColor->color = {0.0f, 0.0f, 1.0f, fillAlpha};
   childFill->color = childColor;
-  child->contents = {childRect, childFill};
+  // Added with no paint and kept outside the contour at 262..298 x 70..230 (child-local 212..248 x
+  // 20..180): the contour drops unpainted geometry, the subtree geometry would keep it.
+  auto bareRect = document->makeNode<pagx::Rectangle>();
+  bareRect->size = {36.0f, 160.0f};
+  bareRect->position = {230.0f, 100.0f};
+  child->contents = {childRect, childFill, bareRect};
   glassLayer->children.push_back(child);
 
   if (withGlass) {
@@ -604,6 +610,12 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleCoversTheSubtreeContourFallback) {
   ASSERT_FALSE(control.isEmpty());
 
   ExpectCoversGeometry(glass, control);
+
+  // The fallback is the subtree contour, not the subtree geometry: the child's unpainted rectangle
+  // must stay uncovered, so a mask grown onto it would show here instead of passing silently.
+  const int unpainted = CountDifferentPixelsInRect(glass, control, 264, 72, 296, 228);
+  ASSERT_GE(unpainted, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(unpainted, 0) << "the glass must not cover unpainted child geometry, got " << unpainted;
 }
 
 }  // namespace pag

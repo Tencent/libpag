@@ -909,6 +909,8 @@ Layer styles compute their effects based on layer content. For example, when fil
 
 Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
 
+The **subtree contour** of a layer applies the same construction to the layer and all of its descendants.
+
 #### Layer Geometry
 
 **Layer geometry** is the outline the layer itself covers: the outline of every shape the layer's own fills and strokes draw, including paints that are fully transparent, plus the outline of geometry that no painter draws. It differs from layer contour in two ways:

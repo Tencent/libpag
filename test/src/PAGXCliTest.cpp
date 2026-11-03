@@ -1227,6 +1227,53 @@ CLI_TEST(PAGXCliTest, Verify_DowngradeableLayer) {
   EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features") != std::string::npos);
 }
 
+// The same shape with a GlassStyle on the parent: following the advice would move the children's
+// geometry into the parent and change what the style masks with, so the advice must be withheld.
+CLI_TEST(PAGXCliTest, Verify_DowngradeableLayerWithGlass) {
+  auto inputPath = TestResourcePath("verify_downgradeable_layer_glass.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  // Another diagnostic may raise the exit code, so only the absence of this one is asserted, and
+  // the fixture must still report something or the absence would prove nothing.
+  EXPECT_FALSE(output.empty());
+  EXPECT_EQ(output.find("child Layer(s) use no Layer-exclusive features"), std::string::npos);
+}
+
+// Two identical Glass Layers with subtrees: extracting either into a Composition would leave it
+// without geometry of its own, so both the window and the subtree rules must skip them.
+CLI_TEST(PAGXCliTest, Verify_StructurallyIdenticalGlassLayers) {
+  const std::string body =
+      "<Layer width=\"100\" height=\"100\"><Layer width=\"100%\" height=\"100%\">"
+      "<Layer left=\"5\" top=\"5\" width=\"90\" height=\"90\"><Rectangle width=\"100%\" "
+      "height=\"100%\"/><Fill color=\"#FF0000\"/></Layer></Layer>";
+  const std::string files[] = {"structurally_identical_glass.pagx",
+                               "structurally_identical_plain.pagx"};
+  std::string output[2];
+  for (int i = 0; i < 2; i++) {
+    auto inputPath = TempDir() + "/" + files[i];
+    {
+      std::ofstream file(inputPath);
+      file << "<pagx width=\"200\" height=\"200\">" << body;
+      if (i == 0) {
+        file << "<GlassStyle/>";
+      }
+      file << "</Layer>" << body << "</Layer></pagx>";
+    }
+    std::ostringstream oss;
+    auto* old = std::cerr.rdbuf(oss.rdbuf());
+    CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+    std::cerr.rdbuf(old);
+    output[i] = oss.str();
+  }
+  EXPECT_TRUE(output[1].find("structurally identical Layers") != std::string::npos)
+      << "the plain fixture must trigger the advice, otherwise the absence proves nothing";
+  EXPECT_EQ(output[0].find("structurally identical Layers"), std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Verify_MergeableAdjacentLayers) {
   auto inputPath = TestResourcePath("verify_mergeable_adjacent_layers.pagx");
   std::streambuf* old = std::cerr.rdbuf();
