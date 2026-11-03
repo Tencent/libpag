@@ -1244,7 +1244,8 @@ CLI_TEST(PAGXCliTest, Verify_DowngradeableLayerWithGlass) {
 }
 
 // Two identical Glass Layers with subtrees: extracting either into a Composition would leave it
-// without geometry of its own, so both the window and the subtree rules must skip them.
+// without geometry of its own, so both the window and the subtree rules must skip them. Only
+// identical copies reach either rule, so both document copies carry the GlassStyle.
 CLI_TEST(PAGXCliTest, Verify_StructurallyIdenticalGlassLayers) {
   const std::string body =
       "<Layer width=\"100\" height=\"100\"><Layer width=\"100%\" height=\"100%\">"
@@ -1257,11 +1258,15 @@ CLI_TEST(PAGXCliTest, Verify_StructurallyIdenticalGlassLayers) {
     auto inputPath = TempDir() + "/" + files[i];
     {
       std::ofstream file(inputPath);
-      file << "<pagx width=\"200\" height=\"200\">" << body;
-      if (i == 0) {
-        file << "<GlassStyle/>";
+      file << "<pagx width=\"200\" height=\"200\">";
+      for (int copy = 0; copy < 2; copy++) {
+        file << body;
+        if (i == 0) {
+          file << "<GlassStyle/>";
+        }
+        file << "</Layer>";
       }
-      file << "</Layer>" << body << "</Layer></pagx>";
+      file << "</pagx>";
     }
     std::ostringstream oss;
     auto* old = std::cerr.rdbuf(oss.rdbuf());

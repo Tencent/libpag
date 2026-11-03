@@ -183,6 +183,36 @@ static int CountDifferentPixels(const tgfx::Bitmap& first, const tgfx::Bitmap& s
   return CountDifferentPixelsInRect(first, second, 0, 0, first.width(), first.height());
 }
 
+// Largest single-channel difference inside the rect: the pixel counter above saturates at "differs",
+// which cannot tell a full mask from a faint one.
+static int MaxChannelDifferenceInRect(const tgfx::Bitmap& first, const tgfx::Bitmap& second,
+                                      int left, int top, int right, int bottom) {
+  if (first.isEmpty() || second.isEmpty() || first.width() != second.width() ||
+      first.height() != second.height()) {
+    return -1;
+  }
+  left = std::max(left, 0);
+  top = std::max(top, 0);
+  right = std::min(right, first.width());
+  bottom = std::min(bottom, first.height());
+  tgfx::Pixmap firstPixmap(first);
+  tgfx::Pixmap secondPixmap(second);
+  const auto* firstPixels = static_cast<const uint8_t*>(firstPixmap.pixels());
+  const auto* secondPixels = static_cast<const uint8_t*>(secondPixmap.pixels());
+  const size_t rowBytes = firstPixmap.rowBytes();
+  int maxDifference = 0;
+  for (int y = top; y < bottom; y++) {
+    for (int x = left; x < right; x++) {
+      const auto offset = static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x) * 4;
+      for (size_t channel = 0; channel < 4; channel++) {
+        maxDifference = std::max(maxDifference, std::abs(firstPixels[offset + channel] -
+                                                         secondPixels[offset + channel]));
+      }
+    }
+  }
+  return maxDifference;
+}
+
 // The glass geometry spans 50..250 on both axes. A mask that stops short leaves one of the four
 // edge bands or the interior unchanged, so every one of them must show a difference.
 static void ExpectCoversGeometry(const tgfx::Bitmap& glass, const tgfx::Bitmap& control) {
@@ -713,6 +743,104 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleReplacesGradientFillWithOpaqueWhite) {
     ASSERT_GE(outside, 0) << "a rect count must not be an error code";
     EXPECT_EQ(outside, 0) << "the glass must paint inside its geometry only, got " << outside;
   }
+}
+
+// The same gradient, but on a child layer of a glass layer that owns no geometry, so the mask comes
+// from the subtree contour fallback instead of the analytical outline.
+static std::shared_ptr<pagx::PAGXDocument> MakeChildContourGradientDocument(bool withGlass,
+                                                                            bool gradientFill) {
+  auto document = MakeStripedBackdropDocument();
+  auto glassLayer = document->makeNode<pagx::Layer>();
+  glassLayer->x = 50.0f;
+  glassLayer->y = 50.0f;
+  glassLayer->width = 200.0f;
+  glassLayer->height = 200.0f;
+
+  auto child = document->makeNode<pagx::Layer>();
+  auto childRect = document->makeNode<pagx::Rectangle>();
+  childRect->size = {200.0f, 200.0f};
+  childRect->position = {100.0f, 100.0f};
+  auto childFill = document->makeNode<pagx::Fill>();
+  childFill->alpha = 0.15f;
+  if (gradientFill) {
+    auto gradient = document->makeNode<pagx::LinearGradient>();
+    gradient->colorStops = {MakeGradientStop(document.get(), 0.0f, 1.0f),
+                            MakeGradientStop(document.get(), 0.45f, 1.0f),
+                            MakeGradientStop(document.get(), 0.55f, 0.0f),
+                            MakeGradientStop(document.get(), 1.0f, 0.0f)};
+    childFill->color = gradient;
+  } else {
+    auto color = document->makeNode<pagx::SolidColor>();
+    color->color = {0.0f, 0.0f, 0.0f, 0.0f};
+    childFill->color = color;
+  }
+  child->contents = {childRect, childFill};
+  glassLayer->children.push_back(child);
+
+  if (withGlass) {
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
+  }
+  document->layers.push_back(glassLayer);
+  return document;
+}
+
+// The gradient lives on a child of a glass layer that owns no geometry, so the mask comes from the
+// subtree contour fallback. The fallback paints that contour opaque white as well, so the fade to
+// alpha 0 changes nothing: the transparent end stays covered, like a fully transparent solid fill.
+PAGX_TEST(PAGXGlassRenderTest, GlassStyleContourFallbackReplacesGradientFillWithOpaqueWhite) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto glass = RenderViaDisplayList(MakeChildContourGradientDocument(true, true).get(), context);
+  auto control = RenderViaDisplayList(MakeChildContourGradientDocument(false, true).get(), context);
+  auto transparent =
+      RenderViaDisplayList(MakeChildContourGradientDocument(false, false).get(), context);
+  auto solidGlass =
+      RenderViaDisplayList(MakeChildContourGradientDocument(true, false).get(), context);
+  ASSERT_FALSE(glass.isEmpty());
+  ASSERT_FALSE(control.isEmpty());
+  ASSERT_FALSE(transparent.isEmpty());
+  ASSERT_FALSE(solidGlass.isEmpty());
+
+  // The fixture only proves anything if the gradient really paints a full left half and no right
+  // half: compare it against the same layer filled with a fully transparent color.
+  const int paintedLeft = CountDifferentPixelsInRect(control, transparent, 62, 62, 138, 238);
+  ASSERT_GE(paintedLeft, 0) << "a rect count must not be an error code";
+  EXPECT_GT(paintedLeft, 500) << "the gradient's opaque half must be visible, got " << paintedLeft;
+  const int paintedRight = CountDifferentPixelsInRect(control, transparent, 162, 62, 238, 238);
+  ASSERT_GE(paintedRight, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(paintedRight, 0) << "the gradient's transparent half must paint nothing, got "
+                             << paintedRight;
+
+  // The counterpart fixture, with the same rectangle filled with an alpha-0 solid, must be covered
+  // there; otherwise a silently inert glass would read as "the fallback kept the gradient alpha".
+  const int solidRight = CountDifferentPixelsInRect(solidGlass, transparent, 162, 62, 238, 238);
+  ASSERT_GE(solidRight, 0) << "a rect count must not be an error code";
+  EXPECT_GT(solidRight, 500) << "the contour mask must cover an alpha-0 child fill, got "
+                             << solidRight;
+
+  const int left = CountDifferentPixelsInRect(glass, control, 62, 62, 138, 238);
+  const int right = CountDifferentPixelsInRect(glass, control, 162, 62, 238, 238);
+  ASSERT_GE(left, 0) << "a rect count must not be an error code";
+  ASSERT_GE(right, 0) << "a rect count must not be an error code";
+  EXPECT_GT(left, 500) << "the glass must be active under the opaque end, got " << left;
+  EXPECT_GT(right, 500) << "the mask must cover the transparent end too, got " << right;
+
+  // A mask that kept the gradient's alpha could still change a few pixels, so compare the peak
+  // deviation with the opaque end: the transparent end must be masked about as strongly.
+  const int maxLeft = MaxChannelDifferenceInRect(glass, control, 62, 62, 138, 238);
+  const int maxRight = MaxChannelDifferenceInRect(glass, control, 162, 62, 238, 238);
+  ASSERT_GE(maxLeft, 0) << "a deviation must not be an error code";
+  ASSERT_GE(maxRight, 0) << "a deviation must not be an error code";
+  EXPECT_GT(maxRight * 2, maxLeft) << "the transparent end must be masked about as strongly, got "
+                                   << "maxRight=" << maxRight << " maxLeft=" << maxLeft;
+
+  // Painted white or dropped entirely: an alpha-0 gradient end must render exactly like an alpha-0
+  // solid fill under the same contour.
+  const int solidGap = CountDifferentPixelsInRect(glass, solidGlass, 162, 62, 238, 238);
+  ASSERT_GE(solidGap, 0) << "a rect count must not be an error code";
+  EXPECT_EQ(solidGap, 0) << "the gradient end must match an alpha-0 solid fill, got " << solidGap;
 }
 
 }  // namespace pag
