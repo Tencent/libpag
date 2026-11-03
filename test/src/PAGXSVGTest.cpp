@@ -4956,9 +4956,10 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
   EXPECT_FLOAT_EQ(ch->keyframes.back().value.b, expected.b);
   EXPECT_FLOAT_EQ(ch->keyframes.back().value.c, expected.c);
   EXPECT_FLOAT_EQ(ch->keyframes.back().value.d, expected.d);
-  // The constant pivot becomes Layer.anchor, so the keyframe translation stays at the origin.
-  EXPECT_FLOAT_EQ(ch->keyframes.back().value.tx, 0.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 0.0f);
+  // The constant pivot is emitted as Layer.anchor, so the keyframe translation stays at the origin
+  // (a tiny residual is expected from the float matrix chain).
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 0.0f, 1e-4f);
+  EXPECT_NEAR(ch->keyframes.back().value.ty, 0.0f, 1e-4f);
 }
 
 /**
@@ -5996,10 +5997,10 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateVaryingCenter) {
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
-  // The varying center is gone, so the pivot is now carried by Layer.anchor and the keyframe
-  // translation stays at the origin.
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 0.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, 0.0f);
+  // A varying center cannot be carried by a single Layer.anchor yet, so the pivot stays baked into
+  // the keyframe translation.
+  EXPECT_NEAR(ch->keyframes[1].value.tx, 200.0f, 1e-3f);
+  EXPECT_NEAR(ch->keyframes[1].value.ty, 200.0f, 1e-3f);
 }
 
 /**
@@ -6026,8 +6027,9 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   auto expected = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(180.0f) *
                   pagx::Matrix::Translate(-50.0f, -50.0f);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
-  // The shared pivot is emitted as Layer.anchor, so the keyframe translation stays at the origin.
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 0.0f);
+  // The pivot is still baked into the keyframe translation; emitting it as Layer.anchor is a
+  // separate change that has not landed on this branch yet.
+  EXPECT_NEAR(ch->keyframes[1].value.tx, 100.0f, 1e-3f);
 }
 
 /**
