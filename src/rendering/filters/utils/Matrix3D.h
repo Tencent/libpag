@@ -69,7 +69,7 @@ class Matrix3D {
 
   static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
 
-  static Matrix3D Perspective(float near, float far, float angle);
+  static Matrix3D Perspective(float zNear, float zFar, float angle);
 
   Matrix3D& setScale(float x, float y, float z = 1);
 
