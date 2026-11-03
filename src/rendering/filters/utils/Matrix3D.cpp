@@ -62,9 +62,9 @@ static float Invert4x4Matrix(const float inMatrix[16], float outMatrix[16]) {
   float determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
   if (outMatrix) {
     if (FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
-      return 0.0;
+      return 0.0f;
     }
-    float invdet = 1.0 / determinant;
+    float invdet = 1.0f / determinant;
     b00 *= invdet;
     b01 *= invdet;
     b02 *= invdet;
