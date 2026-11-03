@@ -453,10 +453,39 @@ bool ParsePointChannelName(const std::string& name, size_t& outIndex, bool& outI
   return true;
 }
 
+// Returns the matrix that maps the mask path's own coordinates into the masked element's space.
+// A Path used by a mask lives in the mask layer's subtree, so the chain from the mask root down to
+// its parent layer has to be accumulated the same way writeMaskGeometry does.
+bool FindMaskPathMatrix(const Layer* layer, const Path* target, const Matrix& parent, Matrix& out) {
+  if (layer == nullptr) {
+    return false;
+  }
+  Matrix combined = parent * BuildLayerMatrix(layer);
+  for (auto* element : layer->contents) {
+    if (element == target) {
+      out = combined;
+      return true;
+    }
+  }
+  for (auto* child : layer->children) {
+    if (FindMaskPathMatrix(child, target, combined, out)) {
+      return true;
+    }
+  }
+  if (layer->composition != nullptr) {
+    for (auto* compLayer : layer->composition->layers) {
+      if (FindMaskPathMatrix(compLayer, target, combined, out)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 std::string RebuildAnimatedPathSVGString(const Path* pathNode,
                                          const std::unordered_map<size_t, const Channel*>& xChs,
                                          const std::unordered_map<size_t, const Channel*>& yChs,
-                                         Frame frame) {
+                                         Frame frame, const Matrix& transform = {}) {
   if (pathNode == nullptr || pathNode->data == nullptr || pathNode->data->isEmpty()) {
     return "";
   }
@@ -471,6 +500,11 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
   for (const auto& kv : yChs) {
     if (kv.first < pts.size()) {
       pts[kv.first].y = EvalFloatChannel(kv.second, frame, pts[kv.first].y);
+    }
+  }
+  if (!transform.isIdentity()) {
+    for (auto& pt : pts) {
+      pt = transform.mapPoint(pt);
     }
   }
   PathData rebuilt = PathDataFromSVGString("");
@@ -798,6 +832,9 @@ struct BundleChannelSet {
   const Path* animatedMaskPath = nullptr;
   std::unordered_map<size_t, const Channel*> maskPtX = {};
   std::unordered_map<size_t, const Channel*> maskPtY = {};
+  // Mask layer transform. A clip-path carries no matrix of its own, so the mask geometry has to be
+  // baked into the generated coordinates.
+  Matrix maskMatrix = {};
 
   std::set<Frame> keyTimes = {};
   std::unordered_map<Frame, SegmentEasing> stopEasings = {};
@@ -978,7 +1015,8 @@ bool BindChannelToBundleSet(
 
 BundleChannelSet CollectBundleChannels(
     PAGXDocument& doc, const DomTargetBundle& bundle,
-    const std::unordered_map<const SolidColor*, const Node*>& solidToPainter) {
+    const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
+    const std::unordered_map<const Path*, const Layer*>& maskPathToLayer) {
   BundleChannelSet result = {};
   for (auto* obj : bundle.objects) {
     Node* objTarget = ResolveTargetNode(doc, obj->target);
@@ -993,6 +1031,16 @@ BundleChannelSet CollectBundleChannels(
       // channels' keyframes or override their easing.
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings);
+      }
+    }
+  }
+  if (result.animatedMaskPath != nullptr) {
+    auto maskIt = maskPathToLayer.find(result.animatedMaskPath);
+    if (maskIt != maskPathToLayer.end() && maskIt->second != nullptr &&
+        maskIt->second->mask != nullptr) {
+      Matrix maskMatrix = {};
+      if (FindMaskPathMatrix(maskIt->second->mask, result.animatedMaskPath, {}, maskMatrix)) {
+        result.maskMatrix = maskMatrix;
       }
     }
   }
@@ -1370,8 +1418,8 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
 
   if (chSet.animatedMaskPath != nullptr) {
-    std::string dStr =
-        RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX, chSet.maskPtY, t);
+    std::string dStr = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
+                                                    chSet.maskPtY, t, chSet.maskMatrix);
     AppendCssDecl(decls, "clip-path", "path(\"" + dStr + "\")");
   }
 
@@ -1731,6 +1779,9 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
             _restoredNodeIds.emplace_back(hostLayer, hostLayer->id);
             hostLayer->id = _ctx.nextId("animM");
           }
+          // Coverage masks keep their paint, so they are emitted as an inline <mask> whose
+          // geometry is animated instead of being reduced to a clip polygon.
+          _ctx.animatedMaskPaths.insert(pathNode);
         } else {
           std::string domId = !pathNode->id.empty() ? pathNode->id : StripAtPrefix(obj->target);
           if (domId.empty()) {
@@ -1753,6 +1804,9 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   _ctx.animatedElementIds.clear();
   _ctx.animatedVisibleLayers.clear();
   _ctx.animatedDomIdUseCount.clear();
+  _ctx.animatedMaskPaths.clear();
+  _ctx.animatedMaskPathIds.clear();
+  _ctx.svgMaskIds.clear();
 }
 
 std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
@@ -1822,11 +1876,46 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       if (elements.empty()) {
         continue;
       }
-      BundleChannelSet chSet = CollectBundleChannels(_doc, bundle, _solidToPainter);
+      BundleChannelSet chSet =
+          CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer);
       if (chSet.keyTimes.empty()) {
         continue;
       }
       BundleTimingInfo timing = ComputeBundleTiming(anim, mount.offset, chSet);
+
+      if (chSet.animatedMaskPath != nullptr) {
+        auto idIt = _ctx.animatedMaskPathIds.find(chSet.animatedMaskPath);
+        if (idIt != _ctx.animatedMaskPathIds.end()) {
+          // The mask is an inline SVG subtree, so its geometry animates on its own: emit `d` stops
+          // for the mask path and let the masked element keep its static style. A coverage mask
+          // must never be rewritten as a clip polygon, which would drop its paint.
+          const Frame windowStart = timing.bundleShiftFrames;
+          const Frame windowEnd = windowStart + timing.effectiveDuration;
+          std::set<Frame> stopTimes = {};
+          for (Frame t : chSet.keyTimes) {
+            if (t >= windowStart && t <= windowEnd) {
+              stopTimes.insert(t);
+            }
+          }
+          stopTimes.insert(windowStart);
+          stopTimes.insert(windowEnd);
+          std::string stops = {};
+          for (Frame t : stopTimes) {
+            std::string d = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
+                                                         chSet.maskPtY, t);
+            Frame relTime = (t >= windowStart) ? (t - windowStart) : 0;
+            stops += "  " + FormatPercent(relTime, timing.effectiveDuration) + " { d: path(\"" + d +
+                     "\"); }\n";
+          }
+          std::string kfName = MakeSafeKeyframesName(idIt->second, animCounter++);
+          keyframesCss += "@keyframes " + kfName + " {\n" + stops + "}\n";
+          keyframesCss +=
+              "#" + idIt->second + " { animation: " +
+              BuildAnimationShorthand(anim, kfName, timing, mount.offset, mount.scope != 0) +
+              "; }\n";
+          continue;
+        }
+      }
 
       // One animated node can render into tags of different kinds (a Fill painting both a box and
       // a text span), and paint channels map to a different CSS property per kind. Keyframes are
