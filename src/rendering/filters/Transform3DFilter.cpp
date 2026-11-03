@@ -389,14 +389,6 @@ void Transform3DFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU
   if (resources == nullptr) {
     return;
   }
-  auto state = findCompositionState(resources);
-  auto targetWidth = width;
-  auto targetHeight = height;
-  if (state != nullptr && state->depthTextureWidth > 0 && state->depthTextureHeight > 0) {
-    targetWidth = state->depthTextureWidth;
-    targetHeight = state->depthTextureHeight;
-  }
-
   struct VertexUniforms {
     std::array<float, 16> matrixData;
   };
@@ -406,23 +398,8 @@ void Transform3DFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU
     float padding[3];
   };
 
-  float compWidth = static_cast<float>(width);
-  float compHeight = static_cast<float>(height);
-  float tgtWidth = static_cast<float>(targetWidth);
-  float tgtHeight = static_cast<float>(targetHeight);
-
-  float ndcRight = (compWidth / tgtWidth) * 2.0f - 1.0f;
-  float ndcTop = (compHeight / tgtHeight) * 2.0f - 1.0f;
-
-  Matrix3D viewportMatrix = {};
-  viewportMatrix.setScale((ndcRight + 1.0f) / 2.0f, (ndcTop + 1.0f) / 2.0f, 1.0f);
-  viewportMatrix.postTranslate((ndcRight - 1.0f) / 2.0f, (ndcTop - 1.0f) / 2.0f, 0.0f);
-
-  auto finalMatrix = matrix;
-  finalMatrix.postConcat(viewportMatrix);
-
   VertexUniforms vertexUniforms = {};
-  finalMatrix.getColMajor(vertexUniforms.matrixData.data());
+  matrix.getColMajor(vertexUniforms.matrixData.data());
   auto vertexUniformBuffer =
       gpu->createBuffer(sizeof(VertexUniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (vertexUniformBuffer != nullptr) {
