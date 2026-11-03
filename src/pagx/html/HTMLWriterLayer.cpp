@@ -2050,9 +2050,7 @@ void HTMLWriter::ExpandStrokePaddedExtent(const std::vector<Element*>& elems,
         scopeGeos.push_back({t, elem, svgPath, nullptr});
       }
     } else if (t == NodeType::Stroke) {
-      auto* st = static_cast<const Stroke*>(elem);
-      float pad = (st->align != StrokeAlign::Center) ? st->width * 2.0f : st->width;
-      maxPad = std::max(maxPad, pad);
+      maxPad = std::max(maxPad, StrokeExtentPad(static_cast<const Stroke*>(elem)));
     } else if (t == NodeType::Group) {
       auto* grp = static_cast<const Group*>(elem);
       Matrix gm = BuildGroupMatrix(grp);

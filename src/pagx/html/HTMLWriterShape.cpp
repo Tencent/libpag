@@ -51,6 +51,21 @@ static float ClampedRectangleRoundness(const Rectangle* rect, const Size& size) 
   return std::min(rect->roundness, std::min(size.width / 2, size.height / 2));
 }
 
+float HTMLWriter::StrokeExtentPad(const Stroke* stroke) {
+  if (stroke == nullptr || !(stroke->width > 0.0f)) {
+    return 0.0f;
+  }
+  switch (stroke->align) {
+    case StrokeAlign::Inside:
+      return 0.0f;
+    case StrokeAlign::Outside:
+      return stroke->width;
+    case StrokeAlign::Center:
+    default:
+      return stroke->width * 0.5f;
+  }
+}
+
 bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                         bool useModifiedPathData, float& outX, float& outY,
                                         float& outW, float& outH) {
@@ -1667,7 +1682,7 @@ void HTMLWriter::renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInf
     renderSVG(out, geos, fill, nullptr, alpha, painterBlend, trim, MergePathMode::Append);
   }
   // Compute bounding box of all geometries including stroke padding.
-  float pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+  float pad = StrokeExtentPad(stroke);
   float x0 = 0, y0 = 0, bw = 0, bh = 0;
   if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, bw, bh)) {
     return;
@@ -1922,10 +1937,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     return;
   }
   if (_coalesceSVGDraws && painterBlend == BlendMode::Normal) {
-    float pad = 0.0f;
-    if (stroke) {
-      pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-    }
+    float pad = StrokeExtentPad(stroke);
     float x0 = 0, y0 = 0, sw = 0, sh = 0;
     if (ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
       _pendingSVGDraws.push_back({geos, fill, stroke, alpha, trim});
@@ -1933,10 +1945,7 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     return;
   }
   flushPendingSVGDraws(out);
-  float pad = 0.0f;
-  if (stroke) {
-    pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-  }
+  float pad = StrokeExtentPad(stroke);
   float x0 = 0, y0 = 0, sw = 0, sh = 0;
   if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
     return;
@@ -1994,11 +2003,7 @@ void HTMLWriter::flushPendingSVGDraws(HTMLBuilder& out) {
   float maxY = std::numeric_limits<float>::lowest();
   bool hasAny = false;
   for (const auto& draw : draws) {
-    float pad = 0.0f;
-    if (draw.stroke) {
-      pad = (draw.stroke->align != StrokeAlign::Center) ? draw.stroke->width * 2.0f
-                                                        : draw.stroke->width;
-    }
+    float pad = StrokeExtentPad(draw.stroke);
     float x0 = 0, y0 = 0, sw = 0, sh = 0;
     if (ComputeGeosBoundingBox(draw.geos, pad, true, x0, y0, sw, sh)) {
       minX = std::min(minX, x0);
@@ -2265,10 +2270,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     bool needClipPath = (mergeMode == MergePathMode::Intersect);
 
     if (needClipPath) {
-      float pad = 0.0f;
-      if (stroke) {
-        pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-      }
+      float pad = StrokeExtentPad(stroke);
       float x0 = 0, y0 = 0, sw = 0, sh = 0;
       if (!ComputeGeosBoundingBox(geos, pad, false, x0, y0, sw, sh)) {
         return;
@@ -2372,10 +2374,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (mergedPath.empty()) {
       return;
     }
-    float pad = 0.0f;
-    if (stroke) {
-      pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-    }
+    float pad = StrokeExtentPad(stroke);
     float x0 = 0, y0 = 0, sw = 0, sh = 0;
     // Include modified path data in the bounding box so Repeater-expanded geometry (which stores
     // the transformed per-copy path in modifiedPathData) drives the SVG viewBox. Using the
