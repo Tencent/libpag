@@ -18,7 +18,6 @@
 
 #include "pagx/utils/LayerTransformUtils.h"
 #include <cmath>
-#include <cstdio>
 #include "base/utils/Log.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 
@@ -84,6 +83,13 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
   ComposeMatrix3DComponents(*components, matrix);
 }
 
+// Length of one row or column of the linear part, used to make the singularity test relative.
+static double ColumnNorm(const float values[3]) {
+  return std::sqrt(static_cast<double>(values[0]) * values[0] +
+                   static_cast<double>(values[1]) * values[1] +
+                   static_cast<double>(values[2]) * values[2]);
+}
+
 // Moves the pivot of an affine matrix: T(anchor) * matrix * T(-anchor). Only the translation column
 // changes, to t + anchor - L * anchor, so the bottom row - including a homogeneous scale other than
 // 1 - is left untouched.
@@ -131,27 +137,35 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
   const float a2[3] = {matrix.getRowColumn(2, 0), matrix.getRowColumn(2, 1),
                        matrix.getRowColumn(2, 2)};
   const float b[3] = {p0, p1, p2};
-  const float det = a0[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
-                    a1[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
-                    a2[0] * (a0[1] * a1[2] - a0[2] * a1[1]);
-  if (std::abs(det) < 1e-6f) {
-    // A singular linear part cannot be split into a projection and an affine part, so there is no
-    // affine part to conjugate. Keeping the input is the only answer that stays finite.
-    LOGE("ApplyAnchorToMatrix: ignored the anchor on a singular transform with perspective.");
-    return matrix;
+  const double det = static_cast<double>(a0[0]) *
+                         (static_cast<double>(a1[1]) * a2[2] - static_cast<double>(a1[2]) * a2[1]) -
+                     static_cast<double>(a1[0]) *
+                         (static_cast<double>(a0[1]) * a2[2] - static_cast<double>(a0[2]) * a2[1]) +
+                     static_cast<double>(a2[0]) *
+                         (static_cast<double>(a0[1]) * a1[2] - static_cast<double>(a0[2]) * a1[1]);
+  // The tolerance is relative to the column lengths, so a uniformly scaled linear part stays
+  // decomposable: a 0.001 scale gives |det| = 1e-9 but is perfectly invertible, and judging it by an
+  // absolute bound would make the pivot depend on the scale.
+  const double scale = ColumnNorm(a0) * ColumnNorm(a1) * ColumnNorm(a2);
+  if (scale == 0.0 || std::abs(det) <= 1e-6 * scale) {
+    // A flattened linear part cannot be split into a projection and an affine part. Conjugating the
+    // affine rows exactly like the 2D path keeps the pivot alive and stays continuous with a
+    // vanishing perspective; the projection row keeps the authored coefficients.
+    return ConjugateAffine(matrix, anchor, anchorZ);
   }
+  const float determinant = static_cast<float>(det);
   const float solved0 =
       (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) - a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
        a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
-      det;
+      determinant;
   const float solved1 =
       (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) - b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
        a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
-      det;
+      determinant;
   const float solved2 =
       (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) - a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
        b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
-      det;
+      determinant;
   const float p3 = matrix.getRowColumn(3, 3) - solved0 * matrix.getRowColumn(0, 3) -
                    solved1 * matrix.getRowColumn(1, 3) - solved2 * matrix.getRowColumn(2, 3);
   Matrix3D affine = matrix;

@@ -124,6 +124,7 @@ static Point ParsePoint(const std::string& str, bool* outValid = nullptr);
 static Size ParseSize(const std::string& str, bool* outValid = nullptr);
 static Rect ParseRect(const std::string& str, bool* outValid = nullptr);
 static Color ParseColor(const std::string& str, bool* outValid = nullptr);
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values);
 static Point GetPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc);
 static Size GetSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
@@ -552,10 +553,9 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   // "x,y" keeps the pivot in the layer plane; "x,y,z" moves it out of the plane for 3D transforms.
   auto anchorStr = GetAttribute(node, "anchor");
   if (!anchorStr.empty()) {
-    auto anchorValues = ParseFloatList(anchorStr);
-    const bool allFinite = std::all_of(anchorValues.begin(), anchorValues.end(),
-                                       [](float value) { return std::isfinite(value); });
-    if ((anchorValues.size() != 2 && anchorValues.size() != 3) || !allFinite) {
+    std::vector<float> anchorValues = {};
+    if (!ParseFiniteFloatList(anchorStr, &anchorValues) ||
+        (anchorValues.size() != 2 && anchorValues.size() != 3)) {
       ReportError(doc, node, "Invalid anchor '" + anchorStr + "' (expected 'x,y' or 'x,y,z').");
     } else {
       layer->anchor = {anchorValues[0], anchorValues[1]};

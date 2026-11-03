@@ -195,9 +195,10 @@ class Layer : public Node, public LayoutNode {
 
   /**
    * The z coordinate of the pivot in layer-local pixels; a zero value keeps the pivot in the layer
-   * plane. It moves the rotation centre only with a 3D transform (matrix3D or the rotationX /
-   * rotationY components); with a 2D transform it becomes a Z translation, which an orthographic
-   * projection does not show but depth sorting still reads. The default value is 0.
+   * plane. It moves the rotation centre once the linear part touches Z (a matrix3D, or any Z
+   * component such as rotationX / rotationY and scaleZ); with a purely 2D transform it becomes a Z
+   * translation, which an orthographic projection does not show but depth sorting still reads. The
+   * default value is 0.
    */
   float anchorZ = 0.0f;
 
