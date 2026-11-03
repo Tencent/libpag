@@ -4844,17 +4844,17 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate) {
   EXPECT_EQ(channel->name, "matrix");
   EXPECT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
   auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
-  // The 360-degree sweep splits into three 120-degree segments: 4 keyframes (0/40/80/120).
-  ASSERT_EQ(matrixChannel->keyframes.size(), 4u);
+  // The 360-degree sweep splits into 20-degree steps: 19 keyframes over the 120-frame span.
+  ASSERT_EQ(matrixChannel->keyframes.size(), 19u);
   EXPECT_EQ(matrixChannel->keyframes[0].time, 0);
   EXPECT_TRUE(matrixChannel->keyframes[0].value.isIdentity());
-  EXPECT_EQ(matrixChannel->keyframes[3].time, 120);
+  EXPECT_EQ(matrixChannel->keyframes.back().time, 120);
   // rotate(360) composes to the identity matrix.
   auto expected = pagx::Matrix::Rotate(360.0f);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.a, expected.a);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.b, expected.b);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.c, expected.c);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.d, expected.d);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes.back().value.a, expected.a);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes.back().value.b, expected.b);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes.back().value.c, expected.c);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes.back().value.d, expected.d);
 }
 
 /**
@@ -4947,17 +4947,18 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
   ASSERT_EQ(obj->channels.size(), 1u);
   EXPECT_EQ(obj->channels[0]->name, "matrix");
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
-  // The 360-degree sweep splits into three 120-degree steps: 4 keyframes (0/40/80/120).
-  ASSERT_EQ(ch->keyframes.size(), 4u);
+  // The 360-degree sweep splits into 20-degree steps: 19 keyframes over the 120-frame span.
+  ASSERT_EQ(ch->keyframes.size(), 19u);
   EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
   auto expected = pagx::Matrix::Translate(25.0f, 25.0f) * pagx::Matrix::Rotate(360.0f) *
                   pagx::Matrix::Translate(-25.0f, -25.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.a, expected.a);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.b, expected.b);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.c, expected.c);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.d, expected.d);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.tx, expected.tx);
-  EXPECT_FLOAT_EQ(ch->keyframes[3].value.ty, expected.ty);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.b, expected.b);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.c, expected.c);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.d, expected.d);
+  // The constant pivot becomes Layer.anchor, so the keyframe translation stays at the origin.
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.tx, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 0.0f);
 }
 
 /**
@@ -5995,8 +5996,10 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateVaryingCenter) {
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, expected.ty);
+  // The varying center is gone, so the pivot is now carried by Layer.anchor and the keyframe
+  // translation stays at the origin.
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, 0.0f);
 }
 
 /**
@@ -6023,7 +6026,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   auto expected = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(180.0f) *
                   pagx::Matrix::Translate(-50.0f, -50.0f);
   EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
+  // The shared pivot is emitted as Layer.anchor, so the keyframe translation stays at the origin.
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 0.0f);
 }
 
 /**
@@ -6131,9 +6135,9 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateFullTurnInterpolation) {
   // The 360-degree sweep is split into three 120-degree segments (the 179-degree step bound
   // avoids inserting keyframes exactly on the atan2 ±pi boundary): 4 keyframes at frames
   // 0 / 40 / 80 / 120.
-  ASSERT_EQ(ch->keyframes.size(), 4u);
-  EXPECT_EQ(ch->keyframes[1].time, 40);
-  EXPECT_EQ(ch->keyframes[2].time, 80);
+  ASSERT_EQ(ch->keyframes.size(), 19u);
+  EXPECT_EQ(ch->keyframes[1].time, 7);
+  EXPECT_EQ(ch->keyframes[2].time, 13);
   // Midpoint (frame 60) sits halfway through the 120→240 segment: 180 degrees.
   auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
   float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
@@ -6165,8 +6169,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate270Interpolation) {
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   // Endpoint: rotate(270) bakes to the matrix of -90 (cos270=0, sin270=-1).
   EXPECT_NEAR(ch->keyframes.back().value.b, -1.0f, 1e-4f);
-  // 270 degrees splits into two 135-degree steps: 0°@0, 135°@60, 270°@120.
-  ASSERT_EQ(ch->keyframes.size(), 3u);
+  // 270 degrees splits into 20-degree steps: 15 keyframes over the 120-frame span.
+  ASSERT_EQ(ch->keyframes.size(), 15u);
   // Midpoint: the inserted 135-degree keyframe.
   auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
   float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
