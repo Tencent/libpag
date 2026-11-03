@@ -24,8 +24,20 @@
 
 namespace pagx {
 
+// The first Text element's baseline mode seeds the box layout: a migrated legacy point text
+// sets Alphabetic so its first line's baseline sits at the box origin, matching the legacy
+// renderer (a standalone Text anchors the same way through its own params).
+static TextBaseline FirstTextBaseline(const std::vector<Text*>& childText) {
+  for (auto* text : childText) {
+    if (text != nullptr) {
+      return text->baseline;
+    }
+  }
+  return TextBaseline::LineBox;
+}
+
 static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWidth,
-                                             float boxHeight) {
+                                             float boxHeight, TextBaseline baseline) {
   TextLayoutParams params = {};
   params.boxWidth = boxWidth;
   params.boxHeight = boxHeight;
@@ -35,6 +47,7 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
   params.lineHeight = textBox->lineHeight;
   params.wordWrap = textBox->wordWrap;
   params.overflow = textBox->overflow;
+  params.baseline = baseline;
   return params;
 }
 
@@ -59,9 +72,9 @@ void TextBox::onMeasure(LayoutContext* context) {
       boxH = std::max(0.0f, boxH - padding.top - padding.bottom);
     }
   }
-  auto params = MakeTextLayoutParams(this, boxW, boxH);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
+  auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextBaseline(childText));
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
@@ -109,9 +122,9 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
         hasPadding ? std::max(0.0f, layoutWidth - padding.left - padding.right) : layoutWidth;
     float boxH =
         hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
-    auto params = MakeTextLayoutParams(this, boxW, boxH);
     std::vector<Text*> childText = {};
     TextLayout::CollectTextElements(elements, childText);
+    auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextBaseline(childText));
     auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
     // Measurement result: keep un-rounded so the TextBox mirrors the exact typeset extent.
     // Rounding is reserved for layout-allocation sites (see LayoutNode::setLayoutSize contract).
@@ -139,10 +152,22 @@ void TextBox::updateLayout(LayoutContext* context) {
   // Non-Text elements: constraint layout with padding.
   auto nodes = CollectLayoutNodes(elements, true);
   PerformConstraintLayout(nodes, layoutWidth, layoutHeight, padding, context);
+  // A content-sized axis keeps its typeset box unconstrained: the settled numeric layoutWidth is
+  // a measurement RESULT (it feeds the parent's allocation and the non-Text children), not a wrap
+  // constraint. Re-typesetting at the measured size would re-center origin-anchored text within
+  // its own measurement — auto boxes anchor Center/End alignment at the origin (legacy
+  // point-text semantics). Constraint-sized axes (authored size, percent, or opposite-edge
+  // constraints) keep the allocated size.
+  if (std::isnan(width) && std::isnan(percentWidth) && (std::isnan(left) || std::isnan(right))) {
+    cw = NAN;
+  }
+  if (std::isnan(height) && std::isnan(percentHeight) && (std::isnan(top) || std::isnan(bottom))) {
+    ch = NAN;
+  }
   // Text elements: typeset with inset bounds, then offset positions by padding.
-  auto params = MakeTextLayoutParams(this, cw, ch);
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
+  auto params = MakeTextLayoutParams(this, cw, ch, FirstTextBaseline(childText));
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   for (size_t i = 0; i < childText.size(); i++) {
     auto* text = childText[i];

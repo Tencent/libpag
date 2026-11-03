@@ -229,6 +229,26 @@ Color ConvertColor(const pag::Color& color) {
 // Converts a legacy layer blend mode to the PAGX equivalent. The first sixteen values share
 // the legacy order; the legacy Add mode maps to PlusLighter (linear dodge, matching
 // TGFXCast.cpp).
+// Maps the legacy paragraph justification onto the box's inline alignment. A NaN-width point
+// box reproduces the legacy centered/right drawX offsets; the FullJustify last-line variants
+// beyond Left have no PAGX equivalent and approximate as Justify (whose last line is Start).
+TextAlign ConvertJustification(pag::ParagraphJustification justification) {
+  switch (justification) {
+    case pag::ParagraphJustification::CenterJustify:
+      return TextAlign::Center;
+    case pag::ParagraphJustification::RightJustify:
+      return TextAlign::End;
+    case pag::ParagraphJustification::FullJustifyLastLineLeft:
+    case pag::ParagraphJustification::FullJustifyLastLineCenter:
+    case pag::ParagraphJustification::FullJustifyLastLineRight:
+    case pag::ParagraphJustification::FullJustifyLastLineFull:
+      return TextAlign::Justify;
+    case pag::ParagraphJustification::LeftJustify:
+    default:
+      return TextAlign::Start;
+  }
+}
+
 BlendMode ConvertBlendMode(pag::BlendMode mode) {
   switch (mode) {
     case pag::BlendMode::Multiply:
@@ -1514,7 +1534,28 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         text->fontSize = textDocument->fontSize;
         text->fauxBold = textDocument->fauxBold;
         text->fauxItalic = textDocument->fauxItalic;
+        // Legacy tracking is 1/1000 em, the same convention as the PAGX Text field.
+        text->tracking = textDocument->tracking;
+        if (!textDocument->boxText) {
+          // Legacy point text anchors the first line's baseline at the layer origin; combined
+          // with the box's NaN width, Center/End become the legacy centered/right drawX offsets.
+          text->baseline = TextBaseline::Alphabetic;
+        }
         textBox->elements.push_back(text);
+        // The legacy derives line spacing from the document leading (auto = 1.2 x fontSize); the
+        // PAGX auto mode uses font metrics instead, so the spacing is always mapped explicitly.
+        textBox->lineHeight = textDocument->leading == 0 ? roundf(textDocument->fontSize * 1.2f)
+                                                         : textDocument->leading;
+        textBox->textAlign = ConvertJustification(textDocument->justification);
+        if (textDocument->direction == pag::TextDirection::Vertical) {
+          textBox->writingMode = WritingMode::Vertical;
+        }
+        if (textDocument->justification == pag::ParagraphJustification::FullJustifyLastLineCenter ||
+            textDocument->justification == pag::ParagraphJustification::FullJustifyLastLineRight ||
+            textDocument->justification == pag::ParagraphJustification::FullJustifyLastLineFull) {
+          state->warn(PAGExportWarning::UnsupportedColorSource,
+                      "justified text last-line alignment approximated as start");
+        }
         if (textDocument->applyFill) {
           auto* fill = state->document->makeNode<Fill>();
           auto* solid = state->document->makeNode<SolidColor>();

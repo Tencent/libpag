@@ -103,7 +103,9 @@ class Text : public Element, public LayoutNode {
 
   /**
    * Specifies how position.y is interpreted. LineBox (default): position.y is the top of the
-   * linebox (based on font metrics line height). Alphabetic: position.y is the alphabetic baseline.
+   * linebox (based on font metrics line height). Alphabetic: position.y is the alphabetic
+   * baseline. When the Text is the first element of a TextBox, its baseline mode seeds the box
+   * layout's anchoring.
    */
   TextBaseline baseline = TextBaseline::LineBox;
 
