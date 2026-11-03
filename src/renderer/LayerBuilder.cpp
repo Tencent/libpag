@@ -2772,6 +2772,7 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        tgfxStyle->setSpread(style->spread);
         _result.binding.set(style, tgfxStyle);
         bindDropShadowStyleChannels(style);
         return tgfxStyle;
@@ -2787,6 +2788,7 @@ class LayerBuilderContext {
         if (node->blendMode != BlendMode::Normal) {
           tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
         }
+        tgfxStyle->setSpread(style->spread);
         _result.binding.set(style, tgfxStyle);
         bindInnerShadowStyleChannels(style);
         return tgfxStyle;
@@ -2922,6 +2924,11 @@ class LayerBuilderContext {
         node, "blurY", WriteDropShadowStyleBlurY,
         ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::blurrinessY>);
     _result.binding.setAccessor(
+        node, "spread",
+        WriteMixedFloat<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::spread,
+                        &tgfx::DropShadowStyle::setSpread>,
+        ReadScalar<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::spread>);
+    _result.binding.setAccessor(
         node, "color", WriteDropShadowStyleColor,
         ReadColorChannel<tgfx::DropShadowStyle, &tgfx::DropShadowStyle::color>);
     _result.binding.setAccessor(
@@ -2988,6 +2995,11 @@ class LayerBuilderContext {
     _result.binding.setAccessor(
         node, "blurY", WriteInnerShadowStyleBlurY,
         ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::blurrinessY>);
+    _result.binding.setAccessor(
+        node, "spread",
+        WriteMixedFloat<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::spread,
+                        &tgfx::InnerShadowStyle::setSpread>,
+        ReadScalar<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::spread>);
     _result.binding.setAccessor(
         node, "color", WriteInnerShadowStyleColor,
         ReadColorChannel<tgfx::InnerShadowStyle, &tgfx::InnerShadowStyle::color>);

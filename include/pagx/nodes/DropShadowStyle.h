@@ -25,6 +25,11 @@ namespace pagx {
 
 /**
  * A drop shadow layer style that renders a shadow behind the layer content.
+ *
+ * Fields are append-only: the importer, exporter, and channel table address them by name, so
+ * declaration order carries no format meaning, while appending keeps the offsets of existing
+ * fields stable. See PAGXDocument::makeNode() for why that alone does not make the class binary
+ * compatible across header versions.
  */
 class DropShadowStyle : public LayerStyle {
  public:
@@ -57,6 +62,12 @@ class DropShadowStyle : public LayerStyle {
    * Whether the shadow is shown behind the layer. The default value is true.
    */
   bool showBehindLayer = true;
+
+  /**
+   * The shadow spread distance in pixels in layer-local coordinates. Positive values expand the shadow
+   * outward, and negative values shrink it inward. The default value is 0.
+   */
+  float spread = 0.0f;
 
   NodeType nodeType() const override {
     return NodeType::DropShadowStyle;

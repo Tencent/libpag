@@ -184,10 +184,10 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
 | `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
-| `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
+| `box-shadow: X Y [B [S]] [C]` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow; non-zero spread `S` is diagnosed and omitted by the current HTML importer, although PAGX styles support it |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
-| `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
+| `filter: blur(X) drop-shadow(X Y [B] [C])` (no spread or `inset`) | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
 | `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
