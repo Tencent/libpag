@@ -276,9 +276,9 @@ std::shared_ptr<tgfx::Image> Transform3DFilter::Apply(
     viewMatrix = Matrix3D::LookAt(cameraEye, cameraCoa, cameraUp);
   }
 
-  float near = -0.25f;
-  float far = 100.0f;
-  Matrix3D projectionMatrix = Matrix3D::Perspective(near, far, cameraFov);
+  float zNear = -0.25f;
+  float zFar = 100.0f;
+  Matrix3D projectionMatrix = Matrix3D::Perspective(zNear, zFar, cameraFov);
   auto finalMatrix = modelMatrix;
   finalMatrix.postConcat(viewMatrix);
   finalMatrix.postConcat(projectionMatrix);
