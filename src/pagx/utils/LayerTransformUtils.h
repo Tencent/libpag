@@ -55,8 +55,8 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
 // Conjugates the affine part A of the matrix around the pivot: with matrix = P * A the result is
 // P * T(anchor) * A * T(-anchor), so the translation becomes t + anchor - L * anchor and the
 // projection P stays outside the pivot. A 2D matrix is the P = I case. A zero anchor returns the
-// input unchanged; a singular A with a projection row keeps the input, since it has no affine part
-// to conjugate.
+// input unchanged; a flattened A with a projection row cannot be split, and then the pivot falls
+// back to the 2D conjugation, leaving the projection row as authored.
 Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ);
 
 // Returns the Layer's local transform without the layout position and without the anchor: the
