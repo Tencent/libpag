@@ -84,68 +84,11 @@ void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components
   ComposeMatrix3DComponents(*components, matrix);
 }
 
-// Moves the transform pivot to `anchor`: T(anchor) * M * T(-anchor). The linear part is unchanged
-// and the translation becomes t + anchor - L * anchor, so the translation stays outside the pivot.
-Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ) {
-  if (anchor.x == 0.0f && anchor.y == 0.0f && anchorZ == 0.0f) {
-    return matrix;
-  }
+// Moves the pivot of an affine matrix: T(anchor) * matrix * T(-anchor). Only the translation column
+// changes, to t + anchor - L * anchor, so the bottom row - including a homogeneous scale other than
+// 1 - is left untouched.
+static Matrix3D ConjugateAffine(const Matrix3D& matrix, const Point& anchor, float anchorZ) {
   Matrix3D result = matrix;
-  const bool hasPerspective =
-      matrix.getRowColumn(3, 0) != 0.0f || matrix.getRowColumn(3, 1) != 0.0f ||
-      matrix.getRowColumn(3, 2) != 0.0f || matrix.getRowColumn(3, 3) != 1.0f;
-  if (hasPerspective) {
-    // A perspective matrix is P * A with P built from the bottom row (the projection) and A affine.
-    // The pivot belongs to the affine chain only, mirroring how DCC tools keep the pivot inside the
-    // object transform and apply the camera last: M = P * T(a) * A * T(-a). Touching the translation
-    // column alone would leave the w row inconsistent, hence the split.
-    // Recover P's bottom row from M = P * A: M.row3.xyz = p0*A.row0 + p1*A.row1 + p2*A.row2 with
-    // A.row3 = (0,0,0,1). Taking M.row3 directly as P would lose the part contributed by A.
-    const float a0[3] = {matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
-                         matrix.getRowColumn(0, 2)};
-    const float a1[3] = {matrix.getRowColumn(1, 0), matrix.getRowColumn(1, 1),
-                         matrix.getRowColumn(1, 2)};
-    const float a2[3] = {matrix.getRowColumn(2, 0), matrix.getRowColumn(2, 1),
-                         matrix.getRowColumn(2, 2)};
-    const float b[3] = {matrix.getRowColumn(3, 0), matrix.getRowColumn(3, 1),
-                        matrix.getRowColumn(3, 2)};
-    const float det = a0[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
-                      a1[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
-                      a2[0] * (a0[1] * a1[2] - a0[2] * a1[1]);
-    if (std::abs(det) < 1e-6f) {
-      return matrix;
-    }
-    const float p0 =
-        (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) - a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
-         a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
-        det;
-    const float p1 =
-        (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) - b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
-         a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
-        det;
-    const float p2 =
-        (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) - a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
-         b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
-        det;
-    Matrix3D affine = matrix;
-    affine.setRowColumn(3, 0, 0.0f);
-    affine.setRowColumn(3, 1, 0.0f);
-    affine.setRowColumn(3, 2, 0.0f);
-    affine.setRowColumn(3, 3, 1.0f);
-    const Matrix3D anchored = ApplyAnchorToMatrix(affine, anchor, anchorZ);
-    for (int row = 0; row < 3; ++row) {
-      for (int column = 0; column < 4; ++column) {
-        result.setRowColumn(row, column, anchored.getRowColumn(row, column));
-      }
-    }
-    for (int column = 0; column < 4; ++column) {
-      result.setRowColumn(
-          3, column,
-          p0 * anchored.getRowColumn(0, column) + p1 * anchored.getRowColumn(1, column) +
-              p2 * anchored.getRowColumn(2, column) + anchored.getRowColumn(3, column));
-    }
-    return result;
-  }
   const float linearX = matrix.getRowColumn(0, 0) * anchor.x +
                         matrix.getRowColumn(0, 1) * anchor.y + matrix.getRowColumn(0, 2) * anchorZ;
   const float linearY = matrix.getRowColumn(1, 0) * anchor.x +
@@ -155,6 +98,76 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
   result.setRowColumn(0, 3, matrix.getRowColumn(0, 3) + anchor.x - linearX);
   result.setRowColumn(1, 3, matrix.getRowColumn(1, 3) + anchor.y - linearY);
   result.setRowColumn(2, 3, matrix.getRowColumn(2, 3) + anchorZ - linearZ);
+  return result;
+}
+
+// Conjugates the affine part of the matrix around the pivot: with matrix = P * A, the result is
+// P * T(anchor) * A * T(-anchor). P is the projection built from `perspective`, or the projection
+// row split out of a matrix3D; it stays outside the pivot, so the pivot belongs to the object
+// transform and the viewer keeps the projection. A layer whose affine part is the identity keeps
+// its pose unchanged even under perspective; a 2D matrix is the P = I case and only its
+// translation moves.
+Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ) {
+  if (anchor.x == 0.0f && anchor.y == 0.0f && anchorZ == 0.0f) {
+    return matrix;
+  }
+  // The bottom row is (0, 0, 0, m33) when P carries no x / y / z projection coefficient, which
+  // covers every affine matrix. Conjugating A then leaves the bottom row alone, so the whole matrix
+  // is an affine conjugation whatever m33 is.
+  const float p0 = matrix.getRowColumn(3, 0);
+  const float p1 = matrix.getRowColumn(3, 1);
+  const float p2 = matrix.getRowColumn(3, 2);
+  if (p0 == 0.0f && p1 == 0.0f && p2 == 0.0f) {
+    return ConjugateAffine(matrix, anchor, anchorZ);
+  }
+  // matrix = P * A with P = [[I, 0], [p0, p1, p2, p3]], so A is exactly the matrix with its bottom
+  // row replaced by (0, 0, 0, 1). P.row3.xyz follows from P.row3.xyz * A.linear = matrix.row3.xyz,
+  // and the homogeneous scale from p3 = matrix[3][3] - P.row3.xyz . A.translation. Reading p3 out
+  // of matrix[3][3] directly would assume p3 = 1 and pull a scaled homogeneous row back to 1.
+  const float a0[3] = {matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
+                       matrix.getRowColumn(0, 2)};
+  const float a1[3] = {matrix.getRowColumn(1, 0), matrix.getRowColumn(1, 1),
+                       matrix.getRowColumn(1, 2)};
+  const float a2[3] = {matrix.getRowColumn(2, 0), matrix.getRowColumn(2, 1),
+                       matrix.getRowColumn(2, 2)};
+  const float b[3] = {p0, p1, p2};
+  const float det = a0[0] * (a1[1] * a2[2] - a1[2] * a2[1]) -
+                    a1[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
+                    a2[0] * (a0[1] * a1[2] - a0[2] * a1[1]);
+  if (std::abs(det) < 1e-6f) {
+    // A singular linear part cannot be split into a projection and an affine part, so there is no
+    // affine part to conjugate. Keeping the input is the only answer that stays finite.
+    LOGE("ApplyAnchorToMatrix: ignored the anchor on a singular transform with perspective.");
+    return matrix;
+  }
+  const float solved0 =
+      (b[0] * (a1[1] * a2[2] - a1[2] * a2[1]) - a1[0] * (b[1] * a2[2] - b[2] * a2[1]) +
+       a2[0] * (b[1] * a1[2] - b[2] * a1[1])) /
+      det;
+  const float solved1 =
+      (a0[0] * (b[1] * a2[2] - b[2] * a2[1]) - b[0] * (a0[1] * a2[2] - a0[2] * a2[1]) +
+       a2[0] * (a0[1] * b[2] - a0[2] * b[1])) /
+      det;
+  const float solved2 =
+      (a0[0] * (a1[1] * b[2] - b[1] * a1[2]) - a1[0] * (a0[1] * b[2] - b[1] * a0[2]) +
+       b[0] * (a0[1] * a1[2] - a0[2] * a1[1])) /
+      det;
+  const float p3 = matrix.getRowColumn(3, 3) - solved0 * matrix.getRowColumn(0, 3) -
+                   solved1 * matrix.getRowColumn(1, 3) - solved2 * matrix.getRowColumn(2, 3);
+  Matrix3D affine = matrix;
+  affine.setRowColumn(3, 0, 0.0f);
+  affine.setRowColumn(3, 1, 0.0f);
+  affine.setRowColumn(3, 2, 0.0f);
+  affine.setRowColumn(3, 3, 1.0f);
+  const Matrix3D anchored = ConjugateAffine(affine, anchor, anchorZ);
+  Matrix3D result = anchored;
+  for (int column = 0; column < 4; ++column) {
+    result.setRowColumn(3, column,
+                        solved0 * anchored.getRowColumn(0, column) +
+                            solved1 * anchored.getRowColumn(1, column) +
+                            solved2 * anchored.getRowColumn(2, column));
+  }
+  result.setRowColumn(3, 3, result.getRowColumn(3, 3) + p3);
   return result;
 }
 
@@ -178,32 +191,6 @@ Matrix3D ComposeLayerTransform3DWithoutAnchor(const Layer* layer) {
 }
 
 Matrix3D BuildLayerTransform3DWithAnchor(const Layer* layer) {
-  const bool hasAnchor =
-      layer->anchor.x != 0.0f || layer->anchor.y != 0.0f || layer->anchorZ != 0.0f;
-  if (!hasAnchor) {
-    return ComposeLayerTransform3DWithoutAnchor(layer);
-  }
-  // Component path: the composition puts the perspective matrix outermost (M = P * T * R * K * S),
-  // so the pivot only belongs to the affine chain: M = P * T(a) * L * T(-a). Building the affine
-  // part without perspective, folding the anchor there and recomposing keeps the projection fixed
-  // while the pivot still decides the visual centre.
-  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity()) {
-    Matrix3DComponents components = {};
-    Matrix3D composed = {};
-    LayerTransformComponents(layer, &components, &composed);
-    Matrix3DComponents flat = components;
-    flat.perspective = 0;
-    Matrix3D affine = {};
-    if (ComposeMatrix3DComponents(flat, &affine)) {
-      const Matrix3D anchored = ApplyAnchorToMatrix(affine, layer->anchor, layer->anchorZ);
-      components.translate[0] = anchored.getRowColumn(0, 3);
-      components.translate[1] = anchored.getRowColumn(1, 3);
-      components.translate[2] = anchored.getRowColumn(2, 3);
-      if (ComposeMatrix3DComponents(components, &composed)) {
-        return composed;
-      }
-    }
-  }
   return ApplyAnchorToMatrix(ComposeLayerTransform3DWithoutAnchor(layer), layer->anchor,
                              layer->anchorZ);
 }

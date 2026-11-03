@@ -495,6 +495,226 @@ PAGX_TEST(PAGXAnchorTest, ComponentPathAppliesAnchor) {
 }
 
 /**
+ * Test case: only the affine part is conjugated, so a scaled homogeneous row keeps its scale and a
+ * pivot on a layer without a linear transform leaves the pose alone.
+ */
+PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorKeepsHomogeneousScale) {
+  const std::string scaled = "1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0.0000000001";
+  auto doc = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"10,20\" matrix3D=\"" + scaled + "\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  const auto matrix = pagx::BuildLayerTransform3DWithAnchor(layer);
+  // The linear part is the identity, so the pivot cannot move anything, and the homogeneous scale
+  // must stay where the author put it instead of being pulled back to 1.
+  EXPECT_NEAR(matrix.getRowColumn(0, 0), 1.0f, 1e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(0, 3), 0.0f, 1e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 3), 0.0f, 1e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(3, 3), 0.0000000001f, 1e-12f);
+}
+
+/**
+ * Test case: a vanishing perspective is the same rule with p = 0, so the pivot must not make the
+ * matrix jump when `perspective` crosses zero.
+ */
+PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorIsContinuousAcrossZero) {
+  auto flat =
+      ParseDoc(MakeRectDoc("id=\"layer\" rotationY=\"30\" perspective=\"0\" anchor=\"100,50\""));
+  // `perspective` is a viewing distance: an absent projection is the d -> infinity limit, so the
+  // rule must not change between no perspective and a very distant one.
+  auto almost = ParseDoc(
+      MakeRectDoc("id=\"layer\" rotationY=\"30\" perspective=\"1000000\" anchor=\"100,50\""));
+  ASSERT_TRUE(flat != nullptr);
+  ASSERT_TRUE(almost != nullptr);
+  auto* flatLayer = static_cast<pagx::Layer*>(flat->findNode("layer"));
+  auto* almostLayer = static_cast<pagx::Layer*>(almost->findNode("layer"));
+  ASSERT_TRUE(flatLayer != nullptr);
+  ASSERT_TRUE(almostLayer != nullptr);
+  const auto flatMatrix = pagx::BuildLayerTransform3DWithAnchor(flatLayer);
+  const auto almostMatrix = pagx::BuildLayerTransform3DWithAnchor(almostLayer);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_NEAR(flatMatrix.getRowColumn(row, column), almostMatrix.getRowColumn(row, column),
+                  1e-3f)
+          << "row " << row << " column " << column;
+    }
+  }
+  // The pivot has to matter, otherwise the case compares two documents that never differ.
+  auto unanchored = ParseDoc(MakeRectDoc("id=\"layer\" rotationY=\"30\" perspective=\"0\""));
+  ASSERT_TRUE(unanchored != nullptr);
+  auto* unanchoredLayer = static_cast<pagx::Layer*>(unanchored->findNode("layer"));
+  ASSERT_TRUE(unanchoredLayer != nullptr);
+  const auto unanchoredMatrix = pagx::BuildLayerTransform3DWithAnchor(unanchoredLayer);
+  EXPECT_GT(std::abs(flatMatrix.getRowColumn(2, 3) - unanchoredMatrix.getRowColumn(2, 3)), 40.0f);
+}
+
+/**
+ * Test case: the translation sits inside the projection, so a perspective layer with an authored x
+ * matches the matrix whose pivoted translation is spelled out.
+ */
+PAGX_TEST(PAGXAnchorTest, PerspectivePositionStaysInsideProjection) {
+  auto anchored =
+      ParseDoc(MakeRectDoc("id=\"layer\" x=\"40\" rotationY=\"30\" perspective=\"500\" "
+                           "anchor=\"100,50\""));
+  auto baked = ParseDoc(
+      MakeRectDoc("id=\"layer\" matrix3D=\"0.866025,0,-0.5,0.001,0,1,0,0,0.5,0,0.866025,-0.001732,"
+                  "53.39746,0,50,0.9\""));
+  ASSERT_TRUE(anchored != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  auto* anchoredLayer = static_cast<pagx::Layer*>(anchored->findNode("layer"));
+  auto* bakedLayer = static_cast<pagx::Layer*>(baked->findNode("layer"));
+  ASSERT_TRUE(anchoredLayer != nullptr);
+  ASSERT_TRUE(bakedLayer != nullptr);
+  const auto anchoredMatrix = pagx::BuildLayerTransform3DWithAnchor(anchoredLayer);
+  const auto bakedMatrix = pagx::BuildLayerTransform3DWithAnchor(bakedLayer);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_NEAR(anchoredMatrix.getRowColumn(row, column), bakedMatrix.getRowColumn(row, column),
+                  1e-3f)
+          << "row " << row << " column " << column;
+    }
+  }
+}
+
+/**
+ * Test case: the anchor channels drive the pivot itself, so an animated pivot matches a pivot
+ * authored statically on the frame the keys land on.
+ */
+PAGX_TEST(PAGXAnchorTest, AnimateAnchorChannels) {
+  const std::string animations =
+      "  <Animations>\n"
+      "    <Animation id=\"pivot\" duration=\"60\">\n"
+      "      <Object target=\"rotated\">\n"
+      "        <Channel name=\"anchor.x\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\"/>\n"
+      "          <Key time=\"60\" value=\"100\"/>\n"
+      "        </Channel>\n"
+      "        <Channel name=\"anchor.y\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\"/>\n"
+      "          <Key time=\"60\" value=\"50\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n";
+  auto animated = ParseDoc(MakeDoc("id=\"rotated\" matrix=\"0,1,-1,0,0,0\"", animations));
+  auto authored = ParseDoc(MakeRectDoc("id=\"rotated\" anchor=\"50,25\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(animated != nullptr);
+  ASSERT_TRUE(authored != nullptr);
+  const auto animatedPixels = RenderFrame(animated, 500'000);
+  ASSERT_FALSE(animatedPixels.empty());
+  EXPECT_GT(CountOpaquePixels(animatedPixels), 100u) << "the frame must actually draw something";
+  EXPECT_EQ(CountDifferentPixels(animatedPixels, RenderFrame(authored)), 0u);
+  auto plain = ParseDoc(MakeRectDoc("id=\"rotated\" matrix=\"0,1,-1,0,0,0\""));
+  ASSERT_TRUE(plain != nullptr);
+  EXPECT_GT(CountDifferentPixels(animatedPixels, RenderFrame(plain)), 0u)
+      << "the pivot write must move the frame";
+}
+
+/**
+ * Test case: anchor.z is a channel as well, so an animated pivot depth matches a static one.
+ */
+PAGX_TEST(PAGXAnchorTest, AnimateAnchorZChannel) {
+  const std::string rotation = "1,0,0,0,0,0.5,0.8660254,0,0,-0.8660254,0.5,0,0,0,0,1";
+  const std::string animations =
+      "  <Animations>\n"
+      "    <Animation id=\"pivot\" duration=\"60\">\n"
+      "      <Object target=\"rotated\">\n"
+      "        <Channel name=\"anchor.z\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\"/>\n"
+      "          <Key time=\"60\" value=\"40\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n";
+  auto animated = ParseDoc(
+      MakeDoc("id=\"rotated\" anchor=\"100,50\" matrix3D=\"" + rotation + "\"", animations));
+  auto authored =
+      ParseDoc(MakeRectDoc("id=\"rotated\" anchor=\"100,50,20\" matrix3D=\"" + rotation + "\""));
+  ASSERT_TRUE(animated != nullptr);
+  ASSERT_TRUE(authored != nullptr);
+  const auto animatedPixels = RenderFrame(animated, 500'000);
+  ASSERT_FALSE(animatedPixels.empty());
+  EXPECT_GT(CountOpaquePixels(animatedPixels), 100u) << "the frame must actually draw something";
+  EXPECT_EQ(CountDifferentPixels(animatedPixels, RenderFrame(authored)), 0u);
+}
+
+/**
+ * Test case: an anchor over an animated matrix3D is applied to the sampled pose, so the frame
+ * matches a document whose matrix3D already carries the pivot.
+ */
+PAGX_TEST(PAGXAnchorTest, AnchorAppliesOverAnimatedMatrix3D) {
+  const std::string rotation = "1,0,0,0,0,0.5,0.8660254,0,0,-0.8660254,0.5,0,0,0,0,1";
+  const std::string keys = "          <Key time=\"0\" value=\"" + rotation +
+                           "\"/>\n          <Key time=\"30\" value=\"" + rotation +
+                           "\"/>\n          <Key time=\"60\" value=\"" + rotation + "\"/>\n";
+  const std::string animations =
+      "  <Animations>\n"
+      "    <Animation id=\"rotate\" duration=\"60\">\n"
+      "      <Object target=\"rotated\">\n"
+      "        <Channel name=\"matrix3D\" type=\"matrix3D\">\n" +
+      keys +
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n";
+  auto animated = ParseDoc(
+      MakeDoc("id=\"rotated\" anchor=\"100,50,20\" matrix3D=\"" + rotation + "\"", animations));
+  auto baked =
+      ParseDoc(MakeRectDoc("id=\"rotated\" matrix3D=\"1,0,0,0,0,0.5,0.8660254,0,0,"
+                           "-0.8660254,0.5,0,0,42.32051,-33.30127,1\""));
+  ASSERT_TRUE(animated != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  const auto animatedPixels = RenderFrame(animated, 500'000);
+  ASSERT_FALSE(animatedPixels.empty());
+  EXPECT_GT(CountOpaquePixels(animatedPixels), 100u) << "the frame must actually draw something";
+  EXPECT_EQ(CountDifferentPixels(animatedPixels, RenderFrame(baked)), 0u);
+}
+
+/**
+ * Test case: a matrix3D channel that cannot be decomposed still gets the pivot, and only once: the
+ * keyframe holds the unanchored pose, so the published matrix is the pivoted one.
+ */
+PAGX_TEST(PAGXAnchorTest, AnchorAppliesOverNonDecomposableMatrix3DChannel) {
+  const std::string pose = "0.866025,0,-0.5,0.001,0,1,0,0,0.5,0,0.866025,-0.001732,0,0,0,1";
+  const std::string keys = "          <Key time=\"0\" value=\"" + pose +
+                           "\"/>\n          <Key time=\"30\" value=\"" + pose +
+                           "\"/>\n          <Key time=\"60\" value=\"" + pose + "\"/>\n";
+  const std::string animations =
+      "  <Animations>\n"
+      "    <Animation id=\"rotate\" duration=\"60\">\n"
+      "      <Object target=\"rotated\">\n"
+      "        <Channel name=\"matrix3D\" type=\"matrix3D\">\n" +
+      keys +
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n";
+  auto animated = ParseDoc(MakeDoc("id=\"rotated\" anchor=\"100,50\"", animations));
+  auto authored =
+      ParseDoc(MakeRectDoc("id=\"rotated\" anchor=\"100,50\" matrix3D=\"" + pose + "\""));
+  ASSERT_TRUE(animated != nullptr);
+  ASSERT_TRUE(authored != nullptr);
+  const auto animatedPixels = RenderFrame(animated, 500'000);
+  ASSERT_FALSE(animatedPixels.empty());
+  EXPECT_GT(CountOpaquePixels(animatedPixels), 100u) << "the frame must actually draw something";
+  EXPECT_EQ(CountDifferentPixels(animatedPixels, RenderFrame(authored)), 0u);
+  // The pivoted pose the channel produces is the projection of the affine part, so it matches the
+  // matrix with the pivot baked in up to the precision of these literals.
+  auto* authoredLayer = static_cast<pagx::Layer*>(authored->findNode("rotated"));
+  ASSERT_TRUE(authoredLayer != nullptr);
+  const auto anchored = pagx::BuildLayerTransform3DWithAnchor(authoredLayer);
+  const std::vector<float> baked = {0.866025f, 0.0f, -0.5f, 0.001f, 0.0f,      1.0f,
+                                    0.0f,      0.0f, 0.5f,  0.0f,   0.866025f, -0.001732f,
+                                    13.39746f, 0.0f, 50.0f, 0.9f};
+  for (int index = 0; index < 16; ++index) {
+    const int row = index % 4;
+    const int column = index / 4;
+    EXPECT_NEAR(anchored.getRowColumn(row, column), baked[static_cast<size_t>(index)], 1e-3f)
+        << "row " << row << " column " << column;
+  }
+}
+
+/**
  * Test case: the HTML export writes the same pivoted matrix as the renderer.
  */
 PAGX_TEST(PAGXAnchorTest, HtmlExportAppliesAnchor) {

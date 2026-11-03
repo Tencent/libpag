@@ -994,13 +994,19 @@ Layer 的子元素按类型自动归类为五个集合：
 
 剪切角为 ±90° 或 `perspective` 为负数时无法组合，此时忽略变换分量，只应用 `x`/`y`/`z`。
 
-**anchor（局部变换支点）**：`anchor` 指定局部变换的旋转 / 缩放支点，平移在支点变换之后叠加：
+**anchor（局部变换支点）**：`anchor` 指定局部变换的旋转 / 缩放支点，它只共轭局部变换的仿射部分：
 
 ```text
-M3 = T(translate) * T(anchor.x, anchor.y, anchorZ) * L3 * T(-anchor.x, -anchor.y, -anchorZ)
+M = P * T(translate) * T(anchor.x, anchor.y, anchorZ) * L * T(-anchor.x, -anchor.y, -anchorZ)
 ```
 
-其中 `L3` 是 `matrix` / `matrix3D` 的线性部分（`M` 为 2D 时 `anchorZ` 不参与），`translate` 是其平移量。`anchor` 写两个值时等价于 `(ax, ay, 0)`，支点落在图层平面内；写三个值时第三个值是支点深度，透视投影下的旋转中心随之移到图层平面之外。3D 支点只在 `matrix3D` 或 `rotationX` / `rotationY` 等 3D 变换下可见，2D 变换忽略第三个值。`anchor` 为 `0,0`（默认）时退化为“矩阵即完整变换”，与既有文档完全兼容；`anchor` 非零时，`matrix` 的 `tx`/`ty` 只表示纯平移，不应再包含支点补偿。同一份数据里不允许同时存在“烘焙进 tx/ty 的支点补偿”和 `anchor`，两者叠加会导致整体偏移。
+其中 `L` 是 `matrix` / `matrix3D` 的线性部分（或分量组合出的 `R * K * S`），`translate` 是同一来源的平移量，`P` 是投影：`perspective` 构造的投影行（`perspective` 为 0 时为单位阵），或从 `matrix3D` 自带的投影行拆出的投影。展开后只有平移改变，`t' = t + anchor - L * anchor`，线性部分不变。投影留在支点之外，因此线性部分为单位阵时 `anchor` 不改变姿态（即使图层带透视），2D 矩阵只是 `P = I` 的特例——这与 CSS `transform-origin` 不同，后者把 `perspective()` 一起共轭。
+
+`anchor` 写两个值时等价于 `(ax, ay, 0)`，支点落在图层平面内；写三个值时第三个值是支点深度，旋转中心随之移到图层平面之外。3D 支点只在 `matrix3D` 或 `rotationX` / `rotationY` 等 3D 变换下可见，2D 变换忽略第三个值。`anchor` 为 `0,0`（默认）时退化为“矩阵即完整变换”，与既有文档完全兼容；`anchor` 非零时，`matrix` 的 `tx`/`ty` 只表示纯平移，不应再包含支点补偿。同一份数据里不允许同时存在“烘焙进 tx/ty 的支点补偿”和 `anchor`，两者叠加会导致整体偏移。
+
+`anchor` 不是变换优先级链的输入：`matrix3D` / `matrix` / 分量加 `x`/`y`/`z` 先决定 `L` 和 `translate`，`anchor` 只对选中的结果施加一次，也不会让被高优先级屏蔽的 `matrix` 复活。与 `x`/`y`/`z` 的规则相反，非单位的静态 `matrix` / `matrix3D` 不屏蔽 `anchor`，因为 `x`/`y` 加到平移上会重复计数，而 `anchor` 是重新定义支点。注意与 `Group.anchor` 同名不同义：Group 的 `anchor` 从内容位置中减去，线性部分为单位阵时内容仍整体位移 `-anchor`。
+
+支点不能从姿态反解：任意支点都能配一个平移得到同一个矩阵，只有 `det(I - L) != 0` 时才有唯一解 `a = (I - L)⁻¹ * t`。所以 `anchor` 与 `matrix` / `matrix3D` 互不影响，动画里也各自驱动自己的状态（见附录 D.1）。
 
 SVG 的 `rotate(θ, cx, cy)` 对应 `anchor="cx,cy"` 加只含线性部分（`tx = ty = 0`）的矩阵关键帧。
 
@@ -3112,10 +3118,12 @@ Layer / Group
 | `scale.x` / `scale.y` / `scale.z` | float | 缩放（`scaleX`/`scaleY`/`scaleZ`） |
 | `skew.x` / `skew.y` | float | 剪切角，单位为度（`skewX`/`skewY`） |
 | `perspective` | float | 透视距离（`perspective`）；0 表示无透视 |
+| `anchor.x` / `anchor.y` | float | 局部变换支点（图层本地像素），按分量线性插值 |
+| `anchor.z` | float | 支点深度，仅 3D 变换下可见 |
 
 旋转/缩放/剪切/透视通道驱动 §5.2 所述的 Layer 变换分量，可以像 `x`/`y`/`z` 一样做动画和数据绑定。组合后剪切角为 ±90° 或 `perspective` 为负数的写入会被拒绝。
 
-`anchor` 不是动画通道：它没有注册在 `PAGXNodeChannel.cpp` 中，写进 `<Channel>` 不会生效。锚点属于文档的静态姿态，动画只驱动 §5.2 的变换分量与 `matrix` / `matrix3D`。
+`anchor` 通道驱动支点本身，它与姿态分开保存：支点无法从矩阵回读（同一个矩阵可由不同支点配平移得到，见 §5.2），所以 `anchor` 的读取返回支点状态而不是分解结果，`matrix` / `matrix3D` 的写入也不会改动支点；写入 `anchor` 后按当前姿态重新套用支点。`anchor` 不参与布局，写入不需要重新布局。
 
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 

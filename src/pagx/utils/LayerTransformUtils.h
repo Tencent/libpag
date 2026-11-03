@@ -52,8 +52,11 @@ bool HasLayerTransformComponents(const Layer* layer);
 // negative perspective), only the translation is kept; matrix is the identity if even that fails.
 void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components, Matrix3D* matrix);
 
-// Moves the transform pivot to `anchor`: T(anchor) * matrix * T(-anchor). The linear part is kept
-// and the translation becomes t + anchor - L * anchor. A zero anchor returns the input unchanged.
+// Conjugates the affine part A of the matrix around the pivot: with matrix = P * A the result is
+// P * T(anchor) * A * T(-anchor), so the translation becomes t + anchor - L * anchor and the
+// projection P stays outside the pivot. A 2D matrix is the P = I case. A zero anchor returns the
+// input unchanged; a singular A with a projection row keeps the input, since it has no affine part
+// to conjugate.
 Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float anchorZ);
 
 // Returns the Layer's local transform without the layout position and without the anchor: the
@@ -62,10 +65,8 @@ Matrix3D ApplyAnchorToMatrix(const Matrix3D& matrix, const Point& anchor, float 
 // once, when the pose is published.
 Matrix3D ComposeLayerTransform3DWithoutAnchor(const Layer* layer);
 
-// Returns the Layer's local transform without the layout position, with the anchor applied: the
-// non-identity matrix3D, else the non-identity matrix lifted with z, else the composition of x / y /
-// z and the components, then ApplyAnchorToMatrix. The projection stays outside the pivot
-// (M = P * T(anchor) * L * T(-anchor)), so the anchor never moves the projection centre.
+// Returns the Layer's local transform without the layout position, with the anchor applied:
+// ApplyAnchorToMatrix of the same transform ComposeLayerTransform3DWithoutAnchor composes.
 Matrix3D BuildLayerTransform3DWithAnchor(const Layer* layer);
 
 }  // namespace pagx
