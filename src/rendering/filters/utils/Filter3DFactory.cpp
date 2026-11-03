@@ -17,18 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Filter3DFactory.h"
+#include "rendering/filters/Transform3DFilter.h"
 
 namespace pag {
 
-std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache*,
-                                            const FilterList*, const tgfx::Rect&,
-                                            const tgfx::Point&, tgfx::Rect*, tgfx::Point* offset) {
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            const FilterList* filterList,
+                                            const tgfx::Rect& clipBounds,
+                                            const tgfx::Point& sourceScale,
+                                            tgfx::Rect* filterBounds, tgfx::Point* offset) {
+  if (filterList->layer->transform3D) {
+    auto oldBounds = *filterBounds;
+    auto containingComposition = filterList->layer->containingComposition;
+    *filterBounds = tgfx::Rect::MakeWH(containingComposition->width, containingComposition->height);
+    if (!filterBounds->intersect(clipBounds)) {
+      return nullptr;
+    }
+    return Transform3DFilter::Apply(input, cache, filterList->layer, filterList->layerFrame,
+                                    oldBounds, sourceScale, offset);
+  }
   offset->set(0, 0);
   return input;
 }
 
 bool Has3DSupport() {
-  return false;
+  return true;
 }
 
 }  // namespace pag

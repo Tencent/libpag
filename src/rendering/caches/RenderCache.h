@@ -49,6 +49,14 @@ class RenderCache : public Performance {
     return _uniqueID;
   }
 
+  /**
+   * Returns a sequence number that increases every time beginFrame() is called. Render filters that
+   * need to accumulate GPU state across layers within a frame use it to detect frame boundaries.
+   */
+  uint64_t frameSequence() const {
+    return _frameSequence;
+  }
+
   void beginFrame();
 
   void attachToContext(tgfx::Context* current, bool forDrawing = true);
@@ -183,6 +191,7 @@ class RenderCache : public Performance {
 
  private:
   ID _uniqueID = 0;
+  uint64_t _frameSequence = 0;
   PAGStage* stage = nullptr;
   uint32_t contextID = 0;
   tgfx::Context* context = nullptr;
