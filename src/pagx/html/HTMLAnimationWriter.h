@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -27,6 +28,7 @@
 namespace pagx {
 
 class HTMLWriterContext;
+class Animation;
 class Layer;
 class SolidColor;
 class LayerFilter;
@@ -60,6 +62,33 @@ class HTMLAnimationSession {
   std::string emitKeyframesAndWeave(std::string& bodyHtml);
 
  private:
+  // One <Animation> mount: a document-level animation, or one Composition slot's timeline. Both
+  // carry their own timeline offset, so siblings that share a source Composition stay independent.
+  struct AnimationMount {
+    const Animation* animation = nullptr;
+    size_t scope = 0;
+    int64_t offset = 0;
+    bool playing = true;
+  };
+
+  // Resolves every animation object target to the DOM id its tag will carry, claiming and
+  // remembering ids for the nodes that need one.
+  void ResolveAnimationTargets(const std::vector<const Animation*>& animations);
+  // Lists the document-level animations and the timelines mounted by Composition slots.
+  std::vector<AnimationMount> CollectAnimationMounts() const;
+
+  // Declarations collected per target element while weaving. They are applied to the body in one
+  // pass at the end instead of rewriting the body once per target.
+  struct ElementEdits {
+    std::vector<std::string> idOrder = {};
+    std::unordered_map<std::string, std::vector<std::string>> animDecls = {};
+    std::unordered_map<std::string, bool> needsZeroOrigin = {};
+    std::unordered_map<std::string, bool> liftsSvgClip = {};
+    std::unordered_map<std::string, std::vector<bool>> playStates = {};
+  };
+
+  static void ApplyElementEdits(std::string& bodyHtml, const ElementEdits& edits);
+
   PAGXDocument& _doc;
   HTMLWriterContext& _ctx;
   bool _active = false;
