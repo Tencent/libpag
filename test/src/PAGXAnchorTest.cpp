@@ -27,8 +27,10 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/SVGExporter.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
@@ -133,6 +135,21 @@ std::string MakeAnimatedRotateDoc(const std::string& layerAttributes, const std:
                      "      </Object>\n"
                      "    </Animation>\n"
                      "  </Animations>\n");
+}
+
+// Returns the value of the first transform attribute in the SVG, or an empty string.
+std::string FirstTransform(const std::string& svg) {
+  static const std::string key = "transform=\"";
+  auto begin = svg.find(key);
+  if (begin == std::string::npos) {
+    return {};
+  }
+  begin += key.size();
+  auto end = svg.find('"', begin);
+  if (end == std::string::npos) {
+    return {};
+  }
+  return svg.substr(begin, end - begin);
 }
 
 }  // namespace
@@ -726,6 +743,42 @@ PAGX_TEST(PAGXAnchorTest, HtmlExportAppliesAnchor) {
   // rotate(90) around (100,50): the affine pivot moves the translation to a - L*a = (150,-50).
   EXPECT_NE(css.find("translate(150px,-50px)"), std::string::npos) << css;
   EXPECT_NE(css.find("rotate(90deg)"), std::string::npos) << css;
+}
+
+/**
+ * Test case: the 2D matrix branch shared by the SVG / PPT / HTML clip and mask export folds the
+ * pivot, so an anchored layer exports the same transform as a document with the pivot baked in.
+ */
+PAGX_TEST(PAGXAnchorTest, ExportMatrixAppliesAnchorOnMatrixBranch) {
+  auto anchored = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50\" matrix=\"0,1,-1,0,0,0\""));
+  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" matrix=\"0,1,-1,0,150,-50\""));
+  ASSERT_TRUE(anchored != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  auto* anchoredLayer = static_cast<pagx::Layer*>(anchored->findNode("layer"));
+  auto* bakedLayer = static_cast<pagx::Layer*>(baked->findNode("layer"));
+  ASSERT_TRUE(anchoredLayer != nullptr);
+  ASSERT_TRUE(bakedLayer != nullptr);
+  const auto anchoredMatrix = pagx::BuildLayerMatrix(anchoredLayer);
+  const auto bakedMatrix = pagx::BuildLayerMatrix(bakedLayer);
+  // rotate(90) around (100,50): t' = a - L*a = (150,-50).
+  EXPECT_NEAR(anchoredMatrix.tx, 150.0f, 1e-4f);
+  EXPECT_NEAR(anchoredMatrix.ty, -50.0f, 1e-4f);
+  EXPECT_NEAR(anchoredMatrix.tx, bakedMatrix.tx, 1e-4f);
+  EXPECT_NEAR(anchoredMatrix.ty, bakedMatrix.ty, 1e-4f);
+}
+
+/**
+ * Test case: the SVG export writes the pivoted transform, so the exported group matches the baked
+ * document instead of dropping the anchor.
+ */
+PAGX_TEST(PAGXAnchorTest, SvgExportAppliesAnchor) {
+  auto anchored = ParseDoc(MakeRectDoc("id=\"layer\" anchor=\"100,50\" matrix=\"0,1,-1,0,0,0\""));
+  auto baked = ParseDoc(MakeRectDoc("id=\"layer\" matrix=\"0,1,-1,0,150,-50\""));
+  ASSERT_TRUE(anchored != nullptr);
+  ASSERT_TRUE(baked != nullptr);
+  const auto anchoredTransform = FirstTransform(pagx::SVGExporter::ToSVG(*anchored));
+  ASSERT_FALSE(anchoredTransform.empty()) << "the layer transform must reach the SVG";
+  EXPECT_EQ(anchoredTransform, FirstTransform(pagx::SVGExporter::ToSVG(*baked)));
 }
 
 }  // namespace pag
