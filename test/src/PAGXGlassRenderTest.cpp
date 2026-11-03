@@ -511,8 +511,8 @@ static std::shared_ptr<pagx::PAGXDocument> MakeOversizedChildDocument(bool withG
   // Semi-transparent so a grown mask would show through; opaque paint would hide the leak.
   paintedColor->color = {0.0f, 1.0f, 0.0f, 0.5f};
   paintedFill->color = paintedColor;
-  // The bare rectangle follows the painter, so the fill only paints the geometry before it. This
-  // one stays invisible while still extending the subtree's contour.
+  // The bare rectangle follows the painter, so the fill only paints the geometry before it.
+  // Unpainted geometry is also dropped by contour recording, so this rect covers nothing.
   auto bareRect = document->makeNode<pagx::Rectangle>();
   bareRect->size = {100.0f, 60.0f};
   bareRect->position = {200.0f, 50.0f};

@@ -1687,8 +1687,7 @@ CLI_TEST(VerifyUtilsTest, IsLayerShellCenterYConstraintSet) {
 }
 
 // ---------------------------------------------------------------------------
-// VerifyUtils: UsesOwnGeometryMask — GlassStyle is the only style that masks with
-// the layer's own geometry, so the predicate must key off the style type alone.
+// VerifyUtils: UsesOwnGeometryMask — GlassStyle is the only own-geometry mask style.
 // ---------------------------------------------------------------------------
 
 CLI_TEST(VerifyUtilsTest, UsesOwnGeometryMaskWithoutStylesIsFalse) {
