@@ -8536,6 +8536,13 @@
             "0119": "60a88e548"
         }
     },
+    "PAGTransform3DTest": {
+        "Camera": "27aecc11d",
+        "ScaledSurface": "27aecc11d",
+        "Transform3D": "27aecc11d",
+        "Transform3D_BOX": "27aecc11d",
+        "Transform3D_Sequence": "27aecc11d"
+    },
     "PAGXCliTest": {
         "ImportResolve_MultiLayer": "60a88e548",
         "RenderBackground": "60a88e548",
