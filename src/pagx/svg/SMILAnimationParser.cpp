@@ -378,6 +378,41 @@ static SyncBaseRef ParseSyncBase(const std::string& token) {
 // keyframes beyond it, and appends a Hold keyframe carrying the evaluated value so fill="freeze"
 // holds the end-time value and fill="remove" (whose base-value keyframe is added later at
 // endFrame+1 by AddBaseValueKeyframes) reverts from there.
+// Linear interpolation over a transform parameter sequence. A looping animation with a negative
+// begin has to move that phase into the values: a PAGX track cannot start before frame 0 (the
+// runtime and Ardot both clamp negative times to the first keyframe).
+static std::vector<float> SampleTransformParams(const std::vector<std::vector<float>>& sets,
+                                                const std::vector<double>& times, double u) {
+  if (sets.empty() || times.size() != sets.size()) {
+    return {};
+  }
+  if (u <= times.front()) {
+    return sets.front();
+  }
+  if (u >= times.back()) {
+    return sets.back();
+  }
+  for (size_t k = 1; k < times.size(); ++k) {
+    if (u > times[k]) {
+      continue;
+    }
+    const double span = times[k] - times[k - 1];
+    const double t = span > 0.0 ? (u - times[k - 1]) / span : 0.0;
+    const auto& a = sets[k - 1];
+    const auto& b = sets[k];
+    std::vector<float> out = {};
+    const size_t count = std::max(a.size(), b.size());
+    out.reserve(count);
+    for (size_t j = 0; j < count; ++j) {
+      const float av = j < a.size() ? a[j] : (j < b.size() ? b[j] : 0.0f);
+      const float bv = j < b.size() ? b[j] : av;
+      out.push_back(static_cast<float>(av + (bv - av) * t));
+    }
+    return out;
+  }
+  return sets.back();
+}
+
 static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Frame endFrame) {
   switch (valueType) {
     case ChannelValueType::Float: {
@@ -2004,7 +2039,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
 
   // end limits the active duration: keyframes beyond it are truncated and a Hold keyframe with
   // the end-time value is appended, so freeze holds that value and remove reverts from there.
-  if (timing.endSeconds > timing.beginSeconds) {
+  // endSeconds < 0 means "no end constraint" (see ResolvedTiming). Comparing it directly against a
+  // negative begin made the sentinel look like a real end time: begin=-1.3s satisfied -1 > -1.3 and
+  // the parser truncated the track to -60, leaving every later sample past the last keyframe.
+  if (timing.endSeconds >= 0.0 && timing.endSeconds > timing.beginSeconds) {
     Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
     if (endLimit < outEndFrame) {
       for (auto* ch : channels) {
@@ -2101,7 +2139,10 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
     endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
   }
   // end limits the active duration: the set value holds until end, then remove reverts.
-  if (timing.endSeconds > timing.beginSeconds) {
+  // endSeconds < 0 means "no end constraint" (see ResolvedTiming). Comparing it directly against a
+  // negative begin made the sentinel look like a real end time: begin=-1.3s satisfied -1 > -1.3 and
+  // the parser truncated the track to -60, leaving every later sample past the last keyframe.
+  if (timing.endSeconds >= 0.0 && timing.endSeconds > timing.beginSeconds) {
     Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
     if (endLimit < endFrame) {
       endFrame = endLimit;
@@ -2171,9 +2212,15 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
-  // begin comes pre-resolved by buildAnimation (syncbase references solved); negative values
-  // keep negative keyframe times (the animation started before the timeline origin).
+  // begin comes pre-resolved by buildAnimation (syncbase references solved). A negative begin on a
+  // looping animation is a phase offset rather than a negative timeline: fold it into the sampled
+  // parameters so the track starts at frame 0 and covers the whole cycle.
   Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+  double phaseShift = 0.0;
+  if (beginFrames < 0 && durFrames > 0 && IsIndefiniteRepeat(animElement)) {
+    phaseShift = std::fmod(static_cast<double>(-beginFrames) / static_cast<double>(durFrames), 1.0);
+    beginFrames = 0;
+  }
 
   auto keyTimesStr = ctx.getAttribute(animElement, "keyTimes");
   auto keyTimes = parseKeyTimes(keyTimesStr);
@@ -2253,6 +2300,21 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     keyTimes = std::move(expandedTimes);
   }
 
+  if (phaseShift > 0.0 && !paramSets.empty()) {
+    std::vector<std::vector<float>> resampled = {};
+    resampled.reserve(paramSets.size());
+    for (size_t i = 0; i < paramSets.size(); ++i) {
+      double u = keyTimes[i] + phaseShift;
+      u -= std::floor(u);
+      auto params = SampleTransformParams(paramSets, keyTimes, u);
+      if (params.empty()) {
+        params = paramSets[i];
+      }
+      resampled.push_back(std::move(params));
+    }
+    paramSets = std::move(resampled);
+  }
+
   // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
   // targeting the Layer. The runtime evaluates Matrix keyframes with decomposition interpolation
   // (LerpKeyframeValue<Matrix>) and applies keySplines bezier easing through the same
@@ -2285,7 +2347,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
 
   // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
   // keyframe carrying the end-time value.
-  if (timing.endSeconds > timing.beginSeconds) {
+  // endSeconds < 0 means "no end constraint" (see ResolvedTiming). Comparing it directly against a
+  // negative begin made the sentinel look like a real end time: begin=-1.3s satisfied -1 > -1.3 and
+  // the parser truncated the track to -60, leaving every later sample past the last keyframe.
+  if (timing.endSeconds >= 0.0 && timing.endSeconds > timing.beginSeconds) {
     Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
     if (endLimit < outEndFrame) {
       ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
@@ -2384,6 +2449,15 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
 
   // begin comes pre-resolved by buildAnimation (syncbase references solved).
   Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+  // A negative begin on a looping animation is a phase offset, not a shift of the whole timeline:
+  // keeping the keyframes at negative times leaves every sample after the last keyframe, so the
+  // player clamps to it and the element freezes. Fold the offset into the path progress and start
+  // the track at frame 0 so the loop covers the full cycle.
+  double phaseShift = 0.0;
+  if (beginFrames < 0 && durFrames > 0 && IsIndefiniteRepeat(animElement)) {
+    phaseShift = std::fmod(static_cast<double>(-beginFrames) / static_cast<double>(durFrames), 1.0);
+    beginFrames = 0;
+  }
 
   // Build tgfx::Path from the SVG path data string.
   auto pathData = PathDataFromSVGString(pathStr);
@@ -2451,7 +2525,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   }
   for (int i = 0; i < denseCount; ++i) {
     double normalizedTime = static_cast<double>(i) / static_cast<double>(denseCount - 1);
-    double pathProgress = normalizedTime;
+    // Progress keeps advancing past 1.0 so the sequence stays monotonic across the wrap; the
+    // distance below is taken modulo the path length.
+    // Progress only wraps when a loop phase shift is applied. Without a shift the final sample must
+    // stay on the path end, otherwise floor(1.0) sends it back to the start and the track ends with
+    // an identity matrix.
+    double progress = normalizedTime + phaseShift;
+    double pathProgress = phaseShift > 0.0 ? progress - std::floor(progress) : progress;
     if (!keyPoints.empty()) {
       pathProgress = keyPoints[i];
     }
@@ -2514,7 +2594,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   }
   // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
   // keyframe carrying the end-time value.
-  if (timing.endSeconds > timing.beginSeconds) {
+  // endSeconds < 0 means "no end constraint" (see ResolvedTiming). Comparing it directly against a
+  // negative begin made the sentinel look like a real end time: begin=-1.3s satisfied -1 > -1.3 and
+  // the parser truncated the track to -60, leaving every later sample past the last keyframe.
+  if (timing.endSeconds >= 0.0 && timing.endSeconds > timing.beginSeconds) {
     Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
     if (endLimit < outEndFrame) {
       ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
