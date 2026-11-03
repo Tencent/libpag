@@ -147,20 +147,20 @@ Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
   return result;
 }
 
-Matrix3D Matrix3D::Perspective(float near, float far, float angle) {
-  if (far <= near) {
+Matrix3D Matrix3D::Perspective(float zNear, float zFar, float angle) {
+  if (zFar <= zNear) {
     return Matrix3D();
   }
 
-  float denomInv = 1.0f / (far - near);
+  float denomInv = 1.0f / (zFar - zNear);
   float halfAngle = angle * 0.5f;
   float cot = cosf(halfAngle) / sinf(halfAngle);
 
   Matrix3D result = {};
   result.setRC(0, 0, cot);
   result.setRC(1, 1, cot);
-  result.setRC(2, 2, (far + near) * denomInv);
-  result.setRC(2, 3, 2 * far * near * denomInv);
+  result.setRC(2, 2, (zFar + zNear) * denomInv);
+  result.setRC(2, 3, 2 * zFar * zNear * denomInv);
   result.setRC(3, 2, -1);
   return result;
 }
