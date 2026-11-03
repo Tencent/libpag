@@ -21,6 +21,7 @@
 #include "WebTestBuildInfo.h"
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 #include "utils/Baseline.h"
 #if !defined(TGFX_USE_WEBGPU)
 #include <emscripten/html5_webgl.h>
@@ -62,7 +63,10 @@ static int ExecuteTests(const char* filter) {
   auto exitCode = RUN_ALL_TESTS();
   const auto* tests = testing::UnitTest::GetInstance();
   auto stats = pag::Baseline::GetComparisonStats();
-  if (tests->test_to_run_count() == 0 || stats.missingBaseline != 0) {
+  // A wholesale stale comparison cache sends every key down the accepted-version-change path,
+  // which must not pass without a single real comparison.
+  if (tests->test_to_run_count() == 0 || stats.missingBaseline != 0 ||
+      (stats.compared == 0 && stats.versionSkipped != 0)) {
     exitCode = 1;
   }
   nlohmann::json result = {{"exitCode", exitCode},

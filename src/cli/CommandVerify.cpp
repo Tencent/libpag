@@ -3131,11 +3131,18 @@ int RunVerify(int argc, char* argv[]) {
   if (opts.fontPaths.empty()) {
     doc->applyLayout();
   } else {
-    FontConfig fontConfig;
-    for (const auto& fontPath : opts.fontPaths) {
-      fontConfig.addFallbackFont(fontPath, 0);
+    // Loading fallback fonts dominates per-file verify runs (test loops re-invoke RunVerify with
+    // the same font list), so cache the built config across invocations.
+    static std::vector<std::string> cachedFontPaths = {};
+    static FontConfig cachedFontConfig = {};
+    if (opts.fontPaths != cachedFontPaths) {
+      cachedFontConfig = FontConfig();
+      for (const auto& fontPath : opts.fontPaths) {
+        cachedFontConfig.addFallbackFont(fontPath, 0);
+      }
+      cachedFontPaths = opts.fontPaths;
     }
-    doc->applyLayout(&fontConfig);
+    doc->applyLayout(&cachedFontConfig);
   }
 
   // Parse the XML DOM for signature-based duplicate detection.
@@ -3200,6 +3207,12 @@ int RunVerify(int argc, char* argv[]) {
   if (!opts.id.empty()) {
     renderArgs.push_back("--id");
     renderArgs.push_back(opts.id);
+  }
+  // Forward the fallback fonts so the render pass measures text the same way the layout above
+  // did; otherwise the two passes disagree on platforms without system fonts.
+  for (const auto& fontPath : opts.fontPaths) {
+    renderArgs.push_back("--fallback");
+    renderArgs.push_back(fontPath);
   }
   renderArgs.push_back(opts.inputFile);
 

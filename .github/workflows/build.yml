@@ -251,6 +251,10 @@ jobs:
         working-directory: web
         run: npm run test:cypress-runner && npm run test:video
 
+      - name: Typecheck Cypress Specs
+        working-directory: web
+        run: npm run typecheck:cypress
+
       - name: Cypress run:st
         uses: cypress-io/github-action@v7.4.9
         with:

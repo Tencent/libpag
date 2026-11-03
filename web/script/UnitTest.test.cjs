@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { Tick: Drain, CreateTimers } = require('./test-support/harness.cjs');
 
 const Source = fs.readFileSync(path.join(__dirname, 'UnitTest.js'), 'utf8');
 
@@ -12,10 +13,10 @@ function CreateHarness(options = {}) {
   const server = new EventEmitter();
   const child = new EventEmitter();
   const fakeProcess = new EventEmitter();
-  const timers = new Map();
+  const clock = CreateTimers();
+  const timers = clock.timers;
   const calls = { spawns: [], signals: [], errors: [], closes: 0, connectionsClosed: 0, unrefs: 0 };
   let listenCallback = null;
-  let timerId = 0;
   child.pid = 1234;
   child.exitCode = null;
   child.signalCode = null;
@@ -92,13 +93,8 @@ function CreateHarness(options = {}) {
         calls.errors.push(String(error));
       },
     },
-    setTimeout(callback, delay) {
-      timers.set(++timerId, { callback, delay });
-      return timerId;
-    },
-    clearTimeout(id) {
-      timers.delete(id);
-    },
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
   };
   new vm.Script(Source, { filename: 'UnitTest.js' }).runInNewContext(context);
   return {
@@ -123,10 +119,6 @@ function CreateHarness(options = {}) {
       assert.fail(`No pending ${delay}ms timeout.`);
     },
   };
-}
-
-function Drain() {
-  return new Promise(setImmediate);
 }
 
 function AssertClean(harness) {

@@ -21,7 +21,7 @@
     "clean": "rm -rf build-webgl build-webgpu build-baseline-webgl build-baseline-webgpu dist results"
   },
   "devDependencies": {
-    "puppeteer": "^24.38.0"
+    "puppeteer": "24.38.0"
   },
   "keywords": [
     "libpag",

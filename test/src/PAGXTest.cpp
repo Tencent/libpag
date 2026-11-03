@@ -167,15 +167,6 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   return layer;
 }
 
-static const std::vector<std::string>& GetFallbackFontPaths() {
-  static const std::vector<std::string> paths = {
-      ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
-      ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"),
-      ProjectPath::Absolute("resources/font/NotoSansHebrew-Regular.ttf"),
-  };
-  return paths;
-}
-
 static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();

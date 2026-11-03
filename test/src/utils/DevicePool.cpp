@@ -19,8 +19,7 @@
 #include "DevicePool.h"
 #include "rendering/gpu/Devices.h"
 #if defined(TGFX_USE_METAL)
-#include "core/AtlasManager.h"
-#include "tgfx/gpu/Context.h"
+#include "utils/MetalTestSupport.h"
 #endif
 
 namespace pag {
@@ -37,15 +36,9 @@ std::shared_ptr<tgfx::Device> DevicePool::Make() {
 
 bool DevicePool::ResetAtlasForComparison() {
 #if defined(TGFX_USE_METAL)
-  DeviceLockScope scope(Devices::MakeDefault());
-  if (!scope) {
-    return false;
-  }
-  auto context = scope.context();
-  context->flushAndSubmit(true);
-  // Like tgfx's ContextScope, keep atlas placement independent of earlier pixel comparisons.
-  context->atlasManager()->releaseAll();
+  return ResetMetalAtlasForComparison();
+#else
+  return false;
 #endif
-  return true;
 }
 }  // namespace pag

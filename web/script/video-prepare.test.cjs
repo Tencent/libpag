@@ -5,6 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
+const { Deferred, Tick } = require('./test-support/harness.cjs');
 
 function LoadSource(file, dependencies) {
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), {
@@ -17,15 +18,6 @@ function LoadSource(file, dependencies) {
   new vm.Script(source, { filename: file }).runInNewContext(context);
   return context.exports;
 }
-
-function Deferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise(function pending(done, fail) { resolve = done; reject = fail; });
-  return { promise, resolve, reject };
-}
-
-function Tick() { return new Promise(setImmediate); }
 
 function CreateHarness() {
   const readers = [];
@@ -135,7 +127,9 @@ function CreateHarness() {
           const reader = module.videoReaderManager.getVideoReaderByID(id);
           assert.equal(reader.owner, player, 'correct owner bound at every native call');
           if (reader.getError() === null) {
-            assert.equal(reader.frame, content.frame, 'successful video must be ready before native work');
+            if (!options.allowStaleFrames) {
+              assert.equal(reader.frame, content.frame, 'successful video must be ready before native work');
+            }
           } else {
             assert.equal(options.failFrame || options.failedVideoIDs.has(id), true);
           }
@@ -203,6 +197,26 @@ test('progress changing during video wait resamples the new frame', async functi
   player.setProgress(9);
   assert.equal(await pending, true);
   assert.deepEqual(h.readers[0].attempts.map(function frame(attempt) { return attempt.frame; }), [0, 9]);
+  assert.equal(h.calls.find(function flushed(call) { return call[0] === 'flush'; })[2], 9);
+  player.destroy();
+});
+
+test('repeated progress changes during video waits render the latest frame with stale video', async function () {
+  const h = CreateHarness();
+  h.options.allowStaleFrames = true;
+  const player = h.Player();
+  h.options.block = true;
+  const pending = player.flush();
+  await Tick();
+  player.setProgress(4);
+  await Tick();
+  player.setProgress(9);
+  h.options.block = false;
+  // The second invalidation must not restart seeking again: rendering proceeds with whatever
+  // frames are prepared (none here), so the video stays stale while the flush still happens.
+  assert.equal(await pending, true);
+  assert.deepEqual(h.readers[0].attempts.map(function frame(attempt) { return attempt.frame; }), [0, 4]);
+  assert.equal(h.readers[0].frame, -1);
   assert.equal(h.calls.find(function flushed(call) { return call[0] === 'flush'; })[2], 9);
   player.destroy();
 });

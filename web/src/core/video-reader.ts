@@ -84,6 +84,10 @@ class VideoReaderOperation {
 }
 
 export class VideoReader {
+  /**
+   * Creates a reader for a video element or MP4 bytes. A Uint8Array source must already own its
+   * memory (e.g. copied out of the WASM heap): the reader takes it over without copying again.
+   */
   public static async create(
     source: Uint8Array | HTMLVideoElement,
     width: number,
@@ -162,7 +166,12 @@ export class VideoReader {
   }
 
   public cancelPrepare(): void {
-    const pausePlayback = this.temporaryPlayback !== null || this.playRequest !== null;
+    // Pause only playback that a cancelled prepare started itself (first-frame warmup). When
+    // playback is intended (isPlaying), pausing here would reject the in-flight play() promise
+    // with AbortError, and per-frame setProgress() invalidations would thrash play/pause and
+    // keep postponing playback startup.
+    const pausePlayback =
+      !this.isPlaying && (this.temporaryPlayback !== null || this.playRequest !== null);
     this.prepareOperation?.cancel();
     this.playOperation?.cancel();
     this.prepareOperation = null;
@@ -255,8 +264,8 @@ export class VideoReader {
     this.videoEl.preload = 'auto';
     this.videoEl.width = width;
     this.videoEl.height = height;
-    const buffer = (source as Uint8Array).slice();
-    const blob = new Blob([buffer], { type: 'video/mp4' });
+    // The source buffer is owned by this reader (see create()); the Blob copies it internally.
+    const blob = new Blob([source as Uint8Array], { type: 'video/mp4' });
     this.objectURL = URL.createObjectURL(blob);
     this.videoEl.src = this.objectURL;
     if (IPHONE) {

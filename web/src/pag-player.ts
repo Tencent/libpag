@@ -407,8 +407,9 @@ export class PAGPlayer {
 
     private async executeOperation(operation: PlayerOperation, callback: ((res: boolean) => void) | null,
         compositionVersion: number): Promise<boolean> {
+        let reanchored = false;
         while (!this.isDestroyed && this.compositionVersion === compositionVersion) {
-            const version = this.frameVersion;
+            let version = this.frameVersion;
             const needsVideo = this.needsVideoPreparation();
             let manager: VideoReaderManager | null = null;
             let plan: VideoFrameTarget[] = [];
@@ -429,14 +430,30 @@ export class PAGPlayer {
                     plan = manager.captureTargets();
                     const preparation = await manager.prepareTargets(plan);
                     if (this.compositionVersion !== compositionVersion) return false;
-                    if (version !== this.frameVersion || !manager.matchesTargets(plan)) continue;
-                    if (preparation === 'cancelled') return false;
+                    if (version !== this.frameVersion || !manager.matchesTargets(plan)) {
+                        if (!reanchored) {
+                            // The position changed during preparation: prepare once more for the
+                            // newest position.
+                            reanchored = true;
+                            continue;
+                        }
+                        // Interrupted again (e.g. continuous scrubbing): repeated re-seeking would
+                        // starve rendering, so re-anchor on the latest position and render now
+                        // with whatever frames are prepared. Videos may show a stale frame this
+                        // pass while all other layers stay current.
+                        version = this.frameVersion;
+                        plan = manager.captureTargets();
+                    } else if (preparation === 'cancelled') {
+                        return false;
+                    }
                     // Frame failures must still reach native rendering so other layers and its fallback path can run.
                 }
             }
             const result = await PAGModule.webAssemblyQueue.exec<boolean | undefined>(this.invokeNative, this,
                 operation, callback, compositionVersion, version, manager, plan, needsVideo);
             if (result !== undefined) return result;
+            if (reanchored) return false;
+            reanchored = true;
         }
         return false;
     }

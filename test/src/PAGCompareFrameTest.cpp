@@ -30,10 +30,8 @@
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Task.h"
+#include "utils/DevicePool.h"
 #include "utils/TestUtils.h"
-#if defined(TGFX_USE_METAL)
-#include "utils/MetalTestSupport.h"
-#endif
 
 namespace pag {
 using namespace tgfx;
@@ -162,14 +160,13 @@ PAG_PIXEL_TEST(PAGFrameCompareTest, RenderFiles) {
   // The single-threaded web build has no pthreads: run the corpus serially like the Metal path
   // below, so pixel comparisons stay independent of interleaving.
   for (const auto& file : files) {
-    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
     CompareFileFrames(file);
   }
 #elif defined(TGFX_USE_METAL)
   // Metal workers share one glyph atlas; interleaving can change Linear-sampled text pixels.
   // Keep independent baseline files serial and clear atlas history before each file.
   for (const auto& file : files) {
-    ASSERT_TRUE(ResetMetalAtlasForComparison());
+    ASSERT_TRUE(DevicePool::ResetAtlasForComparison());
     CompareFileFrames(file);
   }
 #else

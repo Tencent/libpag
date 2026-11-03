@@ -387,8 +387,12 @@ export class PAGView {
       this.setDebugData({ flushTime: clock.measure('', 'flush') });
       this.updateFPS();
     });
-    if (this.isDestroyed || version !== this.playbackVersion) return false;
+    if (this.isDestroyed) return false;
+    // Emit onAnimationUpdate even when this flush was superseded by play()/pause()/setProgress()
+    // mid-flight: the flush cycle still completed, and listeners tracking update ticks should not
+    // observe a gap. onAnimationFlushed stays tied to a frame that was actually presented.
     this.eventManager.emit('onAnimationUpdate', this);
+    if (version !== this.playbackVersion) return false;
     if (res) {
       this.eventManager.emit('onAnimationFlushed', this);
     }

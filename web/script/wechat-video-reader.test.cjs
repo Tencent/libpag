@@ -5,43 +5,19 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
+const { Deferred: CreateDeferred, DrainMicrotasks, CreateTimers } = require('./test-support/harness.cjs');
 
 const SourcePath = path.join(__dirname, '../src/wechat/video-reader.ts');
 const Source = ts.transpileModule(fs.readFileSync(SourcePath, 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-function CreateDeferred() {
-  let resolvePromise;
-  let rejectPromise;
-  const promise = new Promise(function wait(resolve, reject) {
-    resolvePromise = resolve;
-    rejectPromise = reject;
-  });
-  return {
-    promise,
-    settled: false,
-    resolve(value) {
-      this.settled = true;
-      resolvePromise(value);
-    },
-    reject(error) {
-      this.settled = true;
-      rejectPromise(error);
-    },
-  };
-}
-
-async function DrainMicrotasks() {
-  for (let index = 0; index < 12; index++) await Promise.resolve();
-}
-
 function CreateHarness(context, options = {}) {
-  const timers = new Map();
+  const clock = CreateTimers();
+  const timers = clock.timers;
   const files = new Set();
   const decoders = [];
   const readers = [];
-  let timerID = 0;
   const owner = {
     isDestroyed: false,
     playing: options.playing ?? true,
@@ -124,11 +100,6 @@ function CreateHarness(context, options = {}) {
     return decoder;
   }
 
-  function AddTimer(callback, delay, kind) {
-    timers.set(++timerID, { callback, delay, kind });
-    return timerID;
-  }
-
   function MockRequire(name) {
     if (name === './constant') return { MP4_CACHE_PATH: '/mock/' };
     if (name === '@tgfx/wechat/array-buffer-image') return { ArrayBufferImage };
@@ -159,18 +130,10 @@ function CreateHarness(context, options = {}) {
       Error,
       Promise,
       wx: { createVideoDecoder: CreateDecoder },
-      setInterval(callback, delay) {
-        return AddTimer(callback, delay, 'interval');
-      },
-      clearInterval(id) {
-        timers.delete(id);
-      },
-      setTimeout(callback, delay) {
-        return AddTimer(callback, delay, 'timeout');
-      },
-      clearTimeout(id) {
-        timers.delete(id);
-      },
+      setInterval: clock.setInterval,
+      clearInterval: clock.clearInterval,
+      setTimeout: clock.setTimeout,
+      clearTimeout: clock.clearTimeout,
     },
     { filename: SourcePath },
   );

@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { ArtifactNames, Backends, Modes, SnapshotBuild, HashText, RemoveBackup, ValidateBuildInfo,
+const { ArtifactNames, Backends, Modes, SnapshotBuild, HashText, ReplaceDirectory, ValidateBuildInfo,
   ValidateCache, ValidateResult } = require('./artifacts');
 const { SourceMetadata, ValidateProvenance, CheckUpdateSource } = require('./cache-source');
 
@@ -226,22 +226,100 @@ function CommitCache(source, destination, baselineVersion, runInfo) {
   const parent = path.dirname(destination);
   fs.mkdirSync(parent, { recursive: true });
   const stage = fs.mkdtempSync(path.join(parent, '.web-cache-'));
-  const backup = `${stage}.previous`;
   try {
     fs.writeFileSync(path.join(stage, 'md5.json'), cache.md5);
     fs.writeFileSync(path.join(stage, 'version.json'), cache.version);
     fs.writeFileSync(path.join(stage, 'HEAD'), cache.head);
     fs.writeFileSync(path.join(stage, 'provenance.json'), JSON.stringify(runInfo, null, 2) + '\n');
-    if (fs.existsSync(destination)) fs.renameSync(destination, backup);
-    try {
-      fs.renameSync(stage, destination);
-    } catch (error) {
-      if (fs.existsSync(backup)) fs.renameSync(backup, destination);
-      throw error;
-    }
-    RemoveBackup(backup);
+    ReplaceDirectory(stage, destination);
   } finally {
     fs.rmSync(stage, { recursive: true, force: true });
+  }
+}
+
+function PrepareOutput(options) {
+  const output = options.output ? path.resolve(options.output) :
+    path.join(__dirname, 'results', `${options.backend}-${options.mode}-${crypto.randomUUID()}`);
+  if (!output.startsWith(ProjectRoot + path.sep) || fs.existsSync(output)) {
+    throw new Error('Output must be a new directory inside the repository');
+  }
+  fs.mkdirSync(output, { recursive: true });
+  return output;
+}
+
+function LoadRunConfig(options, directory, cacheDirectory, runInfo) {
+  const buildInfo = SnapshotBuild(path.join(__dirname, 'dist', `${options.backend}-${options.mode}`),
+    directory, options.backend, options.mode);
+  const config = { buildInfo, filter: options.filter,
+    baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
+    cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
+  if (options.mode === 'update') {
+    runInfo.source = { ...CheckUpdateSource(buildInfo), ref: 'origin/main', clean: true };
+  } else {
+    runInfo.cacheProvenance = config.cache.provenance;
+  }
+  return { buildInfo, config };
+}
+
+async function StartBrowser(session, directory, options, config, runInfo) {
+  session.server = await StartServer(directory);
+  const args = ['--enable-unsafe-webgpu'];
+  if (options.noSandbox) args.push('--no-sandbox', '--disable-setuid-sandbox');
+  if (process.platform === 'darwin') args.push('--use-gl=angle', '--use-angle=metal');
+  if (process.platform === 'linux') {
+    args.push('--disable-dev-shm-usage');
+    if (options.backend === 'webgpu') args.push('--use-webgpu-adapter=swiftshader');
+  }
+  session.browser = await require('puppeteer').launch({ headless: true, args });
+  runInfo.browser = await session.browser.version();
+  session.page = await session.browser.newPage();
+  session.page.on('console', function onConsole(message) { console.log(message.text()); });
+  await session.page.evaluateOnNewDocument(InstallConfig, config);
+}
+
+function WatchFatal(session) {
+  return new Promise(function watch(resolve, reject) {
+    session.page.on('pageerror', function onPageError(error) { reject(error); });
+    session.page.on('error', function onCrash(error) { reject(error); });
+    session.browser.on('disconnected', function onDisconnected() {
+      if (!session.closing) reject(new Error('Browser disconnected'));
+    });
+  });
+}
+
+async function ExecuteSuite(session, output, options, buildInfo, runInfo) {
+  const page = session.page;
+  await page.goto(`http://127.0.0.1:${session.server.address().port}/index.html`,
+    { waitUntil: 'domcontentloaded', timeout: TimeoutMS });
+  await page.waitForFunction(IsFinished, { timeout: TimeoutMS });
+  const state = await page.evaluate(ReadState);
+  runInfo.result = state.result;
+  runInfo.errors.push(...state.errors);
+  session.collecting = true;
+  runInfo.artifacts = await CollectFiles(page, output, options);
+  ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
+  if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
+  ValidateResult(state.result);
+  const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
+  if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
+      report.failures !== state.result.failed) {
+    throw new Error('GoogleTest report does not match the execution result');
+  }
+  const finalState = await page.evaluate(ReadState);
+  runInfo.errors = finalState.errors;
+  if (state.result.exitCode !== 0 || runInfo.errors.length) {
+    throw new Error('Tests or browser validation failed');
+  }
+}
+
+async function CollectPartialArtifacts(session, output, options, runInfo) {
+  if (!session.page || session.page.isClosed() || session.collecting) return;
+  try {
+    session.collecting = true;
+    runInfo.artifacts = await WithDeadline(CollectFiles(session.page, output, options), 10000,
+      'Partial transfer timed out');
+  } catch (artifactError) {
+    runInfo.errors.push(`Partial artifacts unavailable: ${artifactError.message}`);
   }
 }
 
@@ -249,101 +327,29 @@ async function Run(options) {
   if (options.mode === 'update' && process.env.PAG_WEB_BASELINE_INVOKED !== '1') {
     throw new Error('Baseline generation requires the explicit baseline entry point');
   }
-  const published = path.join(__dirname, 'dist', `${options.backend}-${options.mode}`);
+  const output = PrepareOutput(options);
   const cacheDirectory = path.join(ProjectRoot, 'test/baseline/.cache', options.backend);
+  const runInfo = { buildInfo: null, filter: options.filter, result: null, errors: [], artifacts: [] };
+  const session = { server: null, browser: null, page: null, closing: false, collecting: false };
   let buildInfo = null;
   let config = null;
-  const output = options.output ? path.resolve(options.output) :
-    path.join(__dirname, 'results', `${options.backend}-${options.mode}-${crypto.randomUUID()}`);
-  if (!output.startsWith(ProjectRoot + path.sep) || fs.existsSync(output)) {
-    throw new Error('Output must be a new directory inside the repository');
-  }
-  fs.mkdirSync(output, { recursive: true });
-  const runInfo = { buildInfo, filter: options.filter, result: null, errors: [], artifacts: [] };
-  let server = null;
-  let browser = null;
-  let page = null;
-  let timer = null;
-  let closing = false;
   let failed = false;
-  let collecting = false;
   try {
     const directory = path.join(output, 'artifacts');
-    buildInfo = SnapshotBuild(published, directory, options.backend, options.mode);
+    ({ buildInfo, config } = LoadRunConfig(options, directory, cacheDirectory, runInfo));
     runInfo.buildInfo = buildInfo;
-    config = { buildInfo, filter: options.filter,
-      baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
-      cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
-    if (options.mode === 'update') {
-      runInfo.source = { ...CheckUpdateSource(buildInfo), ref: 'origin/main', clean: true };
-    } else {
-      runInfo.cacheProvenance = config.cache.provenance;
-    }
-    server = await StartServer(directory);
-    const args = ['--enable-unsafe-webgpu'];
-    if (options.noSandbox) args.push('--no-sandbox', '--disable-setuid-sandbox');
-    if (process.platform === 'darwin') args.push('--use-gl=angle', '--use-angle=metal');
-    if (process.platform === 'linux') {
-      args.push('--disable-dev-shm-usage');
-      if (options.backend === 'webgpu') args.push('--use-webgpu-adapter=swiftshader');
-    }
-    browser = await require('puppeteer').launch({ headless: true, args });
-    runInfo.browser = await browser.version();
-    page = await browser.newPage();
-    page.on('console', function onConsole(message) { console.log(message.text()); });
-    await page.evaluateOnNewDocument(InstallConfig, config);
-    const fatal = new Promise(function watch(resolve, reject) {
-      timer = setTimeout(function onTimeout() { reject(new Error('Test or artifact transfer timed out')); }, TimeoutMS);
-      page.on('pageerror', function onPageError(error) { reject(error); });
-      page.on('error', function onCrash(error) { reject(error); });
-      browser.on('disconnected', function onDisconnected() {
-        if (!closing) reject(new Error('Browser disconnected'));
-      });
-    });
-    async function execute() {
-      await page.goto(`http://127.0.0.1:${server.address().port}/index.html`,
-        { waitUntil: 'domcontentloaded', timeout: TimeoutMS });
-      await page.waitForFunction(IsFinished, { timeout: TimeoutMS });
-      const state = await page.evaluate(ReadState);
-      runInfo.result = state.result;
-      runInfo.errors.push(...state.errors);
-      collecting = true;
-      runInfo.artifacts = await CollectFiles(page, output, options);
-      ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
-      if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
-      ValidateResult(state.result);
-      const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
-      if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
-          report.failures !== state.result.failed) {
-        throw new Error('GoogleTest report does not match the execution result');
-      }
-      const finalState = await page.evaluate(ReadState);
-      runInfo.errors = finalState.errors;
-      if (state.result.exitCode !== 0 || runInfo.errors.length) throw new Error('Tests or browser validation failed');
-    }
-    await Promise.race([execute(), fatal]);
+    await StartBrowser(session, directory, options, config, runInfo);
+    await WithDeadline(
+      Promise.race([ExecuteSuite(session, output, options, buildInfo, runInfo), WatchFatal(session)]),
+      TimeoutMS, 'Test or artifact transfer timed out');
   } catch (error) {
     failed = true;
     runInfo.errors.push(error.message);
     console.error(error.message);
-    if (page && !page.isClosed() && !collecting) {
-      let partialTimer = null;
-      try {
-        collecting = true;
-        const deadline = new Promise(function limit(resolve, reject) {
-          partialTimer = setTimeout(function timeout() { reject(new Error('Partial transfer timed out')); }, 10000);
-        });
-        runInfo.artifacts = await Promise.race([CollectFiles(page, output, options), deadline]);
-      } catch (artifactError) {
-        runInfo.errors.push(`Partial artifacts unavailable: ${artifactError.message}`);
-      } finally {
-        clearTimeout(partialTimer);
-      }
-    }
+    await CollectPartialArtifacts(session, output, options, runInfo);
   } finally {
-    clearTimeout(timer);
-    closing = true;
-    const cleanupErrors = await CloseResources(browser, server);
+    session.closing = true;
+    const cleanupErrors = await CloseResources(session.browser, session.server);
     if (cleanupErrors.length) {
       failed = true;
       runInfo.errors.push(...cleanupErrors);

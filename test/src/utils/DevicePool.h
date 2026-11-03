@@ -31,9 +31,10 @@ class DevicePool {
   static std::shared_ptr<tgfx::Device> Make();
 
   /**
-   * Clears the shared Metal glyph atlas between independent pixel comparisons. Other backends are
-   * unchanged. Call only after all previous CPU rendering tasks have finished. The device lock is
-   * released before returning, so callers can render normally. Returns false if Metal is unavailable.
+   * Clears the shared Metal glyph atlas between independent pixel comparisons. Call only after
+   * all previous CPU rendering tasks have finished. The device lock is released before returning,
+   * so callers can render normally. Returns false when the backend has no atlas isolation to
+   * reset (any non-Metal backend) or when the Metal device cannot be created or locked.
    */
   static bool ResetAtlasForComparison();
 };

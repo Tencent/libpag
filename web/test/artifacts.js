@@ -62,6 +62,20 @@ function RemoveBackup(backup) {
   }
 }
 
+// Atomically moves a fully written staging directory into place, restoring the previous
+// destination on failure. The caller retains ownership of stage cleanup when this throws.
+function ReplaceDirectory(stage, destination) {
+  const backup = `${stage}.previous`;
+  if (fs.existsSync(destination)) fs.renameSync(destination, backup);
+  try {
+    fs.renameSync(stage, destination);
+  } catch (error) {
+    if (fs.existsSync(backup)) fs.renameSync(backup, destination);
+    throw error;
+  }
+  RemoveBackup(backup);
+}
+
 function Publish(backend, mode, buildDirectory, webDirectory = __dirname) {
   const info = JSON.parse(fs.readFileSync(path.join(buildDirectory, 'build-info.json'), 'utf8'));
   ValidateBuildInfo(info, backend, mode);
@@ -69,7 +83,6 @@ function Publish(backend, mode, buildDirectory, webDirectory = __dirname) {
   fs.mkdirSync(root, { recursive: true });
   const stage = fs.mkdtempSync(path.join(root, '.publish-'));
   const destination = path.join(root, `${backend}-${mode}`);
-  const backup = `${stage}.previous`;
   try {
     const binding = fs.readFileSync(path.join(buildDirectory, 'tgfx-binding-path.txt'), 'utf8').trim();
     if (path.basename(binding) !== 'tgfx.esm.js') throw new Error('Invalid TGFX binding path');
@@ -83,14 +96,7 @@ function Publish(backend, mode, buildDirectory, webDirectory = __dirname) {
       info.files[name] = HashFile(path.join(stage, name));
     }
     fs.writeFileSync(path.join(stage, 'build-info.json'), JSON.stringify(info, null, 2) + '\n');
-    if (fs.existsSync(destination)) fs.renameSync(destination, backup);
-    try {
-      fs.renameSync(stage, destination);
-    } catch (error) {
-      if (fs.existsSync(backup)) fs.renameSync(backup, destination);
-      throw error;
-    }
-    RemoveBackup(backup);
+    ReplaceDirectory(stage, destination);
   } finally {
     fs.rmSync(stage, { recursive: true, force: true });
   }
@@ -144,7 +150,7 @@ function ValidateResult(result) {
 }
 
 module.exports = { ArtifactNames, Backends, Modes, ValidateBuildInfo, HashFile, HashText, ReadBuild,
-  SnapshotBuild, RemoveBackup, Publish, FlattenStrings, ValidateCache, ValidateResult };
+  SnapshotBuild, RemoveBackup, ReplaceDirectory, Publish, FlattenStrings, ValidateCache, ValidateResult };
 
 if (require.main === module) {
   try {

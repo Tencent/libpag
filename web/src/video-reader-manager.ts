@@ -141,6 +141,7 @@ export class VideoReaderManager {
         if (this.isDestroyed || this.owner.isDestroyed) return false;
         const data = this.wasmIns._getMp4DataByID(id) as Uint8Array | null;
         if (!data) throw new Error(`Missing MP4 data for video ${id}`);
+        // Copy the bytes out of the WASM heap once; the reader takes over the copy as-is.
         const pending = PAGModule.VideoReader.create(data.slice(), this.wasmIns._getWidthByID(id),
           this.wasmIns._getHeightByID(id), this.wasmIns._getFrameRateByID(id),
           this.wasmIns._getStaticTimeRangesByID(id), this.owner).then(this.acceptReader.bind(this));
