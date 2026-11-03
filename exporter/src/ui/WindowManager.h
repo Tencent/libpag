@@ -55,24 +55,8 @@ class WindowManager {
   // Runs the Qt event loop that keeps the plugin windows interactive. A re-entrant menu click
   // while a window is already open must not start a second, nested exec() loop: quitting only
   // unwinds the innermost loop and would strand the After Effects main thread inside the plugin,
-  // so this returns immediately when a loop is already running.
+  // so this returns immediately when a loop is already running or when no window is visible.
   void runEventLoop();
-
-  // Reports whether any plugin event loop (the main exec() loop or a modal wait such as
-  // AlertWindow) is currently pumping events, so callers that open their own nested loop can
-  // avoid stacking a second one.
-  bool isEventLoopRunning() const;
-
-  // RAII scope that marks a nested event loop as running for its lifetime, keeping
-  // isEventLoopRunning() accurate while a modal QEventLoop (outside the main exec() loop) pumps
-  // events.
-  class EventLoopScope {
-   public:
-    EventLoopScope();
-    ~EventLoopScope();
-    EventLoopScope(const EventLoopScope&) = delete;
-    EventLoopScope& operator=(const EventLoopScope&) = delete;
-  };
 
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;
@@ -88,7 +72,6 @@ class WindowManager {
 
   int argc = 0;
   char** argv = nullptr;
-  int eventLoopDepth = 0;
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QTranslator> translator = nullptr;
   std::unique_ptr<ConfigWindow> configWindow = nullptr;

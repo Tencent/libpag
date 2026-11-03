@@ -19,8 +19,10 @@
 #include "WindowManager.h"
 #include <QApplication>
 #include <QFile>
+#include <QGuiApplication>
 #include <QQuickStyle>
 #include <QTranslator>
+#include <QWindow>
 #include <QtGui/QFont>
 #include <QtQuick/QQuickWindow>
 #include <memory>
@@ -168,28 +170,31 @@ void WindowManager::init() {
   AlertInfoManager::GetInstance().saveWarnings.clear();
 }
 
-WindowManager::EventLoopScope::EventLoopScope() {
-  WindowManager::GetInstance().eventLoopDepth++;
-}
-
-WindowManager::EventLoopScope::~EventLoopScope() {
-  WindowManager::GetInstance().eventLoopDepth--;
-}
-
 void WindowManager::runEventLoop() {
   // Re-entered menu clicks while a plugin window is already open must not stack nested exec()
   // loops, because closing the last window only quits the innermost loop and the leaked layers
   // would keep the After Effects main thread inside the plugin forever. Returning early keeps a
   // single loop pumping events for every open window.
-  if (isEventLoopRunning()) {
+  if (BaseWindow::isEventLoopRunning()) {
     return;
   }
-  EventLoopScope scope;
+  // Guard against a loop that can never exit: when the user cancels the save dialog opened by
+  // ExportWindow::init(), show() creates no window, so entering app->exec() here would wait
+  // forever and strand the After Effects main thread inside the plugin. Only run the loop when at
+  // least one top-level window is visible to quit it on close.
+  bool hasVisibleWindow = false;
+  const auto windows = QGuiApplication::topLevelWindows();
+  for (auto* topLevelWindow : windows) {
+    if (topLevelWindow != nullptr && topLevelWindow->isVisible()) {
+      hasVisibleWindow = true;
+      break;
+    }
+  }
+  if (!hasVisibleWindow) {
+    return;
+  }
+  BaseWindow::EventLoopScope scope;
   app->exec();
-}
-
-bool WindowManager::isEventLoopRunning() const {
-  return eventLoopDepth > 0;
 }
 
 }  // namespace exporter

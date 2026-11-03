@@ -24,6 +24,20 @@
 
 namespace exporter {
 
+int BaseWindow::eventLoopDepth = 0;
+
+bool BaseWindow::isEventLoopRunning() {
+  return eventLoopDepth > 0;
+}
+
+BaseWindow::EventLoopScope::EventLoopScope() {
+  BaseWindow::eventLoopDepth++;
+}
+
+BaseWindow::EventLoopScope::~EventLoopScope() {
+  BaseWindow::eventLoopDepth--;
+}
+
 BaseWindow::BaseWindow(QApplication* app, QObject* parent) : QObject(parent), app(app) {
   engine = std::make_unique<QQmlApplicationEngine>(app);
   switchLanguage();
