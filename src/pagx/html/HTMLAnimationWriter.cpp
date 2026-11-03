@@ -386,47 +386,6 @@ void AppendCssDecl(std::string& decls, const std::string& prop, const std::strin
   decls += prop + ": " + val;
 }
 
-// Finds the opening tag `<tagName ... id="domId" ...>` in `html` and returns the tag name
-// (lowercased) as well as `[tagStart, tagEnd)` bounds.
-bool FindElementOpeningTagById(const std::string& html, const std::string& domId,
-                               size_t& outTagStart, size_t& outTagEnd, std::string& outTagName) {
-  std::string needle = "id=\"" + domId + "\"";
-  size_t searchPos = 0;
-  while (searchPos < html.size()) {
-    size_t idPos = html.find(needle, searchPos);
-    if (idPos == std::string::npos) {
-      return false;
-    }
-    // Verify attribute boundary before `id=`.
-    if (idPos == 0 ||
-        (html[idPos - 1] != ' ' && html[idPos - 1] != '\t' && html[idPos - 1] != '\n')) {
-      searchPos = idPos + needle.size();
-      continue;
-    }
-    size_t tagStart = html.rfind('<', idPos);
-    size_t tagEnd = html.find('>', idPos);
-    if (tagStart == std::string::npos || tagEnd == std::string::npos) {
-      return false;
-    }
-    size_t nameStart = tagStart + 1;
-    size_t nameEnd = nameStart;
-    while (nameEnd < tagEnd && html[nameEnd] != ' ' && html[nameEnd] != '\t' &&
-           html[nameEnd] != '/' && html[nameEnd] != '>') {
-      nameEnd++;
-    }
-    outTagName = html.substr(nameStart, nameEnd - nameStart);
-    for (char& c : outTagName) {
-      if (c >= 'A' && c <= 'Z') {
-        c = static_cast<char>(c - 'A' + 'a');
-      }
-    }
-    outTagStart = tagStart;
-    outTagEnd = tagEnd + 1;
-    return true;
-  }
-  return false;
-}
-
 bool ParsePointChannelName(const std::string& name, size_t& outIndex, bool& outIsX) {
   if (name.rfind("point", 0) != 0) {
     return false;
@@ -572,60 +531,17 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
   return std::string::npos;
 }
 
-// The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
-// extent (a stroke animated wider than its static width) would be clipped by the viewport. Lifts the
-// clipping on the <svg> hosting the animated tag at `tagStart` while keeping its viewport size.
-void LiftEnclosingSvgClip(std::string& bodyHtml, size_t tagStart) {
-  size_t svgStart = FindEnclosingSvgStart(bodyHtml, tagStart);
-  if (svgStart == std::string::npos) {
-    return;
-  }
-  size_t svgEnd = bodyHtml.find('>', svgStart);
-  if (svgEnd == std::string::npos) {
-    return;
-  }
-  std::string svgTag = bodyHtml.substr(svgStart, svgEnd - svgStart);
-  size_t stylePos = svgTag.find(" style=\"");
-  if (stylePos == std::string::npos) {
-    bodyHtml.insert(svgEnd, " style=\"overflow:visible\"");
-    return;
-  }
-  size_t valStart = stylePos + 8;
-  size_t valEnd = svgTag.find('"', valStart);
-  if (valEnd == std::string::npos) {
-    return;
-  }
-  std::string styleVal = svgTag.substr(valStart, valEnd - valStart);
-  if (styleVal.find("overflow:") != std::string::npos) {
-    return;
-  }
-  if (!styleVal.empty() && styleVal.back() != ';') {
-    styleVal += ';';
-  }
-  styleVal += "overflow:visible";
-  bodyHtml.replace(svgStart + valStart, valEnd - valStart, styleVal);
-}
-
-// Injects `animation` declaration (and optional extra style properties such as
-// `transform-origin:0 0`) into the opening tag with `id="domId"` in `bodyHtml`. When `liftSvgClip`
-// is set, also lifts the viewport clipping of the <svg> hosting that tag.
-bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
-                               const std::string& animDecl, bool needsZeroTransformOrigin,
-                               bool liftSvgClip) {
-  size_t tagStart = 0;
-  size_t tagEnd = 0;
-  std::string tagName;
-  if (!FindElementOpeningTagById(bodyHtml, domId, tagStart, tagEnd, tagName)) {
-    return false;
-  }
-  std::string tagStr = bodyHtml.substr(tagStart, tagEnd - tagStart);
-  size_t stylePos = tagStr.find(" style=\"");
-  bool styleWoven = false;
+// Builds the opening tag text with the animation declarations added to its style attribute. A tag
+// without a style attribute (a bare SVG <path/>) gets one inserted before its closing bracket.
+std::string BuildWovenTag(const std::string& tagStr, const std::string& animDecl,
+                          bool needsZeroTransformOrigin) {
+  std::string woven = tagStr;
+  size_t stylePos = woven.find(" style=\"");
   if (stylePos != std::string::npos) {
     size_t valStart = stylePos + 8;
-    size_t valEnd = tagStr.find('"', valStart);
+    size_t valEnd = woven.find('"', valStart);
     if (valEnd != std::string::npos) {
-      std::string styleVal = tagStr.substr(valStart, valEnd - valStart);
+      std::string styleVal = woven.substr(valStart, valEnd - valStart);
       if (needsZeroTransformOrigin && styleVal.find("transform-origin:") == std::string::npos) {
         if (!styleVal.empty() && styleVal.back() != ';') {
           styleVal += ';';
@@ -636,28 +552,49 @@ bool WeaveStyleIntoElementById(std::string& bodyHtml, const std::string& domId,
         styleVal += ';';
       }
       styleVal += "animation:" + animDecl;
-      tagStr.replace(valStart, valEnd - valStart, styleVal);
-      styleWoven = true;
+      woven.replace(valStart, valEnd - valStart, styleVal);
+      return woven;
     }
   }
-  if (!styleWoven) {
-    // No existing style="..." attribute on the tag (e.g. SVG <path/>). Insert one before `/>`/`>`.
-    std::string newStyle = " style=\"";
-    if (needsZeroTransformOrigin) {
-      newStyle += "transform-origin:0 0;";
-    }
-    newStyle += "animation:" + animDecl + "\"";
-    size_t insertPos = tagStr.size() - 1;
-    if (insertPos > 0 && tagStr[insertPos - 1] == '/') {
-      insertPos -= 1;
-    }
-    tagStr.insert(insertPos, newStyle);
+  std::string newStyle = " style=\"";
+  if (needsZeroTransformOrigin) {
+    newStyle += "transform-origin:0 0;";
   }
-  bodyHtml.replace(tagStart, tagEnd - tagStart, tagStr);
-  if (liftSvgClip) {
-    LiftEnclosingSvgClip(bodyHtml, tagStart);
+  newStyle += "animation:" + animDecl + "\"";
+  size_t insertPos = woven.size() - 1;
+  if (insertPos > 0 && woven[insertPos - 1] == '/') {
+    insertPos -= 1;
   }
-  return true;
+  woven.insert(insertPos, newStyle);
+  return woven;
+}
+
+// Builds the <svg ...> opening tag with clipping lifted, or returns an empty string when the tag
+// already exposes clipping or has no style attribute to extend.
+std::string BuildLiftedSvgTag(const std::string& svgTag) {
+  size_t stylePos = svgTag.find(" style=\"");
+  if (stylePos == std::string::npos) {
+    std::string lifted = svgTag;
+    size_t insertPos = lifted.size() - 1;
+    lifted.insert(insertPos, " style=\"overflow:visible\"");
+    return lifted;
+  }
+  size_t valStart = stylePos + 8;
+  size_t valEnd = svgTag.find('"', valStart);
+  if (valEnd == std::string::npos) {
+    return {};
+  }
+  std::string styleVal = svgTag.substr(valStart, valEnd - valStart);
+  if (styleVal.find("overflow:") != std::string::npos) {
+    return {};
+  }
+  if (!styleVal.empty() && styleVal.back() != ';') {
+    styleVal += ';';
+  }
+  styleVal += "overflow:visible";
+  std::string lifted = svgTag;
+  lifted.replace(valStart, valEnd - valStart, styleVal);
+  return lifted;
 }
 
 // ============================================================================
@@ -1622,19 +1559,53 @@ struct BundleElement {
   std::string tagName = {};
 };
 
+// Every id emitted into the body, resolved once. Looking each id up with a fresh scan of the whole
+// body costs O(targets x bodyLength) on documents with many animated elements.
+using TagNameIndex = std::unordered_map<std::string, std::string>;
+
+TagNameIndex BuildTagNameIndex(const std::string& bodyHtml) {
+  TagNameIndex index = {};
+  size_t searchFrom = 0;
+  while ((searchFrom = bodyHtml.find("id=\"", searchFrom)) != std::string::npos) {
+    auto idEnd = bodyHtml.find('"', searchFrom + 4);
+    if (idEnd == std::string::npos) {
+      break;
+    }
+    auto tagStart = bodyHtml.rfind('<', searchFrom);
+    auto tagEnd = bodyHtml.find('>', searchFrom);
+    if (tagStart != std::string::npos && tagEnd != std::string::npos) {
+      size_t nameStart = tagStart + 1;
+      size_t nameEnd = nameStart;
+      while (nameEnd < tagEnd && bodyHtml[nameEnd] != ' ' && bodyHtml[nameEnd] != '/' &&
+             bodyHtml[nameEnd] != '>') {
+        nameEnd++;
+      }
+      std::string tagName = bodyHtml.substr(nameStart, nameEnd - nameStart);
+      for (char& c : tagName) {
+        if (c >= 'A' && c <= 'Z') {
+          c = static_cast<char>(c - 'A' + 'a');
+        }
+      }
+      index.emplace(bodyHtml.substr(searchFrom + 4, idEnd - searchFrom - 4), std::move(tagName));
+    }
+    searchFrom = idEnd + 1;
+  }
+  return index;
+}
+
 // Lists every tag rendering the bundle's target: the base id plus the "<base>__N" copies that
 // HTMLWriterContext::claimAnimatedDomId hands out when one node renders into several tags.
-std::vector<BundleElement> FindBundleElements(const std::string& bodyHtml,
+std::vector<BundleElement> FindBundleElements(const TagNameIndex& tagIndex,
                                               const std::string& domId) {
   std::vector<BundleElement> elements = {};
   for (size_t copyIndex = 0;; ++copyIndex) {
     BundleElement element = {};
     element.id = copyIndex == 0 ? domId : domId + "__" + std::to_string(copyIndex);
-    size_t tagStart = 0;
-    size_t tagEnd = 0;
-    if (!FindElementOpeningTagById(bodyHtml, element.id, tagStart, tagEnd, element.tagName)) {
+    auto it = tagIndex.find(element.id);
+    if (it == tagIndex.end()) {
       break;
     }
+    element.tagName = it->second;
     elements.push_back(std::move(element));
   }
   return elements;
@@ -1645,24 +1616,37 @@ std::vector<BundleElement> FindBundleElements(const std::string& bodyHtml,
 // (a shape, its Fill, its Stroke and its TrimPath), so resolve through the ids recorded for the
 // node when a claim was made: searching only for its own base id would miss the tag that a sibling
 // candidate claimed. Layers, layer filters and mask paths keep their own id instead.
-std::vector<BundleElement> FindBundleElementsForNode(const std::string& bodyHtml,
-                                                     const HTMLWriterContext& ctx,
+// Animated tags grouped by the node they render, so a bundle does not have to scan every tag.
+using AnimatedTagIndex =
+    std::unordered_map<const Node*, std::vector<std::pair<size_t, std::string>>>;
+
+AnimatedTagIndex BuildAnimatedTagIndex(const HTMLWriterContext& ctx) {
+  AnimatedTagIndex index = {};
+  for (const auto& tag : ctx.animatedDomTags) {
+    index[tag.node].push_back({tag.scope, tag.id});
+  }
+  return index;
+}
+
+std::vector<BundleElement> FindBundleElementsForNode(const TagNameIndex& tagIndex,
+                                                     const AnimatedTagIndex& tagIndexByNode,
                                                      const DomTargetBundle& bundle, size_t scope) {
   std::vector<BundleElement> elements = {};
   std::set<std::string> addedIds = {};
-  for (const auto& tag : ctx.animatedDomTags) {
-    if (tag.scope != scope || tag.node != bundle.primaryHost || !addedIds.insert(tag.id).second) {
-      continue;
-    }
-    size_t tagStart = 0;
-    size_t tagEnd = 0;
-    std::string tagName = {};
-    if (FindElementOpeningTagById(bodyHtml, tag.id, tagStart, tagEnd, tagName)) {
-      elements.push_back({tag.id, tagName});
+  auto it = tagIndexByNode.find(bundle.primaryHost);
+  if (it != tagIndexByNode.end()) {
+    for (const auto& entry : it->second) {
+      if (entry.first != scope || !addedIds.insert(entry.second).second) {
+        continue;
+      }
+      auto nameIt = tagIndex.find(entry.second);
+      if (nameIt != tagIndex.end()) {
+        elements.push_back({entry.second, nameIt->second});
+      }
     }
   }
   if (elements.empty() && scope == 0) {
-    return FindBundleElements(bodyHtml, bundle.domId);
+    return FindBundleElements(tagIndex, bundle.domId);
   }
   return elements;
 }
@@ -1864,6 +1848,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
   }
 
+  // Both indexes are built once: resolving every animated tag per bundle would otherwise rescan the
+  // whole body for each target.
+  const auto tagIndex = BuildTagNameIndex(bodyHtml);
+  const auto tagIndexByNode = BuildAnimatedTagIndex(_ctx);
+
   for (const auto& mount : mounts) {
     const auto* anim = mount.animation;
     if (anim->duration <= 0 || anim->frameRate <= 0.0f || anim->objects.empty()) {
@@ -1872,7 +1861,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
     for (const auto& bundle : bundles) {
-      auto elements = FindBundleElementsForNode(bodyHtml, _ctx, bundle, mount.scope);
+      auto elements = FindBundleElementsForNode(tagIndex, tagIndexByNode, bundle, mount.scope);
       if (elements.empty()) {
         continue;
       }
@@ -1964,7 +1953,55 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
   }
 
+  // Resolve every pending id with a single scan, then rebuild the body once. Looking each id up from
+  // the start of the body and letting std::string::replace shift the tail every time costs
+  // O(targets x bodyLength) on documents with many animated elements.
+  struct TextEdit {
+    size_t start = 0;
+    size_t end = 0;
+    std::string text = {};
+  };
+  std::unordered_map<std::string, std::pair<size_t, size_t>> tagRanges = {};
+  {
+    std::unordered_set<std::string> pendingIds(elementIdOrder.begin(), elementIdOrder.end());
+    size_t searchFrom = 0;
+    while (!pendingIds.empty()) {
+      auto idPos = bodyHtml.find("id=\"", searchFrom);
+      if (idPos == std::string::npos) {
+        break;
+      }
+      if (idPos != 0) {
+        char prev = bodyHtml[idPos - 1];
+        if (prev != ' ' && prev != '\t' && prev != '\n') {
+          searchFrom = idPos + 4;
+          continue;
+        }
+      }
+      auto idEnd = bodyHtml.find('"', idPos + 4);
+      if (idEnd == std::string::npos) {
+        break;
+      }
+      std::string id = bodyHtml.substr(idPos + 4, idEnd - idPos - 4);
+      searchFrom = idEnd + 1;
+      if (pendingIds.erase(id) == 0) {
+        continue;
+      }
+      auto tagStart = bodyHtml.rfind('<', idPos);
+      auto tagEnd = bodyHtml.find('>', idPos);
+      if (tagStart == std::string::npos || tagEnd == std::string::npos) {
+        continue;
+      }
+      tagRanges[id] = {tagStart, tagEnd};
+    }
+  }
+
+  std::vector<TextEdit> edits = {};
+  std::unordered_set<size_t> liftedSvgStarts = {};
   for (const auto& elementId : elementIdOrder) {
+    auto rangeIt = tagRanges.find(elementId);
+    if (rangeIt == tagRanges.end()) {
+      continue;
+    }
     const auto& decls = elementAnimDecls[elementId];
     std::string combined;
     for (size_t i = 0; i < decls.size(); ++i) {
@@ -1983,8 +2020,43 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         combined += playStates[i] ? "running" : "paused";
       }
     }
-    WeaveStyleIntoElementById(bodyHtml, elementId, combined, elementNeedsZeroOrigin[elementId],
-                              elementLiftsSvgClip[elementId]);
+    size_t tagStart = rangeIt->second.first;
+    size_t tagEnd = rangeIt->second.second;
+    edits.push_back({tagStart, tagEnd,
+                     BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined,
+                                   elementNeedsZeroOrigin[elementId])});
+    // The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
+    // extent would be clipped; lift the clipping on the hosting <svg> while keeping its viewport.
+    if (elementLiftsSvgClip[elementId]) {
+      auto svgStart = FindEnclosingSvgStart(bodyHtml, tagStart);
+      if (svgStart != std::string::npos && liftedSvgStarts.insert(svgStart).second) {
+        auto svgEnd = bodyHtml.find('>', svgStart);
+        if (svgEnd != std::string::npos) {
+          auto liftedTag = BuildLiftedSvgTag(bodyHtml.substr(svgStart, svgEnd - svgStart));
+          if (!liftedTag.empty()) {
+            edits.push_back({svgStart, svgEnd, std::move(liftedTag)});
+          }
+        }
+      }
+    }
+  }
+
+  if (!edits.empty()) {
+    std::sort(edits.begin(), edits.end(),
+              [](const TextEdit& a, const TextEdit& b) { return a.start < b.start; });
+    std::string rebuilt;
+    rebuilt.reserve(bodyHtml.size() + edits.size() * 64);
+    size_t cursor = 0;
+    for (const auto& edit : edits) {
+      if (edit.start < cursor) {
+        continue;
+      }
+      rebuilt.append(bodyHtml, cursor, edit.start - cursor);
+      rebuilt += edit.text;
+      cursor = edit.end;
+    }
+    rebuilt.append(bodyHtml, cursor, std::string::npos);
+    bodyHtml = std::move(rebuilt);
   }
 
   return keyframesCss;

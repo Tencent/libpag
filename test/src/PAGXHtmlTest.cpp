@@ -5100,6 +5100,43 @@ CLI_TEST(PAGXHtmlTest, AnimatedRepeaterStrokeStaysInsideEachCopy) {
 // Animation CSS and @font-face rules are independent outputs. Emitting them from one buffer makes
 // the animation depend on the font path staying intact: any change that skips or moves the font
 // rules silently drops every keyframe.
+// Weaving used to look each target up by rescanning the whole body and rewriting it in place, so a
+// document with many animated elements degraded badly. Every target must still receive its own
+// declaration once the edits are batched into a single rebuild.
+CLI_TEST(PAGXHtmlTest, ManyAnimationTargetsEachGetTheirDeclaration) {
+  constexpr int kTargets = 40;
+  std::string xml = "<pagx width=\"400\" height=\"400\">\n";
+  for (int i = 0; i < kTargets; ++i) {
+    xml += "  <Layer id=\"box" + std::to_string(i) + "\" left=\"" + std::to_string((i % 8) * 50) +
+           "\" top=\"" + std::to_string((i / 8) * 50) +
+           "\" width=\"40\" height=\"40\">\n"
+           "    <Rectangle position=\"20,20\" size=\"40,40\"/>\n"
+           "    <Fill color=\"#2563EB\"/>\n"
+           "  </Layer>\n";
+  }
+  xml +=
+      "  <Animations>\n    <Animation id=\"loop\" duration=\"60\" frameRate=\"60\" "
+      "loop=\"loop\">\n";
+  for (int i = 0; i < kTargets; ++i) {
+    xml += "      <Object target=\"box" + std::to_string(i) +
+           "\"><Channel name=\"alpha\" type=\"float\">"
+           "<Key time=\"0\" value=\"1\" interpolation=\"linear\"/>"
+           "<Key time=\"60\" value=\"0.2\"/></Channel></Object>\n";
+  }
+  xml += "    </Animation>\n  </Animations>\n</pagx>";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), static_cast<size_t>(kTargets)) << html;
+  for (int i = 0; i < kTargets; ++i) {
+    auto tag = FindTagContaining(html, "id=\"box" + std::to_string(i) + "\"");
+    ASSERT_FALSE(tag.empty()) << i;
+    EXPECT_EQ(CountOccurrences(tag, "animation:"), 1u) << i << tag;
+  }
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationCssIsEmittedSeparatelyFromFontFace) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
