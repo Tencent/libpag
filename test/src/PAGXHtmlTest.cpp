@@ -5097,6 +5097,49 @@ CLI_TEST(PAGXHtmlTest, AnimatedRepeaterStrokeStaysInsideEachCopy) {
 // the stroke alignment: a centered stroke paints width/2 beyond the geometry, an outside stroke
 // paints width, and an inside stroke stays within the geometry. Padding every alignment by the same
 // amount inflates the Layer box (and the round-trip Layer size) without changing any pixel.
+// Animation CSS and @font-face rules are independent outputs. Emitting them from one buffer makes
+// the animation depend on the font path staying intact: any change that skips or moves the font
+// rules silently drops every keyframe.
+CLI_TEST(PAGXHtmlTest, AnimationCssIsEmittedSeparatelyFromFontFace) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/embedded_font_with_animation.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  // The document really does produce both kinds of rules.
+  ASSERT_NE(html.find("@font-face"), std::string::npos) << html;
+  ASSERT_NE(html.find("@keyframes"), std::string::npos) << html;
+  size_t styleStart = 0;
+  bool sawFontBlock = false;
+  bool sawAnimationBlock = false;
+  while ((styleStart = html.find("<style>", styleStart)) != std::string::npos) {
+    auto styleEnd = html.find("</style>", styleStart);
+    ASSERT_NE(styleEnd, std::string::npos);
+    auto block = html.substr(styleStart, styleEnd - styleStart);
+    if (block.find("@font-face") != std::string::npos) {
+      sawFontBlock = true;
+      EXPECT_EQ(block.find("@keyframes"), std::string::npos)
+          << "Keyframes must not ride along with the font rules";
+    }
+    if (block.find("@keyframes") != std::string::npos) {
+      sawAnimationBlock = true;
+    }
+    styleStart = styleEnd;
+  }
+  EXPECT_TRUE(sawFontBlock);
+  EXPECT_TRUE(sawAnimationBlock);
+
+  // The animation must not depend on fonts being present at all: a document without embedded fonts
+  // still has to emit its keyframes.
+  auto textHtml = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/fill/04_alpha_on_text.pagx"),
+      options);
+  ASSERT_FALSE(textHtml.empty());
+  EXPECT_NE(textHtml.find("@keyframes"), std::string::npos) << textHtml;
+  EXPECT_EQ(textHtml.find("@font-face"), std::string::npos) << textHtml;
+}
+
 CLI_TEST(PAGXHtmlTest, StrokeAlignDeterminesPaddedLayerBox) {
   struct AlignCase {
     const char* align;
