@@ -49,6 +49,10 @@ bool HasLayerOnlyFeatures(const Layer* layer);
  */
 bool IsLayerShell(const Layer* layer);
 
+/** True when a style masks with the layer's own geometry (LayerStyleContentSource::Geometry in
+ * tgfx): moving geometry between the layer and its children would change the mask. */
+bool UsesOwnGeometryMask(const Layer* layer);
+
 // ============================================================================
 // Element / painter classification
 // ============================================================================

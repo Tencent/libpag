@@ -256,6 +256,21 @@ describe('pagxBuildCanonicalAnimation', () => {
     expect(out.animationShorthand).toBe('pagxAnim0 1s linear 0s infinite normal both');
   });
 
+  test('suppresses a zero-iteration animation instead of turning it into one iteration', () => {
+    const cap = {
+      keyframes: [
+        { offset: 0, props: { transform: 'rotate(0deg)' } },
+        { offset: 1, props: { transform: 'rotate(90deg)' } },
+      ],
+      durationMs: 1000,
+      delayMs: 0,
+      iterations: 0,
+      direction: 'normal',
+      timing: 'linear',
+    };
+    expect(pagxBuildCanonicalAnimation(cap, 0, PAGX_ANIM_PREFIX)).toBeNull();
+  });
+
   test('returns null when no stop yields any tracked declaration', () => {
     const cap = {
       keyframes: [{ offset: 0, props: { width: '5px' } }, { offset: 1, props: { width: '9px' } }],

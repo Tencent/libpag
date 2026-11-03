@@ -992,6 +992,9 @@ bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
   if (!layer->contents.empty()) {
     return changed;  // mixed: paint order would change
   }
+  if (UsesOwnGeometryMask(layer)) {
+    return changed;  // the layer falls back to the subtree contour; moving children changes it
+  }
 
   for (auto* child : layer->children) {
     if (!child->children.empty()) {
@@ -1401,6 +1404,9 @@ bool ChildHasNoPaintAffectingEffect(const Layer* child) {
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
                            const std::unordered_set<const Layer*>& maskRefs) {
+  if (UsesOwnGeometryMask(parent)) {
+    return false;  // glass masks with the parent's own geometry, which absorbing would grow
+  }
   if (!child->children.empty()) {
     return false;  // only leaf payload wrappers; child layers would need layout re-parenting
   }

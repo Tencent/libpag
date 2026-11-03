@@ -33,7 +33,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 
-#ifdef PAG_USE_SWIFTSHADER
+#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
 #else
 #ifndef GL_SILENCE_DEPRECATION
@@ -75,8 +75,12 @@ uint32_t GetGLVersion(const char* versionString) {
 
 /**
  * 用例描述: 测试 PAGSurface 数据同步
+ * Excluded from the webgl lane (PAG_WEBGL_ONLY): the case asserts desktop-GL semaphore
+ * semantics, which do not exist on Emscripten's single global GL context. The webgpu lane
+ * and native builds keep it.
  */
-PAG_TEST(PAGSurfaceTest, FromTexture) {
+#ifndef PAG_WEBGL_ONLY
+PAG_PIXEL_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
@@ -128,11 +132,12 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
     EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceTest/FromTexture"));
   }
 }
+#endif
 
 /**
  * 用例描述: 遮罩使用屏幕坐标系时origin不一致的情况
  */
-PAG_TEST(PAGSurfaceTest, Mask) {
+PAG_PIXEL_TEST(PAGSurfaceTest, Mask) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
@@ -162,7 +167,11 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 
 /**
  * 用例描述: 测试 GLRestorer 在共享纹理场景下正确保存和恢复 OpenGL 状态
+ * Excluded from the webgl lane (PAG_WEBGL_ONLY): the case asserts cross-context
+ * viewport/scissor/FBO state restoration, which does not exist on Emscripten's single
+ * global GL context. The webgpu lane and native builds keep it.
  */
+#ifndef PAG_WEBGL_ONLY
 PAG_TEST(PAGSurfaceTest, GLRestorer) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
@@ -238,11 +247,12 @@ PAG_TEST(PAGSurfaceTest, GLRestorer) {
   glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
+#endif
 
 /**
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
  */
-PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
+PAG_PIXEL_TEST(PAGSurfaceTest, BottomLeftScissor) {
   auto pagFile = LoadPAGFile("assets/test.pag");
   auto width = pagFile->width();
   auto height = pagFile->height() * 2;

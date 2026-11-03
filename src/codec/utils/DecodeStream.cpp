@@ -300,7 +300,10 @@ void DecodeStream::positionChanged(size_t offset) {
 
 bool DecodeStream::checkEndOfFile(uint32_t bytesToRead) {
   // The _position must not use the uint32_t type, otherwise it will overflow.
-  if (_position + bytesToRead > dataView.size()) {
+  // Check with subtraction instead of addition: on wasm size_t is 32-bit, so
+  // _position + bytesToRead wraps around, letting corrupted lengths (e.g. a fuzzed tag length
+  // of 0xFFFFFFFF) pass the check and poison the stream position with a wrapped value.
+  if (bytesToRead > dataView.size() || _position > dataView.size() - bytesToRead) {
     PAGThrowError(context, "End of file was encountered.");
     return true;
   }

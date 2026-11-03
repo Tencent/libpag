@@ -36,13 +36,19 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   _width = sequence->getVideoWidth();
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
-  emscripten::val videoReaderManage = val::module_property("videoReaderManager");
-  videoReader = videoReaderManage.call<val>("getVideoReaderByID",
-                                            static_cast<int>(sequence->composition->uniqueID));
-  if (!videoReader.isUndefined()) {
-    auto video = videoReader.call<val>("getVideo");
-    if (!video.isNull()) {
-      imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
+  // The TS SDK assigns Module.videoReaderManager before rendering video content. Embedders
+  // driving the wasm API directly (e.g. the web test runner) never set it, so a missing
+  // manager must degrade to "no hardware decoder" instead of crashing on an undefined JS
+  // object; the factory list then falls back to the remaining decoder factories.
+  emscripten::val videoReaderManager = val::module_property("videoReaderManager");
+  if (!videoReaderManager.isUndefined()) {
+    videoReader = videoReaderManager.call<val>("getVideoReaderByID",
+                                               static_cast<int>(sequence->composition->uniqueID));
+    if (!videoReader.isUndefined()) {
+      auto video = videoReader.call<val>("getVideo");
+      if (!video.isNull()) {
+        imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
+      }
     }
   }
 }

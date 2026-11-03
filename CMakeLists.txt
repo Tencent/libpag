@@ -565,6 +565,9 @@ if (WEB)
     # GPUDrawable reuses tgfx's ReadCanvasSize() from WebJSBindings.h, which tgfx keeps in its
     # internal src tree instead of the public include directory.
     list(APPEND PAG_INCLUDES ${TGFX_DIR}/src)
+    # RTTI must stay off for the whole web build: tgfx's emscripten bindings are compiled
+    # no-rtti and use synthetic typeinfo, so mixing RTTI libpag code into the same embind
+    # registry splits type identities and breaks every JS-to-C++ call at runtime.
     list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
@@ -918,6 +921,23 @@ if (PAG_EXCLUDE_FILES)
 endif ()
 
 if (WEB)
+    if (PAG_USE_WEBGPU)
+        # tgfx's WebGPU backend links libtint (an ALIAS of tint_api) as a separate
+        # EXCLUDE_FROM_ALL target, so the final link needs it. It must be referenced by target
+        # name (not a $<TARGET_FILE:...> path): tint_api is a thin archive whose implementation
+        # lives in ~50 component libraries propagated through CMake's link closure, and a file
+        # path entry drops that closure, leaving the tint symbols undefined. The closure flows
+        # to the consumers through target_link_libraries(pag ...) below; lib-merge cannot take
+        # a target name, but tint needs no merging for the same reason.
+        if (TARGET libtint)
+            set(PAG_LINK_TARGETS libtint)
+        else ()
+            message(FATAL_ERROR
+                    "PAG_USE_WEBGPU requires building tgfx from source: the libtint target "
+                    "is missing, which means a prebuilt tgfx (TGFX_CACHE_DIR) is in use and "
+                    "the final link would fail on tint symbols.")
+        endif ()
+    endif ()
     if (HasParent)
         # When used as a subdirectory, build as a static library for the parent to link.
         add_library(pag STATIC ${PAG_FILES})
@@ -1008,7 +1028,7 @@ target_include_directories(pag PUBLIC include PRIVATE ${PAG_INCLUDES})
 if (PAG_USE_RTTR)
     target_include_directories(pag SYSTEM PRIVATE ${RTTR_INCLUDE})
 endif ()
-target_link_libraries(pag ${PAG_STATIC_LIBS} ${PAG_SHARED_LIBS})
+target_link_libraries(pag ${PAG_STATIC_LIBS} ${PAG_LINK_TARGETS} ${PAG_SHARED_LIBS})
 set_target_properties(pag PROPERTIES PREFIX "")
 set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 
@@ -1191,13 +1211,14 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture)|CocoaSurface(Header)?)Test\\.mm$")
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
         if (NOT PAG_USE_METAL)
-            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture)Test\\.mm$")
+            list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetal(Surface|Texture|Atlas)Test\\.mm$")
         endif ()
     endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
@@ -1219,6 +1240,10 @@ if (PAG_BUILD_TESTS)
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
             ${TGFX_DIR}/third_party/json/include
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    if (PAG_USE_METAL)
+        set_source_files_properties(test/src/utils/DevicePool.cpp PROPERTIES
+                INCLUDE_DIRECTORIES "${TGFX_DIR}/src;${TGFX_DIR}/third_party/concurrentqueue")
+    endif ()
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
@@ -1268,6 +1293,22 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    if (PAG_USE_METAL)
+        # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
+        # replace this private API when tgfx provides a supported test-reset hook.
+        add_library(pag-metal-test-support OBJECT test/src/utils/MetalTestSupport.cpp)
+        add_dependencies(pag-metal-test-support ${PAG_DEPEND_TARGETS})
+        target_include_directories(pag-metal-test-support PRIVATE ${PAG_INCLUDES}
+                ${TGFX_DIR}/src ${TGFX_DIR}/third_party/concurrentqueue)
+        target_compile_definitions(pag-metal-test-support PRIVATE ${PAG_TEST_DEFINES})
+        target_compile_options(pag-metal-test-support PRIVATE ${PAG_TEST_COMPILE_OPTIONS})
+        foreach (METAL_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_sources(${METAL_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-metal-test-support>)
+            add_dependencies(${METAL_TEST_TARGET} pag-metal-test-support)
+        endforeach ()
+    endif ()
 
     if (MACOS AND USE_NATIVE_PLATFORM AND NOT CMAKE_CROSSCOMPILING)
         # Link the archive directly so this pure Objective-C consumer inherits no TGFX_USE_* macros

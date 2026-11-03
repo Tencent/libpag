@@ -59,10 +59,6 @@
 namespace pag {
 
 PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
-  pag::DeviceLockScope deviceLock;
-  ASSERT_TRUE(static_cast<bool>(deviceLock));
-  auto* context = deviceLock.context();
-
   auto doc = pagx::PAGXDocument::Make(240, 240);
   auto* ancestor = doc->makeNode<pagx::Layer>();
   ancestor->x = 10;
@@ -104,16 +100,21 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
   tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
   tgfx::Pixmap pixmap(actual);
   ASSERT_TRUE(codec->readPixels(pixmap.info(), pixmap.writablePixels()));
-  auto expected = tgfx::Surface::Make(context, codec->width(), codec->height());
-  ASSERT_NE(expected, nullptr);
-  expected->getCanvas()->translate(-bounds.left, -bounds.top);
-  build.root->draw(expected->getCanvas());
-  tgfx::Bitmap reference(codec->width(), codec->height(), false, false);
-  tgfx::Pixmap referencePixels(reference);
-  ASSERT_TRUE(expected->readPixels(referencePixels.info(), referencePixels.writablePixels()));
-  EXPECT_EQ(referencePixels.info().byteSize(), pixmap.info().byteSize());
-  EXPECT_EQ(std::memcmp(referencePixels.pixels(), pixmap.pixels(), pixmap.info().byteSize()), 0);
-  EXPECT_NEAR(pixmap.getColor(80, 80).alpha, 0.5f, 0.01f);
+  {
+    // RenderMaskedLayer locks its own device; reference draws must not span rasterization calls.
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    auto expected = tgfx::Surface::Make(deviceLock.context(), codec->width(), codec->height());
+    ASSERT_NE(expected, nullptr);
+    expected->getCanvas()->translate(-bounds.left, -bounds.top);
+    build.root->draw(expected->getCanvas());
+    tgfx::Bitmap reference(codec->width(), codec->height(), false, false);
+    tgfx::Pixmap referencePixels(reference);
+    ASSERT_TRUE(expected->readPixels(referencePixels.info(), referencePixels.writablePixels()));
+    EXPECT_EQ(referencePixels.info().byteSize(), pixmap.info().byteSize());
+    EXPECT_EQ(std::memcmp(referencePixels.pixels(), pixmap.pixels(), pixmap.info().byteSize()), 0);
+    EXPECT_NEAR(pixmap.getColor(80, 80).alpha, 0.5f, 0.01f);
+  }
 
   auto localBounds = pagx::ComputeRasterizedLayerBoundsInSpace(target, parent);
   auto localData = pagx::RenderMaskedLayer(&gpu, build.root, target, parent, 1);
@@ -123,7 +124,10 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
   tgfx::Bitmap localBitmap(localCodec->width(), localCodec->height(), false, false);
   tgfx::Pixmap localPixels(localBitmap);
   ASSERT_TRUE(localCodec->readPixels(localPixels.info(), localPixels.writablePixels()));
-  auto localReference = tgfx::Surface::Make(context, localCodec->width(), localCodec->height());
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto localReference =
+      tgfx::Surface::Make(deviceLock.context(), localCodec->width(), localCodec->height());
   ASSERT_NE(localReference, nullptr);
   localReference->getCanvas()->translate(-localBounds.left, -localBounds.top);
   parent->draw(localReference->getCanvas());
@@ -139,10 +143,6 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerUsesParentCompositing) {
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
-  pag::DeviceLockScope deviceLock;
-  ASSERT_TRUE(static_cast<bool>(deviceLock));
-  auto* context = deviceLock.context();
-
   const std::string xml =
       "<pagx width=\"100\" height=\"100\"><Layer preserve3D=\"true\">"
       "<Layer z=\"100\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
@@ -164,6 +164,9 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
   auto importedRoot = pagx::LayerBuilder::Build(imported.get());
   ASSERT_NE(originalRoot, nullptr);
   ASSERT_NE(importedRoot, nullptr);
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   auto reference = tgfx::Surface::Make(context, 100, 100);
   auto actual = tgfx::Surface::Make(context, 100, 100);
   ASSERT_NE(reference, nullptr);
@@ -176,10 +179,6 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesDepthWithoutPerspective) {
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
-  pag::DeviceLockScope deviceLock;
-  ASSERT_TRUE(static_cast<bool>(deviceLock));
-  auto* context = deviceLock.context();
-
   const std::string xml =
       "<pagx width=\"240\" height=\"240\">"
       "<Layer x=\"20\" y=\"30\" alpha=\"0.5\" perspective=\"500\" preserve3D=\"true\">"
@@ -196,6 +195,9 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
   auto importedRoot = pagx::LayerBuilder::Build(imported.get());
   ASSERT_NE(originalRoot, nullptr);
   ASSERT_NE(importedRoot, nullptr);
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   auto reference = tgfx::Surface::Make(context, 240, 240);
   auto actual = tgfx::Surface::Make(context, 240, 240);
   ASSERT_NE(reference, nullptr);
@@ -209,10 +211,6 @@ PAGX_TEST(PAGXUtilsTest, SVGExportPreservesShared3DProjection) {
 }
 
 PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
-  pag::DeviceLockScope deviceLock;
-  ASSERT_TRUE(static_cast<bool>(deviceLock));
-  auto* context = deviceLock.context();
-
   const std::string xml =
       "<pagx width=\"100\" height=\"100\">"
       "<Layer id=\"m\" visible=\"false\"><Rectangle position=\"25,25\" size=\"50,50\"/>"
@@ -237,7 +235,9 @@ PAGX_TEST(PAGXUtilsTest, RasterLayerPreservesMaskScrollRectAndAlpha) {
   tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
   tgfx::Pixmap actualPixels(actual);
   ASSERT_TRUE(codec->readPixels(actualPixels.info(), actualPixels.writablePixels()));
-  auto expected = tgfx::Surface::Make(context, codec->width(), codec->height());
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto expected = tgfx::Surface::Make(deviceLock.context(), codec->width(), codec->height());
   ASSERT_NE(expected, nullptr);
   expected->getCanvas()->translate(-bounds.left, -bounds.top);
   build.root->draw(expected->getCanvas());

@@ -32,7 +32,7 @@ using nlohmann::json;
 /**
  * 用例描述: PAGImageLayer 图层基础边缘 Case 测试
  */
-PAG_TEST(PAGImageLayerTest, imageBasetTest) {
+PAG_PIXEL_TEST(PAGImageLayerTest, imageBasetTest) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -57,7 +57,7 @@ PAG_TEST(PAGImageLayerTest, imageBasetTest) {
 /**
  * 用例描述: PAGImageLayer多线程替换测试
  */
-PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
+PAG_PIXEL_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -69,6 +69,8 @@ PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
 
   TestPAGFile->setCurrentTime(3000000);
   TestPAGPlayer->flush();
+#if !defined(__EMSCRIPTEN__)
+  // Concurrency is unavailable in the single-threaded web build; skip the racing section.
   // 多线程同时替换图片
   std::thread thread1([imageLayer, image, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
@@ -93,6 +95,7 @@ PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
   thread1.join();
   thread2.join();
   thread3.join();
+#endif
 
   imageLayer->replaceImage(image);
   TestPAGPlayer->flush();
@@ -111,7 +114,7 @@ PAG_TEST(PAGImageLayerTest, imageLayerContentDuration) {
   ASSERT_NE(imageLayer, nullptr);
   ASSERT_EQ(imageLayer->contentDuration(), 1160000);
 
-  testFile = LoadPAGFile("resources/apitest/test_TimeRemapBeyondFileRange.pag");
+  testFile = LoadPAGFile("resources/apitest/test_timeRemapBeyondFileRange.pag");
   // 图层 timeremap 都超过了文件显示区域
   imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(testFile, LayerType::Image, commonTarget));
@@ -147,7 +150,7 @@ PAG_TEST(PAGImageLayerTest, getBoundsTest) {
 /**
  * 用例描述: PAGImageLayer setImage接口 测试
  */
-PAG_TEST(PAGImageLayerTest, setImage) {
+PAG_PIXEL_TEST(PAGImageLayerTest, setImage) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/filter/fastblur.pag");
   auto image = MakePAGImage("resources/apitest/imageReplacement.png");

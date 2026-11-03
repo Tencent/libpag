@@ -372,28 +372,28 @@ CLI_TEST(PAGXCliTest, Bounds_IdAndXPathMutuallyExclusive) {
 // Render tests — Verify rendered output matches baseline screenshots
 //==============================================================================
 
-CLI_TEST(PAGXCliTest, Render_Basic) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Basic) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderBasic"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Gradient) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Gradient) {
   auto inputPath = TestResourcePath("render_gradient.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderGradient"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Scale) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Scale) {
   auto inputPath = TestResourcePath("render_scale.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--scale", "2.0", inputPath}, "PAGXCliTest/RenderScale"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Crop) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Crop) {
   auto inputPath = TestResourcePath("render_crop.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--crop", "50,50,100,100", inputPath}, "PAGXCliTest/RenderCrop"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Background) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Background) {
   auto inputPath = TestResourcePath("render_background.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--background", "#0088FF", inputPath},
                                "PAGXCliTest/RenderBackground"));
@@ -455,7 +455,7 @@ CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
   EXPECT_LT(switched.getColor(250, 50).red, 0.1f);
 }
 
-CLI_TEST(PAGXCliTest, Render_WebpFormat) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_WebpFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderWebpFormat.webp";
   auto ret =
@@ -464,7 +464,7 @@ CLI_TEST(PAGXCliTest, Render_WebpFormat) {
   EXPECT_TRUE(CompareRenderedImage(outputPath, "PAGXCliTest/RenderWebpFormat"));
 }
 
-CLI_TEST(PAGXCliTest, Render_JpgFormat) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_JpgFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderJpgFormat.jpg";
   auto ret =
@@ -483,14 +483,14 @@ CLI_TEST(PAGXCliTest, Render_Quality) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
-CLI_TEST(PAGXCliTest, Render_CombinedOptions) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_CombinedOptions) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   EXPECT_TRUE(RenderAndCompare(
       {"render", "--scale", "2.0", "--crop", "0,0,200,200", "--background", "#FFFF00", inputPath},
       "PAGXCliTest/RenderCombinedOptions"));
 }
 
-CLI_TEST(PAGXCliTest, Render_Text) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_Text) {
   auto inputPath = TestResourcePath("render_text.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderText"));
 }
@@ -541,47 +541,47 @@ CLI_TEST(PAGXCliTest, Render_UnsupportedFormat) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Render_IdFull) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdFull) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", inputPath}, "PAGXCliTest/RenderIdFull"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdBadge) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdBadge) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "badge", inputPath}, "PAGXCliTest/RenderIdBadge"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdCard) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdCard) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "card", inputPath}, "PAGXCliTest/RenderIdCard"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdBanner) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdBanner) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "banner", inputPath}, "PAGXCliTest/RenderIdBanner"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdNestedIcon) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdNestedIcon) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(
       RenderAndCompare({"render", "--id", "icon", inputPath}, "PAGXCliTest/RenderIdNestedIcon"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdWithScale) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdWithScale) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--scale", "2", inputPath},
                                "PAGXCliTest/RenderIdWithScale"));
 }
 
-CLI_TEST(PAGXCliTest, Render_IdWithCrop) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_IdWithCrop) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--id", "banner", "--crop", "60,0,120,80", inputPath},
                                "PAGXCliTest/RenderIdWithCrop"));
 }
 
-CLI_TEST(PAGXCliTest, Render_XPathLayer) {
+CLI_PIXEL_TEST(PAGXCliTest, Render_XPathLayer) {
   auto inputPath = TestResourcePath("render_layer_target.pagx");
   EXPECT_TRUE(RenderAndCompare({"render", "--xpath", "//Layer[@id='badge']", inputPath},
                                "PAGXCliTest/RenderXPathLayer"));
@@ -1231,6 +1231,58 @@ CLI_TEST(PAGXCliTest, Verify_DowngradeableLayer) {
   auto output = oss.str();
   EXPECT_NE(ret, 0);  // warning returns non-zero
   EXPECT_TRUE(output.find("child Layer(s) use no Layer-exclusive features") != std::string::npos);
+}
+
+// The same shape with a GlassStyle on the parent: following the advice would move the children's
+// geometry into the parent and change what the style masks with, so the advice must be withheld.
+CLI_TEST(PAGXCliTest, Verify_DowngradeableLayerWithGlass) {
+  auto inputPath = TestResourcePath("verify_downgradeable_layer_glass.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  // Another diagnostic may raise the exit code, so only the absence of this one is asserted, and
+  // the fixture must still report something or the absence would prove nothing.
+  EXPECT_FALSE(output.empty());
+  EXPECT_EQ(output.find("child Layer(s) use no Layer-exclusive features"), std::string::npos);
+}
+
+// Two identical Glass Layers with subtrees: extracting either into a Composition would leave it
+// without geometry of its own, so both the window and the subtree rules must skip them. Only
+// identical copies reach either rule, so both document copies carry the GlassStyle.
+CLI_TEST(PAGXCliTest, Verify_StructurallyIdenticalGlassLayers) {
+  const std::string body =
+      "<Layer width=\"100\" height=\"100\"><Layer width=\"100%\" height=\"100%\">"
+      "<Layer left=\"5\" top=\"5\" width=\"90\" height=\"90\"><Rectangle width=\"100%\" "
+      "height=\"100%\"/><Fill color=\"#FF0000\"/></Layer></Layer>";
+  const std::string files[] = {"structurally_identical_glass.pagx",
+                               "structurally_identical_plain.pagx"};
+  std::string output[2];
+  for (int i = 0; i < 2; i++) {
+    auto inputPath = TempDir() + "/" + files[i];
+    {
+      std::ofstream file(inputPath);
+      file << "<pagx width=\"200\" height=\"200\">";
+      for (int copy = 0; copy < 2; copy++) {
+        file << body;
+        if (i == 0) {
+          file << "<GlassStyle/>";
+        }
+        file << "</Layer>";
+      }
+      file << "</pagx>";
+    }
+    std::ostringstream oss;
+    auto* old = std::cerr.rdbuf(oss.rdbuf());
+    CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+    std::cerr.rdbuf(old);
+    output[i] = oss.str();
+  }
+  EXPECT_TRUE(output[1].find("structurally identical Layers") != std::string::npos)
+      << "the plain fixture must trigger the advice, otherwise the absence proves nothing";
+  EXPECT_EQ(output[0].find("structurally identical Layers"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Verify_MergeableAdjacentLayers) {
@@ -3171,7 +3223,7 @@ CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
   EXPECT_NE(ret, 0);
 }
 
-CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
+CLI_PIXEL_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
   // Resolving an inline SVG with two sibling paths must preserve their common source depth:
   // each path and its painter live in a separate peer Group. Flattening only the first path while
   // grouping the second would make the output asymmetric and can change painter accumulation.

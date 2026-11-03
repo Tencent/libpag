@@ -53,11 +53,13 @@ class DiskCache {
   static bool WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
  private:
+  static constexpr uint32_t InitialFileID = 1;
+
   std::mutex locker = {};
   std::string customCacheDir;
   std::string configPath;
   std::string cacheFolder;
-  uint32_t fileIDCount = 1;
+  uint32_t fileIDCount = InitialFileID;
   size_t totalDiskSize = 0;
   size_t maxDiskSize = 1073741824;  // 1 GB
   std::unordered_map<std::string, uint32_t> cachedFileIDs = {};

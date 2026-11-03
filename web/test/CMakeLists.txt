@@ -1,0 +1,309 @@
+cmake_minimum_required(VERSION 3.13)
+project(PAGWebTest)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_emscripten.cmake)
+
+set(CMAKE_CXX_STANDARD 17)
+
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif ()
+
+option(PAG_USE_WEBGPU "Build the test binary against the WebGPU backend" OFF)
+option(PAG_UPDATE_BASELINE "Record MD5s into the local cache instead of comparing" OFF)
+option(PAG_SKIP_GENERATE_BASELINE_IMAGES "Do not regenerate _base.webp reference images" OFF)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+# The root CMakeLists must not create native test targets that cannot compile for Emscripten.
+set(PAG_BUILD_TESTS OFF)
+# Mirror the native test configuration: the pagx suites need the extended formats.
+set(PAG_BUILD_PAGX ON)
+set(PAG_BUILD_SVG ON)
+set(PAG_BUILD_HTML ON)
+set(PAG_BUILD_PPT ON)
+# Mirror the native test builds (root CMakeLists enables FreeType with PAG_BUILD_TESTS): the text
+# suites load .otf fixtures through tgfx::Typeface::MakeFromPath, which is a nullptr stub on web
+# unless the embedded FreeType backend is compiled in (tgfx WebTypeface.cpp).
+set(PAG_USE_FREETYPE ON)
+# The test suites call into CLI entry points (RunVerify, image storage helpers), which also
+# pulls in the libxml2 vendor and the generated pagx_xsd.h header from the root's CLI block.
+set(PAG_BUILD_CLI ON)
+# Web platform only enables WEBP decode by default. Enable encode for baseline image generation
+# and PNG encoding for the pagx static-image rasterization path (HTML/PPT diamond/conic gradients,
+# plus-darker backdrops, mask baking) whose artifacts are PNG-encoded by tgfx::ImageCodec.
+# These must use the PAG_USE_ prefix: the root CMakeLists mirrors PAG_USE_* onto TGFX_USE_* when it
+# configures tgfx, which would silently drop variables set in the tgfx namespace here.
+set(PAG_USE_PNG_DECODE ON)
+set(PAG_USE_PNG_ENCODE ON)
+set(PAG_USE_JPEG_DECODE ON)
+set(PAG_USE_WEBP_ENCODE ON)
+set(PAG_USE_JPEG_ENCODE ON)
+
+# Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
+# PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
+# prevents it from running again inside the root CMakeLists.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./libpag)
+
+# The pagx-cli executable itself has no meaning in the browser; only its sources are reused
+# by the test binary. Keep it out of the default build so `cmake --build` stays lean.
+set_target_properties(pagx-cli PROPERTIES EXCLUDE_FROM_ALL YES)
+
+set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+
+# The root CMakeLists resolves TGFX_DIR inside its own (child) directory scope, so it never
+# propagates back here. Resolve it again for this scope, honoring a user-provided cache value.
+if (NOT TGFX_DIR)
+    set(TGFX_DIR ${ROOT}/third_party/tgfx)
+else ()
+    get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+endif ()
+
+# Collect test sources (reuse the existing native tests).
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${ROOT}/test/src/*.*)
+
+# Objective-C platform tests never compile under Emscripten.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "\\.mm$")
+# The web build uses WebTestRunner.cpp as its entry point.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "TestMain\\.cpp$")
+# Native CMake compiles this helper only into Metal targets.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "MetalTestSupport\\.cpp$")
+# Phase-1 exclusions (see README.md "Excluded on the web"):
+list(FILTER TEST_SOURCES EXCLUDE REGEX "MultiThreadCase\\.cpp$")            # pthreads
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGANRRegressionTest\\.cpp$")       # pthreads
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGDiskCacheTest\\.cpp$")           # pthreads + MEMFS disk cache
+# The suite asserts sequence/image cache counts driven by the native 500ms prefetch window
+# (DECODING_VISIBLE_DISTANCE); the web build prefetches the whole timeline in
+# RenderCache::prepareLayers(), so the counts permanently differ from the native semantics.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "AsyncDecodeTest\\.cpp$")            # web full-timeline prefetch
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
+# The legacy HTML-importer suite uses dynamic_cast. RTTI cannot be enabled to accommodate it:
+# tgfx's emscripten bindings are compiled no-rtti with synthetic typeinfo, so an RTTI libpag in
+# the same embind registry splits type identities and breaks all JS-to-C++ calls at runtime.
+# The suite's logic stays covered by the native lanes.
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXHTMLImporterTest\\.cpp$")       # dynamic_cast vs no-RTTI
+
+# Exclude hidden files (e.g., .DS_Store).
+foreach (FILE_PATH ${TEST_SOURCES})
+    get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
+    if (NOT FILE_NAME)
+        list(APPEND TEST_EXCLUDE_FILES ${FILE_PATH})
+    endif ()
+endforeach ()
+if (TEST_EXCLUDE_FILES)
+    list(REMOVE_ITEM TEST_SOURCES ${TEST_EXCLUDE_FILES})
+endif ()
+
+# Web test adapter sources.
+file(GLOB WEB_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+list(APPEND TEST_SOURCES ${WEB_TEST_SOURCES})
+
+# CLI implementation sources, mirroring the native test build (the suites reference
+# pagx::cli entry points; main.cpp is replaced by WebTestRunner.cpp).
+file(GLOB CLI_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/cli/*.cpp)
+list(FILTER CLI_SOURCES EXCLUDE REGEX "main\\.cpp$")
+list(APPEND TEST_SOURCES ${CLI_SOURCES})
+
+# The vendor's prebuilt gtest static library is compiled with -fno-rtti and therefore lacks
+# the typeinfo the RTTI-enabled test translation units reference. Compile gtest from source
+# instead so the typeinfo symbols exist in the same build.
+set(GTEST_SRC_DIR ${TGFX_DIR}/third_party/googletest/googletest)
+list(APPEND TEST_SOURCES ${GTEST_SRC_DIR}/src/gtest-all.cc)
+set_source_files_properties(${GTEST_SRC_DIR}/src/gtest-all.cc PROPERTIES COMPILE_OPTIONS "-w")
+
+# Test-only archive decoders, mirroring the native test build so that archive-producing suites
+# validate the central directory, entry data, and CRCs by actually extracting.
+set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+set(WOFF2_DIR ${ROOT}/third_party/woff2)
+set(BROTLI_DIR ${WOFF2_DIR}/brotli)
+file(GLOB BROTLI_DEC_SOURCES ${BROTLI_DIR}/c/dec/*.c)
+list(APPEND TEST_SOURCES ${MINIZIP_DIR}/unzip.c ${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES})
+set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
+        PROPERTIES COMPILE_OPTIONS "-w")
+
+add_executable(pag-test ${TEST_SOURCES})
+
+# minizip's zip.c (compiled into the pag library) and unzip.c (test sources) reference zlib
+# symbols. Native lanes resolve them transitively through ffavc's dynamic-library dependency
+# chain; the web build has no ffavc, so link the zlib static library from tgfx's vendor system.
+add_vendor_target(zlib-vendor STATIC_VENDORS zlib CONFIG_DIR ${TGFX_DIR})
+find_vendor_libraries(zlib-vendor STATIC ZLIB_STATIC_LIBS)
+add_dependencies(pag-test zlib-vendor)
+
+# Generate the HEAD file with the current commit hash for baseline versioning.
+execute_process(COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${ROOT}
+        OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
+
+# Determine the backend name for the baseline cache directory.
+if (PAG_USE_WEBGPU)
+    set(PAG_BACKEND_NAME "webgpu")
+else ()
+    set(PAG_BACKEND_NAME "webgl")
+    # The webgl lane runs on Emscripten's single global GL context: multi-device and
+    # multi-context semantics do not exist there. Tests that assert desktop-GL behavior
+    # (PAGSurfaceTest.FromTexture/GLRestorer, PAGXRuntimeTest.PAGSurfaceWrapRejectsMismatchedDevice)
+    # are excluded from this lane via PAG_WEBGL_ONLY. These OpenGL-specific tests remain
+    # covered by the native OpenGL build, not the WebGPU build.
+    target_compile_definitions(pag-test PRIVATE PAG_WEBGL_ONLY)
+endif ()
+
+# Runtime cache injection keeps comparison inputs independent of the WASM build and read-only.
+# Each configure generates an identity shared by the module and its published artifact manifest.
+execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${ROOT}
+        OUTPUT_VARIABLE SOURCE_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${TGFX_DIR}
+        OUTPUT_VARIABLE TGFX_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(RANDOM LENGTH 32 ALPHABET 0123456789abcdef PAG_TEST_BUILD_ID)
+set(PAG_TEST_MODE "compare")
+if (PAG_UPDATE_BASELINE)
+    set(PAG_TEST_MODE "update")
+endif ()
+set(BUILD_INFO "{\"protocol\":1,\"backend\":\"${PAG_BACKEND_NAME}\",\"mode\":\"${PAG_TEST_MODE}\",\"buildId\":\"${PAG_TEST_BUILD_ID}\",\"sourceRevision\":\"${SOURCE_REVISION}\",\"tgfxRevision\":\"${TGFX_REVISION}\",\"configuration\":\"${CMAKE_BUILD_TYPE}\"}")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json "${BUILD_INFO}\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/tgfx-binding-path.txt "${TGFX_DIR}/web/lib/tgfx.esm.js\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/WebTestBuildInfo.h
+        "#pragma once\nstatic constexpr const char* BuildInfoJson = R\"json(${BUILD_INFO})json\";\n")
+target_include_directories(pag-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+# Preload test resources. The whole-dataset directories mirror the native runs; the apitest
+# fixtures are linked file-by-file at the top level only, excluding the 492MB apitest/SVG
+# corpus that belongs to the (web-excluded) PAGXSVGTest. resources/html is 15MB of corpus for
+# the HTML eval pipeline and stays preloaded because PAGX suites reference it.
+set(PRELOAD_RESOURCES "")
+foreach (resource_dir IN ITEMS pagx_to_html font filter timestretch text blend layout gradient
+        disk fuzz compare html svg cli)
+    list(APPEND PRELOAD_RESOURCES
+        "SHELL:--preload-file ${ROOT}/resources/${resource_dir}@/resources/${resource_dir}")
+endforeach ()
+# Several suites load fixtures directly from the repository-root assets/ directory (for example
+# PAGFileTest.SetStartTime's assets/replacement.pag). Without it the loads return nullptr and the
+# tests crash on null-pointer calls instead of failing an assertion.
+list(APPEND PRELOAD_RESOURCES "SHELL:--preload-file ${ROOT}/assets@/assets")
+# PAGXTest.SpecSamples walks spec/samples with a directory_iterator (which aborts in
+# -fno-exceptions mode when the directory is missing).
+list(APPEND PRELOAD_RESOURCES "SHELL:--preload-file ${ROOT}/spec@/spec")
+file(GLOB APITEST_TOP_LEVEL ${ROOT}/resources/apitest/*)
+foreach (fixture ${APITEST_TOP_LEVEL})
+    if (NOT IS_DIRECTORY ${fixture})
+        get_filename_component(fixture_name "${fixture}" NAME)
+        list(APPEND PRELOAD_RESOURCES "SHELL:--preload-file ${fixture}@/resources/apitest/${fixture_name}")
+    endif ()
+endforeach ()
+
+target_compile_options(pag-test PRIVATE
+        -fno-rtti
+        -fno-exceptions
+        -fno-access-control
+        -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
+)
+
+# Asyncify enables synchronous C++ code to await JS Promises. Required for the WebGPU backend
+# where buffer mapping is fully asynchronous: without it, the synchronous readPixels() used by
+# Baseline::Compare busy-waits forever. Only enabled for WebGPU; enabling it on WebGL causes
+# function signature mismatch crashes in indirect calls.
+if (PAG_USE_WEBGPU)
+    # ASYNCIFY_REMOVE excludes the shader compilation libraries (tint and friends) from
+    # instrumentation. These are pure CPU computation and never participate in async
+    # operations; instrumenting them corrupts their execution state.
+    set(ASYNCIFY_LINK_OPTIONS
+            -sASYNCIFY=1
+            -sASYNCIFY_STACK_SIZE=262144
+            "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
+    )
+    # The WebTestRunner GL-context guard branches on the backend macro, which the root project
+    # only defines for the pag library target, not for the test sources.
+    target_compile_definitions(pag-test PRIVATE TGFX_USE_WEBGPU)
+    target_compile_definitions(pag-test PRIVATE PAG_USE_ASYNCIFY)
+    # Mirror tgfx's own web test lane: WebGPUBuffer's synchronous map (EM_ASYNC_JS) is only
+    # compiled with TGFX_USE_ASYNCIFY. Without it requestMapAsync() takes the callback path,
+    # never suspends the stack, and Surface::readPixels() always fails on WebGPU.
+    target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
+    set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
+    # HEAPU8 mirrors the main web build (root CMakeLists.txt): tgfx's web image paths
+    # (WebImageBuffer/NativeCodec/ReadPixelsFromCanvasImage) read Module.HEAPU8 directly.
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','WebGPU','HEAPU8','HEAP8']")
+else ()
+    set(ASYNCIFY_LINK_OPTIONS "")
+    set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
+    set(WEB_EXPORTED_RUNTIME_METHODS "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL','HEAPU8','HEAP8']")
+endif ()
+target_compile_definitions(pag-test PRIVATE
+        PAG_BACKEND_NAME="${PAG_BACKEND_NAME}"
+        $<$<BOOL:${PAG_UPDATE_BASELINE}>:UPDATE_BASELINE>
+        $<$<AND:$<BOOL:${PAG_UPDATE_BASELINE}>,$<NOT:$<BOOL:${PAG_SKIP_GENERATE_BASELINE_IMAGES}>>>:GENERATE_BASELINE_IMAGES>
+)
+
+target_link_options(pag-test PRIVATE
+        -lembind
+        # emcc picks the cached libembind variation from the link line: without -fno-rtti here
+        # USE_RTTI defaults to true, so bind.cpp gets linked with RTTI while our translation
+        # units are compiled no-rtti. The two sides then key registered types differently
+        # (&typeid(T) vs CanonicalizedID<T>::c) and every emval crossing (e.g. HardwareDecoder's
+        # call<val>) fails with "unknown type". Mirrors tgfx's web/test link options.
+        -fno-rtti
+        -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
+        -sWASM=1
+        ${WEB_GRAPHICS_LINK_OPTIONS}
+        ${ASYNCIFY_LINK_OPTIONS}
+        -sALLOW_MEMORY_GROWTH=1
+        -sINITIAL_MEMORY=256MB
+        -sMAXIMUM_MEMORY=2GB
+        -sSTACK_SIZE=1MB
+        -sEXPORT_NAME='PAGTest'
+        -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest','_GetBuildInfo','_GetRunResult','_malloc','_free']
+        ${WEB_EXPORTED_RUNTIME_METHODS}
+        -sMODULARIZE=1
+        -sEXPORT_ES6=1
+        -sENVIRONMENT=web,worker
+        "SHELL:--preload-file ${ROOT}/test/baseline/version.json@/test/baseline/version.json"
+        "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache/${PAG_BACKEND_NAME}/HEAD"
+        ${PRELOAD_RESOURCES}
+)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(pag-test PRIVATE -g3 -O0)
+    target_link_options(pag-test PRIVATE
+            -g3 -O0
+            -gsource-map
+            -sASSERTIONS=2
+            -Wno-limited-postlink-optimizations
+    )
+else ()
+    target_compile_options(pag-test PRIVATE -Oz)
+    target_link_options(pag-test PRIVATE -Oz --profiling-funcs)
+endif ()
+
+target_include_directories(pag-test PRIVATE
+        ${ROOT}                                   # pagx/... headers used by the pagx suites
+        ${ROOT}/src                               # libpag internal headers (base/..., rendering/...)
+        ${ROOT}/test/src                          # test utilities (utils/..., base/...)
+        ${TGFX_DIR}/src                           # tgfx internal headers (core/utils/MD5.h, AtlasManager.h)
+        ${TGFX_DIR}/include
+)
+# Third-party headers are SYSTEM includes: emscripten's clang enables -Wcharacter-conversion for
+# -Werror builds, and the vendored googletest triggers it (gtest-printers.h char16_t -> char32_t),
+# which would otherwise fail the build on third-party code we do not maintain.
+target_include_directories(pag-test SYSTEM PRIVATE
+        ${TGFX_DIR}/third_party/googletest/googletest
+        ${TGFX_DIR}/third_party/googletest/googletest/include
+        ${TGFX_DIR}/third_party/json/include
+        ${MINIZIP_DIR}
+        ${WOFF2_DIR}/include
+        ${BROTLI_DIR}/c/include
+        ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY}
+        ${ROOT}/third_party/out/libxml2/${INCLUDE_ENTRY}  # CLI XSD validation (libxml2)
+)
+
+target_link_libraries(pag-test
+        pag
+        ${ZLIB_STATIC_LIBS}
+)
+
+# libxml2 headers require the static-linkage declaration; the generated pagx_xsd.h lives in the
+# root project's binary directory (build-<backend>/libpag/generated).
+target_compile_definitions(pag-test PRIVATE LIBXML_STATIC)
+target_include_directories(pag-test PRIVATE
+        ${CMAKE_BINARY_DIR}/libpag/generated
+)

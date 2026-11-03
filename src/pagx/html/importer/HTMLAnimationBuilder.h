@@ -18,8 +18,11 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include "pagx/nodes/Animation.h"
 
 namespace pagx {
 
@@ -86,12 +89,30 @@ class HTMLAnimationBuilder {
                               const std::string& fillTargetId, const std::string& strokeTargetId,
                               float dashScale);
 
+  /** Collects provisional group origins before building channels, including SVG animation lists. */
+  void prepareTiming(const std::unordered_map<std::string, std::string>& style, bool inlineSvg);
+
+  /** Removes any excess shift caused by candidates that emitted no playable objects. */
+  void finalizeTiming();
+
+  /** Returns the original grouping length, before the timeline is shifted to remove negative times. */
+  Frame coalescingLength(const Animation* animation) const;
+
  private:
+  Frame resolveDelayFrames(float delaySeconds, Frame durationFrames, LoopMode loopMode,
+                           bool needsTrailingBaseline);
+  void setAnimationTiming(Animation* animation, LoopMode loopMode, Frame durationFrames,
+                          Frame delayFrames, bool needsTrailingBaseline, Frame originalDelayFrames);
+  void addAnimation(Animation* animation, Frame originalDelayFrames);
+
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
   const std::unordered_map<std::string, html::CssKeyframesRule>* _keyframes = nullptr;
+  std::unordered_map<const Animation*, Frame> _coalescingLengths;
+  std::unordered_map<const Animation*, Frame> _originalDelays;
+  std::map<std::pair<LoopMode, Frame>, Frame> _groupStarts;
 };
 
 }  // namespace pagx

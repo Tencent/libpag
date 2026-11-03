@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <utility>
 #include "pagx/FontConfig.h"
 #include "pagx/SystemFonts.h"
@@ -177,9 +178,14 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
-  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
-  bool available =
-      typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
+  // Probe through SystemFonts::FindFont rather than Typeface::MakeFromName: on web,
+  // MakeFromName unconditionally returns a WebTypeface that echoes the requested family name
+  // verbatim, so the FontNamesMatch comparison below would succeed for any name (including
+  // families the renderer will silently substitute). FindFont is backed by the real platform
+  // font manager (empty on web, where browser fonts cannot be probed synchronously), so an
+  // unavailable family yields an empty location and the stack falls through to the next entry.
+  auto location = SystemFonts::FindFont(family, "");
+  bool available = !location.path.empty();
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
@@ -357,6 +363,15 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  // Plan a provisional nonnegative origin before generating keyframes or fill-mode baselines. SVG
+  // shapes and ordinary elements can belong to the same timing group. Discarded candidates may
+  // affect this origin; finalizeTiming corrects it after the playable objects have been emitted.
+  for (auto& entry : _pendingAnimations) {
+    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.first), false);
+  }
+  for (auto& shape : _pendingSvgShapeAnimations) {
+    _animationBuilder->prepareTiming(shape.style, true);
+  }
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
@@ -371,6 +386,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
                                               shape.rotationTargetId, shape.fillTargetId,
                                               shape.strokeTargetId, shape.dashScale);
   }
+  _animationBuilder->finalizeTiming();
   coalesceAnimations();
   buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();
@@ -382,17 +398,23 @@ void HTMLParserContext::coalesceAnimations() {
   if (!_document || _document->animations.size() < 2) {
     return;
   }
-  // First animation of each (duration, frameRate, loop) group becomes the group leader and keeps
-  // its id; later animations in the same group have their objects appended to the leader and are
-  // dropped from the list. Leaders are scanned linearly because a page has only a handful of
-  // distinct timings even when it animates hundreds of elements. Order is preserved so the
-  // resulting `<Animations>` block still follows document order.
+  // First animation of each group becomes the group leader and keeps its id; later animations in
+  // the same group have their objects appended to the leader and are dropped from the list.
+  // Leaders are scanned linearly because a page has only a handful of distinct timings even when
+  // it animates hundreds of elements. Order is preserved so the resulting `<Animations>` block
+  // still follows document order.
+  //
+  // Once animations group by their original (unshifted) end time, frame rate and loop mode.
+  // Infinite (Loop / PingPong) animations group by (cycle, frameRate, loop). Negative delays shift
+  // the origin of each group before emission, so matching members have the same frame 0; the
+  // merged duration is the latest shifted end among them. Each member pauses from the shared
+  // origin to its first keyframe, and from its last keyframe to the shared end.
   std::vector<Node*> coalesced;
   coalesced.reserve(_document->animations.size());
-  // Parallel list of the Animation* leaders held in `coalesced`, used to match subsequent
-  // animations by timing. Non-animation timelines (e.g. state machines) are passed through
-  // untouched and never participate in coalescing.
+  // Only `leaders` and `leaderLengths` have matching indices; `coalesced` can also contain
+  // non-animation timelines (e.g. state machines), which never participate in coalescing.
   std::vector<Animation*> leaders;
+  std::vector<Frame> leaderLengths;
   for (auto* node : _document->animations) {
     if (node == nullptr) {
       continue;
@@ -402,9 +424,11 @@ void HTMLParserContext::coalesceAnimations() {
       continue;
     }
     auto* anim = static_cast<Animation*>(node);
+    Frame length = _animationBuilder->coalescingLength(anim);
     Animation* group = nullptr;
-    for (auto* leader : leaders) {
-      if (leader->duration == anim->duration && leader->loop == anim->loop &&
+    for (size_t index = 0; index < leaders.size(); index++) {
+      auto* leader = leaders[index];
+      if (leaderLengths[index] == length && leader->loop == anim->loop &&
           std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
         group = leader;
         break;
@@ -413,8 +437,10 @@ void HTMLParserContext::coalesceAnimations() {
     if (group == nullptr) {
       coalesced.push_back(anim);
       leaders.push_back(anim);
+      leaderLengths.push_back(length);
       continue;
     }
+    group->duration = std::max(group->duration, anim->duration);
     for (auto* obj : anim->objects) {
       group->objects.push_back(obj);
     }

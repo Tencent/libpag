@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BulgeFilter.h"
+#include "rendering/filters/utils/Std140Uniforms.h"
 #include "tgfx/core/ImageFilter.h"
 #include "utils/FilterHelper.h"
 
@@ -183,7 +184,7 @@ std::vector<tgfx::BindingEntry> BulgeFilter::uniformBlocks() const {
 void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                    const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                    const tgfx::Point&) const {
-  struct Uniforms {
+  struct alignas(16) Uniforms {
     float horizontalRadius = 0.0f;
     float verticalRadius = 0.0f;
     float bulgeCenterX = 0.0f;
@@ -191,6 +192,14 @@ void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
     float bulgeHeight = 0.0f;
     int pinning = 0;
   };
+
+  static_assert(HasStd140UniformLayout<Uniforms, 32>(), "Args must match the std140 layout.");
+  static_assert(
+      offsetof(Uniforms, horizontalRadius) == 0 && offsetof(Uniforms, verticalRadius) == 4 &&
+          offsetof(Uniforms, bulgeCenterX) == 8 && offsetof(Uniforms, bulgeCenterY) == 12 &&
+          offsetof(Uniforms, bulgeHeight) == 16 && offsetof(Uniforms, pinning) == 20,
+      "Args member offsets must match the shader declaration.");
+
   Uniforms uniforms = {};
   uniforms.horizontalRadius = horizontalRadius;
   uniforms.verticalRadius = verticalRadius;
