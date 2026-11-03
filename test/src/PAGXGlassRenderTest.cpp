@@ -23,11 +23,14 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
@@ -616,6 +619,100 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleCoversTheSubtreeContourFallback) {
   const int unpainted = CountDifferentPixelsInRect(glass, control, 264, 72, 296, 228);
   ASSERT_GE(unpainted, 0) << "a rect count must not be an error code";
   EXPECT_EQ(unpainted, 0) << "the glass must not cover unpainted child geometry, got " << unpainted;
+}
+
+// The glass mask replaces a gradient fill with opaque white, so a layer whose gradient ends fully
+// transparent is still covered end to end. The 15% fill alpha leaves the glass visible below the
+// paint; the stroke switches the mask from the analytical outline to the sampled recording.
+static pagx::ColorStop* MakeGradientStop(pagx::PAGXDocument* document, float offset, float alpha) {
+  auto stop = document->makeNode<pagx::ColorStop>();
+  stop->offset = offset;
+  // Green, because the backdrop is red: a red gradient would be indistinguishable from it.
+  stop->color = {0.0f, 1.0f, 0.0f, alpha};
+  return stop;
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeGradientMaskDocument(bool withGlass,
+                                                                    bool gradientFill,
+                                                                    bool withStroke) {
+  auto document = MakeStripedBackdropDocument();
+  auto glassLayer = document->makeNode<pagx::Layer>();
+  auto glassRect = document->makeNode<pagx::Rectangle>();
+  glassRect->size = {200.0f, 200.0f};
+  glassRect->position = {150.0f, 150.0f};
+  glassLayer->contents = {glassRect};
+
+  auto fill = document->makeNode<pagx::Fill>();
+  fill->alpha = 0.15f;
+  if (gradientFill) {
+    // The defaults are already (0, 0) -> (1, 0) over the geometry box: left to right. The stops
+    // step from opaque to fully transparent across the middle, so each half has one alpha.
+    auto gradient = document->makeNode<pagx::LinearGradient>();
+    gradient->colorStops = {MakeGradientStop(document.get(), 0.0f, 1.0f),
+                            MakeGradientStop(document.get(), 0.45f, 1.0f),
+                            MakeGradientStop(document.get(), 0.55f, 0.0f),
+                            MakeGradientStop(document.get(), 1.0f, 0.0f)};
+    fill->color = gradient;
+  } else {
+    auto color = document->makeNode<pagx::SolidColor>();
+    color->color = {0.0f, 0.0f, 0.0f, 0.0f};
+    fill->color = color;
+  }
+  glassLayer->contents.push_back(fill);
+
+  if (withStroke) {
+    auto stroke = document->makeNode<pagx::Stroke>();
+    auto strokeColor = document->makeNode<pagx::SolidColor>();
+    strokeColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
+    stroke->color = strokeColor;
+    stroke->width = 4.0f;
+    glassLayer->contents.push_back(stroke);
+  }
+  if (withGlass) {
+    glassLayer->styles.push_back(MakeGlassStyle(document.get()));
+  }
+  document->layers.push_back(glassLayer);
+  return document;
+}
+
+PAGX_TEST(PAGXGlassRenderTest, GlassStyleReplacesGradientFillWithOpaqueWhite) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  for (int index = 0; index < 2; index++) {
+    const bool withStroke = index == 1;
+    auto glassDocument = MakeGradientMaskDocument(true, true, withStroke);
+    auto controlDocument = MakeGradientMaskDocument(false, true, withStroke);
+    auto transparentControl = MakeGradientMaskDocument(false, false, withStroke);
+    auto glass = RenderViaDisplayList(glassDocument.get(), context);
+    auto control = RenderViaDisplayList(controlDocument.get(), context);
+    auto transparent = RenderViaDisplayList(transparentControl.get(), context);
+    ASSERT_FALSE(glass.isEmpty());
+    ASSERT_FALSE(control.isEmpty());
+    ASSERT_FALSE(transparent.isEmpty());
+
+    // The fixture only proves anything if its gradient really paints an opaque left half and no
+    // right half: compare it against the same layer filled with a fully transparent color.
+    const int paintedLeft = CountDifferentPixelsInRect(control, transparent, 62, 62, 138, 238);
+    ASSERT_GE(paintedLeft, 0) << "a rect count must not be an error code";
+    EXPECT_GT(paintedLeft, 500) << "the gradient's opaque half must be visible, got "
+                                << paintedLeft;
+    const int paintedRight = CountDifferentPixelsInRect(control, transparent, 162, 62, 238, 238);
+    ASSERT_GE(paintedRight, 0) << "a rect count must not be an error code";
+    EXPECT_EQ(paintedRight, 0) << "the gradient's transparent half must paint nothing, got "
+                               << paintedRight;
+
+    const int left = CountDifferentPixelsInRect(glass, control, 62, 62, 138, 238);
+    const int right = CountDifferentPixelsInRect(glass, control, 162, 62, 238, 238);
+    ASSERT_GE(left, 0) << "a rect count must not be an error code";
+    ASSERT_GE(right, 0) << "a rect count must not be an error code";
+    EXPECT_GT(left, 500) << "the glass must be active under the opaque end, got " << left;
+    EXPECT_GT(right, 500) << "the mask must cover the transparent end too, got " << right;
+    const int outside = CountDifferentPixelsInRect(glass, control, 4, 4, 40, 40);
+    ASSERT_GE(outside, 0) << "a rect count must not be an error code";
+    EXPECT_EQ(outside, 0) << "the glass must paint inside its geometry only, got " << outside;
+  }
 }
 
 }  // namespace pag
