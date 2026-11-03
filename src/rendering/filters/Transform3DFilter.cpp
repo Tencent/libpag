@@ -241,7 +241,7 @@ std::shared_ptr<tgfx::Image> Transform3DFilter::Apply(
     auto transZ =
         1.0f * -cameraPosition.z / (scalar / 2.0f) + (cameraPosition.z > 0.0f ? 1.0f : -1.0f);
     cameraTransformPosition = {cameraPosition.x / scalar * 2.0f - 1.0f,
-                              cameraPosition.y / (scalar * ratio) * 2.0f - 1.0f, transZ};
+                               cameraPosition.y / (scalar * ratio) * 2.0f - 1.0f, transZ};
 
     cameraEye += cameraTransformPosition;
 
