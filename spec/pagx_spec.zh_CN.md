@@ -1010,7 +1010,7 @@ M = P * T(translate) * T(anchor.x, anchor.y, anchorZ) * L * T(-anchor.x, -anchor
 
 支点不能从姿态反解：任意支点都能配一个平移得到同一个矩阵，只有 `det(I - L) != 0` 时才有唯一解 `a = (I - L)⁻¹ * t`。所以 `anchor` 与 `matrix` / `matrix3D` 互不影响，动画里也各自驱动自己的状态（见附录 D.1）。
 
-SVG 的 `rotate(θ, cx, cy)` 对应 `anchor="cx,cy"` 加只含线性部分（`tx = ty = 0`）的矩阵关键帧。
+SVG 的 `rotate(θ, cx, cy)` 可以用 `anchor="cx,cy"` 加只含线性部分（`tx = ty = 0`）的矩阵关键帧等价表达——这是推荐的作者写法；当前 SVG / HTML 导入器仍把 transform-origin 烘焙进 `matrix`，尚未产出 `anchor`。
 
 约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
 

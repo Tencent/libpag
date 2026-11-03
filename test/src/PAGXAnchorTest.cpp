@@ -631,7 +631,9 @@ PAGX_TEST(PAGXAnchorTest, AnimateAnchorChannels) {
  * Test case: anchor.z is a channel as well, so an animated pivot depth matches a static one.
  */
 PAGX_TEST(PAGXAnchorTest, AnimateAnchorZChannel) {
-  const std::string rotation = "1,0,0,0,0,0.5,0.8660254,0,0,-0.8660254,0.5,0,0,0,0,1";
+  // A perspective projection is what makes the pivot depth visible, so both documents carry one.
+  const std::string attributes =
+      "id=\"rotated\" anchor=\"100,50\" rotationX=\"60\" perspective=\"500\"";
   const std::string animations =
       "  <Animations>\n"
       "    <Animation id=\"pivot\" duration=\"60\">\n"
@@ -643,16 +645,22 @@ PAGX_TEST(PAGXAnchorTest, AnimateAnchorZChannel) {
       "      </Object>\n"
       "    </Animation>\n"
       "  </Animations>\n";
-  auto animated = ParseDoc(
-      MakeDoc("id=\"rotated\" anchor=\"100,50\" matrix3D=\"" + rotation + "\"", animations));
-  auto authored =
-      ParseDoc(MakeRectDoc("id=\"rotated\" anchor=\"100,50,20\" matrix3D=\"" + rotation + "\""));
+  auto animated = ParseDoc(MakeDoc(attributes, animations));
+  auto authored = ParseDoc(
+      MakeRectDoc("id=\"rotated\" anchor=\"100,50,20\" rotationX=\"60\" perspective=\"500\""));
   ASSERT_TRUE(animated != nullptr);
   ASSERT_TRUE(authored != nullptr);
   const auto animatedPixels = RenderFrame(animated, 500'000);
   ASSERT_FALSE(animatedPixels.empty());
   EXPECT_GT(CountOpaquePixels(animatedPixels), 100u) << "the frame must actually draw something";
   EXPECT_EQ(CountDifferentPixels(animatedPixels, RenderFrame(authored)), 0u);
+  // The depth has to move the frame, otherwise a channel that never fires would compare two
+  // documents that are identical anyway.
+  auto flat = ParseDoc(
+      MakeRectDoc("id=\"rotated\" anchor=\"100,50\" rotationX=\"60\" perspective=\"500\""));
+  ASSERT_TRUE(flat != nullptr);
+  EXPECT_GT(CountDifferentPixels(animatedPixels, RenderFrame(flat)), 0u)
+      << "the pivot depth must change the projected frame";
 }
 
 /**
@@ -675,10 +683,12 @@ PAGX_TEST(PAGXAnchorTest, AnchorAppliesOverAnimatedMatrix3D) {
       "    </Animation>\n"
       "  </Animations>\n";
   auto animated = ParseDoc(
-      MakeDoc("id=\"rotated\" anchor=\"100,50,20\" matrix3D=\"" + rotation + "\"", animations));
+      MakeDoc("id=\"rotated\" anchor=\"100,50\" matrix3D=\"" + rotation + "\"", animations));
+  // a = (100,50,0), L = rotateX(60) -> t' = a - L*a = (0,25,-43.30127); the in-plane part is
+  // visible without a perspective, which is what this case pins.
   auto baked =
       ParseDoc(MakeRectDoc("id=\"rotated\" matrix3D=\"1,0,0,0,0,0.5,0.8660254,0,0,"
-                           "-0.8660254,0.5,0,0,42.32051,-33.30127,1\""));
+                           "-0.8660254,0.5,0,0,25,-43.30127,1\""));
   ASSERT_TRUE(animated != nullptr);
   ASSERT_TRUE(baked != nullptr);
   const auto animatedPixels = RenderFrame(animated, 500'000);
@@ -743,6 +753,48 @@ PAGX_TEST(PAGXAnchorTest, HtmlExportAppliesAnchor) {
   // rotate(90) around (100,50): the affine pivot moves the translation to a - L*a = (150,-50).
   EXPECT_NE(css.find("translate(150px,-50px)"), std::string::npos) << css;
   EXPECT_NE(css.find("rotate(90deg)"), std::string::npos) << css;
+}
+
+/**
+ * Test case: a flattened linear part cannot be split into a projection and an affine part, so the
+ * pivot falls back to the 2D conjugation instead of being dropped.
+ */
+PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorAppliesOnFlattenedScale) {
+  auto doc =
+      ParseDoc(MakeRectDoc("id=\"layer\" scaleX=\"0\" perspective=\"500\" anchor=\"100,50\""));
+  ASSERT_TRUE(doc != nullptr);
+  auto* layer = static_cast<pagx::Layer*>(doc->findNode("layer"));
+  ASSERT_TRUE(layer != nullptr);
+  const auto matrix = pagx::BuildLayerTransform3DWithAnchor(layer);
+  // L = diag(0, 1, 1) -> t' = a - L*a = (100, 0, 0), the same answer the 2D path gives.
+  EXPECT_NEAR(matrix.getRowColumn(0, 3), 100.0f, 1e-2f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 3), 0.0f, 1e-2f);
+}
+
+/**
+ * Test case: a uniformly small linear part is invertible, so the pivot must survive the singularity
+ * test when the layer is scaled down under perspective.
+ */
+PAGX_TEST(PAGXAnchorTest, PerspectiveAnchorSurvivesSmallScale) {
+  auto scaled =
+      ParseDoc(MakeRectDoc("id=\"layer\" scaleX=\"0.001\" scaleY=\"0.001\" "
+                           "scaleZ=\"0.001\" perspective=\"500\" anchor=\"100,50\""));
+  auto flat =
+      ParseDoc(MakeRectDoc("id=\"layer\" scaleX=\"0.001\" scaleY=\"0.001\" "
+                           "scaleZ=\"0.001\" anchor=\"100,50\""));
+  ASSERT_TRUE(scaled != nullptr);
+  ASSERT_TRUE(flat != nullptr);
+  auto* scaledLayer = static_cast<pagx::Layer*>(scaled->findNode("layer"));
+  auto* flatLayer = static_cast<pagx::Layer*>(flat->findNode("layer"));
+  ASSERT_TRUE(scaledLayer != nullptr);
+  ASSERT_TRUE(flatLayer != nullptr);
+  const auto scaledMatrix = pagx::BuildLayerTransform3DWithAnchor(scaledLayer);
+  const auto flatMatrix = pagx::BuildLayerTransform3DWithAnchor(flatLayer);
+  // L = 0.001 * I -> t' = a - L*a = (99.9, 49.95, 0); the projection must not change that.
+  EXPECT_NEAR(scaledMatrix.getRowColumn(0, 3), 99.9f, 1e-2f);
+  EXPECT_NEAR(scaledMatrix.getRowColumn(1, 3), 49.95f, 1e-2f);
+  EXPECT_NEAR(scaledMatrix.getRowColumn(0, 3), flatMatrix.getRowColumn(0, 3), 1e-2f);
+  EXPECT_NEAR(scaledMatrix.getRowColumn(1, 3), flatMatrix.getRowColumn(1, 3), 1e-2f);
 }
 
 /**
