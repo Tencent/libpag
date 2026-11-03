@@ -247,9 +247,10 @@ jobs:
 
       - name: Run Node Test Suites
         # Gates the UnitTest.js runner and the video reader logic, which the Cypress lanes
-        # below do not exercise (CI invokes `npm run cypress` directly).
+        # below do not exercise (CI invokes `npm run cypress` directly). The web/test harness
+        # suite covers the strict runner itself (cache integrity, artifact transfer, cleanup).
         working-directory: web
-        run: npm run test:cypress-runner && npm run test:video
+        run: npm run test:cypress-runner && npm run test:video && npm --prefix test run test:harness
 
       - name: Typecheck Cypress Specs
         working-directory: web
