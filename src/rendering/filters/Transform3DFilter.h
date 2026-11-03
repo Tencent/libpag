@@ -98,9 +98,6 @@ class Transform3DFilter : public RuntimeFilter {
                              const std::shared_ptr<tgfx::Texture>& outputTexture) const override;
 
  private:
-  Transform3DResources::CompositionState* findCompositionState(
-      Transform3DResources* resources) const;
-
   Transform3DResources::CompositionState* getOrCreateCompositionState(
       Transform3DResources* resources, tgfx::GPU* gpu) const;
 
