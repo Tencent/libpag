@@ -2655,6 +2655,19 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           style += ";height:" + CssFloatToString(maskBox.height) + "px";
         }
       }
+    } else if (maskHasAnimatedPath(layer->mask)) {
+      // A coverage mask with animated geometry cannot become a clip polygon without losing its
+      // paint. Emit it as an inline <mask> so its content stays a live SVG subtree the keyframes
+      // can animate, which keeps the soft edge and the file small.
+      auto maskId = writeAnimatedMaskDef(layer->mask, layer->maskType);
+      _ctx->svgMaskIds[layer] = maskId;
+      std::string maskImage = "url(#" + maskId + ")";
+      style += ";-webkit-mask-image:" + maskImage + ";mask-image:" + maskImage;
+      style += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
+      // Mask coordinates are the masked element's own space, so pin the image to 1:1.
+      std::string maskSize =
+          CssFloatToString(_ctx->docWidth) + "px " + CssFloatToString(_ctx->docHeight) + "px";
+      style += ";-webkit-mask-size:" + maskSize + ";mask-size:" + maskSize;
     } else {
       style += writeMaskCSS(layer->mask, layer->maskType);
     }

@@ -3848,6 +3848,45 @@ CLI_TEST(PAGXHtmlTest, AnimationSingularMatrixProgressBarInterpolates) {
   EXPECT_EQ(rule.find("matrix(0,0,0,1,280,0)"), std::string::npos) << rule;
 }
 
+// Only a Contour mask is a pure outline. An Alpha or Luminance mask paints partial coverage, so an
+// animated one is emitted as an inline SVG <mask> whose path data is animated by CSS: the soft mask
+// survives, and the masked element itself carries no clip-path.
+CLI_TEST(PAGXHtmlTest, AnimationAlphaMaskKeepsSoftMaskInsteadOfClipPath) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/mask/02_alpha_soft_path.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"maskedBox\"");
+  ASSERT_FALSE(tag.empty());
+  // The element references the inline mask instead of baking a frozen mask image.
+  EXPECT_NE(tag.find("mask-image:url(#"), std::string::npos) << tag;
+  EXPECT_EQ(tag.find("url('data:image/svg+xml"), std::string::npos) << tag;
+  EXPECT_EQ(tag.find("clip-path"), std::string::npos) << tag;
+  // The mask keeps its paint and its own animatable geometry.
+  EXPECT_NE(html.find("mask-type:alpha"), std::string::npos) << html;
+  EXPECT_NE(html.find("maskContentUnits=\"userSpaceOnUse\""), std::string::npos) << html;
+  auto rule = KeyframesRuleNamed(html, "pagx_softPath_0");
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("d: path(\"M40 20L260 20L260 180L40 180Z\")"), std::string::npos) << rule;
+  EXPECT_NE(html.find("#softPath { animation: pagx_softPath_0"), std::string::npos) << html;
+}
+
+// The clip has to follow the mask layer's own transform: its position offsets every masked pixel,
+// so an animated clip-path built from the raw path coordinates would sit in the wrong place.
+CLI_TEST(PAGXHtmlTest, AnimationContourMaskKeepsMaskLayerOffset) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadAndConvert(
+      ProjectPath::Absolute("resources/pagx_to_html/animations/mask/03_contour_offset_path.pagx"),
+      options);
+  ASSERT_FALSE(html.empty());
+  auto first = KeyframeStopOf(html, "id=\"maskedBox\"", "0%");
+  EXPECT_NE(first.find("M120 40"), std::string::npos) << first;
+  EXPECT_EQ(first.find("M0 0"), std::string::npos) << first;
+}
+
 // A key past the duration is only an interpolation target. The playback window keeps the PAGX
 // duration, and its final stop carries the value the runtime shows at that boundary, so the ramp
 // neither slows down nor wraps on a longer period.

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: an Alpha mask painted with a horizontal white-to-transparent fade, while the mask path's
+     right edge sweeps left. Only a Contour mask is a pure outline: replacing this mask with a hard
+     clip-path polygon deletes the whole fade band.
+     The mask layer stays visible so players keep it in the animated subtree; it is consumed as a
+     mask and therefore never painted on its own.
+     Target: Path  Channel: point1.x,point2.x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Layer id="softMask">
+      <Path id="softPath" data="M 40 20 L 300 20 L 300 180 L 40 180 Z"/>
+      <Fill>
+        <LinearGradient startPoint="0.6,0.5" endPoint="1,0.5">
+          <ColorStop offset="0" color="#FFFFFFFF"/>
+          <ColorStop offset="1" color="#FFFFFF00"/>
+        </LinearGradient>
+      </Fill>
+    </Layer>
+    <Layer id="maskedBox" mask="@softMask" maskType="alpha">
+      <Rectangle position="160,100" size="240,160"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+  </Layer>
+  <Animations>
+    <Animation id="softSlide" duration="60" frameRate="60" loop="loop">
+      <Object target="softPath">
+        <Channel name="point1.x" type="float">
+          <Key time="0" value="260" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+        <Channel name="point2.x" type="float">
+          <Key time="0" value="260" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

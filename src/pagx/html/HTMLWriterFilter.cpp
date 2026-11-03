@@ -538,6 +538,51 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   return css;
 }
 
+bool HTMLWriter::maskHasAnimatedPath(const Layer* mask, int depth) const {
+  if (mask == nullptr || depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return false;
+  }
+  for (auto* element : mask->contents) {
+    if (element != nullptr && element->nodeType() == NodeType::Path &&
+        _ctx->animatedMaskPaths.count(static_cast<const Path*>(element)) > 0) {
+      return true;
+    }
+  }
+  for (auto* child : mask->children) {
+    if (maskHasAnimatedPath(child, depth + 1)) {
+      return true;
+    }
+  }
+  if (mask->composition != nullptr) {
+    for (auto* layer : mask->composition->layers) {
+      if (maskHasAnimatedPath(layer, depth + 1)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+std::string HTMLWriter::writeAnimatedMaskDef(const Layer* mask, MaskType type) {
+  std::string id = _ctx->nextId("mask");
+  _defs->openTag("mask");
+  _defs->addAttr("id", id);
+  // userSpaceOnUse on both axes keeps the mask content in the masked element's own coordinate
+  // space, which is the same space its children paint in, so no extra positioning is needed.
+  _defs->addAttr("maskUnits", "userSpaceOnUse");
+  _defs->addAttr("x", "0");
+  _defs->addAttr("y", "0");
+  _defs->addAttr("width", CssFloatToString(_ctx->docWidth));
+  _defs->addAttr("height", CssFloatToString(_ctx->docHeight));
+  _defs->addAttr("maskContentUnits", "userSpaceOnUse");
+  _defs->addAttr("style", type == MaskType::Luminance ? "mask-type:luminance" : "mask-type:alpha");
+  _defs->closeTagStart();
+  int gradientIndex = 0;
+  writeMaskGeometry(*_defs, mask, {}, type, 1.0f, gradientIndex);
+  _defs->closeTag();
+  return id;
+}
+
 void HTMLWriter::ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
                                      float& minY, float& maxX, float& maxY, int depth) {
   if (depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
@@ -785,6 +830,12 @@ void HTMLWriter::writeMaskElements(HTMLBuilder& out, const std::vector<Element*>
       std::string d = GetPathSVGString(p);
       if (!d.empty()) {
         out.openTag("path");
+        if (_ctx->animatedMaskPaths.count(p) > 0) {
+          // Animated mask geometry needs a target for its CSS keyframes.
+          std::string pathId = !p->id.empty() ? p->id : _ctx->nextId("maskPath");
+          out.addAttr("id", pathId);
+          _ctx->animatedMaskPathIds[p] = pathId;
+        }
         if (!tr.empty()) {
           out.addAttr("transform", tr);
         }

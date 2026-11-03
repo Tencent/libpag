@@ -307,6 +307,14 @@ class HTMLWriterContext {
   // Number of tags already emitted for each animated base id.
   std::unordered_map<std::string, size_t> animatedDomIdUseCount = {};
 
+  // Mask layers whose subtree contains an animated Path, and the SVG element ids handed to those
+  // Paths. A coverage mask (Alpha / Luminance) cannot be expressed as a clip polygon, so such a
+  // mask is emitted as an inline SVG <mask> whose geometry is animated by CSS inside the mask.
+  std::unordered_set<const Path*> animatedMaskPaths = {};
+  std::unordered_map<const Path*, std::string> animatedMaskPathIds = {};
+  // Masked layer -> id of the inline <mask> generated for it.
+  std::unordered_map<const Layer*, std::string> svgMaskIds = {};
+
   /**
    * Returns the DOM id for the next tag rendering an animated node, or an empty string when none
    * of the candidates is animated. The candidates are checked in order and the first one found in
@@ -656,6 +664,12 @@ class HTMLWriter {
   // Mask/clip defs
   std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
+  // Emits an inline SVG <mask> for an Alpha / Luminance mask whose geometry is animated. The mask
+  // content stays a live SVG subtree, so the weaving pass can animate the path data with CSS
+  // instead of freezing a rasterized mask and clipping it with a polygon.
+  std::string writeAnimatedMaskDef(const Layer* mask, MaskType type);
+  // True when the mask subtree contains a Path driven by animation.
+  bool maskHasAnimatedPath(const Layer* mask, int depth = 0) const;
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
   // Two-pass mask geometry walk. writeMaskCSS emits a self-contained SVG whose viewBox must
