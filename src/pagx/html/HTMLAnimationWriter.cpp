@@ -19,7 +19,6 @@
 #include "pagx/html/HTMLAnimationWriter.h"
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <iomanip>
 #include <set>
 #include <sstream>
@@ -76,36 +75,46 @@ Node* ResolveTargetNode(PAGXDocument& doc, const std::string& target) {
   return nullptr;
 }
 
+// Appends the playable animations among `nodes` that were not collected yet.
+void AppendPlayableAnimations(const std::vector<Node*>& nodes,
+                              std::vector<const Animation*>& result,
+                              std::unordered_set<const Animation*>& seen) {
+  for (auto* node : nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) {
+      continue;
+    }
+    auto* anim = static_cast<const Animation*>(node);
+    if (anim->duration > 0 && anim->frameRate > 0.0f && !anim->objects.empty() &&
+        seen.insert(anim).second) {
+      result.push_back(anim);
+    }
+  }
+}
+
+// Walks the layer tree and collects the animations of every Composition reachable through a slot.
+// Each Composition is visited once: siblings can mount the same source Composition.
+void AppendCompositionAnimations(const std::vector<Layer*>& layers,
+                                 std::vector<const Animation*>& result,
+                                 std::unordered_set<const Animation*>& seen,
+                                 std::unordered_set<const Composition*>& visited) {
+  for (auto* layer : layers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->composition != nullptr && visited.insert(layer->composition).second) {
+      AppendPlayableAnimations(layer->composition->animations, result, seen);
+      AppendCompositionAnimations(layer->composition->layers, result, seen, visited);
+    }
+    AppendCompositionAnimations(layer->children, result, seen, visited);
+  }
+}
+
 std::vector<const Animation*> CollectPlayableAnimations(const PAGXDocument& doc) {
   std::vector<const Animation*> result = {};
   std::unordered_set<const Animation*> seen = {};
-  auto collect = [&](const std::vector<Node*>& nodes) {
-    for (auto* node : nodes) {
-      if (node == nullptr || node->nodeType() != NodeType::Animation) {
-        continue;
-      }
-      auto* anim = static_cast<const Animation*>(node);
-      if (anim->duration > 0 && anim->frameRate > 0.0f && !anim->objects.empty() &&
-          seen.insert(anim).second) {
-        result.push_back(anim);
-      }
-    }
-  };
-  collect(doc.animations);
+  AppendPlayableAnimations(doc.animations, result, seen);
   std::unordered_set<const Composition*> visited = {};
-  std::function<void(const std::vector<Layer*>&)> visitLayers = [&](const auto& layers) {
-    for (auto* layer : layers) {
-      if (layer == nullptr) {
-        continue;
-      }
-      if (layer->composition != nullptr && visited.insert(layer->composition).second) {
-        collect(layer->composition->animations);
-        visitLayers(layer->composition->layers);
-      }
-      visitLayers(layer->children);
-    }
-  };
-  visitLayers(doc.layers);
+  AppendCompositionAnimations(doc.layers, result, seen, visited);
   return result;
 }
 
@@ -1964,12 +1973,18 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
 // Resolves every recorded id with one scan and rebuilds the body once. Looking an id up from the
 // start of the body and letting std::string::replace shift the tail every time costs
 // O(targets x bodyLength) on documents with many animated elements.
+// One replacement of a byte range in the body, collected while resolving the recorded ids.
+struct TextEdit {
+  size_t start = 0;
+  size_t end = 0;
+  std::string text = {};
+};
+
+bool TextEditStartsBefore(const TextEdit& a, const TextEdit& b) {
+  return a.start < b.start;
+}
+
 void HTMLAnimationSession::ApplyElementEdits(std::string& bodyHtml, const ElementEdits& edits) {
-  struct TextEdit {
-    size_t start = 0;
-    size_t end = 0;
-    std::string text = {};
-  };
   std::unordered_map<std::string, std::pair<size_t, size_t>> tagRanges = {};
   {
     std::unordered_set<std::string> pendingIds(edits.idOrder.begin(), edits.idOrder.end());
@@ -2061,8 +2076,7 @@ void HTMLAnimationSession::ApplyElementEdits(std::string& bodyHtml, const Elemen
   }
 
   if (!textEdits.empty()) {
-    std::sort(textEdits.begin(), textEdits.end(),
-              [](const TextEdit& a, const TextEdit& b) { return a.start < b.start; });
+    std::sort(textEdits.begin(), textEdits.end(), TextEditStartsBefore);
     std::string rebuilt;
     rebuilt.reserve(bodyHtml.size() + textEdits.size() * 64);
     size_t cursor = 0;
