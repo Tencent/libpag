@@ -210,11 +210,13 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRequiresPairedAttributes) {
 }
 
 /**
- * Test case: invalid outputBounds values (non-positive size, non-numeric, trailing junk) are
+ * Test case: invalid outputBounds values, including malformed separators and field counts, are
  * rejected rather than producing a zero-sized or partially parsed window.
  */
 PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidBoundsRejected) {
-  const char* bounds[] = {"0,0,0,40", "0,0,80,-1", "0,0,80,40x", "a,b,c,d", "0,0,inf,40"};
+  const char* bounds[] = {"0,0,0,40",   "0,0,80,-1", "0,0,80,40x",   "a,b,c,d",    "0,0,inf,40",
+                          "0,0,10.5.5", "0,0,10+20", "0 0 10 20",    "0,0,,10,20", ",0,0,10,20",
+                          "0,0,10,20,", "0,0,10",    "0,0,10,20,30", "0,0,10,",    "0,0,1e+,20"};
   for (const auto* value : bounds) {
     std::string xml =
         "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
@@ -223,7 +225,24 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidBoundsRejected) {
     auto doc = pagx::PAGXImporter::FromXML(xml);
     ASSERT_TRUE(doc != nullptr) << value;
     EXPECT_TRUE(HasError(doc, "Invalid value")) << value;
+    EXPECT_FALSE(doc->outputBounds.has_value()) << value;
   }
+}
+
+/**
+ * Test case: whitespace around commas and signed scientific notation remain valid bounds.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsAcceptWhitespaceAndExponents) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\" -1e+1 , +2E1 , 3e1 , 4E+1 \"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, -10.0f);
+  EXPECT_EQ(doc->outputBounds->y, 20.0f);
+  EXPECT_EQ(doc->outputBounds->width, 30.0f);
+  EXPECT_EQ(doc->outputBounds->height, 40.0f);
 }
 
 /**

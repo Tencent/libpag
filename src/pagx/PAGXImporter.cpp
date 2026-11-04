@@ -3118,22 +3118,29 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   return doc;
 }
 
-// Strictly parses "x,y,width,height" so trailing junk is rejected instead of silently producing a
-// partially parsed window that later renders the wrong region.
+// Strictly parses four comma-separated numbers so missing separators and trailing junk are
+// rejected instead of silently producing a window that later renders the wrong region.
 static bool ParseOutputBounds(const std::string& str, Rect* rect) {
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
   char* endPtr = nullptr;
   float* fields[] = {&rect->x, &rect->y, &rect->width, &rect->height};
   for (auto* field : fields) {
-    ptr = SkipWhitespaceAndComma(ptr, end);
+    if (field != fields[0]) {
+      if (ptr == end || *ptr != ',') {
+        return false;
+      }
+      ++ptr;
+    }
     *field = strtof(ptr, &endPtr);
     if (endPtr <= ptr) {
       return false;
     }
     ptr = endPtr;
+    while (ptr < end && std::isspace(static_cast<unsigned char>(*ptr))) {
+      ++ptr;
+    }
   }
-  ptr = SkipWhitespaceAndComma(ptr, end);
   if (ptr != end) {
     return false;
   }
