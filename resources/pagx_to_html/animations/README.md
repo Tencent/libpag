@@ -58,14 +58,14 @@ node tools/html-snapshot/eval-animation/run.js \
 
 | 指标 | 数值 |
 |------|------|
-| 用例数 | 114（`Expect: supported` 82 + `Expect: gap` 32） |
+| 用例数 | 122（`Expect: supported` 82 + `Expect: gap` 40） |
 | PAGX 可动画 `(节点, 通道)` 组合 | 179，分布在 31 种节点类型 |
 | 导出器已实现的通道 | 45，分布在 12 种节点类型（另有 3 条映射无效，见第七节） |
 | 用例直接覆盖的通道 | 45 |
 | 覆盖率（对导出器已实现集合） | 45/45 = **100%** |
 | 覆盖率（对 PAGX 全部可动画通道） | 45/179 ≈ **25%** |
 | 已实现但无对应用例 | 0（仅 `playing="false"` 这类时间线行为未覆盖，见第四节） |
-| 已确认缺口（`Expect: gap`） | 32，逐族清单见第五节 |
+| 已确认缺口（`Expect: gap`） | 40，逐族清单见第五节 |
 | 仍无用例固化的缺口族 | 几何尺寸/位置、Polystar、NoiseStyle 等，见第五节 |
 
 判断：**通道维度的覆盖已经补满**——导出器实现的 45 个通道都有用例直接驱动；**但能力面仍然偏窄**：
@@ -131,6 +131,7 @@ Repeater / TextModifier / RangeSelector / 渐变色源 / 图层样式这几族�
 | `skew.x` / `skew.y` | ✔ | ✘ | `layer/15`、`layer/16`（Expect: gap） |
 | `perspective` | ✔ | ✘ | `layer/12`（Expect: gap） |
 | `matrix3D` | ✔ | ✘ | `layer/13`（Expect: gap） |
+| `anchor.x` / `anchor.y` / `anchor.z`（局部变换支点） | ✔ | ✘ | `anchor/01`~`anchor/08`（Expect: gap） |
 
 ### Group / TextBox（共享变换通道）
 
@@ -226,6 +227,7 @@ Repeater / TextModifier / RangeSelector / 渐变色源 / 图层样式这几族�
 | 缺口族 | `Expect: gap` 用例 | 尚未覆盖 |
 |--------|--------------------|----------|
 | Layer 变换分量 / 3D | `layer/10`（rotation.z）、`layer/11`（rotation.y）、`layer/17`（rotation.x）、`layer/12`（perspective）、`layer/13`（matrix3D）、`layer/14`（z）、`layer/15`（skew.x）、`layer/16`（skew.y） | `scale.z` |
+| Layer 支点（`anchor.*`） | `anchor/01`~`anchor/08` | — |
 | Layer 混合模式 | `layer/07` | — |
 | Stroke 尖角限制 | `stroke/05` | — |
 | 几何尺寸 / 位置 | **无** | `size.height`、Rectangle/Ellipse 的 `position.x/y` |
@@ -315,6 +317,7 @@ header 里注明它同时是线性插值与 `loop="once"` 的基准；`interpola
 | `combo` | `#475569` 石板灰 | 八边形（`Polystar` 8 边）+ 双通道 |
 | `sharing` | `#9A3412` 棕 | 圆形（共享颜色的两个点）/ 圆形与文本 |
 | `solid_color` | `#65A30D` 黄绿 | 圆形 |
+| `anchor` | `#C2410C` 砖橙 | 长条 + 深色支点圆点；3D 用例用带内层小卡的卡片 |
 
 每族一个剪影：同一族内形状固定，跨族不重复，报告里一眼能认出"这是另一类用例"，而不是同一张图换个通道名。
 
@@ -338,3 +341,22 @@ header 里注明它同时是线性插值与 `loop="once"` 的基准；`interpola
 
 与 `layer` 族同色系的分支：新增的 Layer 通道用例（`layer/08`~`layer/17`）继续用 `#4F46E5` 与菱形主体；
 `matrix` / `matrix3D` 通道会替换 `x`/`y` 平移，关键帧必须自带 translate（见 `layer/13`）。
+
+## 十、anchor 族
+
+`anchor/` 描述 `Layer.anchor`（`anchor.x` / `anchor.y` / `anchor.z`）作为局部变换支点的行为，与 `layer/` 的 3D 用例互补：
+
+| 用例 | 覆盖点 |
+|------|--------|
+| `anchor/01_rotation_z_offcenter` | 支点落在长条左缘，`rotation.z` 让长条摆动而不是绕原点公转 |
+| `anchor/02_anchor_x_animated` | `anchor.x` 逐帧滑动，同一姿态在每一帧被重新支点化 |
+| `anchor/03_rotation_y_anchor_x` | 3D × 支点耦合：`rotation.y` 绕左缘竖轴翻转，投影必须钉住该边 |
+| `anchor/04_rotation_x_anchor_depth` | `anchor` 第三个值给深度，`rotation.x` 让平面整体前后移动、投影尺寸随之变化 |
+| `anchor/05_anchor_z_animated` | 静态 `rotationX` 下动画 `anchor.z`，支点沿深度移动 |
+| `anchor/06_rotation_y_with_anchor_x` | 3D 旋转与 `anchor.x` 在同一 Object 内同时动画，逐帧合成 |
+| `anchor/07_rotation_x_anchor_y` | 支点贴在卡片下缘，`rotation.x` 像翻盖一样打开 |
+| `anchor/08_anchor_center_vs_default` | 同一角度下"绕图层原点"与"绕中心（`anchor`）"两根长条并排对照 |
+
+`anchor` 把支点做成矩阵的不动点、投影留在支点之外，因此线性部分为单位阵时 `anchor` 不改变姿态（`anchor/08` 的对照就是这条）；
+`anchor` 写三个值时第三个是支点深度，只有存在 Z 向分量（`rotationX` / `rotationY` / `matrix3D` 等）才生效（`anchor/04`、`anchor/05`）。
+把支点烘焙进每个 `matrix3D` 关键帧会被逐帧独立插值，卡片翻转时会整体漂移，这正是 `anchor` 要消除的写法。

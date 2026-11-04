@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Layer anchor at the bar's left edge keeps that edge fixed while rotation.z sweeps the bar,
+     so it swings like a hand instead of orbiting its origin.
+     Target: Layer  Channel: rotation.z  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="handLeft" x="150" y="100" width="120" height="16" anchor="0,8">
+    <Rectangle position="60,8" size="120,16" roundness="8"/>
+    <Fill color="#C2410C"/>
+  </Layer>
+  <Layer x="143" y="93" width="14" height="14">
+    <Rectangle position="7,7" size="14,14" roundness="7"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <Animations>
+    <Animation id="handSweep" duration="60" frameRate="60" loop="loop">
+      <Object target="handLeft">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="-30" interpolation="linear"/>
+          <Key time="30" value="30" interpolation="linear"/>
+          <Key time="60" value="-30"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
