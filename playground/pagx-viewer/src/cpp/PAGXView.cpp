@@ -24,6 +24,8 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
@@ -102,18 +104,27 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   }
 }
 
-void PAGXView::loadPAGX(const val& pagxData) {
+bool PAGXView::loadPAGX(const val& pagxData) {
   parsePAGX(pagxData);
-  buildLayers();
+  return buildLayers();
+}
+
+void PAGXView::resetScene() {
+  scene = nullptr;
+  defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
+  hasOutputView = false;
+  outputSurface = nullptr;
+  pagxWidth = 0.0f;
+  pagxHeight = 0.0f;
+  lastRecording = nullptr;
+  lastAnimationTimeMs = -1.0;
+  presentImmediately = true;
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
-  scene = nullptr;
-  defaultTimeline = nullptr;
-  defaultAnimation = nullptr;
-  lastRecording = nullptr;
-  lastAnimationTimeMs = -1.0;
+  resetScene();
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -139,14 +150,15 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
-void PAGXView::buildLayers() {
+bool PAGXView::buildLayers() {
+  resetScene();
   if (!document) {
-    return;
+    return false;
   }
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
-    return;
+    return false;
   }
   defaultTimeline = scene->getDefaultTimeline();
   defaultAnimation = nullptr;
@@ -155,11 +167,15 @@ void PAGXView::buildLayers() {
   }
   playing = true;
   lastAnimationTimeMs = -1.0;
-  pagxWidth = scene->width();
-  pagxHeight = scene->height();
+  // PAGScene 已补偿输出窗口原点，视图仅使用窗口尺寸取景，避免重复应用原点偏移。
+  auto outputBounds = scene->getOutputBounds();
+  hasOutputView = outputBounds.has_value();
+  pagxWidth = hasOutputView ? outputBounds->width : scene->width();
+  pagxHeight = hasOutputView ? outputBounds->height : scene->height();
   applySceneDisplayOptions();
   updateContentTransform();
   presentImmediately = true;
+  return true;
 }
 
 void PAGXView::advanceTimelines(double frameStartMs) {
@@ -252,6 +268,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
     return;
   }
   tgfxSurface = tgfx::Surface::MakeFrom(context, window);
+  outputSurface = nullptr;
   device->unlock();
   if (tgfxSurface == nullptr) {
     return;
@@ -292,6 +309,11 @@ void PAGXView::applySceneDisplayOptions() {
     return;
   }
   auto options = scene->getDisplayOptions();
+  if (hasOutputView) {
+    options->setRenderMode(PAGRenderMode::Direct);
+    options->setBackgroundColor({0, 0, 0, 0});
+    return;
+  }
   if (defaultTimeline != nullptr) {
     // Tiled caches are invalidated on every animated frame, so tiling only adds overhead during
     // playback. Partial mode redraws just the dirty regions and keeps animated frames smooth.
@@ -305,6 +327,14 @@ void PAGXView::applySceneDisplayOptions() {
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
+  if (hasOutputView) {
+    userZoom = zoom;
+    userOffsetX = offsetX;
+    userOffsetY = offsetY;
+    applyDisplayTransform();
+    presentImmediately = true;
+    return;
+  }
   if (scene != nullptr) {
     if (zoom <= 1.0f) {
       scene->getDisplayOptions()->setSubtreeCacheMaxSize(1024);
@@ -340,7 +370,7 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
   useCustomBackgroundColor = true;
   customBackgroundColor = {std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
                            std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
-  if (scene != nullptr) {
+  if (scene != nullptr && !hasOutputView) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   }
   presentImmediately = true;
@@ -349,14 +379,88 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
 void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
   customBackgroundColor = {};
-  if (scene != nullptr) {
+  if (scene != nullptr && !hasOutputView) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   }
   presentImmediately = true;
 }
 
+// 交付窗口只在采样完成后裁切，避免提前截断 Glass/BackgroundBlur 的背景输入。
+// 中间 Surface 使用视口尺寸，缩放时不按完整文档或放大后的输出窗口分配巨大纹理。
+bool PAGXView::drawOutputView(tgfx::Context* context) {
+  if (outputSurface == nullptr) {
+    outputSurface =
+        tgfx::Surface::Make(context, lastSurfaceWidth, lastSurfaceHeight,
+                            tgfx::ColorType::RGBA_8888, 1, false, 0, tgfxSurface->colorSpace());
+  }
+  if (outputSurface == nullptr) {
+    return false;
+  }
+  auto surface = pagx::MakeFrom(window->getDevice(), outputSurface);
+  auto outputCanvas = outputSurface->getCanvas();
+  auto outputSaveCount = outputCanvas->save();
+  auto recording = pagx::Record(context, scene, surface, true);
+  outputCanvas->restoreToCount(outputSaveCount);
+  if (recording == nullptr) {
+    return false;
+  }
+  context->submit(std::move(recording));
+  auto image = outputSurface->makeImageSnapshot();
+  if (image == nullptr) {
+    return false;
+  }
+  auto canvas = tgfxSurface->getCanvas();
+  auto saveCount = canvas->save();
+  canvas->resetMatrix();
+  canvas->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
+                                         : tgfx::Color::Transparent());
+  auto options = scene->getDisplayOptions();
+  auto offset = options->getContentOffset();
+  auto scale = options->getZoomScale();
+  canvas->clipRect(tgfx::Rect::MakeXYWH(offset.x, offset.y, std::ceil(pagxWidth * scale),
+                                        std::ceil(pagxHeight * scale)),
+                   false);
+  canvas->drawImage(image);
+  canvas->restoreToCount(saveCount);
+  recording = context->flush();
+  if (recording == nullptr) {
+    return false;
+  }
+  context->submit(std::move(recording));
+  return true;
+}
+
 void PAGXView::draw() {
-  if (!ensureWindow() || scene == nullptr) {
+  if (!ensureWindow()) {
+    return;
+  }
+  if (scene == nullptr || hasOutputView) {
+    updateSize();
+    if (!presentImmediately || tgfxSurface == nullptr) {
+      return;
+    }
+    auto device = window->getDevice();
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return;
+    }
+    bool drawn = false;
+    if (scene == nullptr) {
+      tgfxSurface->getCanvas()->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
+                                                               : tgfx::Color::Transparent());
+      auto recording = context->flush();
+      if (recording != nullptr) {
+        context->submit(std::move(recording));
+        drawn = true;
+      }
+    } else {
+      drawn = drawOutputView(context);
+    }
+    if (drawn) {
+      presentImmediately = false;
+      lastRecording = nullptr;
+    }
+    device->unlock();
     return;
   }
   double frameStartMs = emscripten_get_now();

@@ -99,14 +99,14 @@ export class PAGXView {
   }
 
   /**
-   * The original width of the PAGX content.
+   * 交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
    */
   public get contentWidth(): number {
     return this.nativeView._contentWidth();
   }
 
   /**
-   * The original height of the PAGX content.
+   * 交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
    */
   public get contentHeight(): number {
     return this.nativeView._contentHeight();
@@ -135,7 +135,10 @@ export class PAGXView {
    * @param data PAGX file binary data
    */
   public loadPAGX(data: Uint8Array): void {
-    this.nativeView._loadPAGX(data);
+    if (!this.nativeView._loadPAGX(data)) {
+      this.nativeView._draw();
+      throw new Error('PAGXView: 文档解析失败，或默认输出视图无效、不受支持。');
+    }
   }
 
   /**
@@ -144,6 +147,7 @@ export class PAGXView {
    */
   public clear(): void {
     this.nativeView._loadPAGX(new Uint8Array(0));
+    this.nativeView._draw();
   }
 
   /**
@@ -188,7 +192,10 @@ export class PAGXView {
    * Must be called after parsePAGX() and any loadFileData() calls.
    */
   public buildLayers(): void {
-    this.nativeView._buildLayers();
+    if (!this.nativeView._buildLayers()) {
+      this.nativeView._draw();
+      throw new Error('PAGXView: 场景创建失败，或默认输出视图无效、不受支持。');
+    }
   }
 
   /**

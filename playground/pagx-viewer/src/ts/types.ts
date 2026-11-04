@@ -56,7 +56,7 @@ export interface _PAGXView {
    * This is a convenience method that calls parsePAGX() and buildLayers().
    * @param data PAGX file binary data
    */
-  _loadPAGX(data: Uint8Array): void;
+  _loadPAGX(data: Uint8Array): boolean;
 
   /**
    * Parses PAGX data without building layers.
@@ -84,7 +84,7 @@ export interface _PAGXView {
    * Builds the layer tree after parsing and loading external files.
    * Must be called after parsePAGX() and any loadFileData() calls.
    */
-  _buildLayers(): void;
+  _buildLayers(): boolean;
 
   /**
    * Updates the view size to match the canvas dimensions.
@@ -121,12 +121,12 @@ export interface _PAGXView {
   _draw(): void;
 
   /**
-   * Returns the original width of the PAGX content.
+   * 返回交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
    */
   _contentWidth(): number;
 
   /**
-   * Returns the original height of the PAGX content.
+   * 返回交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
    */
   _contentHeight(): number;
 

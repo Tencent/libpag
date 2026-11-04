@@ -40,7 +40,10 @@ class PAGXView {
 
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
-  void loadPAGX(const emscripten::val& pagxData);
+  /**
+   * 加载 PAGX 文档；解析或场景校验失败时返回 false。
+   */
+  bool loadPAGX(const emscripten::val& pagxData);
 
   void parsePAGX(const emscripten::val& pagxData);
 
@@ -48,7 +51,10 @@ class PAGXView {
 
   bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
 
-  void buildLayers();
+  /**
+   * 为已解析文档创建场景；没有文档、默认输出视图无效或不受支持时返回 false。
+   */
+  bool buildLayers();
 
   void updateSize();
 
@@ -71,10 +77,16 @@ class PAGXView {
 
   void draw();
 
+  /**
+   * 返回交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
+   */
   float contentWidth() const {
     return pagxWidth;
   }
 
+  /**
+   * 返回交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
+   */
   float contentHeight() const {
     return pagxHeight;
   }
@@ -95,6 +107,8 @@ class PAGXView {
   void applyDisplayTransform();
   void applySceneDisplayOptions();
   bool ensureWindow();
+  void resetScene();
+  bool drawOutputView(tgfx::Context* context);
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
   void onZoomEnd();
@@ -105,6 +119,7 @@ class PAGXView {
   std::string canvasID = {};
   std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
   std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
+  std::shared_ptr<tgfx::Surface> outputSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
@@ -128,6 +143,8 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
+  // 仅成对字段通过 PAGScene 校验后启用；无字段文档仍按完整文档取景和渲染。
+  bool hasOutputView = false;
   float contentScale = 1.0f;
   float contentOffsetX = 0.0f;
   float contentOffsetY = 0.0f;
