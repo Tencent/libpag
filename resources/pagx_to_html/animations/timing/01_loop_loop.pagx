@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: a LoopMode pingPong animation folds the alpha ramp back towards the first key.
+<!-- Tests: a LoopMode loop animation restarts the alpha ramp from the first key each cycle.
      Target: Layer  Channel: alpha  Type: float
      Expect: supported
      Ref: - -->
@@ -8,13 +8,13 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
-  <Layer id="pingPongBox" x="120" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+  <Layer id="loopBox" x="120" y="60" width="80" height="80">
+    <Ellipse position="40,40" size="80,80"/>
+    <Fill color="#0284C7"/>
   </Layer>
   <Animations>
-    <Animation id="pingPongFade" duration="60" frameRate="60" loop="pingPong">
-      <Object target="pingPongBox">
+    <Animation id="loopFade" duration="60" frameRate="60" loop="loop">
+      <Object target="loopBox">
         <Channel name="alpha" type="float">
           <Key time="0" value="0.2" interpolation="linear"/>
           <Key time="60" value="1" interpolation="linear"/>

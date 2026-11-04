@@ -12,7 +12,7 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle id="growRect" position="160,100" size="80,120" roundness="8"/>
-    <Fill id="growRectFill" color="#2563EB"/>
+    <Fill id="growRectFill" color="#B45309"/>
   </Layer>
   <Animations>
     <Animation id="growAndTint" duration="60" frameRate="60" loop="once">
@@ -24,7 +24,7 @@
       </Object>
       <Object target="growRectFill">
         <Channel name="color" type="color">
-          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="0" value="#B45309" interpolation="linear"/>
           <Key time="60" value="#F97316"/>
         </Channel>
       </Object>

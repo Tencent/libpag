@@ -9,6 +9,10 @@
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
     <Layer id="softMask">
       <Path id="softPath" data="M 40 20 L 300 20 L 300 180 L 40 180 Z"/>
       <Fill>
@@ -20,7 +24,7 @@
     </Layer>
     <Layer id="maskedBox" mask="@softMask" maskType="alpha">
       <Rectangle position="160,100" size="240,160"/>
-      <Fill color="#2563EB"/>
+      <Fill color="#B91C1C"/>
     </Layer>
   </Layer>
   <Animations>
