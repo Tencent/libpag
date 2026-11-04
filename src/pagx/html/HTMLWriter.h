@@ -280,45 +280,75 @@ class HTMLWriterContext {
   // emission-site tag ("chain:", "dss:", "iss:", "issb:") so different sites never collide.
   std::unordered_map<std::string, std::string> filterDefIds = {};
 
-  // Populated by HTMLAnimationSession when keyframe animations are active. Maps an animated
-  // non-Layer element (Group, Fill, Stroke, Text, or geometry Element) to the DOM id that
-  // should be emitted on its corresponding HTML/SVG tag so the post-weaving pass can attach
-  // `animation` declarations. Empty when no animations are exported.
-  std::unordered_map<const Node*, std::string> animatedElementIds = {};
-  // Initially hidden Layers need their contents emitted when a visible channel may show them later.
-  std::unordered_set<const Layer*> animatedVisibleLayers = {};
+  // State that only the animation export needs. Keeping it in one place separates keyframe
+  // bookkeeping from the generic writer's own state and lets the session drop it as a unit.
+  struct AnimationState {
+    // Maps an animated non-Layer element (Group, Fill, Stroke, Text or geometry Element) to the DOM
+    // id its tag must carry so the weaving pass can attach `animation` declarations.
+    std::unordered_map<const Node*, std::string> elementIds = {};
+    // Initially hidden Layers need their contents emitted when a visible channel may show them later.
+    std::unordered_set<const Layer*> visibleLayers = {};
+    // Number of tags already emitted for each animated base id.
+    std::unordered_map<std::string, size_t> domIdUseCount = {};
 
-  struct AnimationInstance {
-    const Composition* composition = nullptr;
-    const Layer* slot = nullptr;
+    // Animated Paths inside a mask, and the SVG element ids handed to them. A coverage mask (Alpha /
+    // Luminance) cannot be expressed as a clip polygon, so such a mask is emitted as an inline SVG
+    // <mask> whose geometry is animated by CSS inside the mask.
+    std::unordered_set<const Path*> maskPaths = {};
+    std::unordered_map<const Path*, std::string> maskPathIds = {};
+    // Masked layer -> id of the inline <mask> generated for it.
+    std::unordered_map<const Layer*, std::string> svgMaskIds = {};
+
+    struct Instance {
+      const Composition* composition = nullptr;
+      const Layer* slot = nullptr;
+      size_t scope = 0;
+      size_t parentScope = 0;
+    };
+    struct Tag {
+      const Node* node = nullptr;
+      size_t scope = 0;
+      std::string id = {};
+    };
+    std::vector<Instance> instances = {};
+    std::vector<Tag> tags = {};
+
+    // Current Composition slot scope: 0 at document level, non-zero inside a slot. Move it through
+    // AnimationScopeGuard so every exit path restores the previous value.
     size_t scope = 0;
-    size_t parentScope = 0;
-  };
-  struct AnimatedDomTag {
-    const Node* node = nullptr;
-    size_t scope = 0;
-    std::string id = {};
-  };
-  size_t animationScope = 0;
-  size_t nextAnimationScope = 1;
-  std::vector<AnimationInstance> animationInstances = {};
-  std::vector<AnimatedDomTag> animatedDomTags = {};
+    size_t nextScope = 1;
 
-  // Number of tags already emitted for each animated base id.
-  std::unordered_map<std::string, size_t> animatedDomIdUseCount = {};
+    void Reset() {
+      *this = AnimationState{};
+    }
+  };
+  AnimationState animation = {};
 
-  // Mask layers whose subtree contains an animated Path, and the SVG element ids handed to those
-  // Paths. A coverage mask (Alpha / Luminance) cannot be expressed as a clip polygon, so such a
-  // mask is emitted as an inline SVG <mask> whose geometry is animated by CSS inside the mask.
-  std::unordered_set<const Path*> animatedMaskPaths = {};
-  std::unordered_map<const Path*, std::string> animatedMaskPathIds = {};
-  // Masked layer -> id of the inline <mask> generated for it.
-  std::unordered_map<const Layer*, std::string> svgMaskIds = {};
+  // Makes a fresh Composition slot scope current for its lifetime and restores the previous one.
+  class AnimationScopeGuard {
+   public:
+    AnimationScopeGuard(HTMLWriterContext& ctx, const Composition* composition, const Layer* slot)
+        : _ctx(ctx), _parentScope(ctx.animation.scope) {
+      size_t scope = _ctx.animation.nextScope++;
+      _ctx.animation.instances.push_back({composition, slot, scope, _parentScope});
+      _ctx.animation.scope = scope;
+    }
+    ~AnimationScopeGuard() {
+      _ctx.animation.scope = _parentScope;
+    }
+
+    AnimationScopeGuard(const AnimationScopeGuard&) = delete;
+    AnimationScopeGuard& operator=(const AnimationScopeGuard&) = delete;
+
+   private:
+    HTMLWriterContext& _ctx;
+    size_t _parentScope = 0;
+  };
 
   /**
    * Returns the DOM id for the next tag rendering an animated node, or an empty string when none
    * of the candidates is animated. The candidates are checked in order and the first one found in
-   * animatedElementIds supplies the base id. One node can render into several tags (Repeater
+   * animation.elementIds supplies the base id. One node can render into several tags (Repeater
    * copies, per-geometry SVG shapes, a Fill shared by shapes and text, every Text under one
    * TextBox), so the first tag gets the base id and later tags get "<base>__1", "<base>__2", and
    * so on, which keeps ids unique and lets the weaving pass reach every copy.
@@ -329,7 +359,7 @@ class HTMLWriterContext {
    * those records, which keeps the animations of the other candidates instead of dropping them.
    */
   std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
-    if (animatedElementIds.empty()) {
+    if (animation.elementIds.empty()) {
       return {};
     }
     std::string id = {};
@@ -337,15 +367,15 @@ class HTMLWriterContext {
       if (node == nullptr) {
         continue;
       }
-      auto it = animatedElementIds.find(node);
-      if (it == animatedElementIds.end()) {
+      auto it = animation.elementIds.find(node);
+      if (it == animation.elementIds.end()) {
         continue;
       }
       if (id.empty()) {
-        size_t index = animatedDomIdUseCount[it->second]++;
+        size_t index = animation.domIdUseCount[it->second]++;
         id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
       }
-      animatedDomTags.push_back({node, animationScope, id});
+      animation.tags.push_back({node, animation.scope, id});
     }
     return id;
   }

@@ -387,7 +387,7 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   _pendingSVGDraws.clear();
   // Group SVG draws only when exporting animations. Static documents must retain their original
   // per-draw viewBoxes: sharing one SVG changes clipping and gradient/stroke rasterization.
-  _coalesceSVGDraws = !_ctx->animatedElementIds.empty();
+  _coalesceSVGDraws = !_ctx->animation.elementIds.empty();
   ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
   float roundCornerRadius = 0.0f;
@@ -604,9 +604,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // would be silently dropped — pagx_features Pipeline buttons (".pagx", ".pag",
         // "Production" labels) symptom: button background renders, label text disappears.
         if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
-            _ctx->animatedElementIds.count(group) > 0) {
+            _ctx->animation.elementIds.count(group) > 0) {
           std::vector<Element*> propagatedPainters = {};
-          if (_ctx->animatedElementIds.count(group) > 0 && !hasPainter && !hasText && !hasTextBox &&
+          if (_ctx->animation.elementIds.count(group) > 0 && !hasPainter && !hasText && !hasTextBox &&
               !group->elements.empty()) {
             bool shapeOnly = true;
             for (auto* child : group->elements) {
@@ -2079,7 +2079,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
   // caller's offsets at destruction regardless of how writeLayer returns.
   RepeaterOffsetGuard offsetGuard(_ctx);
-  if (!layer->visible && _ctx->animatedVisibleLayers.count(layer) == 0) {
+  if (!layer->visible && _ctx->animation.visibleLayers.count(layer) == 0) {
     out.openTag("div");
     out.addAttr("style", "display:none");
     if (!layer->id.empty()) {
@@ -2658,7 +2658,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       // paint. Emit it as an inline <mask> so its content stays a live SVG subtree the keyframes
       // can animate, which keeps the soft edge and the file small.
       auto maskId = writeAnimatedMaskDef(layer->mask, layer->maskType);
-      _ctx->svgMaskIds[layer] = maskId;
+      _ctx->animation.svgMaskIds[layer] = maskId;
       std::string maskImage = "url(#" + maskId + ")";
       style += ";-webkit-mask-image:" + maskImage + ";mask-image:" + maskImage;
       style += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
@@ -2698,7 +2698,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   out.openTag("div");
   // A Composition may be mounted more than once: each animated child Layer needs its own DOM id
   // and timing even though all instances share the same source Layer node.
-  auto animatedId = _ctx->animationScope != 0 ? _ctx->claimAnimatedDomId({layer}) : std::string{};
+  auto animatedId = _ctx->animation.scope != 0 ? _ctx->claimAnimatedDomId({layer}) : std::string{};
   if (!animatedId.empty()) {
     out.addAttr("id", animatedId);
   } else if (!layer->id.empty()) {
@@ -3038,12 +3038,10 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
   writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
   if (layer->composition) {
-    auto parentScope = _ctx->animationScope;
-    auto scope = _ctx->nextAnimationScope++;
-    _ctx->animationInstances.push_back({layer->composition, layer, scope, parentScope});
-    _ctx->animationScope = scope;
+    // The guard restores the enclosing scope on every exit path, including early returns inside
+    // writeComposition, so a nested slot cannot leak its scope to later siblings.
+    HTMLWriterContext::AnimationScopeGuard scopeGuard(*_ctx, layer->composition, layer);
     writeComposition(out, layer->composition, contentAlpha, childDistribute);
-    _ctx->animationScope = parentScope;
   }
 
   // Restore childLayerOffset before each child writeLayer call: the offset is consumed (cleared)
