@@ -75,9 +75,19 @@ Node* ResolveTargetNode(PAGXDocument& doc, const std::string& target) {
   return nullptr;
 }
 
+// Everything the animation export needs from the document tree. Collected by a single traversal:
+// the playable animations, the SolidColor and filter owners, the mask paths and the timeline
+// offsets all describe the same tree, so walking it once keeps those views consistent.
+struct DocumentIndex {
+  std::vector<const Animation*> animations = {};
+  std::unordered_map<const SolidColor*, const Node*> solidToPainter = {};
+  std::unordered_map<const LayerFilter*, const Layer*> filterToLayer = {};
+  std::unordered_map<const Path*, const Layer*> maskPathToLayer = {};
+  std::unordered_map<std::string, int64_t> timelineOffsets = {};
+};
+
 // Appends the playable animations among `nodes` that were not collected yet.
-void AppendPlayableAnimations(const std::vector<Node*>& nodes,
-                              std::vector<const Animation*>& result,
+void AppendPlayableAnimations(const std::vector<Node*>& nodes, DocumentIndex& index,
                               std::unordered_set<const Animation*>& seen) {
   for (auto* node : nodes) {
     if (node == nullptr || node->nodeType() != NodeType::Animation) {
@@ -86,36 +96,9 @@ void AppendPlayableAnimations(const std::vector<Node*>& nodes,
     auto* anim = static_cast<const Animation*>(node);
     if (anim->duration > 0 && anim->frameRate > 0.0f && !anim->objects.empty() &&
         seen.insert(anim).second) {
-      result.push_back(anim);
+      index.animations.push_back(anim);
     }
   }
-}
-
-// Walks the layer tree and collects the animations of every Composition reachable through a slot.
-// Each Composition is visited once: siblings can mount the same source Composition.
-void AppendCompositionAnimations(const std::vector<Layer*>& layers,
-                                 std::vector<const Animation*>& result,
-                                 std::unordered_set<const Animation*>& seen,
-                                 std::unordered_set<const Composition*>& visited) {
-  for (auto* layer : layers) {
-    if (layer == nullptr) {
-      continue;
-    }
-    if (layer->composition != nullptr && visited.insert(layer->composition).second) {
-      AppendPlayableAnimations(layer->composition->animations, result, seen);
-      AppendCompositionAnimations(layer->composition->layers, result, seen, visited);
-    }
-    AppendCompositionAnimations(layer->children, result, seen, visited);
-  }
-}
-
-std::vector<const Animation*> CollectPlayableAnimations(const PAGXDocument& doc) {
-  std::vector<const Animation*> result = {};
-  std::unordered_set<const Animation*> seen = {};
-  AppendPlayableAnimations(doc.animations, result, seen);
-  std::unordered_set<const Composition*> visited = {};
-  AppendCompositionAnimations(doc.layers, result, seen, visited);
-  return result;
 }
 
 void IndexElements(const std::vector<Element*>& elements,
@@ -157,50 +140,55 @@ void CollectMaskPaths(const Layer* maskLayer, const Layer* hostLayer,
   }
 }
 
-void IndexLayerTree(const std::vector<Layer*>& layers,
-                    std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
-                    std::unordered_map<const LayerFilter*, const Layer*>& filterToLayer,
-                    std::unordered_map<const Path*, const Layer*>& maskPathToLayer) {
-  for (auto* layer : layers) {
-    if (layer == nullptr) {
-      continue;
+// Collects what a single layer contributes on its own: its element painters, its animation filters,
+// the paths of its mask subtree and the offsets of the timelines it mounts.
+void IndexLayerContents(const Layer* layer, DocumentIndex& index) {
+  IndexElements(layer->contents, index.solidToPainter);
+  for (auto* filter : layer->filters) {
+    if (filter != nullptr) {
+      index.filterToLayer[filter] = layer;
     }
-    IndexElements(layer->contents, solidToPainter);
-    for (auto* filter : layer->filters) {
-      if (filter != nullptr) {
-        filterToLayer[filter] = layer;
+  }
+  if (layer->mask != nullptr) {
+    CollectMaskPaths(layer->mask, layer, index.maskPathToLayer);
+  }
+  for (const auto& tl : layer->timelines) {
+    if (tl != nullptr && tl->timelineType() == TimelineType::Animation) {
+      auto* animTl = static_cast<const AnimationTimeline*>(tl.get());
+      std::string id = StripAtPrefix(animTl->animationId);
+      if (!id.empty() && animTl->evaluationOffset != 0) {
+        index.timelineOffsets[id] = animTl->evaluationOffset;
       }
     }
-    if (layer->mask != nullptr) {
-      CollectMaskPaths(layer->mask, layer, maskPathToLayer);
-    }
-    if (layer->composition != nullptr) {
-      IndexLayerTree(layer->composition->layers, solidToPainter, filterToLayer, maskPathToLayer);
-    }
-    IndexLayerTree(layer->children, solidToPainter, filterToLayer, maskPathToLayer);
   }
 }
 
-void CollectTimelineOffsets(const std::vector<Layer*>& layers,
-                            std::unordered_map<std::string, int64_t>& animOffsets) {
+// Walks the layer tree once, filling every part of `index`. A Composition is visited only the first
+// time it is reached: siblings can mount the same source Composition.
+void IndexLayerTree(const std::vector<Layer*>& layers, DocumentIndex& index,
+                    std::unordered_set<const Animation*>& seenAnimations,
+                    std::unordered_set<const Composition*>& visitedCompositions) {
   for (auto* layer : layers) {
     if (layer == nullptr) {
       continue;
     }
-    for (const auto& tl : layer->timelines) {
-      if (tl != nullptr && tl->timelineType() == TimelineType::Animation) {
-        auto* animTl = static_cast<const AnimationTimeline*>(tl.get());
-        std::string id = StripAtPrefix(animTl->animationId);
-        if (!id.empty() && animTl->evaluationOffset != 0) {
-          animOffsets[id] = animTl->evaluationOffset;
-        }
-      }
+    IndexLayerContents(layer, index);
+    if (layer->composition != nullptr && visitedCompositions.insert(layer->composition).second) {
+      AppendPlayableAnimations(layer->composition->animations, index, seenAnimations);
+      IndexLayerTree(layer->composition->layers, index, seenAnimations, visitedCompositions);
     }
-    if (layer->composition != nullptr) {
-      CollectTimelineOffsets(layer->composition->layers, animOffsets);
-    }
-    CollectTimelineOffsets(layer->children, animOffsets);
+    IndexLayerTree(layer->children, index, seenAnimations, visitedCompositions);
   }
+}
+
+// Single entry point for every document view the animation export needs.
+DocumentIndex BuildDocumentIndex(const PAGXDocument& doc) {
+  DocumentIndex index = {};
+  std::unordered_set<const Animation*> seenAnimations = {};
+  AppendPlayableAnimations(doc.animations, index, seenAnimations);
+  std::unordered_set<const Composition*> visitedCompositions = {};
+  IndexLayerTree(doc.layers, index, seenAnimations, visitedCompositions);
+  return index;
 }
 
 // Segment easing descriptor extracted from a Channel at a given keyframe time.
@@ -1667,15 +1655,18 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
   if (!enabled) {
     return;
   }
-  auto animations = CollectPlayableAnimations(doc);
-  if (animations.empty()) {
+  auto index = BuildDocumentIndex(doc);
+  if (index.animations.empty()) {
     return;
   }
   _active = true;
 
-  IndexLayerTree(doc.layers, _solidToPainter, _filterToLayer, _maskPathToLayer);
+  _solidToPainter = std::move(index.solidToPainter);
+  _filterToLayer = std::move(index.filterToLayer);
+  _maskPathToLayer = std::move(index.maskPathToLayer);
+  _timelineOffsets = std::move(index.timelineOffsets);
 
-  ResolveAnimationTargets(animations);
+  ResolveAnimationTargets(index.animations);
 }
 
 // Resolves every animated object target to the DOM id its tag will carry. Layer and Group targets
@@ -1811,9 +1802,6 @@ HTMLAnimationSession::~HTMLAnimationSession() {
 
 std::vector<HTMLAnimationSession::AnimationMount>
 HTMLAnimationSession::CollectAnimationMounts() const {
-  std::unordered_map<std::string, int64_t> timelineOffsets = {};
-  CollectTimelineOffsets(_doc.layers, timelineOffsets);
-
   std::vector<AnimationMount> mounts = {};
   for (auto* node : _doc.animations) {
     if (node == nullptr || node->nodeType() != NodeType::Animation) {
@@ -1821,8 +1809,8 @@ HTMLAnimationSession::CollectAnimationMounts() const {
     }
     auto* anim = static_cast<const Animation*>(node);
     int64_t offset = 0;
-    auto it = timelineOffsets.find(anim->id);
-    if (it != timelineOffsets.end()) {
+    auto it = _timelineOffsets.find(anim->id);
+    if (it != _timelineOffsets.end()) {
       offset = it->second;
     }
     mounts.push_back({anim, 0, offset, true});
