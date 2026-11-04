@@ -9935,6 +9935,183 @@ PAGX_TEST(PAGXTest, HitTestGlobalMatrix) {
   EXPECT_FLOAT_EQ(matrix.ty, 45.0f);
 }
 
+static void CollectRuntimeLayerMap(
+    const std::shared_ptr<pagx::PAGLayer>& layer,
+    std::unordered_map<const tgfx::Layer*, pagx::PAGLayer*>* registry) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->runtimeLayer != nullptr) {
+    (*registry)[layer->runtimeLayer.get()] = layer.get();
+  }
+  for (const auto& child : layer->getChildren()) {
+    CollectRuntimeLayerMap(child, registry);
+  }
+}
+
+static std::vector<pagx::PAGLayer*> BaseEquivalentHits(
+    const std::shared_ptr<pagx::PAGScene>& scene,
+    const std::unordered_map<const tgfx::Layer*, pagx::PAGLayer*>& registry, float surfaceX,
+    float surfaceY) {
+  // Reproduce the original two-argument path: probe the tgfx runtime tree with a root-space point
+  // and map each hit back through the runtime-layer to PAGLayer correspondence.
+  std::vector<pagx::PAGLayer*> expected = {};
+  auto* rootRuntime = scene->rootComposition()->runtimeLayer.get();
+  if (rootRuntime == nullptr) {
+    return expected;
+  }
+  float rootX = 0;
+  float rootY = 0;
+  if (!scene->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+    return expected;
+  }
+  for (const auto& runtimeHit : rootRuntime->getLayersUnderPoint(rootX, rootY)) {
+    auto it = registry.find(runtimeHit.get());
+    if (it != registry.end()) {
+      expected.push_back(it->second);
+    }
+  }
+  return expected;
+}
+
+static pagx::Layer* MakeHitEquivalenceRectLayer(pagx::PAGXDocument* doc, const std::string& name,
+                                                float x, float y, float width, float height,
+                                                pagx::Color color) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->name = name;
+  layer->matrix = pagx::Matrix::Translate(x, y);
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {0, 0};
+  rect->size = {width, height};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = color;
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  return layer;
+}
+
+static void ExpectTwoArgMatchesBase(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                   const char* scenario, pagx::FontConfig* fontConfig) {
+  SCOPED_TRACE(scenario);
+  doc->applyLayout(fontConfig);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  std::unordered_map<const tgfx::Layer*, pagx::PAGLayer*> registry = {};
+  CollectRuntimeLayerMap(scene->rootComposition(), &registry);
+  ASSERT_FALSE(registry.empty());
+  size_t hitCount = 0;
+  for (int y = 10; y < 200; y += 20) {
+    for (int x = 10; x < 200; x += 20) {
+      auto pointX = static_cast<float>(x);
+      auto pointY = static_cast<float>(y);
+      auto expected = BaseEquivalentHits(scene, registry, pointX, pointY);
+      auto actual = scene->getLayersUnderPoint(pointX, pointY);
+      ASSERT_EQ(actual.size(), expected.size()) << "point (" << x << ", " << y << ")";
+      for (size_t index = 0; index < actual.size(); ++index) {
+        EXPECT_EQ(actual[index].get(), expected[index])
+            << "point (" << x << ", " << y << ") index " << index;
+        EXPECT_EQ(actual[index]->name(), expected[index]->name());
+        EXPECT_EQ(actual[index]->id(), expected[index]->id());
+      }
+      if (!actual.empty()) {
+        hitCount++;
+      }
+    }
+  }
+  EXPECT_TRUE(hitCount > 0);
+}
+
+/**
+ * Test case: the two-argument getLayersUnderPoint stays item-by-item equivalent to the original
+ * tgfx tree probe for the content and layer states that affect hit testing: shaped text,
+ * stroke-only geometry, transparent fills, scrollRect clipping, masks and nested containers. Each
+ * scenario is sampled over a grid of hit and miss points, and every result is compared by handle,
+ * order, name and id against the original path reproduced from the runtime tree.
+ */
+PAGX_TEST(PAGXTest, HitTestTwoArgEquivalentToBase) {
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto textLayer = MakeTextLayer(doc.get(), "Hello", 24, {0, 0, 0, 1});
+    textLayer->name = "Text";
+    textLayer->matrix = pagx::Matrix::Translate(20, 40);
+    doc->layers.push_back(textLayer);
+    ExpectTwoArgMatchesBase(doc, "text", &fontConfig);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto strokeLayer = doc->makeNode<pagx::Layer>();
+    strokeLayer->name = "Stroke";
+    strokeLayer->matrix = pagx::Matrix::Translate(30, 30);
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {0, 0};
+    rect->size = {100, 100};
+    auto stroke = doc->makeNode<pagx::Stroke>();
+    auto strokeColor = doc->makeNode<pagx::SolidColor>();
+    strokeColor->color = {0, 0, 1, 1};
+    stroke->color = strokeColor;
+    stroke->width = 8;
+    strokeLayer->contents.push_back(rect);
+    strokeLayer->contents.push_back(stroke);
+    doc->layers.push_back(strokeLayer);
+    ExpectTwoArgMatchesBase(doc, "stroke", &fontConfig);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    doc->layers.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Transparent", 30, 30, 100, 100,
+                                                      {1, 0, 0, 0.25f}));
+    ExpectTwoArgMatchesBase(doc, "transparent fill", &fontConfig);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto scrollLayer = doc->makeNode<pagx::Layer>();
+    scrollLayer->name = "Scroll";
+    scrollLayer->width = 200;
+    scrollLayer->height = 200;
+    scrollLayer->hasScrollRect = true;
+    scrollLayer->scrollRect = pagx::Rect::MakeXYWH(20, 20, 100, 100);
+    scrollLayer->children.push_back(MakeHitEquivalenceRectLayer(
+        doc.get(), "ScrollChild", 30, 30, 100, 100, {0, 1, 0, 1}));
+    doc->layers.push_back(scrollLayer);
+    ExpectTwoArgMatchesBase(doc, "scrollRect", &fontConfig);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto maskLayer = MakeHitEquivalenceRectLayer(doc.get(), "Mask", 20, 20, 50, 100,
+                                                 {1, 1, 1, 1});
+    auto maskedLayer = MakeHitEquivalenceRectLayer(doc.get(), "Masked", 20, 20, 100, 100,
+                                                   {0, 0, 1, 1});
+    maskedLayer->mask = maskLayer;
+    doc->layers.push_back(maskLayer);
+    doc->layers.push_back(maskedLayer);
+    ExpectTwoArgMatchesBase(doc, "mask", &fontConfig);
+  }
+
+  {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto container = doc->makeNode<pagx::Layer>();
+    container->name = "Container";
+    container->width = 200;
+    container->height = 200;
+    container->children.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Leaf", 40, 40, 100,
+                                                              100, {0, 1, 0, 1}));
+    doc->layers.push_back(container);
+    doc->layers.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Sibling", 100, 100, 100, 100,
+                                                      {1, 0, 1, 1}));
+    ExpectTwoArgMatchesBase(doc, "nested container", &fontConfig);
+  }
+}
+
 static pagx::Layer* MakeTestLayer(pagx::PAGXDocument* doc, float x, float y, float fillR,
                                   float fillG, float fillB) {
   auto layer = doc->makeNode<pagx::Layer>();
