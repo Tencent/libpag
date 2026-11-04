@@ -434,34 +434,36 @@ void HTMLStyleCascade::resolveTextStroke(const PropertyMap& props, HTMLInherited
   }
 }
 
-// `<svg width="80" height="60">` carries its size on the element instead of in CSS, and the HTML
-// importer never turns those attributes into a Layer size. Resolving them here gives the transform
-// pipeline a reference box, so a percentage / keyword `transform-origin` can become an `anchor`; the
-// SVG resolver applies the same intrinsic size later, so nothing else changes.
-void ApplySvgAttributeSize(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
-                           HTMLValueParser& valueParser) {
+HTMLTransformReference HTMLStyleCascade::getTransformReferenceSize(
+    const std::shared_ptr<DOMNode>& element) {
+  const auto& props = getResolvedStyle(element);
+  HTMLBoxAttributes box = {};
+  parseBoxSizing(box, props);
+  HTMLTransformReference reference = {};
+  reference.widthPx = box.widthPx;
+  reference.heightPx = box.heightPx;
   if (element == nullptr || element->name != "svg") {
-    return;
+    return reference;
   }
-  if (std::isnan(box.widthPx) && std::isnan(box.widthPct)) {
+  if (std::isnan(reference.widthPx) && std::isnan(box.widthPct)) {
     const auto* attribute = element->findAttribute("width");
     if (attribute != nullptr) {
-      box.widthPx = valueParser.parseAbsoluteLengthPx(*attribute);
+      reference.widthPx = _valueParser.parseAbsoluteLengthPx(*attribute);
     }
   }
-  if (std::isnan(box.heightPx) && std::isnan(box.heightPct)) {
+  if (std::isnan(reference.heightPx) && std::isnan(box.heightPct)) {
     const auto* attribute = element->findAttribute("height");
     if (attribute != nullptr) {
-      box.heightPx = valueParser.parseAbsoluteLengthPx(*attribute);
+      reference.heightPx = _valueParser.parseAbsoluteLengthPx(*attribute);
     }
   }
+  return reference;
 }
 
 HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
-  ApplySvgAttributeSize(box, element, _valueParser);
   // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
   // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
   // only at Layer construction time so inference can still use the measured child geometry.
@@ -478,7 +480,9 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
   parseBoxVisuals(box, props);
-  parseBoxTransform(box, props);
+  const auto reference = getTransformReferenceSize(element);
+  parseBoxTransform(box, props, element != nullptr ? element->name : std::string(),
+                    reference.widthPx, reference.heightPx);
   return box;
 }
 
@@ -781,7 +785,9 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
 }
 
-void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props) {
+void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props,
+                                         const std::string& elementName, float referenceWidthPx,
+                                         float referenceHeightPx) {
   box.preserve3D = ToLower(Trim(LookupProperty(props, "transform-style"))) == "preserve-3d";
   const std::string transform = Trim(LookupProperty(props, "transform"));
   Matrix3D pose = {};
@@ -789,7 +795,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
     return;
   }
   const std::string originValue = Trim(LookupProperty(props, "transform-origin"));
-  const auto origin = ResolveTransformOrigin(originValue, box.widthPx, box.heightPx, _valueParser);
+  const auto origin =
+      ResolveTransformOrigin(originValue, referenceWidthPx, referenceHeightPx, _valueParser);
   HTMLTransform parsed = {};
   parsed.valid = true;
   parsed.pose = pose;
@@ -797,8 +804,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   parsed.originZ = origin.z;
   parsed.originResolved = origin.resolved;
   if (!origin.resolved) {
-    _diagnostics.warn("html: transform-origin '" + originValue +
-                      "' cannot be resolved against the box size; pivoting at the top-left "
+    _diagnostics.warn("html: transform-origin '" + originValue + "' on <" + elementName +
+                      "> cannot be resolved against the box size; pivoting at the top-left "
                       "corner");
   }
   box.transform = parsed;

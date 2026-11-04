@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include "pagx/types/Matrix.h"
@@ -28,6 +29,16 @@ namespace pagx {
 
 class HTMLValueParser;
 class HTMLDiagnosticSink;
+
+/**
+ * The box size `transform-origin` resolves percentages and keywords against. It equals the CSS box
+ * size, except for an `<svg>` sized by its `width` / `height` attributes: those stand in for the
+ * reference box only, so layer sizing and other percentage-based properties stay untouched.
+ */
+struct HTMLTransformReference {
+  float widthPx = NAN;
+  float heightPx = NAN;
+};
 
 /**
  * Resolved CSS `transform-origin` in layer-local pixels. `resolved` is false when the value uses a
@@ -85,10 +96,5 @@ Matrix ToAffine2D(const Matrix3D& matrix);
  * projects and the pivot therefore cannot change the visible result.
  */
 bool IsLinearIdentity(const Matrix3D& matrix);
-
-/**
- * Returns true when the pose is finite and, unless it is flat, invertible.
- */
-bool IsUsableTransform(const Matrix3D& matrix);
 
 }  // namespace pagx
