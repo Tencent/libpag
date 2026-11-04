@@ -1916,13 +1916,13 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   // validation on reload instead of quietly turning into a whole-canvas document.
   if (!doc.targetLayerId.empty()) {
     xml.addAttribute("targetLayer", "@" + doc.targetLayerId);
-  } else {
-    xml.addAttribute("targetLayer", doc.declaredTargetLayer);
+  } else if (doc.declaredTargetLayer.has_value()) {
+    xml.addRequiredAttribute("targetLayer", *doc.declaredTargetLayer);
   }
   if (doc.outputBounds.has_value()) {
     xml.addAttribute("outputBounds", RectToString(*doc.outputBounds));
-  } else {
-    xml.addAttribute("outputBounds", doc.declaredOutputBounds);
+  } else if (doc.declaredOutputBounds.has_value()) {
+    xml.addRequiredAttribute("outputBounds", *doc.declaredOutputBounds);
   }
   WriteCustomData(xml, &doc);
   xml.closeElementStart();

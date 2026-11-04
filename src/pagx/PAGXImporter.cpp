@@ -3149,23 +3149,28 @@ static bool ParseOutputBounds(const std::string& str, Rect* rect) {
 // failure is recorded on the document so consumers of the default output reject it instead of
 // silently rendering the whole canvas.
 static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
-  auto targetAttr = GetAttribute(root, "targetLayer");
-  auto boundsAttr = GetAttribute(root, "outputBounds");
-  bool hasTarget = !targetAttr.empty();
-  bool hasBounds = !boundsAttr.empty();
+  for (const auto& attribute : root->attributes) {
+    if (attribute.name == "targetLayer") {
+      doc->declaredTargetLayer = attribute.value;
+    } else if (attribute.name == "outputBounds") {
+      doc->declaredOutputBounds = attribute.value;
+    }
+  }
+  bool hasTarget = doc->declaredTargetLayer.has_value();
+  bool hasBounds = doc->declaredOutputBounds.has_value();
   if (!hasTarget && !hasBounds) {
     return;
   }
   // Keep the authored values until the pair parses cleanly: the exporter replays them verbatim so
   // an invalid declaration survives a round trip instead of degrading into a whole-canvas document.
-  doc->declaredTargetLayer = targetAttr;
-  doc->declaredOutputBounds = boundsAttr;
   if (hasTarget != hasBounds) {
     doc->outputViewError =
         "The 'targetLayer' and 'outputBounds' attributes must be specified together.";
     ReportError(doc, root, doc->outputViewError);
     return;
   }
+  const auto& targetAttr = *doc->declaredTargetLayer;
+  const auto& boundsAttr = *doc->declaredOutputBounds;
   if (targetAttr.size() < 2 || targetAttr[0] != '@') {
     doc->outputViewError = "Invalid value '" + targetAttr +
                            "' for 'targetLayer' attribute. Expected a Layer reference '@id'.";
@@ -3183,8 +3188,8 @@ static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
   }
   doc->targetLayerId = targetAttr.substr(1);
   doc->outputBounds = bounds;
-  doc->declaredTargetLayer.clear();
-  doc->declaredOutputBounds.clear();
+  doc->declaredTargetLayer.reset();
+  doc->declaredOutputBounds.reset();
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {

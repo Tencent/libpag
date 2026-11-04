@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include "pagx/PAGScene.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -307,6 +308,13 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport
     std::vector<std::string> expectedAttributes = {};
   };
   const Case cases[] = {
+      {"targetLayer=\"\"", {"targetLayer=\"\""}},
+      {"outputBounds=\"\"", {"outputBounds=\"\""}},
+      {"targetLayer=\"\" outputBounds=\"\"", {"targetLayer=\"\"", "outputBounds=\"\""}},
+      {"targetLayer=\"\" outputBounds=\"0,0,10,10\"",
+       {"targetLayer=\"\"", "outputBounds=\"0,0,10,10\""}},
+      {"targetLayer=\"@target\" outputBounds=\"\"",
+       {"targetLayer=\"@target\"", "outputBounds=\"\""}},
       {"targetLayer=\"@target\"", {"targetLayer=\"@target\""}},
       {"targetLayer=\"target\" outputBounds=\"0,0,10,10\"",
        {"targetLayer=\"target\"", "outputBounds=\"0,0,10,10\""}},
@@ -319,6 +327,7 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport
     auto doc = pagx::PAGXImporter::FromXML(xml);
     ASSERT_TRUE(doc != nullptr) << testCase.declaration;
     EXPECT_FALSE(doc->outputViewError.empty()) << testCase.declaration;
+    EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr) << testCase.declaration;
 
     auto exported = pagx::PAGXExporter::ToXML(*doc);
     for (const auto& expected : testCase.expectedAttributes) {
@@ -327,7 +336,21 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport
     auto reloaded = pagx::PAGXImporter::FromXML(exported);
     ASSERT_TRUE(reloaded != nullptr) << testCase.declaration;
     EXPECT_FALSE(reloaded->outputViewError.empty()) << testCase.declaration;
+    EXPECT_EQ(pagx::PAGScene::Make(reloaded), nullptr) << testCase.declaration;
   }
+}
+
+PAGX_TEST(PAGXImporterValidationTest, AbsentOutputViewStaysAbsentAfterExport) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(exported.find("targetLayer="), std::string::npos);
+  EXPECT_EQ(exported.find("outputBounds="), std::string::npos);
+  auto reloaded = pagx::PAGXImporter::FromXML(exported);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->outputViewError.empty());
+  EXPECT_NE(pagx::PAGScene::Make(reloaded), nullptr);
 }
 
 }  // namespace pag
