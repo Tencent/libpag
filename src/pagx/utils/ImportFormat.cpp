@@ -115,7 +115,8 @@ bool HasUnresolvedImports(const PAGXDocument* document,
       continue;
     }
     const auto* layer = static_cast<const Layer*>(node.get());
-    if (LayerHasUnresolvedImport(layer) || HasUnresolvedImports(layer->externalDoc.get(), visited)) {
+    if (LayerHasUnresolvedImport(layer) ||
+        HasUnresolvedImports(layer->externalDoc.get(), visited)) {
       return true;
     }
   }
@@ -150,8 +151,7 @@ bool ImportSourcesConflict(bool hasComposition, bool hasImportSource) {
 bool LayerHasDeclaredComposition(const Layer* layer, const PAGXDocument* document) {
   return layer != nullptr &&
          (!layer->compositionFilePath.empty() ||
-          (layer->composition != nullptr &&
-           !document->isMountedComposition(layer->composition)));
+          (layer->composition != nullptr && !document->isMountedComposition(layer->composition)));
 }
 
 bool DocumentHasConflictingImportSources(const PAGXDocument* document) {

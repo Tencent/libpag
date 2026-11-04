@@ -314,9 +314,9 @@ static void ResolveLayers(const std::vector<Layer*>& layers, const std::string& 
                           const ImportFormatOptions& formatOptions, PAGXDocument* doc,
                           int& resolvedCount, int& errorCount) {
   for (auto* layer : layers) {
-    bool hasImport = !LayerHasDeclaredComposition(layer, doc) &&
-                     (!layer->importDirective.source.empty() ||
-                      !layer->importDirective.content.empty());
+    bool hasImport =
+        !LayerHasDeclaredComposition(layer, doc) &&
+        (!layer->importDirective.source.empty() || !layer->importDirective.content.empty());
     if (hasImport) {
       if (ResolveOneLayer(layer, baseDir, formatOptions, doc)) {
         resolvedCount++;
@@ -344,7 +344,8 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
   }
 
   if (DocumentHasConflictingImportSources(doc)) {
-    std::cerr << "pagx resolve: error: Layer cannot declare both 'composition' and 'import' sources\n";
+    std::cerr
+        << "pagx resolve: error: Layer cannot declare both 'composition' and 'import' sources\n";
     stats.errorCount++;
     return stats;
   }

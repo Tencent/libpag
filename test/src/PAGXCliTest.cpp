@@ -3532,16 +3532,15 @@ CLI_TEST(PAGXCliTest, LazyInlineSvg_LayoutRenderBoundsAndExport) {
   EXPECT_EQ(CallRun(pagx::cli::RunRender, {"render", inputPath, "-o", pngPath}), 0);
   EXPECT_TRUE(std::filesystem::exists(pngPath));
   auto svgPath = TempDir() + "/lazy_inline_svg.svg";
-  EXPECT_EQ(CallRun(pagx::cli::RunExport,
-                    {"export", "--input", inputPath, "--output", svgPath}), 0);
+  EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", svgPath}),
+            0);
   EXPECT_FALSE(ReadFile(svgPath).empty());
   auto htmlPath = TempDir() + "/lazy_inline_svg.html";
-  EXPECT_EQ(CallRun(pagx::cli::RunExport,
-                    {"export", "--input", inputPath, "--output", htmlPath}), 0);
+  EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", htmlPath}),
+            0);
   EXPECT_FALSE(ReadFile(htmlPath).empty());
   auto embedPath = TempDir() + "/lazy_inline_svg_embedded.pagx";
-  EXPECT_EQ(CallRun(pagx::cli::RunEmbed,
-                    {"embed", inputPath, "--skip-fonts", "-o", embedPath}), 0);
+  EXPECT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--skip-fonts", "-o", embedPath}), 0);
   EXPECT_EQ(ReadFile(embedPath).find("<svg"), std::string::npos);
   auto embedded = pagx::PAGXImporter::FromFile(embedPath);
   ASSERT_NE(embedded, nullptr);
@@ -3557,8 +3556,8 @@ CLI_TEST(PAGXCliTest, Import_ExtensionlessSourceUsesContentFormat) {
             "fill=\"#00FF00\"/></svg>";
   }
   auto outputPath = TempDir() + "/extensionless_svg_imported.pagx";
-  EXPECT_EQ(CallRun(pagx::cli::RunImport,
-                    {"import", "--input", inputPath, "--output", outputPath}), 0);
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath}),
+            0);
   EXPECT_NE(ReadFile(outputPath).find("#00FF00"), std::string::npos);
   auto doc = pagx::PAGXImporter::FromFile(outputPath);
   ASSERT_NE(doc, nullptr);
@@ -3581,8 +3580,9 @@ CLI_TEST(PAGXCliTest, Embed_InlineTextAndImageAreFlattenedAndPersisted) {
   }
   auto outputPath = TempDir() + "/inline_embed_resources_out.pagx";
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
-  EXPECT_EQ(CallRun(pagx::cli::RunEmbed,
-                    {"embed", inputPath, "--fallback", fontPath, "-o", outputPath}), 0);
+  EXPECT_EQ(
+      CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--fallback", fontPath, "-o", outputPath}),
+      0);
   auto output = ReadFile(outputPath);
   EXPECT_EQ(output.find("<svg"), std::string::npos);
   EXPECT_EQ(output.find("inline_embed_image.png"), std::string::npos);
@@ -3666,9 +3666,9 @@ CLI_TEST(PAGXCliTest, Resolve_InlineImageEmbedHonorsBaseDirectory) {
 </pagx>)";
   }
   auto outputPath = TempDir() + "/inline_image_base_out.pagx";
-  EXPECT_EQ(CallRun(pagx::cli::RunResolve,
-                    {"resolve", inputPath, "--images", "embed", "--image-base-dir", imageBaseDir,
-                     "-o", outputPath}), 0);
+  EXPECT_EQ(CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "--images", "embed",
+                                            "--image-base-dir", imageBaseDir, "-o", outputPath}),
+            0);
   auto doc = pagx::PAGXImporter::FromFile(outputPath);
   ASSERT_NE(doc, nullptr);
   bool embedded = false;
@@ -3718,8 +3718,9 @@ CLI_TEST(PAGXCliTest, LazyInlineResourcesUseTheSameDirectoryAsResolve) {
   auto direct = RenderCLI({"render", inputPath});
   ASSERT_FALSE(direct.isEmpty());
   auto outputPath = TempDir() + "/lazy_relative_flattened.pagx";
-  ASSERT_EQ(CallRun(pagx::cli::RunResolve,
-                    {"resolve", inputPath, "--images", "embed", "-o", outputPath}), 0);
+  ASSERT_EQ(
+      CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "--images", "embed", "-o", outputPath}),
+      0);
   auto resolved = RenderCLI({"render", outputPath});
   ASSERT_FALSE(resolved.isEmpty());
   ASSERT_EQ(direct.width(), resolved.width());
@@ -3757,7 +3758,7 @@ CLI_TEST(PAGXCliTest, FileSubDocumentInlineResourcesKeepTheirOwnDirectory) {
   </Layer>
 </pagx>)";
   EXPECT_TRUE(doc->loadFileData("child/scene.pagx",
-                               pagx::Data::MakeWithCopy(childXML.data(), childXML.size())));
+                                pagx::Data::MakeWithCopy(childXML.data(), childXML.size())));
   ASSERT_EQ(doc->layers.size(), 1u);
   auto child = doc->layers[0]->externalDoc;
   ASSERT_NE(child, nullptr);

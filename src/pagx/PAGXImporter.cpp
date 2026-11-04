@@ -2967,9 +2967,8 @@ static bool ValidateLayerSources(const DOMNode* node,
   if (node->name == "svg" || node->name == "html") {
     return true;
   }
-  if (node->name == "Layer" &&
-      ImportSourcesConflict(!GetAttribute(node, "composition").empty(),
-                            !GetAttribute(node, "import").empty())) {
+  if (node->name == "Layer" && ImportSourcesConflict(!GetAttribute(node, "composition").empty(),
+                                                     !GetAttribute(node, "import").empty())) {
     LOGE("line %d: Layer cannot declare both 'composition' and 'import' sources.", node->line);
     return false;
   }
@@ -2981,8 +2980,7 @@ static bool ValidateLayerSources(const DOMNode* node,
     return false;
   }
   for (auto child = node->firstChild; child != nullptr; child = child->nextSibling) {
-    if (child->type == DOMNodeType::Element &&
-        !ValidateLayerSources(child.get(), compositionIds)) {
+    if (child->type == DOMNodeType::Element && !ValidateLayerSources(child.get(), compositionIds)) {
       return false;
     }
   }

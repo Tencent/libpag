@@ -1097,6 +1097,11 @@ if (PAG_BUILD_CLI)
     message("PAGX_CLI_VERSION: ${PAGX_CLI_VERSION}")
 
     # Generate pagx_xsd.h from spec/pagx.xsd
+    # The schema is embedded into a generated header at configure time. Declare the source as a
+    # configure dependency so an XSD edit re-runs CMake instead of leaving 'cmake --build'
+    # validating documents against a stale schema.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
     # Use HEX encoding to avoid MSVC string literal length limit (C2026)
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT HEX)
     string(LENGTH "${PAGX_XSD_CONTENT}" PAGX_XSD_HEX_LEN)

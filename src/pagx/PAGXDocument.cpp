@@ -67,9 +67,9 @@ static void PruneExpiredScenes(std::vector<std::weak_ptr<PAGScene>>* scenes) {
   scenes->erase(std::remove_if(scenes->begin(), scenes->end(), IsExpiredScene), scenes->end());
 }
 
-void PAGXDocument::appendExternalFilePaths(
-    std::vector<std::string>* paths, std::unordered_set<const PAGXDocument*>& visited,
-    std::unordered_set<std::string>& chain) const {
+void PAGXDocument::appendExternalFilePaths(std::vector<std::string>* paths,
+                                           std::unordered_set<const PAGXDocument*>& visited,
+                                           std::unordered_set<std::string>& chain) const {
   if (paths == nullptr || !visited.insert(this).second) {
     return;
   }
@@ -86,18 +86,17 @@ void PAGXDocument::appendExternalFilePaths(
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       auto mounted = mountedCompositions.find(layer->composition);
-      bool supersededInline = mounted != mountedCompositions.end() &&
-                              mounted->second == MountType::InlineImport &&
-                              (!layer->compositionFilePath.empty() ||
-                               !layer->importDirective.source.empty());
+      bool supersededInline =
+          mounted != mountedCompositions.end() && mounted->second == MountType::InlineImport &&
+          (!layer->compositionFilePath.empty() || !layer->importDirective.source.empty());
       if ((layer->composition == nullptr || supersededInline) &&
           IsExternalFilePath(layer->compositionFilePath)) {
         if (chain.find(layer->compositionFilePath) == chain.end()) {
           paths->push_back(layer->compositionFilePath);
         }
       } else if (!supersededInline && layer->externalDoc != nullptr) {
-        bool inserted = !layer->compositionFilePath.empty() &&
-                        chain.insert(layer->compositionFilePath).second;
+        bool inserted =
+            !layer->compositionFilePath.empty() && chain.insert(layer->compositionFilePath).second;
         layer->externalDoc->appendExternalFilePaths(paths, visited, chain);
         if (inserted) {
           chain.erase(layer->compositionFilePath);
@@ -132,8 +131,8 @@ static void AppendExternalImagePaths(const PAGXDocument* document, std::vector<s
   }
 }
 
-static bool DetachSupersededInlineImports(
-    PAGXDocument* document, std::unordered_set<const PAGXDocument*>& visited) {
+static bool DetachSupersededInlineImports(PAGXDocument* document,
+                                          std::unordered_set<const PAGXDocument*>& visited) {
   if (document == nullptr || !visited.insert(document).second) {
     return false;
   }
@@ -393,7 +392,7 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
   }
   mountedCompositions.insert(other.mountedCompositions.begin(), other.mountedCompositions.end());
   inlineImportMountFailures.insert(other.inlineImportMountFailures.begin(),
-                                    other.inlineImportMountFailures.end());
+                                   other.inlineImportMountFailures.end());
   other.mountedCompositions.clear();
   other.inlineImportMountFailures.clear();
   // The nodes now belong to this document. Clearing the source's ownership set and id index
@@ -716,8 +715,8 @@ bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Dat
           auto* layer = static_cast<Layer*>(node);
           if (layer->composition != nullptr && layer->externalDoc != nullptr &&
               !entry.first->isMountedComposition(layer->composition)) {
-            auto source = ResolveImportResourcePath(entry.first->sourceDirectory,
-                                                    layer->compositionFilePath);
+            auto source =
+                ResolveImportResourcePath(entry.first->sourceDirectory, layer->compositionFilePath);
             auto directory = GetImportSourceDirectory(source);
             layer->externalDoc->sourceDirectory = directory;
             ResolveImportResources(layer->externalDoc.get(), directory);

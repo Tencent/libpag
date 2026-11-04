@@ -29,7 +29,6 @@
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PropertyData.h"
-#include "pagx/utils/ImportFormat.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
@@ -41,6 +40,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/ImportFormat.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -56,16 +56,16 @@ using ResolvedTargets = std::vector<std::pair<Node*, std::vector<Channel*>>>;
 using CollectChildCompositionsFunction = void (*)(const PAGLayer*, std::vector<PAGComposition*>&);
 
 struct TimelineReplayAccess {
-  std::unique_ptr<RuntimeBinding> PAGComposition::* binding;
-  std::vector<std::shared_ptr<PAGTimeline>> PAGComposition::* timelines;
-  ResolvedTargets PAGAnimation::* targets;
+  std::unique_ptr<RuntimeBinding> PAGComposition::*binding;
+  std::vector<std::shared_ptr<PAGTimeline>> PAGComposition::*timelines;
+  ResolvedTargets PAGAnimation::*targets;
   CollectChildCompositionsFunction collectChildren;
 };
 
-void UnregisterCompositionDocuments(
-    PAGComposition* root, PAGScene* scene, PAGXDocument* PAGComposition::* documentMember,
-    CollectChildCompositionsFunction collectChildren,
-    void (PAGXDocument::*unregisterScene)(PAGScene*)) {
+void UnregisterCompositionDocuments(PAGComposition* root, PAGScene* scene,
+                                    PAGXDocument* PAGComposition::*documentMember,
+                                    CollectChildCompositionsFunction collectChildren,
+                                    void (PAGXDocument::*unregisterScene)(PAGScene*)) {
   std::vector<PAGComposition*> pending = {root};
   std::unordered_set<PAGXDocument*> visited = {};
   while (!pending.empty()) {
@@ -84,7 +84,7 @@ void UnregisterCompositionDocuments(
 
 void ReapplyCompositionTreeDataBinds(
     PAGComposition* comp, const Node* targetNode, RuntimeBinding* scopeBinding,
-    std::unique_ptr<DataBindRuntime> PAGComposition::* runtimeMember,
+    std::unique_ptr<DataBindRuntime> PAGComposition::*runtimeMember,
     CollectChildCompositionsFunction collectChildren) {
   if (comp == nullptr) {
     return;
@@ -97,12 +97,12 @@ void ReapplyCompositionTreeDataBinds(
   collectChildren(comp, childComps);
   for (auto* childComp : childComps) {
     ReapplyCompositionTreeDataBinds(childComp, targetNode, scopeBinding, runtimeMember,
-                                   collectChildren);
+                                    collectChildren);
   }
 }
 
-bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
-                            float rootY, bool shapeHitTest) {
+bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX, float rootY,
+                             bool shapeHitTest) {
   // Composition slots carry the referencing layer's visibility, clip and mask. Check every
   // intermediate runtime layer, not just the child PAGLayer's own runtime node.
   auto rootPoint = tgfx::Point::Make(rootX, rootY);
@@ -165,7 +165,7 @@ bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer,
     }
   }
   if (!childHit && !OwnContentContainsPoint(layer.get(), parentRuntime, rootX, rootY, surfaceX,
-                                           surfaceY, shapeHitTest)) {
+                                            surfaceY, shapeHitTest)) {
     return false;
   }
   out->push_back(layer);
@@ -186,7 +186,7 @@ bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
 }
 
 bool TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
-                                 ResolvedTargets PAGAnimation::* targetsMember,
+                                 ResolvedTargets PAGAnimation::*targetsMember,
                                  const std::unordered_set<const Node*>& dirtySet) {
   if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
     return true;
@@ -838,8 +838,8 @@ void PAGScene::reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding*
   }
   if (_rootComposition != nullptr) {
     ReapplyCompositionTreeDataBinds(_rootComposition.get(), targetNode, scopeBinding,
-                                   &PAGComposition::dataBindRuntime,
-                                   &PAGComposition::CollectChildCompositions);
+                                    &PAGComposition::dataBindRuntime,
+                                    &PAGComposition::CollectChildCompositions);
   }
 }
 

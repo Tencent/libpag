@@ -247,8 +247,7 @@ static GlyphType ClassifyGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return GlyphType::Spacing;
 }
 
-static void CollectTextFromElements(PAGXDocument* document,
-                                    const std::vector<Element*>& elements,
+static void CollectTextFromElements(PAGXDocument* document, const std::vector<Element*>& elements,
                                     std::vector<Text*>& outText) {
   for (auto* element : elements) {
     if (element == nullptr || !document->ownsNode(element)) {
@@ -287,8 +286,7 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
     CollectTextFromLayer(document, layer, allText);
   }
   for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Composition &&
-        !document->isMountedComposition(node.get())) {
+    if (node->nodeType() == NodeType::Composition && !document->isMountedComposition(node.get())) {
       auto* comp = static_cast<Composition*>(node.get());
       for (auto* layer : comp->layers) {
         CollectTextFromLayer(document, layer, allText);

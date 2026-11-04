@@ -1860,8 +1860,7 @@ PAGX_TEST(PAGXTest, ImportFormatUsesOnePrecedenceRule) {
   EXPECT_EQ(pagx::ResolveImportFormat("SVG", "file.html", "<body/>"), "svg");
   EXPECT_EQ(pagx::ResolveImportFormat("", "file.XHTML", "<svg/>"), "html");
   EXPECT_EQ(pagx::ResolveImportFormat("htm", "file.svg", "<svg/>"), "html");
-  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<?xml version=\"1.0\"?><!--root--><svg/>"),
-            "svg");
+  EXPECT_EQ(pagx::ResolveImportFormat("", "", "<?xml version=\"1.0\"?><!--root--><svg/>"), "svg");
   EXPECT_EQ(pagx::ResolveImportFormat("", "", "<body/>"), "html");
   EXPECT_EQ(pagx::ResolveImportFormat("", "", "<g/>"), "g");
   EXPECT_EQ(pagx::ResolveImportFormat("", "", "<!-- <html> --><svg/>"), "svg");
@@ -1901,9 +1900,10 @@ PAGX_TEST(PAGXTest, UnresolvedImportsIncludeTheEntireExternalChain) {
       "<pagx width=\"100\" height=\"100\"><Layer id=\"outer\" composition=\"first.pagx\"/></pagx>");
   ASSERT_NE(doc, nullptr);
   std::string firstXML =
-      "<pagx width=\"100\" height=\"100\"><Layer id=\"middle\" composition=\"second.pagx\"/></pagx>";
-  ASSERT_TRUE(doc->loadFileData("first.pagx",
-                               pagx::Data::MakeWithCopy(firstXML.data(), firstXML.size())));
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"middle\" "
+      "composition=\"second.pagx\"/></pagx>";
+  ASSERT_TRUE(
+      doc->loadFileData("first.pagx", pagx::Data::MakeWithCopy(firstXML.data(), firstXML.size())));
   std::string secondXML = R"(<pagx width="100" height="100">
   <Resources><Composition id="resource" width="20" height="20">
     <Layer id="unresolved" import="missing.svg"/>
@@ -1911,7 +1911,7 @@ PAGX_TEST(PAGXTest, UnresolvedImportsIncludeTheEntireExternalChain) {
   <Layer composition="@resource"/>
 </pagx>)";
   ASSERT_TRUE(doc->loadFileData("second.pagx",
-                               pagx::Data::MakeWithCopy(secondXML.data(), secondXML.size())));
+                                pagx::Data::MakeWithCopy(secondXML.data(), secondXML.size())));
   auto* outer = doc->findNode<pagx::Layer>("outer");
   ASSERT_NE(outer, nullptr);
   ASSERT_NE(outer->externalDoc, nullptr);
@@ -1935,9 +1935,11 @@ PAGX_TEST(PAGXTest, UnresolvedImportsIncludeTheEntireExternalChain) {
 PAGX_TEST(PAGXTest, ConflictingExplicitSourcesAreRejected) {
   std::vector<std::string> sources = {"external.pagx", "@missing", "@inner"};
   for (const auto& source : sources) {
-    auto xml = "<pagx version=\"1.0\" width=\"100\" height=\"100\">"
-               "<Resources><Composition id=\"inner\" width=\"20\" height=\"20\"/></Resources>"
-               "<Layer composition=\"" + source + "\" import=\"file.svg\"/></pagx>";
+    auto xml =
+        "<pagx version=\"1.0\" width=\"100\" height=\"100\">"
+        "<Resources><Composition id=\"inner\" width=\"20\" height=\"20\"/></Resources>"
+        "<Layer composition=\"" +
+        source + "\" import=\"file.svg\"/></pagx>";
     EXPECT_EQ(pagx::PAGXImporter::FromXML(xml), nullptr);
   }
 
@@ -1982,8 +1984,8 @@ PAGX_TEST(PAGXTest, DeclaredCompositionOverridesInlineContent) {
   EXPECT_EQ(host->importDirective.content, content);
 
   std::string fileXML = "<pagx version=\"1.0\" width=\"20\" height=\"20\"/>";
-  ASSERT_TRUE(doc->loadFileData("external.pagx",
-                                  pagx::Data::MakeWithCopy(fileXML.data(), fileXML.size())));
+  ASSERT_TRUE(
+      doc->loadFileData("external.pagx", pagx::Data::MakeWithCopy(fileXML.data(), fileXML.size())));
   ASSERT_NE(host->composition, nullptr);
   EXPECT_TRUE(doc->isMountedComposition(host->composition));
   doc->setNodeId(host->composition, "fileWrapper");
@@ -2075,7 +2077,7 @@ PAGX_TEST(PAGXTest, OptimizerDoesNotEnterMountedCompositionDomain) {
   </Layer>
 </pagx>)";
   ASSERT_TRUE(doc->loadFileData("external.pagx",
-                                  pagx::Data::MakeWithCopy(externalXML.data(), externalXML.size())));
+                                pagx::Data::MakeWithCopy(externalXML.data(), externalXML.size())));
   auto* host = doc->findNode<pagx::Layer>("host");
   ASSERT_NE(host, nullptr);
   ASSERT_NE(host->composition, nullptr);
@@ -2095,11 +2097,13 @@ PAGX_TEST(PAGXTest, OptimizerDoesNotEnterMountedCompositionDomain) {
 PAGX_TEST(PAGXTest, InvalidCompositionReferenceDoesNotFallBackToInline) {
   std::vector<std::string> sources = {"@missing", "@path", "@"};
   for (const auto& source : sources) {
-    auto xml = "<pagx width=\"100\" height=\"100\">"
-               "<Resources><PathData id=\"path\" data=\"M0 0 L20 0 Z\"/></Resources>"
-               "<Layer composition=\"" + source +
-               "\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\"/>"
-               "</Layer></pagx>";
+    auto xml =
+        "<pagx width=\"100\" height=\"100\">"
+        "<Resources><PathData id=\"path\" data=\"M0 0 L20 0 Z\"/></Resources>"
+        "<Layer composition=\"" +
+        source +
+        "\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\"/>"
+        "</Layer></pagx>";
     EXPECT_EQ(pagx::PAGXImporter::FromXML(xml), nullptr);
   }
   auto valid = pagx::PAGXImporter::FromXML(R"(<pagx width="100" height="100">
@@ -2131,7 +2135,7 @@ PAGX_TEST(PAGXTest, MountedInlineSourceSwitchRebuildsLiveScene) {
   <Layer id="replacement"><Rectangle width="20" height="20"/><Fill color="#00FF00"/></Layer>
 </pagx>)";
   EXPECT_TRUE(doc->loadFileData("replacement.pagx",
-                               pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
+                                pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
   ASSERT_NE(host->externalDoc, nullptr);
   EXPECT_NE(host->externalDoc, retiredDocument);
   EXPECT_FALSE(retiredDocument->hasLiveScenes());
@@ -2169,7 +2173,7 @@ PAGX_TEST(PAGXTest, MountedInlineSourceSwitchAfterFailedLayout) {
   <Layer><Rectangle width="20" height="20"/><Fill color="#00FF00"/></Layer>
 </pagx>)";
   EXPECT_TRUE(doc->loadFileData("replacement.pagx",
-                               pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
+                                pagx::Data::MakeWithCopy(replacement.data(), replacement.size())));
   EXPECT_FALSE(scene->getLayersUnderPoint(15, 15).empty());
 }
 
@@ -2226,8 +2230,8 @@ PAGX_TEST(PAGXTest, EmbeddingDoesNotMutateMountedDomain) {
   std::string textDocument = R"(<pagx width="100" height="100">
   <Layer id="textLayer"><Text id="text" text="Embed" fontSize="24"/><Fill color="#FF0000"/></Layer>
 </pagx>)";
-  ASSERT_TRUE(doc->loadFileData("text.pagx",
-                               pagx::Data::MakeWithCopy(textDocument.data(), textDocument.size())));
+  ASSERT_TRUE(doc->loadFileData(
+      "text.pagx", pagx::Data::MakeWithCopy(textDocument.data(), textDocument.size())));
   auto foreignDoc = host->externalDoc;
   ASSERT_NE(foreignDoc, nullptr);
   auto* text = foreignDoc->findNode<pagx::Text>("text");
@@ -9993,7 +9997,7 @@ static pagx::Layer* MakeHitEquivalenceRectLayer(pagx::PAGXDocument* doc, const s
 }
 
 static void ExpectTwoArgMatchesBase(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                                   const char* scenario, pagx::FontConfig* fontConfig) {
+                                    const char* scenario, pagx::FontConfig* fontConfig) {
   SCOPED_TRACE(scenario);
   doc->applyLayout(fontConfig);
   auto scene = pagx::PAGScene::Make(doc);
@@ -10066,8 +10070,8 @@ PAGX_TEST(PAGXTest, HitTestTwoArgEquivalentToBase) {
 
   {
     auto doc = pagx::PAGXDocument::Make(200, 200);
-    doc->layers.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Transparent", 30, 30, 100, 100,
-                                                      {1, 0, 0, 0.25f}));
+    doc->layers.push_back(
+        MakeHitEquivalenceRectLayer(doc.get(), "Transparent", 30, 30, 100, 100, {1, 0, 0, 0.25f}));
     ExpectTwoArgMatchesBase(doc, "transparent fill", &fontConfig);
   }
 
@@ -10079,18 +10083,17 @@ PAGX_TEST(PAGXTest, HitTestTwoArgEquivalentToBase) {
     scrollLayer->height = 200;
     scrollLayer->hasScrollRect = true;
     scrollLayer->scrollRect = pagx::Rect::MakeXYWH(20, 20, 100, 100);
-    scrollLayer->children.push_back(MakeHitEquivalenceRectLayer(
-        doc.get(), "ScrollChild", 30, 30, 100, 100, {0, 1, 0, 1}));
+    scrollLayer->children.push_back(
+        MakeHitEquivalenceRectLayer(doc.get(), "ScrollChild", 30, 30, 100, 100, {0, 1, 0, 1}));
     doc->layers.push_back(scrollLayer);
     ExpectTwoArgMatchesBase(doc, "scrollRect", &fontConfig);
   }
 
   {
     auto doc = pagx::PAGXDocument::Make(200, 200);
-    auto maskLayer = MakeHitEquivalenceRectLayer(doc.get(), "Mask", 20, 20, 50, 100,
-                                                 {1, 1, 1, 1});
-    auto maskedLayer = MakeHitEquivalenceRectLayer(doc.get(), "Masked", 20, 20, 100, 100,
-                                                   {0, 0, 1, 1});
+    auto maskLayer = MakeHitEquivalenceRectLayer(doc.get(), "Mask", 20, 20, 50, 100, {1, 1, 1, 1});
+    auto maskedLayer =
+        MakeHitEquivalenceRectLayer(doc.get(), "Masked", 20, 20, 100, 100, {0, 0, 1, 1});
     maskedLayer->mask = maskLayer;
     doc->layers.push_back(maskLayer);
     doc->layers.push_back(maskedLayer);
@@ -10103,11 +10106,11 @@ PAGX_TEST(PAGXTest, HitTestTwoArgEquivalentToBase) {
     container->name = "Container";
     container->width = 200;
     container->height = 200;
-    container->children.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Leaf", 40, 40, 100,
-                                                              100, {0, 1, 0, 1}));
+    container->children.push_back(
+        MakeHitEquivalenceRectLayer(doc.get(), "Leaf", 40, 40, 100, 100, {0, 1, 0, 1}));
     doc->layers.push_back(container);
-    doc->layers.push_back(MakeHitEquivalenceRectLayer(doc.get(), "Sibling", 100, 100, 100, 100,
-                                                      {1, 0, 1, 1}));
+    doc->layers.push_back(
+        MakeHitEquivalenceRectLayer(doc.get(), "Sibling", 100, 100, 100, 100, {1, 0, 1, 1}));
     ExpectTwoArgMatchesBase(doc, "nested container", &fontConfig);
   }
 }

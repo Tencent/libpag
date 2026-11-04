@@ -1642,8 +1642,7 @@ bool DedupPathDataResources(PAGXDocument* doc) {
     RewritePathDataInLayer(layer, redirect);
   }
   for (auto& nodePtr : doc->nodes) {
-    if (nodePtr->nodeType() == NodeType::Composition &&
-        !doc->isMountedComposition(nodePtr.get())) {
+    if (nodePtr->nodeType() == NodeType::Composition && !doc->isMountedComposition(nodePtr.get())) {
       auto* comp = static_cast<Composition*>(nodePtr.get());
       for (auto* layer : comp->layers) {
         RewritePathDataInLayer(layer, redirect);
@@ -1913,8 +1912,8 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
   result.iterationsUsed +=
       OptimizeLayerList(doc, doc->layers, maskRefs, animatedTargets, options, &result.converged);
   for (auto* comp : compositions) {
-    result.iterationsUsed += OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets,
-                                               options, &result.converged);
+    result.iterationsUsed +=
+        OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets, options, &result.converged);
   }
 
   // Resource-level cleanup: deduplicate identical PathData resources first (so the prune pass
