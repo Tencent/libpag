@@ -1768,7 +1768,7 @@ PAGX_TEST(PAGXTest, InlineImportRetriesAfterContentFix) {
 /**
  * Test case: resolving an inline <svg> that lives inside a Composition resource. Flattening it
  * detaches the mounted sub-document, and PAGXDocument::detachInlineImport() then calls
- * removeNodes(), which resizes and renumbers the document's node list. ResolveDocument must walk a
+ * removeNodes(), which erases entries from the document's node list. ResolveDocument must walk a
  * snapshot and re-check ownership, otherwise iterating nodes past that point hands back destroyed
  * unique_ptrs and the very first virtual call crashes.
  */
@@ -9702,10 +9702,10 @@ PAGX_TEST(PAGXTest, HitTestNestedPureContainer) {
 }
 
 /**
- * Test case: getLayersUnderPoint's shapeHitTest argument selects how a layer's own content is
- * tested. The corner of an ellipse's bounding box is inside the box but outside the filled ellipse,
- * so the two modes disagree there while agreeing at the centre; false keeps the pre-existing
- * bounding-box behaviour.
+ * Test case: the collection query always uses bounding boxes for quick selection, while shape
+ * accuracy is a per-layer test via PAGLayer::hitTestPoint(). The corner of an ellipse's bounding
+ * box is inside the box but outside the filled ellipse, so the two modes disagree there while
+ * agreeing at the centre.
  */
 PAGX_TEST(PAGXTest, HitTestShapeVersusBounds) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -9728,22 +9728,18 @@ PAGX_TEST(PAGXTest, HitTestShapeVersusBounds) {
   ASSERT_TRUE(scene != nullptr);
 
   // (5, 5) is inside the 100x100 bounding box but outside the ellipse inscribed in it, so the
-  // default bounding-box test hits and the shape test misses.
+  // collection query hits while the shape test on the returned handle misses.
   auto boundsHits = scene->getLayersUnderPoint(5, 5);
   ASSERT_FALSE(boundsHits.empty());
   EXPECT_EQ(boundsHits[0]->name(), "Ellipse");
-  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5, true).empty());
+  EXPECT_TRUE(boundsHits[0]->hitTestPoint(5, 5));
+  EXPECT_FALSE(boundsHits[0]->hitTestPoint(5, 5, true));
 
   // The centre is inside the ellipse, so both modes hit the same layer.
   auto centerHits = scene->getLayersUnderPoint(50, 50);
   ASSERT_FALSE(centerHits.empty());
   EXPECT_EQ(centerHits[0]->name(), "Ellipse");
-  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50, true).empty());
-
-  // The handle re-tests itself with the same switch.
-  EXPECT_TRUE(boundsHits[0]->hitTestPoint(5, 5));
-  EXPECT_FALSE(boundsHits[0]->hitTestPoint(5, 5, true));
-  EXPECT_TRUE(boundsHits[0]->hitTestPoint(50, 50, true));
+  EXPECT_TRUE(centerHits[0]->hitTestPoint(50, 50, true));
 }
 
 /**
@@ -9957,8 +9953,9 @@ static std::vector<pagx::PAGLayer*> BaseEquivalentHits(
     const std::shared_ptr<pagx::PAGScene>& scene,
     const std::unordered_map<const tgfx::Layer*, pagx::PAGLayer*>& registry, float surfaceX,
     float surfaceY) {
-  // Reproduce the original two-argument path: probe the tgfx runtime tree with a root-space point
-  // and map each hit back through the runtime-layer to PAGLayer correspondence.
+  // Probe the tgfx runtime tree directly and map hits back through an independent runtime-layer
+  // to PAGLayer table. The scene uses the same tgfx probe, so this locks the mapping and ordering
+  // rather than comparing two different traversal implementations.
   std::vector<pagx::PAGLayer*> expected = {};
   auto* rootRuntime = scene->rootComposition()->runtimeLayer.get();
   if (rootRuntime == nullptr) {
@@ -10028,11 +10025,11 @@ static void ExpectTwoArgMatchesBase(const std::shared_ptr<pagx::PAGXDocument>& d
 }
 
 /**
- * Test case: the two-argument getLayersUnderPoint stays item-by-item equivalent to the original
- * tgfx tree probe for the content and layer states that affect hit testing: shaped text,
- * stroke-only geometry, transparent fills, scrollRect clipping, masks and nested containers. Each
- * scenario is sampled over a grid of hit and miss points, and every result is compared by handle,
- * order, name and id against the original path reproduced from the runtime tree.
+ * Test case: getLayersUnderPoint maps the tgfx bounding-box probe back one-to-one, in order, for
+ * the content and layer states that affect hit testing: shaped text, stroke-only geometry,
+ * transparent fills, scrollRect clipping, masks and nested containers. Each scenario is sampled
+ * over a grid of hit and miss points, and every result is compared by handle, order, name and id
+ * against an independent probe of the runtime tree.
  */
 PAGX_TEST(PAGXTest, HitTestTwoArgEquivalentToBase) {
   pagx::FontConfig fontConfig;

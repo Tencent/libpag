@@ -174,34 +174,21 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void advanceAndApply(int64_t deltaMicroseconds);
 
   /**
-   * Returns the layers under the given surface point. The first layer in the array is the top-most
-   * under the point, the last is the bottom-most, and every ancestor of a hit layer follows it. A
-   * layer is hit when the point falls on its own content. Hidden layers, and points outside a
+   * Returns the layers under the given surface point, checked against their bounding boxes for
+   * quick selection. The first layer in the array is the top-most under the point, the last is the
+   * bottom-most, and every ancestor of a hit layer follows it. Hidden layers, and points outside a
    * layer's scrollRect clip or mask, are skipped together with their subtrees. Returns an empty
    * array if nothing is hit. Hit testing does not require a prior draw(). Accepts surface
    * coordinates (with zoom and content offset applied) instead of the composition's local
    * coordinates. The layers are runtime objects: resolving one to a PAGX source node, or applying
    * an editor selection policy such as picking a text layer by its box, is the host's job
    * (PAGLayer::getNode() plus PAGXDocument::ownsNode()), since the core keeps no source-node to
-   * runtime-layer map.
+   * runtime-layer map. For shape-accurate testing of a single layer, use
+   * PAGLayer::hitTestPoint(x, y, true).
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY);
-
-  /**
-   * Same as the two-argument form, with an explicit choice of how a layer's own content is tested.
-   * Declared as a separate overload rather than a defaulted argument so the two-argument symbol
-   * keeps its original mangled name for hosts that link libpag as a binary.
-   * @param surfaceX the x coordinate in surface (device) space.
-   * @param surfaceY the y coordinate in surface (device) space.
-   * @param shapeHitTest how a layer's own content is tested. false tests the bounding box and
-   * preserves the pre-existing behaviour. true tests the actual shape (glyph outlines for text, the
-   * filled or stroked area for geometry), so the gap between two glyphs, the inside of a stroke-only
-   * shape and a fully transparent fill are not hits. Callers that need precise picking pass true.
-   */
-  std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float surfaceX, float surfaceY,
-                                                             bool shapeHitTest);
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full

@@ -353,7 +353,7 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
 
   // Also resolve in Composition layers.
   // Snapshot the compositions before resolving: ResolveLayers() can detach an inline import, and
-  // PAGXDocument::detachInlineImport() then calls removeNodes(), which resizes and renumbers
+  // PAGXDocument::detachInlineImport() then calls removeNodes(), which erases entries from
   // doc->nodes. Iterating nodes directly would invalidate the range-for's cached end and hand back
   // dangling unique_ptrs (a virtual call on a destroyed node), so walk a stable snapshot and skip
   // entries that an earlier detach already removed.

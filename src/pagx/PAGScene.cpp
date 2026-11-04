@@ -45,13 +45,12 @@
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
 namespace {
 
-using RuntimeLayerMember = std::shared_ptr<tgfx::Layer> PAGLayer::*;
 using ResolvedTargets = std::vector<std::pair<Node*, std::vector<Channel*>>>;
 using CollectChildCompositionsFunction = void (*)(const PAGLayer*, std::vector<PAGComposition*>&);
 
@@ -101,75 +100,25 @@ void ReapplyCompositionTreeDataBinds(
   }
 }
 
-bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX, float rootY,
-                             bool shapeHitTest) {
-  // Composition slots carry the referencing layer's visibility, clip and mask. Check every
-  // intermediate runtime layer, not just the child PAGLayer's own runtime node.
-  auto rootPoint = tgfx::Point::Make(rootX, rootY);
-  for (auto* current = layer; current != nullptr && current != stop; current = current->parent()) {
-    if (!current->visible()) {
-      return false;
-    }
-    auto scrollRect = current->scrollRect();
-    if (!scrollRect.isEmpty()) {
-      auto localPoint = current->globalToLocal(rootPoint);
-      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
-        return false;
-      }
-    }
-    auto mask = current->mask();
-    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY, shapeHitTest)) {
-      return false;
+// Maps the tgfx probe results back to PAGLayer handles without a persistent registry. The runtime
+// tree can contain helper layers (mask owners, composition slots) that have no PAGLayer, so only
+// hits present in the order map are kept. A single walk keeps the mapping in sync with the current
+// tree without register/unregister bookkeeping.
+void MapRuntimeHits(const std::shared_ptr<PAGLayer>& layer,
+                    const std::unordered_map<const tgfx::Layer*, size_t>& hitOrder,
+                    std::vector<std::shared_ptr<PAGLayer>>* out) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->runtimeLayer != nullptr) {
+    auto it = hitOrder.find(layer->runtimeLayer.get());
+    if (it != hitOrder.end()) {
+      (*out)[it->second] = layer;
     }
   }
-  return true;
-}
-
-bool OwnContentContainsPoint(PAGLayer* layer, tgfx::Layer* runtimeLayer, float rootX, float rootY,
-                             float surfaceX, float surfaceY, bool shapeHitTest) {
-  if (runtimeLayer == nullptr || runtimeLayer->type() != tgfx::LayerType::Vector ||
-      static_cast<tgfx::VectorLayer*>(runtimeLayer)->contents().empty()) {
-    return false;
+  for (const auto& child : layer->getChildren()) {
+    MapRuntimeHits(child, hitOrder, out);
   }
-  // Reject outside the own-content bounds before hitTestPoint can recurse into a subtree whose
-  // children have already missed. Otherwise hovering empty space traverses that subtree twice.
-  auto localPoint = runtimeLayer->globalToLocal(tgfx::Point::Make(rootX, rootY));
-  if (!runtimeLayer->getBounds(runtimeLayer).contains(localPoint.x, localPoint.y)) {
-    return false;
-  }
-  return layer->hitTestPoint(surfaceX, surfaceY, shapeHitTest);
-}
-
-bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer,
-                             RuntimeLayerMember runtimeMember, float rootX, float rootY,
-                             float surfaceX, float surfaceY, bool shapeHitTest,
-                             std::vector<std::shared_ptr<PAGLayer>>* out) {
-  // Prune only by visibility, clip and mask. Gating on an ancestor's shape would repeat the
-  // descendants' shape tests at every level because tgfx's shape test is recursive.
-  bool childHit = false;
-  const auto& children = layer->getChildren();
-  auto* parentRuntime = (layer.get()->*runtimeMember).get();
-  for (auto item = children.rbegin(); item != children.rend(); ++item) {
-    const auto& child = *item;
-    if (child == nullptr) {
-      continue;
-    }
-    auto* childRuntime = (child.get()->*runtimeMember).get();
-    if (childRuntime == nullptr ||
-        !RuntimePathAcceptsPoint(childRuntime, parentRuntime, rootX, rootY, shapeHitTest)) {
-      continue;
-    }
-    if (CollectLayersUnderPoint(child, runtimeMember, rootX, rootY, surfaceX, surfaceY,
-                                shapeHitTest, out)) {
-      childHit = true;
-    }
-  }
-  if (!childHit && !OwnContentContainsPoint(layer.get(), parentRuntime, rootX, rootY, surfaceX,
-                                            surfaceY, shapeHitTest)) {
-    return false;
-  }
-  out->push_back(layer);
-  return true;
 }
 
 bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
@@ -885,11 +834,6 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
 
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
-  return getLayersUnderPoint(surfaceX, surfaceY, false);
-}
-
-std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX, float surfaceY,
-                                                                     bool shapeHitTest) {
   float rootX = 0;
   float rootY = 0;
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
@@ -898,9 +842,21 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
     return {};
   }
+  auto runtimeHits = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  std::unordered_map<const tgfx::Layer*, size_t> hitOrder = {};
+  for (size_t i = 0; i < runtimeHits.size(); ++i) {
+    hitOrder.emplace(runtimeHits[i].get(), i);
+  }
+  std::vector<std::shared_ptr<PAGLayer>> mapped = {};
+  mapped.resize(runtimeHits.size());
+  MapRuntimeHits(_rootComposition, hitOrder, &mapped);
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  CollectLayersUnderPoint(_rootComposition, &PAGLayer::runtimeLayer, rootX, rootY, surfaceX,
-                          surfaceY, shapeHitTest, &result);
+  result.reserve(runtimeHits.size());
+  for (auto& layer : mapped) {
+    if (layer != nullptr) {
+      result.push_back(std::move(layer));
+    }
+  }
   return result;
 }
 
