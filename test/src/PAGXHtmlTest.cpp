@@ -3876,6 +3876,39 @@ CLI_TEST(PAGXHtmlTest, AnimationAlphaMaskKeepsSoftMaskInsteadOfClipPath) {
 // The weaver resolves a target by scanning the emitted body for `id="..."`. Text content that
 // happens to contain the same literal must not capture the declaration: the scan has to stay inside
 // opening tags, otherwise the animation lands on the text span and the real element stays static.
+// A Text node is never an animation target: the runtime animates its shaping channels (text,
+// fontSize, letterSpacing, fontFamily), and none of them has a CSS equivalent. The exporter must
+// therefore neither emit a rule for such channels nor attach an empty animation to the span.
+CLI_TEST(PAGXHtmlTest, AnimationTextShapingChannelsAreNotExported) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text id="label" text="AB" fontFamily="Arial" fontSize="20" position="160,100"/>
+      <Fill color="#1D4ED8"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="60" frameRate="60" loop="loop">
+        <Object target="label">
+          <Channel name="fontSize" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="80"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(html.find("@keyframes"), std::string::npos) << html;
+  auto spanTag = FindTagContaining(html, "<span");
+  ASSERT_FALSE(spanTag.empty());
+  EXPECT_EQ(spanTag.find("animation:"), std::string::npos) << spanTag;
+  // The text itself is still exported as content.
+  EXPECT_NE(html.find(">AB<"), std::string::npos) << html;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationTargetIdMentionedInTextIsNotWoven) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">
