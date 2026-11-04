@@ -5537,6 +5537,78 @@ CLI_TEST(PAGXHtmlTest, ManyAnimationTargetsEachGetTheirDeclaration) {
   }
 }
 
+// An animated Group that holds only geometry is forced into its own DOM wrapper, so its geometry no
+// longer propagates to the painter its parent would have used. That painter has to be forwarded,
+// including when the Group sits inside a flattened Group rather than directly in the Layer.
+// A MergePath draw collapses its shapes into one <path>. That path is the only tag that can carry
+// the painter's animation, so it needs the animated id or the keyframes have nowhere to attach.
+CLI_TEST(PAGXHtmlTest, AnimationPainterOnMergedPathKeepsKeyframes) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="host" width="200" height="200">
+      <Group>
+        <Rectangle position="80,100" size="80,60"/>
+        <Ellipse position="120,100" size="60,60"/>
+        <MergePath mode="union"/>
+        <Fill id="mergeFill" color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="tint" duration="60" frameRate="60" loop="loop">
+        <Object target="mergeFill">
+          <Channel name="color" type="color">
+            <Key time="0" value="#2563EB" interpolation="linear"/>
+            <Key time="60" value="#F97316"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  auto rule = KeyframesRuleNamed(html, "pagx_mergeFill_0");
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("fill: #2563EB"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("fill: #F97316"), std::string::npos) << rule;
+  EXPECT_NE(html.find("id=\"mergeFill\""), std::string::npos) << html;
+  EXPECT_NE(html.find("animation:pagx_mergeFill_0"), std::string::npos) << html;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationGroupNestedInGroupKeepsParentPainters) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer id="host" width="200" height="200">
+      <Group>
+        <Group id="innerBox">
+          <Rectangle position="100,100" size="80,60"/>
+        </Group>
+      </Group>
+      <Fill color="#DC2626"/>
+    </Layer>
+    <Animations>
+      <Animation id="fade" duration="60" frameRate="60" loop="loop">
+        <Object target="innerBox">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.4"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"innerBox\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // The wrapper the animation needs must still carry the parent's paint.
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  EXPECT_NE(html.find("#DC2626"), std::string::npos) << html;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationCssIsEmittedSeparatelyFromFontFace) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
@@ -5594,16 +5666,35 @@ CLI_TEST(PAGXHtmlTest, StrokeAlignDeterminesPaddedLayerBox) {
         "<pagx width=\"320\" height=\"200\">\n"
         "  <Layer id=\"box\" left=\"40\" top=\"40\">\n"
         "    <Rectangle position=\"60,40\" size=\"80,60\"/>\n"
-        "    <Stroke color=\"#0F172A\" width=\"20\" align=\"" +
+        "    <Stroke id=\"boxStroke\" color=\"#0F172A\" width=\"20\" align=\"" +
         std::string(alignCase.align) +
         "\"/>\n"
         "  </Layer>\n"
+        "  <Animations>\n"
+        "    <Animation id=\"grow\" duration=\"60\" frameRate=\"60\" loop=\"loop\">\n"
+        "      <Object target=\"boxStroke\"><Channel name=\"width\" type=\"float\">\n"
+        "        <Key time=\"0\" value=\"20\" interpolation=\"linear\"/>\n"
+        "        <Key time=\"60\" value=\"24\"/>\n"
+        "      </Channel></Object>\n"
+        "    </Animation>\n"
+        "  </Animations>\n"
         "</pagx>";
     auto html = LoadXMLAndConvert(xml, options);
     ASSERT_FALSE(html.empty()) << alignCase.align;
     auto tag = FindTagContaining(html, "id=\"box\"");
     ASSERT_FALSE(tag.empty()) << alignCase.align;
     EXPECT_NE(tag.find(alignCase.expectedBox), std::string::npos) << alignCase.align << tag;
+
+    // Without animations the box keeps the authored extent: the expansion exists for the coalesced
+    // SVG the animated export emits, and a static export must not move.
+    pagx::HTMLExportOptions staticOptions;
+    staticOptions.extractStyleSheet = false;
+    staticOptions.exportAnimations = false;
+    auto staticHtml = LoadXMLAndConvert(xml, staticOptions);
+    auto staticTag = FindTagContaining(staticHtml, "id=\"box\"");
+    ASSERT_FALSE(staticTag.empty()) << alignCase.align;
+    // All three alignments share the same static box: the stroke does not enlarge it.
+    EXPECT_NE(staticTag.find("width:100px;height:70px"), std::string::npos) << staticTag;
   }
 }
 
