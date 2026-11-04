@@ -2327,6 +2327,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.closeTagStart();
         }
         out.openTag("path");
+        // The merged path is the only tag that can carry the painter's animation; without an id the
+        // weaver has nothing to attach the keyframes to and the animation is dropped.
+        auto mergeAnimId = _ctx->claimAnimatedDomId({fill, stroke});
+        if (!mergeAnimId.empty()) {
+          out.addAttr("id", mergeAnimId);
+        }
         out.addAttr("d", firstPathD);
         applySVGFill(out, fill, x0, y0, sw, sh);
         applySVGStroke(out, stroke);
@@ -2404,6 +2410,10 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.addAttr("style", svgStyle);
     out.closeTagStart();
     out.openTag("path");
+    auto mergedAnimId = _ctx->claimAnimatedDomId({fill, stroke});
+    if (!mergedAnimId.empty()) {
+      out.addAttr("id", mergedAnimId);
+    }
     out.addAttr("d", mergedPath);
     bool hasMergeFillRule = fillRule != "nonzero";
     if (hasMergeFillRule) {

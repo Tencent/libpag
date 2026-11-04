@@ -84,6 +84,58 @@ static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float
   positionSet = true;
 }
 
+// A Group animated on its own that holds nothing but geometry has no painter of its own: whatever
+// paints it is declared later in the enclosing element list. The animation forces such a Group into
+// its own DOM wrapper, so the enclosing painters have to be forwarded or the wrapper stays empty
+// and the geometry loses its color.
+static bool GroupNeedsPropagatedPainters(const Group* group, int depth = 0) {
+  if (group == nullptr || group->elements.empty() ||
+      depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return false;
+  }
+  for (auto* element : group->elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Path ||
+        type == NodeType::Polystar) {
+      continue;
+    }
+    // Geometry can sit one or more Groups deep; those Groups carry no painter either.
+    if (type == NodeType::Group &&
+        GroupNeedsPropagatedPainters(static_cast<const Group*>(element), depth + 1)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+// Collects the first Fill and the first Stroke declared after `fromIndex`; they paint the geometry
+// accumulated above them.
+static void CollectPaintersAfter(const std::vector<Element*>& elements, size_t fromIndex,
+                                 std::vector<Element*>& out) {
+  bool foundFill = false;
+  bool foundStroke = false;
+  for (size_t i = fromIndex; i < elements.size(); ++i) {
+    auto* painter = elements[i];
+    if (painter == nullptr) {
+      continue;
+    }
+    if (painter->nodeType() == NodeType::Fill && !foundFill) {
+      out.push_back(painter);
+      foundFill = true;
+    } else if (painter->nodeType() == NodeType::Stroke && !foundStroke) {
+      out.push_back(painter);
+      foundStroke = true;
+    }
+    if (foundFill && foundStroke) {
+      break;
+    }
+  }
+}
+
 static bool ContainsOnlyLineBreaks(const std::string& text) {
   if (text.empty()) {
     return false;
@@ -612,41 +664,18 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
             _ctx->animation.elementIds.count(group) > 0) {
           std::vector<Element*> propagatedPainters = {};
-          if (_ctx->animation.elementIds.count(group) > 0 && !hasPainter && !hasText &&
-              !hasTextBox && !group->elements.empty()) {
-            bool shapeOnly = true;
-            for (auto* child : group->elements) {
-              auto childType = child->nodeType();
-              if (childType != NodeType::Rectangle && childType != NodeType::Ellipse &&
-                  childType != NodeType::Path && childType != NodeType::Polystar) {
-                shapeOnly = false;
-                break;
-              }
-            }
-            if (shapeOnly) {
-              bool foundFill = false;
-              bool foundStroke = false;
-              for (size_t painterIndex = elemIndex + 1; painterIndex < elements.size();
-                   ++painterIndex) {
-                auto* painter = elements[painterIndex];
-                if (painter->nodeType() == NodeType::Fill && !foundFill) {
-                  propagatedPainters.push_back(painter);
-                  foundFill = true;
-                } else if (painter->nodeType() == NodeType::Stroke && !foundStroke) {
-                  propagatedPainters.push_back(painter);
-                  foundStroke = true;
-                }
-                if (foundFill && foundStroke) {
-                  break;
-                }
-              }
-            }
+          if (_ctx->animation.elementIds.count(group) > 0 && GroupNeedsPropagatedPainters(group)) {
+            CollectPaintersAfter(elements, elemIndex + 1, propagatedPainters);
           }
           flushPendingSVGDraws(out);
           writeGroup(out, group, alpha, distribute, {}, &propagatedPainters);
         } else {
+          std::vector<Element*> flattenedPainters = {};
+          if (GroupNeedsPropagatedPainters(group)) {
+            CollectPaintersAfter(elements, elemIndex + 1, flattenedPainters);
+          }
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
-                       curTextBox, state);
+                       curTextBox, state, &flattenedPainters);
         }
         break;
       }
@@ -759,7 +788,8 @@ struct ElementDispatchStateGuard {
 
 void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                               LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                              const TextBox* curTextBox, ElementDispatchState& state) {
+                              const TextBox* curTextBox, ElementDispatchState& state,
+                              const std::vector<Element*>* enclosingPainters) {
   ElementDispatchStateGuard stateGuard(state);
   std::vector<GeoInfo> groupGeos;
   Matrix gm = BuildGroupMatrix(group);
@@ -781,7 +811,8 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       break;
     }
   }
-  for (auto* ge : group->elements) {
+  for (size_t elemIndex = 0; elemIndex < group->elements.size(); ++elemIndex) {
+    auto* ge = group->elements[elemIndex];
     auto gt = ge->nodeType();
     if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
         gt == NodeType::Polystar) {
@@ -955,7 +986,20 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       }
     } else if (gt == NodeType::Group) {
       flushPendingSVGDraws(out);
-      writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
+      auto* childGroup = static_cast<const Group*>(ge);
+      // Same propagation as the top-level path: an animated pure-geometry Group inside a flattened
+      // Group is painted by painters declared later in this element list, not by its own contents.
+      std::vector<Element*> propagatedPainters = {};
+      if (_ctx->animation.elementIds.count(childGroup) > 0 &&
+          GroupNeedsPropagatedPainters(childGroup)) {
+        CollectPaintersAfter(group->elements, elemIndex + 1, propagatedPainters);
+        if (propagatedPainters.empty() && enclosingPainters != nullptr) {
+          // The painters live outside this flattened Group; the child cannot propagate its
+          // geometry up to them, so they have to be forwarded instead.
+          propagatedPainters = *enclosingPainters;
+        }
+      }
+      writeGroup(out, childGroup, alpha, distribute, gm, &propagatedPainters);
     } else if (gt == NodeType::RoundCorner) {
       // Mirror the top-level RoundCorner handler (case above): apply the radius to
       // every shape geo that came before it in the group's element list, replacing
@@ -2338,8 +2382,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       // make the child SVG wider/taller than the parent div and mislead downstream Flex
       // inference on round-trip import. Expand un-authored axes to cover the stroke-padded
       // extent of contents.
-      if (layer->layout == LayoutMode::None && !layer->contents.empty() &&
-          (std::isnan(layer->width) || std::isnan(layer->height))) {
+      // Only the animated export needs this: it coalesces the child draws into one <svg>, whose
+      // padded box can exceed the Layer box. A static export keeps one <svg> per draw and must stay
+      // byte-identical to the behaviour before animation support was added.
+      if (!_ctx->animation.elementIds.empty() && layer->layout == LayoutMode::None &&
+          !layer->contents.empty() && (std::isnan(layer->width) || std::isnan(layer->height))) {
         float maxRight = outW;
         float maxBottom = outH;
         ExpandStrokePaddedExtent(layer->contents, Matrix::Identity(), maxRight, maxBottom);
