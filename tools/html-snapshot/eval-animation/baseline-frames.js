@@ -107,6 +107,11 @@ function parseArgs(argv) {
     fail('-o <out-dir> is required');
   }
   opts.outDir = path.resolve(opts.outDir);
+  // Validate the sample grid file here so a typo fails immediately instead of silently falling back
+  // to computed samples after the browser has started.
+  if (opts.timesJson && !fs.existsSync(opts.timesJson)) {
+    fail(`times file not found: ${opts.timesJson}`);
+  }
   return opts;
 }
 
@@ -227,7 +232,12 @@ async function main() {
     let globalDurationMs = await page.evaluate(pagxMeasureGlobalDurationMs);
     await page.evaluate(pagxCaptureAnimeInstances);
     let timesMs;
-    if (opts.timesJson && fs.existsSync(opts.timesJson)) {
+    if (opts.timesJson) {
+      // A missing or unreadable times file used to fall back to computed samples, which silently
+      // scored the run against a different sample grid than the caller asked for.
+      if (!fs.existsSync(opts.timesJson)) {
+        fail(`times file not found: ${opts.timesJson}`);
+      }
       const refMeta = JSON.parse(fs.readFileSync(opts.timesJson, 'utf8'));
       if (Array.isArray(refMeta.samples) && refMeta.samples.length > 0) {
         timesMs = refMeta.samples.map((s) => (typeof s.timeSec === 'number' ? s.timeSec * 1000 : 0));
