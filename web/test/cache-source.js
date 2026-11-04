@@ -53,8 +53,10 @@ function CheckUpdateSource(info, root = ProjectRoot) {
   if (revision !== Git(root, ['rev-parse', 'origin/main'])) throw new Error('Update requires origin/main HEAD');
   const metadata = SourceMetadata(revision, root);
   if (info) ValidateSource(info, metadata);
-  if (Git(root, ['status', '--porcelain', '--untracked-files=normal'])) {
-    throw new Error('Baseline source working tree must be clean');
+  const dirty = Git(root, ['status', '--porcelain', '--untracked-files=normal']);
+  if (dirty) {
+    const entries = dirty.split('\n').slice(0, 5).join('\n');
+    throw new Error(`Baseline source working tree must be clean:\n${entries}`);
   }
   const tgfx = fs.realpathSync(path.join(root, 'third_party/tgfx'));
   if (tgfx !== path.join(fs.realpathSync(root), 'third_party/tgfx') ||
