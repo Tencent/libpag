@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Group anchor.y slides the pivot of a statically rotated group, so the triangle swings around the new
+     pivot instead of spinning in place.
+     Target: Group  Channel: anchor.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group id="anchorGroupY" position="150,60" anchor="0,0" rotation="30">
+      <Polystar type="polygon" pointCount="3" outerRadius="46" rotation="-90"/>
+      <Fill color="#EA580C"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="anchorSwing" duration="60" frameRate="60" loop="once">
+      <Object target="anchorGroupY">
+        <Channel name="anchor.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="80"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

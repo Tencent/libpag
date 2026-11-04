@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: InnerShadowStyle blurX / blurY soften the inner rim from a hard line into a soft vignette.
+     Target: InnerShadowStyle  Channel: blurX,blurY  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="180,130" roundness="18"/>
+    <Fill color="#FFFFFF"/>
+    <InnerShadowStyle id="cardInner" offsetX="0" offsetY="6" blurX="0" blurY="0" color="#1E1B4B"/>
+  </Layer>
+  <Animations>
+    <Animation id="rimSoften" duration="60" frameRate="60" loop="once">
+      <Object target="cardInner">
+        <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="16"/>
+        </Channel>
+        <Channel name="blurY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="16"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

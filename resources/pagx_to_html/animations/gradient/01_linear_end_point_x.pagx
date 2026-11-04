@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: LinearGradient endPoint.x widens the gradient ramp from the left third to the full card.
+     Target: LinearGradient  Channel: endPoint.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="180,150"/>
+    <Fill>
+      <LinearGradient id="linearEndGrad" startPoint="0,0" endPoint="0.3,0">
+        <ColorStop offset="0" color="#0891B2"/>
+        <ColorStop offset="0.5" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="rampWiden" duration="60" frameRate="60" loop="once">
+      <Object target="linearEndGrad">
+        <Channel name="endPoint.x" type="float">
+          <Key time="0" value="0.3" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

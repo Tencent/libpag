@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer skew.x shears the box horizontally.
+     Target: Layer  Channel: skew.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="shearBoxX" x="120" y="60" width="80" height="80">
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="shearX" duration="60" frameRate="60" loop="once">
+      <Object target="shearBoxX">
+        <Channel name="skew.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
