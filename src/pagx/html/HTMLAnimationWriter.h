@@ -98,7 +98,7 @@ class HTMLAnimationSession {
 
   std::unordered_map<const SolidColor*, const Node*> _solidToPainter = {};
   std::unordered_map<const LayerFilter*, const Layer*> _filterToLayer = {};
-  std::unordered_map<const Path*, const Layer*> _maskPathToLayer = {};
+  std::unordered_map<const Path*, Layer*> _maskPathToLayer = {};
   std::unordered_map<std::string, int64_t> _timelineOffsets = {};
 };
 
