@@ -105,7 +105,8 @@ constexpr const char* kSVGUsage = R"(SVG options:
 )";
 
 constexpr const char* kHTMLUsage = R"(HTML options:
-  --no-animations             Omit CSS @keyframes and animation declarations
+  --html-no-animations        Omit CSS @keyframes and animation declarations
+                              (--no-animations is accepted as a deprecated alias)
 
 )";
 
@@ -315,7 +316,21 @@ static int ResolveExportOptions(ExportOptions* options) {
   return 0;
 }
 
+// Rejects a format-scoped flag used with another output format. Silently dropping such a flag would
+// produce output the caller did not ask for, so it is treated as a usage error.
+static int RejectFlagForFormat(const std::string& flag, const std::string& format,
+                               const char* expected) {
+  std::cerr << "pagx export: error: " << flag << " only applies to --format " << expected
+            << " (got " << format << ")\n";
+  return 1;
+}
+
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
+  // Format-scoped flags remember the spelling used, so the error can name the flag instead of a
+  // group of flags the caller may not have passed.
+  std::string svgFlagUsed = {};
+  std::string htmlFlagUsed = {};
+  std::string pptFlagUsed = {};
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -342,21 +357,26 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         return 1;
       }
       options->svgIndent = static_cast<int>(value);
+      svgFlagUsed = arg;
       MarkNonVideoOption(options, "--svg-indent");
-    } else if (arg == "--no-animations") {
+    } else if (arg == "--html-no-animations" || arg == "--no-animations") {
       options->htmlExportAnimations = false;
-      MarkNonVideoOption(options, "--no-animations");
+      htmlFlagUsed = arg;
+      MarkNonVideoOption(options, arg.c_str());
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
+      svgFlagUsed = arg;
       MarkNonVideoOption(options, "--svg-no-xml-declaration");
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
       MarkNonVideoOption(options, "--text-to-path");
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
+      pptFlagUsed = arg;
       MarkNonVideoOption(options, "--ppt-no-bake-unsupported");
     } else if (arg == "--ppt-ignore-glyphruns") {
       options->pptIgnoreGlyphRuns = true;
+      pptFlagUsed = arg;
       MarkNonVideoOption(options, "--ppt-ignore-glyphruns");
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.emplace_back(argv[++i]);
@@ -378,7 +398,20 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     i++;
   }
 
-  return ResolveExportOptions(options);
+  int resolved = ResolveExportOptions(options);
+  if (resolved != 0) {
+    return resolved;
+  }
+  if (!svgFlagUsed.empty() && options->format != "svg") {
+    return RejectFlagForFormat(svgFlagUsed, options->format, "svg");
+  }
+  if (!htmlFlagUsed.empty() && options->format != "html") {
+    return RejectFlagForFormat(htmlFlagUsed, options->format, "html");
+  }
+  if (!pptFlagUsed.empty() && options->format != "pptx") {
+    return RejectFlagForFormat(pptFlagUsed, options->format, "pptx");
+  }
+  return 0;
 }
 
 static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOptions* options) {
