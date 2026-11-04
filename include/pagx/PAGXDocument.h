@@ -88,6 +88,16 @@ class PAGXDocument : public Node {
   std::string outputViewError = {};
 
   /**
+   * Raw values of the `targetLayer` and `outputBounds` root attributes when the importer could not
+   * parse them into `targetLayerId` / `outputBounds`. The exporter writes them back verbatim so an
+   * invalid declaration keeps failing on reload instead of degrading into a whole-canvas document.
+   * Both stay empty when the attributes were absent or parsed successfully; a parsed field always
+   * takes precedence over its raw counterpart.
+   */
+  std::string declaredTargetLayer = {};
+  std::string declaredOutputBounds = {};
+
+  /**
    * Top-level layers (raw pointers, owned by nodes).
    */
   std::vector<Layer*> layers = {};

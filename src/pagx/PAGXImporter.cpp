@@ -3156,6 +3156,10 @@ static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
   if (!hasTarget && !hasBounds) {
     return;
   }
+  // Keep the authored values until the pair parses cleanly: the exporter replays them verbatim so
+  // an invalid declaration survives a round trip instead of degrading into a whole-canvas document.
+  doc->declaredTargetLayer = targetAttr;
+  doc->declaredOutputBounds = boundsAttr;
   if (hasTarget != hasBounds) {
     doc->outputViewError =
         "The 'targetLayer' and 'outputBounds' attributes must be specified together.";
@@ -3179,6 +3183,8 @@ static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
   }
   doc->targetLayerId = targetAttr.substr(1);
   doc->outputBounds = bounds;
+  doc->declaredTargetLayer.clear();
+  doc->declaredOutputBounds.clear();
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {

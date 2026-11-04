@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -293,6 +294,40 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsDynamicContent) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_TRUE(HasError(doc, "animations"));
+}
+
+/**
+ * Test case: a target view declaration that fails to parse keeps its authored attributes through
+ * export, so reloading the exported file reports the same error instead of silently becoming a
+ * whole-canvas document.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport) {
+  struct Case {
+    std::string declaration = {};
+    std::vector<std::string> expectedAttributes = {};
+  };
+  const Case cases[] = {
+      {"targetLayer=\"@target\"", {"targetLayer=\"@target\""}},
+      {"targetLayer=\"target\" outputBounds=\"0,0,10,10\"",
+       {"targetLayer=\"target\"", "outputBounds=\"0,0,10,10\""}},
+      {"targetLayer=\"@target\" outputBounds=\"0,0,0,10\"",
+       {"targetLayer=\"@target\"", "outputBounds=\"0,0,0,10\""}},
+  };
+  for (const auto& testCase : cases) {
+    std::string xml = "<pagx width=\"100\" height=\"100\" " + testCase.declaration +
+                      ">\n  <Layer id=\"target\"/>\n</pagx>\n";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr) << testCase.declaration;
+    EXPECT_FALSE(doc->outputViewError.empty()) << testCase.declaration;
+
+    auto exported = pagx::PAGXExporter::ToXML(*doc);
+    for (const auto& expected : testCase.expectedAttributes) {
+      EXPECT_NE(exported.find(expected), std::string::npos) << testCase.declaration;
+    }
+    auto reloaded = pagx::PAGXImporter::FromXML(exported);
+    ASSERT_TRUE(reloaded != nullptr) << testCase.declaration;
+    EXPECT_FALSE(reloaded->outputViewError.empty()) << testCase.declaration;
+  }
 }
 
 }  // namespace pag
