@@ -2089,9 +2089,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze);
   }
 
-  // SVG 的 rect 以左上角定位，PAGX 的 Rectangle 以中心定位：只动 size 会让矩形从中心向两边
-  // 收缩。这里按同一组时间点补一条位置通道，把「被动画的那条边」钉在静态左上角上。
-  // 基准值关键帧已经写在 size 通道里（值等于静态尺寸），复制过来算出的中心正好是静态中心。
+  // SVG rects are anchored at the top-left corner while a PAGX Rectangle is anchored at its
+  // center, so animating size alone would grow the shape from the center. Mirror the size
+  // keyframes onto a position channel at the same timestamps to pin the animated edge to the
+  // static top-left corner.
   if ((attributeName == "width" || attributeName == "height") &&
       target.valueType == ChannelValueType::Float && !channels.empty()) {
     auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
@@ -2502,8 +2503,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   // When absent, path positions are sampled uniformly.
   // keyPoints may move back and forth along the path (a knob that travels to one end and
   // returns), so this list is parsed without the monotonic requirement of keyTimes.
-  const std::vector<double> keyPoints =
-      ParseKeyPointList(ctx.getAttribute(animElement, "keyPoints"));
+  std::vector<double> keyPoints = ParseKeyPointList(ctx.getAttribute(animElement, "keyPoints"));
+  // A single keyPoint cannot describe a motion track: drop it and fall back to uniform sampling.
+  if (keyPoints.size() < 2) {
+    keyPoints.clear();
+  }
 
   // Determine sample count: adaptive based on path length, clamped to [32, 256]. When keyPoints
   // are provided, the sample count is fixed by the keyPoints list.

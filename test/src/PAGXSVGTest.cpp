@@ -5677,6 +5677,28 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_TranslateSlide) {
 }
 
 /**
+ * animate_motion_invalid_key_points.svg: a single keyPoint cannot describe a motion track, so the
+ * list is dropped and the path is sampled uniformly instead of reading past the list.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/animate_motion_invalid_key_points.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // Uniform sampling walks the whole path: the first frame sits at the start and the last at the
+  // end of the line.
+  EXPECT_NEAR(ch->keyframes.front().value.tx, 0.0f, 0.01f);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 100.0f, 0.01f);
+}
+
+/**
  * Test SVG import: <animate attributeName="rx"> on a <rect> drives Rectangle.roundness (a pixel
  * value), not Ellipse.size. Verifies the rx/ry routing fix: rx/ry route by content node type so
  * <rect rx> is no longer dropped by the ellipse branch, and the value is NOT scaled by *2.
