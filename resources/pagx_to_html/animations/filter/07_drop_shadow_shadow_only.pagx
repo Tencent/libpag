@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: DropShadowFilter shadowOnly drops the card itself and keeps only the shadow, switching on at the
+     middle of the timeline.
+     Target: Layer  Channel: shadowOnly  Type: bool
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar type="polygon" pointCount="6" outerRadius="46" position="90,100"/>
+    <Fill color="#15803D"/>
+    <DropShadowFilter id="shadowOnlyFilter" offsetX="0" offsetY="14" blurX="6" blurY="6" color="#0F172A"/>
+  </Layer>
+  <Animations>
+    <Animation id="shadowOnlySwap" duration="60" frameRate="60" loop="once">
+      <Object target="shadowOnlyFilter">
+        <Channel name="shadowOnly" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

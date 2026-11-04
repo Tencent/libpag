@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A contour mask Path lifts its bottom edge on the y axis, so the masked content is fully visible at
+     the start and clipped from below at the end.
+     Target: Path  Channel: point3.y,point4.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Layer id="liftMask" visible="false">
+      <Path id="liftPath" data="M 40 20 L 280 20 L 280 180 L 40 180 Z"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer mask="@liftMask" maskType="contour">
+      <Rectangle position="160,100" size="240,160"/>
+      <Fill color="#B91C1C"/>
+    </Layer>
+  </Layer>
+  <Animations>
+    <Animation id="liftBottomEdge" duration="60" frameRate="60" loop="once">
+      <Object target="liftPath">
+        <Channel name="point3.y" type="float">
+          <Key time="0" value="180" interpolation="linear"/>
+          <Key time="60" value="100"/>
+        </Channel>
+        <Channel name="point4.y" type="float">
+          <Key time="0" value="180" interpolation="linear"/>
+          <Key time="60" value="100"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

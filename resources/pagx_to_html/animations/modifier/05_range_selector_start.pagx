@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RangeSelector start widens the selector from the first glyph to the whole word, so the text modifier
+     lifts letters one by one.
+     Target: RangeSelector  Channel: start  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56" position="70,120"/>
+    <TextModifier id="waveModifier" position="0,-18">
+      <RangeSelector id="waveSelector" start="0" end="1" offset="0" unit="percentage" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="waveSpread" duration="60" frameRate="60" loop="once">
+      <Object target="waveSelector">
+        <Channel name="start" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

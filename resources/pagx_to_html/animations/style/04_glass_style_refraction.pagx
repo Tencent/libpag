@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: GlassStyle refraction bends the backdrop inside the card rim from none to the full effect.
+     Target: GlassStyle  Channel: refraction  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar position="120,80" type="star" pointCount="5" outerRadius="60" innerRadius="24" rotation="-90"/>
+    <Fill color="#4338CA"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="220,130" size="120,120"/>
+    <Fill color="#0EA5E9"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="180,120" roundness="24"/>
+    <Fill color="#FFFFFF33"/>
+    <GlassStyle id="cardGlass" refraction="0" depth="20" frost="0" dispersion="0" splay="0" lightAngle="45" lightIntensity="60"/>
+  </Layer>
+  <Animations>
+    <Animation id="glassRamp" duration="60" frameRate="60" loop="once">
+      <Object target="cardGlass">
+        <Channel name="refraction" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="100"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

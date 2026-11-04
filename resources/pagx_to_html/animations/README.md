@@ -58,20 +58,20 @@ node tools/html-snapshot/eval-animation/run.js \
 
 | 指标 | 数值 |
 |------|------|
-| 用例数 | 74（`Expect: supported` 72 + `Expect: gap` 2） |
+| 用例数 | 114（`Expect: supported` 82 + `Expect: gap` 32） |
 | PAGX 可动画 `(节点, 通道)` 组合 | 179，分布在 31 种节点类型 |
 | 导出器已实现的通道 | 45，分布在 12 种节点类型（另有 3 条映射无效，见第七节） |
-| 用例直接覆盖的通道 | 37 |
-| 覆盖率（对导出器已实现集合） | 37/45 ≈ **82%** |
-| 覆盖率（对 PAGX 全部可动画通道） | 37/179 ≈ **21%** |
-| 已实现但无对应用例 | 10（见第四节） |
-| 已确认缺口（`Expect: gap`） | 2：`Layer.blendMode`、`Stroke.miterLimit` |
-| 未实现且无用例固化的缺口族 | 见第五节 |
+| 用例直接覆盖的通道 | 45 |
+| 覆盖率（对导出器已实现集合） | 45/45 = **100%** |
+| 覆盖率（对 PAGX 全部可动画通道） | 45/179 ≈ **25%** |
+| 已实现但无对应用例 | 0（仅 `playing="false"` 这类时间线行为未覆盖，见第四节） |
+| 已确认缺口（`Expect: gap`） | 32，逐族清单见第五节 |
+| 仍无用例固化的缺口族 | 几何尺寸/位置、Polystar、NoiseStyle 等，见第五节 |
 
-判断：**通道维度的"能力级"覆盖较完整**（图层变换、绘制器、几何尺寸、滤镜的主要参数都有独立用例），
-**但覆盖面偏窄**——Repeater / TextModifier / RangeSelector / 渐变色源 / 图层样式这几族 PAGX 动画导出器完全没有实现，
-用例集里也没有对应 gap 用例，因此评审者无法从用例集看出这些能力缺失。另外 `Layer.rotation.*` 属于高频能力，
-导出器实际上不产出动画（映射表写错通道名），用例集只有一个涉及**静态** rotation 的组合用例，没有暴露该问题。
+判断：**通道维度的覆盖已经补满**——导出器实现的 45 个通道都有用例直接驱动；**但能力面仍然偏窄**：
+Repeater / TextModifier / RangeSelector / 渐变色源 / 图层样式这几族在导出器里完全没有实现，现在每族至少有一条
+`Expect: gap` 用例把缺口固化下来，报告里的 `export-static` 就是这些缺口的可见信号。`Layer.rotation.*` 属于高频能力，
+导出器目前不产出动画（映射表写错通道名），`layer/10`、`layer/11`、`layer/17` 已把三个轴都登记为 gap。
 
 ## 二、时间线语义覆盖
 
@@ -108,8 +108,8 @@ node tools/html-snapshot/eval-animation/run.js \
 | 通道值类型 `color` | ✔ | ✔ | `fill/01` 等 |
 | 通道值类型 `matrix` | ✔ | ✔ | `layer/04`、`layer/04b` |
 | 通道值类型 `int` | ✔ | ✔ | `layer/07`（gap） |
-| 通道值类型 `string` / `image` | ✔（PAGX 允许） | ✘（CSS 无法动画文本内容/图片） | **无 gap 用例** |
-| 通道值类型 `matrix3D` | ✔ | ✘ | **无 gap 用例** |
+| 通道值类型 `string` / `image` | ✔（PAGX 允许） | ✘（CSS 无法动画文本内容/图片） | `text/03`（string）；`image` 无用例 |
+| 通道值类型 `matrix3D` | ✔ | ✘ | `layer/13` |
 
 ## 三、通道覆盖矩阵
 
@@ -124,13 +124,13 @@ node tools/html-snapshot/eval-animation/run.js \
 | `blendMode` | ✔ | ✘ | `layer/07`（Expect: gap） |
 | `x` / `y` | ✔ | ✔ | `layer/02`、`layer/03`、`combo/01`、`layer/05`、`combo/02` |
 | `matrix` | ✔ | ✔ | `layer/04`、`layer/04b`（最短弧分解） |
-| `scale.x` / `scale.y` | ✔ | ✔ | **无** |
+| `scale.x` / `scale.y` | ✔ | ✔ | `layer/08`、`layer/09` |
 | `scale.z` | ✔ | ✘ | **无 gap 用例** |
-| `z` | ✔ | ✘ | **无 gap 用例** |
-| `rotation.x` / `rotation.y` / `rotation.z` | ✔ | ✘（映射表写了不存在的 `rotation`，见第七节） | **无 gap 用例** |
-| `skew.x` / `skew.y` | ✔ | ✘ | **无 gap 用例** |
-| `perspective` | ✔ | ✘ | **无 gap 用例** |
-| `matrix3D` | ✔ | ✘ | **无 gap 用例** |
+| `z` | ✔ | ✘ | `layer/14`（Expect: gap） |
+| `rotation.x` / `rotation.y` / `rotation.z` | ✔ | ✘（映射表写了不存在的 `rotation`，见第七节） | `layer/17`（x）、`layer/11`（y）、`layer/10`（z）（Expect: gap） |
+| `skew.x` / `skew.y` | ✔ | ✘ | `layer/15`、`layer/16`（Expect: gap） |
+| `perspective` | ✔ | ✘ | `layer/12`（Expect: gap） |
+| `matrix3D` | ✔ | ✘ | `layer/13`（Expect: gap） |
 
 ### Group / TextBox（共享变换通道）
 
@@ -138,14 +138,14 @@ node tools/html-snapshot/eval-animation/run.js \
 |------|------|------|------|
 | `alpha` | ✔ | ✔ | Group：`group/01`；TextBox：`textbox/01` |
 | `position.x` | ✔ | ✔ | Group：`group/02`；TextBox：`textbox/02` |
-| `position.y` | ✔ | ✔ | Group：`group/03`；TextBox：**无** |
+| `position.y` | ✔ | ✔ | Group：`group/03`；TextBox：`textbox/05` |
 | `rotation` | ✔ | ✔ | Group：`group/04`、`group/07`、`combo/04`；TextBox：`textbox/03` |
 | `scale.x` | ✔ | ✔ | Group：`group/05`、`combo/04`；TextBox：`textbox/04` |
-| `scale.y` | ✔ | ✔ | Group：`group/06`、`combo/04`；TextBox：**无** |
-| `anchor.x` | ✔ | ✔ | Group：`group/08`；TextBox：**无** |
-| `anchor.y` | ✔ | ✔ | **无** |
-| `skew` | ✔ | ✔ | Group：`group/09`；TextBox：**无** |
-| `skewAxis` | ✔ | ✔ | Group：`group/10`；TextBox：**无** |
+| `scale.y` | ✔ | ✔ | Group：`group/06`、`combo/04`；TextBox：`textbox/06` |
+| `anchor.x` | ✔ | ✔ | Group：`group/08`；TextBox：`textbox/07` |
+| `anchor.y` | ✔ | ✔ | Group：`group/11`；TextBox：`textbox/09` |
+| `skew` | ✔ | ✔ | Group：`group/09`；TextBox：`textbox/08` |
+| `skewAxis` | ✔ | ✔ | Group：`group/10`；TextBox：`textbox/10` |
 
 ### 几何元素
 
@@ -158,7 +158,7 @@ node tools/html-snapshot/eval-animation/run.js \
 | `Ellipse.size.width` | ✔ | ✔ | `geometry/03` |
 | `Ellipse.size.height` / `position.x` / `position.y` | ✔ | ✘ | **无 gap 用例** |
 | `Polystar.*`（`pointCount`、`outerRadius`、`innerRadius`、`rotation`、`outerRoundness`、`innerRoundness`、`position.x/y`） | ✔ | ✘ | **无 gap 用例** |
-| `Path.point{N}.x` / `.y`（遮罩路径逐点变形，规范未记载，仅代码注释有约定） | ✔（渲染器支持） | ✔ | `mask/01`、`mask/02`、`mask/03`（只用了 `.x`，`.y` 未覆盖） |
+| `Path.point{N}.x` / `.y`（遮罩路径逐点变形，规范未记载，仅代码注释有约定） | ✔（渲染器支持） | ✔ | `mask/01`、`mask/02`、`mask/03`（`.x`）、`mask/04`（`.y`） |
 | `Path.position.x` / `position.y` | ✘（仅编辑） | — | — |
 
 ### 绘制器与颜色源
@@ -173,23 +173,23 @@ node tools/html-snapshot/eval-animation/run.js \
 | `Stroke.dashOffset` | ✔ | ✔ | `stroke/04` |
 | `Stroke.miterLimit` | ✔ | ✘ | `stroke/05`（Expect: gap） |
 | `SolidColor.color`（含被多个 Fill 共享） | ✔ | ✔ | `solid_color/01`、`sharing/01` |
-| `LinearGradient.startPoint.*` / `endPoint.*` | ✔ | ✘ | **无 gap 用例** |
-| `RadialGradient.center.*` / `radius` | ✔ | ✘ | **无 gap 用例** |
-| `ConicGradient.center.*` / `startAngle` / `endAngle` | ✔ | ✘ | **无 gap 用例** |
-| `DiamondGradient.center.*` / `radius` | ✔ | ✘ | **无 gap 用例** |
-| `ColorStop.offset` / `color` | ✔ | ✘ | **无 gap 用例** |
+| `LinearGradient.startPoint.*` / `endPoint.*` | ✔ | ✘ | `gradient/01`（endPoint.x）（Expect: gap） |
+| `RadialGradient.center.*` / `radius` | ✔ | ✘ | `gradient/02`（radius）（Expect: gap） |
+| `ConicGradient.center.*` / `startAngle` / `endAngle` | ✔ | ✘ | `gradient/03`（startAngle）（Expect: gap） |
+| `DiamondGradient.center.*` / `radius` | ✔ | ✘ | `gradient/04`（radius）（Expect: gap） |
+| `ColorStop.offset` / `color` | ✔ | ✘ | `gradient/05`（offset）、`gradient/06`（color）（Expect: gap） |
 
 ### 修改器 / 文本
 
 | 通道 | PAGX | 导出 | 用例 |
 |------|------|------|------|
 | `TrimPath.end`（仅 `type="separate"` 且 `start=0`、`offset=0`） | ✔ | ✔ | `geometry/04`、`stroke/06` |
-| `TrimPath.start` / `offset`、continuous 类型 | ✔ | ✘ | **无 gap 用例** |
-| `RoundCorner.radius` | ✔ | ✘ | **无 gap 用例** |
-| `Repeater.*`（`copies`、`offset`、`anchor.*`、`position.*`、`rotation`、`scale.*`、`startAlpha`、`endAlpha`） | ✔ | ✘ | `sharing/02` 只在 Repeater 内动画 `Fill.color`，不驱动 Repeater 自身通道 |
-| `RangeSelector.*`（`start`、`end`、`offset`、`easeIn`、`easeOut`、`weight`） | ✔ | ✘ | **无 gap 用例** |
-| `TextModifier.*`（13 个通道，含 `fillColor`/`strokeColor`/`strokeWidth`） | ✔ | ✘ | **无 gap 用例** |
-| `Text.text` / `fontFamily` / `fontStyle` / `fontSize` / `letterSpacing` / `fauxBold` / `fauxItalic` / `x` / `y` | ✔（见第七节：规范与实现不一致） | ✘ | **无 gap 用例** |
+| `TrimPath.start` / `offset`、continuous 类型 | ✔ | ✘ | `modifier/02`（start）；`offset` 与 continuous 类型仍无用例 |
+| `RoundCorner.radius` | ✔ | ✘ | `modifier/01`（Expect: gap） |
+| `Repeater.*`（`copies`、`offset`、`anchor.*`、`position.*`、`rotation`、`scale.*`、`startAlpha`、`endAlpha`） | ✔ | ✘ | `modifier/03`（copies）、`modifier/04`（rotation）；其余通道仍无用例 |
+| `RangeSelector.*`（`start`、`end`、`offset`、`easeIn`、`easeOut`、`weight`） | ✔ | ✘ | `modifier/05`（start）；缓动通道仍无用例 |
+| `TextModifier.*`（13 个通道，含 `fillColor`/`strokeColor`/`strokeWidth`） | ✔ | ✘ | `text/01`（fillColor）、`text/02`（alpha）（Expect: gap）；其余通道仍无用例 |
+| `Text.text` / `fontFamily` / `fontStyle` / `fontSize` / `letterSpacing` / `fauxBold` / `fauxItalic` / `x` / `y` | ✔（见第七节：规范与实现不一致） | ✘ | `text/03`（text）；其余通道无用例 |
 
 ### 图层样式与滤镜
 
@@ -199,45 +199,46 @@ node tools/html-snapshot/eval-animation/run.js \
 | `DropShadowFilter.offsetX` / `offsetY` | ✔ | ✔ | `filter/03`、`filter/04` |
 | `DropShadowFilter.blurX` / `blurY` | ✔ | ✔ | `filter/05` |
 | `DropShadowFilter.color` | ✔ | ✔ | `filter/06` |
-| `DropShadowFilter.shadowOnly` | ✔ | ✘ | **无 gap 用例** |
-| `InnerShadowFilter.*` | ✔ | ✘ | **无 gap 用例** |
-| `BlendFilter.color` | ✔ | ✘ | **无 gap 用例** |
-| `NoiseFilter.*` / `NoiseStyle.*` | ✔ | ✘ | **无 gap 用例** |
-| `DropShadowStyle.*` / `InnerShadowStyle.*` / `BackgroundBlurStyle.*` | ✔ | ✘ | **无 gap 用例** |
-| `GlassStyle.*`（7 个通道） | ✔ | ✘ | **无 gap 用例** |
+| `DropShadowFilter.shadowOnly` | ✔ | ✘ | `filter/07`（Expect: gap） |
+| `InnerShadowFilter.*` | ✔ | ✘ | `filter/08`（offsetX）（Expect: gap） |
+| `BlendFilter.color` | ✔ | ✘ | `filter/09`（Expect: gap） |
+| `NoiseFilter.*` | ✔ | ✘ | `filter/10`（density）（Expect: gap） |
+| `NoiseStyle.*` | ✔ | ✘ | **无 gap 用例** |
+| `DropShadowStyle.*` | ✔ | ✘ | `style/01`（offsetX）（Expect: gap） |
+| `InnerShadowStyle.*` | ✔ | ✘ | `style/02`（blurX/blurY）（Expect: gap） |
+| `BackgroundBlurStyle.*` | ✔ | ✘ | `style/03`（blurX）（Expect: gap） |
+| `GlassStyle.*`（7 个通道） | ✔ | ✘ | `style/04`（refraction）（Expect: gap） |
 
-## 四、已实现但没有用例直接覆盖（10 个）
+## 四、已实现但没有用例直接覆盖
 
-补齐这 10 个的成本很低——都是"复制现有用例改通道名"：
+通道维度已经清零：导出器实现的 45 个通道都有用例直接驱动。剩下的都是**非通道**的时间线行为：
 
-| 通道 | 说明 |
-|------|------|
-| `Layer.scale.x` / `Layer.scale.y` | 导出器已实现（实测会产出 `@keyframes`），只是没有用例；现有 scale 用例都在 Group 上 |
-| `Group.anchor.y` | 只有 `anchor.x` |
-| `TextBox.position.y` | 只有 `position.x` |
-| `TextBox.scale.y` | 只有 `scale.x` |
-| `TextBox.anchor.x` / `anchor.y` | 无 |
-| `TextBox.skew` / `skewAxis` | 无（Group 上都有） |
-| `Path.point{N}.y` | 只驱动过 `.x`，`.y` 走同一分支但未验证 |
-| `<Timelines playing="false">` | 导出实现里有专门的暂停态处理（`elementPlayStates`），无用例 |
+| 项 | 说明 |
+|----|------|
+| `<Timelines playing="false">` | 导出实现里有暂停态处理（`elementPlayStates`），但没有用例；需要一条"参考与导出都静止"的用例，注意它在报告里会带 `both-static` 标记 |
+| 同一节点挂多条 `<Animation>` | 未验证两条时间线写同一通道时的合成顺序 |
 
 ## 五、PAGX 可动画但 CSS 导出未实现（缺口族）
 
-按"是否容易被 CSS 表达"排序，前两组的缺失更像实现遗漏而不是能力不可能：
+本轮为每个缺口族至少补了一条 `Expect: gap` 用例：它们在报告里表现为 `export-static`（参考在动、导出不动），
+把"未支持"变成可见事实。仍标 **无** 的族建议后续补。
 
-1. **Layer 3D / 变换分量**：`z`、`rotation.x/y/z`、`scale.z`、`skew.x/y`、`perspective`、`matrix3D`。
-   `rotation.z` 尤其需要注意：`kChannelBindingTable` 里写的是 `{Layer, "rotation"}`，而 PAGX 的 Layer 只有
-   `rotation.x/y/z`，因此这条映射永远不会命中，**Layer 旋转动画在导出时被静默丢弃**（`skew`/`scale.z`/`perspective`
-   同理没有条目）。用一张 `rotation.z` 从 0→90 的文档实测：`pagx render --time` 会转，导出 HTML 无任何 `@keyframes`。
-2. **几何尺寸/位置的另一半**：`size.height`、Rectangle/Ellipse/Polystar 的 `position.x/y`、Polystar 全部通道。
-3. **渐变色源**：Linear/Radial/Conic/Diamond 的端点、中心、半径、角度，`ColorStop.offset/color`。
-4. **修改器**：`RoundCorner.radius`、`TrimPath.start/offset`、Repeater 自身通道、RangeSelector 缓动。
-5. **文本**：`TextModifier` 全部、`Text` 的文本属性。
-6. **样式/滤镜**：`InnerShadowFilter`、`BlendFilter`、`Noise*`、`DropShadowStyle`/`InnerShadowStyle`/`BackgroundBlurStyle`/`GlassStyle`、
-   `DropShadowFilter.shadowOnly`。
+| 缺口族 | `Expect: gap` 用例 | 尚未覆盖 |
+|--------|--------------------|----------|
+| Layer 变换分量 / 3D | `layer/10`（rotation.z）、`layer/11`（rotation.y）、`layer/17`（rotation.x）、`layer/12`（perspective）、`layer/13`（matrix3D）、`layer/14`（z）、`layer/15`（skew.x）、`layer/16`（skew.y） | `scale.z` |
+| Layer 混合模式 | `layer/07` | — |
+| Stroke 尖角限制 | `stroke/05` | — |
+| 几何尺寸 / 位置 | **无** | `size.height`、Rectangle/Ellipse 的 `position.x/y` |
+| Polystar | **无** | `pointCount`、`outerRadius`、`innerRadius`、`rotation`、内外圆角 |
+| 渐变色源 | `gradient/01`~`gradient/06` | 中心点通道 |
+| 修改器 | `modifier/01`（RoundCorner.radius）、`modifier/02`（TrimPath.start）、`modifier/03`（Repeater.copies）、`modifier/04`（Repeater.rotation）、`modifier/05`（RangeSelector.start） | `TrimPath.offset`、continuous、Repeater 其余通道、RangeSelector 缓动 |
+| 文本 | `text/01`（TextModifier.fillColor）、`text/02`（TextModifier.alpha）、`text/03`（Text.text） | 其余 TextModifier / Text 通道 |
+| 图层样式 | `style/01`（DropShadowStyle.offsetX）、`style/02`（InnerShadowStyle.blur）、`style/03`（BackgroundBlurStyle.blurX）、`style/04`（GlassStyle.refraction） | `NoiseStyle`、`GlassStyle` 其余通道 |
+| 滤镜 | `filter/07`（shadowOnly）、`filter/08`（InnerShadowFilter.offsetX）、`filter/09`（BlendFilter.color）、`filter/10`（NoiseFilter.density） | 其余滤镜通道 |
 
-这些族目前都**没有 `Expect: gap` 用例**，用例集无法反映缺口的规模。建议至少给每族补一条 gap 用例
-（一个文件、一个通道即可），让"未支持"成为可见事实而不是隐性行为。
+其中 `rotation.z` 最容易被忽略：`kChannelBindingTable` 里写的是 `{Layer, "rotation"}`，而 PAGX 的 Layer 只有
+`rotation.x/y/z`，因此这条映射永不命中，**Layer 旋转动画在导出时被静默丢弃**。用一张 `rotation.z` 从 0→90
+的文档实测：`pagx render --time` 会转，导出 HTML 无任何 `@keyframes`。
 
 ## 六、冗余与重叠分析
 
@@ -300,7 +301,7 @@ header 里注明它同时是线性插值与 `loop="once"` 的基准；`interpola
 
 | 族 | 强调色 | 主体形状 |
 |----|--------|----------|
-| `layer` | `#4F46E5` 靛蓝 | 菱形（`Polystar` 4 边，旋转/矩阵补间可见） |
+| `layer` | `#4F46E5` 靛蓝 | 菱形（`Polystar` 4 边）；旋转/矩阵类改用不等边三角形，避免 90° 旋转对称把错路径样本掩盖 |
 | `group` | `#EA580C` 橙 | 三角形（`Polystar` 3 边，旋转/斜切可见） |
 | `textbox` | `#7C3AED` 紫 | 文本 "AB" |
 | `fill` | `#DB2777` 玫红 | 胶囊（`roundness` 取高度一半）/ 文本 / 渐变三角 |
@@ -323,3 +324,17 @@ header 里注明它同时是线性插值与 `loop="once"` 的基准；`interpola
 - 形状必须让被测语义可见：旋转/斜切类不能用圆（旋转前后像素完全一致），因此 `group` 用三角形、
   `boundary` 用五角星；`matrix` 通道会覆盖 `x`/`y` 平移，其关键帧必须自带 translate，否则内容会落到画布外。
 - 新增用例沿用上表；如果需要新族，在同一张表里登记，不要临时起色。
+
+## 九、新增族的 fixture
+
+本轮新增的四个族沿用第八节约定：320×200、`#F8FAFC` 背景、每族一个剪影，颜色只在族内保持一致。
+
+| 族 | 强调色 | 主体 |
+|----|--------|------|
+| `gradient` | `#0891B2` 青 | 椭圆 + 渐变填充（线性/径向/锥形/菱形），方向变化一眼可辨 |
+| `modifier` | `#9333EA` 紫 | 五边形（RoundCorner）/ 五角星描边（TrimPath）/ Repeater 方块阵列 / 文本 |
+| `text` | `#BE123C` 玫红 | 72px 粗体 "AB" |
+| `style` | `#4338CA` 靛紫 | 白色卡片；模糊类用例自带星形+圆形背板，否则看不出模糊效果 |
+
+与 `layer` 族同色系的分支：新增的 Layer 通道用例（`layer/08`~`layer/17`）继续用 `#4F46E5` 与菱形主体；
+`matrix` / `matrix3D` 通道会替换 `x`/`y` 平移，关键帧必须自带 translate（见 `layer/13`）。
