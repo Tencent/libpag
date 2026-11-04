@@ -774,13 +774,15 @@ bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float
   if (rootX == nullptr || rootY == nullptr) {
     return false;
   }
-  float zoomScale = displayList->zoomScale();
-  if (zoomScale == 0.0f) {
+  // Invert the single root-to-surface transform below so hit testing always agrees with drawing,
+  // including the output window origin. The matrix is scale + translate only, so dividing by the
+  // diagonal and subtracting the translation is the exact inverse.
+  Matrix rootToSurface = {};
+  if (!rootToSurfaceMatrix(&rootToSurface) || rootToSurface.a == 0.0f || rootToSurface.d == 0.0f) {
     return false;
   }
-  const auto& contentOffset = displayList->contentOffset();
-  *rootX = (surfaceX - contentOffset.x) / zoomScale;
-  *rootY = (surfaceY - contentOffset.y) / zoomScale;
+  *rootX = (surfaceX - rootToSurface.tx) / rootToSurface.a;
+  *rootY = (surfaceY - rootToSurface.ty) / rootToSurface.d;
   return true;
 }
 
@@ -790,7 +792,18 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   }
   float zoomScale = displayList->zoomScale();
   const auto& contentOffset = displayList->contentOffset();
-  *out = {zoomScale, 0, 0, zoomScale, contentOffset.x, contentOffset.y};
+  float originX = 0.0f;
+  float originY = 0.0f;
+  if (outputViewState == OutputViewState::Valid) {
+    // renderTo() applies translate(contentOffset) * scale(zoom) * translate(-outputBounds.origin)
+    // before drawing the target layer. Surface<->root conversions must use the same transform.
+    const auto& bounds = *document->outputBounds;
+    originX = bounds.x;
+    originY = bounds.y;
+  }
+  float translateX = contentOffset.x - originX * zoomScale;
+  float translateY = contentOffset.y - originY * zoomScale;
+  *out = {zoomScale, 0, 0, zoomScale, translateX, translateY};
   return true;
 }
 
