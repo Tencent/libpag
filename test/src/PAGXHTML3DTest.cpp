@@ -895,6 +895,54 @@ PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesKeepAnchorOutsideProjection) {
 }
 
 /**
+ * Test case: a pivot with depth. `transform-origin: 20px 10px 30px` puts the rotation centre off
+ * the layer plane, so rotating about X also slides the plane along Z by `anchorZ - L_z * anchorZ`
+ * while the stored pose stays un-pivoted.
+ */
+PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
+  const std::string templateHtml = R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div id="card" style="width:120px;height:80px;background-color:#6366F1;
+           transform:perspective(600px) rotateX(60deg);transform-origin:ORIGIN"></div>
+    </body></html>
+  )HTML";
+  std::string withDepth = templateHtml;
+  withDepth.replace(withDepth.find("ORIGIN"), 6, "20px 10px 30px");
+  std::string withoutDepth = templateHtml;
+  withoutDepth.replace(withoutDepth.find("ORIGIN"), 6, "20px 10px");
+
+  auto doc = ParseHtml(withDepth);
+  ASSERT_NE(doc, nullptr);
+  auto* layer = FindLayerById(doc, "card");
+  ASSERT_NE(layer, nullptr);
+  EXPECT_TRUE(NearlyEqual(layer->anchor.x, 20.0f));
+  EXPECT_TRUE(NearlyEqual(layer->anchor.y, 10.0f));
+  EXPECT_TRUE(NearlyEqual(layer->anchorZ, 30.0f));
+
+  // The stored pose is the raw CSS value: a depth pivot must not leak into the translation column.
+  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(0, 3), 0.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(1, 3), 0.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(2, 3), 0.0f, 1e-5f));
+
+  // The pivot is applied once, after the projection: t' = a - L * a with L = rotateX(60).
+  const auto local = pagx::BuildLayerTransform3DWithAnchor(layer);
+  EXPECT_TRUE(NearlyEqual(local.getRowColumn(0, 3), 0.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(local.getRowColumn(1, 3), 30.980762f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3), 6.339746f, 0.01f));
+
+  // The depth itself is what moves the plane: dropping anchorZ shifts Z back by
+  // anchorZ - L_z * anchorZ = 30 - cos(60) * 30 = 15.
+  auto flatDoc = ParseHtml(withoutDepth);
+  ASSERT_NE(flatDoc, nullptr);
+  auto* flatLayer = FindLayerById(flatDoc, "card");
+  ASSERT_NE(flatLayer, nullptr);
+  ASSERT_TRUE(NearlyEqual(flatLayer->anchorZ, 0.0f));
+  const auto flatLocal = pagx::BuildLayerTransform3DWithAnchor(flatLayer);
+  EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3) - flatLocal.getRowColumn(2, 3), 15.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(local.getRowColumn(1, 3) - flatLocal.getRowColumn(1, 3), 0.0f, 0.01f));
+}
+
+/**
  * Test case: compound keyframes compose in CSS order and keep the translation authored.
  */
 PAG_TEST(PAGXHTML3DTest, AnimatedCompoundKeyframesCompose) {
