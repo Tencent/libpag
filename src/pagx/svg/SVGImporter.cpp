@@ -1548,8 +1548,7 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
       if (maskLayer) {
         // One mask definition expands into one instance per <use> reference; ids must stay
         // unique across instances, otherwise mask="@..." can resolve to the wrong one.
-        static int maskInstanceSeq = 0;
-        maskLayer->id = maskLayer->id + "_" + std::to_string(++maskInstanceSeq);
+        maskLayer->id = maskLayer->id + "_" + std::to_string(++_maskInstanceSeq);
         maskLayer->name = maskLayer->id;
         group->mask = maskLayer;
         group->maskType = (getAttribute(maskIt->second, "mask-type") == "alpha")
@@ -3229,7 +3228,8 @@ static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-    // 连续的分号会产出空声明：跳过时分隔符要一起吃掉，避免下一个属性名带上 ";"。
+    // Consecutive separators produce empty declarations; consume them together so the next
+    // property name does not keep a leading ";".
     while (pos < styleStr.size() &&
            (std::isspace(static_cast<unsigned char>(styleStr[pos])) || styleStr[pos] == ';')) {
       ++pos;
@@ -3745,14 +3745,6 @@ std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMN
 
   _animatedNodeMap[element.get()] = std::move(info);
   return layer->id;
-}
-
-void SVGParserContext::registerAnimatedContentNodes(const std::shared_ptr<DOMNode>& element,
-                                                    const AnimatedNodeInfo& nodeInfo) {
-  (void)element;
-  (void)nodeInfo;
-  // Content node ids are allocated lazily by SMILAnimationParser::resolveAnimateTarget when an
-  // <animate>/<set> targets a Fill/Stroke/Shape. Nothing to do here at convertToLayer time.
 }
 
 // A matrix channel replaces the target layer's static matrix at runtime. Consumers that render the

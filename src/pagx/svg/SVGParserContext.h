@@ -270,16 +270,10 @@ class SVGParserContext {
   void collectSMILAnimations(const std::shared_ptr<DOMNode>& node);
 
   // Ensure the given element has an id (generating one if missing) and record the mapping from
-  // DOM element to AnimatedNodeInfo so buildAnimation can later resolve targets. Creates a Group
-  // child element when the element has animateTransform/animateMotion so transform channels have
-  // scalar properties to drive. Returns the resolved target id (empty when element has no SMIL
-  // animations and nothing is recorded).
+  // DOM element to AnimatedNodeInfo so buildAnimation can later resolve targets. Transform
+  // animations are baked onto the Layer matrix channel, so no Group child is created. Returns the
+  // resolved target id (empty when element has no SMIL animations and nothing is recorded).
   std::string registerAnimatedElement(const std::shared_ptr<DOMNode>& element, Layer* layer);
-
-  // Assign ids to Fill/Stroke/Shape content nodes that are targets of <animate> on the given
-  // element, recording them in the AnimatedNodeInfo's contentNodeIds map.
-  void registerAnimatedContentNodes(const std::shared_ptr<DOMNode>& element,
-                                    const AnimatedNodeInfo& nodeInfo);
 
   // Build the top-level Animation node from _smilAnimations + _animatedNodeMap, append it to
   // doc->animations, and attach an AnimationTimeline to the root layer. No-op when no SMIL
@@ -311,6 +305,9 @@ class SVGParserContext {
   // whether it lives in a root-level <defs>, a nested <defs>, or the rendered subtree.
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _elementsById = {};
   std::vector<Layer*> _maskLayers = {};
+  // Instance counter for mask layers expanded from <use>; kept per parse so ids stay reproducible
+  // across runs and do not race when several documents parse concurrently.
+  int _maskInstanceSeq = 0;
   std::unordered_map<std::string, Image*> _imageSourceToId =
       {};                                             // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
