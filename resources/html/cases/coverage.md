@@ -79,6 +79,9 @@ Legend: [x] covered in this phase (P1) · [ ] reserved for a later phase.
 | `opacity`, `mix-blend-mode` | supported | `12-opacity-blend__opacity`, `...mix-blend-mode-*` |
 | `background-blend-mode` | dropped | `12-opacity-blend__background-blend-mode` |
 | `transform` single fn + origin | supported | `13-transform__rotate/scale/scale-xy/skew-x/translate/matrix/transform-origin-center` |
+| `transform-origin` px / % / keyword | honoured as the pivot (`Layer.anchor`) | `13-transform__transform-origin-px-noncenter`, `...percent`, `...keywords`, `...skew-corner` |
+| `transform-origin` three value | pivot depth kept (`anchorZ`) | `13-transform__transform-origin-three-value` |
+| `transform-origin` with pure translate | pivot is a no-op, no anchor emitted | `13-transform__transform-origin-translate` |
 | `transform` chained / 3d / perspective | dropped | `13-transform__rotate-chained`, `...rotate3d`, `...perspective` |
 | `overflow: hidden` | clipToBounds | `14-overflow-clip__overflow-hidden` |
 | `clip-path: url(#id)` | contour mask (XFAIL) | `14-overflow-clip__clip-path-url` |
