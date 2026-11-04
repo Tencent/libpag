@@ -272,6 +272,8 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
       singleLayer->matrix = contentMatrix * singleLayer->matrix;
+      _contentMatrix = contentMatrix;
+      _contentMatrixBakedIntoLayer = true;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
@@ -1173,6 +1175,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   }
 
   bool uniformFill = true;
+  std::string groupFill = {};
   if (!emittedRuns.empty()) {
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
@@ -1279,9 +1282,31 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         group->elements.push_back(textPath);
       }
     }
+
+    // Runs may be the only place a paint is declared (a tspan fill with no <text> fill). When
+    // every run agrees, use that paint for the group instead of the element default.
+    if (uniformFill && !firstFill.empty()) {
+      std::string elementFill = getAttribute(element, "fill");
+      if (elementFill.empty()) {
+        elementFill = inheritedStyle.fill;
+      }
+      if (elementFill.empty()) {
+        elementFill = "#000000";
+      }
+      if (elementFill != firstFill) {
+        groupFill = firstFill;
+      }
+    }
   }
 
-  addFillStroke(element, group->elements, inheritedStyle, uniformFill);
+  if (!groupFill.empty()) {
+    auto fillNode = _document->makeNode<Fill>();
+    auto solidColor = _document->makeNode<SolidColor>();
+    solidColor->color = parseColor(groupFill);
+    fillNode->color = solidColor;
+    group->elements.push_back(fillNode);
+  }
+  addFillStroke(element, group->elements, inheritedStyle, uniformFill && groupFill.empty());
   return group;
 }
 

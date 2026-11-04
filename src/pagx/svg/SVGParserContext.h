@@ -323,16 +323,28 @@ class SVGParserContext {
   int _nextGeneratedId = 0;
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
+  // viewBox -> document mapping. When it is pre-multiplied onto a single top-level layer, matrix
+  // animations on that layer must compose with it instead of replacing the whole pose.
+  Matrix _contentMatrix = Matrix::Identity();
+  bool _contentMatrixBakedIntoLayer = false;
 
  public:
-  /** Returns the document viewBox width used for unit conversions (parseLength). */
-  float getViewBoxWidth() const {
-    return _viewBoxWidth;
-  }
-  /** Returns the document viewBox height used for unit conversions (parseLength). */
-  float getViewBoxHeight() const {
-    return _viewBoxHeight;
-  }
+   /** Returns the document viewBox width used for unit conversions (parseLength). */
+   float getViewBoxWidth() const {
+     return _viewBoxWidth;
+   }
+   /** Returns the document viewBox height used for unit conversions (parseLength). */
+   float getViewBoxHeight() const {
+     return _viewBoxHeight;
+   }
+   /** Returns the viewBox mapping pre-multiplied onto a single top-level layer. */
+   const Matrix& getContentMatrix() const {
+     return _contentMatrix;
+   }
+   /** Whether the viewBox mapping was baked into the animated top-level layer itself. */
+   bool isContentMatrixBakedIntoLayer() const {
+     return _contentMatrixBakedIntoLayer;
+   }
 
  private:
   // CSS class rules: key is class name (without dot), value is style properties.
