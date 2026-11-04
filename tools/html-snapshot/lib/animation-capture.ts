@@ -420,6 +420,28 @@ export function pagxExtractTranslate(
 // a temporary element so scale / rotate authored directly in keyframes is kept
 // too, and fall back to translate-only extraction when the value cannot be
 // resolved to a matrix (e.g. a 3D transform).
+// Projects a `matrix3d` onto its 2D affine components when it is really flat
+// (no depth translation, no Z linear terms, no projection row); returns null for
+// a pose that genuinely uses the third dimension.
+export function pagxMatrix3DFlat6(values: number[]): number[] | null {
+  if (values.length !== 16 || values.some((v) => isNaN(v))) return null;
+  const near = (value: number, target: number): boolean => Math.abs(value - target) < 1e-6;
+  if (!near(values[2], 0) || !near(values[3], 0) || !near(values[6], 0) || !near(values[7], 0) ||
+      !near(values[8], 0) || !near(values[9], 0) || !near(values[10], 1) || !near(values[11], 0) ||
+      !near(values[14], 0) || !near(values[15], 1)) {
+    return null;
+  }
+  return [values[0], values[1], values[4], values[5], values[12], values[13]];
+}
+
+export function pagxParseMatrix3D(value: string): number[] | null {
+  const m = (value || '').trim().match(/^matrix3d\(([^)]+)\)$/i);
+  if (!m) return null;
+  const parts = m[1].split(',').map((x) => parseFloat(x.trim()));
+  if (parts.length !== 16 || parts.some((v) => isNaN(v))) return null;
+  return parts;
+}
+
 export function pagxExtractTransform(
   transformStr: string,
   box?: { width: number; height: number } | null,
@@ -438,9 +460,20 @@ export function pagxExtractTransform(
     }
     return null;
   }
-  // matrix3d(...) has no 2D affine equivalent the runtime can play; keep only
-  // its translation (mirrors pagxExtractTranslate's matrix3d branch).
-  if (/^matrix3d\(/.test(s)) return pagxExtractTranslate(transformStr, box);
+  // `matrix3d(...)` carries depth or perspective, which the importer plays through the
+  // `matrix3D` channel, so the authored values are forwarded verbatim. A pose that is only
+  // pedantically 4x4 (flat affine) still collapses to `matrix(...)` / `translate(...)` so the
+  // common paths keep their compact, decimatable output.
+  const values3d = pagxParseMatrix3D(transformStr);
+  if (values3d) {
+    const flat = pagxMatrix3DFlat6(values3d);
+    if (!flat) return 'matrix3d(' + values3d.join(', ') + ')';
+    const linearIsIdentity =
+      Math.abs(flat[0] - 1) < 1e-6 && Math.abs(flat[1]) < 1e-6 &&
+      Math.abs(flat[2]) < 1e-6 && Math.abs(flat[3] - 1) < 1e-6;
+    if (linearIsIdentity) return 'translate(' + flat[4] + 'px, ' + flat[5] + 'px)';
+    return 'matrix(' + flat.join(', ') + ')';
+  }
   // Friendly compound string (WAAPI / transition keyframe author value): if it
   // is pure translate, reuse the percentage-resolving translate path; otherwise
   // resolve the whole chain to a matrix via a throwaway element so any scale /
@@ -477,6 +510,14 @@ export function pagxTransformToMatrix6(value: string): number[] | null {
     const parts = mm[1].split(',').map((x) => parseFloat(x.trim()));
     if (parts.length === 6 && parts.every((x) => !isNaN(x))) return parts;
     return null;
+  }
+  const values3d = pagxParseMatrix3D(v);
+  if (values3d) {
+    // Decimation only needs a monotonic handle on the visible motion, so a 3D pose is reduced to
+    // its 2D projection; the emitted keyframe keeps the full matrix3d values.
+    const flat = pagxMatrix3DFlat6(values3d);
+    if (flat) return flat;
+    return [values3d[0], values3d[1], values3d[4], values3d[5], values3d[12], values3d[13]];
   }
   const t = pagxParseTranslateXY(v);
   if (t) return [1, 0, 0, 1, t[0], t[1]];
@@ -3558,6 +3599,8 @@ export function pagxAnimMain(opts: {
 // relies on for its HELPER_FNS bundle).
 const PAGX_ANIM_FNS = [
   pagxExtractTranslate,
+  pagxParseMatrix3D,
+  pagxMatrix3DFlat6,
   pagxExtractTransform,
   pagxTransformToMatrix6,
   pagxResolveCapturedTransformOrigin,
