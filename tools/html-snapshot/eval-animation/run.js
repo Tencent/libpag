@@ -213,6 +213,44 @@ function findCorpusFiles(corpusDir, only, recursive, ext = '.html') {
 
 // Parse `subset:animation-*` importer diagnostics plus the "captured N animation(s)" line the
 // snapshot tool logs, so the report shows how much animation actually flowed through each stage.
+
+// Identity of a cached case run: the source file as it currently sits on disk plus the sampling that
+// produced the frames. Reusing frames across a changed source or a different sample grid would score
+// an old run against expectations it was never rendered for.
+function buildCaseCacheKey(sourcePath, opts) {
+  let source = { size: -1, mtimeMs: -1 };
+  try {
+    const stat = fs.statSync(sourcePath);
+    source = { size: stat.size, mtimeMs: stat.mtimeMs };
+  } catch (err) {
+    source = { size: -1, mtimeMs: -1 };
+  }
+  return { source, samples: opts.samples, roundtrip: !!opts.roundtrip };
+}
+
+function cacheKeyMatches(cacheKeyPath, expected) {
+  try {
+    const actual = JSON.parse(fs.readFileSync(cacheKeyPath, 'utf8'));
+    return (
+      actual.source &&
+      actual.source.size === expected.source.size &&
+      actual.source.mtimeMs === expected.source.mtimeMs &&
+      actual.samples === expected.samples &&
+      !!actual.roundtrip === expected.roundtrip
+    );
+  } catch (err) {
+    return false;
+  }
+}
+
+function writeCaseCacheKey(cacheKeyPath, key) {
+  try {
+    fs.writeFileSync(cacheKeyPath, JSON.stringify(key));
+  } catch (err) {
+    // The cache key only shortens re-runs; failing to persist it must not fail the case.
+  }
+}
+
 function countAnimationsCaptured(stderrPath) {
   if (!fs.existsSync(stderrPath)) return 0;
   const text = fs.readFileSync(stderrPath, 'utf8');
@@ -280,6 +318,10 @@ async function processCase(entry, outDir, opts) {
   const htmlPath = entry.path;
   const base = entry.name;
   const caseDir = path.join(outDir, base);
+  // Cached frames are only reusable for the same source and the same sample grid.
+  const cacheKeyPath = path.join(caseDir, '.cache-key.json');
+  const skipExisting = opts.skipExisting &&
+    cacheKeyMatches(cacheKeyPath, buildCaseCacheKey(entry.path, opts));
   const baselineDir = path.join(caseDir, 'baseline');
   const renderDir = path.join(caseDir, 'render');
   const diffDir = path.join(caseDir, 'diff');
@@ -320,7 +362,7 @@ async function processCase(entry, outDir, opts) {
   const engineArgs = opts.browserEngine ? ['--browser-engine', opts.browserEngine] : [];
 
   // 1. baseline frames (ground-truth timeline)
-  if (!opts.skipExisting || !fs.existsSync(samplesJson)) {
+  if (!skipExisting || !fs.existsSync(samplesJson)) {
     const r = await spawnCapture(
       process.execPath,
       [
@@ -355,7 +397,7 @@ async function processCase(entry, outDir, opts) {
   }
 
   // 2. snapshot (captures + normalises the animation into the subset HTML)
-  if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
+  if (!skipExisting || !fs.existsSync(subsetHtml)) {
     const r = await forkSnapshotCli({
       input: htmlPath,
       output: subsetHtml,
@@ -381,7 +423,7 @@ async function processCase(entry, outDir, opts) {
   row.animCaptured = countAnimationsCaptured(snapshotStderr);
 
   // 3. import
-  if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
+  if (!skipExisting || !fs.existsSync(subsetPagx)) {
     const r = await runPagxImportToFile({
       pagxBin: opts.pagxBin,
       subsetHtml,
@@ -428,7 +470,7 @@ async function processCase(entry, outDir, opts) {
     const diffPng = path.join(diffDir, `frame-${idx}.png`);
     if (fs.existsSync(baselinePng)) baselineFrames.push(baselinePng);
 
-    if (!opts.skipExisting || !fs.existsSync(renderPng)) {
+    if (!skipExisting || !fs.existsSync(renderPng)) {
       const r = await runPagxRenderAtTime({
         pagxBin: opts.pagxBin,
         pagxFile: subsetPagx,
@@ -469,7 +511,7 @@ async function processCase(entry, outDir, opts) {
     ensureDir(exportedBrowserDir);
     ensureDir(roundtripRenderDir);
 
-    if (!opts.skipExisting || !fs.existsSync(exportedHtml)) {
+    if (!skipExisting || !fs.existsSync(exportedHtml)) {
       const r = await runPagxExportHtml({
         pagxBin: opts.pagxBin,
         pagxFile: subsetPagx,
@@ -484,7 +526,7 @@ async function processCase(entry, outDir, opts) {
 
     // 7A. Render exported.html in headless Chromium at the exact same sample timestamps
     const exportedSamplesJson = path.join(exportedBrowserDir, 'samples.json');
-    if (!opts.skipExisting || !fs.existsSync(exportedSamplesJson)) {
+    if (!skipExisting || !fs.existsSync(exportedSamplesJson)) {
       const r = await spawnCapture(
         process.execPath,
         [
@@ -504,7 +546,7 @@ async function processCase(entry, outDir, opts) {
 
     // 7B. Snapshot exported.html -> roundtrip.subset.html -> roundtrip.pagx -> resolve -> render frames
     const roundtripSubsetHtml = path.join(caseDir, 'roundtrip.subset.html');
-    if (!opts.skipExisting || !fs.existsSync(roundtripPagx)) {
+    if (!skipExisting || !fs.existsSync(roundtripPagx)) {
       const rSnap = await forkSnapshotCli({
         input: exportedHtml,
         output: roundtripSubsetHtml,
@@ -555,7 +597,7 @@ async function processCase(entry, outDir, opts) {
       const expBrowserPng = path.join(exportedBrowserDir, `frame-${idx}.png`);
       const rtRenderPng = path.join(roundtripRenderDir, `frame-${idx}.png`);
 
-      if (!opts.skipExisting || !fs.existsSync(rtRenderPng)) {
+      if (!skipExisting || !fs.existsSync(rtRenderPng)) {
         const r = await runPagxRenderAtTime({
           pagxBin: opts.pagxBin,
           pagxFile: roundtripPagx,
@@ -703,6 +745,10 @@ function classifyPagxMotion(refStatic, exportStatic) {
 async function processPagxCase(entry, outDir, opts) {
   const pagxPath = entry.path;
   const caseDir = path.join(outDir, entry.name);
+  // Cached frames are only reusable for the same source and the same sample grid.
+  const cacheKeyPath = path.join(caseDir, '.cache-key.json');
+  const skipExisting = opts.skipExisting &&
+    cacheKeyMatches(cacheKeyPath, buildCaseCacheKey(entry.path, opts));
   // Directory layout mirrors the HTML eval so the shared report player works unchanged:
   // baseline/ = reference (pagx render --time), render/ = candidate (exported HTML in the browser).
   const baselineDir = path.join(caseDir, 'baseline');
@@ -778,7 +824,7 @@ async function processPagxCase(entry, outDir, opts) {
   for (const s of samples) {
     const idx = String(s.index).padStart(3, '0');
     const refPng = path.join(baselineDir, `frame-${idx}.png`);
-    if (!opts.skipExisting || !fs.existsSync(refPng)) {
+    if (!skipExisting || !fs.existsSync(refPng)) {
       const r = await runPagxRenderAtTime({
         pagxBin: opts.pagxBin,
         pagxFile: pagxPath,
@@ -797,7 +843,7 @@ async function processPagxCase(entry, outDir, opts) {
 
   // 2. export
   const exportedHtml = path.join(caseDir, 'exported.html');
-  if (!opts.skipExisting || !fs.existsSync(exportedHtml)) {
+  if (!skipExisting || !fs.existsSync(exportedHtml)) {
     const r = await runPagxExportHtml({
       pagxBin: opts.pagxBin,
       pagxFile: pagxPath,
@@ -813,7 +859,7 @@ async function processPagxCase(entry, outDir, opts) {
   // 3. candidate frames: the exported HTML seeked to the same times in the browser
   const engineArgs = opts.browserEngine ? ['--browser-engine', opts.browserEngine] : [];
   const browserSamplesJson = path.join(renderDir, 'samples.json');
-  if (!opts.skipExisting || !fs.existsSync(browserSamplesJson)) {
+  if (!skipExisting || !fs.existsSync(browserSamplesJson)) {
     const r = await spawnCapture(
       process.execPath,
       [
@@ -1554,6 +1600,10 @@ async function main() {
         console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  diff ${fmt(row.pixelDiffMean * 100, 2)}%  motion ${fmt(row.motion, 3)}  anim ${row.animCaptured}  (${dur} ms)`);
       }
       rows[i] = row;
+      if (!row.error) {
+        writeCaseCacheKey(path.join(opts.outDir, c.name, '.cache-key.json'),
+          buildCaseCacheKey(c.path, opts));
+      }
     }
   };
 
@@ -1570,6 +1620,14 @@ async function main() {
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'report.csv')}`);
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'report.md')}`);
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'index.html')}`);
+
+  // A run that produced reports is not a successful run: case failures used to leave the exit code
+  // at 0, so CI could not tell a broken export from a clean one.
+  const failed = rows.filter((row) => row && row.error).length;
+  if (failed > 0) {
+    console.error(`anim-run: ${failed} of ${rows.length} case(s) failed`);
+    process.exitCode = 1;
+  }
 }
 
 if (require.main === module) {
@@ -1580,6 +1638,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildCaseCacheKey,
+  cacheKeyMatches,
+  writeCaseCacheKey,
   writeIndexHtml,
   writeMarkdown,
   writeCsv,
