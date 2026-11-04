@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer perspective tightens the projection distance while the box keeps a static 45 degree rotationY.
+     Target: Layer  Channel: perspective  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="perspectiveBox" x="120" y="60" width="80" height="80" rotationY="45">
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="perspectivePull" duration="60" frameRate="60" loop="once">
+      <Object target="perspectiveBox">
+        <Channel name="perspective" type="float">
+          <Key time="0" value="1000" interpolation="linear"/>
+          <Key time="60" value="200"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

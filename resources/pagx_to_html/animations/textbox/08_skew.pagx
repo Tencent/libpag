@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox skew shears the laid out text block.
+     Target: TextBox  Channel: skew  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <TextBox id="boxSkew" position="40,50" width="220" height="90" textAlign="center" paragraphAlign="middle">
+      <Text text="AB" fontFamily="Arial" fontSize="36"/>
+      <Fill color="#7C3AED"/>
+    </TextBox>
+  </Layer>
+  <Animations>
+    <Animation id="boxShear" duration="60" frameRate="60" loop="once">
+      <Object target="boxSkew">
+        <Channel name="skew" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

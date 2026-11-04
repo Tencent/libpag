@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: BackgroundBlurStyle blurX frosts the backdrop behind the translucent card, from clear to heavily blurred.
+     Target: BackgroundBlurStyle  Channel: blurX  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar position="120,80" type="star" pointCount="5" outerRadius="60" innerRadius="24" rotation="-90"/>
+    <Fill color="#4338CA"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="220,130" size="120,120"/>
+    <Fill color="#0EA5E9"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="180,120" roundness="16"/>
+    <Fill color="#FFFFFF66"/>
+    <BackgroundBlurStyle id="cardFrost" blurX="0" blurY="0"/>
+  </Layer>
+  <Animations>
+    <Animation id="frostRamp" duration="60" frameRate="60" loop="once">
+      <Object target="cardFrost">
+        <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

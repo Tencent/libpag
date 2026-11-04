@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer rotation.x tips the box away around its horizontal axis, so perspective shrinks its height.
+     Target: Layer  Channel: rotation.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="tipBoxX" x="120" y="60" width="80" height="80" perspective="500">
+    <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="tipX" duration="60" frameRate="60" loop="once">
+      <Object target="tipBoxX">
+        <Channel name="rotation.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="50"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
