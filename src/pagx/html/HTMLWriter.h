@@ -608,9 +608,13 @@ class HTMLWriter {
   // `hasUpcomingRepeater` indicates whether a Repeater element follows this Group in its parent,
   // affecting how geos are batched. `curTextBox` propagates the enclosing TextBox context for
   // inline text elements.
+  // `enclosingPainters` are the Fill/Stroke declared after this Group in its parent element list.
+  // An animated pure-geometry child Group is painted by them, so they are forwarded when the child
+  // needs its own DOM wrapper and can no longer propagate its geometry to the parent.
   void flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                     LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                    const TextBox* curTextBox, ElementDispatchState& state);
+                    const TextBox* curTextBox, ElementDispatchState& state,
+                    const std::vector<Element*>* enclosingPainters = nullptr);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
   // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
