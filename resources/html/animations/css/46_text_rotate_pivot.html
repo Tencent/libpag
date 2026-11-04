@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Text Rotate Off-Center Pivot</title>
+    <!--
+      Text leaves pivot on their host layer, so the same requirement applies: baking the origin into
+      each keyframe makes the baseline slide, while a fixed pivot keeps the bottom-left corner put.
+    -->
+    <style>
+      @keyframes tilt {
+        0%   { transform: rotate(-8deg); }
+        50%  { transform: rotate(8deg); }
+        100% { transform: rotate(-8deg); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <h1 id="title"
+        style="position: absolute; left: 60px; top: 70px; margin: 0;
+               width: 160px; height: 40px;
+               font-size: 32px; line-height: 40px; color: #F8FAFC;
+               transform-origin: 0px 40px;
+               animation: tilt 2s ease-in-out infinite;">Tilt</h1>
+  </body>
+</html>
