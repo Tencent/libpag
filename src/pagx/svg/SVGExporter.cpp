@@ -332,11 +332,9 @@ class SVGWriterContext {
 
   // Layers referenced by another layer's Layer::mask pointer. Populated lazily by
   // SVGWriter::isMaskReferenceLayer on first use. writeLayer skips these: their content is
-  // emitted through writeMaskDef into <defs>, and emitting them as regular content would
-  // duplicate the mask geometry. Before mask reference layers kept visible=true in imported
-  // documents, the generic "!visible && no mask" check in writeLayer happened to skip them;
-  // now that visible is restored for downstream consumers, this explicit set is the skip
-  // authority.
+  // emitted through writeMaskDef into <defs>, so emitting them as regular content would
+  // duplicate the mask geometry. Imported documents keep them visible=true, so the visibility
+  // check in writeLayer cannot identify them.
   std::unordered_set<const Layer*> maskReferenceLayers = {};
   bool maskReferencesReady = false;
 
@@ -544,10 +542,6 @@ class SVGWriter {
   // space and would silently misplace the mask otherwise, so a warning is surfaced via
   // addWarning when a cross-parent reference is detected.
   const Layer* findLayerParent(const Layer* layer);
-  // Lazily builds and caches `_context->maskReferenceLayers` (every layer referenced by
-  // another layer's Layer::mask pointer, including nested mask-of-mask references). Used by
-  // writeLayer to skip reference layers: their content is emitted through writeMaskDef into
-  // <defs>, so emitting them again as regular content would duplicate the mask geometry.
   bool isMaskReferenceLayer(const Layer* layer);
   // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
   // Caller wires the id onto the group as clip-path="url(#...)".
@@ -3309,8 +3303,8 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // Mask reference layers are skipped: their content is emitted through writeMaskDef into
   // <defs> when the owning layer references them, so emitting them here would duplicate the
-  // mask geometry. (Their visible flag is true in imported documents — restored by
-  // RestoreMaskLayerVisibility — so the generic visibility check below no longer skips them.)
+  // mask geometry. Their visible flag is true in imported documents, so the visibility check
+  // below cannot take over this skip.
   if (isMaskReferenceLayer(layer)) {
     return;
   }
