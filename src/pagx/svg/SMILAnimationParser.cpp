@@ -274,9 +274,9 @@ static void ComputeBezierHandles(KeyframeInterpolationType interpolation,
   }
 }
 
-// Reads repeatCount attribute: returns -1.0 for "indefinite", 0.0 for unparseable, otherwise the
-// count (clamped to >=1.0). Fractional counts are preserved so ExpandRepeatCount can truncate the
-// final repetition at the fractional offset. Callers compare > 1.0 instead of > 1.
+// Reads repeatCount attribute: returns -1.0 for "indefinite", 1.0 when absent or unparseable,
+// otherwise the count (clamped to >=1.0). Fractional counts are preserved so ExpandRepeatCount can
+// truncate the final repetition at the fractional offset. Callers compare > 1.0 instead of > 1.
 static double ParseRepeatCount(const std::string& value) {
   if (value == "indefinite") {
     return -1.0;
@@ -1817,6 +1817,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+  if (durFrames < 1) {
+    // A sub-frame duration would collapse every keyframe onto frame 0.
+    durFrames = 1;
+  }
 
   // begin comes pre-resolved by buildAnimation (syncbase references like "id.end" solved against
   // their targets). Negative values keep negative keyframe times: the animation started before
@@ -2127,7 +2131,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
                                                   horizontal ? "position.x" : "position.y");
       for (const auto& key : size_channel->keyframes) {
         AppendKeyframe(anchor_channel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
-                       key.interpolation, {}, {});
+                       key.interpolation, key.bezierOut, key.bezierIn);
       }
       channels.push_back(anchor_channel);
     }
@@ -2264,6 +2268,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+  if (durFrames < 1) {
+    // A sub-frame duration would collapse every keyframe onto frame 0.
+    durFrames = 1;
+  }
 
   // begin comes pre-resolved by buildAnimation (syncbase references solved). A negative begin on a
   // looping animation is a phase offset rather than a negative timeline: fold it into the sampled
@@ -2509,6 +2517,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
+  if (durFrames < 1) {
+    // A sub-frame duration would collapse every keyframe onto frame 0.
+    durFrames = 1;
+  }
 
   // begin comes pre-resolved by buildAnimation (syncbase references solved).
   Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
