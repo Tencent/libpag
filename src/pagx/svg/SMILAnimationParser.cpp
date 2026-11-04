@@ -1419,6 +1419,10 @@ std::string SMILAnimationParser::ensureContentNodeId(SVGParserContext& ctx, PAGX
   if (id.empty()) {
     id = ctx.generateUniqueId(prefix);
     node->id = id;
+  }
+  // PAGAnimation::resolveTargets resolves targets through findNode, so a content node carrying an
+  // id assigned by the importer still has to be registered for the animation to apply.
+  if (doc->findNode(id) != node) {
     doc->registerNode(node, id);
   }
   return id;
