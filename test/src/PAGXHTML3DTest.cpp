@@ -189,7 +189,8 @@ pagx::TypedChannel<pagx::Matrix3D>* FindMatrix3DChannel(pagx::Animation* animati
 }
 
 // Renders one frame through the runtime path (PAGScene + PAGSurface), matching the CLI player.
-std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc) {
+std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                 int64_t timeUs = 0) {
   std::vector<uint8_t> pixels = {};
   if (doc == nullptr) {
     return pixels;
@@ -198,7 +199,16 @@ std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc)
   if (scene == nullptr) {
     return pixels;
   }
-  scene->advanceAndApply(0);
+  if (timeUs != 0) {
+    for (const auto& id : scene->getAnimationIds()) {
+      auto animation = scene->getAnimation(id);
+      if (animation != nullptr) {
+        animation->setCurrentTime(timeUs);
+        animation->apply(1.0f);
+      }
+    }
+  }
+  scene->advanceAndApply(timeUs);
   auto surface = pagx::PAGSurface::MakeOffscreen(DocSize, DocSize);
   if (surface == nullptr || !scene->draw(surface)) {
     return {};
@@ -786,6 +796,60 @@ PAG_TEST(PAGXHTML3DTest, AnimatedKeywordOriginResolvesAnchor) {
 }
 
 /**
+ * Test case: a single vertical keyword is the Y component (`transform-origin: top` == `center top`),
+ * matching CSS rather than being read as an X value.
+ */
+PAG_TEST(PAGXHTML3DTest, SingleKeywordOriginMapsToTheVerticalAxis) {
+  const std::string templateHtml = R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div id="box" style="width:100px;height:60px;background-color:#000;
+           transform:rotate(10deg);transform-origin:KEYWORD"></div>
+    </body></html>
+  )HTML";
+  std::string topHtml = templateHtml;
+  topHtml.replace(topHtml.find("KEYWORD"), 7, "top");
+  std::string bottomHtml = templateHtml;
+  bottomHtml.replace(bottomHtml.find("KEYWORD"), 7, "bottom");
+
+  auto top = ParseHtml(topHtml);
+  ASSERT_NE(top, nullptr);
+  auto* topLayer = FindLayerById(top, "box");
+  ASSERT_NE(topLayer, nullptr);
+  EXPECT_TRUE(NearlyEqual(topLayer->anchor.x, 50.0f));
+  EXPECT_TRUE(NearlyEqual(topLayer->anchor.y, 0.0f));
+
+  auto bottom = ParseHtml(bottomHtml);
+  ASSERT_NE(bottom, nullptr);
+  auto* bottomLayer = FindLayerById(bottom, "box");
+  ASSERT_NE(bottomLayer, nullptr);
+  EXPECT_TRUE(NearlyEqual(bottomLayer->anchor.x, 50.0f));
+  EXPECT_TRUE(NearlyEqual(bottomLayer->anchor.y, 60.0f));
+}
+
+/**
+ * Test case: an `<svg>` sized by attributes keeps its CSS-derived (unset) layer size — the attribute
+ * values only feed the pivot reference box.
+ */
+PAG_TEST(PAGXHTML3DTest, InlineSvgAttributeSizeOnlyFeedsThePivot) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <svg id="icon" width="80" height="60" viewBox="0 0 80 60"
+           style="transform:rotateY(20deg);transform-origin:50% 50%">
+        <rect x="4" y="4" width="72" height="52" fill="#6366F1"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto layers = LayersWithNonIdentityMatrix3D(doc);
+  ASSERT_EQ(layers.size(), 1u);
+  auto* host = layers.front();
+  EXPECT_TRUE(std::isnan(host->width)) << "the attribute size must not resize the layer";
+  EXPECT_TRUE(std::isnan(host->height));
+  EXPECT_TRUE(NearlyEqual(host->anchor.x, 40.0f));
+  EXPECT_TRUE(NearlyEqual(host->anchor.y, 30.0f));
+}
+
+/**
  * Test case: text leaves route the animated transform (and the pivot) through their host layer.
  */
 PAG_TEST(PAGXHTML3DTest, AnimatedTextLeafKeepsAnchor) {
@@ -842,6 +906,70 @@ PAG_TEST(PAGXHTML3DTest, AnimatedBrightnessSplitKeepsAnchorWithMatrix) {
   for (auto* child : layer->children) {
     EXPECT_TRUE(HasZeroAnchor(child)) << "generated wrappers must not inherit the pivot";
   }
+}
+
+/**
+ * Test case: a static 3D pose does not swallow a flat translation animation. `matrix3D` outranks
+ * `matrix` in the runtime priority, so the keyframes must be lifted onto the matrix3D channel.
+ */
+PAG_TEST(PAGXHTML3DTest, Static3DDoesNotSwallowTranslateAnimation) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0%   { transform: translateX(0px); }
+        100% { transform: translateX(100px); }
+      }
+    </style></head>
+    <body style="width:200px;height:200px">
+      <div id="box" style="width:80px;height:60px;background-color:#000;
+           transform:rotateY(30deg);animation:move 1s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  EXPECT_EQ(FindChannel(animation, "matrix"), nullptr)
+      << "a matrix channel would be hidden by the static matrix3D";
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->keyframes.size(), 2u);
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.front().value.getRowColumn(0, 3), 0.0f));
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.back().value.getRowColumn(0, 3), 100.0f));
+  // The animation replaces the whole `transform`, so the keyframes are pure translations even though
+  // the element carries a static 3D pose; only the channel they ride on changes.
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.back().value.getRowColumn(0, 0), 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.back().value.getRowColumn(3, 2), 0.0f, 1e-5f))
+      << "the lifted keyframe must not inherit the static projection row";
+}
+
+/**
+ * Test case: a static 3D pose does not swallow a 2D rotation animation either.
+ */
+PAG_TEST(PAGXHTML3DTest, Static3DDoesNotSwallow2DRotationAnimation) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes spin {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(90deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:200px">
+      <div id="box" style="width:80px;height:60px;background-color:#000;
+           transform:rotateY(30deg);animation:spin 1s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  EXPECT_EQ(FindChannel(animation, "matrix"), nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->keyframes.size(), 2u);
+  const auto& last = channel->keyframes.back().value;
+  EXPECT_TRUE(NearlyEqual(last.getRowColumn(0, 0), 0.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(last.getRowColumn(1, 0), 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(last.getRowColumn(0, 1), -1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(last.getRowColumn(1, 1), 0.0f, 0.001f));
 }
 
 /**
@@ -1010,6 +1138,63 @@ PAG_TEST(PAGXHTML3DTest, AnimatedCompoundKeyframesCompose) {
 // ---------------------------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * Test case: the anchored form and the legacy baked form agree pixel for pixel at a keyframe time,
+ * including the wrapper-sensitive content (filter, box-shadow, child layer). This is the
+ * new-vs-old equivalence check for the 2D path: same pose, two encodings.
+ */
+PAGX_TEST(PAGXHTML3DRenderTest, Animated2DAnchorRendersLikeBakedMatrix) {
+  const std::string html = R"HTML(
+    <html><head><style>
+      @keyframes spinFx {
+        0%   { transform: rotate(0deg); }
+        50%  { transform: rotate(90deg); }
+        100% { transform: rotate(180deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:200px">
+      <div id="box" style="position:absolute;left:60px;top:50px;width:60px;height:40px;
+           background-color:#6366F1;box-shadow:0 2px 6px #0008;
+           filter:drop-shadow(4px 0 0 #F472B6);
+           transform-origin:10px 30px;animation:spinFx 1s linear infinite">
+        <div style="position:absolute;left:6px;top:6px;width:20px;height:20px;
+             background-color:#F8FAFC"></div>
+      </div>
+    </body></html>
+  )HTML";
+  auto anchored = ParseHtml(html);
+  auto baked = ParseHtml(html);
+  ASSERT_NE(anchored, nullptr);
+  ASSERT_NE(baked, nullptr);
+  auto* anchoredAnimation = FirstAnimation(anchored);
+  auto* bakedAnimation = FirstAnimation(baked);
+  ASSERT_NE(anchoredAnimation, nullptr);
+  ASSERT_NE(bakedAnimation, nullptr);
+  auto* bakedLayer = FindLayerById(baked, ChannelTarget(bakedAnimation, "matrix"));
+  ASSERT_NE(bakedLayer, nullptr);
+  ASSERT_FALSE(HasZeroAnchor(bakedLayer)) << "the HTML origin must produce an anchor";
+  auto* matrixChannel = FindMatrixChannel(bakedAnimation);
+  ASSERT_NE(matrixChannel, nullptr);
+  ASSERT_GE(matrixChannel->keyframes.size(), 2u);
+  // Legacy encoding: fold the pivot into every keyframe and drop the anchor.
+  for (auto& keyframe : matrixChannel->keyframes) {
+    keyframe.value = pagx::Matrix::Translate(bakedLayer->anchor.x, bakedLayer->anchor.y) *
+                     keyframe.value *
+                     pagx::Matrix::Translate(-bakedLayer->anchor.x, -bakedLayer->anchor.y);
+  }
+  bakedLayer->anchor = {};
+  bakedLayer->anchorZ = 0.0f;
+
+  // Sample the middle keyframe (50% of a 1s animation) so both documents hold an exact pose.
+  constexpr int64_t kMiddleKeyframeUs = 500'000;
+  auto anchoredPixels = RenderFrame(anchored, kMiddleKeyframeUs);
+  auto bakedPixels = RenderFrame(baked, kMiddleKeyframeUs);
+  ASSERT_FALSE(anchoredPixels.empty());
+  ASSERT_FALSE(bakedPixels.empty());
+  ASSERT_EQ(anchoredPixels.size(), bakedPixels.size());
+  EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+}
 
 /**
  * Test case: a static 3D pose with a non-centre origin renders exactly like the same document with

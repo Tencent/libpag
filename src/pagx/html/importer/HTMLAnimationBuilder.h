@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/nodes/Animation.h"
 
 namespace pagx {
@@ -65,7 +66,7 @@ class HTMLAnimationBuilder {
    * reference it.
    */
   bool buildForElement(const std::unordered_map<std::string, std::string>& resolvedStyle,
-                       Layer* layer);
+                       Layer* layer, const HTMLTransformReference& reference);
 
   /**
    * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that

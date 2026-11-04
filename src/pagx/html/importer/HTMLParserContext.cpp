@@ -376,7 +376,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
     const auto& style = _styleCascade->getResolvedStyle(entry.first);
-    _animationBuilder->buildForElement(style, entry.second);
+    _animationBuilder->buildForElement(style, entry.second,
+                                       _styleCascade->getTransformReferenceSize(entry.first));
   }
   // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
