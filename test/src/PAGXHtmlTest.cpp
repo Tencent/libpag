@@ -3471,7 +3471,8 @@ CLI_TEST(PAGXHtmlTest, AnimationKeyframeBoundaryHold) {
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
   auto html = LoadAndConvert(
-      ProjectPath::Absolute("resources/pagx_to_html/animations/keyframe_boundary_hold.pagx"), opts);
+      ProjectPath::Absolute("resources/pagx_to_html/animations/boundary/03_offset_once_hold.pagx"),
+      opts);
   ASSERT_FALSE(html.empty());
 
   auto sliderTag = FindTagContaining(html, "id=\"slider\"");
@@ -3675,11 +3676,15 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationKeepsStaticTransform) {
 
   auto tag = FindTagContaining(html, "id=\"tiltBox\"");
   ASSERT_FALSE(tag.empty());
-  auto rotatePos = tag.find("transform:rotate(");
-  ASSERT_NE(rotatePos, std::string::npos);
-  auto rotateEnd = tag.find(')', rotatePos);
-  ASSERT_NE(rotateEnd, std::string::npos);
-  auto staticTransform = tag.substr(rotatePos + 10, rotateEnd - rotatePos - 9);
+  // The static transform keeps whatever form the writer chose (rotate or matrix3d); the animated
+  // translate has to sit in front of it unchanged.
+  auto transformPos = tag.find("transform:");
+  ASSERT_NE(transformPos, std::string::npos) << tag;
+  auto transformStart = transformPos + std::string("transform:").size();
+  auto transformEnd = tag.find(';', transformStart);
+  ASSERT_NE(transformEnd, std::string::npos) << tag;
+  auto staticTransform = tag.substr(transformStart, transformEnd - transformStart);
+  ASSERT_FALSE(staticTransform.empty()) << tag;
   EXPECT_NE(html.find("0% { transform: translate(0px, 0px) " + staticTransform + "; }"),
             std::string::npos);
   EXPECT_NE(html.find("100% { transform: translate(120px, 0px) " + staticTransform + "; }"),
@@ -3784,9 +3789,9 @@ CLI_TEST(PAGXHtmlTest, AnimationFillSharedByRectAndTextUsesPerTagKeyframes) {
   EXPECT_NE(rectName, textName);
   auto rectRule = KeyframesRuleNamed(html, rectName);
   auto textRule = KeyframesRuleNamed(html, textName);
-  EXPECT_NE(rectRule.find("0% { background-color: #2563EB; }"), std::string::npos) << rectRule;
+  EXPECT_NE(rectRule.find("0% { background-color: #9A3412; }"), std::string::npos) << rectRule;
   EXPECT_NE(rectRule.find("100% { background-color: #F97316; }"), std::string::npos) << rectRule;
-  EXPECT_NE(textRule.find("0% { color: #2563EB; }"), std::string::npos) << textRule;
+  EXPECT_NE(textRule.find("0% { color: #9A3412; }"), std::string::npos) << textRule;
   EXPECT_NE(textRule.find("100% { color: #F97316; }"), std::string::npos) << textRule;
   EXPECT_EQ(textRule.find("background-color"), std::string::npos) << textRule;
 }
@@ -4330,7 +4335,7 @@ CLI_TEST(PAGXHtmlTest, AnimationFillColorKeepsStaticPainterAlphaOnBox) {
 
   auto first = KeyframeStopOf(html, "id=\"tintedFill\"", "0%");
   auto last = KeyframeStopOf(html, "id=\"tintedFill\"", "100%");
-  EXPECT_NE(first.find("background-color: rgba(37,99,235,0.251)"), std::string::npos) << first;
+  EXPECT_NE(first.find("background-color: rgba(219,39,119,0.251)"), std::string::npos) << first;
   EXPECT_NE(last.find("background-color: rgba(249,115,22,0.251)"), std::string::npos) << last;
 }
 
@@ -4650,7 +4655,7 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
   EXPECT_NE(svgTag.find("overflow:visible"), std::string::npos) << svgTag;
   // The viewport itself stays sized for the static stroke; only the clipping is lifted. A centered
   // stroke paints half its width on each side, so the pad is width/2 rather than the full width.
-  EXPECT_NE(svgTag.find("viewBox=\"78 38 164 124\""), std::string::npos) << svgTag;
+  EXPECT_NE(svgTag.find("viewBox=\"58 28 204 144\""), std::string::npos) << svgTag;
 }
 
 // Each mount maps its timeline offset onto the full CSS shorthand: the duration has to stay the
@@ -4664,10 +4669,10 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
     const char* shorthand;  // duration, easing, delay, iteration count, fill mode
   };
   const TimingCase cases[] = {
-      {"timing/05_offset_positive_once.pagx", "cardColor", "0.3333s steps(1, end) 0.0833s 1 both"},
-      {"timing/06_offset_positive_loop.pagx", "cardChild", "1s linear -0.75s infinite"},
-      {"timing/07_offset_negative_once.pagx", "cardColor", "0.3333s steps(1, end) -0.1667s 1 both"},
-      {"timing/08_offset_ping_pong.pagx", "cardChild", "1s linear -1.75s infinite alternate"},
+      {"timing/04_offset_positive_once.pagx", "cardColor", "0.3333s steps(1, end) 0.0833s 1 both"},
+      {"timing/05_offset_positive_loop.pagx", "cardChild", "1s linear -0.75s infinite"},
+      {"timing/06_offset_negative_once.pagx", "cardColor", "0.3333s steps(1, end) -0.1667s 1 both"},
+      {"timing/07_offset_ping_pong.pagx", "cardChild", "1s linear -1.75s infinite alternate"},
   };
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
@@ -4685,7 +4690,7 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
   // the wrapped window rather than by a shortened ramp.
   auto negative =
       LoadAndConvert(ProjectPath::Absolute(
-                         "resources/pagx_to_html/animations/timing/07_offset_negative_once.pagx"),
+                         "resources/pagx_to_html/animations/timing/06_offset_negative_once.pagx"),
                      opts);
   auto negativeRule = KeyframesRuleNamed(
       negative, AnimationNameOfTag(FindTagContaining(negative, "id=\"cardColor\"")));
@@ -4698,7 +4703,7 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
   opts.extractStyleSheet = false;
   auto html = LoadAndConvert(
       ProjectPath::Absolute(
-          "resources/pagx_to_html/animations/timing/09_offset_shared_animation.pagx"),
+          "resources/pagx_to_html/animations/timing/08_offset_shared_animation.pagx"),
       opts);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("@keyframes"), std::string::npos);
