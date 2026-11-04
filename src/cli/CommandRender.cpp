@@ -501,6 +501,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
 
   if (targetTgfxLayer != nullptr) {
     auto canvas = surface->getCanvas();
+    canvas->clear(displayList.backgroundColor());
     canvas->scale(options.scale, options.scale);
     canvas->translate(-offsetX, -offsetY);
     pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer);

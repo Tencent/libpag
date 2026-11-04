@@ -405,6 +405,27 @@ CLI_TEST(PAGXCliTest, Render_TargetViewUsesDocumentWindow) {
   EXPECT_GT(target.alpha, 0.99f);
 }
 
+CLI_TEST(PAGXCliTest, Render_TargetViewBackgroundFillsPaddingAndBlendsAlpha) {
+  auto path = WriteTempRenderFile(
+      "render_target_view_background.pagx",
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">"
+      "<Layer id=\"target\" alpha=\"0.5\">"
+      "<Rectangle position=\"50,50\" size=\"40,40\"/><Fill color=\"#0000FF\"/>"
+      "</Layer></pagx>");
+  auto bitmap = RenderCliFile({"render", "--background", "#00FF00"}, path);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto padding = bitmap.getColor(10, 10);
+  EXPECT_NEAR(padding.red, 0.0f, 0.01f);
+  EXPECT_NEAR(padding.green, 1.0f, 0.01f);
+  EXPECT_NEAR(padding.blue, 0.0f, 0.01f);
+  EXPECT_NEAR(padding.alpha, 1.0f, 0.01f);
+  auto target = bitmap.getColor(50, 50);
+  EXPECT_NEAR(target.red, 0.0f, 0.01f);
+  EXPECT_NEAR(target.green, 0.5f, 0.01f);
+  EXPECT_NEAR(target.blue, 0.5f, 0.01f);
+  EXPECT_NEAR(target.alpha, 1.0f, 0.01f);
+}
+
 CLI_TEST(PAGXCliTest, Render_TargetViewCropIsRelativeToTarget) {
   auto path = WriteTempRenderFile(
       "render_target_view_crop.pagx",
