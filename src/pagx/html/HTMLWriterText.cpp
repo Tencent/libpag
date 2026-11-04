@@ -963,7 +963,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
-  auto animId = _ctx->claimAnimatedDomId({tb, fill, text});
+  // A Text node is never an animation target: its shaping channels (text, fontSize, letterSpacing,
+  // fontFamily, ...) have no CSS equivalent, so the session does not register them and they must not
+  // be offered as candidates here.
+  auto animId = _ctx->claimAnimatedDomId({tb, fill});
   if (!animId.empty()) {
     out.addAttr("id", animId);
   }
