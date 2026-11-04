@@ -40,15 +40,24 @@
 
 namespace pagx {
 
-// 同一时刻的两个关键帧表示瞬时跳变（例如 opacity 1 -> 0 -> 1 在同一帧完成）：前一帧必须
-// 记为 Hold，否则下游时间轴会把两个同 time 的 key 合并，跳变丢失——导入编辑器后表现为
-// 整条轨道恒定不变。
-template <typename T>
-static void AppendKeyframeWithHold(TypedChannel<T>* channel, const Keyframe<T>& key) {
-  if (!channel->keyframes.empty() && channel->keyframes.back().time == key.time) {
-    channel->keyframes.back().interpolation = KeyframeInterpolationType::Hold;
+// 同一时刻的两个关键帧表示瞬时跳变（例如 opacity 1 -> 0 -> 1 在同一帧完成）。只把前一帧
+// 记为 Hold 还不够：以 frame 为键的时间轴（编辑器轨道）会按时间戳去重，把后者丢掉，整条
+// 轨道看起来恒定。这里把前一帧提前一帧，两个 key 时间不同，跳变在任何实现里都能保留。
+// 只对 float 属性通道（alpha 等）生效：matrix 通道的同帧跳变尚未验证，先保持原样。
+static void ShiftSameTimeFloatKeyframes(TypedChannel<float>* channel) {
+  if (channel == nullptr || channel->keyframes.size() < 2) {
+    return;
   }
-  channel->keyframes.push_back(key);
+  for (size_t i = 1; i < channel->keyframes.size(); ++i) {
+    if (channel->keyframes[i].time == channel->keyframes[i - 1].time) {
+      channel->keyframes[i - 1].interpolation = KeyframeInterpolationType::Hold;
+      if (channel->keyframes[i - 1].time > 0) {
+        channel->keyframes[i - 1].time -= 1;
+      } else {
+        channel->keyframes[i].time += 1;
+      }
+    }
+  }
 }
 
 static void SkipWhitespaceAndComma(const char*& ptr, const char* end) {
@@ -440,7 +449,7 @@ static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Fram
       key.time = endFrame;
       key.value = value;
       key.interpolation = KeyframeInterpolationType::Hold;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Color: {
@@ -457,7 +466,7 @@ static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Fram
       key.time = endFrame;
       key.value = value;
       key.interpolation = KeyframeInterpolationType::Hold;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Matrix: {
@@ -474,7 +483,7 @@ static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Fram
       key.time = endFrame;
       key.value = value;
       key.interpolation = KeyframeInterpolationType::Hold;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     default:
@@ -749,7 +758,7 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double rep
       if (accumulate) {
         key.value += offset;
       }
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
     }
   }
   // Fractional tail: sample one extra keyframe at the fractional boundary so the last repetition
@@ -772,7 +781,7 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double rep
     key.interpolation = original.front().interpolation;
     key.bezierOut = original.front().bezierOut;
     key.bezierIn = original.front().bezierIn;
-    AppendKeyframeWithHold(ch, key);
+    ch->keyframes.push_back(key);
   }
 }
 
@@ -806,7 +815,7 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
         key.value.blue += static_cast<float>(k) * delta.blue;
         key.value.alpha += static_cast<float>(k) * delta.alpha;
       }
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
     }
   }
   if (fraction > 0.0 && original.size() >= 2) {
@@ -836,7 +845,7 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
     key.interpolation = original.front().interpolation;
     key.bezierOut = original.front().bezierOut;
     key.bezierIn = original.front().bezierIn;
-    AppendKeyframeWithHold(ch, key);
+    ch->keyframes.push_back(key);
   }
 }
 
@@ -870,7 +879,7 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
         for (size_t idx = 0; idx < original.size(); ++idx) {
           auto key = original[idx];
           key.time += timeOffset;
-          AppendKeyframeWithHold(ch, key);
+          ch->keyframes.push_back(key);
         }
       }
       // Fractional tail: sample one extra matrix keyframe at the fractional boundary by linearly
@@ -893,7 +902,7 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
         key.interpolation = original.front().interpolation;
         key.bezierOut = original.front().bezierOut;
         key.bezierIn = original.front().bezierIn;
-        AppendKeyframeWithHold(ch, key);
+        ch->keyframes.push_back(key);
       }
       break;
     }
@@ -1651,7 +1660,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.interpolation = interpolation;
       key.bezierOut = bezierOut;
       key.bezierIn = bezierIn;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Bool: {
@@ -1660,7 +1669,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.time = time;
       key.value = std::get<bool>(value);
       key.interpolation = interpolation;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Int: {
@@ -1669,7 +1678,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.time = time;
       key.value = std::get<int>(value);
       key.interpolation = interpolation;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::String: {
@@ -1678,7 +1687,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.time = time;
       key.value = std::get<std::string>(value);
       key.interpolation = interpolation;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Color: {
@@ -1689,7 +1698,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.interpolation = interpolation;
       key.bezierOut = bezierOut;
       key.bezierIn = bezierIn;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     case ChannelValueType::Matrix: {
@@ -1700,7 +1709,7 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       key.interpolation = interpolation;
       key.bezierOut = bezierOut;
       key.bezierIn = bezierIn;
-      AppendKeyframeWithHold(ch, key);
+      ch->keyframes.push_back(key);
       break;
     }
     default:
@@ -1901,6 +1910,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     }
     AppendKeyframe(primaryChannel, target.valueType, time, keyValues[i], interpolation, bezierOut,
                    bezierIn);
+  }
+  if (target.valueType == ChannelValueType::Float) {
+    ShiftSameTimeFloatKeyframes(static_cast<TypedChannel<float>*>(primaryChannel));
   }
   channels.push_back(primaryChannel);
 
