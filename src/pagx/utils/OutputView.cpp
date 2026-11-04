@@ -250,6 +250,9 @@ void DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& 
     return;
   }
   auto wrapper = parent.layer();
+  // Draw helpers must not leak the coordinate mapping into the caller's canvas state: surfaces
+  // reuse one Canvas across frames.
+  tgfx::AutoCanvasRestore canvasRestore(canvas);
   canvas->concat(wrapper->getRelativeMatrix(root.get()));
   wrapper->draw(canvas);
 }

@@ -580,6 +580,10 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
       return false;
     }
     auto canvas = tgfxSurface->getCanvas();
+    // The surface keeps one Canvas across frames, so the view transform must be scoped to this
+    // draw. Otherwise every frame accumulates the translate/scale and the content drifts out of
+    // the output window.
+    tgfx::AutoCanvasRestore canvasRestore(canvas);
     const auto& background = displayList->backgroundColor();
     if (autoClear) {
       canvas->clear(background);

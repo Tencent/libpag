@@ -33,6 +33,8 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/tgfx.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
@@ -890,6 +892,57 @@ PAGX_PIXEL_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
   scene->advanceAndApply(500000);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_hidden"));
+}
+
+static bool ReadSurfacePixels(const std::shared_ptr<pagx::PAGSurface>& surface,
+                              std::vector<uint8_t>* pixels) {
+  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false);
+  tgfx::Pixmap pixmap(bitmap);
+  if (pixmap.isEmpty() || !surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
+    return false;
+  }
+  auto* bytes = static_cast<uint8_t*>(pixmap.writablePixels());
+  pixels->assign(bytes, bytes + pixmap.rowBytes() * pixmap.height());
+  return true;
+}
+
+/**
+ * Test case: drawing a target-layer view repeatedly to the same surface must produce identical
+ * frames. A PAGSurface keeps one Canvas for its lifetime, so the view transform applied by
+ * PAGScene::draw() has to be scoped to the draw; otherwise every frame accumulates the translate /
+ * scale and the content eventually leaves the output window.
+ */
+PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("target");
+  layer->width = 100;
+  layer->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {10, 10};
+  rect->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+
+  std::vector<uint8_t> firstFrame = {};
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(ReadSurfacePixels(surface, &firstFrame));
+  EXPECT_EQ(firstFrame[3], 255u);
+
+  std::vector<uint8_t> secondFrame = {};
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
+  EXPECT_EQ(secondFrame, firstFrame);
 }
 
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is
