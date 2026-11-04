@@ -716,9 +716,6 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
     layer->matrix = affine;
     return;
   }
-  if (!IsUsableTransform(pose)) {
-    return;
-  }
   if (needsAnchor) {
     layer->anchor = box.transform.origin;
     layer->anchorZ = box.transform.originZ;
@@ -741,7 +738,9 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
       layer->centerX = 0.0f;
     }
   }
-  layer->preserve3D = box.preserve3D;
+  if (box.preserve3D) {
+    layer->preserve3D = true;
+  }
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
     // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,

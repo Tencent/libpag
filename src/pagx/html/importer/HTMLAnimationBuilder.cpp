@@ -46,6 +46,7 @@
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
+#include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
 
@@ -427,12 +428,9 @@ bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
     pureTranslate = false;
     return true;
   }
-  const Matrix affine = ToAffine2D(outPose);
-  constexpr float kIdentityEpsilon = 1e-4f;
-  pureTranslate = std::fabs(affine.b) < kIdentityEpsilon &&
-                  std::fabs(affine.c) < kIdentityEpsilon &&
-                  std::fabs(affine.a - 1.0f) < kIdentityEpsilon &&
-                  std::fabs(affine.d - 1.0f) < kIdentityEpsilon;
+  // Reuse the pose epsilon so "the linear part is the identity" has a single definition shared
+  // with IsLinearIdentity(); two thresholds would route the same pose to different channels.
+  pureTranslate = IsLinearIdentity(outPose);
   return true;
 }
 
@@ -441,9 +439,12 @@ bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
 // resolved because the box has no absolute size, in which case the caller pivots at the top-left
 // and warns.
 bool ResolveAnchor(const std::unordered_map<std::string, std::string>& style, const Layer* layer,
-                   HTMLValueParser& parser, Point& point, float& depth) {
-  float width = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
-  float height = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
+                   const HTMLTransformReference& reference, HTMLValueParser& parser, Point& point,
+                   float& depth) {
+  float width = reference.widthPx;
+  float height = reference.heightPx;
+  if (std::isnan(width)) width = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
+  if (std::isnan(height)) height = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
   if (std::isnan(width) && layer != nullptr) width = layer->width;
   if (std::isnan(height) && layer != nullptr) height = layer->height;
   const auto origin =
@@ -1073,7 +1074,8 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 }
 
 bool HTMLAnimationBuilder::buildForElement(
-    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer) {
+    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
+    const HTMLTransformReference& reference) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
 
   // Gather the animation spec from the shorthand and/or longhands.
@@ -1362,7 +1364,7 @@ bool HTMLAnimationBuilder::buildForElement(
     if (needsAnchor) {
       Point anchor = {};
       float anchorZ = 0.0f;
-      if (ResolveAnchor(resolvedStyle, layer, _valueParser, anchor, anchorZ)) {
+      if (ResolveAnchor(resolvedStyle, layer, reference, _valueParser, anchor, anchorZ)) {
         layer->anchor = anchor;
         layer->anchorZ = anchorZ;
       } else {
@@ -1371,19 +1373,29 @@ bool HTMLAnimationBuilder::buildForElement(
             "top-left may differ from CSS [subset:animation-unsupported-property]");
       }
     }
+    // A static `matrix3D` outranks `matrix` in the runtime transform priority, so a flat keyframe
+    // route has to be lifted onto the matrix3D channel; otherwise the keyframes are written to a
+    // matrix the renderer never reads and the animation has no visible effect.
+    const bool staticPoseIs3D = !layer->matrix3D.isIdentity();
     if (transformAllPureTranslate && !hasStaticPose) {
       for (const auto& ts : transformStops) {
         const Matrix affine = ToAffine2D(ts.second);
         xKeys.push_back({ts.first, affine.tx, interp, {}, {}});
         yKeys.push_back({ts.first, affine.ty, interp, {}, {}});
       }
-    } else if (transformAllFlat) {
+    } else if (transformAllFlat && !staticPoseIs3D) {
       for (const auto& ts : transformStops) {
         matrixKeys.push_back({ts.first, ToAffine2D(ts.second), interp, {}, {}});
       }
     } else {
       for (const auto& ts : transformStops) {
-        matrix3DKeys.push_back({ts.first, ts.second, interp, {}, {}});
+        matrix3DKeys.push_back({ts.first,
+                                IsFlatTransform(ts.second)
+                                    ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
+                                    : ts.second,
+                                interp,
+                                {},
+                                {}});
       }
     }
   }
