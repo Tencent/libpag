@@ -1939,7 +1939,7 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!trim) {
     return;
   }
-  bool animatedEnd = _ctx->animatedElementIds.find(trim) != _ctx->animatedElementIds.end();
+  bool animatedEnd = _ctx->animation.elementIds.find(trim) != _ctx->animation.elementIds.end();
   if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset) && !animatedEnd) {
     return;
   }

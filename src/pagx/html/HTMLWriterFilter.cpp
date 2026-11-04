@@ -544,7 +544,7 @@ bool HTMLWriter::maskHasAnimatedPath(const Layer* mask, int depth) const {
   }
   for (auto* element : mask->contents) {
     if (element != nullptr && element->nodeType() == NodeType::Path &&
-        _ctx->animatedMaskPaths.count(static_cast<const Path*>(element)) > 0) {
+        _ctx->animation.maskPaths.count(static_cast<const Path*>(element)) > 0) {
       return true;
     }
   }
@@ -830,11 +830,11 @@ void HTMLWriter::writeMaskElements(HTMLBuilder& out, const std::vector<Element*>
       std::string d = GetPathSVGString(p);
       if (!d.empty()) {
         out.openTag("path");
-        if (_ctx->animatedMaskPaths.count(p) > 0) {
+        if (_ctx->animation.maskPaths.count(p) > 0) {
           // Animated mask geometry needs a target for its CSS keyframes.
           std::string pathId = !p->id.empty() ? p->id : _ctx->nextId("maskPath");
           out.addAttr("id", pathId);
-          _ctx->animatedMaskPathIds[p] = pathId;
+          _ctx->animation.maskPathIds[p] = pathId;
         }
         if (!tr.empty()) {
           out.addAttr("transform", tr);
