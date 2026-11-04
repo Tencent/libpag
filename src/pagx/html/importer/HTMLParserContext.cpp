@@ -782,7 +782,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     }
   }
 
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box);
 
   // Must run after applyBackgroundVisuals(): the fold reuses the rounded Rectangle just
   // emitted into `layer->contents` as the image's fill geometry.
