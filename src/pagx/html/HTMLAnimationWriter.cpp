@@ -1556,44 +1556,81 @@ struct BundleElement {
   std::string tagName = {};
 };
 
-// Every id emitted into the body, resolved once. Looking each id up with a fresh scan of the whole
-// body costs O(targets x bodyLength) on documents with many animated elements.
-using TagNameIndex = std::unordered_map<std::string, std::string>;
+bool IsHtmlSpace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
 
-TagNameIndex BuildTagNameIndex(const std::string& bodyHtml) {
-  TagNameIndex index = {};
-  size_t searchFrom = 0;
-  while ((searchFrom = bodyHtml.find("id=\"", searchFrom)) != std::string::npos) {
-    auto idEnd = bodyHtml.find('"', searchFrom + 4);
-    if (idEnd == std::string::npos) {
+// Reads the id attribute of the opening tag spanning [`tagStart`, `tagEnd`), starting the attribute
+// search at `nameEnd` so the tag name itself is never matched.
+std::string ReadTagId(const std::string& html, size_t tagStart, size_t tagEnd, size_t nameEnd) {
+  size_t searchFrom = nameEnd;
+  while (searchFrom < tagEnd) {
+    auto idPos = html.find("id=\"", searchFrom);
+    if (idPos == std::string::npos || idPos >= tagEnd) {
+      return {};
+    }
+    // A standalone attribute is preceded by whitespace; `data-id="..."` and text content are not.
+    if (idPos > tagStart && IsHtmlSpace(html[idPos - 1])) {
+      auto idEnd = html.find('"', idPos + 4);
+      if (idEnd != std::string::npos && idEnd < tagEnd) {
+        return html.substr(idPos + 4, idEnd - idPos - 4);
+      }
+      return {};
+    }
+    searchFrom = idPos + 4;
+  }
+  return {};
+}
+
+// Every id emitted into the body, resolved once: its tag name and the byte range of its opening tag.
+// Looking an id up with a fresh scan of the whole body costs O(targets x bodyLength) on documents
+// with many animated elements, and matching raw text mistakes a literal `id="..."` in content for an
+// element, so the scan walks tags instead.
+struct BodyTagIndex {
+  std::unordered_map<std::string, std::string> nameById = {};
+  std::unordered_map<std::string, std::pair<size_t, size_t>> rangeById = {};
+};
+
+BodyTagIndex BuildTagIndex(const std::string& html) {
+  BodyTagIndex index = {};
+  size_t pos = 0;
+  while ((pos = html.find('<', pos)) != std::string::npos) {
+    auto tagEnd = html.find('>', pos);
+    if (tagEnd == std::string::npos) {
       break;
     }
-    auto tagStart = bodyHtml.rfind('<', searchFrom);
-    auto tagEnd = bodyHtml.find('>', searchFrom);
-    if (tagStart != std::string::npos && tagEnd != std::string::npos) {
-      size_t nameStart = tagStart + 1;
-      size_t nameEnd = nameStart;
-      while (nameEnd < tagEnd && bodyHtml[nameEnd] != ' ' && bodyHtml[nameEnd] != '/' &&
-             bodyHtml[nameEnd] != '>') {
-        nameEnd++;
-      }
-      std::string tagName = bodyHtml.substr(nameStart, nameEnd - nameStart);
-      for (char& c : tagName) {
-        if (c >= 'A' && c <= 'Z') {
-          c = static_cast<char>(c - 'A' + 'a');
-        }
-      }
-      index.emplace(bodyHtml.substr(searchFrom + 4, idEnd - searchFrom - 4), std::move(tagName));
+    // Closing tags, comments and declarations carry no attributes.
+    if (pos + 1 >= html.size() || html[pos + 1] == '/' || html[pos + 1] == '!' ||
+        html[pos + 1] == '?') {
+      pos = tagEnd + 1;
+      continue;
     }
-    searchFrom = idEnd + 1;
+    size_t nameStart = pos + 1;
+    size_t nameEnd = nameStart;
+    while (nameEnd < tagEnd && !IsHtmlSpace(html[nameEnd]) && html[nameEnd] != '/' &&
+           html[nameEnd] != '>') {
+      nameEnd++;
+    }
+    std::string tagName = html.substr(nameStart, nameEnd - nameStart);
+    for (char& c : tagName) {
+      if (c >= 'A' && c <= 'Z') {
+        c = static_cast<char>(c - 'A' + 'a');
+      }
+    }
+    std::string id = ReadTagId(html, pos, tagEnd, nameEnd);
+    if (!id.empty()) {
+      index.nameById.emplace(id, std::move(tagName));
+      index.rangeById.emplace(id, std::make_pair(pos, tagEnd));
+    }
+    pos = tagEnd + 1;
   }
   return index;
 }
 
 // Lists every tag rendering the bundle's target: the base id plus the "<base>__N" copies that
 // HTMLWriterContext::claimAnimatedDomId hands out when one node renders into several tags.
-std::vector<BundleElement> FindBundleElements(const TagNameIndex& tagIndex,
-                                              const std::string& domId) {
+std::vector<BundleElement> FindBundleElements(
+    const std::unordered_map<std::string, std::string>& tagIndex, const std::string& domId) {
   std::vector<BundleElement> elements = {};
   for (size_t copyIndex = 0;; ++copyIndex) {
     BundleElement element = {};
@@ -1625,9 +1662,9 @@ AnimatedTagIndex BuildAnimatedTagIndex(const HTMLWriterContext& ctx) {
   return index;
 }
 
-std::vector<BundleElement> FindBundleElementsForNode(const TagNameIndex& tagIndex,
-                                                     const AnimatedTagIndex& tagIndexByNode,
-                                                     const DomTargetBundle& bundle, size_t scope) {
+std::vector<BundleElement> FindBundleElementsForNode(
+    const std::unordered_map<std::string, std::string>& tagIndex,
+    const AnimatedTagIndex& tagIndexByNode, const DomTargetBundle& bundle, size_t scope) {
   std::vector<BundleElement> elements = {};
   std::set<std::string> addedIds = {};
   auto it = tagIndexByNode.find(bundle.primaryHost);
@@ -1851,9 +1888,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
 
   const auto mounts = CollectAnimationMounts();
 
-  // Both indexes are built once: resolving every animated tag per bundle would otherwise rescan the
+  // All indexes are built once: resolving every animated tag per bundle would otherwise rescan the
   // whole body for each target.
-  const auto tagIndex = BuildTagNameIndex(bodyHtml);
+  const auto tagIndex = BuildTagIndex(bodyHtml);
   const auto tagIndexByNode = BuildAnimatedTagIndex(_ctx);
 
   for (const auto& mount : mounts) {
@@ -1864,7 +1901,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
     for (const auto& bundle : bundles) {
-      auto elements = FindBundleElementsForNode(tagIndex, tagIndexByNode, bundle, mount.scope);
+      auto elements =
+          FindBundleElementsForNode(tagIndex.nameById, tagIndexByNode, bundle, mount.scope);
       if (elements.empty()) {
         continue;
       }
@@ -1956,14 +1994,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
   }
 
-  ApplyElementEdits(bodyHtml, edits);
+  ApplyElementEdits(bodyHtml, tagIndex.rangeById, edits);
 
   return keyframesCss;
 }
 
-// Resolves every recorded id with one scan and rebuilds the body once. Looking an id up from the
-// start of the body and letting std::string::replace shift the tail every time costs
-// O(targets x bodyLength) on documents with many animated elements.
 // One replacement of a byte range in the body, collected while resolving the recorded ids.
 struct TextEdit {
   size_t start = 0;
@@ -1975,41 +2010,12 @@ bool TextEditStartsBefore(const TextEdit& a, const TextEdit& b) {
   return a.start < b.start;
 }
 
-void HTMLAnimationSession::ApplyElementEdits(std::string& bodyHtml, const ElementEdits& edits) {
-  std::unordered_map<std::string, std::pair<size_t, size_t>> tagRanges = {};
-  {
-    std::unordered_set<std::string> pendingIds(edits.idOrder.begin(), edits.idOrder.end());
-    size_t searchFrom = 0;
-    while (!pendingIds.empty()) {
-      auto idPos = bodyHtml.find("id=\"", searchFrom);
-      if (idPos == std::string::npos) {
-        break;
-      }
-      if (idPos != 0) {
-        char prev = bodyHtml[idPos - 1];
-        if (prev != ' ' && prev != '\t' && prev != '\n') {
-          searchFrom = idPos + 4;
-          continue;
-        }
-      }
-      auto idEnd = bodyHtml.find('"', idPos + 4);
-      if (idEnd == std::string::npos) {
-        break;
-      }
-      std::string id = bodyHtml.substr(idPos + 4, idEnd - idPos - 4);
-      searchFrom = idEnd + 1;
-      if (pendingIds.erase(id) == 0) {
-        continue;
-      }
-      auto tagStart = bodyHtml.rfind('<', idPos);
-      auto tagEnd = bodyHtml.find('>', idPos);
-      if (tagStart == std::string::npos || tagEnd == std::string::npos) {
-        continue;
-      }
-      tagRanges[id] = {tagStart, tagEnd};
-    }
-  }
-
+// Applies every recorded declaration and rebuilds the body once. Applying one declaration at a time
+// and letting std::string::replace shift the tail costs O(targets x bodyLength).
+void HTMLAnimationSession::ApplyElementEdits(
+    std::string& bodyHtml,
+    const std::unordered_map<std::string, std::pair<size_t, size_t>>& tagRanges,
+    const ElementEdits& edits) {
   std::vector<TextEdit> textEdits = {};
   std::unordered_set<size_t> liftedSvgStarts = {};
   for (const auto& elementId : edits.idOrder) {
