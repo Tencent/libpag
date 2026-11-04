@@ -1615,10 +1615,13 @@ function buildStyle(left, top, width, height, computed, opts) {
   }
 
   // Forward a canonical `pagxAnim*` animation (set by animation-capture.ts) so
-  // the importer can map it onto a PAGX animation. Emitted for every element
-  // kind so animated containers, text leaves and replaced elements all carry
-  // their declaration.
-  appendAnimation(parts, computed);
+  // the importer can map it onto a PAGX animation. `suppressAnimation` is set by
+  // the synthesized per-line `<span>`s: their wrapper already carries the same
+  // declaration, and emitting it twice makes the importer animate both the host
+  // Layer and the text Layer, doubling every rotation / translation.
+  if (!opts.suppressAnimation) {
+    appendAnimation(parts, computed);
+  }
 
   return parts.join('; ');
 }
@@ -2611,7 +2614,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     const tl = line.rect.left - parentRect.left;
     const tt = lt - parentRect.top;
     const base = buildStyle(tl, tt, line.rect.width, lh, computed, {
-      box: false, text: true,
+      box: false, text: true, suppressAnimation: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
     let transformed = applyTextTransform(line.text, computed);
@@ -2668,6 +2671,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     const tl = cl - parentRect.left;
     const tt = col.rect.top - parentRect.top;
     const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+      suppressAnimation: true,
       box: false, text: true,
     });
     let transformed = applyTextTransform(col.text, computed);

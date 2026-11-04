@@ -34,10 +34,30 @@ describe('pagxExtractTransform', () => {
     expect(pagxExtractTransform('matrix(2, 0, 0, 2, 12, 34)')).toBe('matrix(2, 0, 0, 2, 12, 34)');
   });
 
-  test('matrix3d delegates to the translate-only extraction', () => {
+  test('a flat matrix3d collapses to its 2D affine', () => {
     expect(
       pagxExtractTransform('matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 7, 8, 0, 1)'),
-    ).toBe('translate(7px, 8px)');
+    ).toBe('matrix(2, 0, 0, 2, 7, 8)');
+  });
+
+  test('a purely translated matrix3d folds to translate()', () => {
+    expect(
+      pagxExtractTransform('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 12, 34, 0, 1)'),
+    ).toBe('translate(12px, 34px)');
+  });
+
+  test('a 3D pose keeps every matrix3d value', () => {
+    // rotateY(30deg) with perspective(500px): the depth and projection terms must survive so the
+    // importer can route the keyframe to its `matrix3D` channel.
+    const pose =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 0, 0, 0, 1)';
+    expect(pagxExtractTransform(pose)).toBe(pose);
+  });
+
+  test('matrix6 projects a 3D pose so decimation still sees the motion', () => {
+    const pose =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 3, 4, 0, 1)';
+    expect(pagxTransformToMatrix6(pose)).toEqual([0.866025, 0, 0, 1, 3, 4]);
   });
 
   test('a friendly pure-translate string reuses the translate path', () => {
