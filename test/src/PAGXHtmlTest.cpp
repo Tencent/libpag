@@ -3873,6 +3873,48 @@ CLI_TEST(PAGXHtmlTest, AnimationAlphaMaskKeepsSoftMaskInsteadOfClipPath) {
   EXPECT_NE(html.find("#softPath { animation: pagx_softPath_0"), std::string::npos) << html;
 }
 
+// An animated mask path resolves its bundle through the masked layer's id: that id is the tag the
+// bundle is routed to. A masked layer that is not animated itself therefore still gets one, and the
+// mask keyframes are emitted. Without that id the bundle resolves to no tag and is dropped.
+CLI_TEST(PAGXHtmlTest, AnimationMaskPathOnUnnamedLayerKeepsKeyframes) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Layer id="softMask">
+        <Path id="softPath" data="M 40 20 L 300 20 L 300 180 L 40 180 Z"/>
+        <Fill>
+          <LinearGradient startPoint="0.6,0.5" endPoint="1,0.5">
+            <ColorStop offset="0" color="#FFFFFFFF"/>
+            <ColorStop offset="1" color="#FFFFFF00"/>
+          </LinearGradient>
+        </Fill>
+      </Layer>
+      <Layer mask="@softMask" maskType="alpha">
+        <Rectangle position="160,100" size="240,160"/>
+        <Fill color="#2563EB"/>
+      </Layer>
+    </Layer>
+    <Animations>
+      <Animation id="softSlide" duration="60" frameRate="60" loop="loop">
+        <Object target="softPath">
+          <Channel name="point1.x" type="float">
+            <Key time="0" value="260" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // The masked layer had no authored id, so the exporter assigns one to route the bundle.
+  EXPECT_NE(html.find("id=\"animM"), std::string::npos) << html;
+  EXPECT_NE(html.find("mask-image:url(#"), std::string::npos) << html;
+  EXPECT_NE(html.find("#softPath { animation: "), std::string::npos) << html;
+}
+
 // The clip has to follow the mask layer's own transform: its position offsets every masked pixel,
 // so an animated clip-path built from the raw path coordinates would sit in the wrong place.
 CLI_TEST(PAGXHtmlTest, AnimationContourMaskKeepsMaskLayerOffset) {

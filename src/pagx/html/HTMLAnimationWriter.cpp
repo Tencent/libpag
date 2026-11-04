@@ -82,7 +82,7 @@ struct DocumentIndex {
   std::vector<const Animation*> animations = {};
   std::unordered_map<const SolidColor*, const Node*> solidToPainter = {};
   std::unordered_map<const LayerFilter*, const Layer*> filterToLayer = {};
-  std::unordered_map<const Path*, const Layer*> maskPathToLayer = {};
+  std::unordered_map<const Path*, Layer*> maskPathToLayer = {};
   std::unordered_map<std::string, int64_t> timelineOffsets = {};
 };
 
@@ -125,8 +125,8 @@ void IndexElements(const std::vector<Element*>& elements,
   }
 }
 
-void CollectMaskPaths(const Layer* maskLayer, const Layer* hostLayer,
-                      std::unordered_map<const Path*, const Layer*>& maskPathToLayer) {
+void CollectMaskPaths(const Layer* maskLayer, Layer* hostLayer,
+                      std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
   if (maskLayer == nullptr || hostLayer == nullptr) {
     return;
   }
@@ -142,7 +142,7 @@ void CollectMaskPaths(const Layer* maskLayer, const Layer* hostLayer,
 
 // Collects what a single layer contributes on its own: its element painters, its animation filters,
 // the paths of its mask subtree and the offsets of the timelines it mounts.
-void IndexLayerContents(const Layer* layer, DocumentIndex& index) {
+void IndexLayerContents(Layer* layer, DocumentIndex& index) {
   IndexElements(layer->contents, index.solidToPainter);
   for (auto* filter : layer->filters) {
     if (filter != nullptr) {
@@ -950,7 +950,7 @@ bool BindChannelToBundleSet(
 BundleChannelSet CollectBundleChannels(
     PAGXDocument& doc, const DomTargetBundle& bundle,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
-    const std::unordered_map<const Path*, const Layer*>& maskPathToLayer) {
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
   BundleChannelSet result = {};
   for (auto* obj : bundle.objects) {
     Node* objTarget = ResolveTargetNode(doc, obj->target);
@@ -1418,7 +1418,7 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     PAGXDocument& doc, const Animation* anim, const HTMLWriterContext& ctx,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
     const std::unordered_map<const LayerFilter*, const Layer*>& filterToLayer,
-    const std::unordered_map<const Path*, const Layer*>& maskPathToLayer) {
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
   std::vector<DomTargetBundle> bundles = {};
   std::unordered_map<std::string, size_t> bundleIndex = {};
 
@@ -1765,7 +1765,10 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         auto* pathNode = static_cast<const Path*>(targetNode);
         auto maskIt = _maskPathToLayer.find(pathNode);
         if (maskIt != _maskPathToLayer.end() && maskIt->second != nullptr) {
-          auto* hostLayer = const_cast<Layer*>(maskIt->second);
+          auto* hostLayer = maskIt->second;
+          // The masked layer id is the routing key of this bundle: without it the bundle resolves
+          // to no tag and the mask keyframes would be skipped. A masked layer that is not animated
+          // itself therefore still needs one, assigned here and restored by the destructor.
           if (hostLayer->id.empty()) {
             _restoredNodeIds.emplace_back(hostLayer, hostLayer->id);
             hostLayer->id = _ctx.nextId("animM");
