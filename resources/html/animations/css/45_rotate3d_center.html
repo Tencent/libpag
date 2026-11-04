@@ -3,15 +3,17 @@
   <head>
     <title>Rotate3D Center Pivot</title>
     <!--
-      3D-only case: a card flipping around its centre with `perspective()` in every keyframe (a CSS
+      3D-only case: a card tilting around its centre with `perspective()` in every keyframe (a CSS
       transform animation replaces the whole property). The default centre origin means the pivot
-      adds nothing, so this isolates the 3D pipeline from the anchor work.
+      adds nothing, so this isolates the 3D pipeline from the anchor work. The sweep stays inside
+      +/-50 degrees on purpose: a full 0-360 turn samples edge-on poses where the card has no
+      visible area, which reads as flicker in the frame strips instead of rotation.
     -->
     <style>
-      @keyframes flip {
-        0%   { transform: perspective(600px) rotateY(0deg); }
-        50%  { transform: perspective(600px) rotateY(180deg); }
-        100% { transform: perspective(600px) rotateY(360deg); }
+      @keyframes tilt {
+        0%   { transform: perspective(600px) rotateX(-50deg); }
+        50%  { transform: perspective(600px) rotateX(50deg); }
+        100% { transform: perspective(600px) rotateX(-50deg); }
       }
     </style>
   </head>
@@ -20,7 +22,7 @@
          style="position: absolute; left: 60px; top: 40px;
                 width: 120px; height: 80px; border-radius: 12px;
                 background-color: #38BDF8;
-                animation: flip 3s linear infinite;">
+                animation: tilt 2.4s ease-in-out infinite;">
       <div style="position: absolute; left: 24px; top: 24px;
                   width: 72px; height: 32px; border-radius: 8px;
                   background-color: #F472B6;"></div>
