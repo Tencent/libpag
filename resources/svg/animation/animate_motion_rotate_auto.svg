@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect id="r" width="20" height="20" fill="red">
+    <animateMotion path="M0,0 L100,0" rotate="auto" dur="1s" fill="freeze"/>
+  </rect>
+</svg>
