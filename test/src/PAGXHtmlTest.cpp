@@ -3876,13 +3876,13 @@ CLI_TEST(PAGXHtmlTest, AnimationAlphaMaskKeepsSoftMaskInsteadOfClipPath) {
 // The weaver resolves a target by scanning the emitted body for `id="..."`. Text content that
 // happens to contain the same literal must not capture the declaration: the scan has to stay inside
 // opening tags, otherwise the animation lands on the text span and the real element stays static.
-// A Text node is never an animation target: the runtime animates its shaping channels (text,
-// fontSize, letterSpacing, fontFamily), and none of them has a CSS equivalent. The exporter must
-// therefore neither emit a rule for such channels nor attach an empty animation to the span.
-CLI_TEST(PAGXHtmlTest, AnimationTextShapingChannelsAreNotExported) {
+// Font size and letter spacing are the only Text shaping channels CSS reproduces faithfully: both
+// interpolate while the browser re-lays out the text, which is what the runtime does when it
+// reshapes. They are emitted on the span that carries the text.
+CLI_TEST(PAGXHtmlTest, AnimationTextFontSizeAndLetterSpacingAreExported) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">
-      <Text id="label" text="AB" fontFamily="Arial" fontSize="20" position="160,100"/>
+      <Text id="label" text="AB" fontFamily="Arial" fontSize="20" position="40,100"/>
       <Fill color="#1D4ED8"/>
     </Layer>
     <Animations>
@@ -3891,6 +3891,45 @@ CLI_TEST(PAGXHtmlTest, AnimationTextShapingChannelsAreNotExported) {
           <Channel name="fontSize" type="float">
             <Key time="0" value="20" interpolation="linear"/>
             <Key time="60" value="80"/>
+          </Channel>
+          <Channel name="letterSpacing" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="6"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto spanTag = FindTagContaining(html, "<span");
+  ASSERT_FALSE(spanTag.empty());
+  EXPECT_NE(spanTag.find("animation:"), std::string::npos) << spanTag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(spanTag));
+  ASSERT_FALSE(rule.empty());
+  EXPECT_NE(rule.find("font-size: 20px"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("font-size: 80px"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("letter-spacing: 0px"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("letter-spacing: 6px"), std::string::npos) << rule;
+}
+
+// Text content and font family can only switch values, not interpolate, so a channel that owns them
+// stays out of the keyframes instead of producing a rule that would replay empty stops.
+CLI_TEST(PAGXHtmlTest, AnimationTextContentChannelIsNotExported) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text id="label" text="AB" fontFamily="Arial" fontSize="20" position="40,100"/>
+      <Fill color="#1D4ED8"/>
+    </Layer>
+    <Animations>
+      <Animation id="swap" duration="60" frameRate="60" loop="once">
+        <Object target="label">
+          <Channel name="text" type="string">
+            <Key time="0" value="AB" interpolation="hold"/>
+            <Key time="30" value="CD" interpolation="hold"/>
           </Channel>
         </Object>
       </Animation>
@@ -3905,7 +3944,6 @@ CLI_TEST(PAGXHtmlTest, AnimationTextShapingChannelsAreNotExported) {
   auto spanTag = FindTagContaining(html, "<span");
   ASSERT_FALSE(spanTag.empty());
   EXPECT_EQ(spanTag.find("animation:"), std::string::npos) << spanTag;
-  // The text itself is still exported as content.
   EXPECT_NE(html.find(">AB<"), std::string::npos) << html;
 }
 

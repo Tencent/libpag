@@ -1275,9 +1275,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       out.openTag("span");
       {
-        // A Text node is never registered as an animation target: text shaping channels have no CSS
-        // equivalent, so only its Fill can be claimed here.
-        auto animId = _ctx->claimAnimatedDomId({span.fill});
+        auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
         if (!animId.empty()) {
           out.addAttr("id", animId);
         }
@@ -1416,7 +1414,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     }
     out.openTag("span");
     {
-      auto animId = _ctx->claimAnimatedDomId({span.fill});
+      auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
       if (!animId.empty()) {
         out.addAttr("id", animId);
       }
