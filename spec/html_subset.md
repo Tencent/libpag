@@ -200,8 +200,8 @@ rebuilt as an inset child layer, which is how CSS paints gradient borders (a pla
 `background-color` still paints the border box). Any other value is dropped with a diagnostic.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
-`outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
-`path`), and compound / non-`matrix3d` 3D `transform` chains.
+`outline`, the `perspective` property (use `transform: perspective()` instead), and geometric
+`clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/`path`).
 
 ### 4.5 Text
 
