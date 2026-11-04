@@ -930,8 +930,9 @@ PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
   EXPECT_TRUE(NearlyEqual(local.getRowColumn(1, 3), 30.980762f, 0.01f));
   EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3), 6.339746f, 0.01f));
 
-  // The depth itself is what moves the plane: dropping anchorZ shifts Z back by
-  // anchorZ - L_z * anchorZ = 30 - cos(60) * 30 = 15.
+  // The depth itself is what moves the plane: dropping anchorZ pulls the pivot back onto the layer,
+  // which changes the composed translation by (0, 0, anchorZ) - L * (0, 0, anchorZ). rotateX(60)
+  // mixes Y and Z, so both components move: Z by (1 - cos60) * 30 = 15, Y by sin60 * 30 = 25.98.
   auto flatDoc = ParseHtml(withoutDepth);
   ASSERT_NE(flatDoc, nullptr);
   auto* flatLayer = FindLayerById(flatDoc, "card");
@@ -939,7 +940,8 @@ PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
   ASSERT_TRUE(NearlyEqual(flatLayer->anchorZ, 0.0f));
   const auto flatLocal = pagx::BuildLayerTransform3DWithAnchor(flatLayer);
   EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3) - flatLocal.getRowColumn(2, 3), 15.0f, 0.01f));
-  EXPECT_TRUE(NearlyEqual(local.getRowColumn(1, 3) - flatLocal.getRowColumn(1, 3), 0.0f, 0.01f));
+  EXPECT_TRUE(
+      NearlyEqual(local.getRowColumn(1, 3) - flatLocal.getRowColumn(1, 3), 25.980762f, 0.01f));
 }
 
 /**

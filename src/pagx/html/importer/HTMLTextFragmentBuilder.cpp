@@ -567,7 +567,7 @@ Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNod
   if (shrinkWidth) outer->width = NAN;
   if (shrinkHeight) outer->height = NAN;
   _layerBuilder.applyLayerAttributes(outer, element, box);
-  _layerBuilder.applyBoxTransform(outer, box, element);
+  _layerBuilder.applyBoxTransform(outer, box);
 
   Layer* textHost = outer;
   if (hasBgVisuals) {
