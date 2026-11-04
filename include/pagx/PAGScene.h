@@ -200,10 +200,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
-   * on-screen transform (including animation, the display zoom/offset, and the default output
-   * window origin when the document declares one) applied. Returns an empty rectangle if the layer
-   * is null or does not belong to this scene. For the layer's untransformed local bounds, use
-   * PAGLayer::getBounds.
+   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
+   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
+   * local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
@@ -253,14 +252,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   bool renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context,
                 bool autoClear);
 
-  // Converts a surface-space point to the layer tree's root coordinate space by inverting
-  // rootToSurfaceMatrix(). Used by getLayersUnderPoint and PAGLayer::hitTestPoint so handles can
-  // hit-test in surface coordinates. Returns false if out is null or the transform is singular.
+  // Converts a surface-space point to the layer tree's root coordinate space using the display
+  // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
+  // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
 
-  // Writes the root-to-surface transform (zoomScale, contentOffset and, for a target view, the
-  // outputBounds origin that renderTo() subtracts) into out. Returned as a pagx Matrix to keep tgfx
-  // out of this header.
+  // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
+  // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
+  // matrix. Returned as a pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;

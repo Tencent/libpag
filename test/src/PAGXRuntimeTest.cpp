@@ -953,43 +953,6 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
 }
 
 /**
- * Test case: surface<->root conversions must include the output window origin. renderTo() draws
- * with a translate of -outputBounds.x/y, so the red square at root (20,20) lands at surface (0,0),
- * and getGlobalBounds()/hitTestPoint() have to report the same position instead of the root one.
- */
-PAGX_TEST(PAGXRuntimeTest, OutputViewCoordinateConversionIncludesWindowOrigin) {
-  auto doc = MakeTargetViewDocument();
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_TRUE(scene != nullptr);
-  ASSERT_FALSE(scene->rootComposition()->children.empty());
-  auto handle = scene->rootComposition()->children[0];
-  ASSERT_TRUE(handle != nullptr);
-
-  auto localBounds = handle->getBounds();
-  EXPECT_FLOAT_EQ(localBounds.x, 20.0f);
-  EXPECT_FLOAT_EQ(localBounds.y, 20.0f);
-
-  auto bounds = scene->getGlobalBounds(handle);
-  EXPECT_FLOAT_EQ(bounds.x, 0.0f);
-  EXPECT_FLOAT_EQ(bounds.y, 0.0f);
-  EXPECT_FLOAT_EQ(bounds.width, 10.0f);
-  EXPECT_FLOAT_EQ(bounds.height, 10.0f);
-  EXPECT_TRUE(handle->hitTestPoint(2.0f, 2.0f));
-  auto globalMatrix = handle->getGlobalMatrix();
-  EXPECT_FLOAT_EQ(globalMatrix.tx, -20.0f);
-  EXPECT_FLOAT_EQ(globalMatrix.ty, -20.0f);
-
-  auto* options = scene->getDisplayOptions();
-  options->setZoomScale(2.0f);
-  options->setContentOffset(5.0f, 10.0f);
-  bounds = scene->getGlobalBounds(handle);
-  EXPECT_FLOAT_EQ(bounds.x, 5.0f);
-  EXPECT_FLOAT_EQ(bounds.y, 10.0f);
-  EXPECT_FLOAT_EQ(bounds.width, 20.0f);
-  EXPECT_FLOAT_EQ(bounds.height, 20.0f);
-}
-
-/**
  * Test case: an edit that breaks the target view declaration after the scene was built must make
  * draw() fail instead of silently switching to a whole-canvas render. Clearing only targetLayerId
  * leaves outputBounds behind, which is an invalid pair; restoring the id makes the view valid again.
