@@ -167,7 +167,8 @@ bool PAGXView::buildLayers() {
   }
   playing = true;
   lastAnimationTimeMs = -1.0;
-  // PAGScene 已补偿输出窗口原点，视图仅使用窗口尺寸取景，避免重复应用原点偏移。
+  // PAGScene already compensates for the output origin; use only its size to frame the view so
+  // the origin offset is not applied twice.
   auto outputBounds = scene->getOutputBounds();
   hasOutputView = outputBounds.has_value();
   pagxWidth = hasOutputView ? outputBounds->width : scene->width();
@@ -385,8 +386,9 @@ void PAGXView::clearBackgroundColor() {
   presentImmediately = true;
 }
 
-// 交付窗口只在采样完成后裁切，避免提前截断 Glass/BackgroundBlur 的背景输入。
-// 中间 Surface 使用视口尺寸，缩放时不按完整文档或放大后的输出窗口分配巨大纹理。
+// Clip the output window after sampling to preserve the backdrop input for Glass/BackgroundBlur.
+// Size the intermediate surface to the viewport to avoid allocating huge textures for the full
+// document or the scaled output window when zooming.
 bool PAGXView::drawOutputView(tgfx::Context* context) {
   if (outputSurface == nullptr) {
     outputSurface =

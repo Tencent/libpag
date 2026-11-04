@@ -121,12 +121,12 @@ export interface _PAGXView {
   _draw(): void;
 
   /**
-   * 返回交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
+   * Returns the output window width when a default output view is present, or the document width.
    */
   _contentWidth(): number;
 
   /**
-   * 返回交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
+   * Returns the output window height when a default output view is present, or the document height.
    */
   _contentHeight(): number;
 

@@ -41,7 +41,7 @@ class PAGXView {
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
   /**
-   * 加载 PAGX 文档；解析或场景校验失败时返回 false。
+   * Loads a PAGX document. Returns false if parsing or scene validation fails.
    */
   bool loadPAGX(const emscripten::val& pagxData);
 
@@ -52,7 +52,8 @@ class PAGXView {
   bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
 
   /**
-   * 为已解析文档创建场景；没有文档、默认输出视图无效或不受支持时返回 false。
+   * Creates a scene from the parsed document. Returns false if no document is loaded or its
+   * default output view is invalid or unsupported.
    */
   bool buildLayers();
 
@@ -78,14 +79,14 @@ class PAGXView {
   void draw();
 
   /**
-   * 返回交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
+   * Returns the output window width when a default output view is present, or the document width.
    */
   float contentWidth() const {
     return pagxWidth;
   }
 
   /**
-   * 返回交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
+   * Returns the output window height when a default output view is present, or the document height.
    */
   float contentHeight() const {
     return pagxHeight;
@@ -143,7 +144,8 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
-  // 仅成对字段通过 PAGScene 校验后启用；无字段文档仍按完整文档取景和渲染。
+  // Enabled only after PAGScene validates the paired fields. Documents without them use the full
+  // document for framing and rendering.
   bool hasOutputView = false;
   float contentScale = 1.0f;
   float contentOffsetX = 0.0f;

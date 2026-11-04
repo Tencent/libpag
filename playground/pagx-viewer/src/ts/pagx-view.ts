@@ -99,14 +99,14 @@ export class PAGXView {
   }
 
   /**
-   * 交付内容宽度：有默认输出视图时为窗口宽度，否则为文档宽度。
+   * The output window width when a default output view is present, or the document width.
    */
   public get contentWidth(): number {
     return this.nativeView._contentWidth();
   }
 
   /**
-   * 交付内容高度：有默认输出视图时为窗口高度，否则为文档高度。
+   * The output window height when a default output view is present, or the document height.
    */
   public get contentHeight(): number {
     return this.nativeView._contentHeight();
