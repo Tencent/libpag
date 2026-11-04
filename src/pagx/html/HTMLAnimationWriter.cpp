@@ -1438,22 +1438,22 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Fill ||
                nType == NodeType::Stroke || nType == NodeType::Rectangle ||
                nType == NodeType::Ellipse) {
-      auto it = ctx.animatedElementIds.find(targetNode);
-      if (it != ctx.animatedElementIds.end()) {
+      auto it = ctx.animation.elementIds.find(targetNode);
+      if (it != ctx.animation.elementIds.end()) {
         domId = it->second;
       }
     } else if (nType == NodeType::SolidColor) {
       auto sIt = solidToPainter.find(static_cast<const SolidColor*>(targetNode));
       if (sIt != solidToPainter.end() && sIt->second != nullptr) {
         primaryHost = sIt->second;
-        auto idIt = ctx.animatedElementIds.find(primaryHost);
-        if (idIt != ctx.animatedElementIds.end()) {
+        auto idIt = ctx.animation.elementIds.find(primaryHost);
+        if (idIt != ctx.animation.elementIds.end()) {
           domId = idIt->second;
         }
       }
     } else if (nType == NodeType::TrimPath) {
-      auto idIt = ctx.animatedElementIds.find(targetNode);
-      if (idIt != ctx.animatedElementIds.end()) {
+      auto idIt = ctx.animation.elementIds.find(targetNode);
+      if (idIt != ctx.animation.elementIds.end()) {
         domId = idIt->second;
       }
     } else if (nType == NodeType::BlurFilter || nType == NodeType::DropShadowFilter) {
@@ -1469,8 +1469,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         primaryHost = mIt->second;
         domId = primaryHost->id;
       } else {
-        auto idIt = ctx.animatedElementIds.find(pathNode);
-        if (idIt != ctx.animatedElementIds.end()) {
+        auto idIt = ctx.animation.elementIds.find(pathNode);
+        if (idIt != ctx.animation.elementIds.end()) {
           domId = idIt->second;
         }
       }
@@ -1656,7 +1656,7 @@ using AnimatedTagIndex =
 
 AnimatedTagIndex BuildAnimatedTagIndex(const HTMLWriterContext& ctx) {
   AnimatedTagIndex index = {};
-  for (const auto& tag : ctx.animatedDomTags) {
+  for (const auto& tag : ctx.animation.tags) {
     index[tag.node].push_back({tag.scope, tag.id});
   }
   return index;
@@ -1726,7 +1726,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           _restoredNodeIds.emplace_back(layer, layer->id);
           layer->id = _ctx.nextId("animL");
         }
-        _ctx.animatedElementIds[layer] = layer->id;
+        _ctx.animation.elementIds[layer] = layer->id;
         for (auto* ch : obj->channels) {
           if (ch == nullptr) {
             continue;
@@ -1734,7 +1734,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           auto role = LookupChannelRole(nType, ch->name);
           if (role == TargetChannelRole::LayerVisibility &&
               ch->valueType() == ChannelValueType::Bool) {
-            _ctx.animatedVisibleLayers.insert(layer);
+            _ctx.animation.visibleLayers.insert(layer);
           }
           if (role == TargetChannelRole::Opacity && !layer->groupOpacity) {
             _restoredGroupOpacity.emplace_back(layer, layer->groupOpacity);
@@ -1751,7 +1751,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           }
         }
         if (hasGeometryChannel) {
-          _ctx.animatedElementIds[targetNode] =
+          _ctx.animation.elementIds[targetNode] =
               targetNode->id.empty() ? _ctx.nextId("animGeo") : targetNode->id;
         }
       } else if (nType == NodeType::TrimPath) {
@@ -1760,7 +1760,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           for (auto* channel : obj->channels) {
             if (channel != nullptr &&
                 LookupChannelRole(nType, channel->name) == TargetChannelRole::TrimEnd) {
-              _ctx.animatedElementIds[trim] = trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
+              _ctx.animation.elementIds[trim] = trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
               break;
             }
           }
@@ -1771,7 +1771,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         if (domId.empty()) {
           domId = _ctx.nextId("animG");
         }
-        _ctx.animatedElementIds[group] = domId;
+        _ctx.animation.elementIds[group] = domId;
       } else if (nType == NodeType::SolidColor) {
         auto* solid = static_cast<const SolidColor*>(targetNode);
         auto it = _solidToPainter.find(solid);
@@ -1780,14 +1780,14 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           if (domId.empty()) {
             domId = _ctx.nextId("animC");
           }
-          _ctx.animatedElementIds[it->second] = domId;
+          _ctx.animation.elementIds[it->second] = domId;
         }
       } else if (nType == NodeType::Fill || nType == NodeType::Stroke) {
         std::string domId = !targetNode->id.empty() ? targetNode->id : StripAtPrefix(obj->target);
         if (domId.empty()) {
           domId = _ctx.nextId("animP");
         }
-        _ctx.animatedElementIds[targetNode] = domId;
+        _ctx.animation.elementIds[targetNode] = domId;
       } else if (nType == NodeType::BlurFilter || nType == NodeType::DropShadowFilter) {
         auto* filter = static_cast<const LayerFilter*>(targetNode);
         auto it = _filterToLayer.find(filter);
@@ -1812,13 +1812,13 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           }
           // Coverage masks keep their paint, so they are emitted as an inline <mask> whose
           // geometry is animated instead of being reduced to a clip polygon.
-          _ctx.animatedMaskPaths.insert(pathNode);
+          _ctx.animation.maskPaths.insert(pathNode);
         } else {
           std::string domId = !pathNode->id.empty() ? pathNode->id : StripAtPrefix(obj->target);
           if (domId.empty()) {
             domId = _ctx.nextId("animPath");
           }
-          _ctx.animatedElementIds[pathNode] = domId;
+          _ctx.animation.elementIds[pathNode] = domId;
         }
       }
     }
@@ -1832,12 +1832,9 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   for (auto& kv : _restoredGroupOpacity) {
     kv.first->groupOpacity = kv.second;
   }
-  _ctx.animatedElementIds.clear();
-  _ctx.animatedVisibleLayers.clear();
-  _ctx.animatedDomIdUseCount.clear();
-  _ctx.animatedMaskPaths.clear();
-  _ctx.animatedMaskPathIds.clear();
-  _ctx.svgMaskIds.clear();
+  // The whole animation state belongs to this session; dropping it as one unit cannot leave a
+  // half-cleared scope or registry behind for the next export.
+  _ctx.animation.Reset();
 }
 
 std::vector<HTMLAnimationSession::AnimationMount>
@@ -1857,7 +1854,7 @@ HTMLAnimationSession::CollectAnimationMounts() const {
   }
   // Each Composition slot creates a distinct timeline. Preserve its scope, offset and play state
   // instead of collapsing mounts by Animation id: siblings can share the same source Composition.
-  for (const auto& instance : _ctx.animationInstances) {
+  for (const auto& instance : _ctx.animation.instances) {
     for (const auto& driver : instance.slot->timelines) {
       if (driver == nullptr || driver->timelineType() != TimelineType::Animation) {
         continue;
@@ -1914,8 +1911,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       BundleTimingInfo timing = ComputeBundleTiming(anim, mount.offset, chSet);
 
       if (chSet.animatedMaskPath != nullptr) {
-        auto idIt = _ctx.animatedMaskPathIds.find(chSet.animatedMaskPath);
-        if (idIt != _ctx.animatedMaskPathIds.end()) {
+        auto idIt = _ctx.animation.maskPathIds.find(chSet.animatedMaskPath);
+        if (idIt != _ctx.animation.maskPathIds.end()) {
           // The mask is an inline SVG subtree, so its geometry animates on its own: emit `d` stops
           // for the mask path and let the masked element keep its static style. A coverage mask
           // must never be rewritten as a clip polygon, which would drop its paint.
