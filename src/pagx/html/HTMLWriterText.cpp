@@ -963,10 +963,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
-  // A Text node is never an animation target: its shaping channels (text, fontSize, letterSpacing,
-  // fontFamily, ...) have no CSS equivalent, so the session does not register them and they must not
-  // be offered as candidates here.
-  auto animId = _ctx->claimAnimatedDomId({tb, fill});
+  // The span is the only tag a Text renders into, so font-size / letter-spacing keyframes land here.
+  auto animId = _ctx->claimAnimatedDomId({tb, fill, text});
   if (!animId.empty()) {
     out.addAttr("id", animId);
   }

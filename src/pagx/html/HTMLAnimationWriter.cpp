@@ -635,6 +635,8 @@ enum class TargetChannelRole {
   FilterOffsetY,
   FilterColor,
   FilterAlpha,
+  FontSize,
+  LetterSpacing,
 };
 
 struct ChannelBindingRule {
@@ -671,6 +673,8 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Group, "anchor.y", TargetChannelRole::AnchorY},
     {NodeType::Group, "skew", TargetChannelRole::Skew},
     {NodeType::Group, "skewAxis", TargetChannelRole::SkewAxis},
+    {NodeType::Text, "fontSize", TargetChannelRole::FontSize},
+    {NodeType::Text, "letterSpacing", TargetChannelRole::LetterSpacing},
     {NodeType::TextBox, "alpha", TargetChannelRole::Opacity},
     {NodeType::TextBox, "position.x", TargetChannelRole::GroupPosX},
     {NodeType::TextBox, "position.y", TargetChannelRole::GroupPosY},
@@ -759,6 +763,11 @@ struct BundleChannelSet {
   const Channel* dashOffsetCh = nullptr;
   const Fill* fillPainter = nullptr;
   const Stroke* strokePainter = nullptr;
+  // Text shaping channels that map to a single CSS property. Text content, font family and font
+  // style would need a step swap, and resizing a short single-line label is the only shaping
+  // animation CSS reproduces faithfully, so only these two are bound.
+  const Channel* fontSizeCh = nullptr;
+  const Channel* letterSpacingCh = nullptr;
 
   std::unordered_map<const LayerFilter*, FilterChannelSlot> filterChMap = {};
   bool hasFilterAnim = false;
@@ -867,6 +876,12 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::SkewAxis:
       out.skewAxisCh = ch;
+      return true;
+    case TargetChannelRole::FontSize:
+      out.fontSizeCh = ch;
+      return true;
+    case TargetChannelRole::LetterSpacing:
+      out.letterSpacingCh = ch;
       return true;
     case TargetChannelRole::FillColor:
       out.fillColorCh = ch;
@@ -1237,6 +1252,30 @@ void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagNa
   }
 }
 
+// Text shaping channels that map to a CSS property are emitted on the span itself. Only font size
+// and letter spacing are bound: CSS interpolates them while re-laying out the text, which is what
+// the runtime does when it reshapes. That holds for the short single-line labels this is used for;
+// text content, font family and font style would need a step swap and stay static.
+void EmitTextCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
+                        std::string& decls) {
+  if (chSet.fontSizeCh == nullptr && chSet.letterSpacingCh == nullptr) {
+    return;
+  }
+  const Text* text = nullptr;
+  if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Text) {
+    text = static_cast<const Text*>(bundle.primaryHost);
+  }
+  if (chSet.fontSizeCh != nullptr) {
+    float size = EvalFloatChannel(chSet.fontSizeCh, t, text != nullptr ? text->fontSize : 0.0f);
+    AppendCssDecl(decls, "font-size", CssFloatToString(size) + "px");
+  }
+  if (chSet.letterSpacingCh != nullptr) {
+    float spacing =
+        EvalFloatChannel(chSet.letterSpacingCh, t, text != nullptr ? text->letterSpacing : 0.0f);
+    AppendCssDecl(decls, "letter-spacing", CssFloatToString(spacing) + "px");
+  }
+}
+
 void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                           std::string& decls) {
   if (!chSet.hasFilterAnim || bundle.primaryHost == nullptr ||
@@ -1349,6 +1388,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "visibility", visibleLength == 0.0f ? "hidden" : "visible");
   }
   EmitPaintCssAtFrame(chSet, tagName, t, decls);
+  EmitTextCssAtFrame(bundle, chSet, t, decls);
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
 
   if (chSet.animatedMaskPath != nullptr) {
@@ -1435,9 +1475,9 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     auto nType = targetNode->nodeType();
     if (nType == NodeType::Layer) {
       domId = targetNode->id;
-    } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Fill ||
-               nType == NodeType::Stroke || nType == NodeType::Rectangle ||
-               nType == NodeType::Ellipse) {
+    } else if (nType == NodeType::Group || nType == NodeType::TextBox ||
+               nType == NodeType::Text || nType == NodeType::Fill || nType == NodeType::Stroke ||
+               nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
       auto it = ctx.animation.elementIds.find(targetNode);
       if (it != ctx.animation.elementIds.end()) {
         domId = it->second;
@@ -1760,7 +1800,8 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           for (auto* channel : obj->channels) {
             if (channel != nullptr &&
                 LookupChannelRole(nType, channel->name) == TargetChannelRole::TrimEnd) {
-              _ctx.animation.elementIds[trim] = trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
+              _ctx.animation.elementIds[trim] =
+                  trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
               break;
             }
           }
@@ -1798,6 +1839,11 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             hostLayer->id = _ctx.nextId("animF");
           }
         }
+      } else if (nType == NodeType::Text) {
+        auto* text = static_cast<Text*>(targetNode);
+        // A Text renders as a span that can carry font-size / letter-spacing keyframes. The id is
+        // not restored afterwards: it only has to be unique within this export.
+        _ctx.animation.elementIds[text] = !text->id.empty() ? text->id : _ctx.nextId("animT");
       } else if (nType == NodeType::Path) {
         auto* pathNode = static_cast<const Path*>(targetNode);
         auto maskIt = _maskPathToLayer.find(pathNode);
@@ -1837,8 +1883,8 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   _ctx.animation.Reset();
 }
 
-std::vector<HTMLAnimationSession::AnimationMount>
-HTMLAnimationSession::CollectAnimationMounts() const {
+std::vector<HTMLAnimationSession::AnimationMount> HTMLAnimationSession::CollectAnimationMounts()
+    const {
   std::vector<AnimationMount> mounts = {};
   for (auto* node : _doc.animations) {
     if (node == nullptr || node->nodeType() != NodeType::Animation) {
@@ -2050,9 +2096,9 @@ void HTMLAnimationSession::ApplyElementEdits(
     bool liftsSvgClip = liftIt != edits.liftsSvgClip.end() && liftIt->second;
     size_t tagStart = rangeIt->second.first;
     size_t tagEnd = rangeIt->second.second;
-    textEdits.push_back({tagStart, tagEnd,
-                         BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined,
-                                       needsZeroOrigin)});
+    textEdits.push_back(
+        {tagStart, tagEnd,
+         BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined, needsZeroOrigin)});
     // The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
     // extent would be clipped; lift the clipping on the hosting <svg> while keeping its viewport.
     if (liftsSvgClip) {
