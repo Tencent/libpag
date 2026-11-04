@@ -707,7 +707,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     auto* layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
-    _layerBuilder->applyBoxTransform(layer, box, element);
+    _layerBuilder->applyBoxTransform(layer, box);
 
     // A Layer with an unresolved import directive cannot also carry vector contents. When the
     // replaced SVG has box visuals, keep those on an outer layer, resolve the SVG in a filling
@@ -771,7 +771,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   // The image is the foreground paint: CSS backgrounds sit behind it, while border and box
   // effects remain visible around it. The shared geometry also preserves border-radius.
   _layerBuilder->applyBackgroundVisuals(layer, box, fill);
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box);
   auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
   assignElementId(wrapper, element);
   return wrapper;
@@ -783,7 +783,7 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   auto* layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
   _layerBuilder->applyLayerAttributes(layer, element, box);
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box);
 
   // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
   // `resolveInheritedStyle` returns the style descendants see, but `resolvedTextColor`

@@ -27,6 +27,7 @@
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -693,37 +694,36 @@ void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes
   }
 }
 
-void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                                         const std::shared_ptr<DOMNode>& element) {
-  if (!box.transform.valid) return;
-  Matrix m = box.transform.matrix;
-  if (m.isIdentity()) return;
-  // Resolve the pivot (cx, cy). CSS resolves `transform-origin: 50% 50%`
-  // (the default) to the box's geometric centre; non-default origins set
-  // `originXPx/originYPx` during parsing so we honour the requested pivot
-  // here. Without explicit width/height on a default-origin transform we
-  // can't compute the centre, so the transform falls back to a top-left
-  // pivot — usually a visible mismatch, hence the warning.
-  float cx = NAN;
-  float cy = NAN;
-  if (!std::isnan(box.transform.originXPx) && !std::isnan(box.transform.originYPx)) {
-    cx = box.transform.originXPx;
-    cy = box.transform.originYPx;
-  } else if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx)) {
-    cx = box.widthPx * 0.5f;
-    cy = box.heightPx * 0.5f;
-  } else {
-    std::string tag = (element ? element->name : std::string("?"));
-    _diagnostics.warn("html: transform on '<" + tag +
-                      ">' without explicit width/height; transform-origin defaults to top-left "
-                      "and may differ from CSS transform-origin: 50% 50%");
+void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box) {
+  if (!box.transform.valid) {
+    return;
   }
-  if (!std::isnan(cx) && !std::isnan(cy)) {
-    Matrix toCenter = Matrix::Translate(cx, cy);
-    Matrix fromCenter = Matrix::Translate(-cx, -cy);
-    m = toCenter * m * fromCenter;
+  const auto& pose = box.transform.pose;
+  // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a
+  // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
+  // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or
+  // pure projection) is unaffected by the pivot, so it keeps the legacy matrix-only form.
+  const bool needsAnchor = box.transform.originResolved && !IsLinearIdentity(pose);
+  if (IsFlatTransform(pose)) {
+    const Matrix affine = ToAffine2D(pose);
+    if (affine.isIdentity()) {
+      return;
+    }
+    if (needsAnchor) {
+      layer->anchor = box.transform.origin;
+      layer->anchorZ = box.transform.originZ;
+    }
+    layer->matrix = affine;
+    return;
   }
-  layer->matrix = m;
+  if (!IsUsableTransform(pose)) {
+    return;
+  }
+  if (needsAnchor) {
+    layer->anchor = box.transform.origin;
+    layer->anchorZ = box.transform.originZ;
+  }
+  layer->matrix3D = pose;
 }
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
@@ -741,6 +741,7 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
       layer->centerX = 0.0f;
     }
   }
+  layer->preserve3D = box.preserve3D;
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
     // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,
@@ -897,6 +898,10 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   outer->blendMode = inner->blendMode;
   outer->matrix = inner->matrix;
   outer->matrix3D = inner->matrix3D;
+  // The pivot belongs to the pose: a layer that takes over the matrix must take over the anchor,
+  // otherwise the runtime would apply the pivot in the wrong coordinate space (or twice).
+  outer->anchor = inner->anchor;
+  outer->anchorZ = inner->anchorZ;
   outer->preserve3D = inner->preserve3D;
   outer->filters = std::move(inner->filters);
   outer->customData = std::move(inner->customData);
@@ -915,6 +920,8 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   inner->blendMode = BlendMode::Normal;
   inner->matrix = Matrix{};
   inner->matrix3D = Matrix3D{};
+  inner->anchor = {};
+  inner->anchorZ = 0.0f;
   inner->preserve3D = false;
 
   outer->children.push_back(inner);

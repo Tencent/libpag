@@ -365,6 +365,8 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLSvgFilterDecoder.h
             src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
             src/pagx/html/importer/HTMLTextFragmentBuilder.h
+            src/pagx/html/importer/HTMLTransform3D.cpp
+            src/pagx/html/importer/HTMLTransform3D.h
             src/pagx/html/importer/HTMLTransformContext.h
             src/pagx/html/importer/HTMLTransformPasses.cpp
             src/pagx/html/importer/HTMLTransformPasses.h
