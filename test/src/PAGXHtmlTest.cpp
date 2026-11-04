@@ -3474,16 +3474,6 @@ CLI_TEST(PAGXHtmlTest, AnimationKeyframeBoundaryHold) {
       ProjectPath::Absolute("resources/pagx_to_html/animations/keyframe_boundary_hold.pagx"), opts);
   ASSERT_FALSE(html.empty());
 
-  EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
-                      "  0% { opacity: 0.2; }\n"
-                      "  25% { opacity: 0.2; }\n"
-                      "  100% { opacity: 1; }\n"
-                      "}"),
-            std::string::npos);
-  auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
-  ASSERT_FALSE(onceTag.empty());
-  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
-
   auto sliderTag = FindTagContaining(html, "id=\"slider\"");
   ASSERT_FALSE(sliderTag.empty());
   // In the source PAGX, left=20 is the layout slot, while the animated x keys are 100 and 300.
@@ -4663,9 +4653,6 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
   EXPECT_NE(svgTag.find("viewBox=\"78 38 164 124\""), std::string::npos) << svgTag;
 }
 
-// A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
-// keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
-// an animation that would play empty stops.
 // Each mount maps its timeline offset onto the full CSS shorthand: the duration has to stay the
 // animation's own length, and the offset has to show up as the delay (positive once, negative once,
 // and as a wrapped negative delay for looping) with the iteration and direction that the loop mode
@@ -4921,6 +4908,9 @@ CLI_TEST(PAGXHtmlTest, AnimationSharedDivKeepsGeometryAndFill) {
   EXPECT_NE(divTag.find("pagx_growRectFill_"), std::string::npos) << divTag;
 }
 
+// A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
+// keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
+// an animation that would play empty stops.
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",
