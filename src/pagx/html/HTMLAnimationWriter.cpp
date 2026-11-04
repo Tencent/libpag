@@ -458,9 +458,16 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
       pts[kv.first].y = EvalFloatChannel(kv.second, frame, pts[kv.first].y);
     }
   }
-  if (!transform.isIdentity()) {
+  // The path's own placement applies inside the mask subtree, so it must be composed before the
+  // mask transform: maskMatrix * pathLocal. Applying them one after another in the wrong order
+  // offsets the geometry whenever both are non-identity.
+  auto pathPos = pathNode->renderPosition();
+  float pathScale = pathNode->renderScale();
+  Matrix pathLocal = Matrix::Translate(pathPos.x, pathPos.y) * Matrix::Scale(pathScale, pathScale);
+  Matrix combined = transform * pathLocal;
+  if (!combined.isIdentity()) {
     for (auto& pt : pts) {
-      pt = transform.mapPoint(pt);
+      pt = combined.mapPoint(pt);
     }
   }
   PathData rebuilt = PathDataFromSVGString("");
@@ -497,10 +504,14 @@ std::string RebuildAnimatedPathSVGString(const Path* pathNode,
         break;
     }
   }
-  auto pos = pathNode->renderPosition();
-  float scale = pathNode->renderScale();
-  Matrix m = Matrix::Translate(pos.x, pos.y) * Matrix::Scale(scale, scale);
-  return m.isIdentity() ? PathDataToSVGString(rebuilt) : TransformPathDataToSVG(rebuilt, m);
+  // Reversed paths wind the other way; the mask fill rule depends on it, and the static path string
+  // (GetPathSVGString) applies the same reversal.
+  if (pathNode->reversed) {
+    PathData reversedData = PathDataFromSVGString("");
+    ReversePathData(rebuilt, reversedData);
+    return PathDataToSVGString(reversedData);
+  }
+  return PathDataToSVGString(rebuilt);
 }
 
 // Returns the start of the innermost `<svg` opening tag that encloses `pos`, or npos when `pos` is
@@ -1475,8 +1486,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     auto nType = targetNode->nodeType();
     if (nType == NodeType::Layer) {
       domId = targetNode->id;
-    } else if (nType == NodeType::Group || nType == NodeType::TextBox ||
-               nType == NodeType::Text || nType == NodeType::Fill || nType == NodeType::Stroke ||
+    } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Text ||
+               nType == NodeType::Fill || nType == NodeType::Stroke ||
                nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
       auto it = ctx.animation.elementIds.find(targetNode);
       if (it != ctx.animation.elementIds.end()) {
