@@ -1492,6 +1492,11 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
     switch (style->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto shadow = static_cast<const DropShadowStyle*>(style);
+        if (shadow->spread != 0) {
+          addWarning(
+              "DropShadowStyle spread is not supported by SVG export and was ignored for style '" +
+              shadow->id + "'.");
+        }
         agg.dropShadowResults.push_back(writeDropShadowFragment(shadow->blurX, shadow->blurY,
                                                                 shadow->offsetX, shadow->offsetY,
                                                                 shadow->color, shadowIndex++));
@@ -1502,6 +1507,11 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
       }
       case NodeType::InnerShadowStyle: {
         auto shadow = static_cast<const InnerShadowStyle*>(style);
+        if (shadow->spread != 0) {
+          addWarning(
+              "InnerShadowStyle spread is not supported by SVG export and was ignored for style '" +
+              shadow->id + "'.");
+        }
         agg.innerShadowResults.push_back(writeInnerShadowFragment(shadow->blurX, shadow->blurY,
                                                                   shadow->offsetX, shadow->offsetY,
                                                                   shadow->color, shadowIndex++));

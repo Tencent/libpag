@@ -884,7 +884,7 @@ Layers are the fundamental organizational units for PAGX content. Each Layer ser
 
 ### 5.1 Core Concepts
 
-This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
+This section introduces the core concepts of the layer rendering pipeline. These concepts — layer content, layer contour, layer geometry, and layer background — form the foundation for understanding how layer styles, filters, and masks compute their effects.
 
 #### Layer Rendering Pipeline
 
@@ -912,6 +912,17 @@ Layer styles compute their effects based on layer content. For example, when fil
 3. **Image fills**: Fully transparent pixels remain transparent; all other pixels become fully opaque
 
 Note: Geometry elements without painters (standalone Rectangle, Ellipse, etc.) do not participate in contour.
+
+The **subtree contour** of a layer applies the same construction to the layer and all of its descendants.
+
+#### Layer Geometry
+
+**Layer geometry** is the outline the layer itself covers: the outline of every shape the layer's own fills and strokes draw, including paints that are fully transparent, plus the outline of geometry that no painter draws. It differs from layer contour in two ways:
+
+1. **Descendants never contribute.** Child layers belong to layer content and to the subtree contour, but not to the layer geometry.
+2. **Unpainted geometry is included.** A standalone Rectangle or Ellipse that carries no fill or stroke contributes its outline, even though it adds nothing to the contour.
+
+A layer that records no geometry has none to mask with; a style that needs one falls back as its own section describes (§5.3.5 for GlassStyle).
 
 #### Layer Background
 
@@ -971,6 +982,7 @@ Layer child elements are automatically categorized into five collections by type
 | `perspective` | float | 0 | Perspective viewing distance `d`; 0 means none, negative values are invalid |
 | `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | identity matrix | 3D transform (16 values, column-major); must be finite and invertible |
+| `anchor` | Point | 0,0 | Pivot of the local transform in layer-local pixels: `"x,y"` or `"x,y,z"`; conjugates the affine part as `M = P * T(t) * T(anchor) * L * T(-anchor)`, so the perspective projection stays outside the pivot. Values must be finite |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Group opacity |
@@ -997,6 +1009,24 @@ Layer child elements are automatically categorized into five collections by type
 
 A skew of ±90° or a negative `perspective` cannot be composed; the transform components are then ignored and only `x`/`y`/`z` apply.
 
+**anchor (local transform pivot)**: `anchor` sets the pivot the local transform rotates and scales around. It conjugates the affine part of the local transform only:
+
+```text
+M = P * T(translate) * T(anchor.x, anchor.y, anchorZ) * L * T(-anchor.x, -anchor.y, -anchorZ)
+```
+
+where `L` is the linear part of `matrix` / `matrix3D` (or the `R * K * S` composed from the components), `translate` is the translation of the same source, and `P` is the projection: the row built from `perspective` (identity when `perspective` is 0), or the projection row split out of a `matrix3D` that carries one. Expanded, only the translation changes, `t' = t + anchor - L * anchor`, and the linear part stays. The projection stays outside the pivot, so a layer whose linear part is the identity keeps its pose even under perspective, and a 2D matrix is just the `P = I` case. This differs from the CSS `transform-origin`, which conjugates `perspective()` along with the rest.
+
+Two values mean `(ax, ay, 0)`, so the pivot lies in the layer plane; a third value is the pivot depth and moves the rotation centre off the plane. The depth only takes effect once the Z row of the linear part differs from `(0, 0, 1)`, i.e. with a `matrix3D` or a Z component such as `rotationX` / `rotationY` and `scaleZ`. For a purely 2D transform that row is `(0, 0, 1)`, so `t_z' = z + anchorZ - anchorZ = z`: the depth cancels out exactly and changes neither the frame nor the depth ordering, which makes it redundant data. An `anchor.z` channel moves the rotation centre in depth under the same condition, so the ordering may change from frame to frame. A zero `anchor` (the default) reproduces the legacy meaning of `matrix` as the complete transform, so existing documents keep their behavior; with a non-zero `anchor`, `matrix` `tx`/`ty` are a pure translation and must not carry a baked pivot. One document must not use both a baked pivot in `tx`/`ty` and `anchor`, since the two add up.
+
+`anchor` is not an input of the transform priority chain: `matrix3D` / `matrix` / components plus `x`/`y`/`z` decide `L` and `translate` first, and the anchor applies once to the chosen result; it does not revive a `matrix` masked by a higher priority source. Unlike `x`/`y`/`z`, a non-identity static `matrix` / `matrix3D` does not mask `anchor`: `x`/`y` added to the translation would count twice, while the anchor redefines the pivot. Note that `Group.anchor` is a different attribute with the same name: a group subtracts its anchor from the content position, so an identity linear part still moves the content by `-anchor`.
+
+The pivot cannot be recovered from the pose: any anchor can be paired with a translation to produce the same matrix, and only `det(I - L) != 0` gives the unique `a = (I - L)⁻¹ * t`. Therefore `anchor` and `matrix` / `matrix3D` never update each other, and each drives its own state when animated (see Appendix D.1).
+
+An SVG `rotate(θ, cx, cy)` maps to `anchor="cx,cy"` plus matrix keyframes that carry only the linear part (`tx = ty = 0`). That is the recommended authoring form; the SVG / HTML importers still bake the transform origin into `matrix` and do not emit `anchor` yet.
+
+**Why this differs from the PAG / Lottie anchor model**: a Layer's local transform is one complete matrix including the translation, while PAG/Lottie model it as two independent attributes, `anchorPoint` and `position`; the abstraction levels differ, so `anchor` does not copy their split. This format makes the pivot a fixed point of the matrix and keeps `tx`/`ty` a pure translation, so matrix keyframes never carry a per-frame pivot compensation and the attribute maps one-to-one onto the CSS `transform-origin` and Ardot's `transformOrigin`. The conversion is `T(t) · T(a) · L · T(-a)`, which equals `T(t + a) · L · T(-a)`, i.e. PAG's and `Group`'s `position = matrix.t + anchor`. Keep the two questions apart: the geometry does not follow PAG, while the animation capability does — `anchorPoint` is a property in PAG too, and so are the `anchor.x` / `anchor.y` / `anchor.z` channels here.
+
 The position generated by constraint or container layout is applied outside the local transform: `T(layoutPosition) * local`.
 
 **Transform animation**: The Layer keeps one current local transform shared by its `x`/`y`/`z`, transform component, `matrix`, and `matrix3D` channels. Each animation write (and each data-bound `x`/`y`/`z` or component write, since a full `matrix` / `matrix3D` cannot be data-bound) mixes only the part it drives into the current value (`current = mix(current, value, weight)`); everything no source drives keeps its current value. `x`/`y`/`z` drive the translation, each component channel drives its own component, and `matrix3D` drives the whole matrix. Component values are kept as written while no matrix is written, so a scale can animate from 0 and a rotation beyond 180° keeps its value; after a `matrix` or `matrix3D` write, the next component write first decomposes the matrix into components (rotation then uses the equivalent Euler angles with the smaller X and Z rotation, and the shear becomes `skewX` with `skewY` 0), and it is rejected if the matrix cannot be decomposed, carries perspective other than a Z-axis distance, or carries a shear involving Z. `matrix` mixes the whole local transform toward the 2D matrix carrying the current Z translation, so at full weight it replaces everything except the Z translation and resets any 3D rotation, scale, skew, or perspective written earlier. Within one animation the priority above applies to the channels it contains, independent of channel order. A non-identity static `matrix` ignores `x`/`y` and component writes, and a non-identity static `matrix3D` ignores `x`/`y`/`z`, component, and `matrix` writes. When the local transform has perspective, an `x`/`y`/`z` write replaces the translation of the decomposed transform, so the translation stays inside the projection; the write is rejected if the transform cannot be decomposed. A finite singular pose is still published. A degenerate projection of the content plane has no drawable area, but a singular 4×4 matrix can still have a non-degenerate planar projection (for example, zero Z scale). Component reads and writes that require decomposition fail while a matrix pose is singular; a later decomposable matrix write restores them.
@@ -1017,9 +1047,9 @@ Layer styles add visual effects above or below layer content without modifying t
 
 **Input Sources for Layer Styles**:
 
-All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills.
+All layer styles compute effects based on **layer content**. During computation, layer content is converted to its opaque counterpart: geometric shapes are rendered with their normal fills, then all semi-transparent pixels are converted to fully opaque (fully transparent pixels are preserved). This means shadows produced by semi-transparent fills appear the same as those from fully opaque fills. GlassStyle is the exception: it uses the layer's own geometry instead of the opaque layer content (see §5.3.5).
 
-Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in §5.1.
+Some layer styles additionally use **layer geometry**, **layer contour**, or **layer background** as input (see individual style descriptions). Definitions of these concepts are in §5.1.
 
 > [Sample](samples/layer_styles.pagx)
 
@@ -1030,7 +1060,7 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 | `blendMode` | BlendMode | normal | Blend mode (see §2.9) |
 | `excludeChildEffects` | bool | false | Whether to exclude child layer effects |
 
-**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included.
+**excludeChildEffects**: When `false` (default), the layer style computes based on the full layer content including child layers' rendering results. When `true`, child layers' styles and filters are excluded from the layer content used to compute this style, but child layers' base rendering results are still included. GlassStyle is the exception: its mask is the layer's own geometry, so child rendering results never contribute — children only enter through the subtree-contour fallback used when the layer records no geometry (see §5.3.5).
 
 #### 5.3.1 DropShadowStyle
 
@@ -1042,18 +1072,58 @@ Draws a drop shadow **below** the layer. Computes shadow shape based on opaque l
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
+| `spread` | float | 0 | Signed layer-local length. Positive expands the shadow shape outward, negative contracts it |
 | `color` | Color | #000000 | Shadow color |
 | `showBehindLayer` | bool | true | Whether shadow shows behind layer |
 
 **Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the offset content
-3. Fill the shadow region with `color`
-4. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
+1. Get opaque layer content. When `spread` is non-zero, spread the content contour by `spread` (positive outward, negative inward) to form the shadow shape; when it is 0, use the layer content raster unchanged
+2. Offset the shadow shape by `(offsetX, offsetY)`
+3. Apply Gaussian blur `(blurX, blurY)` to the offset shape
+4. Fill the shadow region with `color`
+5. If `showBehindLayer="false"`, use layer contour as erase mask to cut out occluded portion
 
 **showBehindLayer**:
 - `true`: Shadow displays completely, including portion occluded by layer content
 - `false`: Portion of shadow occluded by layer content is cut out (using layer contour as erase mask)
+
+**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. Spread applies to the shadow geometry before offsetting, blurring and clipping, so a positive value can extend the shadow beyond the layer bounds. The default `spread="0"` keeps the plain raster path, so documents that omit the attribute render unchanged.
+
+**Spread geometry**: the shadow shape is rebuilt from the content outline rather than morphed point by point. All distances are layer-local. When a single outline is available (one geometry carrying one fill and/or one stroke):
+
+- **Rectangle**: the rectangle outset by `spread` on all four sides; corners stay sharp.
+- **Rounded rectangle**: the bounds outset by `spread`, and every non-zero corner radius becomes `max(0, radius + spread)` per axis, so the corners stay concentric with the outset bounds and a sharp corner stays sharp.
+- **Ellipse**: the same rule applied with radii equal to half the width and half the height, so each semi-axis becomes `max(0, semiAxis + spread)`.
+- **Stroke without fill**: the shadow shape is the stroke band of width `width + 2 × spread`, centered on the centerline that `align` defines — the outline itself for `center`, the outline displaced outward by `width / 2` for `outside`, and inward by `width / 2` for `inside`. When the band's inner edge collapses, the band becomes solid out to its outer edge.
+- **Fill with stroke**: the fill outline is first outset by `spread` plus the stroke's outward extent — `width / 2` for `center`, `width` for `outside`, 0 for `inside` — then the rules above apply.
+- **Collapse**: when the resulting shape has zero or negative width or height, the shadow is not drawn; for a stroke this happens at `width + 2 × spread ≤ 0`. `InnerShadowStyle` fills the whole content area instead (§5.3.3).
+
+Content without a single outline is spread from a substitute rectangle:
+
+- **Irregular closed path** (star, freeform outline): its bounding rectangle with sharp corners, first outset by the stroke's outward extent when the path is stroked. Strokes are treated as fills here, so the shadow is rectangular rather than a morphological offset of the outline.
+- **Single `Text` element**: the bounds of the rendered glyphs.
+- **Content without a single outline** (several geometries, several `Text` elements, text combined with other geometry, a group that only contains child layers): the content image bounds. For text these bounds come from conservative glyph metrics, typically the font bounding box, and can extend well beyond the visible glyphs.
+
+The rules above are the normative behavior of this version: they state exactly how each kind of content is converted into the shadow shape, and do not promise morphological spreading of arbitrary outlines.
+
+**Compatibility**: `spread` defaults to 0, so documents written before this attribute keep their appearance. A reader that predates it may ignore `spread` or reject such documents, and will not show the spread effect. In the C++ API the field is a new member of `DropShadowStyle` and `InnerShadowStyle`, so code built against an older header must be rebuilt.
+
+
+**Units and PAG conversion**: PAGX `spread` is an absolute pixel distance in layer-local coordinates. The binary PAG `DropShadowStyleV2.spread` is instead a dimensionless proportion of `size`: its stroke extent is `size × spread` and its remaining blur radius is `size × (1 − spread) / 2`. Do not copy the same-named field directly between formats. Converters must account for both spread and blur, and the different geometry algorithms may prevent an exact conversion.
+
+**Export/import limitations**: HTML import currently diagnoses and drops non-zero CSS `box-shadow` spread. HTML and SVG vector export currently render shadow styles with zero spread; HTML reports this degradation on stderr, and SVG reports it through the export API's `warnings` output. These limitations apply to both drop and inner shadows.
+
+**Performance**: Non-zero spread requires generating an additional shadow shape image when the layer is redrawn. Animating it can therefore cost more than using the zero-spread raster path; measure performance with representative content and output scales.
+
+**Example**:
+
+```xml
+<Layer>
+  <Rectangle position="60,40" size="120,80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+</Layer>
+```
 
 #### 5.3.2 BackgroundBlurStyle
 
@@ -1080,13 +1150,28 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
+| `spread` | float | 0 | Signed layer-local length. Positive thickens the inner shadow band inward, negative thins it |
 | `color` | Color | #000000 | Shadow color |
 
 **Rendering Steps**:
-1. Get opaque layer content and offset by `(offsetX, offsetY)`
-2. Apply Gaussian blur `(blurX, blurY)` to the inverse of the offset content (exterior region)
-3. Fill the shadow region with `color`
-4. Intersect with opaque layer content, keeping only shadow inside content
+1. Get opaque layer content as the region the shadow is clipped to
+2. Derive the occluder from the content contour, contracted by `spread` when it is positive and expanded when it is negative; when it is 0, use the layer content raster unchanged
+3. Offset the occluder by `(offsetX, offsetY)`
+4. Apply Gaussian blur `(blurX, blurY)` to the occluder
+5. Fill the region inside the content but outside the blurred occluder with `color`
+
+**spread**: Measured in layer-local units, the same as `offsetX` and `offsetY`, and scaled together with the layer content. The value is passed through unchanged: the renderer derives the occluder direction internally, so documents never negate it. The default `spread="0"` keeps the plain raster path. A positive spread large enough to collapse the occluder makes the shadow cover the entire content area. The occluder is derived with the §5.3.1 geometry rules using the opposite sign: a positive `spread` contracts the shape that §5.3.1 would expand by the same amount, so bounds and stroke bands shrink and corner radii decrease, floored at 0.
+
+**Example**:
+
+```xml
+<Layer id="panel" left="60" top="40" width="120" height="80">
+  <Rectangle width="120" height="80" roundness="16"/>
+  <Fill color="#E6E6E6"/>
+  <DropShadowStyle id="drop" offsetY="4" blurX="3" blurY="3" spread="2" color="#00000040"/>
+  <InnerShadowStyle id="inner" offsetY="8" blurX="4" blurY="4" spread="-6" color="#282828"/>
+</Layer>
+```
 
 #### 5.3.4 NoiseStyle
 
@@ -1105,7 +1190,7 @@ Overlays procedural Perlin noise above the layer content. Three noise modes are 
 
 #### 5.3.5 GlassStyle
 
-Simulates the physical behavior of light passing through a glass surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. Computes the effect based on **layer background**, using opaque layer content as the shape mask. The background comes implicitly from the complete PAGX layer tree below the layer; no background reference attribute is used. All seven parameters are animatable float channels matching `tgfx::GlassStyle`.
+Simulates the physical behavior of light passing through a glass surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. Computes the effect based on **layer background**, masked by the layer's **own geometry**: the geometry recorded by the layer's own painters — including geometry drawn by painters with alpha = 0 and geometry covered by a `SolidColor` fill whose color alpha is 0 — plus geometry that no painter draws, regardless of whether the layer has any visible fill. If the layer records no geometry, the mask falls back to the layer contour of the subtree: it includes the descendants and paints with alpha = 0, but not geometry that no painter draws. When the layer has neither, nothing is rendered for the style. The mask follows the layer contour's color rules: solid and gradient fills are replaced with opaque white, while an image fill keeps its own shader, so only fully transparent pixels stay uncovered and every other pixel, including semi-transparent ones, becomes fully opaque. The background comes implicitly from the complete PAGX layer tree below the layer; no background reference attribute is used. All seven parameters are animatable float channels matching `tgfx::GlassStyle`.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1119,7 +1204,7 @@ Simulates the physical behavior of light passing through a glass surface, produc
 
 **Rendering Steps**:
 1. Get layer background below the layer (implicit backdrop of the full PAGX layer tree)
-2. Apply frosted blur (`frost`), refraction (`refraction`, `depth`, `splay`), and chromatic dispersion (`dispersion`) to the layer background, shaped by the opaque layer content
+2. Apply frosted blur (`frost`), refraction (`refraction`, `depth`, `splay`), and chromatic dispersion (`dispersion`) to the layer background, masked by the layer's own geometry
 3. Add specular edge highlights using `lightAngle` and `lightIntensity`
 
 ### 5.4 Layer Filters
@@ -3058,8 +3143,12 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
 | `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |
 | `perspective` | float | Perspective distance (`perspective`); 0 means none |
+| `anchor.x` / `anchor.y` | float | Local transform pivot in layer-local pixels, interpolated per component |
+| `anchor.z` | float | Pivot depth; needs a Z component, a purely 2D transform cancels it out |
 
 The rotation/scale/skew/perspective channels drive the Layer transform components described in §5.2 and can be animated and data-bound like `x`/`y`/`z`. A write that would compose a skew of ±90° or a negative `perspective` is rejected.
+
+The `anchor` channels drive the pivot itself, which is kept apart from the pose: the pivot cannot be read back from a matrix (different pivots paired with matching translations produce the same matrix, see §5.2), so reading `anchor` returns the pivot state instead of a decomposed value, and `matrix` / `matrix3D` writes do not touch the pivot; a pivot write re-applies the anchor to the current pose. The pivot does not take part in layout, so a write needs no layout pass.
 
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 
@@ -3178,8 +3267,11 @@ Group and TextBox share the following transform channels for applying animated t
 |---------|------------|-------------|
 | `offsetX`, `offsetY` | float | Shadow offset (DropShadow, InnerShadow) |
 | `blurX`, `blurY` | float | Blur radius |
+| `spread` | float | Signed shadow spread (DropShadowStyle, InnerShadowStyle only) |
 | `color` | color | Shadow / overlay color |
 | `showBehindLayer` | boolean | Show behind layer (DropShadowStyle) |
+
+The `spread` channel exists only on `DropShadowStyle` and `InnerShadowStyle`. It is not part of `LayerStyle` in general and is not available on `DropShadowFilter` or `InnerShadowFilter` (§D.9).
 
 **GlassStyle** (all animatable float channels):
 

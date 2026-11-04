@@ -503,6 +503,9 @@ static std::vector<ChannelDef> BuildLayerFields() {
       FIELD_PERSPECTIVE(Layer, "perspective", perspective, Anim),
       FIELD_MATRIX(Layer, "matrix", matrix, Anim),
       FIELD_MATRIX3D(Layer, "matrix3D", matrix3D, Anim),
+      FIELD_POINT_X(Layer, "anchor.x", anchor, Anim),
+      FIELD_POINT_Y(Layer, "anchor.y", anchor, Anim),
+      FIELD_FLOAT(Layer, "anchor.z", anchorZ, Anim),
       FIELD_BOOL(Layer, "preserve3D", preserve3D, NoFlags),
       FIELD_BOOL(Layer, "antiAlias", antiAlias, NoFlags),
       FIELD_BOOL(Layer, "groupOpacity", groupOpacity, NoFlags),
@@ -822,6 +825,7 @@ static std::vector<ChannelDef> BuildDropShadowStyleFields() {
       FIELD_FLOAT(DropShadowStyle, "offsetY", offsetY, Anim),
       FIELD_FLOAT(DropShadowStyle, "blurX", blurX, Anim),
       FIELD_FLOAT(DropShadowStyle, "blurY", blurY, Anim),
+      FIELD_FLOAT(DropShadowStyle, "spread", spread, Anim),
       FIELD_COLOR(DropShadowStyle, "color", color, Anim),
       FIELD_BOOL(DropShadowStyle, "showBehindLayer", showBehindLayer, Anim),
   };
@@ -835,6 +839,7 @@ static std::vector<ChannelDef> BuildInnerShadowStyleFields() {
       FIELD_FLOAT(InnerShadowStyle, "offsetY", offsetY, Anim),
       FIELD_FLOAT(InnerShadowStyle, "blurX", blurX, Anim),
       FIELD_FLOAT(InnerShadowStyle, "blurY", blurY, Anim),
+      FIELD_FLOAT(InnerShadowStyle, "spread", spread, Anim),
       FIELD_COLOR(InnerShadowStyle, "color", color, Anim),
   };
 }

@@ -373,9 +373,19 @@ float HTMLValueParser::resolveLineHeightPx(const std::string& valueRaw, float fo
 
 std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
     const std::string& value) {
+  return parseShadowList(value, true);
+}
+
+std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(const std::string& value,
+                                                                          bool boxShadow) {
+  const std::string shadowName = boxShadow ? "box-shadow" : "drop-shadow()";
   std::vector<ShadowSpec> out;
   if (value.empty()) return out;
   auto items = SplitTopLevelCommas(value);
+  if (!boxShadow && items.size() != 1) {
+    _diagnostics.warn("html: malformed drop-shadow() '" + value + "'");
+    return out;
+  }
   for (auto& item : items) {
     auto tokens = SplitTopLevelWhitespace(item);
     if (tokens.empty()) continue;
@@ -400,16 +410,18 @@ std::vector<HTMLValueParser::ShadowSpec> HTMLValueParser::parseShadowList(
       }
       nonLengths.push_back(t);
     }
-    if (lengths.size() >= 2) {
-      s.offsetX = lengths[0];
-      s.offsetY = lengths[1];
-      if (lengths.size() >= 3) s.blur = lengths[2];
-      if (lengths.size() >= 4 && lengths[3] != 0) {
-        _diagnostics.warn("html: box-shadow spread is not supported and was ignored");
-      }
-    } else {
-      _diagnostics.warn("html: malformed box-shadow '" + item + "'");
+    if (lengths.size() < 2 || lengths.size() > (boxShadow ? 4u : 3u) || (!boxShadow && s.inset) ||
+        (lengths.size() >= 3 && lengths[2] < 0)) {
+      _diagnostics.warn("html: malformed " + shadowName + " '" + item + "'");
       continue;
+    }
+    s.offsetX = lengths[0];
+    s.offsetY = lengths[1];
+    if (lengths.size() >= 3) s.blur = lengths[2];
+    if (lengths.size() == 4 && lengths[3] != 0) {
+      _diagnostics.warn(
+          "html: box-shadow spread is not yet mapped by HTML import and was ignored; "
+          "PAGX shadow styles support spread");
     }
     if (!nonLengths.empty()) {
       // Join color tokens back (handles rgb(...) etc.).
@@ -463,10 +475,12 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       step.blurY = step.blurX;
     } else if (name == "drop-shadow") {
       step.kind = FilterStep::Kind::DropShadow;
-      auto shadows = parseShadowList(args);
-      if (!shadows.empty()) {
-        step.shadow = shadows.front();
+      auto shadows = parseShadowList(args, false);
+      if (shadows.empty()) {
+        pos = end + 1;
+        continue;
       }
+      step.shadow = shadows.front();
     } else if (name == "url") {
       // `filter: url(#id)` references an SVG `<filter>` def. Strip optional quotes and the
       // leading '#'; the caller resolves the id through the shared-defs table.

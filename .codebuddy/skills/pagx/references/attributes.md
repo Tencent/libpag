@@ -56,6 +56,7 @@ Basic container for content, child layers, styles, and filters.
 | `y` | float | 0 | Y position (prefer constraint attribute `top`) |
 | `matrix` | Matrix | identity | 2D transform "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | — | 3D transform (16 values, column-major) |
+| `anchor` | Anchor | 0,0 | Pivot of the local transform in layer-local pixels: `"x,y"` or `"x,y,z"`; conjugates the affine part as `M = P · T(t) · T(a) · L · T(-a)`, so the projection stays outside the pivot. Animatable through `anchor.x` / `anchor.y` / `anchor.z` |
 | `preserve3D` | bool | false | Preserve 3D transform space for child layers |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | true | Composite to offscreen buffer before applying alpha |
@@ -316,10 +317,13 @@ Layer style that draws a drop shadow below layer content.
 | `offsetY` | float | 0 | Shadow Y offset |
 | `blurX` | float | 0 | Shadow X blur radius |
 | `blurY` | float | 0 | Shadow Y blur radius |
+| `spread` | float | 0 | Signed shadow spread: positive expands the shadow shape, negative contracts it |
 | `color` | Color | #000000 | Shadow color |
 | `showBehindLayer` | bool | true | Whether shadow shows behind layer (false = occluded portion cut out) |
 | `blendMode` | BlendMode | normal | Blend mode for compositing |
 | `excludeChildEffects` | bool | false | Exclude child layer effects from style computation |
+
+`spread` rebuilds the shadow shape from the layer outline: a rectangle is outset on all sides, a rounded rectangle also shifts every non-zero corner radius by the same amount, an ellipse shifts its semi-axes, and a stroke band widens by `2 × spread`. Content without a single outline (text, several geometries, a group that only holds child layers) spreads from the content bounds instead, so irregular paths and text give a rectangle-based shadow. The HTML importer does not map CSS `box-shadow` spread yet, so set the attribute explicitly. `DropShadowFilter` and `InnerShadowFilter` have no `spread`.
 
 ### InnerShadowStyle
 
@@ -331,9 +335,12 @@ Layer style that draws an inner shadow above layer content, appearing inside the
 | `offsetY` | float | 0 | Shadow Y offset |
 | `blurX` | float | 0 | Shadow X blur radius |
 | `blurY` | float | 0 | Shadow Y blur radius |
+| `spread` | float | 0 | Signed spread: positive thickens the shadow band inward, negative thins it |
 | `color` | Color | #000000 | Shadow color |
 | `blendMode` | BlendMode | normal | Blend mode for compositing |
 | `excludeChildEffects` | bool | false | Exclude child layer effects from style computation |
+
+The occluder uses the `DropShadowStyle` shape rules with the sign flipped, so a positive `spread` contracts it and thickens the band. A positive value large enough to collapse the occluder fills the whole content area with the shadow color.
 
 ### BackgroundBlurStyle
 

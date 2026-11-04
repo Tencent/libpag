@@ -215,7 +215,7 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   // z-axis perspective on flat content matches what tgfx renders (asMatrix keeps the x/y
   // perspective terms and drops the z column, so a constant w divide is exact), and depth-shared
   // subtrees bake through hasPreserve3D instead. A non-positive w is not a valid projection.
-  const auto localTransform = BuildLayerLocalMatrix3D(layer);
+  const auto localTransform = BuildLayerTransform3DWithAnchor(layer);
   out.hasPerspectiveTransform = localTransform.getRowColumn(3, 0) != 0 ||
                                 localTransform.getRowColumn(3, 1) != 0 ||
                                 localTransform.getRowColumn(3, 3) <= 0;

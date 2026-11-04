@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>libpag Web Test</title>
+    <script src="./ffavc.min.js"></script>
+</head>
+<body>
+    <canvas id="pag-test-canvas" width="1024" height="1024" style="display: none;"></canvas>
+    <script type="module">
+        window.__pagTest = { finished: false, buildInfo: null, result: null, errors: [] };
+        const state = window.__pagTest;
+        const config = window.__pagTestConfig;
+        let device = null;
+
+        function recordDeviceLoss(info) {
+            state.errors.push(`GPU device lost: ${info.message}`);
+        }
+
+        function recordGPUError(event) {
+            state.errors.push(`GPU error: ${event.error.message}`);
+        }
+
+        function recordContextLoss(event) {
+            event.preventDefault();
+            state.errors.push('WebGL context lost');
+        }
+
+        try {
+            if (!config) throw new Error('Launch this page through run_test.js');
+            const response = await fetch('./build-info.json');
+            if (!response.ok) throw new Error('Missing build manifest');
+            const manifest = await response.json();
+            for (const key of ['protocol', 'backend', 'mode', 'buildId']) {
+                if (manifest[key] !== config.buildInfo[key]) {
+                    throw new Error(`Manifest mismatch: ${key}`);
+                }
+            }
+            const { default: PAGTest } = await import('./pag-test.js');
+            const { TGFXBind } = await import('./tgfx.esm.js');
+            const canvas = document.getElementById('pag-test-canvas');
+            canvas.addEventListener('webglcontextlost', recordContextLoss);
+            const options = { canvas };
+            if (manifest.backend === 'webgpu') {
+                if (!navigator.gpu) throw new Error('WebGPU is unavailable');
+                const adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) throw new Error('No WebGPU adapter');
+                device = await adapter.requestDevice();
+                device.lost.then(recordDeviceLoss);
+                device.addEventListener('uncapturederror', recordGPUError);
+                device.pushErrorScope('validation');
+                device.pushErrorScope('internal');
+                device.pushErrorScope('out-of-memory');
+                options.preinitializedWebGPUDevice = device;
+            }
+            const module = await PAGTest(options);
+            window.__pagTestFS = module.FS;
+            state.buildInfo = JSON.parse(module.ccall('GetBuildInfo', 'string', [], []));
+            for (const key of ['protocol', 'backend', 'mode', 'buildId', 'sourceRevision', 'tgfxRevision']) {
+                if (state.buildInfo[key] !== manifest[key]) {
+                    throw new Error(`WASM identity mismatch: ${key}`);
+                }
+            }
+            const fs = module.FS;
+            const baseline = fs.readFile('/test/baseline/version.json', { encoding: 'utf8' });
+            if (baseline !== config.baselineVersion) {
+                throw new Error('Baseline version changed since the DATA file was built');
+            }
+            if (manifest.mode === 'compare') {
+                if (!config.cache) throw new Error('Missing baseline cache');
+                const cachePath = `/test/baseline/.cache/${manifest.backend}`;
+                fs.mkdirTree(cachePath);
+                fs.writeFile(`${cachePath}/md5.json`, config.cache.md5);
+                fs.writeFile(`${cachePath}/version.json`, config.cache.version);
+            }
+            TGFXBind(module);
+            if (!window.ffavc) throw new Error('ffavc software decoder is unavailable');
+            const FFAVC = await window.ffavc.FFAVCInit();
+            module._registerSoftwareDecoderFactory(new FFAVC.FFAVCDecoderFactory());
+            module._useSoftwareDecoder = true;
+            fs.mkdirTree('/test');
+            const exitCode = config.filter
+                ? await module.ccall('RunTest', 'number', ['string'], [config.filter], { async: true })
+                : await module.ccall('RunAllTests', 'number', [], [], { async: true });
+            if (device) await device.queue.onSubmittedWorkDone();
+            state.result = JSON.parse(module.ccall('GetRunResult', 'string', [], []));
+            if (!state.result || state.result.exitCode !== exitCode) {
+                throw new Error('Missing or inconsistent native test result');
+            }
+        } catch (error) {
+            state.errors.push(error.stack || String(error));
+        } finally {
+            if (device) {
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        const error = await device.popErrorScope();
+                        if (error) state.errors.push(`GPU scoped error: ${error.message}`);
+                    } catch (error) {
+                        state.errors.push(`GPU error collection failed: ${error.message}`);
+                    }
+                }
+            }
+            state.finished = true;
+        }
+    </script>
+</body>
+</html>

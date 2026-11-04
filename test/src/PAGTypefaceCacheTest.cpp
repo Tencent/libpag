@@ -92,8 +92,7 @@ static std::shared_ptr<Typeface> CachedTypeface(const pagx::Font* fontNode) {
 
 // Builds a minimal text document, embeds fonts, and reloads it from XML so the embedded glyphRun
 // path (the one that lazily builds and caches a tgfx typeface on each Font node) is exercised by
-// LayerBuilder. Returns nullptr if the fallback font asset is missing on disk so the test is
-// skipped gracefully.
+// LayerBuilder. Returns nullptr if the required font or any embedding round-trip step fails.
 static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
   auto typeface = Typeface::MakeFromPath(fontPath);
@@ -107,6 +106,11 @@ static std::shared_ptr<pagx::PAGXDocument> MakeReloadedEmbeddedTextDocument() {
   auto* text = authoredDoc->makeNode<pagx::Text>();
   text->text = "Hi";
   text->fontSize = 24;
+  // Without an explicit family the layout falls back to platform system fonts, which are empty on
+  // web: shaping then produces no glyphs and every case below fails on FindFirstEmbeddedFont.
+  // Set the family/style to the registered font so Stage 1 resolves it deterministically.
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
   auto* fill = authoredDoc->makeNode<pagx::Fill>();
   auto* solid = authoredDoc->makeNode<pagx::SolidColor>();
   solid->color = {0, 0, 0, 1};
@@ -150,9 +154,7 @@ static pagx::Font* FindFirstEmbeddedFont(pagx::PAGXDocument* doc) {
 
 CLI_TEST(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
-  if (doc == nullptr) {
-    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
-  }
+  ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
@@ -166,9 +168,7 @@ CLI_TEST(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
 
 CLI_TEST(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
-  if (doc == nullptr) {
-    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
-  }
+  ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
@@ -186,9 +186,8 @@ CLI_TEST(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
 CLI_TEST(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   auto docA = MakeReloadedEmbeddedTextDocument();
   auto docB = MakeReloadedEmbeddedTextDocument();
-  if (docA == nullptr || docB == nullptr) {
-    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
-  }
+  ASSERT_NE(docA, nullptr) << "Failed to prepare the first embedded text document.";
+  ASSERT_NE(docB, nullptr) << "Failed to prepare the second embedded text document.";
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(docA.get()) != nullptr);
   auto* fontA = FindFirstEmbeddedFont(docA.get());
@@ -201,9 +200,7 @@ CLI_TEST(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
 
 CLI_TEST(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
-  if (doc == nullptr) {
-    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
-  }
+  ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
@@ -219,9 +216,7 @@ CLI_TEST(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
 
 CLI_TEST(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
-  if (doc == nullptr) {
-    GTEST_SKIP() << "Fallback font asset missing; skipping integration check.";
-  }
+  ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
   ASSERT_TRUE(pagx::LayerBuilder::Build(doc.get()) != nullptr);
   auto* fontNode = FindFirstEmbeddedFont(doc.get());

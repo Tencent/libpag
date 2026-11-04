@@ -571,16 +571,16 @@ const char* BlendModeToMixBlendMode(BlendMode mode) {
 }
 
 std::string LayerTransformCSS(const Layer* layer) {
-  // A non-finite matrix3D is ignored by the renderer, so it must not reach the CSS either;
-  // BuildLayerLocalMatrix3D below applies the same rule.
+  // Every branch applies the anchor pivot, so the exported CSS matches the renderer.
+  // A non-finite matrix3D is ignored by the renderer, so it must not reach the CSS either.
   if (!layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D)) {
-    return Matrix3DToCSS(layer->matrix3D);
+    return Matrix3DToCSS(ApplyAnchorToMatrix(layer->matrix3D, layer->anchor, layer->anchorZ));
   }
   bool hasMatrix = !layer->matrix.isIdentity() && IsFiniteMatrix(layer->matrix);
   // Transform components compose with the complete authored x / y / z (the perspective applies
   // outside the translation), so the caller emits only the generated layout slot as left / top.
   if (!hasMatrix && HasLayerTransformComponents(layer)) {
-    return Matrix3DToCSS(BuildLayerLocalMatrix3D(layer));
+    return Matrix3DToCSS(BuildLayerTransform3DWithAnchor(layer));
   }
   // Generated layout is emitted as the outer left/top slot. Keep authored x/y in the local
   // transform only on axes where layout supplied a separate position.
@@ -594,8 +594,15 @@ std::string LayerTransformCSS(const Layer* layer) {
     }
   }
   if (layer->z != 0) {
-    return Matrix3DToCSS(LiftMatrixToMatrix3D(m, layer->z));
+    const auto lifted = LiftMatrixToMatrix3D(m, layer->z);
+    return Matrix3DToCSS(ApplyAnchorToMatrix(lifted, layer->anchor, layer->anchorZ));
   }
+  // Lift to 3D so the pivot goes through the same code path as every other branch; a 2D layer has
+  // an identity projection row, so only the translation column changes and it can be folded back.
+  const auto anchored =
+      ApplyAnchorToMatrix(LiftMatrixToMatrix3D(m, 0.0f), layer->anchor, layer->anchorZ);
+  m.tx = anchored.values[12];
+  m.ty = anchored.values[13];
   if (m.isIdentity()) {
     return {};
   }

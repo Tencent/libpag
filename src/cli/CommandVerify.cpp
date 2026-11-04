@@ -31,12 +31,14 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include "cli/CliUtils.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
+#include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -104,6 +106,7 @@ struct VerifyOptions {
   bool skipRender = false;
   bool skipLayout = false;
   bool jsonOutput = false;
+  std::vector<std::string> fontPaths = {};
 };
 
 // ============================================================================
@@ -1143,7 +1146,7 @@ static void DetectPathToPrimitives(const Path* path, std::vector<VerifyDiagnosti
 // These are positional/identity attributes that don't affect the structural content.
 // clang-format off
 static const std::vector<const char*> LAYER_ROOT_STRIP_ATTRS = {
-    "x", "y", "matrix", "matrix3D",
+    "x", "y", "matrix", "matrix3D", "anchor",
     "left", "right", "top", "bottom", "centerX", "centerY",
     "flex", "includeInLayout",
 };
@@ -1287,6 +1290,18 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
         if (hasEmpty) {
           continue;
         }
+        // A Glass layer masks with its own geometry, so extracting it into a Composition would
+        // change that geometry's source; a window containing one is not an extraction candidate.
+        bool hasGlass = false;
+        for (size_t k = start; k < start + win; k++) {
+          if (pagx::UsesOwnGeometryMask(p.children[k])) {
+            hasGlass = true;
+            break;
+          }
+        }
+        if (hasGlass) {
+          continue;
+        }
         std::string sig;
         for (size_t k = start; k < start + win; k++) {
           sig += p.sigs[k] + "|";
@@ -1355,11 +1370,19 @@ static void DetectStructurallyIdenticalLayers(const PAGXDocument* doc,
     subtreeMap[sig].push_back(layer);
   }
   for (auto& pair : subtreeMap) {
-    if (pair.second.size() < 2) {
+    // A Glass layer records no geometry of its own once extracted into a Composition, so its mask
+    // would fall back to the subtree contour; the advice still holds for the remaining Layers.
+    std::vector<const Layer*> candidates;
+    for (auto* layer : pair.second) {
+      if (!pagx::UsesOwnGeometryMask(layer)) {
+        candidates.push_back(layer);
+      }
+    }
+    if (candidates.size() < 2) {
       continue;
     }
     std::vector<int> lines;
-    for (auto* layer : pair.second) {
+    for (auto* layer : candidates) {
       lines.push_back(layer->sourceLine);
     }
     std::sort(lines.begin(), lines.end());
@@ -1439,6 +1462,11 @@ static void DetectDowngradableLayers(const Layer* parentLayer,
   // Cannot downgrade if parent has both contents and children — contents render behind
   // children, so moving children to contents would change the paint order.
   if (!parentLayer->contents.empty()) {
+    return;
+  }
+  // Following this advice would move the children's geometry into the parent, which changes what a
+  // style masked with the parent's own geometry covers (see PAGXOptimizer's guard).
+  if (pagx::UsesOwnGeometryMask(parentLayer)) {
     return;
   }
   // All children must be downgradable — partial downgrade changes paint order.
@@ -1833,8 +1861,10 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
     DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
   }
   DetectDowngradableLayers(layer, diagnostics);
-  // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
-  bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None;
+  // Dedup only when the DetectDowngradableLayers advice actually fires: a Glass layer keeps its
+  // own geometry, so the downgrade advice is suppressed there and the merge advice must still run.
+  bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None &&
+                            !pagx::UsesOwnGeometryMask(layer);
   DetectMergeableAdjacentLayers(layer->children, layer->layout != LayoutMode::None,
                                 dedupWithDowngrade, diagnostics);
   DetectLowOpacityHighCost(layer, diagnostics);
@@ -3047,6 +3077,7 @@ static void PrintUsage() {
             << "  --scale <float>     Render scale factor (default: 1.0)\n"
             << "  --skip-render       Skip screenshot generation\n"
             << "  --skip-layout       Skip layout XML generation\n"
+            << "  --font <path>       Add a fallback font file for text layout (repeatable)\n"
             << "  --json              Output diagnostics in JSON format\n"
             << "  -h, --help          Show this help message\n";
 }
@@ -3075,6 +3106,12 @@ static int ParseOptions(int argc, char* argv[], VerifyOptions* opts) {
       opts->skipLayout = true;
     } else if (strcmp(argv[i], "--json") == 0) {
       opts->jsonOutput = true;
+    } else if (strcmp(argv[i], "--font") == 0) {
+      if (i + 1 >= argc) {
+        std::cerr << "pagx verify: --font requires an argument\n";
+        return 1;
+      }
+      opts->fontPaths.push_back(argv[++i]);
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       PrintUsage();
       return -1;
@@ -3116,7 +3153,24 @@ int RunVerify(int argc, char* argv[]) {
     return 1;
   }
 
-  doc->applyLayout();
+  // Fall back to user-supplied fonts when the platform has no system fonts (web): without a
+  // fallback the text measurement collapses to zero height, which trips the zero-size checks.
+  if (opts.fontPaths.empty()) {
+    doc->applyLayout();
+  } else {
+    // Loading fallback fonts dominates per-file verify runs (test loops re-invoke RunVerify with
+    // the same font list), so cache the built config across invocations.
+    static std::vector<std::string> cachedFontPaths = {};
+    static FontConfig cachedFontConfig = {};
+    if (opts.fontPaths != cachedFontPaths) {
+      cachedFontConfig = FontConfig();
+      for (const auto& fontPath : opts.fontPaths) {
+        cachedFontConfig.addFallbackFont(fontPath, 0);
+      }
+      cachedFontPaths = opts.fontPaths;
+    }
+    doc->applyLayout(&cachedFontConfig);
+  }
 
   // Parse the XML DOM for signature-based duplicate detection.
   auto xmlDoc = xmlReadFile(opts.inputFile.c_str(), nullptr, XML_PARSE_NONET | XML_PARSE_NOBLANKS);
@@ -3180,6 +3234,12 @@ int RunVerify(int argc, char* argv[]) {
   if (!opts.id.empty()) {
     renderArgs.push_back("--id");
     renderArgs.push_back(opts.id);
+  }
+  // Forward the fallback fonts so the render pass measures text the same way the layout above
+  // did; otherwise the two passes disagree on platforms without system fonts.
+  for (const auto& fontPath : opts.fontPaths) {
+    renderArgs.push_back("--fallback");
+    renderArgs.push_back(fontPath);
   }
   renderArgs.push_back(opts.inputFile);
 

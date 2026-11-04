@@ -48,9 +48,9 @@ class HTMLValueParser {
  public:
   /**
    * Container for a single resolved `box-shadow` / `drop-shadow` entry. `inset` distinguishes
-   * inner shadows. CSS `spread` is intentionally not modelled — PAGX has no spread axis on its
-   * shadow styles, so the parser emits a diagnostic when a non-zero spread is present and drops
-   * the value rather than carrying a field downstream consumers cannot honour.
+   * inner shadows. CSS `spread` is not carried here: the parser emits a diagnostic when a non-zero
+   * spread is present and drops the value, so HTML import keeps its zero-spread output until the
+   * mapping onto DropShadowStyle.spread / InnerShadowStyle.spread is added.
    */
   struct ShadowSpec {
     float offsetX = 0;
@@ -94,6 +94,7 @@ class HTMLValueParser {
   float parseAbsoluteLengthPx(const std::string& valueRaw);
   float resolveLineHeightPx(const std::string& valueRaw, float fontSizePx);
 
+  /** Parses box-shadow entries; non-zero spread is diagnosed and omitted by HTML import. */
   std::vector<ShadowSpec> parseShadowList(const std::string& value);
   std::vector<FilterStep> parseFilterChain(const std::string& value);
 
@@ -146,6 +147,8 @@ class HTMLValueParser {
   void emitColorStops(T& targetStops, const GradientStops& stops);
 
  private:
+  std::vector<ShadowSpec> parseShadowList(const std::string& value, bool boxShadow);
+
   // Builds the tiled color stops of a `repeating-linear-gradient` in the gradient line's
   // normalised (0..1) space. One authored period is parsed into pixel positions along the line
   // (`lineLength` px), then repeated forward until the far edge is covered. Returns false when the

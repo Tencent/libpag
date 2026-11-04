@@ -18,6 +18,9 @@
 
 #include "DevicePool.h"
 #include "rendering/gpu/Devices.h"
+#if defined(TGFX_USE_METAL)
+#include "utils/MetalTestSupport.h"
+#endif
 
 namespace pag {
 thread_local std::shared_ptr<tgfx::Device> cachedDevice = nullptr;
@@ -29,5 +32,13 @@ std::shared_ptr<tgfx::Device> DevicePool::Make() {
     cachedDevice = device;
   }
   return device;
+}
+
+bool DevicePool::ResetAtlasForComparison() {
+#if defined(TGFX_USE_METAL)
+  return ResetMetalAtlasForComparison();
+#else
+  return false;
+#endif
 }
 }  // namespace pag

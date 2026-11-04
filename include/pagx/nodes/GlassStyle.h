@@ -26,9 +26,9 @@ namespace pagx {
  * A glass layer style that simulates the physical behavior of light passing through a glass
  * surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. It
  * captures the background content below the layer and renders it with optical distortion shaped by
- * the layer's content. The background comes implicitly from the full PAGX layer tree below the
- * layer; no background reference attribute is used. All seven parameters are animatable float
- * channels with fields matching tgfx::GlassStyle.
+ * the layer's **own geometry** (see §5.3.5 of the PAGX spec). The background comes implicitly from
+ * the full PAGX layer tree below the layer; no background reference attribute is used. All seven
+ * parameters are animatable float channels with fields matching tgfx::GlassStyle.
  */
 class GlassStyle : public LayerStyle {
  public:
