@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Rotate3D With Perspective</title>
+    <title>Rotate3D Off-Center Pivot</title>
     <!--
-      Every keyframe carries `perspective(600px)` because a CSS transform animation replaces the
-      whole property. The projection row lives outside the pivot, so a non-centre origin still
-      keeps the card's left edge fixed while it turns.
+      3D x anchor coupling case. Every keyframe carries `perspective(600px)` because a CSS
+      transform animation replaces the whole property, and the origin sits on the card's left edge
+      at mid height. The projection row must stay outside the pivot, so the card keeps that edge
+      fixed while it turns; baking the pivot into each keyframe makes it drift.
     -->
     <style>
       @keyframes flip {
