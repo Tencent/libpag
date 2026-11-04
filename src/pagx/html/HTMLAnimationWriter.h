@@ -87,7 +87,11 @@ class HTMLAnimationSession {
     std::unordered_map<std::string, std::vector<bool>> playStates = {};
   };
 
-  static void ApplyElementEdits(std::string& bodyHtml, const ElementEdits& edits);
+  // `tagRanges` maps an element id to the byte range of its opening tag in `bodyHtml`.
+  static void ApplyElementEdits(
+      std::string& bodyHtml,
+      const std::unordered_map<std::string, std::pair<size_t, size_t>>& tagRanges,
+      const ElementEdits& edits);
 
   PAGXDocument& _doc;
   HTMLWriterContext& _ctx;

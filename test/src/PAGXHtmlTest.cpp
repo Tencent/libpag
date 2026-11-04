@@ -3873,6 +3873,50 @@ CLI_TEST(PAGXHtmlTest, AnimationAlphaMaskKeepsSoftMaskInsteadOfClipPath) {
   EXPECT_NE(html.find("#softPath { animation: pagx_softPath_0"), std::string::npos) << html;
 }
 
+// The weaver resolves a target by scanning the emitted body for `id="..."`. Text content that
+// happens to contain the same literal must not capture the declaration: the scan has to stay inside
+// opening tags, otherwise the animation lands on the text span and the real element stays static.
+CLI_TEST(PAGXHtmlTest, AnimationTargetIdMentionedInTextIsNotWoven) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text text='Set id="box1" here' fontFamily="Arial" fontSize="14" position="160,30"/>
+      <Fill color="#111111"/>
+    </Layer>
+    <Layer id="box1" left="100" top="90" width="120" height="60">
+      <Rectangle position="60,30" size="120,60"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="fade" duration="60" frameRate="60" loop="loop">
+        <Object target="box1">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="0.2"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto spanTag = FindTagContaining(html, "<span");
+  ASSERT_FALSE(spanTag.empty());
+  EXPECT_EQ(spanTag.find("animation:"), std::string::npos) << spanTag;
+  // The declaration must land on the animated div, not on the span whose text mentions its id.
+  auto animPos = html.find("animation:pagx_box1_");
+  ASSERT_NE(animPos, std::string::npos) << html;
+  auto tagStart = html.rfind('<', animPos);
+  auto tagEnd = html.find('>', animPos);
+  ASSERT_NE(tagStart, std::string::npos);
+  ASSERT_NE(tagEnd, std::string::npos);
+  auto animatedTag = html.substr(tagStart, tagEnd - tagStart);
+  EXPECT_EQ(animatedTag.find("<div"), 0u) << animatedTag;
+  EXPECT_NE(animatedTag.find("id=\"box1\""), std::string::npos) << animatedTag;
+}
+
 // An animated mask path resolves its bundle through the masked layer's id: that id is the tag the
 // bundle is routed to. A masked layer that is not animated itself therefore still gets one, and the
 // mask keyframes are emitted. Without that id the bundle resolves to no tag and is dropped.
