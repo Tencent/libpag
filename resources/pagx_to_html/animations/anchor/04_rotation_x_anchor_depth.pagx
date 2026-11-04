@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: anchor carries a third value, so the pivot sits 30px behind the card plane. Tipping around X then moves
+     the whole plane towards and away from the viewer, which changes its projected size.
+     Target: Layer  Channel: rotation.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="cardPivotZ" x="100" y="60" width="120" height="80" anchor="0,80,30" perspective="600">
+    <Rectangle position="60,40" size="120,80" roundness="12"/>
+    <Fill color="#C2410C"/>
+    <Group position="24,24">
+      <Rectangle position="36,16" size="72,32" roundness="8"/>
+      <Fill color="#FED7AA"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="cardTiltX" duration="60" frameRate="60" loop="loop">
+      <Object target="cardPivotZ">
+        <Channel name="rotation.x" type="float">
+          <Key time="0" value="-45" interpolation="linear"/>
+          <Key time="30" value="45" interpolation="linear"/>
+          <Key time="60" value="-45"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
