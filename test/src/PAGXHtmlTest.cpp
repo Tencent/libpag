@@ -4666,30 +4666,44 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
 // A channel the runtime animates but the exporter has no CSS mapping for contributes nothing to the
 // keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
 // an animation that would play empty stops.
+// Each mount maps its timeline offset onto the full CSS shorthand: the duration has to stay the
+// animation's own length, and the offset has to show up as the delay (positive once, negative once,
+// and as a wrapped negative delay for looping) with the iteration and direction that the loop mode
+// asks for. Asserting only that an animation exists would pass even if the offset were dropped.
 CLI_TEST(PAGXHtmlTest, AnimationCompositionMountedTimelines) {
+  struct TimingCase {
+    const char* file;
+    const char* tagId;
+    const char* shorthand;  // duration, easing, delay, iteration count, fill mode
+  };
+  const TimingCase cases[] = {
+      {"timing/05_offset_positive_once.pagx", "cardColor", "0.3333s steps(1, end) 0.0833s 1 both"},
+      {"timing/06_offset_positive_loop.pagx", "cardChild", "1s linear -0.75s infinite"},
+      {"timing/07_offset_negative_once.pagx", "cardColor", "0.3333s steps(1, end) -0.1667s 1 both"},
+      {"timing/08_offset_ping_pong.pagx", "cardChild", "1s linear -1.75s infinite alternate"},
+  };
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
-  const char* cases[] = {
-      "timing/05_offset_positive_once.pagx",
-      "timing/06_offset_positive_loop.pagx",
-      "timing/07_offset_negative_once.pagx",
-      "timing/08_offset_ping_pong.pagx",
-  };
-  for (const auto* name : cases) {
+  for (const auto& timingCase : cases) {
     auto html = LoadAndConvert(
-        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
-    ASSERT_FALSE(html.empty()) << name;
-    EXPECT_NE(html.find("@keyframes"), std::string::npos) << name;
-    EXPECT_NE(html.find("animation:"), std::string::npos) << name;
+        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + timingCase.file),
+        opts);
+    ASSERT_FALSE(html.empty()) << timingCase.file;
+    auto tag = FindTagContaining(html, std::string("id=\"") + timingCase.tagId + "\"");
+    ASSERT_FALSE(tag.empty()) << timingCase.file;
+    EXPECT_NE(tag.find(timingCase.shorthand), std::string::npos)
+        << timingCase.file << " -> " << tag;
   }
+  // A negative once offset starts past the first key, so the first stop still has to be reached by
+  // the wrapped window rather than by a shortened ramp.
   auto negative =
       LoadAndConvert(ProjectPath::Absolute(
                          "resources/pagx_to_html/animations/timing/07_offset_negative_once.pagx"),
                      opts);
-  EXPECT_NE(negative.find("-0.1667s"), std::string::npos);
   auto negativeRule = KeyframesRuleNamed(
       negative, AnimationNameOfTag(FindTagContaining(negative, "id=\"cardColor\"")));
-  EXPECT_NE(negativeRule.find("75% { background-color: #0000FF;"), std::string::npos);
+  EXPECT_NE(negativeRule.find("75% { background-color: #0000FF;"), std::string::npos)
+      << negativeRule;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
@@ -4705,9 +4719,13 @@ CLI_TEST(PAGXHtmlTest, AnimationCompositionSharedSlotsHaveIndependentPhases) {
   auto slotB = FindTagContaining(html, "id=\"cardChild__1\"");
   ASSERT_FALSE(slotA.empty());
   ASSERT_FALSE(slotB.empty());
-  EXPECT_NE(slotA.find("animation:"), std::string::npos);
-  EXPECT_NE(slotB.find("animation:"), std::string::npos);
-  EXPECT_NE(slotB.find("0.5s"), std::string::npos);
+  // Both slots run the same source animation but from different offsets, so the whole shorthand has
+  // to differ: matching a bare "0.5s" would also hit a 0.5s duration and prove nothing.
+  EXPECT_NE(slotA.find("1s linear 1 both"), std::string::npos) << slotA;
+  EXPECT_EQ(slotA.find("0.5s"), std::string::npos) << slotA;
+  EXPECT_NE(slotB.find("1s linear 0.5s 1 both"), std::string::npos) << slotB;
+  // Separate keyframes, so each slot keeps its own phase instead of sharing one rule.
+  EXPECT_NE(AnimationNameOfTag(slotA), AnimationNameOfTag(slotB)) << slotA << slotB;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationCompositionLayerVisibleWindow) {
