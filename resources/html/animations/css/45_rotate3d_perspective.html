@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rotate3D With Perspective</title>
+    <!--
+      Every keyframe carries `perspective(600px)` because a CSS transform animation replaces the
+      whole property. The projection row lives outside the pivot, so a non-centre origin still
+      keeps the card's left edge fixed while it turns.
+    -->
+    <style>
+      @keyframes flip {
+        0%   { transform: perspective(600px) rotateY(-45deg); }
+        50%  { transform: perspective(600px) rotateY(45deg); }
+        100% { transform: perspective(600px) rotateY(-45deg); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <div id="card"
+         style="position: absolute; left: 60px; top: 40px;
+                width: 120px; height: 80px; border-radius: 12px;
+                background-color: #38BDF8;
+                transform-origin: 0px 40px;
+                animation: flip 2s ease-in-out infinite;"></div>
+  </body>
+</html>
