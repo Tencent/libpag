@@ -40,10 +40,17 @@
 
 namespace pagx {
 
-// 同一时刻的两个关键帧表示瞬时跳变（例如 opacity 1 -> 0 -> 1 在同一帧完成）。只把前一帧
-// 记为 Hold 还不够：以 frame 为键的时间轴（编辑器轨道）会按时间戳去重，把后者丢掉，整条
-// 轨道看起来恒定。这里把前一帧提前一帧，两个 key 时间不同，跳变在任何实现里都能保留。
-// 只对 float 属性通道（alpha 等）生效：matrix 通道的同帧跳变尚未验证，先保持原样。
+// Bounds for values read from untrusted SVG. An unbounded duration, repeat count or rotation angle
+// would otherwise expand into an unlimited number of keyframes.
+static constexpr double kMaxDurationSeconds = 86400.0;
+static constexpr double kMaxRepeatCount = 1000.0;
+static constexpr int kMaxRotationSteps = 10000;
+
+// Two keyframes on the same frame describe an instantaneous jump (opacity 1 -> 0 -> 1 within one
+// frame). Marking the earlier key as Hold is not enough: tracks keyed by frame deduplicate by
+// timestamp and drop the later key, leaving a constant track. Shifting the earlier key one frame
+// back keeps both keys distinct in any implementation. Float property channels only (alpha and
+// friends); same-frame jumps on matrix channels are not verified yet.
 static void ShiftSameTimeFloatKeyframes(TypedChannel<float>* channel) {
   if (channel == nullptr || channel->keyframes.size() < 2) {
     return;
@@ -855,6 +862,9 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
                               double repeatCount, bool accumulate) {
   if (repeatCount <= 1.0) {
     return;
+  }
+  if (repeatCount > kMaxRepeatCount) {
+    repeatCount = kMaxRepeatCount;
   }
   switch (valueType) {
     case ChannelValueType::Float:
@@ -1799,9 +1809,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // Parse timing attributes.
   auto durStr = ctx.getAttribute(animElement, "dur");
   double durSeconds = parseSMILClockValue(durStr);
-  if (durSeconds <= 0.0) {
+  if (!std::isfinite(durSeconds) || durSeconds <= 0.0) {
     // No duration: cannot build keyframes.
     return channels;
+  }
+  if (durSeconds > kMaxDurationSeconds) {
+    durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
@@ -2244,8 +2257,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   // self-contained and avoid exposing internal timing structs in the header).
   auto durStr = ctx.getAttribute(animElement, "dur");
   double durSeconds = parseSMILClockValue(durStr);
-  if (durSeconds <= 0.0) {
+  if (!std::isfinite(durSeconds) || durSeconds <= 0.0) {
     return channels;
+  }
+  if (durSeconds > kMaxDurationSeconds) {
+    durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
@@ -2321,6 +2337,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       // sub-pixel for typical orbit radii, and a full turn becomes 18 keys.
       constexpr float kMaxRotateStep = 20.0f;
       int steps = static_cast<int>(std::ceil(std::abs(delta) / kMaxRotateStep));
+      if (steps > kMaxRotationSteps) {
+        steps = kMaxRotationSteps;
+      }
       for (int k = 1; k <= steps; ++k) {
         float t = static_cast<float>(k) / static_cast<float>(steps);
         std::vector<float> params = {};
@@ -2483,8 +2502,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   // Parse timing.
   auto durStr = ctx.getAttribute(animElement, "dur");
   double durSeconds = parseSMILClockValue(durStr);
-  if (durSeconds <= 0.0) {
+  if (!std::isfinite(durSeconds) || durSeconds <= 0.0) {
     return channels;
+  }
+  if (durSeconds > kMaxDurationSeconds) {
+    durSeconds = kMaxDurationSeconds;
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
@@ -2759,6 +2781,7 @@ Animation* SMILAnimationParser::buildAnimation(
     };
     std::vector<ChannelEntry> layerEntries = {};
     Frame layerEndFrame = 0;
+    Frame indefinitePeriod = 0;
 
     for (const auto& animEl : group.animates) {
       Frame endFrame = 0;
@@ -2777,6 +2800,12 @@ Animation* SMILAnimationParser::buildAnimation(
       if (repeatCount == "indefinite") {
         hasIndefiniteLoop = true;
         elementIndefinite = true;
+        if (indefinitePeriod <= 0) {
+          auto durSeconds = parseSMILClockValue(ctx.getAttribute(animEl, "dur"));
+          if (std::isfinite(durSeconds) && durSeconds > 0.0) {
+            indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+          }
+        }
       }
     }
     for (const auto& setEl : group.sets) {
@@ -2817,6 +2846,12 @@ Animation* SMILAnimationParser::buildAnimation(
         if (repeatCount == "indefinite") {
           hasIndefiniteLoop = true;
           elementIndefinite = true;
+          if (indefinitePeriod <= 0) {
+            auto durSeconds = parseSMILClockValue(ctx.getAttribute(transformEl, "dur"));
+            if (std::isfinite(durSeconds) && durSeconds > 0.0) {
+              indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+            }
+          }
         }
       }
       for (const auto& motionEl : group.animateMotions) {
@@ -2835,6 +2870,12 @@ Animation* SMILAnimationParser::buildAnimation(
         if (repeatCount == "indefinite") {
           hasIndefiniteLoop = true;
           elementIndefinite = true;
+          if (indefinitePeriod <= 0) {
+            auto durSeconds = parseSMILClockValue(ctx.getAttribute(motionEl, "dur"));
+            if (std::isfinite(durSeconds) && durSeconds > 0.0) {
+              indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+            }
+          }
         }
       }
     }
@@ -2851,7 +2892,7 @@ Animation* SMILAnimationParser::buildAnimation(
       if (!obj->channels.empty()) {
         animation->objects.push_back(obj);
         if (elementIndefinite && layerEndFrame > 0) {
-          infiniteObjects.push_back({obj, layerEndFrame});
+          infiniteObjects.push_back({obj, indefinitePeriod > 0 ? indefinitePeriod : layerEndFrame});
         }
       }
     }
