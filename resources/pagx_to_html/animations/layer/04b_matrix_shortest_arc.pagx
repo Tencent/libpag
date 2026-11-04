@@ -10,8 +10,10 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
+  <!-- A scalene triangle has no rotational symmetry: a 4-point polygon repeats every 90 degrees, so
+       a wrong-path sample (90/180/270 degrees off) would look identical and hide the bug. -->
   <Layer id="arcBox" x="160" y="100" width="80" height="80">
-    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Path data="M 8,12 L 72,34 L 24,72 Z"/>
     <Fill color="#4F46E5"/>
   </Layer>
   <Animations>
