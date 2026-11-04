@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: a LoopMode once animation fades the layer in and then stops at the final value.
+<!-- Tests: a frameRate of 30 makes the 60 frame duration span two seconds of playback.
      Target: Layer  Channel: alpha  Type: float
      Expect: supported
      Ref: - -->
@@ -8,13 +8,13 @@
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
-  <Layer id="onceBox" x="120" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+  <Layer id="slowBox" x="120" y="60" width="80" height="80">
+    <Ellipse position="40,40" size="80,80"/>
+    <Fill color="#0284C7"/>
   </Layer>
   <Animations>
-    <Animation id="onceFade" duration="60" frameRate="60" loop="once">
-      <Object target="onceBox">
+    <Animation id="slowFade" duration="60" frameRate="30" loop="once">
+      <Object target="slowBox">
         <Channel name="alpha" type="float">
           <Key time="0" value="0.2" interpolation="linear"/>
           <Key time="60" value="1" interpolation="linear"/>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: a matrix tween between 170 and 190 degrees takes the 20 degree shortest arc through 180
-     instead of the 340 degree way around.
+     instead of the 340 degree way around. A matrix channel replaces the layer's x/y translation, so
+     each key carries its own translate and the box stays on the canvas.
      Target: Layer  Channel: matrix  Type: matrix
      Expect: supported
      Ref: test/src/PAGXTest.cpp:10289 -->
@@ -10,15 +11,15 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="arcBox" x="160" y="100" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
   </Layer>
   <Animations>
     <Animation id="arcTurn" duration="60" frameRate="60" loop="once">
       <Object target="arcBox">
         <Channel name="matrix" type="matrix">
-          <Key time="0" value="-0.9848,0.1736,-0.1736,-0.9848,0,0" interpolation="linear"/>
-          <Key time="60" value="-0.9848,-0.1736,0.1736,-0.9848,0,0" interpolation="linear"/>
+          <Key time="0" value="-0.9848,0.1736,-0.1736,-0.9848,160,100" interpolation="linear"/>
+          <Key time="60" value="-0.9848,-0.1736,0.1736,-0.9848,160,100" interpolation="linear"/>
         </Channel>
       </Object>
     </Animation>

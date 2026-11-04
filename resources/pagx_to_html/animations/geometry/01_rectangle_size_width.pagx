@@ -10,7 +10,7 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle id="growRect" position="160,100" size="80,120" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Fill color="#B45309"/>
   </Layer>
   <Animations>
     <Animation id="rectWidthGrow" duration="60" frameRate="60" loop="once">

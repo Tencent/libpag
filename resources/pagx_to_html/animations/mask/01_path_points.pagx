@@ -16,7 +16,7 @@
     </Layer>
     <Layer mask="@clipMask" maskType="contour">
       <Rectangle position="160,100" size="240,160"/>
-      <Fill color="#2563EB"/>
+      <Fill color="#B91C1C"/>
     </Layer>
   </Layer>
   <Animations>

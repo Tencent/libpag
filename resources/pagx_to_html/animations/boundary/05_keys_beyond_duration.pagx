@@ -10,8 +10,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="overKeyBox" x="120" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="star" pointCount="5" outerRadius="40" innerRadius="16" rotation="-90" position="40,40"/>
+    <Fill color="#0F766E"/>
   </Layer>
   <Animations>
     <Animation id="overKeyFade" duration="120" frameRate="60" loop="once">

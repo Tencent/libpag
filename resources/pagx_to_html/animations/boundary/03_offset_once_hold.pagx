@@ -7,16 +7,20 @@
      Expect: supported
      Ref: - -->
 <pagx width="400" height="160">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
   <Layer id="onceBox" left="20" top="20" width="40" height="40">
     <Rectangle width="40" height="40"/>
-    <Fill color="#FF0000"/>
+    <Fill color="#14B8A6"/>
     <Timelines>
       <Animation ref="@onceAnim" evaluationOffset="30"/>
     </Timelines>
   </Layer>
   <Layer id="slider" left="20" top="100" width="40" height="40">
     <Rectangle width="40" height="40"/>
-    <Fill color="#2563EB"/>
+    <Fill color="#0F766E"/>
   </Layer>
   <Animations>
     <Animation id="onceAnim" duration="120" frameRate="60" loop="once">

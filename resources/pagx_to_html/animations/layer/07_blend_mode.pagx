@@ -10,10 +10,10 @@
   </Layer>
   <Layer x="80" y="40" width="160" height="120">
     <Rectangle position="80,60" size="160,120"/>
-    <Fill color="#2563EB"/>
+    <Fill color="#4F46E5"/>
   </Layer>
   <Layer id="blendBox" x="100" y="60" width="120" height="80">
-    <Rectangle position="60,40" size="120,80"/>
+    <Polystar type="polygon" pointCount="4" outerRadius="48" position="60,40"/>
     <Fill color="#F97316"/>
   </Layer>
   <Animations>

@@ -9,8 +9,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer x="110" y="40" width="100" height="60">
-    <Rectangle position="50,30" size="100,60" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="polygon" pointCount="6" outerRadius="32" position="50,30"/>
+    <Fill color="#15803D"/>
     <DropShadowFilter id="shadowOffsetY" offsetX="0" offsetY="0" blurX="0" blurY="0" color="#1E3A8A"/>
   </Layer>
   <Animations>

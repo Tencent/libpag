@@ -9,8 +9,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="mixedBox" x="120" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Path data="M 6,76 C 6,20 74,20 74,76 Z"/>
+    <Fill color="#C026D3"/>
   </Layer>
   <Animations>
     <Animation id="mixedFade" duration="180" frameRate="60" loop="once">

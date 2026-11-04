@@ -9,8 +9,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="160,100" size="160,120" roundness="8"/>
-    <Fill id="alphaFill" color="#2563EB" alpha="1"/>
+    <Rectangle position="160,100" size="160,120" roundness="60"/>
+    <Fill id="alphaFill" color="#DB2777" alpha="1"/>
   </Layer>
   <Animations>
     <Animation id="fillAlphaFade" duration="60" frameRate="60" loop="once">

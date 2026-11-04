@@ -8,8 +8,8 @@
   <Resources>
     <Composition id="visComp" width="160" height="120">
       <Layer id="visChild" width="160" height="120">
-        <Rectangle position="80,60" size="160,120" roundness="8"/>
-        <Fill color="#2563EB"/>
+        <Polystar type="polygon" pointCount="4" outerRadius="60" position="80,60"/>
+        <Fill color="#4F46E5"/>
       </Layer>
       <Animations>
         <Animation id="visWindow" duration="60" frameRate="60" loop="once">

@@ -10,8 +10,8 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <Group id="growSpinGroup" position="130,50" rotation="0" scale="1,1">
-      <Rectangle size="60,60" roundness="8"/>
-      <Fill color="#2563EB"/>
+      <Polystar type="polygon" pointCount="8" outerRadius="32"/>
+      <Fill color="#475569"/>
     </Group>
   </Layer>
   <Animations>
