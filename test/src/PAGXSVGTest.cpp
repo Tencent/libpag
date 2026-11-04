@@ -5484,6 +5484,199 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
 }
 
 /**
+ * blink_swap.svg: two rects cross-fade their opacity, each with its own looping alpha channel.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_BlinkSwap) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/blink_swap.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 2u);
+  int fadeOut = 0;
+  int fadeIn = 0;
+  for (auto* obj : anim->objects) {
+    ASSERT_EQ(obj->channels.size(), 1u);
+    EXPECT_EQ(obj->channels[0]->name, "alpha");
+    auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+    ASSERT_EQ(ch->keyframes.size(), 3u);
+    EXPECT_EQ(ch->keyframes[0].time, 0);
+    EXPECT_EQ(ch->keyframes[2].time, 90);
+    if (ch->keyframes[0].value == 1.0f) {
+      fadeOut++;
+    } else {
+      fadeIn++;
+    }
+  }
+  // One rect fades out while the other fades in, so the two curves are complementary.
+  EXPECT_EQ(fadeOut, 1);
+  EXPECT_EQ(fadeIn, 1);
+}
+
+/**
+ * bounce_entrance.svg: two staged scale-in animations. The second stage starts at 0.5s and opens
+ * with a Hold keyframe at frame 30; the first overshoots to scale 1.2.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_BounceEntrance) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/bounce_entrance.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 2u);
+  bool sawDelayedStage = false;
+  bool sawOvershoot = false;
+  for (auto* obj : anim->objects) {
+    pagx::TypedChannel<pagx::Matrix>* matrix = nullptr;
+    for (auto* channel : obj->channels) {
+      if (channel->name == "matrix") {
+        matrix = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+      }
+    }
+    ASSERT_NE(matrix, nullptr);
+    if (matrix->keyframes.size() >= 2u &&
+        matrix->keyframes[0].interpolation == pagx::KeyframeInterpolationType::Hold &&
+        matrix->keyframes[1].time == 30) {
+      sawDelayedStage = true;
+    }
+    for (const auto& key : matrix->keyframes) {
+      if (key.value.a > 1.1f) {
+        sawOvershoot = true;
+      }
+    }
+  }
+  EXPECT_TRUE(sawDelayedStage);
+  EXPECT_TRUE(sawOvershoot);
+}
+
+/**
+ * morph_entrance.svg: one rect animates opacity, width, height, x, y and fill in parallel, landing
+ * on the layer alpha, the shape size / position channels and the fill color channel.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_MorphEntrance) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/morph_entrance.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 3u);
+  bool sawAlpha = false;
+  bool sawColor = false;
+  bool sawWidth = false;
+  bool sawHeight = false;
+  bool sawCenter = false;
+  for (auto* obj : anim->objects) {
+    for (auto* channel : obj->channels) {
+      if (channel->name == "alpha") {
+        sawAlpha = true;
+      } else if (channel->name == "color") {
+        sawColor = true;
+      } else if (channel->valueType() == pagx::ChannelValueType::Float) {
+        auto* ch = static_cast<pagx::TypedChannel<float>*>(channel);
+        if (ch->keyframes.size() != 2u) {
+          continue;
+        }
+        if (channel->name == "size.width" && ch->keyframes[1].value == 70.0f) {
+          sawWidth = true;
+        } else if (channel->name == "size.height" && ch->keyframes[1].value == 70.0f) {
+          sawHeight = true;
+        } else if (channel->name == "position.x" || channel->name == "position.y") {
+          sawCenter = true;
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(sawAlpha);
+  EXPECT_TRUE(sawColor);
+  EXPECT_TRUE(sawWidth);
+  EXPECT_TRUE(sawHeight);
+  EXPECT_TRUE(sawCenter);
+}
+
+/**
+ * multi_channel_pulse.svg: a circle pulses radius, fill and opacity together. The radius becomes
+ * the diameter channels and the spline easing is baked into Bezier keyframes.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_MultiChannelPulse) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/multi_channel_pulse.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 3u);
+  bool sawAlpha = false;
+  bool sawColor = false;
+  bool sawDiameter = false;
+  for (auto* obj : anim->objects) {
+    for (auto* channel : obj->channels) {
+      if (channel->name == "alpha") {
+        sawAlpha = true;
+      } else if (channel->name == "color") {
+        sawColor = true;
+      } else if (channel->name == "size.width") {
+        auto* ch = static_cast<pagx::TypedChannel<float>*>(channel);
+        ASSERT_EQ(ch->keyframes.size(), 3u);
+        // r 15 -> 50 -> 15 becomes diameter 30 -> 100 -> 30.
+        EXPECT_FLOAT_EQ(ch->keyframes[0].value, 30.0f);
+        EXPECT_FLOAT_EQ(ch->keyframes[1].value, 100.0f);
+        EXPECT_FLOAT_EQ(ch->keyframes[2].value, 30.0f);
+        EXPECT_EQ(ch->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
+        sawDiameter = true;
+      }
+    }
+  }
+  EXPECT_TRUE(sawAlpha);
+  EXPECT_TRUE(sawColor);
+  EXPECT_TRUE(sawDiameter);
+}
+
+/**
+ * sequential_transform.svg: five consecutive rotate animations on one rect collapse into a single
+ * matrix channel, including the full 360-degree turn split into 20-degree steps.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_SequentialTransform) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/sequential_transform.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_GT(ch->keyframes.size(), 10u);
+  // The last rotate(0 -> 360) spans frames 120..180 and ends back at the identity rotation.
+  EXPECT_EQ(ch->keyframes.back().time, 180);
+  EXPECT_NEAR(ch->keyframes.back().value.a, 1.0f, 1e-3f);
+  bool sawLargeRotation = false;
+  for (const auto& key : ch->keyframes) {
+    if (key.value.b > 0.8f) {
+      sawLargeRotation = true;
+    }
+  }
+  EXPECT_TRUE(sawLargeRotation);
+}
+
+/**
+ * translate_slide.svg: a Translate(0 -> 160 -> 0) slide with spline easing, baked as three matrix
+ * keyframes carrying the offset in tx.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_TranslateSlide) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/translate_slide.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value.tx, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 160.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[2].value.tx, 0.0f);
+}
+
+/**
  * Test SVG import: <animate attributeName="rx"> on a <rect> drives Rectangle.roundness (a pixel
  * value), not Ellipse.size. Verifies the rx/ry routing fix: rx/ry route by content node type so
  * <rect rx> is no longer dropped by the ellipse branch, and the value is NOT scaled by *2.
