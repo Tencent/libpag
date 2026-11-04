@@ -434,10 +434,34 @@ void HTMLStyleCascade::resolveTextStroke(const PropertyMap& props, HTMLInherited
   }
 }
 
+// `<svg width="80" height="60">` carries its size on the element instead of in CSS, and the HTML
+// importer never turns those attributes into a Layer size. Resolving them here gives the transform
+// pipeline a reference box, so a percentage / keyword `transform-origin` can become an `anchor`; the
+// SVG resolver applies the same intrinsic size later, so nothing else changes.
+void ApplySvgAttributeSize(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                           HTMLValueParser& valueParser) {
+  if (element == nullptr || element->name != "svg") {
+    return;
+  }
+  if (std::isnan(box.widthPx) && std::isnan(box.widthPct)) {
+    const auto* attribute = element->findAttribute("width");
+    if (attribute != nullptr) {
+      box.widthPx = valueParser.parseAbsoluteLengthPx(*attribute);
+    }
+  }
+  if (std::isnan(box.heightPx) && std::isnan(box.heightPct)) {
+    const auto* attribute = element->findAttribute("height");
+    if (attribute != nullptr) {
+      box.heightPx = valueParser.parseAbsoluteLengthPx(*attribute);
+    }
+  }
+}
+
 HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
+  ApplySvgAttributeSize(box, element, _valueParser);
   // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
   // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
   // only at Layer construction time so inference can still use the measured child geometry.

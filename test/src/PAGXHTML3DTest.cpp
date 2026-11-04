@@ -531,6 +531,35 @@ PAG_TEST(PAGXHTML3DTest, TransformStylePreserve3DMapsToLayer) {
 }
 
 /**
+ * Test case: an inline `<svg>` host sized by its `width` / `height` attributes (not CSS) still
+ * resolves the box centre for the pivot, so a 3D animation keeps `anchor` at (w/2, h/2).
+ */
+PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostResolvesCenterAnchor) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes flip3d {
+        0%   { transform: perspective(400px) rotateY(0deg); }
+        100% { transform: perspective(400px) rotateY(60deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <svg width="80" height="60" viewBox="0 0 80 60" style="animation:flip3d 1s linear infinite">
+        <rect x="4" y="4" width="72" height="52" fill="#6366F1"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  ASSERT_NE(FindMatrix3DChannel(animation), nullptr);
+  auto* target = FindLayerById(doc, ChannelTarget(animation, "matrix3D"));
+  ASSERT_NE(target, nullptr);
+  EXPECT_TRUE(NearlyEqual(target->anchor.x, 40.0f));
+  EXPECT_TRUE(NearlyEqual(target->anchor.y, 30.0f));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+}
+
+/**
  * Test case: an inline `<svg>` host carries its CSS 3D transform the same way a plain box does.
  */
 PAG_TEST(PAGXHTML3DTest, InlineSvgHostWithPerspectiveEmitsMatrix3D) {
