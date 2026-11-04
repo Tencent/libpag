@@ -52,7 +52,13 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-static Point LayerPositionForCSS(const Layer* layer) {
+// Returns the layer's authored position for left/top. A matrix channel owns the translation, so a
+// layer driven by one reports (0, 0): the keyframes carry the position and adding it twice would
+// offset the whole layer by its x/y.
+static Point LayerPositionForCSS(const Layer* layer, bool matrixDriven) {
+  if (matrixDriven) {
+    return {0.0f, 0.0f};
+  }
   // Mirror the finite checks LayerTransformCSS applies, so a non-finite matrix is treated as absent
   // on both sides and the authored position still reaches left / top.
   bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
@@ -2178,7 +2184,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
-    auto renderPos = LayerPositionForCSS(layer);
+    auto renderPos =
+        LayerPositionForCSS(layer, _ctx->animation.matrixDrivenLayers.count(layer) > 0);
     // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
     // the inverse shift added to their own left/top so they still paint at the correct document
     // position. Consume and clear the offset so it is not applied to grandchild layers.

@@ -288,6 +288,9 @@ class HTMLWriterContext {
     std::unordered_map<const Node*, std::string> elementIds = {};
     // Initially hidden Layers need their contents emitted when a visible channel may show them later.
     std::unordered_set<const Layer*> visibleLayers = {};
+    // Layers whose translation comes from an animated `matrix` channel. The matrix already carries
+    // the position, so the tag must not also emit left/top from the layer's x/y.
+    std::unordered_set<const Layer*> matrixDrivenLayers = {};
     // Number of tags already emitted for each animated base id.
     std::unordered_map<std::string, size_t> domIdUseCount = {};
 

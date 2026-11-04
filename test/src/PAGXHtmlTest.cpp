@@ -3691,6 +3691,39 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationKeepsStaticTransform) {
             std::string::npos);
 }
 
+// A matrix channel owns the layer translation in the runtime: the keyframe matrix carries the
+// position. Writing the layer's x/y onto the tag as well shifts the whole layer by that offset.
+CLI_TEST(PAGXHtmlTest, AnimationMatrixChannelOwnsLayerTranslation) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="movedBox" x="120" y="60" width="40" height="40">
+      <Rectangle position="20,20" size="40,40"/>
+      <Fill color="#0EA5E9"/>
+    </Layer>
+    <Animations>
+      <Animation id="slide" duration="60" frameRate="60" loop="loop">
+        <Object target="movedBox">
+          <Channel name="matrix" type="matrix">
+            <Key time="0" value="1,0,0,1,120,60" interpolation="linear"/>
+            <Key time="60" value="1,0,0,1,200,60"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions opts;
+  opts.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, opts);
+  ASSERT_FALSE(html.empty());
+
+  auto tag = FindTagContaining(html, "id=\"movedBox\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.find("left:"), std::string::npos) << tag;
+  EXPECT_EQ(tag.find("top:"), std::string::npos) << tag;
+  EXPECT_NE(html.find("matrix(1,0,0,1,120,60)"), std::string::npos) << html;
+  EXPECT_NE(html.find("matrix(1,0,0,1,200,60)"), std::string::npos) << html;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationWithMatrixChannel) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="mixLayer" width="50" height="50" matrix="0,1,-1,0,0,0">

@@ -1772,6 +1772,11 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             continue;
           }
           auto role = LookupChannelRole(nType, ch->name);
+          if (role == TargetChannelRole::LayerMatrix) {
+            // The runtime lets a matrix channel own the translation, so the tag must not carry the
+            // layer's x/y as well; see LayerPositionForCSS.
+            _ctx.animation.matrixDrivenLayers.insert(layer);
+          }
           if (role == TargetChannelRole::LayerVisibility &&
               ch->valueType() == ChannelValueType::Bool) {
             _ctx.animation.visibleLayers.insert(layer);
