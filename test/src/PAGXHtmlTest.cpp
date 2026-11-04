@@ -3814,6 +3814,139 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
   return end == std::string::npos ? "" : rule.substr(start + 1, end - start - 1);
 }
 
+// Multiplies two 2D affine matrices stored as [a b c d e f], matching the CSS matrix() order.
+static std::array<double, 6> MultiplyCssMatrix(const std::array<double, 6>& m,
+                                               const std::array<double, 6>& n) {
+  return {m[0] * n[0] + m[2] * n[1],        m[1] * n[0] + m[3] * n[1],
+          m[0] * n[2] + m[2] * n[3],        m[1] * n[2] + m[3] * n[3],
+          m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]};
+}
+
+// Parses a CSS transform function list into [a b c d e f]. Functions apply left to right, so each
+// one multiplies the accumulated matrix from the right.
+static std::array<double, 6> ParseCssTransformMatrix(const std::string& value) {
+  std::array<double, 6> matrix = {1.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+  size_t pos = 0;
+  while (true) {
+    auto open = value.find('(', pos);
+    if (open == std::string::npos) {
+      break;
+    }
+    auto close = value.find(')', open);
+    if (close == std::string::npos) {
+      break;
+    }
+    std::string name = value.substr(pos, open - pos);
+    auto nameStart = name.find_first_not_of(" ,");
+    name = nameStart == std::string::npos ? std::string() : name.substr(nameStart);
+
+    std::vector<double> args = {};
+    std::string argText = value.substr(open + 1, close - open - 1);
+    size_t cursor = 0;
+    while (cursor < argText.size()) {
+      auto next = argText.find_first_of(", ", cursor);
+      std::string piece =
+          argText.substr(cursor, next == std::string::npos ? std::string::npos : next - cursor);
+      if (!piece.empty()) {
+        args.push_back(std::atof(piece.c_str()));
+      }
+      if (next == std::string::npos) {
+        break;
+      }
+      cursor = next + 1;
+    }
+
+    std::array<double, 6> factor = {1.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+    const double kDegToRad = 3.14159265358979323846 / 180.0;
+    if (name == "translate" && !args.empty()) {
+      factor[4] = args[0];
+      factor[5] = args.size() > 1 ? args[1] : 0.0;
+    } else if (name == "translateX" && !args.empty()) {
+      factor[4] = args[0];
+    } else if (name == "translateY" && !args.empty()) {
+      factor[5] = args[0];
+    } else if (name == "rotate" && !args.empty()) {
+      double r = args[0] * kDegToRad;
+      factor = {std::cos(r), std::sin(r), -std::sin(r), std::cos(r), 0.0, 0.0};
+    } else if (name == "skewX" && !args.empty()) {
+      factor[2] = std::tan(args[0] * kDegToRad);
+    } else if (name == "skewY" && !args.empty()) {
+      factor[1] = std::tan(args[0] * kDegToRad);
+    } else if (name == "scale" && !args.empty()) {
+      factor[0] = args[0];
+      factor[3] = args.size() > 1 ? args[1] : args[0];
+    } else if (name == "scaleX" && !args.empty()) {
+      factor[0] = args[0];
+    } else if (name == "scaleY" && !args.empty()) {
+      factor[3] = args[0];
+    } else if (name == "matrix" && args.size() == 6) {
+      factor = {args[0], args[1], args[2], args[3], args[4], args[5]};
+    }
+    matrix = MultiplyCssMatrix(matrix, factor);
+    pos = close + 1;
+  }
+  return matrix;
+}
+
+// Returns the value of `property` in a style attribute or keyframe stop body.
+static std::string CssValueOf(const std::string& text, const std::string& property) {
+  auto start = text.find(property + ":");
+  if (start == std::string::npos) {
+    return "";
+  }
+  start += property.size() + 1;
+  auto end = text.find_first_of(";}\"", start);
+  return text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+}
+
+// The animated transform is emitted as one function per factor so the browser interpolates each
+// one, while the static transform is a single matrix produced by BuildGroupMatrix. The two agree
+// only as long as the factor order and sign conventions stay in sync, so compare the matrices a
+// frame that holds the authored values produces in both paths.
+CLI_TEST(PAGXHtmlTest, GroupAnimatedTransformMatchesStaticMatrix) {
+  const char* xml = R"(<pagx width="200" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Group id="grp" position="30,40" rotation="20" scale="1.5,0.8" skew="12" skewAxis="35"
+             anchor="10,5">
+        <Text text="AB" fontFamily="Arial" fontSize="16" position="0,0"/>
+        <Fill color="#2563EB"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="spin" duration="60" frameRate="60" loop="loop">
+        <Object target="grp">
+          <Channel name="rotation" type="float">
+            <Key time="0" value="20" interpolation="linear"/>
+            <Key time="60" value="80"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions staticOptions;
+  staticOptions.extractStyleSheet = false;
+  staticOptions.exportAnimations = false;
+  auto staticHtml = LoadXMLAndConvert(xml, staticOptions);
+  ASSERT_FALSE(staticHtml.empty());
+  auto staticTag = FindTagContaining(staticHtml, "transform:");
+  ASSERT_FALSE(staticTag.empty()) << staticHtml;
+  auto staticMatrix = ParseCssTransformMatrix(CssValueOf(staticTag, "transform"));
+  // The static path bakes the group transform into a matrix whose translation is non-zero.
+  EXPECT_GT(std::abs(staticMatrix[4]) + std::abs(staticMatrix[5]), 1.0);
+
+  pagx::HTMLExportOptions animatedOptions;
+  animatedOptions.extractStyleSheet = false;
+  auto animatedHtml = LoadXMLAndConvert(xml, animatedOptions);
+  ASSERT_FALSE(animatedHtml.empty());
+  auto stop = KeyframeStopOf(animatedHtml, "id=\"grp\"", "0%");
+  ASSERT_FALSE(stop.empty()) << animatedHtml;
+  auto animatedMatrix = ParseCssTransformMatrix(CssValueOf(stop, "transform"));
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_NEAR(staticMatrix[i], animatedMatrix[i], 2e-3) << "component " << i;
+  }
+}
+
 // Repeated timestamps encode an instantaneous jump: the first key is the value just before the
 // boundary, and the last one is the value from that frame onward. The preceding ramp must still
 // reach the first key instead of fading across the entire previous interval.
