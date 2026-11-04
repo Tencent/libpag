@@ -140,15 +140,9 @@ id,category,feature,tier,expected_warnings,notes
 13-transform__translate,transform,"transform: translate()",subset,,
 13-transform__matrix,transform,"transform: matrix()",subset,,
 13-transform__transform-origin-center,transform,"transform-origin: center honoured",subset,,
-13-transform__rotate-chained,transform,"compound transform chain (unsupported)",subset,subset:unsupported-property,
-13-transform__rotate3d,transform,"rotate3d (unsupported)",subset,subset:unsupported-property,
-13-transform__perspective,transform,"perspective (unsupported)",subset,subset:unsupported-property,
-13-transform__transform-origin-px-noncenter,transform,"transform-origin: <px> <px> off-centre pivot",subset,,pivot must land on Layer.anchor
-13-transform__transform-origin-percent,transform,"transform-origin: 100% 0% resolves against the border box",subset,,percentage pivot
-13-transform__transform-origin-keywords,transform,"transform-origin: right bottom resolves against the border box",subset,,keyword pivot
-13-transform__transform-origin-three-value,transform,"transform-origin: <px> <px> <px> keeps the pivot depth",subset,,third value maps to anchorZ
-13-transform__transform-origin-skew-corner,transform,"skewX pivoted at the bottom-left corner",subset,,non-centre pivot with shear
-13-transform__transform-origin-translate,transform,"pure translate ignores the pivot (identity linear part)",subset,,no anchor expected
+13-transform__rotate-chained,transform,"compound transform chain composed in CSS order",subset,,
+13-transform__rotate3d,transform,"rotate3d with a normalised axis",subset,,
+13-transform__perspective,transform,"perspective() inside the function list",subset,,
 14-overflow-clip__overflow-hidden,overflow-clip,"overflow: hidden -> clipToBounds",subset,,
 14-overflow-clip__clip-path-url,overflow-clip,"clip-path: url(#id) contour mask",subset,,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
 14-overflow-clip__clip-path-polygon,overflow-clip,"clip-path: polygon() (unsupported)",subset,subset:unsupported-property,
