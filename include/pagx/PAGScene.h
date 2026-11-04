@@ -227,8 +227,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // tree first. Used at creation and when an embedded external document changes (an external
   // composition is built into the tree once and cannot be patched in place).
   void buildRuntimeTree();
-  // Resolves and caches the document's default output target after a tree build or edit. Cached so
-  // renderTo() does not walk the authored layer tree on every frame.
+  // Resolves and caches the document's default output view state and target layer after a tree
+  // build or edit. Cached so renderTo() does not walk the authored layer tree on every frame.
   void resolveOutputTarget();
   void buildViewModels();
   void buildNestedViewModels(PAGComposition* parentComp);
@@ -273,6 +273,12 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Authored layer that the document declares as its default static output target, or nullptr.
   const Layer* outputTargetNode = nullptr;
+
+  // Cached state of the document's default output view. An edit can turn a valid declaration into
+  // an invalid one (for example clearing targetLayerId while keeping outputBounds); renderTo() must
+  // reject that state instead of falling back to a whole-canvas render.
+  enum class OutputViewState { None, Valid, Invalid };
+  OutputViewState outputViewState = OutputViewState::None;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 

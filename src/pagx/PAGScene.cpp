@@ -158,8 +158,17 @@ void PAGScene::resolveOutputTarget() {
   outputTargetNode = nullptr;
   const Layer* resolved = nullptr;
   std::string error;
-  if (ResolveOutputView(document.get(), &resolved, &error) == OutputViewStatus::Valid) {
-    outputTargetNode = resolved;
+  switch (ResolveOutputView(document.get(), &resolved, &error)) {
+    case OutputViewStatus::None:
+      outputViewState = OutputViewState::None;
+      break;
+    case OutputViewStatus::Valid:
+      outputViewState = OutputViewState::Valid;
+      outputTargetNode = resolved;
+      break;
+    case OutputViewStatus::Invalid:
+      outputViewState = OutputViewState::Invalid;
+      break;
   }
 }
 
@@ -564,10 +573,10 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
   if (tgfxSurface == nullptr) {
     return false;
   }
-  if (document != nullptr && !document->targetLayerId.empty()) {
-    if (!document->outputBounds.has_value() || outputTargetNode == nullptr) {
-      return false;
-    }
+  if (outputViewState == OutputViewState::Invalid) {
+    return false;
+  }
+  if (outputViewState == OutputViewState::Valid) {
     auto* root = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
     auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
                       ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
@@ -721,8 +730,9 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   // Target-view scenes render only a cropped window, so surface coordinates no longer map to the
-  // document root through the display-list transform. Hit testing is not supported in this mode.
-  if (outputTargetNode != nullptr) {
+  // document root through the display-list transform. Hit testing is not supported in this mode,
+  // including when an edit left the declaration invalid and draw() renders nothing at all.
+  if (outputViewState != OutputViewState::None) {
     return {};
   }
   float rootX = 0;

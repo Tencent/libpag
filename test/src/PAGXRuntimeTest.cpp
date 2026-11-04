@@ -906,13 +906,9 @@ static bool ReadSurfacePixels(const std::shared_ptr<pagx::PAGSurface>& surface,
   return true;
 }
 
-/**
- * Test case: drawing a target-layer view repeatedly to the same surface must produce identical
- * frames. A PAGSurface keeps one Canvas for its lifetime, so the view transform applied by
- * PAGScene::draw() has to be scoped to the draw; otherwise every frame accumulates the translate /
- * scale and the content eventually leaves the output window.
- */
-PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
+// Builds a 100x100 document whose default output view is a 20x20 window over a red square, so a
+// target-view render shows red in the top-left corner and nothing elsewhere.
+static std::shared_ptr<pagx::PAGXDocument> MakeTargetViewDocument() {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>("target");
   layer->width = 100;
@@ -928,6 +924,17 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   doc->layers.push_back(layer);
   doc->targetLayerId = "target";
   doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+  return doc;
+}
+
+/**
+ * Test case: drawing a target-layer view repeatedly to the same surface must produce identical
+ * frames. A PAGSurface keeps one Canvas for its lifetime, so the view transform applied by
+ * PAGScene::draw() has to be scoped to the draw; otherwise every frame accumulates the translate /
+ * scale and the content eventually leaves the output window.
+ */
+PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
+  auto doc = MakeTargetViewDocument();
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
@@ -943,6 +950,28 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   ASSERT_TRUE(scene->draw(surface));
   ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
   EXPECT_EQ(secondFrame, firstFrame);
+}
+
+/**
+ * Test case: an edit that breaks the target view declaration after the scene was built must make
+ * draw() fail instead of silently switching to a whole-canvas render. Clearing only targetLayerId
+ * leaves outputBounds behind, which is an invalid pair; restoring the id makes the view valid again.
+ */
+PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+
+  doc->targetLayerId.clear();
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_FALSE(scene->draw(surface));
+
+  doc->targetLayerId = "target";
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_TRUE(scene->draw(surface));
 }
 
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is
