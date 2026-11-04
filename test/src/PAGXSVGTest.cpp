@@ -5484,6 +5484,40 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
 }
 
 /**
+ * tspan_fill_only.svg: the tspan is the only place a paint is declared, so the group must use it
+ * instead of falling back to the SVG default black.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanFillOnly) {
+  auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/tspan_fill_only.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("#FF0000"), std::string::npos) << xml;
+  EXPECT_EQ(xml.find("#000000"), std::string::npos) << xml;
+}
+
+/**
+ * viewbox_transform_animation.svg: the viewBox -> document mapping is pre-multiplied onto the
+ * single top-level layer, so matrix keyframes must compose with it instead of replacing it.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxTransformAnimation) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/viewbox_transform_animation.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // viewBox 48 -> 24 scales by 0.5, so the animated translate 24 lands at 12.
+  EXPECT_NEAR(ch->keyframes.front().value.tx, 0.0f, 0.01f);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 12.0f, 0.01f);
+  EXPECT_NEAR(ch->keyframes.back().value.a, 0.5f, 0.01f);
+}
+
+/**
  * blink_swap.svg: two rects cross-fade their opacity, each with its own looping alpha channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_BlinkSwap) {

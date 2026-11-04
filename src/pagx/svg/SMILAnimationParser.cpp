@@ -984,7 +984,12 @@ static void MergeAdditiveFloat(Channel* base, const Channel* additive) {
   std::vector<Keyframe<float>> merged = {};
   for (Frame time : allTimes) {
     float baseVal = std::get<float>(base->evaluateAt(time));
-    float additiveVal = std::get<float>(additive->evaluateAt(time));
+    // Before the additive track begins, SMIL adds the identity value rather than the track's
+    // first keyframe, otherwise the base value would be summed with itself during the lead-in.
+    float additiveVal = 0.0f;
+    if (time >= additiveCh->keyframes.front().time) {
+      additiveVal = std::get<float>(additive->evaluateAt(time));
+    }
     Keyframe<float> key = {};
     key.time = time;
     key.value = baseVal + additiveVal;
@@ -1030,7 +1035,11 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
   std::vector<Keyframe<Color>> merged = {};
   for (Frame time : allTimes) {
     Color baseVal = std::get<Color>(base->evaluateAt(time));
-    Color additiveVal = std::get<Color>(additive->evaluateAt(time));
+    // Same identity rule as the float merge: no add before the additive track begins.
+    Color additiveVal = {0, 0, 0, 0};
+    if (time >= additiveCh->keyframes.front().time) {
+      additiveVal = std::get<Color>(additive->evaluateAt(time));
+    }
     Keyframe<Color> key = {};
     key.time = time;
     key.value.red = baseVal.red + additiveVal.red;
@@ -2356,6 +2365,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       // SMIL additive="sum": the animated transform post-multiplies the base value, so each
       // keyframe composes as static * animated.
       m = staticMatrix * m;
+    } else if (ctx.isContentMatrixBakedIntoLayer()) {
+      // The viewBox mapping was pre-multiplied onto this layer. A replaced pose must keep it,
+      // otherwise the animation drops the viewBox scale/offset as soon as it starts.
+      m = ctx.getContentMatrix() * m;
     }
     Point bo = {}, bi = {};
     ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
