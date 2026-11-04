@@ -3903,6 +3903,70 @@ static std::string CssValueOf(const std::string& text, const std::string& proper
 // one, while the static transform is a single matrix produced by BuildGroupMatrix. The two agree
 // only as long as the factor order and sign conventions stay in sync, so compare the matrices a
 // frame that holds the authored values produces in both paths.
+// Merging several draws into one SVG must not move their gradients. The merged path computes each
+// draw's box without stroke padding while the single-draw path pads it, so a gradient that consumed
+// that box would land differently depending on whether the export carries animations at all.
+CLI_TEST(PAGXHtmlTest, MergedSvgKeepsGradientGeometryOfEachDraw) {
+  const char* xml = R"(<pagx width="260" height="160">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Group>
+        <Rectangle position="70,60" size="60,40"/>
+        <Fill>
+          <LinearGradient startPoint="0,0" endPoint="1,1">
+            <ColorStop offset="0" color="#FF0000"/>
+            <ColorStop offset="1" color="#0000FF"/>
+          </LinearGradient>
+        </Fill>
+        <Stroke id="sA" color="#111111" width="16"/>
+      </Group>
+      <Group>
+        <Ellipse position="190,110" size="40,30"/>
+        <Fill>
+          <LinearGradient startPoint="0,1" endPoint="1,0">
+            <ColorStop offset="0" color="#00FF00"/>
+            <ColorStop offset="1" color="#FFFF00"/>
+          </LinearGradient>
+        </Fill>
+        <Stroke color="#111111" width="16"/>
+      </Group>
+    </Layer>
+    <Animations>
+      <Animation id="pulse" duration="60" frameRate="60" loop="loop">
+        <Object target="sA">
+          <Channel name="width" type="float">
+            <Key time="0" value="8" interpolation="linear"/>
+            <Key time="60" value="8"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions staticOptions;
+  staticOptions.extractStyleSheet = false;
+  staticOptions.exportAnimations = false;
+  auto singleHtml = LoadXMLAndConvert(xml, staticOptions);
+  ASSERT_FALSE(singleHtml.empty());
+
+  pagx::HTMLExportOptions animatedOptions;
+  animatedOptions.extractStyleSheet = false;
+  auto mergedHtml = LoadXMLAndConvert(xml, animatedOptions);
+  ASSERT_FALSE(mergedHtml.empty());
+
+  // Coalescing is what the animated export does; it has to keep the gradients of every draw.
+  EXPECT_LT(CountOccurrences(mergedHtml, "viewBox="), CountOccurrences(singleHtml, "viewBox="))
+      << mergedHtml;
+  EXPECT_EQ(CountOccurrences(mergedHtml, "<linearGradient "),
+            CountOccurrences(singleHtml, "<linearGradient "));
+  EXPECT_NE(mergedHtml.find("x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\""), std::string::npos)
+      << mergedHtml;
+  EXPECT_NE(mergedHtml.find("x1=\"0\" y1=\"1\" x2=\"1\" y2=\"0\""), std::string::npos)
+      << mergedHtml;
+  // The shapes themselves keep their geometry.
+  EXPECT_NE(mergedHtml.find("d=\"M100 40L100 80L40 80L40 40Z\""), std::string::npos) << mergedHtml;
+  EXPECT_NE(singleHtml.find("d=\"M100 40L100 80L40 80L40 40Z\""), std::string::npos) << singleHtml;
+}
+
 CLI_TEST(PAGXHtmlTest, GroupAnimatedTransformMatchesStaticMatrix) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer left="0" right="0" top="0" bottom="0">
