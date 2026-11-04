@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: Layer alpha fades a single box from 0.2 to fully opaque over the full duration.
+<!-- Tests: Layer alpha fades a single box from 0.2 to fully opaque over the full duration. This is the
+     canonical baseline for the alpha channel and also the reference for linear interpolation with
+     loop="once", so the interpolation and timing families do not repeat it.
      Target: Layer  Channel: alpha  Type: float
      Expect: supported
      Ref: - -->
@@ -9,8 +11,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="fadeBox" x="120" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
   </Layer>
   <Animations>
     <Animation id="fade" duration="60" frameRate="60" loop="once">

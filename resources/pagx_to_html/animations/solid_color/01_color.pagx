@@ -6,21 +6,21 @@
      Ref: - -->
 <pagx width="320" height="200">
   <Resources>
-    <SolidColor id="sharedColor" color="#2563EB"/>
+    <SolidColor id="sharedColor" color="#65A30D"/>
   </Resources>
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="160,100" size="160,120" roundness="8"/>
+    <Ellipse position="160,100" size="120,120"/>
     <Fill color="@sharedColor"/>
   </Layer>
   <Animations>
     <Animation id="solidColorShift" duration="60" frameRate="60" loop="once">
       <Object target="sharedColor">
         <Channel name="color" type="color">
-          <Key time="0" value="#2563EB" interpolation="linear"/>
+          <Key time="0" value="#65A30D" interpolation="linear"/>
           <Key time="60" value="#F97316" interpolation="linear"/>
         </Channel>
       </Object>

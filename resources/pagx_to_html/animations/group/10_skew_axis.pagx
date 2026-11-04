@@ -10,8 +10,8 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <Group id="skewAxisGroup" position="120,40" skew="30" skewAxis="0">
-      <Rectangle size="80,80" roundness="8"/>
-      <Fill color="#2563EB"/>
+      <Polystar type="polygon" pointCount="3" outerRadius="46" rotation="-90"/>
+      <Fill color="#EA580C"/>
     </Group>
   </Layer>
   <Animations>

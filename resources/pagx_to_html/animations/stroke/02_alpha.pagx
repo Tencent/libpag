@@ -9,9 +9,9 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
-    <Rectangle position="160,100" size="160,120" roundness="16"/>
+    <Ellipse position="160,100" size="200,140"/>
     <Fill color="#FFFFFF"/>
-    <Stroke id="alphaStroke" color="#2563EB" width="12" alpha="1"/>
+    <Stroke id="alphaStroke" color="#0E7490" width="12" alpha="1"/>
   </Layer>
   <Animations>
     <Animation id="strokeAlphaFade" duration="60" frameRate="60" loop="once">

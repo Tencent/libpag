@@ -9,8 +9,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="slideBox" x="40" y="60" width="80" height="80">
-    <Rectangle position="40,40" size="80,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
   </Layer>
   <Animations>
     <Animation id="slideX" duration="60" frameRate="60" loop="once">

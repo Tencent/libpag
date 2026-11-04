@@ -9,8 +9,8 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer x="100" y="60" width="120" height="80">
-    <Rectangle position="60,40" size="120,80" roundness="8"/>
-    <Fill color="#2563EB"/>
+    <Polystar type="polygon" pointCount="6" outerRadius="40" position="60,40"/>
+    <Fill color="#15803D"/>
     <BlurFilter id="blurYFilter" blurX="0" blurY="0"/>
   </Layer>
   <Animations>
