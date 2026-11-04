@@ -463,8 +463,9 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     }
   }
 
-  double pixelWidth = std::ceil(static_cast<double>(sourceWidth) * options.scale);
-  double pixelHeight = std::ceil(static_cast<double>(sourceHeight) * options.scale);
+  // Keep float multiplication so decimal scales retain the existing pixel rounding behavior.
+  double pixelWidth = std::ceil(sourceWidth * options.scale);
+  double pixelHeight = std::ceil(sourceHeight * options.scale);
   constexpr double maxDimension = static_cast<double>(std::numeric_limits<int>::max());
   if (!std::isfinite(pixelWidth) || !std::isfinite(pixelHeight) || pixelWidth < 1.0 ||
       pixelHeight < 1.0 || pixelWidth > maxDimension || pixelHeight > maxDimension) {

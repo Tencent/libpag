@@ -378,6 +378,22 @@ static tgfx::Bitmap RenderCliFile(std::vector<std::string> args, const std::stri
   return pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
 }
 
+CLI_TEST(PAGXCliTest, Render_DecimalScalePreservesDimensions) {
+  auto path = WriteTempRenderFile(
+      "render_decimal_scale.pagx",
+      "<pagx width=\"100\" height=\"100\"><Layer>"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#3366FF\"/>"
+      "</Layer></pagx>");
+  auto tenth = RenderCliFile({"render", "--scale", "0.1"}, path);
+  ASSERT_FALSE(tenth.isEmpty());
+  EXPECT_EQ(tenth.width(), 10);
+  EXPECT_EQ(tenth.height(), 10);
+  auto fifth = RenderCliFile({"render", "--scale", "0.2"}, path);
+  ASSERT_FALSE(fifth.isEmpty());
+  EXPECT_EQ(fifth.width(), 20);
+  EXPECT_EQ(fifth.height(), 20);
+}
+
 CLI_TEST(PAGXCliTest, Render_TargetViewUsesDocumentWindow) {
   auto path = WriteTempRenderFile(
       "render_target_view.pagx",
