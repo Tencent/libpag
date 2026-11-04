@@ -606,8 +606,8 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
             _ctx->animation.elementIds.count(group) > 0) {
           std::vector<Element*> propagatedPainters = {};
-          if (_ctx->animation.elementIds.count(group) > 0 && !hasPainter && !hasText && !hasTextBox &&
-              !group->elements.empty()) {
+          if (_ctx->animation.elementIds.count(group) > 0 && !hasPainter && !hasText &&
+              !hasTextBox && !group->elements.empty()) {
             bool shapeOnly = true;
             for (auto* child : group->elements) {
               auto childType = child->nodeType();
@@ -1275,7 +1275,9 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       out.openTag("span");
       {
-        auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+        // A Text node is never registered as an animation target: text shaping channels have no CSS
+        // equivalent, so only its Fill can be claimed here.
+        auto animId = _ctx->claimAnimatedDomId({span.fill});
         if (!animId.empty()) {
           out.addAttr("id", animId);
         }
@@ -1414,7 +1416,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     }
     out.openTag("span");
     {
-      auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+      auto animId = _ctx->claimAnimatedDomId({span.fill});
       if (!animId.empty()) {
         out.addAttr("id", animId);
       }
