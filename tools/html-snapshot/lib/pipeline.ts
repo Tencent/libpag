@@ -40,6 +40,7 @@ export interface SpawnCaptureOptions extends ProcessOptions {
 }
 
 export interface SpawnCaptureResult {
+  warnings?: string[];
   code: number | null;
   durationMs: number;
   stdout: string;
@@ -359,6 +360,7 @@ export interface RunHtmlToPagxOptions {
 }
 
 export interface RunHtmlToPagxResult {
+  warnings?: string[];
   readiness: ConversionReadiness;
   subsetHtml: string;
   pagx: string;
@@ -527,7 +529,7 @@ async function convertHtml(opts: RunHtmlToPagxOptions): Promise<RunHtmlToPagxRes
       publication.commit();
       log(`[done] ${artifacts.png || artifacts.pagx}`);
     }
-    return { subsetHtml: finalSubset, ...artifacts };
+    return { subsetHtml: finalSubset, ...artifacts, ...(snapshotResult.warnings?.length ? { warnings: snapshotResult.warnings } : {}) };
   } finally {
     if (!opts.publication) publication.dispose();
     if (tempDir) {

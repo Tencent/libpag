@@ -112,6 +112,7 @@ async function launchBundled(kind, args = process.argv.slice(2)) {
     if (kind === 'import') {
       const runtime = require('./dist/lib/import-request');
       opts = runtime.validateImportRequest(runtime.readImportRequest(args));
+      await runtime.validateImportArchive(opts, HERE);
       runtime.preflightImport(opts);
       needsBrowser = runtime.importNeedsBrowser(opts);
     } else if (kind === 'snapshot') {

@@ -583,6 +583,56 @@ include source/native stamps, options and all required artifacts/resources. Miss
 PNGs or changed settings invalidate `--skip-existing`. Batch previews include only
 newly completed inputs and live in `<output-dir>/preview/`.
 
+### ZIP websites
+
+`pagx import website.zip --output-dir out --preview` imports every `.html` and
+`.htm` file in an archive, including nested and unlinked pages. Each page becomes
+an independent PAGX. Output paths preserve the complete entry name, for example
+`pages/about.html` becomes `out/pages/about.html.pagx`; `.html` and `.htm` entries
+therefore do not overwrite each other. `--output` accepts an archive with exactly
+one page. `--dry-run` validates the index and lists outputs without extracting files,
+creating outputs, installing a browser, or launching one.
+
+The archive root is the website's `/`. Use `--html-root website` when the site is
+inside a wrapper directory. A private HTTP server preserves relative URLs, root
+URLs, CSS imports, modules, and same-origin fetches. Paths are case-sensitive when
+served. Root inference, basename resource matching, and implicit SPA fallbacks are
+not performed. SPA routes, extensionless entry points, build scripts and backends
+are not discovered or executed. ZIP imports cannot combine with `--html-scenario`,
+`--html-batch`, `--html-no-snapshot`, or `--output-name`.
+
+ZIP browsers can access the package origin only. Add repeatable
+`--html-allow-origin https://cdn.example.com` options to permit specific remote
+resource origins; redirects to other origins require their own allowance. The
+browser proxy also applies to worker traffic. Native helper font reads use captured
+bytes. Uploaded websites must still run in appropriately isolated service workers
+or containers; the origin policy is not an OS sandbox. ZIP browsers retain the
+Chromium sandbox; only deployments that provide external isolation should set
+`HTML_SNAPSHOT_ZIP_NO_SANDBOX=1` when Chromium cannot sandbox itself.
+
+Used web fonts are captured and embedded automatically. Images follow `--images`;
+retained subset HTML inlines captured images and fonts. Missing resources produce
+`partial` results and diagnostics; page failures do not discard other pages. The
+`import-manifest.json` file records every page and uses paths relative to its output
+directory. With `--output`, its name is `<output-name>.import-manifest.json`.
+Any failed page gives the CLI a nonzero exit code. `--skip-existing` reuses only
+complete artifact sets matching the archive bytes, root, page, conversion options
+and runtime fingerprint. Resource-only archive changes invalidate the cache;
+remote-origin allowances disable skipping because remote bytes can change.
+
+ZIP metadata is checked before browser initialization, and every file payload is
+size/CRC checked before rendering. Archives must use portable paths without links,
+duplicate entries or case/Unicode aliases. `__MACOSX`, `.DS_Store` and AppleDouble
+metadata are ignored. Encryption and compression methods other than Store/Deflate
+are unsupported. ZIP64 is accepted within the same resource limits.
+
+Limits are positive integer environment settings: `HTML_SNAPSHOT_ZIP_ARCHIVE_BYTES`
+(32 MiB), `HTML_SNAPSHOT_ZIP_TOTAL_BYTES` (256 MiB),
+`HTML_SNAPSHOT_ZIP_ENTRY_BYTES` (64 MiB), `HTML_SNAPSHOT_ZIP_ENTRIES` (10000),
+`HTML_SNAPSHOT_ZIP_PAGES` (500), and `HTML_SNAPSHOT_ZIP_PREPARE_MS` (30000).
+Each page retains the normal conversion deadline. Cancellation closes the browser,
+proxy and site before deleting extracted sources.
+
 ### Browser bundle (no Node, no puppeteer)
 
 The DOM-walking helpers in `lib/browser-snapshot.js` are pure browser code —

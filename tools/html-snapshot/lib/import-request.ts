@@ -4,6 +4,8 @@ import { withConversionTask } from './conversion-task';
 import * as fs from 'fs';
 import * as path from 'path';
 import { collectBatchInputs, runBatch } from './batch';
+import { isZipInput, preflightArchiveImport, runArchiveImport } from './archive-import';
+import { websiteOrigins } from './website-proxy';
 import { resolveEngine, checkBrowserRuntime } from './browser-engine';
 import { parseCookie, parseHeader } from './cli';
 import { withCliLifecycle } from './cli-lifecycle';
@@ -20,6 +22,8 @@ export interface ImportRequest extends RunScenarioToPagxOptions {
   batchDir?: string;
   dryRun?: boolean;
   skipExisting?: boolean;
+  archiveRoot?: string;
+  allowOrigins?: string[];
 }
 
 export class ImportRequestError extends Error {
@@ -59,6 +63,11 @@ export function validateImportRequest(opts: ImportRequest): ImportRequest {
     if (opts.scenario) validateScenarioCaptureOptions(opts);
     if (opts.format === 'html' && !opts.htmlNoSnapshot) opts.browserEngine = resolveEngine(opts.browserEngine || undefined);
     const url = isHttpUrl(opts.input);
+    const archive = isZipInput(opts.input);
+    if (!archive && (opts.archiveRoot || opts.allowOrigins?.length)) invalid('--html-root and --html-allow-origin require ZIP input');
+    if (archive && (opts.batchDir || opts.scenario || opts.htmlNoSnapshot || opts.format !== 'html')) {
+      invalid('ZIP requires HTML snapshotting and cannot be combined with batch or scenario');
+    }
     if (opts.batchDir) {
       if (!fs.statSync(opts.batchDir, { throwIfNoEntry: false })?.isDirectory()) {
         throw new ImportRequestError(`input directory not found: ${opts.batchDir}`, 1);
@@ -69,6 +78,15 @@ export function validateImportRequest(opts: ImportRequest): ImportRequest {
     }
     if (!url && !fs.statSync(opts.input, { throwIfNoEntry: false })?.isFile()) {
       throw new ImportRequestError(`input not found: ${opts.input}`, 1);
+    }
+    if (archive) {
+      if (opts.outputName) invalid('--output-name is not supported for ZIP input');
+      if ((!opts.outputFile && !opts.outputDir) || (opts.outputFile && opts.outputDir)) {
+        invalid('ZIP input requires --output-dir or --output, exclusively');
+      }
+      websiteOrigins(opts.allowOrigins);
+      directoryDestination(opts.outputDir || path.dirname(path.resolve(opts.outputFile!)));
+      return opts;
     }
     for (const value of opts.cookies || []) parseCookie('--html-cookie', value, invalid);
     for (const value of opts.headers || []) parseHeader('--html-header', value, invalid);
@@ -132,6 +150,12 @@ export function importNeedsBrowser(opts: ImportRequest): boolean {
   return opts.format === 'html' && !opts.htmlNoSnapshot && !opts.dryRun;
 }
 
+export async function validateImportArchive(opts: ImportRequest, scriptDir: string): Promise<void> {
+  if (!isZipInput(opts.input)) return;
+  try { await preflightArchiveImport({ ...opts, scriptDir }); }
+  catch (error) { throw new ImportRequestError(error instanceof Error ? error.message : String(error)); }
+}
+
 export function preflightImport(opts: ImportRequest): void {
   if (opts.dryRun) return;
   try {
@@ -154,10 +178,15 @@ export function importErrorMessage(error: unknown): string {
 
 export async function runImportRequest(opts: ImportRequest, scriptDir: string): Promise<number> {
   validateImportRequest(opts);
+  await validateImportArchive(opts, scriptDir);
   preflightImport(opts);
   if (importNeedsBrowser(opts)) checkBrowserRuntime(opts.browserEngine);
   const log = (line: string) => process.stderr.write(line + '\n');
   return withCliLifecycle(async () => {
+    if (isZipInput(opts.input)) {
+      const result = await runArchiveImport({ ...opts, scriptDir, log });
+      return result.failed ? 1 : 0;
+    }
     if (opts.batchDir) {
       const result = await runBatch({ ...opts, inputDir: opts.batchDir, outputRoot: opts.outputDir, scriptDir, log });
       return result.failed ? 1 : 0;

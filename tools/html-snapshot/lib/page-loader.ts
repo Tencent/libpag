@@ -197,6 +197,7 @@ export interface OpenAndSettlePageOptions {
   onConsole?: ConsoleListener | null;
   onPageError?: PageErrorListener | null;
   onResponse?: ResponseListener | null;
+  beforeNavigate?: (page: Page) => Promise<void>;
   initScripts?: string[];
   // Prefer the page's static/reduced-motion presentation. Defaults to true:
   // PAGX is a static snapshot, so entrance-animation start states (commonly
@@ -343,6 +344,7 @@ export async function openAndSettlePage(
     // to cache image responses for later in-page inlining without paying the
     // CORS round-trip a second time.
     if (onResponse) page.on('response', onResponse);
+    if (opts?.beforeNavigate) await opts.beforeNavigate(page);
     // Init scripts must be registered before `page.goto` so the page's own
     // inline scripts see the helper bundles already on `window`. Each entry
     // is a self-contained source string (callers prepare it with

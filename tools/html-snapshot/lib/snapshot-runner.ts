@@ -49,6 +49,7 @@ import { responseBytes } from './browser-engine';
 import { capturePseudoContents, captureTextLayout, installTextLayout } from './text-layout';
 import { captureControlPaints, installControlPaints } from './control-capture';
 import type {
+  Page,
   BrowserResponse,
   CookieParam,
   EngineName,
@@ -194,6 +195,8 @@ export function makeResourceCacheListener(
 }
 
 export interface RunSnapshotOptions {
+  beforeNavigate?: (page: Page) => Promise<void>;
+  capturedResourcesOnly?: boolean;
   task?: ConversionTask;
   viewportWidth?: number;
   viewportHeight?: number;
@@ -450,6 +453,7 @@ async function captureSnapshot(
       : null,
     onPageError: log ? (err: Error) => log(`page exception: ${errMessage(err)}`) : null,
     onResponse,
+    beforeNavigate: opts?.beforeNavigate,
     // Ship both helper bundles to the page exactly once at navigation
     // time. Subsequent `page.evaluate(...)` calls only have to send the
     // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
@@ -625,6 +629,7 @@ async function captureSnapshot(
       try {
         const stats = await inlineIconFontsOnPage(page, {
           logger: log || (() => {}), task, capturedFonts: fontBytesByUrl,
+          capturedResourcesOnly: opts?.capturedResourcesOnly,
         });
         if (log && stats.total > 0) {
           log(`inlined ${stats.inlined}/${stats.total} icon-font glyph(s) as SVG`);

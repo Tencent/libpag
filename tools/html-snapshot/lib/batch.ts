@@ -7,7 +7,9 @@ import { throwIfCancelled } from './cli-lifecycle';
 import { writeFileAtomic } from './atomic-write';
 import { generateContactSheet, validatePreviewOptions, type ContactSheetItem, type ContactSheetResult } from './contact-sheet';
 
-import { launchBrowser, type EngineWrapper } from './browser-engine';
+import { launchBrowser, type EngineWrapper, type LaunchOptions } from './browser-engine';
+import { withConversionTask } from './conversion-task';
+import { portableWebsiteSnapshot } from './website-snapshot';
 import { runSnapshot } from './snapshot-runner';
 import { errMessage } from './common';
 import { parseCookie, parseHeader } from './cli';
@@ -19,6 +21,7 @@ import {
   type SpawnCaptureResult,
   type SnapshotImpl,
   type RunHtmlToPagxOptions,
+  type RunHtmlToPagxResult,
 } from './pipeline';
 
 // Walk `root` recursively and collect every regular file whose name ends
@@ -93,7 +96,7 @@ export function collectBatchInputs(root: string, outputRoot = ''): string[] {
 // same `(snapshotArgs) => SpawnCaptureResult` shape as
 // `pipeline.forkSnapshotCli`, but instead of forking `snapshot.js` it calls
 // `lib/snapshot-runner.ts` against the long-lived `engineHandle`.
-function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
+function makeInProcessSnapshot(engineHandle: EngineWrapper, website = false): SnapshotImpl {
   return async function inProcessSnapshot(
     snapshotArgs: BuildSnapshotArgsOptions,
   ): Promise<SpawnCaptureResult> {
@@ -111,8 +114,25 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
     const owned = await task.own<EngineWrapper['browser']>(() => engine === 'playwright' ? browser.newContext() : browser.createBrowserContext(), context => context.close());
     const context = owned.value;
     try {
+      const warnings: string[] = [];
+      let navigationError = '';
       const result = await runSnapshot({ engine, browser: context }, targetUrl, {
         task,
+        capturedResourcesOnly: website,
+        beforeNavigate: website ? async page => {
+          page.on('response', (response: import('./browser-engine').BrowserResponse) => {
+            if (response.status() < 400) return;
+            const request = response.request();
+            if (new URL(response.url()).pathname === '/favicon.ico') return;
+            const warning = `HTTP ${response.status()}: ${response.url()}`;
+            if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigationError = warning;
+            warnings.push(warning);
+          });
+          page.on('requestfailed', (request: any) => {
+            if (new URL(request.url()).pathname !== '/favicon.ico') warnings.push(`Resource request failed: ${request.url()}`);
+          });
+          page.on('pageerror', (error: unknown) => warnings.push(`Page exception: ${errMessage(error)}`));
+        } : undefined,
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
         waitMs: snapshotArgs.waitMs,
@@ -133,12 +153,17 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
       if (task.readiness.status === 'partial') {
         log(`partial: prepare-timeout (${task.readiness.stages.join(', ')})`);
       }
-      await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false, task });
+      if (navigationError) throw new Error(navigationError);
+      const capturedFiles = new Map<string, string>();
+      for (const font of result.fonts || []) for (const url of font.urls || [font.url]) capturedFiles.set(url, font.path);
+      const html = website ? portableWebsiteSnapshot(result.html, snapshotArgs.imageDir, warnings, capturedFiles) : result.html;
+      await writeFileAtomic(snapshotArgs.output, html, { reuseExisting: false, task });
       task.checkpoint();
       const stderr = stderrChunks.join('\n');
       if (stderr) process.stderr.write(stderr + '\n');
       return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '',
-        fontFiles: (result.fonts || []).map(font => font.path), readiness: task.readiness };
+        fontFiles: (result.fonts || []).map(font => font.path), readiness: task.readiness,
+        ...(warnings.length ? { warnings: [...new Set(warnings)] } : {}) };
     } catch (err) {
       const stderr = stderrChunks.concat([errMessage(err)]).join('\n');
       return { code: 1, durationMs: Date.now() - startedAt, stdout: '', stderr };
@@ -147,6 +172,11 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
 }
 
 export interface RunBatchOptions extends Pick<RunHtmlToPagxOptions, 'fontReplacements'> {
+  signal?: AbortSignal;
+  launchOptions?: LaunchOptions;
+  website?: boolean;
+  includeSkippedPreview?: boolean;
+  onResult?: (input: BatchInput, result: BatchInputResult) => Promise<void>;
   svgOptions?: string[];
   verbose?: boolean;
   pagxImageBaseDir?: string;
@@ -181,6 +211,24 @@ export interface RunBatchOptions extends Pick<RunHtmlToPagxOptions, 'fontReplace
   previewColumns?: number;
 }
 
+export interface BatchInput {
+  input: string;
+  relative: string;
+  outputDir: string;
+  outputName: string;
+  outputFile?: string;
+  signature?: string;
+}
+export interface BatchInputResult {
+  status: 'complete' | 'partial' | 'failed';
+  pagx?: string;
+  png?: string | null;
+  warnings?: string[];
+  readiness?: RunHtmlToPagxResult['readiness'];
+  error?: string;
+  skipped?: boolean;
+}
+
 export interface RunBatchResult {
   processed: number;
   skipped: number;
@@ -197,7 +245,7 @@ function batchSignature(opts: RunBatchOptions, input: string): string {
     return stat ? [stat.size, stat.mtimeMs] : null;
   };
   const { log: _log, dryRun: _dryRun, skipExisting: _skip, preview: _preview,
-    previewColumns: _columns, ...settings } = opts;
+    previewColumns: _columns, signal: _signal, launchOptions: _launch, onResult: _result, ...settings } = opts;
   return JSON.stringify({ input: path.resolve(input), source: stamp(input), binary: stamp(opts.pagxBin), settings });
 }
 
@@ -249,17 +297,26 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   }
   log(`Found ${total} non-subset HTML files under: ${inputDir}`);
 
+  return runBatchInputs(opts, files.map(file => ({ input: file, relative: path.relative(inputDir, file),
+    outputDir: resolveOutputDir(file, inputDir, outputRoot), outputName: basenameStem(file) })));
+}
+
+/** Shared executor; source discovery and stable output naming belong to the caller. */
+export async function runBatchInputs(opts: RunBatchOptions, inputs: BatchInput[]): Promise<RunBatchResult> {
+  throwIfCancelled(); opts.signal?.throwIfAborted();
+  validatePreviewOptions(opts);
+  const log = opts.log || ((line: string) => process.stdout.write(line + '\n'));
+  const total = inputs.length;
+  const signatureFor = (item: BatchInput) => item.signature ?? batchSignature(opts, item.input);
+
   // Dry run never opens the browser.
   if (opts.dryRun) {
     let processed = 0;
     let skipped = 0;
-    files.forEach((file, idx) => {
-      const rel = path.relative(inputDir, file);
-      const outDir = resolveOutputDir(file, inputDir, outputRoot);
-      const stem = basenameStem(file);
-      const target = path.join(outDir, `${stem}.pagx`);
+    inputs.forEach((item, idx) => {
+      const { relative: rel, outputDir: outDir, outputName: stem } = item;
       const index = idx + 1;
-      if (opts.skipExisting && completeBatchResult(path.join(outDir, `${stem}.import.json`), batchSignature(opts, file))) {
+      if (opts.skipExisting && completeBatchResult(path.join(outDir, `${stem}.import.json`), signatureFor(item))) {
         log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         return;
@@ -272,8 +329,18 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   }
 
   // Launch Chromium once.
-  const engineHandle = await launchBrowser({ engine: opts.browserEngine });
-  const snapshotImpl = makeInProcessSnapshot(engineHandle);
+  const engineHandle = await launchBrowser({ ...opts.launchOptions, engine: opts.browserEngine });
+  const snapshotImpl = makeInProcessSnapshot(engineHandle, opts.website);
+  const abort = () => { void engineHandle.browser.close().catch(() => {}); };
+  opts.signal?.addEventListener('abort', abort, { once: true });
+  // Each input has its own deadline; an archive/HTTP owner's cancellation reaches all stages.
+  const convert = <T>(work: (task: import('./conversion-task').ConversionTask) => Promise<T>) =>
+    withConversionTask(undefined, async task => {
+      const cancel = () => task.abort(opts.signal!.reason);
+      if (opts.signal?.aborted) cancel(); else opts.signal?.addEventListener('abort', cancel, { once: true });
+      try { task.checkpoint(); return await work(task); }
+      finally { opts.signal?.removeEventListener('abort', cancel); }
+    });
 
   let processed = 0;
   let skipped = 0;
@@ -283,17 +350,20 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   try {
     for (let i = 0; i < total; i++) {
       throwIfCancelled();
-      const file = files[i];
-      const rel = path.relative(inputDir, file);
+      opts.signal?.throwIfAborted();
+      const item = inputs[i];
+      const { input: file, relative: rel, outputDir: outDir, outputName: stem } = item;
       const index = i + 1;
-      const outDir = resolveOutputDir(file, inputDir, outputRoot);
-      const stem = basenameStem(file);
       const record = path.join(outDir, `${stem}.import.json`);
-      const signature = batchSignature(opts, file);
+      const signature = signatureFor(item);
 
       if (opts.skipExisting && completeBatchResult(record, signature)) {
         log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
+        const pagx = item.outputFile || path.join(outDir, `${stem}.pagx`);
+        const png = opts.doRender || opts.preview ? path.join(outDir, `${stem}.png`) : null;
+        if (opts.includeSkippedPreview && opts.preview && png) previewItems.push({ name: rel, png });
+        await opts.onResult?.(item, { status: 'complete', pagx, png, skipped: true });
         continue;
       }
 
@@ -302,8 +372,10 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
 
       try {
         await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'running', signature }), { reuseExisting: false });
-        const result = await runHtmlToPagx({
+        const result = await convert(task => runHtmlToPagx({
+          task,
           input: file,
+          outputFile: item.outputFile,
           outputDir: outDir,
           outputName: stem,
           pagxBin: opts.pagxBin,
@@ -334,7 +406,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           selector: opts.selector,
           log,
           snapshotImpl,
-        });
+        }));
         if (opts.preview) {
           if (!result.png) throw new Error(`preview requires a rendered PNG for ${rel}`);
           previewItems.push({ name: rel.split(path.sep).join('/'), png: result.png });
@@ -343,13 +415,17 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
         if (result.png) files.push(result.png);
         if (opts.keepSubsetHtml !== false) files.push(result.subsetHtml);
         await writeFileAtomic(record, JSON.stringify({ version: 1,
-          status: result.readiness.status === 'partial' ? 'partial' : 'complete', readiness: result.readiness, signature,
+          status: result.readiness.status === 'partial' || result.warnings?.length ? 'partial' : 'complete', readiness: result.readiness, signature,
           artifacts: artifactStamps(files) }), { reuseExisting: false });
+        await opts.onResult?.(item, { status: result.readiness.status === 'partial' || result.warnings?.length ? 'partial' : 'complete',
+          pagx: result.pagx, png: result.png, warnings: result.warnings, readiness: result.readiness });
         processed++;
       } catch (err) {
         await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'failed', signature,
           error: errMessage(err) }), { reuseExisting: false });
+        await opts.onResult?.(item, { status: 'failed', error: errMessage(err) });
         throwIfCancelled();
+        opts.signal?.throwIfAborted();
         failed++;
         const msg = err instanceof PipelineStepError
           ? `${err.step} failed`
@@ -358,6 +434,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       }
     }
   } finally {
+    opts.signal?.removeEventListener('abort', abort);
     try {
       await engineHandle.browser.close();
     } catch (closeErr) {
@@ -368,10 +445,10 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   throwIfCancelled();
   let preview: ContactSheetResult | undefined;
   if (opts.preview) {
-    preview = previewItems.length ? await generateContactSheet(previewItems, {
-      outputDir: path.join(outputRoot || inputDir, 'preview'), columns: opts.previewColumns,
-      pagxBin: opts.pagxBin, log,
-    }) : { pages: [] };
+    preview = previewItems.length ? await convert(task => generateContactSheet(previewItems, {
+      outputDir: path.join(opts.outputRoot || opts.inputDir, 'preview'), columns: opts.previewColumns,
+      pagxBin: opts.pagxBin, log, task,
+    })) : { pages: [] };
     for (const page of preview.pages) log(`[done] ${page.file}`);
   }
   log(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}`);

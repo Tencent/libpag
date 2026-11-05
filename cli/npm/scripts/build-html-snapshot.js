@@ -40,7 +40,7 @@ const DEST_DIR = path.join(NPM_PKG_DIR, 'html-snapshot');
 // Runtime npm dependencies the snapshot pipeline actually requires (puppeteer
 // is deliberately excluded — see header). Versions are read from the tool's
 // own package.json so they never drift.
-const RUNTIME_DEPS = ['@xmldom/xmldom', 'opentype.js', 'pngjs', 'wawoff2'];
+const RUNTIME_DEPS = ['@xmldom/xmldom', 'opentype.js', 'pngjs', 'wawoff2', 'yauzl', 'yazl', 'mime-types'];
 
 function say(msg) {
   process.stderr.write(`build-html-snapshot: ${msg}\n`);

@@ -406,6 +406,8 @@ struct HTMLImportOptions {
   std::string imageDir;
   std::string selector;
   std::string batchDir;
+  std::string archiveRoot;
+  std::vector<std::string> allowOrigins;
   std::vector<std::string> cookies;
   std::vector<std::string> headers;
   double viewportWidth = -1;
@@ -437,7 +439,7 @@ struct ImportOptions {
 static void PrintUsage() {
   std::cout << R"(Usage: pagx import [input] [options]
 
-Import SVG or HTML into PAGX. HTML pages and URLs are rendered in a browser;
+Import SVG, HTML or a ZIP website into PAGX. HTML pages and URLs are rendered in a browser;
 interaction scenarios export independent static checkpoints in one session.
 
 Input and output:
@@ -481,6 +483,8 @@ HTML options:
   --html-cookie <name=value>      URL cookie (repeatable)
   --html-header <Key: Value>      URL request header (repeatable)
   --html-batch <dir>              Recursively import HTML files; requires --output-dir
+  --html-root <path>              ZIP website root inside the archive (default: archive root)
+  --html-allow-origin <origin>    Allow a remote HTTP(S) origin for ZIP resources (repeatable)
   --skip-existing                 Batch: skip complete sets of requested artifacts
   --dry-run                       Batch: list work without creating outputs or a browser
 
@@ -495,6 +499,7 @@ Examples:
   pagx import page.html --html-scenario states.json --html-checkpoint ready -o ready.pagx
   pagx import https://example.com --output-dir out --output-name demo
   pagx import --html-batch pages --output-dir out --preview
+  pagx import website.zip --output-dir out --preview
 )";
 }
 
@@ -519,7 +524,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
                                                  {"--html-font-dir", &h.fontDir},
                                                  {"--html-image-dir", &h.imageDir},
                                                  {"--html-selector", &h.selector},
-                                                 {"--html-batch", &h.batchDir}};
+                                                 {"--html-batch", &h.batchDir},
+                                                 {"--html-root", &h.archiveRoot}};
   std::map<std::string, bool*> switches = {
       {"--verbose", &o.verbose},
       // Internal handoff: the JS runtime owns publication of external resources.
@@ -599,7 +605,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
     auto str = strings.find(arg);
     auto num = numbers.find(arg);
     if (str == strings.end() && num == numbers.end() && arg != "--images" &&
-        arg != "--html-cookie" && arg != "--html-header" && arg != "--font-replacement") {
+        arg != "--html-cookie" && arg != "--html-header" && arg != "--font-replacement" &&
+        arg != "--html-allow-origin") {
       return ImportArgumentError("unknown option '" + arg + "'");
     }
     if ((hasInlineValue && inlineValue.empty()) ||
@@ -659,12 +666,22 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
         return ImportArgumentError("invalid --images value '" + value +
                                    "' (expected external or embed)");
       }
-    } else if (arg == "--html-cookie")
+    } else if (arg == "--html-allow-origin")
+      h.allowOrigins.push_back(value);
+    else if (arg == "--html-cookie")
       h.cookies.push_back(value);
     else
       h.headers.push_back(value);
   }
   if (o.inputFile.empty() && h.batchDir.empty()) return ImportArgumentError("missing input");
+  const bool zipInput = !IsHttpUrl(o.inputFile) &&
+                        NormalizeFormat("", GetFileExtension(o.inputFile)) == "zip";
+  if (!zipInput && (!h.archiveRoot.empty() || !h.allowOrigins.empty()))
+    return ImportArgumentError("--html-root and --html-allow-origin require ZIP input");
+  if (zipInput && (h.noSnapshot || !h.scenario.empty() || !h.batchDir.empty()))
+    return ImportArgumentError("ZIP requires HTML snapshotting and cannot combine with batch or scenario");
+  if (zipInput && (!o.outputName.empty() || (o.outputDir.empty() && o.outputFile.empty())))
+    return ImportArgumentError("ZIP input requires --output-dir or --output; names derive from page paths");
   if (!h.batchDir.empty() &&
       (!o.inputFile.empty() || !o.outputFile.empty() || !o.outputName.empty())) {
     return ImportArgumentError(
@@ -676,15 +693,16 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
   if (!h.batchDir.empty() && o.outputDir.empty())
     return ImportArgumentError("--html-batch requires --output-dir");
-  if (h.batchDir.empty() && (o.dryRun || o.skipExisting))
-    return ImportArgumentError("--dry-run and --skip-existing require --html-batch");
-  o.format = NormalizeFormat(o.format, !h.batchDir.empty() || IsHttpUrl(o.inputFile)
+  if (h.batchDir.empty() && !zipInput && (o.dryRun || o.skipExisting))
+    return ImportArgumentError("--dry-run and --skip-existing require --html-batch or ZIP input");
+  o.format = NormalizeFormat(o.format, zipInput || !h.batchDir.empty() || IsHttpUrl(o.inputFile)
                                            ? "html"
                                            : GetFileExtension(o.inputFile));
   if (!o.formatOptions.fontReplacements.empty() && o.format != "html")
     return ImportArgumentError("--font-replacement requires HTML input");
   if (o.format != "html" && o.format != "svg")
     return ImportArgumentError("unsupported format '" + o.format + "'");
+  if (zipInput && o.format != "html") return ImportArgumentError("ZIP input requires HTML format");
   if (htmlOptions && o.format != "html")
     return ImportArgumentError("--html-* options require HTML input");
   if (IsHttpUrl(o.inputFile) && (o.format != "html" || h.noSnapshot))
@@ -727,7 +745,7 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       (o.outputDir.empty() || o.outputName.empty()))
     return ImportArgumentError("URL input requires --output or --output-dir with --output-name");
   // Scenarios determine cardinality and checkpoint names in the HTML runtime before any side effects.
-  if (h.scenario.empty() && h.batchDir.empty() && o.outputFile.empty()) {
+  if (!zipInput && h.scenario.empty() && h.batchDir.empty() && o.outputFile.empty()) {
     if (o.outputDir.empty()) o.outputFile = ReplaceExtension(o.inputFile, "pagx");
     else {
       if (o.outputName.empty())
@@ -798,6 +816,8 @@ static std::string ImportRequest(const ImportOptions& o, const std::string& exec
   str("scenario", h.scenario);
   str("checkpoint", h.checkpoint);
   str("batchDir", h.batchDir);
+  str("archiveRoot", h.archiveRoot);
+  array("allowOrigins", h.allowOrigins);
   str("browserEngine", h.browserEngine);
   str("fontDir", h.fontDir);
   str("imageDir", h.imageDir);

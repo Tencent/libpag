@@ -615,7 +615,10 @@ export async function resolveIconFontSvgs(
   }
   await Promise.all(uniqueUrls.map(async (url) => {
     try {
-      const bytes = options?.task?.readiness.status === 'partial' && options.capturedFonts?.has(url)
+      if (options?.capturedResourcesOnly && !url.startsWith('data:') && !options.capturedFonts?.has(url)) {
+        throw new Error('Font was not captured by the website browser');
+      }
+      const bytes = (options?.capturedResourcesOnly || options?.task?.readiness.status === 'partial') && options.capturedFonts?.has(url)
         ? options.capturedFonts.get(url)! : await fetchFontBytes(url, options?.task);
       const font = await parseFontBuffer(bytes);
       fontByUrl.set(url, font);
@@ -646,6 +649,7 @@ export async function resolveIconFontSvgs(
 }
 
 export interface InlineIconFontsOptions {
+  capturedResourcesOnly?: boolean;
   logger?: IconFontLogger;
   task?: ConversionTask;
   capturedFonts?: Map<string, Buffer>;
