@@ -35,15 +35,21 @@ ardot 的数据流是「设计稿节点树 → `pagx::PAGXDocument` → 其他�
 
 CLI 入口在 `src/cli/main.cpp`，导出命令分发在 `src/cli/CommandExport.cpp:263-283`：
 
-| 路径 | 实现 | 本质 | 是否渲染 |
+| 路径 | 实现 | 本质 | GPU 渲染 |
 |---|---|---|---|
-| `export --format svg` | `SVGExporter::ToFile` | 节点树 → SVG 矢量序列化 | 否（不支持的特性 bake 成内嵌 PNG） |
-| `export --format html` | `HTMLExporter::ToFile` | 节点树 → HTML/CSS（ZIP 打包） | 否（同上） |
-| `export --format pptx` | `PPTExporter::ToFile` | 节点树 → OOXML | 否（同上） |
-| `render` | `LayerBuilder::Build` → `tgfx::DisplayList` → `readPixels` → `ImageCodec::Encode` | 静态光栅化单帧 | 是 |
-| `render --time <s>` | `PAGScene::Make` → `setCurrentTime` + `apply` → `advanceAndApply` → `draw` | 动画某一时刻的单帧 | 是 |
+| `export --format svg` | `SVGExporter::ToFile` | 节点树 → SVG 矢量序列化 | 仅 bake 不支持的特性时（`bakeUnsupported` 默认开启） |
+| `export --format html` | `HTMLExporter::ToFile` | 节点树 → HTML/CSS（ZIP 打包） | 同上 |
+| `export --format pptx` | `PPTExporter::ToFile` | 节点树 → OOXML | 同上 |
+| `render` | `LayerBuilder::Build` → `tgfx::DisplayList` → `readPixels` → `ImageCodec::Encode` | 静态光栅化单帧 | 始终 |
+| `render --time <s>` | `PAGScene::Make` → `setCurrentTime` + `apply` → `advanceAndApply` → `draw` | 动画某一时刻的单帧 | 始终 |
 
 前三条是**静态快照序列化，没有时序能力**；只有 `render --time` 具备时间轴能力，但它每次调用都重建 scene，不适合批量出帧。
+
+**注意：这三条 export 并非完全不碰 GPU。** `bakeUnsupported` 开启时（SVG/HTML/PPT 的默认值），凡目标格式无法表达的效果都会通过 `pagx::GPUContext` 懒创建一个 device 做离屏光栅化，结果以 base64 PNG 内嵌到产物中（典型场景：`ImagePattern` 的 tiling、带 mask 的图层、依赖 backdrop 的混合模式）。这一机制的用途与设计意图写在 `src/pagx/utils/RasterUtils.h:37-43`：
+
+> Manages a lazily-created GPU device and context for off-screen rendering. Reuse a single instance across multiple render calls to avoid repeated GL context creation (each `Devices::MakeDefault()` on the GL backend builds a brand-new GL context, which would make per-pattern bakes in SVG/PPT export repeatedly recompile shaders).
+
+也就是说「导出需要 device」在 pagx 里已有先例，MP4 不是第一次引入这个依赖；`GPUContext` 的「懒创建 + 全程复用一个实例」正是 MP4 逐帧渲染要照搬的模式。
 
 ### 2.2 ardot 的调用链路
 
@@ -68,7 +74,7 @@ pagx 公开 API：HTMLExporter::ToData / PPTExporter::ToData / PAGXExporter::ToX
 3. **字体在 import 阶段注入** `document->fontConfig`，导出侧复用。
 4. **图片资源通过 `collect_resource_paths` → `ExportResourceFetchManager::fetch` → `document->loadFileDataMap()`** 注入。
 5. **GPU 锁是硬约束**：导出器头文件明确要求调用方不得持有同一 device 的 context lock，`DeviceLockScope` 不可重入。
-6. **导出器自建设备**（`RasterUtils.cpp` 内 `pag::Devices::MakeDefault()` 并缓存）。
+6. **导出器自建设备**：`GPUContext` 懒创建 device（内部 `pag::Devices::MakeDefault()`），并在一次导出内全程复用该实例。`MakeDefault()` 本身**不是单例**，每次调用都会新建 device 与 context，复用的责任在调用方。
 
 ### 2.3 两套「快照 / 动画」语义
 
