@@ -23,14 +23,20 @@ app.get('/', (req, res) => {
   res.send('Hello, libpag demo!');
 });
 
+function ReportLaunchFailure(error) {
+  if (error) console.error(error.message);
+}
+
 function OpenBrowser(url) {
   if (process.platform === 'darwin') {
-    execFile('open', [url]);
+    execFile('open', [url], ReportLaunchFailure);
     return;
   }
-  // `start` is a cmd.exe builtin, so it can only be reached through the shell interpreter while
-  // the URL itself stays a separate argument that cmd never parses.
-  execFile('cmd', ['/c', 'start', '', url]);
+  if (process.platform === 'win32') {
+    // `start` is a cmd.exe builtin, so it can only be reached through the shell interpreter while
+    // the URL itself stays a separate argument that cmd never parses.
+    execFile('cmd', ['/c', 'start', '', url], ReportLaunchFailure);
+  }
 }
 
 const port = 8081;
