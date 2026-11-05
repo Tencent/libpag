@@ -2,7 +2,7 @@
 <!-- Tests: anchor.z is animated under a static 30 degree rotationX, so the pivot travels along Z and the projected
      card grows instead of holding one depth.
      Target: Layer  Channel: anchor.z  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

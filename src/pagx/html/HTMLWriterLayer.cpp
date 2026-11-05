@@ -2229,7 +2229,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   } else {
     style += "position:absolute";
     auto renderPos =
-        LayerPositionForCSS(layer, _ctx->animation.matrixDrivenLayers.count(layer) > 0);
+        LayerPositionForCSS(layer, _ctx->animation.matrixDrivenLayers.count(layer) > 0 ||
+                                       _ctx->animation.poseDrivenLayers.count(layer) > 0);
     // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
     // the inverse shift added to their own left/top so they still paint at the correct document
     // position. Consume and clear the offset so it is not applied to grandchild layers.

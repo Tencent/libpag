@@ -3849,6 +3849,85 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
 // every stop carries a `d` with that frame's radius applied.
 // 3D channels (rotation.x/y, z, perspective) cannot be expressed with 2D transform functions, so each
 // frame is emitted as a matrix3d. The static path already builds one from the same components.
+// A Layer's anchor is the pivot of its own pose: the runtime composes
+// T(x, y) * T(anchor) * R * S * T(-anchor), so an animated anchor has to be part of the per-frame
+// transform list instead of being read once from the authored value.
+CLI_TEST(PAGXHtmlTest, AnimationLayerAnchorXSlidesPivot) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="handSlide" x="150" y="100" width="120" height="16" anchor="0,8" rotationZ="20">
+      <Rectangle position="60,8" size="120,16" roundness="8"/>
+      <Fill color="#C2410C"/>
+    </Layer>
+    <Animations>
+      <Animation id="pivotSlide" duration="60" frameRate="60" loop="once">
+        <Object target="handSlide">
+          <Channel name="anchor.x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="120"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"handSlide\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  // The static rotation stays in the list, and the pivot travels with the channel value.
+  auto first = KeyframeStopOf(html, "id=\"handSlide\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"handSlide\"", "100%");
+  ASSERT_FALSE(first.empty()) << rule;
+  ASSERT_FALSE(last.empty()) << rule;
+  EXPECT_NE(first.find("translate(0px, 8px)"), std::string::npos) << first;
+  EXPECT_NE(last.find("translate(120px, 8px)"), std::string::npos) << last;
+  EXPECT_NE(first.find("rotate(20deg)"), std::string::npos) << first;
+  EXPECT_NE(last.find("rotate(20deg)"), std::string::npos) << last;
+  EXPECT_NE(first, last);
+}
+
+// anchor.z moves the pivot along the depth axis, so under a static rotationX the projected size
+// changes: the pivot translation has to carry the animated z as well.
+CLI_TEST(PAGXHtmlTest, AnimationLayerAnchorZChangesDepth) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="cardDepth" x="100" y="60" width="120" height="80" anchor="0,80,0" rotationX="30"
+           perspective="600">
+      <Rectangle position="60,40" size="120,80" roundness="12"/>
+      <Fill color="#C2410C"/>
+    </Layer>
+    <Animations>
+      <Animation id="pivotDepth" duration="60" frameRate="60" loop="once">
+        <Object target="cardDepth">
+          <Channel name="anchor.z" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"cardDepth\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  auto first = KeyframeStopOf(html, "id=\"cardDepth\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"cardDepth\"", "100%");
+  ASSERT_FALSE(first.empty()) << rule;
+  ASSERT_FALSE(last.empty()) << rule;
+  EXPECT_NE(first.find("translate3d(0px, 80px, 0px)"), std::string::npos) << first;
+  EXPECT_NE(last.find("translate3d(0px, 80px, 40px)"), std::string::npos) << last;
+  EXPECT_NE(first, last);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayer3DChannelsEmitMatrix3D) {
   const char* xml = R"(<pagx width="400" height="200">
     <Layer id="tipX" x="60" y="60" width="80" height="80" perspective="500">

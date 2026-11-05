@@ -80,6 +80,10 @@ def load_cases():
         for group in re.findall(r"Channel:\s*(\S+)", header):
             channels.extend(part.strip() for part in group.split(",") if part.strip())
         expect = re.search(r"Expect:\s*(\w+)", header)
+        # `Known-gap` marks a case whose channel is exported but does not match the reference for a
+        # documented reason (e.g. a CSS interpolation difference), so the keyframe presence check
+        # below must not flag it.
+        known_gap = re.search(r"Known-gap:\s*([\w-]+)", header)
         cases.append(
             {
                 "file": rel,
@@ -88,6 +92,7 @@ def load_cases():
                 "targets": targets,
                 "channels": channels,
                 "expect": expect.group(1) if expect else "?",
+                "known_gap": known_gap.group(1) if known_gap else "",
             }
         )
     return cases
@@ -258,6 +263,8 @@ def check(anim, exported, index, cases):
                 stderr=subprocess.DEVNULL,
             )
             html = open(out, encoding="utf-8", errors="ignore").read() if os.path.exists(out) else ""
+            if case.get("known_gap"):
+                continue
             if ("@keyframes" in html) != (case["expect"] == "supported"):
                 failures.append("Expect does not match the export: " + case["file"])
 

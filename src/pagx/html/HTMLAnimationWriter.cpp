@@ -677,6 +677,7 @@ enum class TargetChannelRole {
   LayerSkewY,
   RoundCornerRadius,
   // Layer 3D channels: no 2D transform function expresses them, so the frame emits a matrix3d.
+  AnchorZ,
   LayerRotationX,
   LayerRotationY,
   LayerZ,
@@ -709,6 +710,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "perspective", TargetChannelRole::LayerPerspective},
     {NodeType::Layer, "anchor.x", TargetChannelRole::AnchorX},
     {NodeType::Layer, "anchor.y", TargetChannelRole::AnchorY},
+    {NodeType::Layer, "anchor.z", TargetChannelRole::AnchorZ},
     {NodeType::Layer, "matrix3D", TargetChannelRole::LayerMatrix3D},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
@@ -818,6 +820,7 @@ struct BundleChannelSet {
   const Channel* skewCh = nullptr;
   const Channel* layerSkewXCh = nullptr;
   const Channel* layerSkewYCh = nullptr;
+  const Channel* anchorZCh = nullptr;
   const Channel* layerRotXCh = nullptr;
   const Channel* layerRotYCh = nullptr;
   const Channel* layerZCh = nullptr;
@@ -917,6 +920,9 @@ bool BindChannelToBundleSet(
     // A 3D channel is emitted as one composed matrix3d. Anchored layers need the pivot folded into
     // that matrix differently than the static path does, so they keep the previous behaviour (the
     // channel is not exported) until anchor support lands.
+    case TargetChannelRole::AnchorZ:
+      out.anchorZCh = ch;
+      return true;
     case TargetChannelRole::LayerRotationX:
       out.layerRotXCh = ch;
       return true;
@@ -1154,9 +1160,10 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
   if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer) {
     hostLayer = static_cast<const Layer*>(bundle.primaryHost);
   }
+  // anchor.z moves the pivot along the depth axis, so it needs the 3D list even on its own.
   bool has3DChannel = chSet.layerRotXCh != nullptr || chSet.layerRotYCh != nullptr ||
                       chSet.layerZCh != nullptr || chSet.layerPerspectiveCh != nullptr ||
-                      chSet.layerMatrix3DCh != nullptr;
+                      chSet.layerMatrix3DCh != nullptr || chSet.anchorZCh != nullptr;
   if (has3DChannel && hostLayer != nullptr) {
     // PAGX composes P * T * T(anchor) * L * T(-anchor), with the projection outermost. A CSS
     // function list in the same order reproduces it exactly: `perspective()` is the projection,
@@ -1191,11 +1198,12 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     // The anchor conjugates the affine part only; spelling it out keeps the projection outside.
     float anchorX = EvalFloatChannel(chSet.anchorXCh, t, hostLayer->anchor.x);
     float anchorY = EvalFloatChannel(chSet.anchorYCh, t, hostLayer->anchor.y);
-    bool hasAnchor = !FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY) ||
-                     !FloatNearlyZero(hostLayer->anchorZ);
+    float anchorZ = EvalFloatChannel(chSet.anchorZCh, t, hostLayer->anchorZ);
+    bool hasAnchor =
+        !FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY) || !FloatNearlyZero(anchorZ);
     if (hasAnchor) {
       append("translate3d(" + CssFloatToString(anchorX) + "px, " + CssFloatToString(anchorY) +
-             "px, " + CssFloatToString(hostLayer->anchorZ) + "px)");
+             "px, " + CssFloatToString(anchorZ) + "px)");
     }
     float rx = EvalFloatChannel(chSet.layerRotXCh, t, hostLayer->rotationX);
     float ry = EvalFloatChannel(chSet.layerRotYCh, t, hostLayer->rotationY);
@@ -1218,7 +1226,7 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     }
     if (hasAnchor) {
       append("translate3d(" + CssFloatToString(-anchorX) + "px, " + CssFloatToString(-anchorY) +
-             "px, " + CssFloatToString(-hostLayer->anchorZ) + "px)");
+             "px, " + CssFloatToString(-anchorZ) + "px)");
     }
     if (tf.empty()) {
       return;
@@ -1272,10 +1280,9 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     AppendCssDecl(decls, "transform", tf);
     return;
   }
-  // A Layer's anchor is only meaningful together with a 3D pose; on the 2D path the group formula
-  // below does not model it and would misplace the layer, so it stays ignored there.
-  bool anchorApplies =
-      hostLayer == nullptr && (chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr);
+  // A Layer's anchor is the pivot of its own pose (T * T(a) * L * T(-a)), so it participates in the
+  // 2D list as a translate pair, exactly like the 3D one.
+  bool anchorApplies = chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr;
   if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
       chSet.posXCh != nullptr || chSet.posYCh != nullptr || anchorApplies ||
       chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr || chSet.layerSkewXCh != nullptr ||
@@ -1314,6 +1321,7 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       baseSY = layer->scaleY;
       baseSkewX = layer->skewX;
       baseSkewY = layer->skewY;
+      baseAnchor = {layer->anchor.x, layer->anchor.y};
     }
     float px = EvalFloatChannel(chSet.posXCh, t, basePosX);
     float py = EvalFloatChannel(chSet.posYCh, t, basePosY);
@@ -1343,9 +1351,25 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       }
       tf += function;
     };
+    if (isLayerHost) {
+      // The pose list owns the position for a Layer, so the authored x/y is folded in here instead
+      // of being emitted as left/top.
+      auto* layer = static_cast<const Layer*>(bundle.primaryHost);
+      if (!FloatNearlyZero(layer->x) || !FloatNearlyZero(layer->y)) {
+        appendFunction("translate(" + CssFloatToString(layer->x) + "px, " +
+                       CssFloatToString(layer->y) + "px)");
+      }
+    }
     if (!FloatNearlyZero(px) || !FloatNearlyZero(py) || chSet.posXCh != nullptr ||
         chSet.posYCh != nullptr) {
       appendFunction("translate(" + CssFloatToString(px) + "px, " + CssFloatToString(py) + "px)");
+    }
+    // A Layer pose translates the pivot forward before the rotation; the Group matrix only carries
+    // the trailing -anchor, so only a Layer emits this half of the pair.
+    if (isLayerHost && (chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr ||
+                        !FloatNearlyZero(baseAnchor.x) || !FloatNearlyZero(baseAnchor.y))) {
+      appendFunction("translate(" + CssFloatToString(anchorX) + "px, " + CssFloatToString(anchorY) +
+                     "px)");
     }
     if (chSet.rotCh != nullptr || !FloatNearlyZero(rot)) {
       appendFunction("rotate(" + CssFloatToString(rot) + "deg)");
@@ -1684,7 +1708,7 @@ std::string BuildAnimationShorthand(const Animation* anim, const std::string& kf
 }
 
 std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
-    PAGXDocument& doc, const Animation* anim, const HTMLWriterContext& ctx,
+    PAGXDocument& doc, const Animation* anim, HTMLWriterContext& ctx,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
     const std::unordered_map<const LayerFilter*, const Layer*>& filterToLayer,
     const std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
@@ -2069,6 +2093,19 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             continue;
           }
           auto role = LookupChannelRole(nType, ch->name);
+          // A pose channel makes the frame emit a full transform list that also carries the
+          // authored x/y, so the tag drops its left/top. A pure x/y or matrix animation keeps the
+          // previous split (left/top plus a delta translate), so those roles are excluded.
+          if (role == TargetChannelRole::Rotation || role == TargetChannelRole::ScaleX ||
+              role == TargetChannelRole::ScaleY || role == TargetChannelRole::LayerSkewX ||
+              role == TargetChannelRole::LayerSkewY || role == TargetChannelRole::AnchorX ||
+              role == TargetChannelRole::AnchorY || role == TargetChannelRole::AnchorZ ||
+              role == TargetChannelRole::LayerRotationX ||
+              role == TargetChannelRole::LayerRotationY || role == TargetChannelRole::LayerZ ||
+              role == TargetChannelRole::LayerPerspective ||
+              role == TargetChannelRole::LayerMatrix3D) {
+            _ctx.animation.poseDrivenLayers.insert(layer);
+          }
           if (role == TargetChannelRole::LayerMatrix) {
             // The runtime lets a matrix channel own the translation, so the tag must not carry the
             // layer's x/y as well; see LayerPositionForCSS.

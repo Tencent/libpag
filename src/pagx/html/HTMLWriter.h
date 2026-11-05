@@ -292,6 +292,9 @@ class HTMLWriterContext {
     // Layers whose translation comes from an animated `matrix` channel. The matrix already carries
     // the position, so the tag must not also emit left/top from the layer's x/y.
     std::unordered_set<const Layer*> matrixDrivenLayers = {};
+    // Layers whose animated pose carries the authored x/y inside the transform, so the tag must not
+    // also emit them as left/top.
+    std::unordered_set<const Layer*> poseDrivenLayers = {};
     // Number of tags already emitted for each animated base id.
     std::unordered_map<std::string, size_t> domIdUseCount = {};
 

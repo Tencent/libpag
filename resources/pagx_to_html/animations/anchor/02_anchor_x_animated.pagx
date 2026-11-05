@@ -2,7 +2,7 @@
 <!-- Tests: An animated anchor.x slides the pivot from the bar's left edge to its right edge while the bar keeps a
      static 20 degree rotation, so the same pose is re-pivoted every frame.
      Target: Layer  Channel: anchor.x  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

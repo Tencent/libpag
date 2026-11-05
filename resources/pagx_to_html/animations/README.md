@@ -235,10 +235,16 @@ node tools/html-snapshot/eval-animation/run.js \
 <!-- Tests: <一句话说明>
      Target: <NodeType>  Channel: <通道名>[,<通道名>]  Type: <值类型>
      Expect: supported|gap
+     Known-gap: <原因标识>   // 可选，见下
      Ref: <对应的 test/src 用例，没有则 -> -->
 ```
 
 `Target` / `Channel` 会被 `run.js` 读进报告；`Expect: gap` 表示该用例的核心通道导出侧未实现。
+
+`Known-gap` 用于“通道已经导出、但结果与参考对不上”的情况：它把用例保留在 `gap` 组（不计入通过率），
+同时让 `anim_coverage.py --check` 不再因为“gap 用例却有 `@keyframes`”而报错。当前唯一使用它的是
+`layer/12_perspective`（`css-perspective-interpolation`）：CSS 在两条 `perspective()` 之间按矩阵分解
+（等价于对 `1/d` 线性）插值，而运行时按通道值线性取 `d` 再重算矩阵，中间帧必然分叉，端点一致。
 
 ## 7. 范围与已知限制
 
