@@ -204,6 +204,10 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
       continue;
     }
     std::filesystem::path src(resolvedSrc);
+    if (options.deferCopy) {
+      image->filePath = std::filesystem::absolute(src).lexically_normal().generic_string();
+      continue;
+    }
     std::filesystem::path dst = std::filesystem::path(outputDir) / relSource;
     std::error_code ec;
     auto canonSrc = std::filesystem::weakly_canonical(src, ec);

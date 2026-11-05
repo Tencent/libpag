@@ -11,20 +11,24 @@
 
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import type { ConversionTask } from './conversion-task';
 
 const fsp = fs.promises;
 
 export async function writeFileAtomic(
   filePath: string,
   data: Buffer | Uint8Array | string,
-  options: { reuseExisting?: boolean } = {},
+  options: { reuseExisting?: boolean; task?: ConversionTask } = {},
 ): Promise<void> {
   const tmp = `${filePath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
-  await fsp.writeFile(tmp, data);
   try {
-    await fsp.rename(tmp, filePath);
+    options.task?.checkpoint();
+    await fsp.writeFile(tmp, data);
+    options.task?.checkpoint();
+    fs.renameSync(tmp, filePath);
   } catch (err) {
     await fsp.unlink(tmp).catch(() => {});
+    options.task?.checkpoint();
     if (options.reuseExisting === false || !fs.existsSync(filePath)) throw err;
   }
 }

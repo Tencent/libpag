@@ -37,6 +37,7 @@ require('./ensure-built').ensureBuilt();
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
+const { writeFileAtomic } = require('./dist/lib/atomic-write');
 const { ConversionTask } = require('./dist/lib/conversion-task');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
@@ -110,7 +111,7 @@ async function main(task) {
       process.stdout.write(result.html);
       console.error(`${LOG_PREFIX}wrote stdout (${result.width}x${result.height})`);
     } else {
-      fs.writeFileSync(opts.output, result.html, 'utf8');
+      await writeFileAtomic(opts.output, result.html, { reuseExisting: false, task });
       console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
     }
 

@@ -205,6 +205,14 @@ export interface NewPageOptions {
   viewport?: ViewportSpec | null;
 }
 
+// Closing a context/browser also closes its pages. That is successful teardown,
+// including when it races an explicit page close during task cancellation.
+export async function closePage(page: Page, close = page.close.bind(page)): Promise<void> {
+  if (page.isClosed?.()) return;
+  try { await close(); }
+  catch (error) { if (!page.isClosed?.()) throw error; }
+}
+
 // Map our generic options to the engine-specific page constructor calls.
 //
 // Both engines expose `browser.newPage()`. The semantic difference is that

@@ -3,7 +3,7 @@
 // You may obtain a copy at http://www.apache.org/licenses/LICENSE-2.0
 
 import { ConversionTask, withConversionTask } from './conversion-task';
-import { launchBrowser, newPage, type EngineName, type EngineWrapper, type Page } from './browser-engine';
+import { launchBrowser, newPage, closePage, type EngineName, type EngineWrapper, type Page } from './browser-engine';
 import {
   SNAPSHOT_INIT_SCRIPT, inlineExternalImages, inlineCanvases,
   materializeDecorativePseudoElements,
@@ -320,7 +320,7 @@ async function renderPage(
 ): Promise<CurrentStateResult> {
   if (captured.version !== 1) throw new Error('Unsupported captured-page version');
   const warnings = [...captured.unsupported];
-  const owned = await options.task!.own(() => newPage(mirror, { viewport: captured.viewport }), page => page.close());
+  const owned = await options.task!.own(() => newPage(mirror, { viewport: captured.viewport }), closePage);
   const page = owned.value;
   try {
     // An inert copy must not refetch authenticated/mutable resources under a

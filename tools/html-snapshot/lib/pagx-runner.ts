@@ -21,6 +21,7 @@
 // input HTML and the output PAGX on disk; the wrapper guarantees the temp
 // directory is removed when the call returns, success or failure.
 
+import { validatePagx } from './artifact-publication';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -177,6 +178,7 @@ async function importSnapshot({ pagxBin, html, log, availableFonts, task }: RunP
       log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
     }
     const result = fs.readFileSync(pagxPath, 'utf8');
+    validatePagx(result);
     task!.checkpoint();
     return result;
   } finally {

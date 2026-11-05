@@ -5,6 +5,7 @@ const fsp = require('fs').promises;
 const os = require('os');
 const path = require('path');
 const { writeFileAtomic } = require('../dist/lib/atomic-write');
+const { ConversionTask } = require('../dist/lib/conversion-task');
 
 let dir;
 beforeEach(() => {
@@ -16,9 +17,24 @@ afterEach(() => {
 });
 
 describe('writeFileAtomic', () => {
+  test('cancellation during staging cannot replace an existing file', async () => {
+    const task = new ConversionTask();
+    const target = path.join(dir, 'existing.html');
+    fs.writeFileSync(target, 'old');
+    const write = fsp.writeFile;
+    jest.spyOn(fsp, 'writeFile').mockImplementation(async (...args) => {
+      await write(...args); task.abort(new Error('cancelled while writing'));
+    });
+    try {
+      await expect(writeFileAtomic(target, 'new', { task, reuseExisting: false }))
+        .rejects.toThrow('cancelled while writing');
+      expect(fs.readFileSync(target, 'utf8')).toBe('old');
+      expect(fs.readdirSync(dir)).toEqual(['existing.html']);
+    } finally { await task.finish(); }
+  });
   test('preserves the rename error when cleanup also fails', async () => {
     const error = new Error('rename denied');
-    jest.spyOn(fsp, 'rename').mockRejectedValue(error);
+    jest.spyOn(fs, 'renameSync').mockImplementation(() => { throw error; });
     jest.spyOn(fsp, 'unlink').mockRejectedValue(new Error('cleanup denied'));
     const target = path.join(dir, 'missing.bin');
     await expect(writeFileAtomic(target, 'payload')).rejects.toBe(error);
@@ -48,12 +64,12 @@ describe('writeFileAtomic', () => {
     const target = path.join(dir, 'shared.bin');
     fs.writeFileSync(target, 'WINNER');
 
-    const realRename = fsp.rename;
-    fsp.rename = async () => { throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' }); };
+    const realRename = fs.renameSync;
+    fs.renameSync = () => { throw Object.assign(new Error('EEXIST'), { code: 'EEXIST' }); };
     try {
       await expect(writeFileAtomic(target, Buffer.from('LOSER'))).resolves.toBeUndefined();
     } finally {
-      fsp.rename = realRename;
+      fs.renameSync = realRename;
     }
 
     // Target still has the winner's bytes — our payload was discarded.
@@ -65,12 +81,12 @@ describe('writeFileAtomic', () => {
 
   test('rethrows when rename fails and target is missing', async () => {
     const target = path.join(dir, 'nope.bin');
-    const realRename = fsp.rename;
-    fsp.rename = async () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); };
+    const realRename = fs.renameSync;
+    fs.renameSync = () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); };
     try {
       await expect(writeFileAtomic(target, Buffer.from('x'))).rejects.toThrow(/EACCES/);
     } finally {
-      fsp.rename = realRename;
+      fs.renameSync = realRename;
     }
     expect(fs.existsSync(target)).toBe(false);
     // Even on the error path, the staged temp is removed.
@@ -80,11 +96,11 @@ describe('writeFileAtomic', () => {
 
   test('a named checkpoint output must not silently retain old content on rename failure',async()=>{
     const target=path.join(dir,'checkpoint.html');fs.writeFileSync(target,'OLD');
-    const realRename=fsp.rename;
-    fsp.rename=async()=>{throw new Error('EACCES')};
+    const realRename=fs.renameSync;
+    fs.renameSync=()=>{throw new Error('EACCES')};
     try {
       await expect(writeFileAtomic(target,'NEW',{reuseExisting:false})).rejects.toThrow('EACCES');
-    } finally {fsp.rename=realRename;}
+    } finally {fs.renameSync=realRename;}
     expect(fs.readFileSync(target,'utf8')).toBe('OLD');
     expect(fs.readdirSync(dir)).toEqual(['checkpoint.html']);
   });

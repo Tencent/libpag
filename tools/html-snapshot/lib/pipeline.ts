@@ -1,5 +1,8 @@
 // Shared HTML acquisition and native artifact pipeline for pagx import and evaluators.
 
+import { ArtifactPublication, validatePagx } from './artifact-publication';
+import { validatePng } from './png-validation';
+
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -156,6 +159,7 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
 }
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
+  deferImageStorage?: boolean;
   fontReplacements?: FontReplacement[];
   pagxBin?: string;
   input?: string;
@@ -179,6 +183,7 @@ export async function runPagxImportToFile(opts: RunPagxImportToFileOptions = {})
   if (format === 'html') args.push('--html-no-snapshot');
   if (opts.resolve === false) args.push('--no-resolve');
   if (opts.imageStorage) args.push('--images', opts.imageStorage);
+  if (opts.deferImageStorage) args.push('--defer-image-storage');
   if (opts.imageBaseDir) args.push('--image-base-dir', opts.imageBaseDir);
   if (opts.verbose) args.push('--verbose');
   if (opts.svgOptions) args.push(...opts.svgOptions);
@@ -307,6 +312,7 @@ function assertStepOk(stepName: string, result: SpawnCaptureResult): void {
 export type SnapshotImpl = (args: BuildSnapshotArgsOptions) => Promise<SpawnCaptureResult>;
 
 export interface RunHtmlToPagxOptions {
+  publication?: ArtifactPublication;
   task?: ConversionTask;
   fontReplacements?: FontReplacement[];
   log?: (line: string) => void;
@@ -368,33 +374,42 @@ export function convertToArtifacts(opts: RunHtmlToPagxOptions, input: string, fo
 // Snapshot acquisition and native conversion share the same artifact finalizer.
 async function convertArtifacts(opts: RunHtmlToPagxOptions, input: string,
     fonts: string[] = []): Promise<Omit<RunHtmlToPagxResult, 'subsetHtml'>> {
+  const task = opts.task!;
   const pagxBin = opts.pagxBin || defaultPagxBin();
-  const pagxFile = path.resolve(opts.outputFile || path.join(opts.outputDir!, `${opts.outputName}.pagx`));
-  await fs.promises.mkdir(path.dirname(pagxFile), { recursive: true });
-  opts.task?.checkpoint('import');
-  const result = await runPagxImportToFile({
-    task: opts.task, pagxBin, input, pagxFile, format: opts.format || 'html', resolve: opts.doResolve,
-    imageStorage: opts.pagxImages || 'external',
-    imageBaseDir: opts.pagxImageBaseDir || (isHttpUrl(opts.input!) ? '' : path.dirname(path.resolve(opts.input!))),
-    svgOptions: opts.svgOptions, verbose: opts.verbose,
-    fontReplacements: opts.fontReplacements,
-  });
-  assertStepOk('pagx import', result);
-  if (!fs.existsSync(pagxFile)) throw new PipelineStepError('pagx import produced no output', { step: 'pagx import' });
-  if (opts.embedFonts) {
-    opts.task?.checkpoint('embed');
-    assertStepOk('pagx embed', await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts, task: opts.task }));
-  }
-  let png: string | null = null;
-  if (opts.doRender !== false && opts.doResolve !== false) {
-    png = path.join(path.dirname(pagxFile), `${path.parse(pagxFile).name}.png`);
-    opts.task?.checkpoint('render');
-    assertStepOk('pagx render', await runPagxRender({ pagxBin, pagxFile, output: png, task: opts.task,
-      scale: opts.scale || 1, fontFallbacks: fonts }));
-  }
-  opts.task?.checkpoint();
-  opts.log?.(`[done] ${png || pagxFile}`);
-  return { pagx: pagxFile, png, fonts, readiness: opts.task!.readiness };
+  const finalPagx = path.resolve(opts.outputFile || path.join(opts.outputDir!, `${opts.outputName}.pagx`));
+  const publication = opts.publication || new ArtifactPublication(task, path.dirname(finalPagx));
+  const pagxFile = path.join(publication.directory, path.basename(finalPagx));
+  try {
+    task.checkpoint('import');
+    const result = await runPagxImportToFile({
+      task, pagxBin, input, pagxFile, format: opts.format || 'html', resolve: opts.doResolve,
+      imageStorage: opts.pagxImages || 'external', deferImageStorage: opts.pagxImages !== 'embed',
+      imageBaseDir: opts.pagxImageBaseDir || (isHttpUrl(opts.input!) ? '' : path.dirname(path.resolve(opts.input!))),
+      svgOptions: opts.svgOptions, verbose: opts.verbose, fontReplacements: opts.fontReplacements,
+    });
+    assertStepOk('pagx import', result);
+    if (!fs.existsSync(pagxFile)) throw new PipelineStepError('pagx import produced no output', { step: 'pagx import' });
+    validatePagx(await fs.promises.readFile(pagxFile, 'utf8'));
+    if (opts.embedFonts) {
+      task.checkpoint('embed');
+      assertStepOk('pagx embed', await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts, task }));
+      validatePagx(await fs.promises.readFile(pagxFile, 'utf8'));
+    }
+    await publication.prepareImages(pagxFile, finalPagx);
+    let png: string | null = null;
+    if (opts.doRender !== false && opts.doResolve !== false) {
+      png = path.join(path.dirname(finalPagx), `${path.parse(finalPagx).name}.png`);
+      const stagedPng = path.join(publication.directory, path.basename(png));
+      task.checkpoint('render');
+      assertStepOk('pagx render', await runPagxRender({ pagxBin, pagxFile, output: stagedPng, task,
+        scale: opts.scale || 1, fontFallbacks: fonts }));
+      await validatePng(stagedPng, 128 * 1024 * 1024);
+      publication.add(stagedPng, png);
+    }
+    publication.add(pagxFile, finalPagx);
+    if (!opts.publication) publication.commit();
+    return { pagx: finalPagx, png, fonts, readiness: task.readiness };
+  } finally { if (!opts.publication) publication.dispose(); }
 }
 
 export function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
@@ -440,6 +455,7 @@ async function convertHtml(opts: RunHtmlToPagxOptions): Promise<RunHtmlToPagxRes
   const downloadFonts = !!opts.downloadFonts || embedFonts;
   const downloadImages = !!opts.downloadImages;
 
+  const publication = opts.publication || new ArtifactPublication(opts.task!, outputDir);
   // When the user opts out of keeping the subset HTML on disk, redirect it to
   // a self-cleaning temp dir; pagx import still needs a file to read.
   let subsetHtml: string;
@@ -449,7 +465,7 @@ async function convertHtml(opts: RunHtmlToPagxOptions): Promise<RunHtmlToPagxRes
   if (opts.keepSubsetHtml === false) {
     subsetHtml = path.join(tempDir, `${baseName}.subset.html`);
   } else {
-    subsetHtml = path.join(outputDir, `${baseName}.subset.html`);
+    subsetHtml = path.join(publication.directory, `${baseName}.subset.html`);
   }
 
   let fontDir = opts.fontDir || '';
@@ -504,9 +520,16 @@ async function convertHtml(opts: RunHtmlToPagxOptions): Promise<RunHtmlToPagxRes
       }
     }
 
-    const artifacts = await convertToArtifacts({ ...opts, outputDir, outputName: baseName }, subsetHtml, fonts);
-    return { subsetHtml, ...artifacts };
+    const finalSubset = opts.keepSubsetHtml === false ? subsetHtml : path.join(outputDir, `${baseName}.subset.html`);
+    if (opts.keepSubsetHtml !== false) publication.add(subsetHtml, finalSubset);
+    const artifacts = await convertToArtifacts({ ...opts, publication, outputDir, outputName: baseName }, subsetHtml, fonts);
+    if (!opts.publication) {
+      publication.commit();
+      log(`[done] ${artifacts.png || artifacts.pagx}`);
+    }
+    return { subsetHtml: finalSubset, ...artifacts };
   } finally {
+    if (!opts.publication) publication.dispose();
     if (tempDir) {
       opts.task!.deferCleanup(() => fs.promises.rm(tempDir, { recursive: true, force: true }));
     }

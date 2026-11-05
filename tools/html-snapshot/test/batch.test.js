@@ -24,6 +24,7 @@ function touch(rel) {
 
 async function materializeResult(run, opts) {
   const result = await run(opts);
+  result.readiness ||= { status: 'ready', stages: [] };
   result.pagx ||= path.join(opts.outputDir, `${opts.outputName}.pagx`);
   result.subsetHtml ||= path.join(opts.outputDir, `${opts.outputName}.subset.html`);
   for (const file of [result.pagx, result.subsetHtml]) {
@@ -355,7 +356,10 @@ describe('runBatch — in-process snapshot adapter', () => {
     });
     jest.doMock('../dist/lib/pipeline', () => {
       const real = jest.requireActual('../dist/lib/pipeline');
-      return { ...real, runHtmlToPagx: opts => materializeResult(runHtmlToPagx, opts) };
+      const { withConversionTask } = jest.requireActual('../dist/lib/conversion-task');
+      return { ...real, runHtmlToPagx: opts => withConversionTask(opts.task, task =>
+        materializeResult(runHtmlToPagx, { ...opts, task,
+          snapshotImpl: args => opts.snapshotImpl({ ...args, task }) })) };
     });
     return require('../dist/lib/batch');
   }

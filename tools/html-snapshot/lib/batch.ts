@@ -130,12 +130,15 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         log,
       });
       task.checkpoint();
-      await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false });
+      if (task.readiness.status === 'partial') {
+        log(`partial: prepare-timeout (${task.readiness.stages.join(', ')})`);
+      }
+      await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false, task });
       task.checkpoint();
       const stderr = stderrChunks.join('\n');
       if (stderr) process.stderr.write(stderr + '\n');
       return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '',
-        fontFiles: (result.fonts || []).map(font => font.path) };
+        fontFiles: (result.fonts || []).map(font => font.path), readiness: task.readiness };
     } catch (err) {
       const stderr = stderrChunks.concat([errMessage(err)]).join('\n');
       return { code: 1, durationMs: Date.now() - startedAt, stdout: '', stderr };
@@ -339,7 +342,8 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
         const files = [result.pagx, ...result.fonts, ...pagxResourceFiles(result.pagx)];
         if (result.png) files.push(result.png);
         if (opts.keepSubsetHtml !== false) files.push(result.subsetHtml);
-        await writeFileAtomic(record, JSON.stringify({ version: 1, status: 'complete', signature,
+        await writeFileAtomic(record, JSON.stringify({ version: 1,
+          status: result.readiness.status === 'partial' ? 'partial' : 'complete', readiness: result.readiness, signature,
           artifacts: artifactStamps(files) }), { reuseExisting: false });
         processed++;
       } catch (err) {

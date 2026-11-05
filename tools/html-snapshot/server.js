@@ -576,6 +576,15 @@ async function convertSnapshot(req, res, ctx, source, task) {
       + `pagx=${pagx ? pagx.length : 0}B ${Date.now() - source.startedAt}ms`,
     );
 
+    // Serialize before the final deadline check; a large body must not publish after expiry.
+    let json;
+    if (acceptsJson) {
+      const body = { width: result.width, height: result.height, readiness: task.readiness };
+      if (result.name) { body.checkpoint = result.name; body.warnings = result.warnings; }
+      if (wantsHtml) body.html = result.html;
+      if (wantsPagx) body.pagx = pagx;
+      json = JSON.stringify(body);
+    }
     task.checkpoint('publish');
     res.setHeader('X-Snapshot-Width', String(result.width));
     res.setHeader('X-Snapshot-Height', String(result.height));
@@ -585,11 +594,9 @@ async function convertSnapshot(req, res, ctx, source, task) {
     if (result.warnings?.length) res.setHeader('X-Snapshot-Warnings', String(result.warnings.length));
 
     if (acceptsJson) {
-      const body = { width: result.width, height: result.height, readiness: task.readiness };
-      if (result.name) { body.checkpoint = result.name; body.warnings = result.warnings; }
-      if (wantsHtml) body.html = result.html;
-      if (wantsPagx) body.pagx = pagx;
-      jsonResponse(res, 200, body);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(json);
       return;
     }
 

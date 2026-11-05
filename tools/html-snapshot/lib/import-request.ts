@@ -1,4 +1,5 @@
 // Copyright (C) 2026 Tencent. Licensed under the Apache License, Version 2.0.
+import { ArtifactPublication } from './artifact-publication';
 import { withConversionTask } from './conversion-task';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -166,18 +167,24 @@ export async function runImportRequest(opts: ImportRequest, scriptDir: string): 
         await runScenarioToPagx({ ...opts, task, scriptDir, log });
         return 0;
       }
-      const options = { ...opts, task, scriptDir, log };
-      const result = opts.format === 'html' && !opts.htmlNoSnapshot
-        ? await runHtmlToPagx(options) : await convertToArtifacts(options, opts.input);
-      if (opts.preview) {
-        if (!result.png) throw new Error('preview requires a rendered PNG');
-        const base = path.parse(result.pagx).name;
-        const preview = await generateContactSheet([{ name: base, png: result.png }], {
-          outputDir: path.join(path.dirname(result.pagx), `${base}.preview`),
-          columns: opts.previewColumns, pagxBin: opts.pagxBin, log, task,
-        });
-        for (const page of preview.pages) log(`[done] ${page.file}`);
-      }
+      const destination = opts.outputFile ? path.dirname(path.resolve(opts.outputFile))
+        : opts.outputDir || (isHttpUrl(opts.input) ? process.cwd() : path.dirname(path.resolve(opts.input)));
+      const publication = new ArtifactPublication(task, destination);
+      try {
+        const options = { ...opts, task, publication, scriptDir, log };
+        const result = opts.format === 'html' && !opts.htmlNoSnapshot
+          ? await runHtmlToPagx(options) : await convertToArtifacts(options, opts.input);
+        if (opts.preview) {
+          if (!result.png) throw new Error('preview requires a rendered PNG');
+          const base = path.parse(result.pagx).name;
+          await generateContactSheet([{ name: base, png: publication.source(result.png) }], {
+            outputDir: path.join(path.dirname(result.pagx), `${base}.preview`),
+            columns: opts.previewColumns, pagxBin: opts.pagxBin, log, task, publication,
+          });
+        }
+        publication.commit();
+        log(`[done] ${result.png || result.pagx}`);
+      } finally { publication.dispose(); }
       return 0;
     });
   });

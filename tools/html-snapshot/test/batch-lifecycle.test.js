@@ -38,7 +38,7 @@ beforeEach(() => {
     fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.pagx`), '<pagx/>');
     fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.png`), 'PNG');
     return { subsetHtml, pagx: path.join(opts.outputDir, `${opts.outputName}.pagx`),
-      png: path.join(opts.outputDir, `${opts.outputName}.png`), fonts: captured.fontFiles };
+      png: path.join(opts.outputDir, `${opts.outputName}.png`), fonts: captured.fontFiles, readiness: task.readiness };
   }));
   generateContactSheet.mockImplementation(async (items, opts) => ({ pages: [{
     file: path.join(opts.outputDir, 'sheet-001.png'), items: items.map(item => item.name),
@@ -74,6 +74,21 @@ test('a failed input closes its context and later inputs still convert', async (
   expect(contexts).toHaveLength(2);
   contexts.forEach(context => expect(context.close).toHaveBeenCalledTimes(1));
   expect(browser.close).toHaveBeenCalledTimes(1);
+});
+
+test('partial captures retain their reason and skip-existing retries them independently', async () => {
+  runSnapshot.mockImplementationOnce(async (_handle, _url, opts) => {
+    opts.task.markPreparationTimeout('network-idle');
+    return { html: '<html>partial</html>', fonts: [], readiness: opts.task.readiness };
+  });
+  expect(await runBatch(options)).toMatchObject({ processed: 2, failed: 0 });
+  expect(JSON.parse(fs.readFileSync(path.join(dir, 'a.import.json'), 'utf8'))).toMatchObject({
+    status: 'partial', readiness: { status: 'partial', reason: 'prepare-timeout', stages: ['network-idle'] },
+  });
+  expect(stderr).toHaveBeenCalledWith(expect.stringContaining('partial: prepare-timeout'));
+  expect(await runBatch({ ...options, skipExisting: true })).toMatchObject({ processed: 1, skipped: 1, failed: 0 });
+  expect(runSnapshot).toHaveBeenCalledTimes(3);
+  expect(JSON.parse(fs.readFileSync(path.join(dir, 'a.import.json'), 'utf8')).status).toBe('complete');
 });
 
 test('cancellation closes the active context without converting later inputs', async () => {

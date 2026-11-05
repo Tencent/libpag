@@ -30,7 +30,7 @@ function fakePagx() {
     '  shift',
     'done',
     `cp "$input" ${JSON.stringify(copiedPath)}`,
-    'printf \'<pagx><Layer/></pagx>\' > "$out"',
+    'printf \'<pagx width="8" height="8"><Layer/></pagx>\' > "$out"',
   ].join('\n'));
   fs.chmodSync(bin, 0o755);
   return { bin, argvPath, copiedPath };

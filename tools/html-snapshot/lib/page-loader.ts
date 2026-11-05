@@ -12,6 +12,7 @@
 import {
   unwrap,
   newPage,
+  closePage,
   emulateReducedMotion,
   mapWaitUntil,
   addCookies,
@@ -326,7 +327,7 @@ export async function openAndSettlePage(
   const owned = task ? await task.own(async () => {
     const page = await create();
     return { page, close: page.close.bind(page) };
-  }, resource => resource.close()) : undefined;
+  }, resource => closePage(resource.page, resource.close)) : undefined;
   const page = owned ? owned.value.page : await create();
   if (owned) page.close = owned.close;
   try {

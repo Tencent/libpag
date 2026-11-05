@@ -16,7 +16,19 @@ const {
   formatLaunchHint,
   launchBrowser,
   waitForNetworkIdle,
+  closePage,
 } = require('../dist/lib/browser-engine');
+
+test('page cleanup accepts a context that already closed the page or wins the close race', async () => {
+  const page = { isClosed: () => true, close: jest.fn() };
+  await closePage(page);
+  expect(page.close).not.toHaveBeenCalled();
+  let closed = false;
+  const racing = { isClosed: () => closed, close: async () => { closed = true; throw new Error('target closed'); } };
+  await expect(closePage(racing)).resolves.toBeUndefined();
+  await expect(closePage({ isClosed: () => false, close: async () => { throw new Error('still open'); } }))
+    .rejects.toThrow('still open');
+});
 
 describe('waitForNetworkIdle', () => {
   test.each(['puppeteer', 'playwright'])('%s treats a settle timeout as nonfatal', async engine => {

@@ -28,6 +28,19 @@ Normal captures retain late-loaded resources; only a partial capture seals its
 network resource set. Helper fetches coalesce requests and retain failures across
 inline passes, without modifying the source application's networking or timers.
 
+The import runtime validates PAGX and rendered PNG files in a private staging
+directory before publishing them. A requested preview shares this transaction and
+deadline. Failed import/embed/render/preview work leaves existing outputs intact;
+publication checks the deadline again and rolls back replacements on failure.
+External image files are stored under `.pagx-assets/` by content hash, so a new
+conversion cannot overwrite image bytes referenced by an older PAGX. Keep this
+directory with exported files. Shared immutable resources are retained for reuse;
+private staging is removed only after its child processes have exited. Scenario
+checkpoints remain independently publishable and their manifest records completion
+or failure of the overall scenario.
+Batch records distinguish `partial` from `complete`; `--skip-existing` retries a
+partial capture instead of treating it as a complete cached result.
+
 Text capture uses Chromium layout text fragments for source boundaries and effective styles
 (including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
 This preserves drop caps, columns, and overlapping line boxes without relying on global

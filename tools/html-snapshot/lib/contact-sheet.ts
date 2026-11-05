@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+import { validatePng } from './png-validation';
+import { ArtifactPublication } from './artifact-publication';
 import { ConversionTask, withConversionTask } from './conversion-task';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -28,6 +30,7 @@ export interface ContactSheetLayoutOptions {
 
 export interface ContactSheetOptions extends ContactSheetLayoutOptions {
   task?: ConversionTask;
+  publication?: ArtifactPublication;
   outputDir: string;
   pagxBin?: string;
   log?: (line: string) => void;
@@ -69,9 +72,7 @@ export const CONTACT_SHEET_DEFAULTS = Object.freeze({
   maxPixels: 16_000_000,
   maxSourcePixels: 32_000_000,
 });
-const MAX_PNG_BYTES = 128 * 1024 * 1024;
 const MARGIN = 20, GAP = 20, PADDING = 12, LABEL_HEIGHT = 64;
-const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 export function validateContactSheetColumns(columns: number | undefined): void {
   if (columns !== undefined && (!Number.isSafeInteger(columns) || columns < 1 || columns > 32)) {
@@ -158,38 +159,6 @@ export function layoutContactSheet(
   return pages;
 }
 
-/** Check bounds before allocating/decoding. Copy exactly the validated bytes to avoid rereading a changing input. */
-async function validatePng(file: string, maxPixels: number, copyTo?: string): Promise<{ width: number; height: number }> {
-  const handle = await fs.open(file, 'r');
-  try {
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.size < 33 || stat.size > MAX_PNG_BYTES) {
-      throw new Error(`PNG file size must be between 33 and ${MAX_PNG_BYTES} bytes`);
-    }
-    const header = Buffer.alloc(24);
-    await handle.read(header, 0, header.length, 0);
-    if (!header.subarray(0, 8).equals(PNG_SIGNATURE) || header.readUInt32BE(8) !== 13 || header.toString('ascii', 12, 16) !== 'IHDR') {
-      throw new Error('invalid PNG signature or IHDR');
-    }
-    const width = header.readUInt32BE(16), height = header.readUInt32BE(20);
-    if (!width || !height || width * height > maxPixels) {
-      throw new Error(`PNG dimensions ${width}x${height} exceed the pixel budget (${maxPixels}) or are invalid`);
-    }
-    const bytes = Buffer.alloc(stat.size);
-    let offset = 0;
-    while (offset < bytes.length) {
-      const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
-      if (!bytesRead) throw new Error('truncated PNG');
-      offset += bytesRead;
-    }
-    // Native image loading may silently ignore corrupt inputs, so signature-only validation is insufficient.
-    const decoded = PNG.sync.read(bytes, { checkCRC: true });
-    if (decoded.width !== width || decoded.height !== height) throw new Error('PNG dimensions changed while reading');
-    if (copyTo) await fs.writeFile(copyTo, bytes);
-    return { width, height };
-  } finally { await handle.close(); }
-}
-
 function xml(value: string): string {
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, '\ufffd')
     .replace(/[\r\n\t]/g, ' ').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -269,8 +238,11 @@ async function renderContactSheet(
     }
     // No previously published sheet is touched until every page has rendered successfully.
     // The caller's manifest is the authoritative list; older, unlisted sheets are not deleted.
-    options.task!.checkpoint('publish');
-    for (const page of pages) await fs.rename(path.join(staging, path.basename(page.file)), page.file);
+    const publication = options.publication || new ArtifactPublication(options.task!, outputDir);
+    try {
+      for (const page of pages) publication.add(path.join(staging, path.basename(page.file)), page.file);
+      if (!options.publication) publication.commit();
+    } finally { if (!options.publication) publication.dispose(); }
     return { pages };
   } finally { options.task!.deferCleanup(() => fs.rm(staging, { recursive: true, force: true })); }
 }

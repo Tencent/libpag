@@ -431,6 +431,7 @@ struct ImportOptions {
   double previewColumns = -1;
   ImageStorageMode imageStorage = ImageStorageMode::External;
   std::string imageBaseDir;
+  bool deferImageStorage = false;
 };
 
 static void PrintUsage() {
@@ -521,6 +522,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
                                                  {"--html-batch", &h.batchDir}};
   std::map<std::string, bool*> switches = {
       {"--verbose", &o.verbose},
+      // Internal handoff: the JS runtime owns publication of external resources.
+      {"--defer-image-storage", &o.deferImageStorage},
       {"-v", &o.verbose},
       {"--render", &o.render},
       {"--preview", &o.preview},
@@ -708,6 +711,9 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   if (!h.imageDir.empty() && !h.downloadImages)
     return ImportArgumentError("--html-image-dir requires --html-download-images");
   o.render |= o.preview;
+  if (o.deferImageStorage && (o.render || (o.format == "html" && !h.noSnapshot))) {
+    return ImportArgumentError("--defer-image-storage is only valid during native conversion");
+  }
   if (o.render && !o.resolve)
     return ImportArgumentError("rendering and --preview cannot be combined with --no-resolve");
   if (o.previewColumns >= 0 && !o.preview)
@@ -915,6 +921,7 @@ int RunImport(int argc, char* argv[]) {
     // prefix to strip back off when recovering the authored `source`.
     imageOptions.documentDir = inputDir;
     imageOptions.outputDir = GetDirectory(options.outputFile);
+    imageOptions.deferCopy = options.deferImageStorage;
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
   }
 

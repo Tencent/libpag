@@ -94,7 +94,7 @@ describe('runPagxImport — spawn behaviour', () => {
       'done',
       'echo "warning: html: position: absolute on text leaf" 1>&2',
       'echo "real warning: keep me" 1>&2',
-      'printf "<pag/>" > "$out"',
+      'printf "<pagx width=\'8\' height=\'8\'/>" > "$out"',
     ].join('\n'));
     fs.chmodSync(wrapper, 0o755);
     const logs = [];
@@ -104,7 +104,7 @@ describe('runPagxImport — spawn behaviour', () => {
         html: '<div>hi</div>',
         log: (m) => logs.push(m),
       });
-      expect(pagx).toBe('<pag/>');
+      expect(pagx).toBe('<pagx width=\'8\' height=\'8\'/>');
       const joined = logs.join('\n');
       expect(joined).toMatch(/real warning: keep me/);
       expect(joined).not.toMatch(/position: absolute on text leaf/);
@@ -126,7 +126,7 @@ describe('runPagxImport — spawn behaviour', () => {
       '  shift',
       'done',
       'echo "warning: html: position: absolute on text leaf" 1>&2',
-      'printf "<pag/>" > "$out"',
+      'printf "<pagx width=\'8\' height=\'8\'/>" > "$out"',
     ].join('\n'));
     fs.chmodSync(wrapper, 0o755);
     const logs = [];
@@ -136,7 +136,7 @@ describe('runPagxImport — spawn behaviour', () => {
         html: '<div>hi</div>',
         log: (m) => logs.push(m),
       });
-      expect(pagx).toBe('<pag/>');
+      expect(pagx).toBe('<pagx width=\'8\' height=\'8\'/>');
       expect(logs).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

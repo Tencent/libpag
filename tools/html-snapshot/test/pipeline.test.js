@@ -1,6 +1,8 @@
 'use strict';
 
 const fs = require('fs');
+const { PNG } = require('pngjs');
+const shellQuote = value => "'" + value.replace(/'/g, "'\\''") + "'";
 const os = require('os');
 const path = require('path');
 const {
@@ -21,6 +23,7 @@ const { ChildProcessError } = require('../dist/lib/errors');
 let dir;
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'html-snapshot-pipeline-test-'));
+  fs.writeFileSync(path.join(dir, 'valid.png'), PNG.sync.write(new PNG({ width: 8, height: 8 })));
 });
 afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true });
@@ -460,11 +463,11 @@ describe('runHtmlToPagx — orchestrator', () => {
       'done',
       'case "$cmd" in',
       // import writes the .pagx file to --output
-      '  import) echo -n "<pag/>" > "$out" ;;',
+      '  import) printf "%s" "<pagx width=\'8\' height=\'8\'/>" > "$out" ;;',
       // resolve takes the pagx path positionally; touch it to record the call
       '  resolve) : ;;',
-      // render writes a "PNG" to --output (file content shape doesn\'t matter)
-      '  render) echo -n "PNG" > "$out" ;;',
+      // render writes a valid PNG to --output
+      `  render) cp ${shellQuote(path.join(dir, 'valid.png'))} "$out" ;;`,
       'esac',
     ].join('\n'));
     fs.chmodSync(fakePagx, 0o755);
@@ -531,7 +534,7 @@ describe('runHtmlToPagx — orchestrator', () => {
       '  case "$1" in --output) out="$2"; shift;; esac',
       '  shift',
       'done',
-      'if [ "$cmd" = "import" ]; then echo -n "<pag/>" > "$out"; fi',
+      'if [ "$cmd" = "import" ]; then printf "%s" "<pagx width=\'8\' height=\'8\'/>" > "$out"; fi',
       // For `resolve`/`render` we deliberately exit non-zero so a regression
       // that re-enables those steps would surface immediately.
       'if [ "$cmd" != "import" ]; then exit 99; fi',
@@ -745,10 +748,10 @@ function makeFakePagx({ allowRender = true } = {}) {
     '  shift',
     'done',
     'case "$cmd" in',
-    '  import) [ -n "$out" ] && echo -n "<pag/>" > "$out" ;;',
+    '  import) [ -n "$out" ] && printf "%s" "<pagx width=\'8\' height=\'8\'/>" > "$out" ;;',
     '  resolve) : ;;',
     '  embed) : ;;',                         // font-embed: subcommand is `embed`
-    `  render) ${allowRender ? '[ -n "$out" ] && echo -n "PNG" > "$out"' : 'exit 99'} ;;`,
+    `  render) ${allowRender ? `cp ${shellQuote(path.join(dir, 'valid.png'))} "$out"` : 'exit 99'} ;;`,
     'esac',
   ].join('\n'));
   fs.chmodSync(file, 0o755);

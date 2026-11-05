@@ -63,6 +63,9 @@ struct ImageStorageOptions {
   /// (preserving their relative sub-path); it is also where base64/data-URI images are materialised
   /// when converting to External. Required for External mode.
   std::string outputDir = {};
+  /// Resolve local references without copying them. The import runtime stages and publishes
+  /// those resources together with the document after all requested conversion work succeeds.
+  bool deferCopy = false;
 };
 
 /**
