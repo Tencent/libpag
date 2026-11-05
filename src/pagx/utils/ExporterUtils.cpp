@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXDocument.h"
 #include "pagx/utils/ExporterUtils.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
@@ -197,7 +197,6 @@ void DecomposeScale(const Matrix& m, float* sx, float* sy) {
   float det = m.a * m.d - m.b * m.c;
   *sy = (*sx > 0) ? std::abs(det) / *sx : 0;
 }
-
 
 namespace {
 
