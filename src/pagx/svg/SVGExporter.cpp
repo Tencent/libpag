@@ -333,7 +333,9 @@ class SVGWriterContext {
   // Layers referenced by another layer's Layer::mask pointer. Populated lazily by
   // SVGWriter::isMaskReferenceLayer on first use. writeLayer skips these: their content is
   // emitted through writeMaskDef into <defs>, so emitting them as regular content would
-  // duplicate the mask geometry. Imported documents keep them visible=true, so the visibility
+  // duplicate the mask geometry. The runtime treats them the same way — LayerBuilder attaches
+  // them through setMask and tgfx does not draw a layer that owns a maskOwner — so they are mask
+  // definitions, never content. Imported documents keep them visible=true, so the visibility
   // check in writeLayer cannot identify them.
   std::unordered_set<const Layer*> maskReferenceLayers = {};
   bool maskReferencesReady = false;

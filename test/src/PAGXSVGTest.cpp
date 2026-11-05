@@ -5734,12 +5734,13 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
 }
 
 /**
- * mask_reference_also_content.pagx: a layer that is both referenced as another layer's mask and
- * meant to stay visible as content. The exporter writes it only as the mask definition, so the
- * visible copy is dropped. This pins the known limitation: lifting it needs an explicit "mask
- * only" marker on the reference layer instead of the current reference-based inference.
+ * mask_reference_also_content.pagx: a layer referenced through Layer::mask is a mask definition,
+ * not content. LayerBuilder::resolvePendingMasks forces it visible and attaches it via setMask,
+ * and tgfx does not draw a layer that owns a maskOwner, so it never renders as regular content.
+ * The export matches that: the geometry exists only inside <defs>, mirroring what the runtime
+ * draws for the same document.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_MaskReferenceLayerAlsoContent) {
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskReferenceLayerIsNotContent) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx/mask_reference_also_content.pagx"));
   ASSERT_NE(doc, nullptr);
@@ -5747,8 +5748,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MaskReferenceLayerAlsoContent) {
   EXPECT_NE(svg.find("<mask"), std::string::npos);
   auto defsEnd = svg.find("</defs>");
   ASSERT_NE(defsEnd, std::string::npos);
-  // Known limitation: the ellipse exists only inside <defs>, never as visible content.
+  // Matches the runtime: the referenced layer is a mask, so it is not drawn as content either.
   EXPECT_EQ(svg.find("<circle", defsEnd), std::string::npos);
+  EXPECT_NE(svg.find("<circle", 0), std::string::npos);
 }
 
 /**
