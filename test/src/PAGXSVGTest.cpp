@@ -5733,6 +5733,29 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
 }
 
 /**
+ * animate_motion_key_times.svg: keyTimes positions the keyPoints samples instead of spreading them
+ * uniformly, so the path is reached at 20% of the duration and held to the end.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionKeyTimes) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/animate_motion_key_times.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_EQ(ch->keyframes[1].time, 24);
+  EXPECT_EQ(ch->keyframes[2].time, 120);
+  EXPECT_NEAR(ch->keyframes[0].value.tx, 0.0f, 0.01f);
+  EXPECT_NEAR(ch->keyframes[1].value.tx, 100.0f, 0.01f);
+  EXPECT_NEAR(ch->keyframes[2].value.tx, 100.0f, 0.01f);
+}
+
+/**
  * Test SVG import: <animate attributeName="rx"> on a <rect> drives Rectangle.roundness (a pixel
  * value), not Ellipse.size. Verifies the rx/ry routing fix: rx/ry route by content node type so
  * <rect rx> is no longer dropped by the ellipse branch, and the value is NOT scaled by *2.
