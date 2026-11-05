@@ -2565,6 +2565,15 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   if (keyPoints.size() < 2) {
     keyPoints.clear();
   }
+  // keyTimes places the keyPoints samples on the timeline; a mismatched list falls back to an even
+  // distribution instead of reading past the end.
+  std::vector<double> motionKeyTimes = {};
+  if (!keyPoints.empty()) {
+    motionKeyTimes = parseKeyTimes(ctx.getAttribute(animElement, "keyTimes"));
+    if (motionKeyTimes.size() != keyPoints.size()) {
+      motionKeyTimes.clear();
+    }
+  }
 
   // Determine sample count: adaptive based on path length, clamped to [32, 256]. When keyPoints
   // are provided, the sample count is fixed by the keyPoints list.
@@ -2642,7 +2651,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     if (additive) {
       m = staticMatrix * m;
     }
-    Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
+    double sampleTime = motionKeyTimes.empty() ? normalizedTime : motionKeyTimes[i];
+    Frame time = beginFrames + static_cast<Frame>(std::round(sampleTime * durFrames));
     samples.push_back({time, m, pos});
   }
   if (samples.size() >= 3 && keyPoints.empty()) {
