@@ -580,11 +580,12 @@ async function convertSnapshot(req, res, ctx, source, task) {
     res.setHeader('X-Snapshot-Width', String(result.width));
     res.setHeader('X-Snapshot-Height', String(result.height));
     res.setHeader('X-Snapshot-Format', format);
+    res.setHeader('X-Snapshot-Readiness', task.readiness.status);
     if (result.name) res.setHeader('X-Snapshot-Checkpoint', result.name);
     if (result.warnings?.length) res.setHeader('X-Snapshot-Warnings', String(result.warnings.length));
 
     if (acceptsJson) {
-      const body = { width: result.width, height: result.height };
+      const body = { width: result.width, height: result.height, readiness: task.readiness };
       if (result.name) { body.checkpoint = result.name; body.warnings = result.warnings; }
       if (wantsHtml) body.html = result.html;
       if (wantsPagx) body.pagx = pagx;

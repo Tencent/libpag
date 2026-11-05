@@ -7,6 +7,12 @@ export interface ConversionLimits {
   settleMs?: number;
 }
 
+export interface ConversionReadiness {
+  status: 'ready' | 'partial';
+  reason?: 'prepare-timeout';
+  stages: string[];
+}
+
 export class ConversionTimeoutError extends Error {
   readonly status = 408;
   constructor(readonly stage: string) {
@@ -41,6 +47,7 @@ export class ConversionTask {
   private readonly cleanups = new Set<Promise<unknown>>();
   private readonly releaseCli: () => void;
   private cleanupFailed = false;
+  private readonly incompletePreparation = new Set<string>();
   stage = 'source';
 
   constructor(options: ConversionLimits = {}, inherited = false) {
@@ -68,6 +75,31 @@ export class ConversionTask {
 
   get signal(): AbortSignal { return this.controller.signal; }
   get settleExpired(): boolean { return performance.now() >= this.settleDeadline; }
+  get readiness(): ConversionReadiness {
+    return this.incompletePreparation.size
+      ? { status: 'partial', reason: 'prepare-timeout', stages: [...this.incompletePreparation] }
+      : { status: 'ready', stages: [] };
+  }
+
+  markPreparationTimeout(stage: string): void { this.incompletePreparation.add(stage); }
+
+  /** Optional readiness only. Explicit waits, actions, capture and conversion use the hard deadline. */
+  async prepare(stage: string, maxMs: number, work: (timeoutMs: number) => Promise<boolean>): Promise<boolean> {
+    const timeoutMs = this.settleRemaining(maxMs);
+    if (!timeoutMs) { this.markPreparationTimeout(stage); return false; }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const pending = work(timeoutMs);
+      this.trackCleanup(pending.catch(() => {}));
+      const ready = await Promise.race([
+        pending,
+        new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); }),
+      ]);
+      this.checkpoint();
+      if (!ready && this.settleExpired) this.markPreparationTimeout(stage);
+      return ready;
+    } finally { if (timer) clearTimeout(timer); }
+  }
 
   checkpoint(stage?: string): void {
     if (!this.signal.aborted && performance.now() >= this.deadline) this.abort(new ConversionTimeoutError(this.stage));

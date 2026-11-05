@@ -5676,6 +5676,8 @@ const MEASURE_CANVAS_EXPR = '(() => window.__pagxSnapshot.measureCanvas())()';
 // the snapshot will then fall back to the original URL and render as an
 // empty box rather than aborting the pipeline.
 async function inlineExternalImages(cachedMap) {
+  const resources = window.__pagxResources;
+  const fetchResource = resources ? resources.fetch.bind(resources) : fetch.bind(window);
   // Convert a Blob into a `data:` URI without the FileReader callback dance.
   // Reading bytes via `arrayBuffer()` + chunked btoa avoids the "Maximum
   // call stack size" trap that String.fromCharCode(...big) hits on large
@@ -5770,7 +5772,7 @@ async function inlineExternalImages(cachedMap) {
     if (!src.startsWith('data:')) return src;
     if (PASSTHROUGH_MIMES.indexOf(dataUriMime(src)) >= 0) return src;
     try {
-      const res = await fetch(src);
+      const res = await fetchResource(src);
       return await blobToNormalizedDataUri(await res.blob());
     } catch (err) {
       const mime = dataUriMime(src) || 'unlabelled';
@@ -5809,6 +5811,7 @@ async function inlineExternalImages(cachedMap) {
     const selected = img.currentSrc;
     if (!selected || !img.naturalWidth) return;
     if (!pixelSizes.has(selected)) pixelSizes.set(selected, (async () => {
+      if (resources) return resources.imageWidth(cache[selected] || selected);
       const probe = new Image();
       probe.src = selected;
       try { await probe.decode(); return probe.naturalWidth; } catch (_) { return 0; }
@@ -5875,7 +5878,7 @@ async function inlineExternalImages(cachedMap) {
 
   async function processOne(entry) {
     try {
-      const res = await fetch(entry.src, { credentials: 'omit' });
+      const res = await fetchResource(entry.src, { credentials: 'omit' });
       if (!res.ok) {
         console.warn(`html-snapshot: image fetch ${res.status} for ${entry.src}`);
         return;
@@ -5949,7 +5952,7 @@ async function inlineExternalImages(cachedMap) {
 
   async function processOneBg(entry) {
     try {
-      const res = await fetch(entry.url, { credentials: 'omit' });
+      const res = await fetchResource(entry.url, { credentials: 'omit' });
       if (!res.ok) {
         console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
         return;

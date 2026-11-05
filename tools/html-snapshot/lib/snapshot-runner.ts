@@ -55,7 +55,8 @@ import type {
   EngineWrapper,
 } from './browser-engine';
 import { ResourceCache, type CachedResource } from './resource-cache';
-import { ConversionTask, withConversionTask } from './conversion-task';
+import { CaptureStore } from './resource-policy';
+import { ConversionTask, withConversionTask, type ConversionReadiness } from './conversion-task';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -224,7 +225,7 @@ export interface RunSnapshotOptions {
 // along the way. `takeSnapshot` scrolls back to `(0,0)` before measuring, so
 // the final geometry is unchanged — only the visibility/state is advanced.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: number): Promise<void> {
+async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: number, task: ConversionTask): Promise<void> {
   await page.evaluate(async (perStepMs: number) => {
     // Native setTimeout stashed by PAGX_VIRTUAL_CLOCK_INIT_SCRIPT before it froze
     // the page's timers. The page's own setTimeout only fires when the virtual
@@ -268,7 +269,7 @@ async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: numbe
     }
   }, settleMs);
   if (finalWaitMs > 0) {
-    await new Promise((r) => setTimeout(r, finalWaitMs));
+    await task.wait(finalWaitMs);
   }
 }
 
@@ -331,6 +332,7 @@ async function resettleAfterViewportRevert(page: any): Promise<void> {
 }
 
 export interface RunSnapshotResult {
+  readiness: ConversionReadiness;
   html: string;
   width: number;
   height: number;
@@ -405,8 +407,8 @@ async function captureSnapshot(
 
   const { engine } = engineHandle;
   const task = opts!.task!;
-  const imageBytesByUrl = new Map<string, ImageCaptureValue>();
-  const fontBytesByUrl = new Map<string, Buffer>();
+  const imageBytesByUrl = new CaptureStore<ImageCaptureValue>();
+  const fontBytesByUrl = new CaptureStore<Buffer>();
   // Image capture is always on; font capture only when the caller asked for
   // it. Both read disjoint resource types off the same `response` event, so a
   // single composed listener avoids racing two `page.on('response')`
@@ -419,20 +421,18 @@ async function captureSnapshot(
   // healthy run — the snapshot was missing assets but nothing told the
   // operator why.
   const captureImage = makeImageCaptureListener(engine, imageBytesByUrl, log);
-  const captureFont: CaptureResponseListener | null = downloadFonts
+  const captureFont: CaptureResponseListener | null = downloadFonts || inlineIconFonts
     ? makeFontCaptureListener(engine, fontBytesByUrl, log)
     : null;
-  const fontCaptures = new Set<Promise<void>>();
   const onResponse: (resp: BrowserResponse) => void = captureFont
     ? (resp: BrowserResponse) => {
-        void captureImage(resp);
+        imageBytesByUrl.observe(captureImage(resp));
         const capture = captureFont(resp).catch((err: unknown) => {
           if (log) log(`font capture skipped: ${errMessage(err)}`);
         });
-        fontCaptures.add(capture);
-        void capture.finally(() => fontCaptures.delete(capture));
+        fontBytesByUrl.observe(capture);
       }
-    : (resp: BrowserResponse) => { void captureImage(resp); };
+    : (resp: BrowserResponse) => { imageBytesByUrl.observe(captureImage(resp)); };
   const page = await openAndSettlePage(engineHandle, targetUrl, {
     task,
     viewportWidth,
@@ -499,19 +499,27 @@ async function captureSnapshot(
       }
     }
 
-    // Optionally walk the page top-to-bottom first so scroll-triggered reveal
-    // animations fire and lazy media is fetched (the image `response` listener
-    // is already attached, so anything loaded during the scroll lands in
-    // `imageBytesByUrl` below). Best-effort: a failure leaves the page at its
-    // settled, scroll-(0,0) state and the rest of the pipeline proceeds.
+    // An explicitly requested reveal must finish; a partial walk is not success.
     if (scrollReveal) {
-      try {
-        await scrollThroughPage(page, 250, Math.max(waitMs, 400));
-        if (log) log('scroll-reveal: walked page to trigger reveal animations / lazy media');
-      } catch (err) {
-        if (log) log(`scroll-reveal failed: ${errMessage(err)}`);
-      }
+      await scrollThroughPage(page, 250, Math.max(waitMs, 400), task);
+      if (log) log('scroll-reveal: walked page to trigger reveal animations / lazy media');
     }
+
+    await imageBytesByUrl.drain(task, 'image-responses');
+    const syncResources = async () => {
+      const timedOut = await page.evaluate((config: { ms: number; sealed: boolean }) => {
+        const resources = window.__pagxResources;
+        if (!resources) return false;
+        if (config.sealed) resources.seal();
+        else resources.configure(config.ms);
+        return resources.timedOut;
+      }, { ms: task.settleRemaining(), sealed: task.readiness.status === 'partial' });
+      if (timedOut) task.markPreparationTimeout('resource-fetch');
+      if (task.readiness.status === 'partial') {
+        imageBytesByUrl.sealed = true; fontBytesByUrl.sealed = true;
+      }
+    };
+    await syncResources();
 
     // PAGX's renderer can read `data:` URIs and local files but not
     // `http(s)://` URLs, so every external image must be turned into one of
@@ -532,6 +540,7 @@ async function captureSnapshot(
     const images: SavedImage[] = [];
     const seenImageUrls = new Set<string>();
     const inlineCapturedImages = async (): Promise<void> => {
+      await imageBytesByUrl.drain(task, 'image-responses');
       const srcByUrl: Record<string, string> = {};
       if (downloadImages && imageDir) {
         const saved = await bestEffortSave(
@@ -557,6 +566,7 @@ async function captureSnapshot(
         }
       }
       await page.evaluate(inlineExternalImages, srcByUrl);
+      await syncResources();
     };
     await inlineCapturedImages();
 
@@ -614,7 +624,7 @@ async function captureSnapshot(
     if (inlineIconFonts) {
       try {
         const stats = await inlineIconFontsOnPage(page, {
-          logger: log || (() => {}),
+          logger: log || (() => {}), task, capturedFonts: fontBytesByUrl,
         });
         if (log && stats.total > 0) {
           log(`inlined ${stats.inlined}/${stats.total} icon-font glyph(s) as SVG`);
@@ -773,11 +783,11 @@ async function captureSnapshot(
       });
       for (const { url } of sources) {
         if (url.startsWith('data:') && !fontBytesByUrl.has(url)) {
-          try { fontBytesByUrl.set(url, decodeDataFont(url)); }
+          try { fontBytesByUrl.setLocal(url, decodeDataFont(url)); }
           catch (err) { if (log) log(`inline font skipped: ${errMessage(err)}`); }
         }
       }
-      await Promise.all(fontCaptures);
+      if (!fontBytesByUrl.sealed) await fontBytesByUrl.drain(task, 'font-responses');
       fonts = await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font');
       const aliases = sources.flatMap(({ face, url }) => {
         const font = fonts.find((f) => f.url === url || f.urls?.includes(url));
@@ -822,7 +832,7 @@ async function captureSnapshot(
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
     task.checkpoint();
-    return { ...snapshot, fonts, images };
+    return { ...snapshot, fonts, images, readiness: task.readiness };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the

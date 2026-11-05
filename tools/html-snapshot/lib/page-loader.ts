@@ -26,6 +26,7 @@ import {
 } from './browser-engine';
 import { MAX_CAPTURE_HEIGHT_PX } from './common';
 import type { ConversionTask } from './conversion-task';
+import { RESOURCE_POLICY_INIT_SCRIPT } from './resource-policy';
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
@@ -104,7 +105,10 @@ const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
   const viewportH = window.innerHeight || 900;
   const step = Math.max(1, Math.floor(viewportH * cfg.stepFraction));
   let y = window.scrollY || 0;
-  for (let pass = 0; pass < cfg.maxStepsPerSweep; pass++) {
+  let stopped = false;
+  const timer = st(() => { stopped = true; }, cfg.maxDurationMs);
+  try {
+  for (let pass = 0; pass < cfg.maxStepsPerSweep && !stopped; pass++) {
     const height = docHeight();
     y = Math.min(y + step, height);
     try { window.scrollTo(0, y); } catch (_) { /* ignore */ }
@@ -117,6 +121,7 @@ const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
     if (docHeight() >= cfg.maxHeightPx) break;
   }
   return docHeight();
+  } finally { (window.__pagxRealClearTimeout || clearTimeout)(timer); }
 })`;
 
 // Wait (bounded) for any in-flight images to finish decoding so they actually
@@ -237,10 +242,9 @@ const AUTO_SCROLL_CONFIG = {
 // Node-side `networkidle` wait, repeating until the document stops growing (or
 // a bound trips). Non-fatal: a page that throws mid-scroll (or an engine that
 // rejects the evaluate) falls through to whatever is already rendered.
-async function settleLazyContent(page: Page, engine: EngineName): Promise<void> {
+async function settleLazyContent(page: Page, engine: EngineName, task?: ConversionTask): Promise<void> {
   const cfg = AUTO_SCROLL_CONFIG;
-  const cfgJson = JSON.stringify(cfg);
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   let lastHeight = -1;
   let stable = 0;
   try {
@@ -253,13 +257,17 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
     // `auto !important` on <html>/<body> makes every scroll here synchronous.
     await page.evaluate(ROOT_SCROLL_RESET_EXPR);
     for (let round = 0; round < cfg.maxRounds; round++) {
-      if (Date.now() - startedAt >= cfg.maxTotalMs) break;
+      const localRemaining = cfg.maxTotalMs - (performance.now() - startedAt);
+      if (localRemaining <= 0) break;
+      const maxDurationMs = task?.settleRemaining(localRemaining) ?? localRemaining;
+      if (!maxDurationMs) { task?.markPreparationTimeout('lazy-scroll'); break; }
       const height: number = await page.evaluate(
-        `${AUTO_SCROLL_SWEEP_SCRIPT}(${cfgJson})`,
+        `${AUTO_SCROLL_SWEEP_SCRIPT}(${JSON.stringify({ ...cfg, maxDurationMs })})`,
       );
       // Let this round's freshly-triggered data/image fetches land before we
       // judge whether the page has stopped growing.
-      await waitForNetworkIdle(page, engine, cfg.networkIdleMs);
+      if (task) await task.prepare('lazy-network', cfg.networkIdleMs, ms => waitForNetworkIdle(page, engine, ms));
+      else await waitForNetworkIdle(page, engine, cfg.networkIdleMs);
       if (typeof height === 'number' && Math.abs(height - lastHeight) < 4) {
         stable += 1;
       } else {
@@ -269,7 +277,9 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
       if (stable >= cfg.stableRounds) break;
       if (typeof height === 'number' && height >= cfg.maxHeightPx) break;
     }
-    await page.evaluate(`${AUTO_SCROLL_FINALIZE_SCRIPT}(${cfgJson})`);
+    const imageWaitMs = task?.settleRemaining(cfg.imageWaitMs) ?? cfg.imageWaitMs;
+    if (!imageWaitMs) task?.markPreparationTimeout('lazy-images');
+    await page.evaluate(`${AUTO_SCROLL_FINALIZE_SCRIPT}(${JSON.stringify({ imageWaitMs })})`);
   } catch (_) {
     // Best-effort: still try to return the page to the origin so later framing
     // isn't thrown off by a mid-scroll failure.
@@ -338,6 +348,7 @@ export async function openAndSettlePage(
     // `windowAttachScript` from lib/browser-snapshot.ts / lib/icon-font.ts).
     // Always register the Babel classic-runtime shim first so it is in place
     // before any caller-supplied init scripts and before the page's own scripts.
+    await addInitScript(page, engine, RESOURCE_POLICY_INIT_SCRIPT);
     await addInitScript(page, engine, BABEL_CLASSIC_RUNTIME_SHIM);
     for (const script of initScripts) {
       if (script) await addInitScript(page, engine, script);
@@ -366,7 +377,13 @@ export async function openAndSettlePage(
     // the parser, so the timeout fallback would see no body and fail the whole
     // render. `load` is reliable under that contention and guarantees a body.
     try {
-      await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: task?.remaining(30000) ?? 30000 });
+      if (task) {
+        const ready = await task.prepare('navigation', 30000, async timeout => {
+          await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout });
+          return true;
+        });
+        if (!ready) throw new Error('Navigation timeout');
+      } else await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: 30000 });
     } catch (err) {
       // A navigation *timeout* should still not fail the whole render: the
       // document is usually parsed and painted well before every last subresource
@@ -377,6 +394,7 @@ export async function openAndSettlePage(
       task?.checkpoint();
       const msg = err && (err as Error).message ? (err as Error).message : String(err);
       if (!/timeout/i.test(msg)) throw err;
+      if (task?.settleExpired) task.markPreparationTimeout('navigation');
       if (typeof page.url === 'function' && /^(about:blank|chrome-error:)/.test(page.url())) throw err;
       let hasBody = await page.evaluate(() => !!document.body).catch(() => false);
       if (!hasBody) {
@@ -400,7 +418,8 @@ export async function openAndSettlePage(
     // non-fatal — `waitForNetworkIdle` resolves either way — so a chatty CDN only
     // costs the settle budget instead of failing navigation the way a
     // `networkidle`-gated `goto` would.
-    await waitForNetworkIdle(page, engine, 5000);
+    if (task) await task.prepare('network-idle', 5000, ms => waitForNetworkIdle(page, engine, ms));
+    else await waitForNetworkIdle(page, engine, 5000);
 
     // A quiet network does not guarantee Chromium has re-laid-out text with the
     // real webfaces yet: when the idle window opens mid-download, every subsequent
@@ -415,17 +434,22 @@ export async function openAndSettlePage(
     // may have frozen the page's own setTimeout) so a stalled font request
     // degrades to the pre-fix behaviour instead of hanging the snapshot.
     try {
-      await page.evaluate(
-        `Promise.race([document.fonts.ready, ` +
-          `new Promise((r) => (window.__pagxRealSetTimeout || setTimeout)(r, 10000))])`,
+      const waitFonts = (ms: number) => page.evaluate(
+        `Promise.race([document.fonts.ready.then(() => true), ` +
+          `new Promise((r) => (window.__pagxRealSetTimeout || setTimeout)(() => r(false), ${ms}))])`,
       );
+      if (task) await task.prepare('fonts-ready', 10000, waitFonts);
+      else await waitFonts(10000);
     } catch (_) { /* best-effort: proceed with whatever fonts are loaded */ }
 
     if (selector) {
-      await page.waitForSelector(selector, { timeout: 15000 });
+      await page.waitForSelector(selector, { timeout: task?.remaining(15000) ?? 15000 });
     } else {
       try {
-        await page.waitForFunction(ROOT_HAS_CHILDREN_SCRIPT, { timeout: 10000 });
+        const waitRoot = (timeout: number) => page.waitForFunction(ROOT_HAS_CHILDREN_SCRIPT, { timeout })
+          .then(() => true, () => false);
+        if (task) await task.prepare('app-root', 10000, waitRoot);
+        else await waitRoot(10000);
       } catch (_) { /* not fatal — pages without #root simply skip this wait */ }
     }
 
@@ -440,7 +464,7 @@ export async function openAndSettlePage(
     // fully-populated page. Runs for baseline, snapshot, and the flex counter
     // alike, keeping every measurement on the same page state.
     if (autoScroll) {
-      await settleLazyContent(page, engine);
+      await settleLazyContent(page, engine, task);
     }
 
     task?.checkpoint();

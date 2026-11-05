@@ -447,7 +447,7 @@ async function renderPage(
     for (const warning of resourceWarnings) warnings.push(warning);
     await page.evaluate(inlineExternalImages, {});
     await page.evaluate(inlineCanvases);
-    if (options.inlineIconFonts !== false) await inlineIconFontsOnPage(page, {});
+    if (options.inlineIconFonts !== false) await inlineIconFontsOnPage(page, { task: options.task });
     await page.evaluate(materializeDecorativePseudoElements);
     const snapshot = await page.evaluate((extent: string) => {
       const api = (window as unknown as { __pagxSnapshot: { takeSnapshot: (opts: object) =>

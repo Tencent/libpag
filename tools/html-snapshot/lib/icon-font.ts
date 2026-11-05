@@ -32,6 +32,7 @@
 // `data-snapshot-icon-svg` and routes via `renderInlineIconSvg` instead of
 // the pseudo-text leaf, sizing the SVG to the host's measured rect.
 
+import type { ConversionTask } from './conversion-task';
 import * as fs from 'fs';
 import { DROP_TAGS_UPPER_JSON } from './dom-tags';
 import { errMessage } from './common';
@@ -209,7 +210,8 @@ async function collectFontFaceMap(): Promise<Record<string, FontFaceEntry[]>> {
   }
   for (const href of inaccessible) {
     try {
-      const res = await fetch(href, { mode: 'cors', credentials: 'omit' });
+      const resources = typeof window === 'undefined' ? undefined : window.__pagxResources;
+      const res = await (resources?.fetch.bind(resources) || fetch)(href, { mode: 'cors', credentials: 'omit' });
       if (!res.ok) continue;
       const css = await res.text();
       const entries = parseFontFaceFromText(css, href);
@@ -466,7 +468,8 @@ const ICON_FONT_FETCH_TIMEOUT_MS = 10_000;
 // Fetch `url` into a Buffer. Supports `http(s)://`, `data:`, and `file://`
 // schemes; everything else is rejected so a relative-path src that slipped
 // through URL resolution doesn't silently become a no-op.
-export async function fetchFontBytes(url: string): Promise<Buffer> {
+export async function fetchFontBytes(url: string, task?: ConversionTask): Promise<Buffer> {
+  task?.checkpoint();
   if (url.startsWith('data:')) {
     const comma = url.indexOf(',');
     if (comma < 0) throw new Error('malformed data: URL');
@@ -483,9 +486,19 @@ export async function fetchFontBytes(url: string): Promise<Buffer> {
   if (!/^https?:/i.test(url)) {
     throw new Error('unsupported scheme: ' + url);
   }
-  const res = await fetch(url, { signal: AbortSignal.timeout(ICON_FONT_FETCH_TIMEOUT_MS) });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return Buffer.from(await res.arrayBuffer());
+  if (task?.readiness.status === 'partial') throw new Error('Resource capture is sealed');
+  const remaining = task?.settleRemaining(ICON_FONT_FETCH_TIMEOUT_MS) ?? ICON_FONT_FETCH_TIMEOUT_MS;
+  if (!remaining) { task?.markPreparationTimeout('icon-font'); throw new Error('Resource preparation timed out'); }
+  const timeout = AbortSignal.timeout(remaining);
+  try {
+    const res = await fetch(url, { signal: task ? AbortSignal.any([task.signal, timeout]) : timeout });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return Buffer.from(await res.arrayBuffer());
+  } catch (error) {
+    task?.checkpoint();
+    if (timeout.aborted && task?.settleExpired) task.markPreparationTimeout('icon-font');
+    throw error;
+  }
 }
 
 // Parse a font byte buffer (TTF / OTF / WOFF / WOFF2) into an opentype.js
@@ -578,6 +591,7 @@ export type IconFontLogger = (msg: string) => void;
 export async function resolveIconFontSvgs(
   targets: IconFontTarget[] | null | undefined,
   logger: IconFontLogger,
+  options?: InlineIconFontsOptions,
 ): Promise<IconFontResult[]> {
   if (!targets || targets.length === 0) return [];
   const log = logger;
@@ -601,7 +615,8 @@ export async function resolveIconFontSvgs(
   }
   await Promise.all(uniqueUrls.map(async (url) => {
     try {
-      const bytes = await fetchFontBytes(url);
+      const bytes = options?.task?.readiness.status === 'partial' && options.capturedFonts?.has(url)
+        ? options.capturedFonts.get(url)! : await fetchFontBytes(url, options?.task);
       const font = await parseFontBuffer(bytes);
       fontByUrl.set(url, font);
     } catch (err) {
@@ -632,6 +647,8 @@ export async function resolveIconFontSvgs(
 
 export interface InlineIconFontsOptions {
   logger?: IconFontLogger;
+  task?: ConversionTask;
+  capturedFonts?: Map<string, Buffer>;
 }
 
 export interface InlineIconFontsResult {
@@ -677,7 +694,7 @@ export async function inlineIconFontsOnPage(
 
   let results: IconFontResult[] = [];
   try {
-    results = await resolveIconFontSvgs(targets, logger);
+    results = await resolveIconFontSvgs(targets, logger, options);
   } catch (err) {
     logger('inline-icon-fonts: SVG resolution failed: ' + errMessage(err));
     results = [];

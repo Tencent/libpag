@@ -138,6 +138,7 @@ async function convertScenario(opts: RunScenarioToPagxOptions): Promise<Scenario
           return { name: output.name, png: output.png };
         });
         const result = await generateContactSheet(items, {
+          task,
           outputDir: path.join(outputDir, `${base}.preview`), columns: opts.previewColumns,
           pagxBin: opts.pagxBin, log: opts.log,
         });

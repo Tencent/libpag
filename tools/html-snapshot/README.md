@@ -14,6 +14,20 @@ Cancellation stops owned browser resources and native processes. Cleanup has one
 5000 ms grace period; temporary files remain until their users have actually exited.
 An explicit `waitMs` is never silently shortened into a successful capture.
 
+Optional page preparation uses `HTML_SNAPSHOT_SETTLE_TIMEOUT_MS` (default 120000 ms,
+or two thirds of a shorter total). Both limits must be positive integer milliseconds,
+with preparation strictly shorter than the total. When optional navigation/load,
+network-idle, font-ready or lazy-content waiting reaches this deadline, a usable
+document can continue from its captured resources. The result reports
+`readiness: { status: "partial", reason: "prepare-timeout", stages: [...] }`;
+CLI diagnostics print the same reason and HTTP responses include
+`X-Snapshot-Readiness`. A fully prepared capture reports `status: "ready"`.
+An empty/uncommitted navigation, failed required selector/action, or hard deadline
+is an error. Explicit waits and `--html-scroll-reveal` still have to finish.
+Normal captures retain late-loaded resources; only a partial capture seals its
+network resource set. Helper fetches coalesce requests and retain failures across
+inline passes, without modifying the source application's networking or timers.
+
 Text capture uses Chromium layout text fragments for source boundaries and effective styles
 (including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
 This preserves drop caps, columns, and overlapping line boxes without relying on global

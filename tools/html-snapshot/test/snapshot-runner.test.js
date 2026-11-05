@@ -36,7 +36,7 @@ describe('runSnapshot — reduced motion', () => {
       'https://example.com/page',
       expect.objectContaining({ reducedMotion: true }),
     );
-    expect(result).toEqual({ ...snapshot, fonts: [], images: [] });
+    expect(result).toEqual({ ...snapshot, fonts: [], images: [], readiness: { status: 'ready', stages: [] } });
     expect(page.close).toHaveBeenCalledTimes(1);
   });
 

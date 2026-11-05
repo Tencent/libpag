@@ -109,3 +109,21 @@ test('a failed close preserves the conversion error and still closes other resou
   expect(await task.finish()).toBe(false);
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+test('soft expiry only marks partial when optional preparation actually remains unfinished', async () => {
+  jest.useFakeTimers();
+  const task = new ConversionTask({ totalMs: 1000, settleMs: 100 });
+  let release;
+  const slow = new Promise(resolve => { release = resolve; });
+  const result = task.prepare('network-idle', 500, () => slow);
+  await jest.advanceTimersByTimeAsync(100);
+  expect(await result).toBe(false);
+  expect(task.readiness).toEqual({ status: 'partial', reason: 'prepare-timeout', stages: ['network-idle'] });
+  release(true);
+  await task.finish();
+  const ready = new ConversionTask({ totalMs: 1000, settleMs: 100 });
+  await ready.prepare('network-idle', 500, async () => true);
+  await jest.advanceTimersByTimeAsync(200);
+  expect(ready.readiness.status).toBe('ready');
+  await ready.finish();
+});

@@ -96,6 +96,12 @@ async function main(task) {
     for (const warning of result.warnings || []) console.error(`${LOG_PREFIX}${warning}`);
 
     task.checkpoint('publish');
+    if (process.env.PAGX_TASK_REPORT_FILE) {
+      fs.writeFileSync(process.env.PAGX_TASK_REPORT_FILE, JSON.stringify(task.readiness));
+    }
+    if (task.readiness.status === 'partial') {
+      console.error(`${LOG_PREFIX}partial: prepare-timeout (${task.readiness.stages.join(', ')})`);
+    }
     if (opts.outputToStdout) {
       // Stdout mode (triggered by `-o -`, used by pagx's html-snapshot
       // bridge for HTML import): the HTML is the sole stdout payload, and the

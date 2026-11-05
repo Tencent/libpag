@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { runProcess, type ProcessOptions } from './process-runner';
-import { ConversionTask, withConversionTask } from './conversion-task';
+import { ConversionTask, withConversionTask, type ConversionReadiness } from './conversion-task';
 
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
@@ -43,6 +43,7 @@ export interface SpawnCaptureResult {
   stderr: string;
   // In-process snapshots can identify this input's faces without scanning a shared cache.
   fontFiles?: string[];
+  readiness?: ConversionReadiness;
 }
 
 // Internal: spawn a child, capture stdout/stderr, optionally tee stderr to a
@@ -135,10 +136,23 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
   if (!opts.scriptDir) throw new Error('forkSnapshotCli: scriptDir is required');
   const nodeBin = opts.nodeBin || process.execPath;
   const args = buildSnapshotArgs(opts as BuildSnapshotArgsOptions);
-  return spawnCapture(nodeBin, args, {
-    stderrPath: opts.stderrPath,
-    timeoutMs: opts.timeoutMs, task: opts.task, env: opts.task?.childEnvironment(),
-  });
+  const reportDir = opts.task ? fs.mkdtempSync(path.join(os.tmpdir(), 'pagx-report-')) : '';
+  try {
+    const report = reportDir ? path.join(reportDir, 'readiness.json') : '';
+    const result = await spawnCapture(nodeBin, args, {
+      stderrPath: opts.stderrPath, timeoutMs: opts.timeoutMs, task: opts.task,
+      env: opts.task ? { ...opts.task.childEnvironment(), PAGX_TASK_REPORT_FILE: report } : undefined,
+    });
+    if (result.code === 0 && report && fs.existsSync(report)) {
+      const readiness = JSON.parse(fs.readFileSync(report, 'utf8')) as ConversionReadiness;
+      if (readiness.status === 'partial') {
+        for (const stage of readiness.stages) opts.task!.markPreparationTimeout(stage);
+      }
+    }
+    return { ...result, readiness: opts.task?.readiness };
+  } finally {
+    if (reportDir) opts.task!.deferCleanup(() => fs.promises.rm(reportDir, { recursive: true, force: true }));
+  }
 }
 
 export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
@@ -339,6 +353,7 @@ export interface RunHtmlToPagxOptions {
 }
 
 export interface RunHtmlToPagxResult {
+  readiness: ConversionReadiness;
   subsetHtml: string;
   pagx: string;
   png: string | null;
@@ -379,7 +394,7 @@ async function convertArtifacts(opts: RunHtmlToPagxOptions, input: string,
   }
   opts.task?.checkpoint();
   opts.log?.(`[done] ${png || pagxFile}`);
-  return { pagx: pagxFile, png, fonts };
+  return { pagx: pagxFile, png, fonts, readiness: opts.task!.readiness };
 }
 
 export function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
