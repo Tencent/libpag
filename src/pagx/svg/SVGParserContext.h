@@ -301,6 +301,11 @@ class SVGParserContext {
   // Whether the given SVG element has collected SMIL animation children.
   bool hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const;
 
+  // The SMIL parser reads the same attribute/style helpers this context exposes to the importer.
+  // Both live in src/pagx/svg, so the friendship stays inside the import implementation instead of
+  // reaching into the public headers.
+  friend class SMILAnimationParser;
+
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
@@ -348,6 +353,12 @@ class SVGParserContext {
   float getViewBoxHeight() const {
     return _viewBoxHeight;
   }
+  /** Returns the paint server or effect definition registered under `id`, or null. */
+  std::shared_ptr<DOMNode> findDefinition(const std::string& id) const {
+    auto it = _defs.find(id);
+    return it == _defs.end() ? nullptr : it->second;
+  }
+
   /** Returns the viewBox mapping pre-multiplied onto a single top-level layer. */
   const Matrix& getContentMatrix() const {
     return _contentMatrix;
@@ -388,8 +399,6 @@ class SVGParserContext {
 
   // Frame rate used to convert SMIL time values to PAGX Frame indices.
   float _animationFrameRate = 60.0f;
-
-  friend class SMILAnimationParser;
 };
 
 }  // namespace pagx

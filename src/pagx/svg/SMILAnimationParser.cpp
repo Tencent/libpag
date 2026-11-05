@@ -488,15 +488,6 @@ static bool KeyframeTimeLess(const Keyframe<T>& a, const Keyframe<T>& b) {
   return a.time < b.time;
 }
 
-template <typename T>
-struct KeyframeTimeAt {
-  Frame time = 0;
-
-  bool operator()(const Keyframe<T>& key) const {
-    return key.time == time;
-  }
-};
-
 static float LerpFloat(float a, float b, double t) {
   return a + (b - a) * static_cast<float>(t);
 }
@@ -1087,6 +1078,19 @@ struct ChannelWithAdditive {
   bool additive = false;
 };
 
+// Maps keyframe time to its index so the additive merge resolves neighbours in O(1). Scanning the
+// keyframe vector once per union time made the merge O(n^2), which shows up on rotation tracks
+// split into 20-degree steps.
+template <typename T>
+static std::unordered_map<Frame, size_t> BuildKeyframeTimeIndex(const TypedChannel<T>& channel) {
+  std::unordered_map<Frame, size_t> index = {};
+  index.reserve(channel.keyframes.size());
+  for (size_t i = 0; i < channel.keyframes.size(); ++i) {
+    index.emplace(channel.keyframes[i].time, i);
+  }
+  return index;
+}
+
 // Merges one additive channel into the base channel for float-typed channels. Collects the union
 // of keyframe times from both channels, samples each at every time point, and replaces base's
 // keyframes with the summed values. Interpolation mode and bezier handles at a given time are
@@ -1106,6 +1110,8 @@ static void MergeAdditiveFloat(Channel* base, const Channel* additive) {
     allTimes.insert(key.time);
   }
 
+  const auto baseTimes = BuildKeyframeTimeIndex(*baseCh);
+  const auto additiveTimes = BuildKeyframeTimeIndex(*additiveCh);
   std::vector<Keyframe<float>> merged = {};
   for (Frame time : allTimes) {
     float baseVal = std::get<float>(base->evaluateAt(time));
@@ -1120,19 +1126,19 @@ static void MergeAdditiveFloat(Channel* base, const Channel* additive) {
     key.value = baseVal + additiveVal;
     // Prefer base's interpolation/bezier when the time matches a base keyframe; otherwise take
     // additive's. Times present in neither (shouldn't happen) default to Linear.
-    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               KeyframeTimeAt<float>{time});
-    if (baseIt != baseCh->keyframes.end()) {
-      key.interpolation = baseIt->interpolation;
-      key.bezierOut = baseIt->bezierOut;
-      key.bezierIn = baseIt->bezierIn;
+    auto baseIt = baseTimes.find(time);
+    if (baseIt != baseTimes.end()) {
+      const auto& src = baseCh->keyframes[baseIt->second];
+      key.interpolation = src.interpolation;
+      key.bezierOut = src.bezierOut;
+      key.bezierIn = src.bezierIn;
     } else {
-      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                KeyframeTimeAt<float>{time});
-      if (addIt != additiveCh->keyframes.end()) {
-        key.interpolation = addIt->interpolation;
-        key.bezierOut = addIt->bezierOut;
-        key.bezierIn = addIt->bezierIn;
+      auto addIt = additiveTimes.find(time);
+      if (addIt != additiveTimes.end()) {
+        const auto& src = additiveCh->keyframes[addIt->second];
+        key.interpolation = src.interpolation;
+        key.bezierOut = src.bezierOut;
+        key.bezierIn = src.bezierIn;
       }
     }
     merged.push_back(key);
@@ -1157,6 +1163,8 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
     allTimes.insert(key.time);
   }
 
+  const auto baseTimes = BuildKeyframeTimeIndex(*baseCh);
+  const auto additiveTimes = BuildKeyframeTimeIndex(*additiveCh);
   std::vector<Keyframe<Color>> merged = {};
   for (Frame time : allTimes) {
     Color baseVal = std::get<Color>(base->evaluateAt(time));
@@ -1171,19 +1179,19 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
     key.value.green = baseVal.green + additiveVal.green;
     key.value.blue = baseVal.blue + additiveVal.blue;
     key.value.alpha = baseVal.alpha + additiveVal.alpha;
-    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               KeyframeTimeAt<Color>{time});
-    if (baseIt != baseCh->keyframes.end()) {
-      key.interpolation = baseIt->interpolation;
-      key.bezierOut = baseIt->bezierOut;
-      key.bezierIn = baseIt->bezierIn;
+    auto baseIt = baseTimes.find(time);
+    if (baseIt != baseTimes.end()) {
+      const auto& src = baseCh->keyframes[baseIt->second];
+      key.interpolation = src.interpolation;
+      key.bezierOut = src.bezierOut;
+      key.bezierIn = src.bezierIn;
     } else {
-      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                KeyframeTimeAt<Color>{time});
-      if (addIt != additiveCh->keyframes.end()) {
-        key.interpolation = addIt->interpolation;
-        key.bezierOut = addIt->bezierOut;
-        key.bezierIn = addIt->bezierIn;
+      auto addIt = additiveTimes.find(time);
+      if (addIt != additiveTimes.end()) {
+        const auto& src = additiveCh->keyframes[addIt->second];
+        key.interpolation = src.interpolation;
+        key.bezierOut = src.bezierOut;
+        key.bezierIn = src.bezierIn;
       }
     }
     merged.push_back(key);
@@ -1251,6 +1259,8 @@ static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
   for (const auto& key : additiveCh->keyframes) {
     allTimes.insert(key.time);
   }
+  const auto baseTimes = BuildKeyframeTimeIndex(*baseCh);
+  const auto additiveTimes = BuildKeyframeTimeIndex(*additiveCh);
   std::vector<Keyframe<Matrix>> merged = {};
   for (Frame time : allTimes) {
     Matrix baseVal = std::get<Matrix>(base->evaluateAt(time));
@@ -1258,19 +1268,19 @@ static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
     Keyframe<Matrix> key = {};
     key.time = time;
     key.value = baseVal * additiveVal;
-    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               KeyframeTimeAt<Matrix>{time});
-    if (baseIt != baseCh->keyframes.end()) {
-      key.interpolation = baseIt->interpolation;
-      key.bezierOut = baseIt->bezierOut;
-      key.bezierIn = baseIt->bezierIn;
+    auto baseIt = baseTimes.find(time);
+    if (baseIt != baseTimes.end()) {
+      const auto& src = baseCh->keyframes[baseIt->second];
+      key.interpolation = src.interpolation;
+      key.bezierOut = src.bezierOut;
+      key.bezierIn = src.bezierIn;
     } else {
-      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                KeyframeTimeAt<Matrix>{time});
-      if (addIt != additiveCh->keyframes.end()) {
-        key.interpolation = addIt->interpolation;
-        key.bezierOut = addIt->bezierOut;
-        key.bezierIn = addIt->bezierIn;
+      auto addIt = additiveTimes.find(time);
+      if (addIt != additiveTimes.end()) {
+        const auto& src = additiveCh->keyframes[addIt->second];
+        key.interpolation = src.interpolation;
+        key.bezierOut = src.bezierOut;
+        key.bezierIn = src.bezierIn;
       }
     }
     merged.push_back(key);
@@ -1295,6 +1305,8 @@ static void MergeAdditiveBool(Channel* base, const Channel* additive) {
   for (const auto& key : additiveCh->keyframes) {
     allTimes.insert(key.time);
   }
+  const auto baseTimes = BuildKeyframeTimeIndex(*baseCh);
+  const auto additiveTimes = BuildKeyframeTimeIndex(*additiveCh);
   std::vector<Keyframe<bool>> merged = {};
   for (Frame time : allTimes) {
     bool baseVal = std::get<bool>(base->evaluateAt(time));
@@ -1302,15 +1314,13 @@ static void MergeAdditiveBool(Channel* base, const Channel* additive) {
     Keyframe<bool> key = {};
     key.time = time;
     key.value = baseVal || additiveVal;
-    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               KeyframeTimeAt<bool>{time});
-    if (baseIt != baseCh->keyframes.end()) {
-      key.interpolation = baseIt->interpolation;
+    auto baseIt = baseTimes.find(time);
+    if (baseIt != baseTimes.end()) {
+      key.interpolation = baseCh->keyframes[baseIt->second].interpolation;
     } else {
-      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                KeyframeTimeAt<bool>{time});
-      if (addIt != additiveCh->keyframes.end()) {
-        key.interpolation = addIt->interpolation;
+      auto addIt = additiveTimes.find(time);
+      if (addIt != additiveTimes.end()) {
+        key.interpolation = additiveCh->keyframes[addIt->second].interpolation;
       }
     }
     merged.push_back(key);
@@ -1606,7 +1616,7 @@ std::string SMILAnimationParser::ensureContentNodeId(SVGParserContext& ctx, PAGX
   // PAGAnimation::resolveTargets resolves targets through findNode, so a content node carrying an
   // id assigned by the importer still has to be registered for the animation to apply.
   if (doc->findNode(id) != node) {
-    doc->registerNode(node, id);
+    detail::DocumentAccess::RegisterNode(*doc, node, id);
   }
   return id;
 }
@@ -2668,9 +2678,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
       if (child->name == "mpath") {
         std::string href = ctx.getHrefAttribute(child);
         std::string refId = ctx.resolveUrl(href);
-        auto defIt = ctx._defs.find(refId);
-        if (defIt != ctx._defs.end()) {
-          pathStr = ctx.getAttribute(defIt->second, "d");
+        auto definition = ctx.findDefinition(refId);
+        if (definition != nullptr) {
+          pathStr = ctx.getAttribute(definition, "d");
         }
         break;
       }

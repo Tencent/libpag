@@ -46,6 +46,16 @@ class ImagePattern;
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
  * PAGXImporter to load documents and PAGXExporter to save documents.
  */
+namespace detail {
+
+// Internal bridge for importers that register addressable nodes while building a document. Kept
+// out of PAGXDocument's public surface so public headers do not name the parser classes.
+struct DocumentAccess {
+  static void RegisterNode(PAGXDocument& document, Node* node, const std::string& id);
+};
+
+}  // namespace detail
+
 class PAGXDocument : public Node {
  public:
   /**
@@ -364,8 +374,7 @@ class PAGXDocument : public Node {
   friend class PAGComposition;
   friend class LayerBuilderContext;
   friend class LayerBuilderSession;
-  friend class SVGParserContext;
-  friend class SMILAnimationParser;
+  friend struct detail::DocumentAccess;
 };
 
 }  // namespace pagx

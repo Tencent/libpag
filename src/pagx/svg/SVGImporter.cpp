@@ -3229,7 +3229,7 @@ void SVGParserContext::registerFilterAnimationTarget(
   if (filterNode->id.empty()) {
     filterNode->id = generateUniqueId("anim_filter");
   }
-  _document->registerNode(filterNode, filterNode->id);
+  detail::DocumentAccess::RegisterNode(*_document, filterNode, filterNode->id);
   // Record each fe* primitive → filter mapping so registerAnimatedElement can route <animate>
   // children of feGaussianBlur/feOffset to this filter node. A single DropShadowFilter is built
   // from multiple fe* primitives, so multiple DOM keys map to the same filter.
@@ -3773,7 +3773,7 @@ std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMN
   if (layer->id.empty()) {
     layer->id = generateUniqueId("anim_layer");
   }
-  _document->registerNode(layer, layer->id);
+  detail::DocumentAccess::RegisterNode(*_document, layer, layer->id);
 
   AnimatedNodeInfo info = {};
   info.targetLayer = layer;
@@ -3871,7 +3871,7 @@ void SVGParserContext::buildAnimation(Layer* rootLayer) {
     return;
   }
   animation->id = generateUniqueId("smil_anim");
-  _document->registerNode(animation, animation->id);
+  detail::DocumentAccess::RegisterNode(*_document, animation, animation->id);
   _document->animations.push_back(animation);
   NormalizePivotKeyframes(animation, _document.get(), _pivotNormalizedLayers);
   BakeFirstMatrixKeyframe(animation, _document.get());
