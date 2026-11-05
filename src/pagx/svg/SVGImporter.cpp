@@ -1225,13 +1225,10 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     if (elementFill.empty()) {
       elementFill = "#000000";
     }
-    auto runFill = [&elementFill](const TextLine& run) {
-      return run.fill.empty() ? elementFill : run.fill;
-    };
     // A Text node carries a single paint, so runs with different fills need their own Fill.
     std::string firstFill = {};
     for (const auto& run : emittedRuns) {
-      auto fill = runFill(run);
+      auto fill = run.fill.empty() ? elementFill : run.fill;
       if (fill == "none") {
         continue;
       }
@@ -1258,7 +1255,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         text->letterSpacing = letterSpacingValue;
       }
       text->textAnchor = textAnchorValue;
-      auto fill = runFill(run);
+      auto fill = run.fill.empty() ? elementFill : run.fill;
       if (!uniformFill && fill != "none") {
         auto runGroup = _document->makeNode<Group>();
         runGroup->elements.push_back(text);
@@ -3125,15 +3122,20 @@ PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
 
   return path;
 }
+static std::string TrimWhitespace(const std::string& value) {
+  size_t first = 0;
+  while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])) != 0) {
+    ++first;
+  }
+  size_t last = value.size();
+  while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1])) != 0) {
+    --last;
+  }
+  return value.substr(first, last - first);
+}
+
 std::string SVGParserContext::resolveUrl(const std::string& url) {
-  auto trim = [](const std::string& value) {
-    size_t first = 0;
-    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) first++;
-    size_t last = value.size();
-    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1]))) last--;
-    return value.substr(first, last - first);
-  };
-  std::string value = trim(url);
+  std::string value = TrimWhitespace(url);
   if (value.empty()) {
     return "";
   }
@@ -3144,10 +3146,10 @@ std::string SVGParserContext::resolveUrl(const std::string& url) {
   if (value.compare(0, 4, "url(") == 0) {
     size_t end = value.rfind(')');
     if (end != std::string::npos && end >= 4) {
-      std::string inner = trim(value.substr(4, end - 4));
+      std::string inner = TrimWhitespace(value.substr(4, end - 4));
       if (inner.size() >= 2 && ((inner.front() == '"' && inner.back() == '"') ||
                                 (inner.front() == '\'' && inner.back() == '\''))) {
-        inner = trim(inner.substr(1, inner.size() - 2));
+        inner = TrimWhitespace(inner.substr(1, inner.size() - 2));
       }
       if (!inner.empty() && inner.front() == '#') {
         return inner.substr(1);
@@ -3209,9 +3211,6 @@ void SVGParserContext::registerFilterAnimationTarget(
   // animations. Filters without animations must stay unregistered: an id + nodeMap entry with
   // no AnimationObject referencing it trips the verifier's unreferenced-resource check (and
   // would needlessly bloat exported SVG with the id attribute).
-  auto hasSmilAnimation = [this](const std::shared_ptr<DOMNode>& feElement) {
-    return feElement != nullptr && _smilAnimations.find(feElement.get()) != _smilAnimations.end();
-  };
   if (!hasSmilAnimation(blurElement) && !hasSmilAnimation(offsetElement)) {
     return;
   }
@@ -3227,24 +3226,30 @@ void SVGParserContext::registerFilterAnimationTarget(
   // fe* elements are not graphics elements (convertToLayer never visits them), so we also
   // populate _animatedNodeMap here — registerAnimatedElement would otherwise never be called
   // for fe* and buildAnimation would skip their <animate> children.
-  auto registerFe = [this, filterNode](const std::shared_ptr<DOMNode>& feElement) {
-    if (feElement == nullptr) {
-      return;
-    }
-    _feToFilterMap[feElement.get()] = filterNode;
-    // Only register AnimatedNodeInfo when the fe* actually has SMIL animation children;
-    // otherwise buildAnimation would still pick it up and emit an empty AnimationObject.
-    if (_smilAnimations.find(feElement.get()) == _smilAnimations.end()) {
-      return;
-    }
-    AnimatedNodeInfo info = {};
-    info.targetFilter = filterNode;
-    info.targetId = filterNode->id;
-    info.domElement = feElement;
-    _animatedNodeMap[feElement.get()] = std::move(info);
-  };
-  registerFe(blurElement);
-  registerFe(offsetElement);
+  registerFeAnimationTarget(blurElement, filterNode);
+  registerFeAnimationTarget(offsetElement, filterNode);
+}
+
+bool SVGParserContext::hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const {
+  return element != nullptr && _smilAnimations.find(element.get()) != _smilAnimations.end();
+}
+
+void SVGParserContext::registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement,
+                                                 LayerFilter* filterNode) {
+  if (feElement == nullptr || filterNode == nullptr) {
+    return;
+  }
+  _feToFilterMap[feElement.get()] = filterNode;
+  // Only register AnimatedNodeInfo when the fe* actually has SMIL animation children;
+  // otherwise buildAnimation would still pick it up and emit an empty AnimationObject.
+  if (!hasSmilAnimation(feElement)) {
+    return;
+  }
+  AnimatedNodeInfo info = {};
+  info.targetFilter = filterNode;
+  info.targetId = filterNode->id;
+  info.domElement = feElement;
+  _animatedNodeMap[feElement.get()] = std::move(info);
 }
 
 // Parse a CSS style string into a property map. Later properties override earlier ones.

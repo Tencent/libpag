@@ -1862,6 +1862,51 @@ std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* own
   return writeMaskOrClipDef(maskLayer, MaskType::Contour);
 }
 
+// Walks one layer subtree and records the parent edge of every reachable layer. `visited` keeps
+// the walk idempotent for shared-resource references and guards against composition cycles.
+static void CollectLayerParents(const Layer* parent,
+                                std::unordered_map<const Layer*, const Layer*>* map,
+                                std::unordered_set<const Layer*>* visited) {
+  if (parent == nullptr || !visited->insert(parent).second) {
+    return;
+  }
+  for (const auto* child : parent->children) {
+    if (map->find(child) == map->end()) {
+      (*map)[child] = parent;
+    }
+    CollectLayerParents(child, map, visited);
+  }
+  if (parent->composition != nullptr) {
+    for (const auto* compLayer : parent->composition->layers) {
+      if (map->find(compLayer) == map->end()) {
+        (*map)[compLayer] = parent;
+      }
+      CollectLayerParents(compLayer, map, visited);
+    }
+  }
+}
+
+// Collects every layer referenced through Layer::mask, recursing into the mask subtree so nested
+// mask-of-mask references are covered. `visited` guards against cycles.
+static void CollectMaskReferences(const Layer* node, std::unordered_set<const Layer*>* refs,
+                                  std::unordered_set<const Layer*>* visited) {
+  if (node == nullptr || !visited->insert(node).second) {
+    return;
+  }
+  if (node->mask != nullptr) {
+    refs->insert(node->mask);
+    CollectMaskReferences(node->mask, refs, visited);
+  }
+  for (const auto* child : node->children) {
+    CollectMaskReferences(child, refs, visited);
+  }
+  if (node->composition != nullptr) {
+    for (const auto* compLayer : node->composition->layers) {
+      CollectMaskReferences(compLayer, refs, visited);
+    }
+  }
+}
+
 const Layer* SVGWriter::findLayerParent(const Layer* layer) {
   if (layer == nullptr || _doc == nullptr) {
     return nullptr;
@@ -1877,31 +1922,11 @@ const Layer* SVGWriter::findLayerParent(const Layer* layer) {
     // that produced a `composition -> layer -> composition` self-reference cannot blow the
     // stack.
     std::unordered_set<const Layer*> visited;
-    std::function<void(const Layer*)> visit = [&](const Layer* parent) {
-      if (!visited.insert(parent).second) {
-        return;
-      }
-      for (const auto* child : parent->children) {
-        if (map.find(child) == map.end()) {
-          map[child] = parent;
-        }
-        visit(child);
-      }
-      if (parent->composition != nullptr) {
-        for (const auto* compLayer : parent->composition->layers) {
-          if (map.find(compLayer) == map.end()) {
-            map[compLayer] = parent;
-          }
-          visit(compLayer);
-        }
-      }
-    };
     for (const auto& nodePtr : _doc->nodes) {
       if (nodePtr->nodeType() != NodeType::Layer) {
         continue;
       }
-      auto* topLayer = static_cast<Layer*>(nodePtr.get());
-      visit(topLayer);
+      CollectLayerParents(static_cast<Layer*>(nodePtr.get()), &map, &visited);
     }
     _context->layerParentMapReady = true;
   }
@@ -1919,28 +1944,11 @@ bool SVGWriter::isMaskReferenceLayer(const Layer* layer) {
     // register each Layer::mask reference target, recursing into the mask's own subtree so
     // nested mask-of-mask references are covered. `visited` guards against cycles.
     std::unordered_set<const Layer*> visited;
-    std::function<void(const Layer*)> visit = [&](const Layer* node) {
-      if (node == nullptr || !visited.insert(node).second) {
-        return;
-      }
-      if (node->mask != nullptr) {
-        refs.insert(node->mask);
-        visit(node->mask);
-      }
-      for (const auto* child : node->children) {
-        visit(child);
-      }
-      if (node->composition != nullptr) {
-        for (const auto* compLayer : node->composition->layers) {
-          visit(compLayer);
-        }
-      }
-    };
     for (const auto& nodePtr : _doc->nodes) {
       if (nodePtr->nodeType() != NodeType::Layer) {
         continue;
       }
-      visit(static_cast<Layer*>(nodePtr.get()));
+      CollectMaskReferences(static_cast<Layer*>(nodePtr.get()), &refs, &visited);
     }
     _context->maskReferencesReady = true;
   }

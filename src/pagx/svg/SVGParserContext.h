@@ -290,6 +290,13 @@ class SVGParserContext {
                                      const std::shared_ptr<DOMNode>& blurElement,
                                      const std::shared_ptr<DOMNode>& offsetElement);
 
+  // Records one fe* primitive → filter mapping and, when the primitive carries SMIL animation
+  // children, the AnimatedNodeInfo buildAnimation needs to emit its channels.
+  void registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement, LayerFilter* filterNode);
+
+  // Whether the given SVG element has collected SMIL animation children.
+  bool hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const;
+
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).

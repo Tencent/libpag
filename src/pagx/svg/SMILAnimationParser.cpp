@@ -473,6 +473,19 @@ static bool KeyframeTimeLess(const Keyframe<T>& a, const Keyframe<T>& b) {
 }
 
 template <typename T>
+struct KeyframeTimeAt {
+  Frame time = 0;
+
+  bool operator()(const Keyframe<T>& key) const {
+    return key.time == time;
+  }
+};
+
+static float LerpFloat(float a, float b, double t) {
+  return a + (b - a) * static_cast<float>(t);
+}
+
+template <typename T>
 static void AppendTypedKeyframes(TypedChannel<T>* base, const TypedChannel<T>* extra) {
   if (base == nullptr || extra == nullptr) {
     return;
@@ -952,13 +965,12 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
         const auto& last = original.back().value;
         Keyframe<Matrix> key = {};
         key.time = fractionalTime;
-        auto lerp = [](float a, float b, double t) { return a + (b - a) * static_cast<float>(t); };
-        key.value.a = lerp(first.a, last.a, fraction);
-        key.value.b = lerp(first.b, last.b, fraction);
-        key.value.c = lerp(first.c, last.c, fraction);
-        key.value.d = lerp(first.d, last.d, fraction);
-        key.value.tx = lerp(first.tx, last.tx, fraction);
-        key.value.ty = lerp(first.ty, last.ty, fraction);
+        key.value.a = LerpFloat(first.a, last.a, fraction);
+        key.value.b = LerpFloat(first.b, last.b, fraction);
+        key.value.c = LerpFloat(first.c, last.c, fraction);
+        key.value.d = LerpFloat(first.d, last.d, fraction);
+        key.value.tx = LerpFloat(first.tx, last.tx, fraction);
+        key.value.ty = LerpFloat(first.ty, last.ty, fraction);
         key.interpolation = original.front().interpolation;
         key.bezierOut = original.front().bezierOut;
         key.bezierIn = original.front().bezierIn;
@@ -1077,14 +1089,14 @@ static void MergeAdditiveFloat(Channel* base, const Channel* additive) {
     // Prefer base's interpolation/bezier when the time matches a base keyframe; otherwise take
     // additive's. Times present in neither (shouldn't happen) default to Linear.
     auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               [time](const Keyframe<float>& k) { return k.time == time; });
+                               KeyframeTimeAt<float>{time});
     if (baseIt != baseCh->keyframes.end()) {
       key.interpolation = baseIt->interpolation;
       key.bezierOut = baseIt->bezierOut;
       key.bezierIn = baseIt->bezierIn;
     } else {
       auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                [time](const Keyframe<float>& k) { return k.time == time; });
+                                KeyframeTimeAt<float>{time});
       if (addIt != additiveCh->keyframes.end()) {
         key.interpolation = addIt->interpolation;
         key.bezierOut = addIt->bezierOut;
@@ -1128,14 +1140,14 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
     key.value.blue = baseVal.blue + additiveVal.blue;
     key.value.alpha = baseVal.alpha + additiveVal.alpha;
     auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               [time](const Keyframe<Color>& k) { return k.time == time; });
+                               KeyframeTimeAt<Color>{time});
     if (baseIt != baseCh->keyframes.end()) {
       key.interpolation = baseIt->interpolation;
       key.bezierOut = baseIt->bezierOut;
       key.bezierIn = baseIt->bezierIn;
     } else {
       auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                [time](const Keyframe<Color>& k) { return k.time == time; });
+                                KeyframeTimeAt<Color>{time});
       if (addIt != additiveCh->keyframes.end()) {
         key.interpolation = addIt->interpolation;
         key.bezierOut = addIt->bezierOut;
@@ -1215,14 +1227,14 @@ static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
     key.time = time;
     key.value = baseVal * additiveVal;
     auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               [time](const Keyframe<Matrix>& k) { return k.time == time; });
+                               KeyframeTimeAt<Matrix>{time});
     if (baseIt != baseCh->keyframes.end()) {
       key.interpolation = baseIt->interpolation;
       key.bezierOut = baseIt->bezierOut;
       key.bezierIn = baseIt->bezierIn;
     } else {
       auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                [time](const Keyframe<Matrix>& k) { return k.time == time; });
+                                KeyframeTimeAt<Matrix>{time});
       if (addIt != additiveCh->keyframes.end()) {
         key.interpolation = addIt->interpolation;
         key.bezierOut = addIt->bezierOut;
@@ -1259,12 +1271,12 @@ static void MergeAdditiveBool(Channel* base, const Channel* additive) {
     key.time = time;
     key.value = baseVal || additiveVal;
     auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
-                               [time](const Keyframe<bool>& k) { return k.time == time; });
+                               KeyframeTimeAt<bool>{time});
     if (baseIt != baseCh->keyframes.end()) {
       key.interpolation = baseIt->interpolation;
     } else {
       auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
-                                [time](const Keyframe<bool>& k) { return k.time == time; });
+                                KeyframeTimeAt<bool>{time});
       if (addIt != additiveCh->keyframes.end()) {
         key.interpolation = addIt->interpolation;
       }
