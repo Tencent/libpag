@@ -442,21 +442,24 @@ void HTMLStyleCascade::resolveTextStroke(const PropertyMap& props, HTMLInherited
 HTMLTransformReference HTMLStyleCascade::getTransformReferenceSize(
     const std::shared_ptr<DOMNode>& element) {
   const auto& props = getResolvedStyle(element);
-  HTMLBoxAttributes box = {};
-  parseBoxSizing(box, props);
+  // Only the px / percentage split is needed here. `parseBoxSizing` is skipped on purpose: it emits
+  // the `box-sizing` / min-max / aspect-ratio diagnostics, which would otherwise be reported twice
+  // because `computeBoxAttributes` already ran it for this element.
   HTMLTransformReference reference = {};
-  reference.widthPx = box.widthPx;
-  reference.heightPx = box.heightPx;
+  float widthPct = NAN;
+  float heightPct = NAN;
+  ParseSizingDimension(LookupProperty(props, "width"), reference.widthPx, widthPct);
+  ParseSizingDimension(LookupProperty(props, "height"), reference.heightPx, heightPct);
   if (element == nullptr || element->name != "svg") {
     return reference;
   }
-  if (std::isnan(reference.widthPx) && std::isnan(box.widthPct)) {
+  if (std::isnan(reference.widthPx) && std::isnan(widthPct)) {
     const auto* attribute = element->findAttribute("width");
     if (attribute != nullptr) {
       reference.widthPx = _valueParser.parseAbsoluteLengthPx(*attribute);
     }
   }
-  if (std::isnan(reference.heightPx) && std::isnan(box.heightPct)) {
+  if (std::isnan(reference.heightPx) && std::isnan(heightPct)) {
     const auto* attribute = element->findAttribute("height");
     if (attribute != nullptr) {
       reference.heightPx = _valueParser.parseAbsoluteLengthPx(*attribute);
@@ -468,7 +471,11 @@ HTMLTransformReference HTMLStyleCascade::getTransformReferenceSize(
 HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
+  const std::string elementName = element != nullptr ? element->name : std::string();
   parseBoxSizing(box, props);
+  // Resolve the pivot / camera reference box once, before the intrinsic-width marker clears the
+  // measured size, so `transform-origin` and `perspective-origin` share one reference box.
+  const auto reference = getTransformReferenceSize(element);
   // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
   // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
   // only at Layer construction time so inference can still use the measured child geometry.
@@ -484,10 +491,8 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
-  parseBoxVisuals(box, props);
-  const auto reference = getTransformReferenceSize(element);
-  parseBoxTransform(box, props, element != nullptr ? element->name : std::string(),
-                    reference.widthPx, reference.heightPx);
+  parseBoxVisuals(box, props, reference, elementName);
+  parseBoxTransform(box, props, elementName, reference.widthPx, reference.heightPx);
   return box;
 }
 
@@ -667,7 +672,9 @@ bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* o
   return true;
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                                       const HTMLTransformReference& reference,
+                                       const std::string& elementName) {
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
@@ -791,29 +798,25 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
       box.perspectivePx = distance;
     } else {
       _diagnostics.warn("html: perspective '" + perspective +
-                        "' must be a positive length; ignored [subset:unsupported-property]");
+                        "' must be a positive length; ignored");
     }
   }
   if (box.perspectivePx > 0.0f) {
     // CSS projects about `perspective-origin`, which defaults to the centre of the declaring box.
-    const std::string perspectiveOrigin = Trim(LookupProperty(props, "perspective-origin"));
-    float referenceWidth = box.widthPx;
-    float referenceHeight = box.heightPx;
-    if (perspectiveOrigin.empty()) {
-      box.perspectiveOriginX = referenceWidth * 0.5f;
-      box.perspectiveOriginY = referenceHeight * 0.5f;
+    const std::string authored = Trim(LookupProperty(props, "perspective-origin"));
+    const std::string origin = authored.empty() ? std::string("50% 50%") : authored;
+    const auto resolved =
+        ResolveTransformOrigin(origin, reference.widthPx, reference.heightPx, _valueParser);
+    if (resolved.resolved) {
+      box.perspectiveOriginX = resolved.point.x;
+      box.perspectiveOriginY = resolved.point.y;
     } else {
-      const auto origin =
-          ResolveTransformOrigin(perspectiveOrigin, referenceWidth, referenceHeight, _valueParser);
-      if (origin.resolved) {
-        box.perspectiveOriginX = origin.point.x;
-        box.perspectiveOriginY = origin.point.y;
-      } else {
-        _diagnostics.warn("html: perspective-origin '" + perspectiveOrigin +
-                          "' cannot be resolved against the box size; using the box centre");
-        box.perspectiveOriginX = referenceWidth * 0.5f;
-        box.perspectiveOriginY = referenceHeight * 0.5f;
-      }
+      // The default vanishing point is the box centre, which needs an absolute box size. Leaving the
+      // value unknown makes the projection step fall back to the layer origin, so report it once
+      // here instead of silently moving every child's perspective centre.
+      _diagnostics.warn("html: perspective-origin '" + origin + "' on <" + elementName +
+                        "> has no absolute box size; the vanishing point falls back to the layer "
+                        "origin instead of the box centre");
     }
   }
 

@@ -702,6 +702,14 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // on the layer that owns the pose, so it is folded in here rather than read from the parent.
   const Matrix3D pose = PushPerspective(box.transform.pose, box.parentPerspectivePx,
                                         box.parentPerspectiveOriginX, box.parentPerspectiveOriginY);
+  // The parser validated the pose before the parent camera was folded in, and PAGX requires a 3D
+  // pose to be invertible, so the pushed pose is re-checked (`scale(0)` under a perspective parent
+  // would otherwise emit an invalid matrix3D).
+  if (!IsFlatTransform(pose) && !IsInvertiblePose(pose)) {
+    _diagnostics.warn(
+        "html: transform becomes non-invertible under the parent perspective; ignored");
+    return;
+  }
   // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a
   // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
   // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or

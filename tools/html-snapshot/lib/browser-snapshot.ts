@@ -2059,12 +2059,9 @@ function rewritePerspectiveKeyframes(cssText) {
     let consistent = true;
     const rewritten = block.replace(/matrix3d\([^)]*\)/g, (value) => {
       const split = splitProjectiveTransform(value);
-      if (!split) {
-        if (/transform\s*:/.test(block.slice(Math.max(0, block.indexOf(value) - 40), block.indexOf(value)))) {
-          consistent = false;
-        }
-        return value;
-      }
+      // A stop that carries no projection at all is caught by the `projectedCount !== transformCount`
+      // check below, which does not depend on locating the declaration text.
+      if (!split) return value;
       projectedCount++;
       if (distance === 0) {
         distance = split.distance;

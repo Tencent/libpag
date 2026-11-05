@@ -181,7 +181,10 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
 }
 
 Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
-                                                    const HTMLInheritedStyle& inherited) {
+                                                    const HTMLInheritedStyle& inherited,
+                                                    float parentPerspectivePx,
+                                                    float parentPerspectiveOriginX,
+                                                    float parentPerspectiveOriginY) {
   // The generator emits glyph <span>s as direct children of the host container; the first one
   // carries the style (font size / colour) of the first rendered glyph.
   std::shared_ptr<DOMNode> firstSpan;
@@ -216,6 +219,13 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // as container + first-child offset. Only left/top are honoured — per-glyph transforms
   // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
   HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
+  // The host is converted without going through `convertElement`, so the parent camera has to be
+  // folded in here; otherwise a 3D transform on a restored text host loses its projection.
+  // The values already arrive in this element's local coordinates (the caller resolved them), so
+  // they are assigned verbatim instead of being offset again.
+  containerBox.parentPerspectivePx = parentPerspectivePx;
+  containerBox.parentPerspectiveOriginX = parentPerspectiveOriginX;
+  containerBox.parentPerspectiveOriginY = parentPerspectiveOriginY;
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
     HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);

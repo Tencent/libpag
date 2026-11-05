@@ -667,6 +667,22 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   return true;
 }
 
+bool IsInvertiblePose(const Matrix3D& matrix) {
+  return IsInvertible(matrix);
+}
+
+void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX,
+                            float originY) {
+  box.parentPerspectivePx = distancePx;
+  if (!(distancePx > 0.0f) || !std::isfinite(originX) || !std::isfinite(originY)) {
+    return;
+  }
+  const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
+  const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
+  box.parentPerspectiveOriginX = originX - ownLeft;
+  box.parentPerspectiveOriginY = originY - ownTop;
+}
+
 Matrix3D PerspectiveMatrix(float distance) {
   if (!(distance > 0.0f) || !std::isfinite(distance)) {
     return {};
@@ -680,7 +696,7 @@ Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, fl
   }
   // CSS projects about `perspective-origin` (the parent's centre by default), not about the parent's
   // local origin, so the projection is conjugated with that point before it is folded into the pose.
-  const Matrix3D projection = MakePerspective(distance);
+  const Matrix3D projection = PerspectiveMatrix(distance);
   if (!std::isfinite(originX) || !std::isfinite(originY) || (originX == 0.0f && originY == 0.0f)) {
     return Multiply(projection, pose);
   }
