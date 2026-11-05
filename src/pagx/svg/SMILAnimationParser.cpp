@@ -2565,6 +2565,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
   const auto& staticMatrix = nodeInfo.targetLayer->matrix;
   auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+  // Motion samples are baked around the layer origin; keep the same fixed-point spelling as
+  // transform animations so the path is followed without sliding.
+  ch->pivotInterpolation = true;
+  // SVG transform animations rotate and scale about the element's anchor, so the transient
+  // translation must keep that fixed point. CSS-style matrix animations keep the linear spelling.
+  ch->pivotInterpolation = true;
   for (size_t i = 0; i < paramSets.size(); ++i) {
     Matrix m = TransformParamsToMatrix(type, paramSets[i]);
     if (additive) {
