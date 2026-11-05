@@ -372,7 +372,9 @@ class SVGParserContext {
 
   // PAGX node info for each animated SVG element, populated during convertToLayer and consumed
   // by buildAnimation. Key matches _smilAnimations so the two maps can be walked together.
-  std::unordered_map<const DOMNode*, AnimatedNodeInfo> _animatedNodeMap = {};
+  // One entry per converted instance: a <use> reference converts the same DOM subtree again, and
+  // every instance carries its own AnimationObject.
+  std::unordered_map<const DOMNode*, std::vector<AnimatedNodeInfo>> _animatedNodeMap = {};
 
   // Mapping from feGaussianBlur/feOffset DOM elements to the PAGX filter node they contributed
   // to (a single DropShadowFilter is built from multiple fe* primitives, so multiple DOM keys
