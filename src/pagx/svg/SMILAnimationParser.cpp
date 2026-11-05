@@ -51,6 +51,21 @@ static constexpr int kMaxRotationSteps = 10000;
 // timestamp and drop the later key, leaving a constant track. Shifting the earlier key one frame
 // back keeps both keys distinct in any implementation. Float property channels only (alpha and
 // friends); same-frame jumps on matrix channels are not verified yet.
+// Keeps keyframe times strictly increasing. A fractional repeat tail can round onto the previous
+// period's last key, and a same-frame jump can leave several keys on one timestamp; tracks keyed by
+// time would drop all but one of them.
+template <typename T>
+static void EnsureStrictlyIncreasingTimes(std::vector<Keyframe<T>>* keyframes) {
+  if (keyframes == nullptr) {
+    return;
+  }
+  for (size_t i = 1; i < keyframes->size(); ++i) {
+    if ((*keyframes)[i].time <= (*keyframes)[i - 1].time) {
+      (*keyframes)[i].time = (*keyframes)[i - 1].time + 1;
+    }
+  }
+}
+
 static void ShiftSameTimeFloatKeyframes(TypedChannel<float>* channel) {
   if (channel == nullptr || channel->keyframes.size() < 2) {
     return;
@@ -65,6 +80,7 @@ static void ShiftSameTimeFloatKeyframes(TypedChannel<float>* channel) {
       }
     }
   }
+  EnsureStrictlyIncreasingTimes(&channel->keyframes);
 }
 
 static void SkipWhitespaceAndComma(const char*& ptr, const char* end) {
@@ -847,6 +863,10 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double rep
     float sampled = firstVal + (lastVal - firstVal) * static_cast<float>(fraction);
     Keyframe<float> key = {};
     key.time = fractionalTime;
+    if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+      // round(fraction * durFrames) can collapse onto the previous period end.
+      key.time = ch->keyframes.back().time + 1;
+    }
     key.value = sampled;
     key.interpolation = original.front().interpolation;
     key.bezierOut = original.front().bezierOut;
@@ -906,6 +926,10 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
     }
     Keyframe<Color> key = {};
     key.time = fractionalTime;
+    if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+      // round(fraction * durFrames) can collapse onto the previous period end.
+      key.time = ch->keyframes.back().time + 1;
+    }
     key.value.red = firstVal.red + (lastVal.red - firstVal.red) * static_cast<float>(fraction);
     key.value.green =
         firstVal.green + (lastVal.green - firstVal.green) * static_cast<float>(fraction);
@@ -965,6 +989,10 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
         const auto& last = original.back().value;
         Keyframe<Matrix> key = {};
         key.time = fractionalTime;
+        if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+          // round(fraction * durFrames) can collapse onto the previous period end.
+          key.time = ch->keyframes.back().time + 1;
+        }
         key.value.a = LerpFloat(first.a, last.a, fraction);
         key.value.b = LerpFloat(first.b, last.b, fraction);
         key.value.c = LerpFloat(first.c, last.c, fraction);
@@ -999,6 +1027,10 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
         auto key = original.front();
         key.time = static_cast<Frame>(fullRepeats) * durFrames +
                    static_cast<Frame>(std::round(fraction * durFrames));
+        if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+          // round(fraction * durFrames) can collapse onto the previous period end.
+          key.time = ch->keyframes.back().time + 1;
+        }
         ch->keyframes.push_back(key);
       }
       break;
