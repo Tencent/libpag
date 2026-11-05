@@ -37,6 +37,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -650,6 +651,7 @@ enum class TargetChannelRole {
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
+  RoundCornerRadius,
   FontSize,
   LetterSpacing,
 };
@@ -667,8 +669,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "y", TargetChannelRole::LayerY},
     {NodeType::Layer, "matrix", TargetChannelRole::LayerMatrix},
     {NodeType::Layer, "visible", TargetChannelRole::LayerVisibility},
-    {NodeType::Layer, "rotation", TargetChannelRole::Rotation},
-    // PAGX spells the Z spin "rotation.z"; the plain "rotation" spelling is kept for older files.
+    // The Layer spin is "rotation.z" in PAGX; a bare "rotation" never matches a Layer channel.
     {NodeType::Layer, "rotation.z", TargetChannelRole::Rotation},
     {NodeType::Layer, "skew.x", TargetChannelRole::LayerSkewX},
     {NodeType::Layer, "skew.y", TargetChannelRole::LayerSkewY},
@@ -681,6 +682,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
+    {NodeType::RoundCorner, "radius", TargetChannelRole::RoundCornerRadius},
 
     // Group & TextBox channels
     {NodeType::Group, "alpha", TargetChannelRole::Opacity},
@@ -766,6 +768,10 @@ struct BundleChannelSet {
   const Channel* roundnessCh = nullptr;
   const Channel* trimEndCh = nullptr;
   const Channel* trimStartCh = nullptr;
+  // RoundCorner rounds the geometry declared before it, so the frame rebuilds that shape's `d`.
+  const Channel* roundCornerCh = nullptr;
+  const RoundCorner* roundCornerTarget = nullptr;
+  const Element* roundCornerShape = nullptr;
   const TrimPath* trimTarget = nullptr;
   const Channel* rotCh = nullptr;
   const Channel* scaleXCh = nullptr;
@@ -861,6 +867,10 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::RectangleRoundness:
       out.roundnessCh = ch;
+      return true;
+    case TargetChannelRole::RoundCornerRadius:
+      out.roundCornerCh = ch;
+      out.roundCornerTarget = static_cast<const RoundCorner*>(objTarget);
       return true;
     case TargetChannelRole::LayerSkewX:
       out.layerSkewXCh = ch;
@@ -1385,6 +1395,17 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
   if (bundle.primaryHost == nullptr) {
     return;
   }
+  if (chSet.roundCornerCh != nullptr && chSet.roundCornerTarget != nullptr &&
+      chSet.roundCornerShape != nullptr) {
+    // The radius reshapes the outline, so every stop rewrites the path with that frame's radius.
+    PathData raw = PathDataFromSVGString("");
+    GeoToPathData(chSet.roundCornerShape, chSet.roundCornerShape->nodeType(), raw);
+    float radius = EvalFloatChannel(chSet.roundCornerCh, t, chSet.roundCornerTarget->radius);
+    PathData rounded = PathDataFromSVGString("");
+    ApplyRoundCorner(raw, radius, rounded);
+    AppendCssDecl(decls, "d", "path(\"" + PathDataToSVGString(rounded) + "\")");
+    return;
+  }
   auto type = bundle.primaryHost->nodeType();
   if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
     return;
@@ -1559,7 +1580,7 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
           domId = idIt->second;
         }
       }
-    } else if (nType == NodeType::TrimPath) {
+    } else if (nType == NodeType::TrimPath || nType == NodeType::RoundCorner) {
       auto idIt = ctx.animation.elementIds.find(targetNode);
       if (idIt != ctx.animation.elementIds.end()) {
         domId = idIt->second;
@@ -1816,6 +1837,74 @@ HTMLAnimationSession::HTMLAnimationSession(PAGXDocument& doc, HTMLWriterContext&
 
 // Resolves every animated object target to the DOM id its tag will carry. Layer and Group targets
 // may need an id assigned; a Path used by a mask registers as coverage-mask geometry instead.
+// Collects the shapes a RoundCorner rounds: every shape declared before it in the same element list.
+// A nested Group opens its own scope, so the scan only looks at direct children.
+bool CollectShapesBeforeRoundCorner(const std::vector<Element*>& elements,
+                                    const RoundCorner* target,
+                                    std::vector<const Element*>& shapes) {
+  for (auto* element : elements) {
+    if (element == target) {
+      return true;
+    }
+    if (element == nullptr) {
+      continue;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Path ||
+        type == NodeType::Polystar) {
+      shapes.push_back(element);
+    }
+  }
+  return false;
+}
+
+bool FindRoundCornerShapesInElements(const std::vector<Element*>& elements,
+                                     const RoundCorner* target,
+                                     std::vector<const Element*>& shapes) {
+  for (auto* element : elements) {
+    if (element == nullptr || element->nodeType() != NodeType::Group) {
+      continue;
+    }
+    auto* group = static_cast<const Group*>(element);
+    // Collect into a scratch list: a container that does not own the modifier must not contribute
+    // its shapes to the result.
+    std::vector<const Element*> groupShapes = {};
+    if (CollectShapesBeforeRoundCorner(group->elements, target, groupShapes)) {
+      shapes.insert(shapes.end(), groupShapes.begin(), groupShapes.end());
+      return true;
+    }
+    if (FindRoundCornerShapesInElements(group->elements, target, shapes)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool FindRoundCornerShapes(const std::vector<Layer*>& layers, const RoundCorner* target,
+                           std::vector<const Element*>& shapes) {
+  for (auto* layer : layers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    std::vector<const Element*> layerShapes = {};
+    if (CollectShapesBeforeRoundCorner(layer->contents, target, layerShapes)) {
+      shapes.insert(shapes.end(), layerShapes.begin(), layerShapes.end());
+      return true;
+    }
+    if (FindRoundCornerShapesInElements(layer->contents, target, shapes)) {
+      return true;
+    }
+    if (layer->composition != nullptr &&
+        FindRoundCornerShapes(layer->composition->layers, target, shapes)) {
+      return true;
+    }
+    if (FindRoundCornerShapes(layer->children, target, shapes)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void HTMLAnimationSession::ResolveAnimationTargets(
     const std::vector<const Animation*>& animations) {
   for (auto* anim : animations) {
@@ -1879,6 +1968,23 @@ void HTMLAnimationSession::ResolveAnimationTargets(
               break;
             }
           }
+        }
+      } else if (nType == NodeType::RoundCorner) {
+        auto* roundCorner = static_cast<RoundCorner*>(targetNode);
+        std::vector<const Element*> shapes = {};
+        if (FindRoundCornerShapes(_doc.layers, roundCorner, shapes) && shapes.size() == 1) {
+          // The rounded geometry has to be emitted as an inline <path> the keyframes can rewrite,
+          // so it claims an id like an animated geometry node.
+          const Element* shape = shapes.front();
+          // Prefer the modifier's own id so the rewritten <path> is recognisable in the output.
+          std::string id = !roundCorner->id.empty()
+                               ? roundCorner->id
+                               : (!shape->id.empty() ? shape->id : _ctx.nextId("animRC"));
+          _ctx.animation.roundCornerShapes[roundCorner] = shape;
+          _ctx.animation.elementIds[shape] = id;
+          // The bundle is keyed by the modifier, which renders no tag of its own: route it to the
+          // shape's tag through the same id.
+          _ctx.animation.elementIds[roundCorner] = id;
         }
       } else if (nType == NodeType::Group || nType == NodeType::TextBox) {
         auto* group = static_cast<Group*>(targetNode);
@@ -2025,6 +2131,12 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       BundleChannelSet chSet =
           CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer);
+      if (chSet.roundCornerTarget != nullptr) {
+        auto shapeIt = _ctx.animation.roundCornerShapes.find(chSet.roundCornerTarget);
+        if (shapeIt != _ctx.animation.roundCornerShapes.end()) {
+          chSet.roundCornerShape = shapeIt->second;
+        }
+      }
       if (chSet.keyTimes.empty()) {
         continue;
       }
