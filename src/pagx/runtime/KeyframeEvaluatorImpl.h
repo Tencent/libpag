@@ -201,10 +201,9 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     case KeyframeInterpolationType::Bezier:
       return LerpKeyframeValueWithMode<T>(
           left->value, right->value,
-          SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                            static_cast<double>(left->bezierOut.y),
-                            static_cast<double>(right->bezierIn.x),
-                            static_cast<double>(right->bezierIn.y), rawT),
+          SolveBezierEasing(
+              static_cast<double>(left->bezierOut.x), static_cast<double>(left->bezierOut.y),
+              static_cast<double>(right->bezierIn.x), static_cast<double>(right->bezierIn.y), rawT),
           pivotInterpolation);
     case KeyframeInterpolationType::Linear:
     default:
