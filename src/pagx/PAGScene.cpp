@@ -40,12 +40,124 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/ImportFormat.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 
 namespace pagx {
+
+namespace {
+
+using ResolvedTargets = std::vector<std::pair<Node*, std::vector<Channel*>>>;
+using CollectChildCompositionsFunction = void (*)(const PAGLayer*, std::vector<PAGComposition*>&);
+
+struct TimelineReplayAccess {
+  std::unique_ptr<RuntimeBinding> PAGComposition::*binding;
+  std::vector<std::shared_ptr<PAGTimeline>> PAGComposition::*timelines;
+  ResolvedTargets PAGAnimation::*targets;
+  CollectChildCompositionsFunction collectChildren;
+};
+
+void UnregisterCompositionDocuments(PAGComposition* root, PAGScene* scene,
+                                    PAGXDocument* PAGComposition::*documentMember,
+                                    CollectChildCompositionsFunction collectChildren,
+                                    void (PAGXDocument::*unregisterScene)(PAGScene*)) {
+  std::vector<PAGComposition*> pending = {root};
+  std::unordered_set<PAGXDocument*> visited = {};
+  while (!pending.empty()) {
+    auto* comp = pending.back();
+    pending.pop_back();
+    if (comp == nullptr) {
+      continue;
+    }
+    auto* document = comp->*documentMember;
+    if (document != nullptr && visited.insert(document).second) {
+      (document->*unregisterScene)(scene);
+    }
+    collectChildren(comp, pending);
+  }
+}
+
+void ReapplyCompositionTreeDataBinds(
+    PAGComposition* comp, const Node* targetNode, RuntimeBinding* scopeBinding,
+    std::unique_ptr<DataBindRuntime> PAGComposition::*runtimeMember,
+    CollectChildCompositionsFunction collectChildren) {
+  if (comp == nullptr) {
+    return;
+  }
+  auto* runtime = (comp->*runtimeMember).get();
+  if (runtime != nullptr && runtime->getBoundBinding() == scopeBinding) {
+    runtime->reapplyForTarget(targetNode);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  collectChildren(comp, childComps);
+  for (auto* childComp : childComps) {
+    ReapplyCompositionTreeDataBinds(childComp, targetNode, scopeBinding, runtimeMember,
+                                    collectChildren);
+  }
+}
+
+bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
+                             const std::unordered_set<const Node*>& dirtySet) {
+  if (binding == nullptr) {
+    return false;
+  }
+  for (const auto* node : dirtySet) {
+    if (node != nullptr && binding->contains(node)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool TimelineCanTargetDirtyNodes(const PAGTimeline* timeline,
+                                 ResolvedTargets PAGAnimation::*targetsMember,
+                                 const std::unordered_set<const Node*>& dirtySet) {
+  if (timeline == nullptr || timeline->type() != TimelineType::Animation) {
+    return true;
+  }
+  const auto& resolved = static_cast<const PAGAnimation*>(timeline)->*targetsMember;
+  if (resolved.empty()) {
+    return true;
+  }
+  for (const auto& entry : resolved) {
+    auto* target = entry.first;
+    if (target == nullptr) {
+      continue;
+    }
+    // Content-node edits are collapsed to their owning Layer. A non-Layer target's channel may
+    // therefore have been reset even when the dirty set does not contain the target itself.
+    if (target->nodeType() != NodeType::Layer || dirtySet.find(target) != dirtySet.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ApplyTimelinesForDirtyNodes(PAGComposition* comp, const TimelineReplayAccess& access,
+                                 const std::unordered_set<const Node*>& dirtySet) {
+  if (comp == nullptr) {
+    return;
+  }
+  if (BindingCoversDirtyNodes((comp->*access.binding).get(), dirtySet)) {
+    for (auto& timeline : comp->*access.timelines) {
+      if (timeline != nullptr &&
+          TimelineCanTargetDirtyNodes(timeline.get(), access.targets, dirtySet)) {
+        timeline->apply();
+      }
+    }
+  }
+  std::vector<PAGComposition*> childComps = {};
+  access.collectChildren(comp, childComps);
+  for (auto* childComp : childComps) {
+    ApplyTimelinesForDirtyNodes(childComp, access, dirtySet);
+  }
+}
+
+}  // namespace
 
 // Decodes an <Image> resource node into a PAGImage using the same precedence as the renderer's
 // ImagePattern path: host-injected data first, then an inline data URI, then an external file path.
@@ -72,8 +184,16 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   if (document == nullptr) {
     return nullptr;
   }
+  if (DocumentHasConflictingImportSources(document.get())) {
+    LOGE("Layer cannot declare both 'composition' and 'import' sources.");
+    return nullptr;
+  }
   if (!document->isLayoutApplied()) {
     document->applyLayout();
+  }
+  if (!document->isLayoutApplied() || document->hasUnresolvedImports()) {
+    LOGE("PAGScene::Make() aborted: layout failed or an active import remains unresolved.");
+    return nullptr;
   }
   // A cyclic external composition reference leaves the document partially laid out: applyLayout()
   // aborts the offending subtree but the rest of the tree looks valid. Building a scene on top of
@@ -90,11 +210,26 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   scene->displayList = std::make_unique<tgfx::DisplayList>();
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
   scene->buildRuntimeTree();
-  document->registerLiveScene(scene);
   return scene;
 }
 
 void PAGScene::buildRuntimeTree() {
+  if (!document->isLayoutApplied()) {
+    // A detach must rebuild before releasing its old domain, without mounting that import again.
+    std::unordered_set<const PAGXDocument*> visited = {};
+    document->applyLayout(nullptr, visited, nullptr, false);
+  }
+  if (!document->isLayoutApplied()) {
+    LOGE("PAGScene runtime rebuild aborted: document layout failed.");
+    return;
+  }
+  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
+  if (buildResult.root == nullptr) {
+    return;
+  }
+  UnregisterCompositionDocuments(_rootComposition.get(), this, &PAGComposition::document,
+                                 &PAGComposition::CollectChildCompositions,
+                                 &PAGXDocument::unregisterLiveScene);
   // Detach any previously built tree (a rebuild after an external-document edit) so the display list
   // and timeline cache do not retain stale runtime layers.
   if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
@@ -110,7 +245,6 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   instantiatedTimelines.clear();
-  auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
   *rootComp->binding = std::move(buildResult.binding);
@@ -141,6 +275,7 @@ void PAGScene::buildRuntimeTree() {
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
+  document->registerLiveScene(shared_from_this());
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -393,6 +528,9 @@ void PAGScene::buildViewModels() {
 }
 
 PAGScene::~PAGScene() {
+  UnregisterCompositionDocuments(_rootComposition.get(), this, &PAGComposition::document,
+                                 &PAGComposition::CollectChildCompositions,
+                                 &PAGXDocument::unregisterLiveScene);
   if (document != nullptr) {
     document->unregisterLiveScene(this);
   }
@@ -504,6 +642,13 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   instantiatedTimelines.emplace(matched, timeline);
   _rootComposition->binding->setTarget(
       matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
+  // The fresh instance starts with inputs at their declared defaults, and the data-bind pass ran
+  // when the scene was built, so no dirty entry will re-push the bound ones. Re-apply the
+  // ViewModel's current values now; without this the state machine would evaluate conditions
+  // against the declared defaults until the next ViewModel change. A lazily created top-level
+  // instance has a null binding resolved to the root binding here, so the re-apply only touches
+  // the root runtime's entries.
+  reapplyDataBindsForTarget(matched, timeline->effectiveBinding());
   return timeline;
 }
 
@@ -615,6 +760,17 @@ void PAGScene::ClearCompositionTreeDirty(PAGComposition* comp) {
   }
 }
 
+void PAGScene::reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding* scopeBinding) {
+  if (targetNode == nullptr || scopeBinding == nullptr) {
+    return;
+  }
+  if (_rootComposition != nullptr) {
+    ReapplyCompositionTreeDataBinds(_rootComposition.get(), targetNode, scopeBinding,
+                                    &PAGComposition::dataBindRuntime,
+                                    &PAGComposition::CollectChildCompositions);
+  }
+}
+
 void PAGScene::RefreshViewModelImages(PAGComposition* comp,
                                       const std::unordered_set<const Image*>& changed) {
   if (comp == nullptr) {
@@ -655,6 +811,10 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
+// Maps the tgfx probe results back to PAGLayer handles without a persistent registry. The runtime
+// tree can contain helper layers (mask owners, composition slots) that have no PAGLayer, so only
+// hits present in the order map are kept. A single walk keeps the mapping in sync with the current
+// tree without register/unregister bookkeeping.
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   float rootX = 0;
@@ -665,12 +825,35 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
     return {};
   }
+  auto runtimeHits = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  std::unordered_map<const tgfx::Layer*, size_t> hitOrder = {};
+  for (size_t i = 0; i < runtimeHits.size(); ++i) {
+    hitOrder.emplace(runtimeHits[i].get(), i);
+  }
+  std::vector<std::shared_ptr<PAGLayer>> mapped = {};
+  mapped.resize(runtimeHits.size());
+  std::vector<std::shared_ptr<PAGLayer>> pending = {};
+  pending.push_back(_rootComposition);
+  while (!pending.empty()) {
+    auto layer = pending.back();
+    pending.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->runtimeLayer != nullptr) {
+      auto it = hitOrder.find(layer->runtimeLayer.get());
+      if (it != hitOrder.end()) {
+        mapped[it->second] = layer;
+      }
+    }
+    const auto& children = layer->getChildren();
+    pending.insert(pending.end(), children.rbegin(), children.rend());
+  }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
-  for (const auto& hitLayer : hitLayers) {
-    auto it = layerRegistry.find(hitLayer.get());
-    if (it != layerRegistry.end()) {
-      result.push_back(it->second->shared_from_this());
+  result.reserve(runtimeHits.size());
+  for (auto& layer : mapped) {
+    if (layer != nullptr) {
+      result.push_back(std::move(layer));
     }
   }
   return result;
@@ -798,6 +981,39 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       _rootComposition->resetTimelines();
     }
     instantiatedTimelines.clear();
+  } else if (_rootComposition != nullptr) {
+    // RefreshLayerInPlace reset the rebuilt layers' runtime channels to their node defaults. The
+    // per-frame updateDataBinds restores ViewModel-bound channels, but timeline-driven channels
+    // recover only on the next apply(). When playback is paused no advance/apply happens, so an
+    // animated property (e.g. a Channel-driven x) would snap back to its static layout value until
+    // playback resumes. Re-apply the timelines at their current position here (apply without
+    // advancing) so the rebuilt targets are re-resolved (targetsDirty was set above) and written
+    // back immediately. resetTimelines() above already covers the timelineDirty case.
+    // Only the timelines that can write to a refreshed layer need re-applying, so the replay is
+    // filtered instead of walking the whole tree: an edit to a non-animated property (text, color,
+    // name) otherwise re-resolves and rewrites every animation channel in the document, which is a
+    // full frame of work per keystroke on a large document. Compositions whose binding covers none of
+    // the dirty nodes drop out first, then each surviving animation is narrowed by its resolved
+    // targets, so a sibling layer that animation does not drive is skipped as well.
+    std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
+    TimelineReplayAccess access = {&PAGComposition::binding, &PAGComposition::timelines,
+                                   &PAGAnimation::resolvedTargets,
+                                   &PAGComposition::CollectChildCompositions};
+    ApplyTimelinesForDirtyNodes(_rootComposition.get(), access, dirtySet);
+    // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
+    // inside the root composition subtree, so the walk above does not reach them. Re-apply them at
+    // their current position so an animated property on a top-level timeline (e.g. slidingBar's x,
+    // or a state machine's active-state channels) is written back immediately while paused;
+    // otherwise it would snap back to its static layout value until the next tick, which only fires
+    // while playing. They resolve against the root binding, so the same coverage test applies.
+    if (BindingCoversDirtyNodes(_rootComposition->binding.get(), dirtySet)) {
+      for (auto& entry : instantiatedTimelines) {
+        if (entry.second != nullptr &&
+            TimelineCanTargetDirtyNodes(entry.second.get(), access.targets, dirtySet)) {
+          entry.second->apply();
+        }
+      }
+    }
   }
 }
 

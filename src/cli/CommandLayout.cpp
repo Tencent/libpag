@@ -307,12 +307,9 @@ int RunLayout(int argc, char* argv[]) {
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx layout: error: unresolved import directive, run 'pagx resolve' first\n";
+  if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx layout")) {
     return 1;
   }
-
-  document->applyLayout();
 
   // Resolve target layers.
   std::vector<const Layer*> targetLayers;

@@ -40,6 +40,29 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
   return document;
 }
 
+bool PrepareDocumentForRendering(PAGXDocument* document, const FontConfig* fontConfig,
+                                 const std::string& command) {
+  if (document == nullptr) {
+    return false;
+  }
+  auto errorCount = document->errors.size();
+  if (!document->isLayoutApplied() || fontConfig != nullptr) {
+    document->applyLayout(fontConfig);
+  }
+  for (size_t i = errorCount; i < document->errors.size(); i++) {
+    std::cerr << command << ": warning: " << document->errors[i] << "\n";
+  }
+  if (!document->isLayoutApplied()) {
+    std::cerr << command << ": error: document layout failed\n";
+    return false;
+  }
+  if (document->hasUnresolvedImports()) {
+    std::cerr << command << ": error: unresolved import directive, run 'pagx resolve' first\n";
+    return false;
+  }
+  return true;
+}
+
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command) {
   for (const auto& fontFile : fontFiles) {

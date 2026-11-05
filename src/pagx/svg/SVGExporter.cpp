@@ -3504,6 +3504,9 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
   }
+  if (!doc.isLayoutApplied() || doc.hasUnresolvedImports()) {
+    return {};
+  }
   // Clamp rasterScale to a sane range. 0 / negative would silently produce a zero-pixel surface
   // (the bake then fails and the exporter falls through to the vector path, contradicting
   // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * rasterScale))`

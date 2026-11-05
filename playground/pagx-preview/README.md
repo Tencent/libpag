@@ -154,7 +154,7 @@ Build commands:
 
 The single-threaded (`st`) variant is the default: the MCP widget runs in a sandbox iframe without cross-origin isolation, where the `SharedArrayBuffer` that the multi-threaded build depends on is unavailable. The `mt` variant renders faster but only works in the plain browser preview (`pagx-preview file.pagx`, where the server sends the required COOP/COEP headers); inside an MCP host the widget falls back to opening the browser URL.
 
-If the upstream artifacts are already built (or the cloned repo ships them), run `npm run prebuild` to only copy them without rebuilding. `prebuild` automatically:
+If the upstream artifacts are already built (or the cloned repo ships them), run `npm run stage` to only copy them without rebuilding. `stage` automatically:
 - Detects the viewer build variant (MT/ST) and copies wasm + glue to `static/viewer/`
 - Copies the pagx-player ESM bundle to `static/player/`
 - Copies the ext-apps SDK bundle to `static/ext/`

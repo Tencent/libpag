@@ -42,6 +42,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
+#include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/VerifyUtils.h"
 
@@ -63,7 +64,6 @@ namespace {
 
 struct PainterSignature;
 
-bool HasUnresolvedImport(const Layer* layer);
 bool LayerNeedsKeeping(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
 bool LayoutNodeHasConstraints(const LayoutNode* node);
 bool ElementHasConstraints(Element* element);
@@ -160,10 +160,6 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
 // ----------------------------------------------------------------------------
 // Helper definitions start here.
 // ----------------------------------------------------------------------------
-
-bool HasUnresolvedImport(const Layer* layer) {
-  return !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
-}
 
 // A painter paints every geometry that precedes it in the same element list; every non-painter
 // element acts as geometry for that purpose.
@@ -886,7 +882,7 @@ bool IsLayerStructurallyEmpty(const Layer* layer) {
   if (!layer->customData.empty()) {
     return false;
   }
-  if (HasUnresolvedImport(layer)) {
+  if (LayerHasUnresolvedImport(layer)) {
     return false;
   }
   return true;
@@ -1010,7 +1006,7 @@ bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
     if (LayerNeedsKeeping(child, maskRefs)) {
       return changed;
     }
-    if (HasUnresolvedImport(child)) {
+    if (LayerHasUnresolvedImport(child)) {
       return changed;
     }
   }
@@ -1051,7 +1047,8 @@ bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const La
   if (!layer->children.empty()) {
     return false;
   }
-  return IsLayerShell(layer) && !LayerNeedsKeeping(layer, maskRefs) && !HasUnresolvedImport(layer);
+  return IsLayerShell(layer) && !LayerNeedsKeeping(layer, maskRefs) &&
+         !LayerHasUnresolvedImport(layer);
 }
 
 // Backfills `result` with the first `upTo` entries of `source` the first time a mutation happens.
@@ -1436,8 +1433,8 @@ bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
   }
   // An import directive resolves into `contents`, so mixing it with pre-existing content on either
   // layer is unsafe (it can reorder paints), and two imports cannot share one layer.
-  bool parentImport = HasUnresolvedImport(parent);
-  bool childImport = HasUnresolvedImport(child);
+  bool parentImport = LayerHasUnresolvedImport(parent);
+  bool childImport = LayerHasUnresolvedImport(child);
   if (parentImport && childImport) {
     return false;
   }
@@ -1467,7 +1464,7 @@ void AbsorbFillingChild(Layer* parent, Layer* child) {
     parent->contents.push_back(element);
   }
   child->contents.clear();
-  if (HasUnresolvedImport(child)) {
+  if (LayerHasUnresolvedImport(child)) {
     parent->importDirective = child->importDirective;
   }
   parent->children.clear();
@@ -1497,7 +1494,7 @@ bool CanDropShellParent(const Layer* parent, const Layer* child,
   if (LayerNeedsKeeping(parent, maskRefs)) {
     return false;
   }
-  if (HasUnresolvedImport(parent)) {
+  if (LayerHasUnresolvedImport(parent)) {
     return false;
   }
   if (child->flex != 0.0f || !child->includeInLayout) {
@@ -1545,7 +1542,7 @@ void RecomputeMaskRefs(PAGXDocument* doc, std::unordered_set<const Layer*>& refs
   refs.clear();
   CollectMaskRefs(doc->layers, refs);
   for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !doc->isMountedComposition(node.get())) {
       auto* comp = static_cast<Composition*>(node.get());
       CollectMaskRefs(comp->layers, refs);
     }
@@ -1645,7 +1642,7 @@ bool DedupPathDataResources(PAGXDocument* doc) {
     RewritePathDataInLayer(layer, redirect);
   }
   for (auto& nodePtr : doc->nodes) {
-    if (nodePtr->nodeType() == NodeType::Composition) {
+    if (nodePtr->nodeType() == NodeType::Composition && !doc->isMountedComposition(nodePtr.get())) {
       auto* comp = static_cast<Composition*>(nodePtr.get());
       for (auto* layer : comp->layers) {
         RewritePathDataInLayer(layer, redirect);
@@ -1742,7 +1739,7 @@ void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::strin
   }
   for (auto& nodePtr : doc->nodes) {
     auto type = nodePtr->nodeType();
-    if (type == NodeType::Composition) {
+    if (type == NodeType::Composition && !doc->isMountedComposition(nodePtr.get())) {
       auto* comp = static_cast<const Composition*>(nodePtr.get());
       for (auto* layer : comp->layers) {
         CollectRefsFromLayer(layer, refs);
@@ -1881,7 +1878,7 @@ void CollectAnimatedTargets(PAGXDocument* doc, std::unordered_set<std::string>& 
   };
   collectFrom(doc->animations);
   for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
+    if (node->nodeType() == NodeType::Composition && !doc->isMountedComposition(node.get())) {
       collectFrom(static_cast<Composition*>(node.get())->animations);
     }
   }
@@ -1894,6 +1891,11 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
   if (doc == nullptr) {
     return result;
   }
+  if (DocumentHasConflictingImportSources(doc)) {
+    doc->errors.push_back("Layer cannot declare both 'composition' and 'import' sources.");
+    result.converged = false;
+    return result;
+  }
 
   std::unordered_set<const Layer*> maskRefs;
   RecomputeMaskRefs(doc, maskRefs);
@@ -1901,14 +1903,17 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
   std::unordered_set<std::string> animatedTargets;
   CollectAnimatedTargets(doc, animatedTargets);
 
+  std::vector<Composition*> compositions = {};
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition && !doc->isMountedComposition(node.get())) {
+      compositions.push_back(static_cast<Composition*>(node.get()));
+    }
+  }
   result.iterationsUsed +=
       OptimizeLayerList(doc, doc->layers, maskRefs, animatedTargets, options, &result.converged);
-  for (auto& node : doc->nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      result.iterationsUsed += OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets,
-                                                 options, &result.converged);
-    }
+  for (auto* comp : compositions) {
+    result.iterationsUsed +=
+        OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets, options, &result.converged);
   }
 
   // Resource-level cleanup: deduplicate identical PathData resources first (so the prune pass

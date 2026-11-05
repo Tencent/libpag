@@ -51,9 +51,8 @@ class FontEmbedder {
   static void ClearEmbeddedGlyphRuns(PAGXDocument* document);
 
   /**
-   * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
-   * The document must have had applyLayout() called first so that Text nodes contain valid
-   * layout run data.
+   * Embeds layout glyph runs from Text nodes owned by the document. Mounted composition domains
+   * remain unchanged; flatten imports before embedding them. Layout must already have been applied.
    */
   bool embed(PAGXDocument* document);
 };

@@ -340,16 +340,13 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (document == nullptr) {
     return {};
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
-    return {};
-  }
-
   FontConfig fontConfig = {};
   if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
     return {};
   }
-  document->applyLayout(&fontConfig);
+  if (!PrepareDocumentForRendering(document.get(), &fontConfig, "pagx render")) {
+    return {};
+  }
 
   // Animated frame requested: evaluate the timelines at the requested playback time and render
   // through the runtime scene. PAGScene::Make() reuses the already-applied layout.
