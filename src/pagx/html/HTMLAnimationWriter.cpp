@@ -707,6 +707,8 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "rotation.y", TargetChannelRole::LayerRotationY},
     {NodeType::Layer, "z", TargetChannelRole::LayerZ},
     {NodeType::Layer, "perspective", TargetChannelRole::LayerPerspective},
+    {NodeType::Layer, "anchor.x", TargetChannelRole::AnchorX},
+    {NodeType::Layer, "anchor.y", TargetChannelRole::AnchorY},
     {NodeType::Layer, "matrix3D", TargetChannelRole::LayerMatrix3D},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
@@ -916,27 +918,15 @@ bool BindChannelToBundleSet(
     // that matrix differently than the static path does, so they keep the previous behaviour (the
     // channel is not exported) until anchor support lands.
     case TargetChannelRole::LayerRotationX:
-      if (LayerHasAnchorFor3D(objTarget)) {
-        return false;
-      }
       out.layerRotXCh = ch;
       return true;
     case TargetChannelRole::LayerRotationY:
-      if (LayerHasAnchorFor3D(objTarget)) {
-        return false;
-      }
       out.layerRotYCh = ch;
       return true;
     case TargetChannelRole::LayerZ:
-      if (LayerHasAnchorFor3D(objTarget)) {
-        return false;
-      }
       out.layerZCh = ch;
       return true;
     case TargetChannelRole::LayerPerspective:
-      if (LayerHasAnchorFor3D(objTarget)) {
-        return false;
-      }
       out.layerPerspectiveCh = ch;
       return true;
     case TargetChannelRole::LayerMatrix3D:
@@ -1168,34 +1158,72 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
                       chSet.layerZCh != nullptr || chSet.layerPerspectiveCh != nullptr ||
                       chSet.layerMatrix3DCh != nullptr;
   if (has3DChannel && hostLayer != nullptr) {
-    // Nothing in 2D CSS can express a depth rotation or a perspective, so the frame composes the
-    // same 3D matrix the static export uses and emits it whole.
-    Matrix3D matrix = {};
+    // PAGX composes P * T * T(anchor) * L * T(-anchor), with the projection outermost. A CSS
+    // function list in the same order reproduces it exactly: `perspective()` is the projection,
+    // the anchor is spelled out as a translate pair so no transform-origin conjugation applies,
+    // and the pose functions interpolate the way the runtime re-composes each frame instead of
+    // relying on matrix decomposition.
+    std::string tf;
+    auto append = [&tf](const std::string& part) {
+      if (!tf.empty()) {
+        tf += ' ';
+      }
+      tf += part;
+    };
     if (chSet.layerMatrix3DCh != nullptr) {
-      matrix = EvalMatrix3DChannel(chSet.layerMatrix3DCh, t, hostLayer->matrix3D);
-    } else {
-      Matrix3DComponents components = {};
-      Matrix3D ignored = {};
-      LayerTransformComponents(hostLayer, &components, &ignored);
-      if (chSet.layerRotXCh != nullptr) {
-        components.rotation[0] = EvalFloatChannel(chSet.layerRotXCh, t, hostLayer->rotationX);
-      }
-      if (chSet.layerRotYCh != nullptr) {
-        components.rotation[1] = EvalFloatChannel(chSet.layerRotYCh, t, hostLayer->rotationY);
-      }
-      if (chSet.layerZCh != nullptr) {
-        components.translate[2] = EvalFloatChannel(chSet.layerZCh, t, hostLayer->z);
-      }
-      if (chSet.layerPerspectiveCh != nullptr) {
-        components.perspective =
-            EvalFloatChannel(chSet.layerPerspectiveCh, t, hostLayer->perspective);
-      }
-      if (!ComposeMatrix3DComponents(components, &matrix)) {
-        return;
-      }
+      Matrix3D matrix = EvalMatrix3DChannel(chSet.layerMatrix3DCh, t, hostLayer->matrix3D);
+      auto anchored = ApplyAnchorToMatrix(matrix, hostLayer->anchor, hostLayer->anchorZ);
+      AppendCssDecl(decls, "transform", Matrix3DToCSS(anchored));
+      needsZeroOrigin = true;
+      return;
     }
-    auto anchored = ApplyAnchorToMatrix(matrix, hostLayer->anchor, hostLayer->anchorZ);
-    AppendCssDecl(decls, "transform", Matrix3DToCSS(anchored));
+
+    float persist = EvalFloatChannel(chSet.layerPerspectiveCh, t, hostLayer->perspective);
+    if (persist > 0.0f) {
+      append("perspective(" + CssFloatToString(persist) + "px)");
+    }
+    float z = EvalFloatChannel(chSet.layerZCh, t, hostLayer->z);
+    if (!FloatNearlyZero(hostLayer->x) || !FloatNearlyZero(hostLayer->y) || !FloatNearlyZero(z) ||
+        chSet.layerZCh != nullptr) {
+      append("translate3d(" + CssFloatToString(hostLayer->x) + "px, " +
+             CssFloatToString(hostLayer->y) + "px, " + CssFloatToString(z) + "px)");
+    }
+    // The anchor conjugates the affine part only; spelling it out keeps the projection outside.
+    float anchorX = EvalFloatChannel(chSet.anchorXCh, t, hostLayer->anchor.x);
+    float anchorY = EvalFloatChannel(chSet.anchorYCh, t, hostLayer->anchor.y);
+    bool hasAnchor = !FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY) ||
+                     !FloatNearlyZero(hostLayer->anchorZ);
+    if (hasAnchor) {
+      append("translate3d(" + CssFloatToString(anchorX) + "px, " + CssFloatToString(anchorY) +
+             "px, " + CssFloatToString(hostLayer->anchorZ) + "px)");
+    }
+    float rx = EvalFloatChannel(chSet.layerRotXCh, t, hostLayer->rotationX);
+    float ry = EvalFloatChannel(chSet.layerRotYCh, t, hostLayer->rotationY);
+    if (!FloatNearlyZero(rx) || chSet.layerRotXCh != nullptr) {
+      append("rotateX(" + CssFloatToString(rx) + "deg)");
+    }
+    if (!FloatNearlyZero(ry) || chSet.layerRotYCh != nullptr) {
+      append("rotateY(" + CssFloatToString(ry) + "deg)");
+    }
+    if (!FloatNearlyZero(hostLayer->rotationZ)) {
+      append("rotateZ(" + CssFloatToString(hostLayer->rotationZ) + "deg)");
+    }
+    if (!FloatNearlyZero(hostLayer->skewX) || !FloatNearlyZero(hostLayer->skewY)) {
+      append("skew(" + CssFloatToString(hostLayer->skewX) + "deg, " +
+             CssFloatToString(hostLayer->skewY) + "deg)");
+    }
+    if (!FloatNearlyZero(hostLayer->scaleX - 1.0f) || !FloatNearlyZero(hostLayer->scaleY - 1.0f)) {
+      append("scale(" + CssFloatToString(hostLayer->scaleX) + ", " +
+             CssFloatToString(hostLayer->scaleY) + ")");
+    }
+    if (hasAnchor) {
+      append("translate3d(" + CssFloatToString(-anchorX) + "px, " + CssFloatToString(-anchorY) +
+             "px, " + CssFloatToString(-hostLayer->anchorZ) + "px)");
+    }
+    if (tf.empty()) {
+      return;
+    }
+    AppendCssDecl(decls, "transform", tf);
     needsZeroOrigin = true;
     return;
   }
@@ -1244,10 +1272,14 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     AppendCssDecl(decls, "transform", tf);
     return;
   }
+  // A Layer's anchor is only meaningful together with a 3D pose; on the 2D path the group formula
+  // below does not model it and would misplace the layer, so it stays ignored there.
+  bool anchorApplies =
+      hostLayer == nullptr && (chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr);
   if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
-      chSet.posXCh != nullptr || chSet.posYCh != nullptr || chSet.anchorXCh != nullptr ||
-      chSet.anchorYCh != nullptr || chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr ||
-      chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr) {
+      chSet.posXCh != nullptr || chSet.posYCh != nullptr || anchorApplies ||
+      chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr || chSet.layerSkewXCh != nullptr ||
+      chSet.layerSkewYCh != nullptr) {
     float basePosX = 0.0f;
     float basePosY = 0.0f;
     float baseRot = 0.0f;

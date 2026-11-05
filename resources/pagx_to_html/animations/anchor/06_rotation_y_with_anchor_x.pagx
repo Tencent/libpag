@@ -2,7 +2,7 @@
 <!-- Tests: rotation.y and anchor.x animate in the same object, so the card turns while its pivot slides across the
      card; the two channels must compose per frame instead of one overriding the other.
      Target: Layer  Channel: rotation.y,anchor.x  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

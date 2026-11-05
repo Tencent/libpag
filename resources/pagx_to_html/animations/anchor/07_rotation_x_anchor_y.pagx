@@ -2,7 +2,7 @@
 <!-- Tests: rotation.x tips the card around its bottom edge because anchor.y sits on that edge, so the card opens like
      a lid instead of shrinking around its centre.
      Target: Layer  Channel: rotation.x  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
