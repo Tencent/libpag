@@ -655,9 +655,6 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   // (which only suppresses on the parent's clip, not the child's) would fire false positives.
   layer->width = w;
   layer->height = h;
-  // Detaching the reference orphans the mask layer, and its geometry already lives in the
-  // scrollRect above, so hide it to keep it out of the SVG output.
-  m->visible = false;
   layer->mask = nullptr;
   return true;
 }

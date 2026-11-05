@@ -5488,7 +5488,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
  * instead of falling back to the SVG default black.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_TspanFillOnly) {
-  auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/tspan_fill_only.svg"));
+  auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/text/tspan_fill_only.svg"));
   ASSERT_NE(doc, nullptr);
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_NE(xml.find("#FF0000"), std::string::npos) << xml;
