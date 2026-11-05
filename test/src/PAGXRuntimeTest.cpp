@@ -547,6 +547,37 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
 }
 
 /**
+ * Test case: matrix keyframes that start at the identity pose keep the other pose's fixed point,
+ * so a translate+rotate animation spins in place instead of sliding along the straight line
+ * between the two poses. Covers the runtime path shared with non-SVG authors (HTML import).
+ */
+PAGX_TEST(PAGXRuntimeTest, MatrixInterpolationKeepsFixedPoint) {
+  std::vector<pagx::Keyframe<pagx::Matrix>> keyframes;
+  keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  // Rotate 90 degrees around (50,50): its fixed point is the shape's own center.
+  auto target = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(90.0f) *
+                pagx::Matrix::Translate(-50.0f, -50.0f);
+  keyframes.push_back({60, target, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto start = pagx::EvaluateKeyframeSequence(keyframes, 0.0);
+  EXPECT_NEAR(start.a, 1.0f, 1e-3f);
+  EXPECT_NEAR(start.tx, 0.0f, 1e-3f);
+
+  // Halfway the rotation is 45 degrees and the translation is spelled from the fixed point (50,50),
+  // not the midpoint of the two translations (25,25).
+  auto middle = pagx::EvaluateKeyframeSequence(keyframes, 30.0);
+  EXPECT_NEAR(middle.a, 0.7071f, 1e-2f);
+  EXPECT_NEAR(middle.tx, 50.0f, 0.5f);
+  EXPECT_NEAR(middle.ty, -20.71f, 0.5f);
+
+  auto end = pagx::EvaluateKeyframeSequence(keyframes, 60.0);
+  EXPECT_NEAR(end.a, target.a, 1e-3f);
+  EXPECT_NEAR(end.tx, target.tx, 1e-3f);
+  EXPECT_NEAR(end.ty, target.ty, 1e-3f);
+}
+
+/**
  * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid
  * point for each interpolation mode. Hold/None returns the left value, Linear returns exact lerp,
  * and Bezier returns the eased lerp (verified against a known control curve).
