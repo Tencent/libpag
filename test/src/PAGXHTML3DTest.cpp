@@ -602,6 +602,29 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsTheChildPose) {
 }
 
 /**
+ * Test case: an authored `perspective-origin` moves the vanishing point, so it changes where the
+ * projection is conjugated. At `0 0` the pose is the plain `P * R` (no centre conjugation).
+ */
+PAG_TEST(PAGXHTML3DTest, AuthoredPerspectiveOriginMovesTheVanishingPoint) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:160px">
+      <div style="position:absolute;left:40px;top:40px;width:120px;height:80px;
+           perspective:600px;perspective-origin:0px 0px">
+        <div id="card" style="width:120px;height:80px;background-color:#38BDF8;
+             transform:rotateY(30deg);transform-origin:0px 40px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 2), 0.5f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 0), 0.000833f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), -0.001443f, 1e-5f));
+}
+
+/**
  * Test case: the parent `perspective` also projects animated keyframes, and the pivot stays on the
  * child layer so the interpolation never carries a pivot translation.
  */

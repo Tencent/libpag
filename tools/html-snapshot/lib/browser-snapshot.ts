@@ -5096,6 +5096,9 @@ const STYLE_SCHEMA = [
   // The perspective declaration on this element is a camera for its children; the importer pushes
   // it into each child pose, since PAGX keeps the projection on the layer that owns the pose.
   { prop: 'perspective',      scope: 'box',  defaults: ['none'] },
+  // The vanishing point of the camera above; the importer resolves it into the child pose, so it
+  // must survive the snapshot for authored origins.
+  { prop: 'perspective-origin', scope: 'box', defaults: ['50% 50%'] },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
