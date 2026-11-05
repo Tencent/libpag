@@ -31,23 +31,24 @@ python3 tools/anim_coverage.py --check
 | 节点 | 可动画通道 | 导出 | 用例 |
 |------|------------|------|------|
 | Layer | `alpha` | ✔ | `boundary/*`（6）、`combo/02·03`、`interpolation/*`（4）、`layer/01`、`timing/*`（6） |
-| Layer | `anchor.x` | ✘ | `anchor/02·06` |
-| Layer | `anchor.y` `scale.z` | ✘ | — |
-| Layer | `anchor.z` | ✘ | `anchor/05` |
+| Layer | `anchor.x` | ✔ | `anchor/02·06` |
+| Layer | `anchor.y` | ✔ | `anchor/09` |
+| Layer | `anchor.z` | ✔ | `anchor/05` |
 | Layer | `matrix` | ✔ | `layer/04·04b` |
-| Layer | `matrix3D` | ✘ | `layer/13` |
-| Layer | `perspective` | ✘ | `layer/12` |
-| Layer | `rotation.x` | ✘ | `anchor/04·07`、`layer/17` |
-| Layer | `rotation.y` | ✘ | `anchor/03·06`、`layer/11` |
+| Layer | `matrix3D` | ✔ | `layer/13` |
+| Layer | `perspective` | ✔ | `layer/12` |
+| Layer | `rotation.x` | ✔ | `anchor/04·07`、`layer/17` |
+| Layer | `rotation.y` | ✔ | `anchor/03·06`、`layer/11` |
 | Layer | `rotation.z` | ✔ | `anchor/01·08`、`layer/10` |
 | Layer | `scale.x` | ✔ | `layer/08` |
 | Layer | `scale.y` | ✔ | `layer/09` |
+| Layer | `scale.z` | ✘ | — |
 | Layer | `skew.x` | ✔ | `layer/15` |
 | Layer | `skew.y` | ✔ | `layer/16` |
 | Layer | `visible` | ✔ | `layer/06` |
 | Layer | `x` | ✔ | `boundary/03`、`combo/*`（3）、`layer/02·05` |
 | Layer | `y` | ✔ | `combo/01`、`layer/03` |
-| Layer | `z` | ✘ | `layer/14` |
+| Layer | `z` | ✔ | `layer/14` |
 | Group | `alpha` | ✔ | `group/01` |
 | Group | `anchor.x` | ✔ | `group/08` |
 | Group | `anchor.y` | ✔ | `group/11` |
@@ -90,7 +91,7 @@ python3 tools/anim_coverage.py --check
 | TrimPath | `end` | ✔ | `geometry/04`、`stroke/06` |
 | TrimPath | `offset` | ✘ | — |
 | TrimPath | `start` | ✔ | `modifier/02` |
-| RoundCorner | `radius` | ✘ | `modifier/01` |
+| RoundCorner | `radius` | ✔ | `modifier/01` |
 | Repeater | `anchor.x` `anchor.y` `endAlpha` `offset` `position.x` `position.y` `scale.x` `scale.y` `startAlpha` | ✘ | — |
 | Repeater | `copies` | ✘ | `modifier/03` |
 | Repeater | `rotation` | ✘ | `modifier/04` |
@@ -250,6 +251,9 @@ node tools/html-snapshot/eval-animation/run.js \
 
 - **范围**：只覆盖关键帧动画（`<Animation>` / `<Object>` / `<Channel>` / `<Key>` 及其挂载），不含状态机
   （`<StateMachine>`）、ViewModel / `DataBind`，也不含 PAGX 里不可动画的属性（注册表中 `NoFlags` 的条目）。
+- **`Layer.scale.z` 不可验证**：实测在“图层带 `z` + `rotationX` + `perspective`”、“子层带 `z`”、
+  “`preserve3D`”三种配置下，`scale.z` 从 1 变到 2 时 `pagx render --time` 前后像素完全一致，运行时没有
+  可观察效果，因此导出侧不实现、也不设用例（表 1 中标 ✘）。
 - **未映射的通道会被静默丢弃**：导出侧没有诊断输出，缺口只能靠 `Expect: gap` 用例记录；这也是本目录要
   逐族保留代表用例的原因。
 - **头部只记第一个 `Target` / `Channel`**：`geometry/05`、`stroke/06` 等多目标用例在报告里只体现第一个。
