@@ -21,7 +21,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <limits>
 #include <sstream>
 #include <vector>
 #include "pagx/PAGXDocument.h"
@@ -1356,67 +1355,22 @@ bool HTMLAnimationBuilder::buildForElement(
   if (!transformStops.empty()) {
     const bool hasStaticPose = !layer->matrix.isIdentity() || !layer->matrix3D.isIdentity();
     bool needsAnchor = false;
-    bool keysHaveProjection = HasProjection(layer->matrix3D);
     for (const auto& stop : transformStops) {
       if (!IsLinearIdentity(stop.second)) {
         needsAnchor = true;
-      }
-      if (HasProjection(stop.second)) {
-        keysHaveProjection = true;
+        break;
       }
     }
-    Point pivot = {};
-    float pivotZ = 0.0f;
-    bool pivotKnown = false;
-    if (needsAnchor || keysHaveProjection) {
-      pivotKnown = ResolveAnchor(resolvedStyle, layer, reference, _valueParser, pivot, pivotZ);
-      if (!pivotKnown) {
+    if (needsAnchor) {
+      Point anchor = {};
+      float anchorZ = 0.0f;
+      if (ResolveAnchor(resolvedStyle, layer, reference, _valueParser, anchor, anchorZ)) {
+        layer->anchor = anchor;
+        layer->anchorZ = anchorZ;
+      } else {
         _diagnostics.warn(
             "html: transform animation without resolvable transform-origin; pivoting at "
             "top-left may differ from CSS [subset:animation-unsupported-property]");
-      }
-    }
-    if (needsAnchor && pivotKnown) {
-      layer->anchor = pivot;
-      layer->anchorZ = pivotZ;
-    }
-    if (keysHaveProjection && pivotKnown) {
-      // CSS composes `T(origin) * P * L * T(-origin)` (the projection is conjugated too) while PAGX
-      // composes `P * T(origin) * L * T(-origin)`, so a projection pose cannot ride on `anchor`
-      // without a constant offset. Baking the pivot into the keyframes reproduces the CSS order
-      // exactly, but the interpolator then lerps the pivot-induced translation between the keys.
-      // Bake only when that translation is constant across the keys (no drift to introduce) and
-      // otherwise keep the anchor form, which is off by the projection order yet interpolates
-      // cleanly; the error is a sub-pixel-to-few-pixel offset either way.
-      std::vector<std::pair<Frame, Matrix3D>> baked = transformStops;
-      float minTranslation[3] = {std::numeric_limits<float>::max(),
-                                 std::numeric_limits<float>::max(),
-                                 std::numeric_limits<float>::max()};
-      float maxTranslation[3] = {-std::numeric_limits<float>::max(),
-                                 -std::numeric_limits<float>::max(),
-                                 -std::numeric_limits<float>::max()};
-      for (auto& stop : baked) {
-        stop.second = BakeTransformOrigin(stop.second, pivot, pivotZ);
-        for (int axis = 0; axis < 3; ++axis) {
-          const float value = stop.second.getRowColumn(axis, 3);
-          minTranslation[axis] = std::min(minTranslation[axis], value);
-          maxTranslation[axis] = std::max(maxTranslation[axis], value);
-        }
-      }
-      constexpr float kDriftTolerance = 0.25f;
-      bool driftFree = true;
-      for (int axis = 0; axis < 3; ++axis) {
-        if (maxTranslation[axis] - minTranslation[axis] > kDriftTolerance) {
-          driftFree = false;
-        }
-      }
-      if (driftFree) {
-        transformStops = baked;
-        if (!layer->matrix3D.isIdentity()) {
-          layer->matrix3D = BakeTransformOrigin(layer->matrix3D, pivot, pivotZ);
-        }
-        layer->anchor = {};
-        layer->anchorZ = 0.0f;
       }
     }
     // A static `matrix3D` outranks `matrix` in the runtime transform priority, so a flat keyframe
@@ -1624,9 +1578,9 @@ bool HTMLAnimationBuilder::buildForElement(
   // subtree.
   Layer* visualTarget = xyTarget != nullptr ? xyTarget : layer;
 
-  // The pivot lives in `anchor` (applied once per frame after interpolation) unless the keyframes
-  // had to bake it, in which case the pose itself carries it and `anchor` stays empty.
-  Layer* matrixTarget = visualTarget;
+  // The pivot no longer needs structural wrappers: it lives in `anchor`, which the runtime applies
+  // once per frame after interpolation, so the matrix target is always the element layer itself.
+  Layer* matrixTarget = layer;
 
   // Keep brightness-as-opacity independent from the element's authored opacity and transform
   // channels by placing it on a dedicated visual wrapper. SplitForTransformAnimation already
