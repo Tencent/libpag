@@ -146,6 +146,9 @@ class SVGParserContext {
     float currentX = 0;
     float currentY = 0;
     float fontSize = 12;
+    // Whether currentX came from an explicit x: only then can a fill change start a new run at a
+    // known position.
+    bool positioned = false;
     // Combined raw content of every descendant text node, used when a <textPath> turns the
     // run into path-following text (per-line positioning does not apply there).
     std::string textContent = {};
