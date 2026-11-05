@@ -623,6 +623,7 @@ enum class TargetChannelRole {
   GeometryWidth,
   RectangleRoundness,
   TrimEnd,
+  TrimStart,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -646,6 +647,9 @@ enum class TargetChannelRole {
   FilterOffsetY,
   FilterColor,
   FilterAlpha,
+  // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
+  LayerSkewX,
+  LayerSkewY,
   FontSize,
   LetterSpacing,
 };
@@ -664,6 +668,10 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "matrix", TargetChannelRole::LayerMatrix},
     {NodeType::Layer, "visible", TargetChannelRole::LayerVisibility},
     {NodeType::Layer, "rotation", TargetChannelRole::Rotation},
+    // PAGX spells the Z spin "rotation.z"; the plain "rotation" spelling is kept for older files.
+    {NodeType::Layer, "rotation.z", TargetChannelRole::Rotation},
+    {NodeType::Layer, "skew.x", TargetChannelRole::LayerSkewX},
+    {NodeType::Layer, "skew.y", TargetChannelRole::LayerSkewY},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
 
@@ -672,6 +680,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Rectangle, "roundness", TargetChannelRole::RectangleRoundness},
     {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
+    {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
 
     // Group & TextBox channels
     {NodeType::Group, "alpha", TargetChannelRole::Opacity},
@@ -756,6 +765,7 @@ struct BundleChannelSet {
   const Channel* geometryWidthCh = nullptr;
   const Channel* roundnessCh = nullptr;
   const Channel* trimEndCh = nullptr;
+  const Channel* trimStartCh = nullptr;
   const TrimPath* trimTarget = nullptr;
   const Channel* rotCh = nullptr;
   const Channel* scaleXCh = nullptr;
@@ -763,6 +773,8 @@ struct BundleChannelSet {
   const Channel* anchorXCh = nullptr;
   const Channel* anchorYCh = nullptr;
   const Channel* skewCh = nullptr;
+  const Channel* layerSkewXCh = nullptr;
+  const Channel* layerSkewYCh = nullptr;
   const Channel* skewAxisCh = nullptr;
   const Channel* posXCh = nullptr;
   const Channel* posYCh = nullptr;
@@ -850,6 +862,21 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::RectangleRoundness:
       out.roundnessCh = ch;
       return true;
+    case TargetChannelRole::LayerSkewX:
+      out.layerSkewXCh = ch;
+      return true;
+    case TargetChannelRole::LayerSkewY:
+      out.layerSkewYCh = ch;
+      return true;
+    case TargetChannelRole::TrimStart: {
+      auto* trim = static_cast<const TrimPath*>(objTarget);
+      if (trim->type != TrimType::Separate || trim->offset != 0.0f) {
+        return false;
+      }
+      out.trimStartCh = ch;
+      out.trimTarget = trim;
+      return true;
+    }
     case TargetChannelRole::TrimEnd: {
       auto* trim = static_cast<const TrimPath*>(objTarget);
       // A CSS dash animation models a separate trim on a single path. Multi-path continuous
@@ -1101,7 +1128,8 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
   }
   if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
       chSet.posXCh != nullptr || chSet.posYCh != nullptr || chSet.anchorXCh != nullptr ||
-      chSet.anchorYCh != nullptr || chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr) {
+      chSet.anchorYCh != nullptr || chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr ||
+      chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr) {
     float basePosX = 0.0f;
     float basePosY = 0.0f;
     float baseRot = 0.0f;
@@ -1109,9 +1137,13 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     float baseSY = 1.0f;
     float baseSkew = 0.0f;
     float baseSkewAxis = 0.0f;
+    float baseSkewX = 0.0f;
+    float baseSkewY = 0.0f;
     Point baseAnchor = {0.0f, 0.0f};
     bool isTextBoxHost =
         (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::TextBox);
+    bool isLayerHost =
+        (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer);
     if (bundle.primaryHost != nullptr &&
         (bundle.primaryHost->nodeType() == NodeType::Group || isTextBoxHost)) {
       auto* grp = static_cast<const Group*>(bundle.primaryHost);
@@ -1124,6 +1156,14 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       baseSkew = grp->skew;
       baseSkewAxis = grp->skewAxis;
       baseAnchor = grp->anchor;
+    } else if (isLayerHost) {
+      // A Layer keeps its authored components; left/top already carry the translation.
+      auto* layer = static_cast<const Layer*>(bundle.primaryHost);
+      baseRot = layer->rotationZ;
+      baseSX = layer->scaleX;
+      baseSY = layer->scaleY;
+      baseSkewX = layer->skewX;
+      baseSkewY = layer->skewY;
     }
     float px = EvalFloatChannel(chSet.posXCh, t, basePosX);
     float py = EvalFloatChannel(chSet.posYCh, t, basePosY);
@@ -1160,8 +1200,19 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     if (chSet.rotCh != nullptr || !FloatNearlyZero(rot)) {
       appendFunction("rotate(" + CssFloatToString(rot) + "deg)");
     }
-    // A zero skew is an identity shear, so the skew axis only matters while there is a skew.
-    if (chSet.skewCh != nullptr || !FloatNearlyZero(baseSkew)) {
+    if (chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr) {
+      // Layer skew.x / skew.y already are the CSS skew angles (the 2D shear is [[1, tan(x)],
+      // [tan(y), 1]]), so they map straight onto the two CSS functions.
+      float skewX = EvalFloatChannel(chSet.layerSkewXCh, t, baseSkewX);
+      float skewY = EvalFloatChannel(chSet.layerSkewYCh, t, baseSkewY);
+      if (chSet.layerSkewXCh != nullptr || !FloatNearlyZero(skewX)) {
+        appendFunction("skewX(" + CssFloatToString(skewX) + "deg)");
+      }
+      if (chSet.layerSkewYCh != nullptr || !FloatNearlyZero(skewY)) {
+        appendFunction("skewY(" + CssFloatToString(skewY) + "deg)");
+      }
+    } else if (chSet.skewCh != nullptr || !FloatNearlyZero(baseSkew)) {
+      // A zero skew is an identity shear, so the skew axis only matters while there is a skew.
       bool hasSkewAxis = chSet.skewAxisCh != nullptr || !FloatNearlyZero(baseSkewAxis);
       if (hasSkewAxis) {
         appendFunction("rotate(" + CssFloatToString(-skewAxis) + "deg)");
@@ -1389,11 +1440,17 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls);
-  if (chSet.trimEndCh != nullptr && chSet.trimTarget != nullptr) {
+  if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr) && chSet.trimTarget != nullptr) {
+    // The visible run is [start, end]; pathLength="1" keeps both in path fractions.
+    float start = EvalFloatChannel(chSet.trimStartCh, t, chSet.trimTarget->start);
     float end = EvalFloatChannel(chSet.trimEndCh, t, chSet.trimTarget->end);
-    float visibleLength = std::clamp(end, 0.0f, 1.0f);
+    float visibleLength = std::clamp(end - start, 0.0f, 1.0f);
     AppendCssDecl(decls, "stroke-dasharray",
                   CssFloatToString(visibleLength) + " " + CssFloatToString(1.0f - visibleLength));
+    // The dash pattern starts at the path origin, so the shift places the visible run at `start`.
+    if (chSet.trimStartCh != nullptr || !FloatNearlyZero(start)) {
+      AppendCssDecl(decls, "stroke-dashoffset", CssFloatToString(-start));
+    }
     // A zero-length dash still paints a dot with round caps. CSS visibility stays visible until
     // the end of a visible-to-hidden transition, so only the empty end frame is suppressed.
     AppendCssDecl(decls, "visibility", visibleLength == 0.0f ? "hidden" : "visible");
@@ -1814,8 +1871,9 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         auto* trim = static_cast<const TrimPath*>(targetNode);
         if (trim->type == TrimType::Separate && trim->start == 0.0f && trim->offset == 0.0f) {
           for (auto* channel : obj->channels) {
-            if (channel != nullptr &&
-                LookupChannelRole(nType, channel->name) == TargetChannelRole::TrimEnd) {
+            auto role = channel != nullptr ? LookupChannelRole(nType, channel->name)
+                                           : TargetChannelRole::Unknown;
+            if (role == TargetChannelRole::TrimEnd || role == TargetChannelRole::TrimStart) {
               _ctx.animation.elementIds[trim] =
                   trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
               break;

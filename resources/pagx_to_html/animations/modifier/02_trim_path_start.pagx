@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TrimPath start eats the stroke from its beginning while the end stays at the full path.
      Target: TrimPath  Channel: start  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
