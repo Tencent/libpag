@@ -5734,6 +5734,25 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
 }
 
 /**
+ * text_fill_change_inline.svg: a fill change without an explicit x keeps one Text for the line.
+ * Splitting there would need the previous run's advance width, which the importer cannot measure,
+ * and the two runs would overlap.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextFillChangeWithoutPosition) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/text/text_fill_change_inline.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 1u);
+  auto* text = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(text->text, "Hello world");
+}
+
+/**
  * use_instance_animations.svg: two <use> references convert the same animated rect, and each
  * instance keeps its own AnimationObject instead of the last instance overwriting the earlier one.
  */
