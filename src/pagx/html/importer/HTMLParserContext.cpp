@@ -843,10 +843,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // CSS `perspective` projects the direct children, so the bag handed down carries it only one level.
   HTMLInheritedStyle childInherited = inherited;
   childInherited.parentPerspectivePx = box.perspectivePx;
-  if (box.perspectivePx > 0.0f && std::isfinite(box.widthPx) && std::isfinite(box.heightPx)) {
-    // CSS `perspective-origin` defaults to the centre of the declaring box.
-    childInherited.parentPerspectiveOriginX = box.widthPx * 0.5f;
-    childInherited.parentPerspectiveOriginY = box.heightPx * 0.5f;
+  if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
+      std::isfinite(box.perspectiveOriginY)) {
+    childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
+    childInherited.parentPerspectiveOriginY = box.perspectiveOriginY;
   }
   auto child = element->getFirstChild();
   while (child) {
