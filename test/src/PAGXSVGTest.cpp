@@ -5519,6 +5519,35 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxTransformAnimation) {
 }
 
 /**
+ * rotate_about_center.svg: SVG transform animations rotate about their anchor, so the matrix channel
+ * opts into fixed-point interpolation. The flag must survive a PAGX round-trip, otherwise saving
+ * and reloading silently reverts the animation to the linear (CSS) spelling.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MatrixPivotFlagRoundTrip) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/rotate_about_center.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  EXPECT_TRUE(obj->channels[0]->pivotInterpolation);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("pivotInterpolation=\"true\""), std::string::npos) << xml;
+
+  auto reparsed = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reparsed, nullptr);
+  ASSERT_EQ(reparsed->animations.size(), 1u);
+  auto* reparsedAnim = static_cast<pagx::Animation*>(reparsed->animations[0]);
+  ASSERT_EQ(reparsedAnim->objects.size(), 1u);
+  ASSERT_EQ(reparsedAnim->objects[0]->channels.size(), 1u);
+  EXPECT_TRUE(reparsedAnim->objects[0]->channels[0]->pivotInterpolation);
+}
+
+/**
  * blink_swap.svg: two rects cross-fade their opacity, each with its own looping alpha channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_BlinkSwap) {
