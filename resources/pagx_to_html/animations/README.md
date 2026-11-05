@@ -247,6 +247,9 @@ node tools/html-snapshot/eval-animation/run.js \
 `layer/12_perspective`（`css-perspective-interpolation`）：CSS 在两条 `perspective()` 之间按矩阵分解
 （等价于对 `1/d` 线性）插值，而运行时按通道值线性取 `d` 再重算矩阵，中间帧必然分叉，端点一致。
 
+`stroke/05_miter_limit`（`static-miter-join-rendering`）：通道本身已导出，但 `miterLimit > 1` 时**静态**导出的
+尖角几何就与参考差约 1.4%（1/4/10/20 里只有 1 完全一致，其余结果相同），属于既有静态差异，**计划后续修**。
+
 ## 7. 范围与已知限制
 
 - **范围**：只覆盖关键帧动画（`<Animation>` / `<Object>` / `<Channel>` / `<Key>` 及其挂载），不含状态机
