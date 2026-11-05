@@ -475,7 +475,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-bottom", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
-    {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
+    // `perspective` is forwarded so the importer can push it onto the children: PAGX keeps the
+    // projection on the layer that owns the pose, CSS keeps it on the parent.
+    {"perspective", PropAction::Keep, nullptr, nullptr},
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
