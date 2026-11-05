@@ -71,6 +71,13 @@ static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.5f;
  * whether to inherit further or use their own defaults).
  */
 struct HTMLInheritedStyle {
+  // CSS `perspective` declared on the *parent* element (px), pushed into this element's pose. Not
+  // inherited: `resolveInheritedStyle` resets it, and a parent sets it on the bag it hands to its
+  // direct children only. The origin is the parent's `perspective-origin` in the parent's local
+  // coordinates; the child subtracts its own offset to express it locally.
+  float parentPerspectivePx = 0.0f;
+  float parentPerspectiveOriginX = NAN;
+  float parentPerspectiveOriginY = NAN;
   std::string color = {};
   std::string fontFamily = {};
   std::string fontSize = {};
@@ -302,6 +309,19 @@ struct HTMLBoxAttributes {
 
   // CSS `transform-style: preserve-3d`, forwarded onto `Layer.preserve3D`.
   bool preserve3D = false;
+
+  // CSS `perspective` declared on the parent (px), folded into this element's pose. Stored on the box
+  // so the transform write and the animation registration read the same value regardless of which
+  // element happens to be converting when they run. `parentPerspectiveOrigin*` is the parent's
+  // `perspective-origin` re-expressed in this element's local coordinates.
+  float parentPerspectivePx = 0.0f;
+  float parentPerspectiveOriginX = NAN;
+  float parentPerspectiveOriginY = NAN;
+
+  // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
+  // projection on the layer that owns the pose, so the parent value is pushed into each child pose
+  // as `P * pose` (see HTMLTransform3D::PerspectiveMatrix). 0 means "no perspective".
+  float perspectivePx = 0.0f;
 
   HTMLTransform transform = {};
 };

@@ -5093,6 +5093,9 @@ const STYLE_SCHEMA = [
   // ellipse/inset) are also kept and rebuilt into the same contour mask by the
   // importer; other clip-path values collapse to '' so the defaults filter drops them.
   { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
+  // The perspective declaration on this element is a camera for its children; the importer pushes
+  // it into each child pose, since PAGX keeps the projection on the layer that owns the pose.
+  { prop: 'perspective',      scope: 'box',  defaults: ['none'] },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },

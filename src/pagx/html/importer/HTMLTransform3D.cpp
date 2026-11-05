@@ -667,6 +667,28 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   return true;
 }
 
+Matrix3D PerspectiveMatrix(float distance) {
+  if (!(distance > 0.0f) || !std::isfinite(distance)) {
+    return {};
+  }
+  return MakePerspective(distance);
+}
+
+Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY) {
+  if (!(distance > 0.0f) || !std::isfinite(distance)) {
+    return pose;
+  }
+  // CSS projects about `perspective-origin` (the parent's centre by default), not about the parent's
+  // local origin, so the projection is conjugated with that point before it is folded into the pose.
+  const Matrix3D projection = MakePerspective(distance);
+  if (!std::isfinite(originX) || !std::isfinite(originY) || (originX == 0.0f && originY == 0.0f)) {
+    return Multiply(projection, pose);
+  }
+  const Matrix3D toOrigin = MakeTranslation(originX, originY, 0.0f);
+  const Matrix3D fromOrigin = MakeTranslation(-originX, -originY, 0.0f);
+  return Multiply(Multiply(toOrigin, projection), Multiply(fromOrigin, pose));
+}
+
 bool IsFlatTransform(const Matrix3D& matrix) {
   // Composing rotations leaves values like 0.99999994 on the Z axis, so the plane test needs a
   // tolerance instead of exact comparisons.

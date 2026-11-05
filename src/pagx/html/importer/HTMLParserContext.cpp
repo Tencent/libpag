@@ -367,7 +367,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // shapes and ordinary elements can belong to the same timing group. Discarded candidates may
   // affect this origin; finalizeTiming corrects it after the playable objects have been emitted.
   for (auto& entry : _pendingAnimations) {
-    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.first), false);
+    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.element), false);
   }
   for (auto& shape : _pendingSvgShapeAnimations) {
     _animationBuilder->prepareTiming(shape.style, true);
@@ -375,9 +375,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
-    const auto& style = _styleCascade->getResolvedStyle(entry.first);
-    _animationBuilder->buildForElement(style, entry.second,
-                                       _styleCascade->getTransformReferenceSize(entry.first));
+    const auto& style = _styleCascade->getResolvedStyle(entry.element);
+    _animationBuilder->buildForElement(
+        style, entry.layer, _styleCascade->getTransformReferenceSize(entry.element),
+        entry.parentPerspectivePx, entry.parentPerspectiveOriginX, entry.parentPerspectiveOriginY);
   }
   // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
@@ -594,14 +595,17 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 // ID assignment with animation registration hook.
 //==================================================================================================
 
-void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
+                                        float parentPerspectivePx, float parentPerspectiveOriginX,
+                                        float parentPerspectiveOriginY) {
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
   if (layer != nullptr && element != nullptr) {
     const auto& style = _styleCascade->getResolvedStyle(element);
     if (style.count("animation") > 0 || style.count("animation-name") > 0) {
-      _pendingAnimations.emplace_back(element, layer);
+      _pendingAnimations.push_back({element, layer, parentPerspectivePx, parentPerspectiveOriginX,
+                                    parentPerspectiveOriginY});
     }
   }
 }
@@ -694,6 +698,14 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    box.parentPerspectivePx = inherited.parentPerspectivePx;
+    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
+        std::isfinite(inherited.parentPerspectiveOriginY)) {
+      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
+      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
+      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
+      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
+    }
     return _layerBuilder->wrapForMargin(
         _textFragmentBuilder->convertPAGXTextHost(element, inherited), box);
   }
@@ -713,16 +725,40 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    box.parentPerspectivePx = inherited.parentPerspectivePx;
+    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
+        std::isfinite(inherited.parentPerspectiveOriginY)) {
+      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
+      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
+      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
+      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
+    }
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    box.parentPerspectivePx = inherited.parentPerspectivePx;
+    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
+        std::isfinite(inherited.parentPerspectiveOriginY)) {
+      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
+      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
+      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
+      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
+    }
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+  box.parentPerspectivePx = inherited.parentPerspectivePx;
+  if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
+      std::isfinite(inherited.parentPerspectiveOriginY)) {
+    const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
+    const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
+    box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
+    box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
+  }
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
@@ -804,10 +840,18 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
+  // CSS `perspective` projects the direct children, so the bag handed down carries it only one level.
+  HTMLInheritedStyle childInherited = inherited;
+  childInherited.parentPerspectivePx = box.perspectivePx;
+  if (box.perspectivePx > 0.0f && std::isfinite(box.widthPx) && std::isfinite(box.heightPx)) {
+    // CSS `perspective-origin` defaults to the centre of the declaring box.
+    childInherited.parentPerspectiveOriginX = box.widthPx * 0.5f;
+    childInherited.parentPerspectiveOriginY = box.heightPx * 0.5f;
+  }
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto* childLayer = convertElement(child, inherited, depth + 1);
+      auto* childLayer = convertElement(child, childInherited, depth + 1);
       if (childLayer) {
         // CSS border-box: position:absolute descendants are positioned relative to the
         // parent's padding box, which sits inside the border. Shift their explicit
@@ -843,7 +887,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
   applyRoundedOverflowClip(layer, box);
-  assignElementId(wrapper, element);
+  assignElementId(wrapper, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
+                  box.parentPerspectiveOriginY);
   return wrapper;
 }
 
@@ -860,7 +905,8 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   // assignment does not enqueue CSS animations for the post-tree animation pass. Without this,
   // animations on <span>/<a>/<p>/<h1>... elements are silently dropped while identical styles on
   // a <div> work, which is especially visible for per-character text animations.
-  assignElementId(layer, element);
+  assignElementId(layer, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
+                  box.parentPerspectiveOriginY);
   return layer;
 }
 
