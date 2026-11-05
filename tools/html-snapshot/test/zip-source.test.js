@@ -85,6 +85,14 @@ test('supports cancellation and validates limit configuration', async () => {
   expect(() => zipLimits({ prepareMs: 2147483648 })).toThrow(/timer range/);
 });
 
+test('bounds path expansion and counts directories omitted from the ZIP directory records', async () => {
+  for (const name of ['a/'.repeat(128) + 'index.html', 'a'.repeat(256) + '.html', '目录/'.repeat(100) + 'a'.repeat(256)]) {
+    expect(() => zipPath(name)).toThrow(/length or depth/);
+  }
+  await writeZip(archive, { 'a/b/c/index.html': 'home' });
+  await expect(inspectZip(archive, { limits: { entries: 3 } })).rejects.toThrow(/implicit directories/);
+});
+
 test('fingerprint changes when only a resource changes', async () => {
   await writeZip(archive, { 'index.html': 'same', 'style.css': 'red' });
   const first = await inspectZip(archive);

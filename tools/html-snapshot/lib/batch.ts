@@ -8,7 +8,7 @@ import { writeFileAtomic } from './atomic-write';
 import { generateContactSheet, validatePreviewOptions, type ContactSheetItem, type ContactSheetResult } from './contact-sheet';
 
 import { launchBrowser, type EngineWrapper, type LaunchOptions } from './browser-engine';
-import { withConversionTask } from './conversion-task';
+import { withConversionTask, type ConversionTask } from './conversion-task';
 import { portableWebsiteSnapshot } from './website-snapshot';
 import { runSnapshot } from './snapshot-runner';
 import { errMessage } from './common';
@@ -172,6 +172,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper, website = false): Sn
 }
 
 export interface RunBatchOptions extends Pick<RunHtmlToPagxOptions, 'fontReplacements'> {
+  cleanupTask?: ConversionTask;
   signal?: AbortSignal;
   launchOptions?: LaunchOptions;
   website?: boolean;
@@ -245,7 +246,7 @@ function batchSignature(opts: RunBatchOptions, input: string): string {
     return stat ? [stat.size, stat.mtimeMs] : null;
   };
   const { log: _log, dryRun: _dryRun, skipExisting: _skip, preview: _preview,
-    previewColumns: _columns, signal: _signal, launchOptions: _launch, onResult: _result, ...settings } = opts;
+    previewColumns: _columns, signal: _signal, cleanupTask: _cleanup, launchOptions: _launch, onResult: _result, ...settings } = opts;
   return JSON.stringify({ input: path.resolve(input), source: stamp(input), binary: stamp(opts.pagxBin), settings });
 }
 
@@ -334,13 +335,27 @@ export async function runBatchInputs(opts: RunBatchOptions, inputs: BatchInput[]
   const abort = () => { void engineHandle.browser.close().catch(() => {}); };
   opts.signal?.addEventListener('abort', abort, { once: true });
   // Each input has its own deadline; an archive/HTTP owner's cancellation reaches all stages.
-  const convert = <T>(work: (task: import('./conversion-task').ConversionTask) => Promise<T>) =>
-    withConversionTask(undefined, async task => {
-      const cancel = () => task.abort(opts.signal!.reason);
-      if (opts.signal?.aborted) cancel(); else opts.signal?.addEventListener('abort', cancel, { once: true });
-      try { task.checkpoint(); return await work(task); }
-      finally { opts.signal?.removeEventListener('abort', cancel); }
-    });
+  const convert = async <T>(work: (task: ConversionTask) => Promise<T>): Promise<T> => {
+    let child: ConversionTask | undefined;
+    // Register before starting work: the parent may schedule file cleanup as soon
+    // as it is cancelled, before this child's bounded finish() has returned.
+    let drained: (() => void) | undefined;
+    if (opts.cleanupTask) opts.cleanupTask.trackCleanup(new Promise<void>(resolve => { drained = resolve; }));
+    try {
+      return await withConversionTask(undefined, async task => {
+        child = task;
+        const cancel = () => task.abort(opts.signal!.reason);
+        if (opts.signal?.aborted) cancel(); else opts.signal?.addEventListener('abort', cancel, { once: true });
+        try { task.checkpoint(); return await work(task); }
+        finally { opts.signal?.removeEventListener('abort', cancel); }
+      });
+    } finally {
+      if (drained) {
+        if (child) void child.waitForCleanup().then(drained);
+        else drained();
+      }
+    }
+  };
 
   let processed = 0;
   let skipped = 0;

@@ -177,6 +177,12 @@ export class ConversionTask {
     if (!this.signal.aborted) this.controller.abort(reason);
   }
 
+  /** An enclosing owner can retain shared files beyond the bounded shutdown grace. */
+  async waitForCleanup(): Promise<boolean> {
+    while (this.cleanups.size) await Promise.allSettled([...this.cleanups]);
+    return !this.cleanupFailed;
+  }
+
   async finish(graceMs = 5000): Promise<boolean> {
     clearTimeout(this.timer);
     this.releaseCli();
@@ -184,10 +190,7 @@ export class ConversionTask {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
-        (async () => {
-          while (this.cleanups.size) await Promise.allSettled([...this.cleanups]);
-          return !this.cleanupFailed;
-        })(),
+        this.waitForCleanup(),
         new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), graceMs); }),
       ]);
     } finally { if (timer) clearTimeout(timer); }

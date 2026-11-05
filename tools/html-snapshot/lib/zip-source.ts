@@ -17,6 +17,11 @@ export interface ZipLimits {
   prepareMs: number;
 }
 
+export class ZipSourceError extends Error {
+  readonly status = 400;
+  readonly exitCode = 2;
+}
+
 export function zipLimits(overrides: Partial<ZipLimits> = {}): ZipLimits {
   const defaults: ZipLimits = { archiveBytes: 32 * 1024 * 1024, totalBytes: 256 * 1024 * 1024,
     entryBytes: 64 * 1024 * 1024, entries: 10000, pages: 500, prepareMs: 30000 };
@@ -47,12 +52,15 @@ export interface ZipWebsite extends ZipPlan {
 // repairing ambiguous names: normalization must never turn two entries into one file.
 export function zipPath(name: string, directory = false): string {
   const value = directory && name.endsWith('/') ? name.slice(0, -1) : name;
+  const segments = value.split('/');
+  if (Buffer.byteLength(value) > 4096 || segments.length > 128 ||
+      segments.some(part => Buffer.byteLength(part) > 255)) throw new Error('ZIP path exceeds length or depth limit');
   if (!value || /[\\\x00-\x1f\x7f]/.test(value) || /^[A-Za-z]:/.test(value) ||
-      value.split('/').some(part => !part || part === '.' || part === '..')) {
+      segments.some(part => !part || part === '.' || part === '..')) {
     throw new Error(`Unsafe ZIP path: ${JSON.stringify(name)}`);
   }
   // These names cannot be materialized portably and can alias another file on Windows.
-  if (value.split('/').some(part => /[<>:"|?*]/.test(part) || /[. ]$/.test(part) ||
+  if (segments.some(part => /[<>:"|?*]/.test(part) || /[. ]$/.test(part) ||
       /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) {
     throw new Error(`Non-portable ZIP path: ${JSON.stringify(name)}`);
   }
@@ -73,6 +81,12 @@ async function operation<T>(options: ZipOptions, work: (limits: ZipLimits, signa
   else options.signal?.addEventListener('abort', abort, { once: true });
   const timer = setTimeout(() => controller.abort(new Error('ZIP preparation timed out')), limits.prepareMs);
   try { controller.signal.throwIfAborted(); return await work(limits, controller.signal); }
+  catch (error) {
+    controller.signal.throwIfAborted();
+    if (error && typeof error === 'object' && 'code' in error &&
+        /^(EACCES|EPERM|ENOSPC|EMFILE|ENFILE|EIO|ENOENT)$/.test(String(error.code))) throw error;
+    throw new ZipSourceError(error instanceof Error ? error.message : String(error));
+  }
   finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
 }
 
@@ -95,6 +109,7 @@ async function inspect(file: string, root: string, limits: ZipLimits, signal: Ab
       signal.throwIfAborted();
       if (++count > limits.entries) throw new Error('ZIP exceeds entry count limit');
       const directory = entry.fileName.endsWith('/');
+      if (directory && entry.uncompressedSize !== 0) throw new Error('ZIP directory contains file data');
       const name = zipPath(entry.fileName, directory);
       const kind = (entry.externalFileAttributes >>> 16) & 0o170000;
       if (kind && kind !== (directory ? 0o040000 : 0o100000)) throw new Error(`ZIP special file is not supported: ${name}`);
@@ -113,6 +128,7 @@ async function inspect(file: string, root: string, limits: ZipLimits, signal: Ab
         if (previous && (previous.name !== current || previous.directory !== isDirectory ||
             (explicit && previous.explicit))) throw new Error(`ZIP path collision: ${name}`);
         names.set(key, { name: current, directory: isDirectory, explicit: explicit || !!previous?.explicit });
+        if (names.size > limits.entries) throw new Error('ZIP exceeds entry count limit including implicit directories');
       }
       if (!directory && !metadata(name) && (!root || name.startsWith(root + '/'))) {
         files.push(root ? name.slice(root.length + 1) : name);

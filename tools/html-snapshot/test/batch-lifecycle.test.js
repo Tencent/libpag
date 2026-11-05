@@ -14,7 +14,7 @@ const { runHtmlToPagx } = require('../dist/lib/pipeline');
 const { generateContactSheet } = require('../dist/lib/contact-sheet');
 const { runBatch } = require('../dist/lib/batch');
 const { withCliLifecycle } = require('../dist/lib/cli-lifecycle');
-const { withConversionTask } = require('../dist/lib/conversion-task');
+const { ConversionTask, withConversionTask } = require('../dist/lib/conversion-task');
 let dir, options, browser, contexts, stderr;
 beforeEach(() => {
   jest.resetAllMocks();
@@ -97,6 +97,39 @@ test('cancellation closes the active context without converting later inputs', a
   expect(runHtmlToPagx).toHaveBeenCalledTimes(1);
   expect(contexts[0].close).toHaveBeenCalledTimes(1);
   expect(browser.close).toHaveBeenCalledTimes(1);
+});
+
+test('a cancelled batch retains shared files beyond a child cleanup grace period', async () => {
+  const originalFinish = ConversionTask.prototype.finish;
+  const finish = jest.spyOn(ConversionTask.prototype, 'finish').mockImplementation(function () {
+    return originalFinish.call(this, 20);
+  });
+  const parent = new ConversionTask();
+  let started, close;
+  const running = new Promise(resolve => { started = resolve; });
+  runHtmlToPagx.mockImplementation(async opts => {
+    await opts.task.own(async () => ({}), () => new Promise(resolve => { close = resolve; }));
+    started();
+    await new Promise((_, reject) => opts.task.signal.addEventListener('abort', () => reject(opts.task.signal.reason), { once: true }));
+  });
+  const work = runBatch({ ...options, signal: parent.signal, cleanupTask: parent }).catch(error => error);
+  const request = parent.run(() => work).catch(error => error);
+  const removeFiles = jest.fn(async () => {});
+  try {
+    await running;
+    parent.abort(new Error('client disconnected'));
+    await request;
+    parent.deferCleanup(removeFiles);
+    expect(await parent.finish()).toBe(false);
+    await work;
+    expect(removeFiles).not.toHaveBeenCalled();
+    close();
+    expect(await parent.waitForCleanup()).toBe(true);
+    expect(removeFiles).toHaveBeenCalledTimes(1);
+    expect(runHtmlToPagx).toHaveBeenCalledTimes(1);
+  } finally {
+    close?.(); await parent.finish(); finish.mockRestore();
+  }
 });
 
 test('preview contains only newly completed inputs, in order, after browser shutdown', async () => {

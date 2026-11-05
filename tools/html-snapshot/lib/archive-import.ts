@@ -23,7 +23,7 @@ export interface ArchivePlan { source: ZipPlan; inputs: BatchInput[]; outputRoot
 export interface ArchiveManifest {
   version: 1;
   source: { sha256: string; root: string };
-  status: 'running' | 'complete' | 'partial' | 'failed';
+  status: 'planned' | 'running' | 'complete' | 'partial' | 'failed';
   outputs: Array<BatchInputResult & { source: string } | { source: string; status: 'pending' | 'cancelled' }>;
   preview?: RunBatchResult['preview'];
   error?: string;
@@ -61,9 +61,16 @@ export function planArchiveImport(opts: ArchiveImportOptions, source: ZipPlan): 
     if (opts.keepSubsetHtml) targets.push(path.join(input.outputDir, `${input.outputName}.subset.html`));
     directories.push(opts.fontDir || path.join(input.outputDir, `${input.outputName}.fonts`));
     if (opts.downloadImages) directories.push(opts.imageDir || path.join(input.outputDir, `${input.outputName}.images`));
-    if (opts.preview && input.relative.startsWith('preview/')) throw new Error('ZIP output conflicts with reserved preview directory');
+    const sourceDirectories = input.relative.split('/').slice(0, -1);
+    if (sourceDirectories.some(name => name.startsWith('.pagx-stage-'))) throw new Error('ZIP output conflicts with reserved staging directory');
+    if (opts.preview && sourceDirectories[0]?.toLowerCase() === 'preview') throw new Error('ZIP output conflicts with reserved preview directory');
   }
   if (opts.preview) directories.push(path.join(outputRoot, 'preview'));
+  for (const target of [...targets, ...directories]) {
+    if (path.resolve(target).split(path.sep).some(part => Buffer.byteLength(part) > 255)) {
+      throw new Error(`ZIP output path component exceeds length limit: ${target}`);
+    }
+  }
   const seen = new Set<string>();
   const inputStat = fs.statSync(opts.input);
   for (const target of targets) {
@@ -177,7 +184,7 @@ export async function runArchiveImport(opts: ArchiveImportOptions): Promise<RunB
         await writeManifest();
       },
     }, plan.inputs);
-    manifest.status = result.failed ? 'failed' : manifest.outputs.some(item => item.status === 'partial') ? 'partial' : 'complete';
+    manifest.status = opts.dryRun ? 'planned' : result.failed ? 'failed' : manifest.outputs.some(item => item.status === 'partial') ? 'partial' : 'complete';
     if (result.preview) manifest.preview = { pages: result.preview.pages.map(page => ({ ...page,
       file: path.relative(plan!.outputRoot, page.file).split(path.sep).join('/') })) };
     await writeManifest();

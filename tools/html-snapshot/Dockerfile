@@ -128,8 +128,8 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true \
 # back to `npm install` otherwise so the image still builds in a fresh
 # clone where the lockfile is gitignored. Optional deps (playwright) are
 # kept so `--browser-engine playwright` works out of the box.
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; \
-    else npm install --omit=dev --no-audit --no-fund; fi \
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; \
+    else npm install --no-audit --no-fund; fi \
  && npm cache clean --force
 
 # Copy the runtime sources. snapshot.js is included for parity with the
@@ -137,6 +137,10 @@ RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; \
 COPY lib ./lib
 COPY server.js ./server.js
 COPY snapshot.js ./snapshot.js
+COPY import.js ensure-built.js tsconfig.json ./
+
+# Compile the Node runtime before dropping development dependencies.
+RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 
 # Server defaults: bind to all interfaces so the published port is
 # reachable from outside the container; expose 8787 (the server's default

@@ -4,6 +4,7 @@ import * as http from 'node:http';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { lookup } from 'mime-types';
+import type { Socket } from 'node:net';
 import type { ZipWebsite } from './zip-source';
 
 export interface WebsiteServer {
@@ -20,6 +21,7 @@ export async function startWebsiteServer(website: Pick<ZipWebsite, 'directory' |
     for (let i = 1; i < segments.length; i++) directories.add(segments.slice(0, i).join('/'));
   }
   let origin = '';
+  const sockets = new Set<Socket>(), requests = new Set<Promise<void>>();
   const serve = async (req: http.IncomingMessage, res: http.ServerResponse) => {
     const fail = (code: number) => { res.writeHead(code, { 'Content-Type': 'text/plain' }); res.end(http.STATUS_CODES[code]); };
     if (req.headers.host !== new URL(origin).host) { fail(403); return; }
@@ -65,11 +67,14 @@ export async function startWebsiteServer(website: Pick<ZipWebsite, 'directory' |
     await pipeline(fs.createReadStream(file, { start, end }), res);
   };
   const server = http.createServer((req, res) => {
-    void serve(req, res).catch(() => {
+    const pending = serve(req, res).catch(() => {
       if (!res.headersSent) res.writeHead(500);
       res.end();
     });
+    requests.add(pending);
+    void pending.finally(() => requests.delete(pending));
   });
+  server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => { server.off('error', reject); resolve(); });
@@ -85,8 +90,8 @@ export async function startWebsiteServer(website: Pick<ZipWebsite, 'directory' |
     close() {
       return closing ??= new Promise<void>((resolve, reject) => {
         server.close(error => error ? reject(error) : resolve());
-        server.closeAllConnections();
-      });
+        for (const socket of sockets) socket.destroy();
+      }).then(async () => { await Promise.allSettled([...requests]); });
     },
   };
 }

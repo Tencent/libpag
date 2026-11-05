@@ -54,6 +54,18 @@ test('rejects unsupported CLI combinations at the shared request boundary', () =
   }
 });
 
+test('rejects output names that expand past filesystem limits and reserved artifact directories', async () => {
+  for (const [name, settings, error] of [
+    ['a'.repeat(245) + '.html', {}, /length limit/],
+    ['.pagx-stage-user/index.html', {}, /reserved staging/],
+    ['Preview/index.html', { preview: true }, /reserved preview/],
+  ]) {
+    await writeZip(opts.input, { [name]: 'home' });
+    await expect(preflightArchiveImport({ ...opts, ...settings })).rejects.toThrow(error);
+    expect(fs.existsSync(opts.outputDir)).toBe(false);
+  }
+});
+
 test('retained snapshots inline captured files and remove uncaptured resources', () => {
   const imageDir = path.join(dir, 'images'); fs.mkdirSync(imageDir);
   const file = path.join(imageDir, 'image.png'); fs.writeFileSync(file, 'captured');

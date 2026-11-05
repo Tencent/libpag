@@ -19,4 +19,15 @@ async function writeZip(file, entries) {
   return file;
 }
 
-module.exports = { writeZip };
+async function readZip(file) {
+  const zip = await require('yauzl').openPromise(file);
+  const entries = new Map();
+  for await (const entry of zip.eachEntry()) {
+    const chunks = [];
+    for await (const chunk of await zip.openReadStreamPromise(entry)) chunks.push(chunk);
+    entries.set(entry.fileName, Buffer.concat(chunks));
+  }
+  return entries;
+}
+
+module.exports = { writeZip, readZip };

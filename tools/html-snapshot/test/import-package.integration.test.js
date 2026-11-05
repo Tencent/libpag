@@ -8,6 +8,7 @@ const { createRequire } = require('module');
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const { checkImportPackage } = require('../../../cli/npm/scripts/check-import');
+const { writeZip } = require('./archive-helpers');
 const exec = promisify(execFile);
 // Run against an unpacked/installed tarball, never implicitly against source staging.
 const packageDir = process.env.PAGX_PACKAGE_TEST_DIR;
@@ -103,6 +104,24 @@ packagedTest.each(['puppeteer', 'playwright'])('installed import uses the extern
   expect(manifest.preview.status).toBe('complete');
   expect(fs.existsSync(path.join(out, manifest.preview.pages[0].file))).toBe(true);
   expect(fs.readFileSync(path.join(out, 'page.advanced.pagx'), 'utf8')).toContain('Result: PAGX');
+});
+
+packagedTest.each(['puppeteer', 'playwright'])('installed %s imports ZIP websites without repository runtime dependencies', async engine => {
+  const archive = path.join(dir, `${engine}-website.zip`), out = path.join(dir, `${engine}-zip-output`);
+  await writeZip(archive, {
+    'site/index.html': '<link rel="stylesheet" href="/style.css"><body><div id="ready"></div><script src="/app.js"></script></body>',
+    'site/other.htm': '<body style="width:200px;height:100px">Other ZIP page</body>',
+    'site/style.css': 'body { width:200px;height:100px;background:blue }',
+    'site/app.js': 'document.querySelector("#ready").textContent="Installed ZIP runtime";',
+  });
+  const args = ['import', archive, '--html-root', 'site', '--output-dir', out, '--html-browser-engine', engine, '--html-wait-ms', '0'];
+  const emptyCache = path.join(dir, `${engine}-zip-empty-cache`);
+  await run([...args, '--dry-run'], { PAGX_HTML_SNAPSHOT_CACHE: emptyCache, PUPPETEER_EXECUTABLE_PATH: '/absent' });
+  expect(fs.existsSync(emptyCache)).toBe(false); expect(fs.existsSync(out)).toBe(false);
+  await run(args, { HTML_SNAPSHOT_NO_AUTOSCROLL: '1' });
+  const manifest = JSON.parse(fs.readFileSync(path.join(out, 'import-manifest.json')));
+  expect(manifest.status).toBe('complete'); expect(manifest.outputs).toHaveLength(2);
+  expect(fs.readFileSync(path.join(out, 'index.html.pagx'), 'utf8')).toContain('Installed ZIP runtime');
 });
 
 packagedTest.each(['puppeteer', 'playwright'])('installed %s batch isolates page storage and produces a preview', async engine => {

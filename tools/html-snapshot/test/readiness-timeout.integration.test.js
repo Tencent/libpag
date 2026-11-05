@@ -14,22 +14,24 @@ test.each(['puppeteer', 'playwright'])('%s keeps explicit wait/reveal after prep
     if (req.url === '/stalled.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.flushHeaders(); return; }
     res.setHeader('Content-Type', 'text/html');
     res.end('<!doctype html><body style="height:600px"><p id="late">waiting</p><img src="/stalled.png">' +
-      '<script>setTimeout(()=>document.querySelector("p").textContent="explicit wait completed",650)</script>');
+      '<script>setTimeout(()=>document.querySelector("p").textContent="explicit wait completed",2300)</script>');
   });
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/`;
-  const task = new ConversionTask({ totalMs: 10000, settleMs: 300 });
+  // Include cold context creation in the preparation budget. The text still changes
+  // after preparation expires, so capturing it requires the explicit wait below.
+  const task = new ConversionTask({ totalMs: 15000, settleMs: 2000 });
   try {
-    const result = await runSnapshot(browser, url, { task, waitMs: 700, scrollReveal: true,
+    const result = await runSnapshot(browser, url, { task, waitMs: 1500, scrollReveal: true,
       viewportWidth: 320, viewportHeight: 240, inlineIconFonts: false });
     expect(result.html).toContain('explicit wait completed');
     expect(result.readiness.status).toBe('partial');
     expect(result.readiness.reason).toBe('prepare-timeout');
     expect(await task.finish()).toBe(true);
-    const hard = new ConversionTask({ totalMs: 500, settleMs: 150 });
+    const hard = new ConversionTask({ totalMs: 2500, settleMs: 2000 });
     try {
-      await expect(runSnapshot(browser, url, { task: hard, waitMs: 2000, scrollReveal: true }))
+      await expect(runSnapshot(browser, url, { task: hard, waitMs: 4000, scrollReveal: true }))
         .rejects.toBeInstanceOf(ConversionTimeoutError);
     } finally { expect(await hard.finish()).toBe(true); }
   } finally {

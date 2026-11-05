@@ -58,6 +58,10 @@
  *     200 { status: "ok", engine, pagxBin, pagxBinExists, activeRequests }
  *     once the browser is up.
  *
+ *   POST /snapshot-archive?root=site&format=pagx|both&render=true
+ *     application/zip upload -> application/zip containing the per-page artifacts
+ *     and import-manifest.json. See README for limits, options and partial results.
+ *
  * Usage:
  *   node server.js [--port 8787] [--host 127.0.0.1]
  *                  [--browser-engine puppeteer|playwright]
@@ -79,6 +83,8 @@ require('./ensure-built').ensureBuilt();
 
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./dist/lib/browser-engine');
 const { ConversionTask, ConversionTimeoutError } = require('./dist/lib/conversion-task');
+const { handleArchiveHttp } = require('./dist/lib/archive-http');
+const { ZipSourceError } = require('./dist/lib/zip-source');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./dist/lib/pagx-runner');
@@ -702,6 +708,24 @@ function handleGetSnapshot(req, res, ctx) {
   runRoute(req, res, ctx, async () => parseGetSource(req)).catch(makeUnexpectedHandler(res));
 }
 
+function handlePostArchive(req, res, ctx) {
+  if (ctx.archiveControllers.size >= ctx.archiveConcurrency) {
+    jsonError(res, 429, 'Too many active archive imports'); return;
+  }
+  const controller = new AbortController();
+  ctx.archiveControllers.add(controller);
+  ctx.activeRequests += 1;
+  handleArchiveHttp(req, res, { pagxBin: ctx.opts.pagxBin, browserEngine: ctx.opts.browserEngine,
+    scriptDir: __dirname, maxBodyBytes: ctx.opts.maxBodyBytes, readBody, log, signal: controller.signal })
+    .catch(error => {
+      const status = error instanceof HttpError || error instanceof ConversionTimeoutError || error instanceof ZipSourceError
+        ? error.status : 500;
+      log(`POST /snapshot-archive ${status} ${errMessage(error)}`);
+      if (!res.headersSent && !res.destroyed) jsonError(res, status, errMessage(error));
+      else res.destroy();
+    }).finally(() => { ctx.activeRequests -= 1; ctx.archiveControllers.delete(controller); });
+}
+
 // Declarative route table. Adding a new endpoint is a one-line append here
 // instead of an extra `if` branch in the request callback. Three entries is
 // small enough that a linear scan is fine; the cost is dwarfed by the
@@ -709,6 +733,7 @@ function handleGetSnapshot(req, res, ctx) {
 const ROUTES = [
   { method: 'GET', path: '/health', handle: handleHealth },
   { method: 'POST', path: '/snapshot', handle: handlePostSnapshot },
+  { method: 'POST', path: '/snapshot-archive', handle: handlePostArchive },
   { method: 'GET', path: '/snapshot', handle: handleGetSnapshot },
 ];
 
@@ -726,6 +751,8 @@ function dispatch(req, res, ctx) {
 }
 
 async function startServer(opts) {
+  const archiveConcurrency = Number(process.env.HTML_SNAPSHOT_ARCHIVE_MAX_CONCURRENT || 2);
+  if (!Number.isSafeInteger(archiveConcurrency) || archiveConcurrency <= 0) throw new Error('Invalid archive concurrency limit');
   log(`launching ${opts.browserEngine}…`);
   const engineHandle = await launchBrowser({ engine: opts.browserEngine });
   log(`browser ready (engine=${engineHandle.engine})`);
@@ -746,7 +773,7 @@ async function startServer(opts) {
     );
   }
 
-  const ctx = { engineHandle, opts, activeRequests: 0, pagxBinExists };
+  const ctx = { engineHandle, opts, activeRequests: 0, pagxBinExists, archiveConcurrency, archiveControllers: new Set() };
 
   const server = http.createServer((req, res) => dispatch(req, res, ctx));
 
@@ -769,6 +796,7 @@ async function startServer(opts) {
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    for (const controller of ctx.archiveControllers) controller.abort(new Error('Server shutting down'));
     log(`received ${signal}, shutting down…`);
     const forceExitTimer = setTimeout(() => {
       log('forced exit after 10s shutdown timeout');

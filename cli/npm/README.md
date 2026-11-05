@@ -17,7 +17,7 @@ npm install -g @libpag/pagx
 
 | Command | Description |
 |---------|-------------|
-| `pagx import` | Import SVG/HTML, URLs, or interaction checkpoints into PAGX with optional PNGs and previews |
+| `pagx import` | Import SVG/HTML, ZIP websites, URLs, or interaction checkpoints into PAGX with optional PNGs and previews |
 | `pagx validate` | Validate a PAGX file against the specification schema |
 | `pagx render` | Render a PAGX file to an image (PNG, WebP, or JPEG) |
 | `pagx optimize` | Validate, optimize, and format in one step |
@@ -52,6 +52,10 @@ pagx import https://example.com --output-name demo --output-dir out --render
 # Batch: one browser, independent contexts, mirrored output directories
 pagx import --html-batch pages --output-dir out --preview
 pagx import --html-batch pages --output-dir out --dry-run
+
+# ZIP website: one PAGX per HTML entry, with an explicit root when needed
+pagx import website.zip --output-dir out --preview
+pagx import website.zip --html-root website --output-dir out --dry-run
 
 # Playwright supports role locators in scenarios
 pagx import page.html --html-scenario states.json --html-browser-engine playwright --output-dir out
@@ -100,6 +104,28 @@ source, native binary, options and artifact stamps, including referenced resourc
 A lone PAGX or a missing PNG cannot cause a skip. Batch previews in
 `<output-dir>/preview/` contain only newly completed inputs, in order; skipped and
 failed inputs are excluded. An entirely skipped batch generates no preview.
+
+ZIP inputs recursively import all `.html`/`.htm` entries through a private HTTP
+site. `--html-root` selects the package directory mounted at `/`; its default is
+the archive root. Output names retain the original extension, for example
+`nested/page.html.pagx`. Multi-page archives require `--output-dir`, while `-o`
+accepts exactly one page. Fonts are embedded automatically; retained subsets
+inline captured fonts and images. `import-manifest.json` records every page's
+`complete`, `partial` or `failed` result. Failed pages return a nonzero command
+status without discarding successful pages. ZIP previews also include complete
+cached pages.
+
+ZIP resources are offline by default. Repeat `--html-allow-origin https://cdn.example`
+to permit remote resource origins; this disables archive-only cache skipping.
+`--skip-existing` otherwise includes the entire archive and runtime fingerprint,
+so changing only CSS or images triggers a fresh import. ZIP validation rejects
+unsafe/ambiguous paths, links, encryption and unsupported compression. Default
+limits are 32 MiB compressed, 256 MiB extracted, 64 MiB per file, 10000 entries,
+500 pages and 30 seconds of preparation; override them with
+`HTML_SNAPSHOT_ZIP_ARCHIVE_BYTES`, `TOTAL_BYTES`, `ENTRY_BYTES`, `ENTRIES`, `PAGES`
+and `PREPARE_MS` (all with the `HTML_SNAPSHOT_ZIP_` prefix). ZIP imports handle
+browser-ready files; building source projects and enumerating SPA routes require
+separate preparation. Hosted imports require an isolated execution environment.
 
 Runtime configuration:
 

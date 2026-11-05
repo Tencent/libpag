@@ -110,6 +110,27 @@ test('a failed close preserves the conversion error and still closes other resou
   expect(close).toHaveBeenCalledTimes(1);
 });
 
+test('an enclosing task retains shared files until a child finishes late cleanup', async () => {
+  jest.useFakeTimers();
+  const parent = new ConversionTask(), child = new ConversionTask();
+  let closed;
+  await child.own(async () => ({}), () => new Promise(resolve => { closed = resolve; }));
+  const stopping = child.finish(10);
+  await jest.advanceTimersByTimeAsync(10);
+  expect(await stopping).toBe(false);
+  parent.trackCleanup(child.waitForCleanup());
+  const removeSharedFiles = jest.fn(async () => {});
+  parent.deferCleanup(removeSharedFiles);
+  const parentStopping = parent.finish(10);
+  await jest.advanceTimersByTimeAsync(10);
+  expect(await parentStopping).toBe(false);
+  expect(removeSharedFiles).not.toHaveBeenCalled();
+  closed();
+  expect(await parent.waitForCleanup()).toBe(true);
+  expect(removeSharedFiles).toHaveBeenCalledTimes(1);
+  expect(jest.getTimerCount()).toBe(0);
+});
+
 test('soft expiry only marks partial when optional preparation actually remains unfinished', async () => {
   jest.useFakeTimers();
   const task = new ConversionTask({ totalMs: 1000, settleMs: 100 });

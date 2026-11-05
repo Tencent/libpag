@@ -10,13 +10,15 @@ function checkImportPackage(directory) {
   for (const file of ['process.js', 'bin/pagx.js', 'html-snapshot/launch.js', 'html-snapshot/launch-import.js',
     'html-snapshot/runtime.js', 'html-snapshot/import.js', 'html-snapshot/dist/lib/import-request.js',
     'html-snapshot/snapshot.js', 'html-snapshot/ensure-built.js', 'html-snapshot/package.json',
-    'html-snapshot/dist/lib/scenario-pipeline.js', 'html-snapshot/dist/lib/contact-sheet.js']) {
+    'html-snapshot/dist/lib/scenario-pipeline.js', 'html-snapshot/dist/lib/contact-sheet.js',
+    'html-snapshot/dist/lib/archive-import.js', 'html-snapshot/dist/lib/website-server.js',
+    'html-snapshot/dist/lib/zip-source.js', 'html-snapshot/dist/lib/website-proxy.js']) {
     if (!fs.statSync(path.join(directory, file), { throwIfNoEntry: false })?.isFile()) {
       throw new Error(`missing import artifact: ${file}; run npm run build:html-snapshot`);
     }
   }
   const runtime = path.join(directory, 'html-snapshot');
-  for (const name of ['pngjs', 'opentype.js', 'wawoff2']) require.resolve(name, { paths: [runtime] });
+  for (const name of ['pngjs', 'opentype.js', 'wawoff2', 'yauzl', 'yazl', 'mime-types']) require.resolve(name, { paths: [runtime] });
   const env = { ...process.env, PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL: '1' };
   for (const key of ['PAGX_NODE_BIN', 'PAGX_IMPORT_BIN', 'PAGX_HTML_SNAPSHOT_BIN', 'PAGX_BIN']) delete env[key];
   const run = args => {
@@ -30,7 +32,8 @@ function checkImportPackage(directory) {
   const version = run(['--version']).trim();
   if (version !== `pagx ${pkg.version}`) throw new Error(`native version ${version} does not match package ${pkg.version}`);
   const help = run(['import', '--help']);
-  if (!help.includes('--html-scenario') || !help.includes('--html-checkpoint') || !help.includes('--preview')) {
+  if (!help.includes('--html-scenario') || !help.includes('--html-checkpoint') || !help.includes('--preview') ||
+      !help.includes('--html-root') || !help.includes('--html-allow-origin')) {
     throw new Error('native import is outdated: import help is incomplete');
   }
   if (run(['--help']).includes('  capture ')) throw new Error('native CLI still exposes capture');

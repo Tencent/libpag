@@ -625,6 +625,10 @@ size/CRC checked before rendering. Archives must use portable paths without link
 duplicate entries or case/Unicode aliases. `__MACOSX`, `.DS_Store` and AppleDouble
 metadata are ignored. Encryption and compression methods other than Store/Deflate
 are unsupported. ZIP64 is accepted within the same resource limits.
+Paths are limited to 128 components, 4096 UTF-8 bytes in total, and 255 bytes per
+component; generated output names must also fit the component limit. Entry limits
+count implicit parent directories as well as stored entries. Output directories
+starting with `.pagx-stage-` are reserved, as is top-level `preview` when enabled.
 
 Limits are positive integer environment settings: `HTML_SNAPSHOT_ZIP_ARCHIVE_BYTES`
 (32 MiB), `HTML_SNAPSHOT_ZIP_TOTAL_BYTES` (256 MiB),
@@ -632,6 +636,35 @@ Limits are positive integer environment settings: `HTML_SNAPSHOT_ZIP_ARCHIVE_BYT
 `HTML_SNAPSHOT_ZIP_PAGES` (500), and `HTML_SNAPSHOT_ZIP_PREPARE_MS` (30000).
 Each page retains the normal conversion deadline. Cancellation closes the browser,
 proxy and site before deleting extracted sources.
+
+The HTTP service also accepts `POST /snapshot-archive` with
+`Content-Type: application/zip` and the ZIP bytes as the request body. Its response
+is an `application/zip` artifact bundle containing `import-manifest.json`, PAGX
+documents and their resources. `format=both` also includes portable subset HTML;
+the default is `format=pagx`. A completed batch returns HTTP 200 even when individual
+pages fail: inspect the manifest and `X-Snapshot-Status` (`complete`, `partial`, or
+`failed`). `X-Snapshot-Pages` reports the page count. Invalid inputs return 4xx.
+
+```bash
+curl --fail-with-body --data-binary @website.zip \
+  -H 'Content-Type: application/zip' \
+  'http://127.0.0.1:8787/snapshot-archive?root=website&format=both&render=true' \
+  --output imported-webpages.zip
+```
+
+Query options are `root`, `format`, `viewportWidth`, `viewportHeight`, `waitMs`,
+`selector`, `inlineIconFonts`, `captureAnimations`, `scrollReveal`, `render`,
+`preview`, and `previewColumns`. The endpoint does not accept host filesystem paths
+or client-controlled remote-origin allowances. Operators can set
+`HTML_SNAPSHOT_ARCHIVE_ALLOW_ORIGINS` to a comma-separated list of permitted origins.
+The existing server upload limit applies, along with the ZIP limits above.
+Packaging is limited to 20000 files and 512 MiB of uncompressed artifacts/response
+bytes. `HTML_SNAPSHOT_ARCHIVE_TIMEOUT_MS` defaults to 600000 for upload, conversion,
+packaging and response delivery together; each page still has its own shorter
+conversion deadline. `HTML_SNAPSHOT_ARCHIVE_MAX_CONCURRENT` defaults to 2; excess
+requests receive HTTP 429. Client disconnection and server shutdown cancel active
+archive work and clean up its private files. `/snapshot` retains its single-page
+request and response contract.
 
 ### Browser bundle (no Node, no puppeteer)
 
