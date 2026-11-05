@@ -3845,6 +3845,47 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
 // A Layer rotation.z channel is the 2D spin around the layer's own origin; the runtime applies it
 // per frame and CSS expresses it as a plain rotate(). PAGX names the channel "rotation.z", so the
 // binding has to accept that spelling instead of only "rotation".
+// RoundCorner radius rounds the geometry in place, so a CSS equivalent has to rebuild the path:
+// every stop carries a `d` with that frame's radius applied.
+CLI_TEST(PAGXHtmlTest, AnimationRoundCornerRadiusRebuildsPath) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Polystar position="160,100" type="polygon" pointCount="5" outerRadius="80" rotation="-90"/>
+      <RoundCorner id="cornerRadius" radius="0"/>
+      <Fill color="#9333EA"/>
+    </Layer>
+    <Animations>
+      <Animation id="cornerRound" duration="60" frameRate="60" loop="once">
+        <Object target="cornerRadius">
+          <Channel name="radius" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="24"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto pathTag = FindTagContaining(html, "id=\"cornerRadius\"");
+  ASSERT_FALSE(pathTag.empty()) << html;
+  EXPECT_EQ(pathTag.rfind("<path", 0), static_cast<size_t>(0)) << pathTag;
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos) << pathTag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(pathTag));
+  ASSERT_FALSE(rule.empty()) << html;
+  auto first = KeyframeStopOf(html, "id=\"cornerRadius\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"cornerRadius\"", "100%");
+  ASSERT_FALSE(first.empty()) << rule;
+  ASSERT_FALSE(last.empty()) << rule;
+  EXPECT_NE(first.find("d: path("), std::string::npos) << first;
+  EXPECT_NE(last.find("d: path("), std::string::npos) << last;
+  // A larger radius must produce a different outline.
+  EXPECT_NE(first, last);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayerRotationZChannel) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="spinBoxZ" x="120" y="60" width="80" height="80">
