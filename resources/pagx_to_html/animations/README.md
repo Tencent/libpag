@@ -251,9 +251,11 @@ node tools/html-snapshot/eval-animation/run.js \
 
 - **范围**：只覆盖关键帧动画（`<Animation>` / `<Object>` / `<Channel>` / `<Key>` 及其挂载），不含状态机
   （`<StateMachine>`）、ViewModel / `DataBind`，也不含 PAGX 里不可动画的属性（注册表中 `NoFlags` 的条目）。
-- **`Layer.scale.z` 不可验证**：实测在“图层带 `z` + `rotationX` + `perspective`”、“子层带 `z`”、
-  “`preserve3D`”三种配置下，`scale.z` 从 1 变到 2 时 `pagx render --time` 前后像素完全一致，运行时没有
-  可观察效果，因此导出侧不实现、也不设用例（表 1 中标 ✘）。
+- **`Layer.scale.z` 数学上不可见**：运行时按 `P · T · R · (K · S)` 合成（见
+  `src/pagx/runtime/Matrix3DDecompose.h`），缩放是最内层、先于旋转作用在点上。图层里的形状都是 `z = 0`
+  的平面路径，`scaleZ` 只能把 0 变成 0，之后的 `rotationX/Y` 才产生深度，那时缩放已经过去了；`z` 平移属于
+  `T`，在 `S` 外侧，也碰不到。静态 `scaleZ=2` 配合 `rotationX/Y/Z` 实测均为 0 像素差。因此导出侧不实现、
+  也不设用例（表 1 中标 ✘）。
 - **未映射的通道会被静默丢弃**：导出侧没有诊断输出，缺口只能靠 `Expect: gap` 用例记录；这也是本目录要
   逐族保留代表用例的原因。
 - **头部只记第一个 `Target` / `Channel`**：`geometry/05`、`stroke/06` 等多目标用例在报告里只体现第一个。
