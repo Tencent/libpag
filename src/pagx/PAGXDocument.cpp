@@ -380,9 +380,8 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
     nodeSet.insert(node.get());
     // Adopted content is part of this document after the transfer, so its ids join the id index
     // exactly like import-time registration: findNode(), data-bind "@id" targets, and deferred
-    // mask resolution must see these nodes. A collision is reported and the HOST mapping is kept
-    // — registerNode would overwrite it with the adopted node, hijacking every host "@id"
-    // reference to it, which is worse than not registering the foreign id at all.
+    // mask resolution must see these nodes. renameCollidingIds() has already renamed colliding ids,
+    // so the check below is a defensive guard that never overwrites an existing HOST mapping.
     if (!node->id.empty() && nodeMap.find(node->id) != nodeMap.end()) {
       errors.push_back("Duplicate node id '" + node->id + "'.");
     } else {

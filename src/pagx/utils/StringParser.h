@@ -244,10 +244,10 @@ Color ParseColor(const std::string& str, bool* outValid = nullptr);
  * leading whitespace, a leading sign, a hex prefix, non-finite and negative values, and any
  * trailing characters (including whitespace around "%").
  *
- * Shared by the importer and the incremental channel writer: keeping one grammar is what makes
- * "an incremental edit never accepts input a full reparse would reject" hold, so both sides must
- * call this instead of carrying their own copy. Returns false on malformed input with both
- * outputs NaN. The caller owns the diagnostic (importer) or the fallback (incremental edit).
+ * Reserved here as the single XSD grammar for a future incremental channel writer, so an
+ * incremental edit cannot accept input a full reparse would reject. The importer is currently the
+ * only caller. Returns false on malformed input with both outputs NaN. The caller owns the
+ * diagnostic.
  */
 bool ParseDimension(const std::string& raw, float* outAbsolute, float* outPercent);
 

@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <vector>
-#include "pagx/nodes/Channel.h"
+#include "pagx/nodes/KeyValue.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -55,17 +55,12 @@ inline constexpr bool HasFlag(ChannelFlags value, ChannelFlags flag) {
 // string, or a Matrix3D value that is not finite and invertible.
 using ChannelAccessor = bool (*)(Node* node, KeyValue* getOut, const KeyValue* setIn);
 
-// One reflective channel of a node type, addressed by channel name. valueType is the scalar kind
-// the channel carries in its KeyValue (reusing KeyValue.h's ChannelValueType). Enums are carried
-// as their string name, so they share ChannelValueType::String and are validated by the accessor.
-// valueType is not read in this PR: its only consumer is the raw-attribute writer
-// SetNodeChannelFromString(), which parses a string into the right KeyValue alternative and arrives
-// in a follow-up PR with the incremental editor.
+// One reflective channel of a node type, addressed by channel name. The accessor owns the value
+// encoding, so the table only carries the name and the two independent flags.
 struct ChannelDef {
   const char* channel;
   ChannelFlags flags;
   ChannelAccessor access;
-  ChannelValueType valueType;
 };
 
 // Returns the channel table for the given node type, or an empty table if the type has no

@@ -466,55 +466,52 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 // is added or renamed here, update that table too, or the edit silently falls back to a full
 // reparse instead of an incremental write.
 #define FIELD_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessFloat<T, &T::member>, ChannelValueType::Float }
+  { name, cls, &AccessFloat<T, &T::member> }
 #define FIELD_SKEW(T, name, member, cls) \
-  { name, cls, &AccessSkewAngle<T, &T::member>, ChannelValueType::Float }
+  { name, cls, &AccessSkewAngle<T, &T::member> }
 #define FIELD_PERSPECTIVE(T, name, member, cls) \
-  { name, cls, &AccessPerspectiveDistance<T, &T::member>, ChannelValueType::Float }
+  { name, cls, &AccessPerspectiveDistance<T, &T::member> }
 #define FIELD_BOOL(T, name, member, cls) \
-  { name, cls, &AccessBool<T, &T::member>, ChannelValueType::Bool }
+  { name, cls, &AccessBool<T, &T::member> }
 #define FIELD_INT(T, name, member, cls) \
-  { name, cls, &AccessInt<T, &T::member>, ChannelValueType::Int }
+  { name, cls, &AccessInt<T, &T::member> }
 #define FIELD_STRING(T, name, member, cls) \
-  { name, cls, &AccessString<T, &T::member>, ChannelValueType::String }
+  { name, cls, &AccessString<T, &T::member> }
 #define FIELD_COLOR(T, name, member, cls) \
-  { name, cls, &AccessColor<T, &T::member>, ChannelValueType::Color }
+  { name, cls, &AccessColor<T, &T::member> }
 #define FIELD_MATRIX(T, name, member, cls) \
-  { name, cls, &AccessMatrix<T, &T::member>, ChannelValueType::Matrix }
+  { name, cls, &AccessMatrix<T, &T::member> }
 #define FIELD_MATRIX3D(T, name, member, cls) \
-  { name, cls, &AccessMatrix3D<T, &T::member>, ChannelValueType::Matrix3D }
+  { name, cls, &AccessMatrix3D<T, &T::member> }
 #define FIELD_POINT_X(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, true>, ChannelValueType::Float }
+  { name, cls, &AccessPointAxis<T, &T::member, true> }
 #define FIELD_POINT_Y(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, false>, ChannelValueType::Float }
+  { name, cls, &AccessPointAxis<T, &T::member, false> }
 #define FIELD_SIZE_W(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, true>, ChannelValueType::Float }
+  { name, cls, &AccessSizeAxis<T, &T::member, true> }
 #define FIELD_SIZE_H(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, false>, ChannelValueType::Float }
+  { name, cls, &AccessSizeAxis<T, &T::member, false> }
 #define FIELD_PADDING_L(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 0>, ChannelValueType::Float }
+  { name, cls, &AccessPaddingComp<T, &T::member, 0> }
 #define FIELD_PADDING_T(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 1>, ChannelValueType::Float }
+  { name, cls, &AccessPaddingComp<T, &T::member, 1> }
 #define FIELD_PADDING_R(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 2>, ChannelValueType::Float }
+  { name, cls, &AccessPaddingComp<T, &T::member, 2> }
 #define FIELD_PADDING_B(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 3>, ChannelValueType::Float }
+  { name, cls, &AccessPaddingComp<T, &T::member, 3> }
 #define FIELD_OPT_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessOptionalFloat<T, &T::member>, ChannelValueType::Float }
+  { name, cls, &AccessOptionalFloat<T, &T::member> }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
-  { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color }
+  { name, cls, &AccessOptionalColor<T, &T::member> }
 // The width/height dimension channels and their percent siblings. Both accessors cross-clear the
 // two members (see AccessDimensionAxis), so writing one clears the other: a stale percent would
 // keep overriding a freshly written absolute value, and vice versa.
 #define FIELD_DIMENSION(T, name, cls, WidthAxis) \
-  { name, cls, &AccessDimensionAxis<T, WidthAxis, false>, ChannelValueType::Float }
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, false> }
 #define FIELD_PERCENT(T, name, cls, WidthAxis) \
-  { name, cls, &AccessDimensionAxis<T, WidthAxis, true>, ChannelValueType::Float }
-#define FIELD_ENUM(T, name, member, cls, E)                                                   \
-  {                                                                                           \
-    name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String>, \
-        ChannelValueType::String                                                              \
-  }
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, true> }
+#define FIELD_ENUM(T, name, member, cls, E) \
+  { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -655,7 +652,7 @@ static std::vector<ChannelDef> BuildTextFields() {
 
 static std::vector<ChannelDef> BuildFillFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color},
+      {"color", Anim, &AccessFillStrokeColor},
       FIELD_FLOAT(Fill, "alpha", alpha, Anim),
       FIELD_ENUM(Fill, "blendMode", blendMode, NoFlags, BlendMode),
       FIELD_ENUM(Fill, "fillRule", fillRule, NoFlags, FillRule),
@@ -665,7 +662,7 @@ static std::vector<ChannelDef> BuildFillFields() {
 
 static std::vector<ChannelDef> BuildStrokeFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color},
+      {"color", Anim, &AccessFillStrokeColor},
       FIELD_FLOAT(Stroke, "width", width, Anim),
       FIELD_FLOAT(Stroke, "alpha", alpha, Anim),
       FIELD_ENUM(Stroke, "blendMode", blendMode, NoFlags, BlendMode),

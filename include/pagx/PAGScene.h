@@ -174,17 +174,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void advanceAndApply(int64_t deltaMicroseconds);
 
   /**
-   * Returns the layers under the given surface point, checked against their bounding boxes for
-   * quick selection. The first layer in the array is the top-most under the point, the last is the
-   * bottom-most, and every ancestor of a hit layer follows it. Hidden layers, and points outside a
-   * layer's scrollRect clip or mask, are skipped together with their subtrees. Returns an empty
-   * array if nothing is hit. Hit testing does not require a prior draw(). Accepts surface
-   * coordinates (with zoom and content offset applied) instead of the composition's local
-   * coordinates. The layers are runtime objects: resolving one to a PAGX source node, or applying
-   * an editor selection policy such as picking a text layer by its box, is the host's job
-   * (PAGLayer::getNode() plus PAGXDocument::ownsNode()), since the core keeps no source-node to
-   * runtime-layer map. For shape-accurate testing of a single layer, use
-   * PAGLayer::hitTestPoint(x, y, true).
+   * Returns the layers under the given surface point. The first layer in the array is the top-most
+   * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
+   * testing does not require a prior draw(). Accepts surface coordinates (with zoom and content
+   * offset applied) instead of the composition's local coordinates.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
@@ -193,8 +186,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
    * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
-   * rectangle if the layer is null or does not belong to this scene. For the layer's
-   * untransformed local bounds, use PAGLayer::getBounds.
+   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
+   * local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;

@@ -431,10 +431,8 @@ static void ReadDimension(const DOMNode* node, const std::string& name, float* o
   if (str == nullptr || str->empty()) {
     return;
   }
-  // Shares the grammar with the incremental channel writer (PAGXNodeChannel): both go through
-  // StringParser::ParseDimension, so a value accepted here is accepted there and vice versa.
-  // Carrying a second copy would let the XSD rules drift apart and silently break the promise
-  // that an incremental edit matches a full reparse. The importer only adds the diagnostic.
+  // Use the shared StringParser grammar so the XSD rules have a single implementation; a second
+  // copy would let them drift apart. The importer only adds the diagnostic.
   if (!ParseDimension(*str, outAbsolute, outPercent)) {
     ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
   }
