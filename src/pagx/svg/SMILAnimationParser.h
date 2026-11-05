@@ -159,7 +159,7 @@ class SMILAnimationParser {
   static Animation* buildAnimation(
       SVGParserContext& ctx, PAGXDocument* doc,
       const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations,
-      const std::unordered_map<const DOMNode*, AnimatedNodeInfo>& animatedNodeMap, float frameRate);
+      const std::unordered_map<const DOMNode*, std::vector<AnimatedNodeInfo>>& animatedNodeMap, float frameRate);
 
   /**
    * Parses a SMIL clock value into seconds. Supports "2s", "500ms", "2.5" (bare seconds),

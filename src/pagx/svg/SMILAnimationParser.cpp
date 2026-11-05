@@ -2903,7 +2903,8 @@ static void TileChannelKeyframes(Channel* channel, Frame period, Frame maxEnd) {
 Animation* SMILAnimationParser::buildAnimation(
     SVGParserContext& ctx, PAGXDocument* doc,
     const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations,
-    const std::unordered_map<const DOMNode*, AnimatedNodeInfo>& animatedNodeMap, float frameRate) {
+    const std::unordered_map<const DOMNode*, std::vector<AnimatedNodeInfo>>& animatedNodeMap,
+    float frameRate) {
   if (animatedNodeMap.empty()) {
     return nullptr;
   }
@@ -2935,150 +2936,153 @@ Animation* SMILAnimationParser::buildAnimation(
   }
 
   for (const auto& pair : animatedNodeMap) {
-    bool elementIndefinite = false;
-    const auto& nodeInfo = pair.second;
     auto smilIt = smilAnimations.find(pair.first);
     if (smilIt == smilAnimations.end()) {
       continue;
     }
     const auto& group = smilIt->second;
+    for (const auto& nodeInfo : pair.second) {
+      bool elementIndefinite = false;
 
-    // Collect <animate>/<set> channels grouped by their actual target node id. A single SVG
-    // element may carry animations that drive different PAGX nodes (e.g. opacity → Layer,
-    // stroke-dashoffset → Stroke), so we must create one AnimationObject per target.
-    struct ChannelEntry {
-      Channel* channel = nullptr;
-      bool additive = false;
-      std::string targetId = {};
-    };
-    std::vector<ChannelEntry> layerEntries = {};
-    Frame layerEndFrame = 0;
-    Frame indefinitePeriod = 0;
+      // Collect <animate>/<set> channels grouped by their actual target node id. A single SVG
+      // element may carry animations that drive different PAGX nodes (e.g. opacity → Layer,
+      // stroke-dashoffset → Stroke), so we must create one AnimationObject per target.
+      struct ChannelEntry {
+        Channel* channel = nullptr;
+        bool additive = false;
+        std::string targetId = {};
+      };
+      std::vector<ChannelEntry> layerEntries = {};
+      Frame layerEndFrame = 0;
+      Frame indefinitePeriod = 0;
 
-    for (const auto& animEl : group.animates) {
-      Frame endFrame = 0;
-      bool additive = (ctx.getAttribute(animEl, "additive") == "sum");
-      std::string targetId;
-      auto parsedChannels = parseAnimate(
-          ctx, doc, animEl, nodeInfo, frameRate,
-          timings.count(animEl.get()) ? timings[animEl.get()] : defaultTiming, endFrame, targetId);
-      for (auto* ch : parsedChannels) {
-        layerEntries.push_back({ch, additive, targetId});
-      }
-      if (endFrame > layerEndFrame) {
-        layerEndFrame = endFrame;
-      }
-      auto repeatCount = ctx.getAttribute(animEl, "repeatCount");
-      if (repeatCount == "indefinite") {
-        hasIndefiniteLoop = true;
-        elementIndefinite = true;
-        if (indefinitePeriod <= 0) {
-          auto durSeconds = parseSMILClockValue(ctx.getAttribute(animEl, "dur"));
-          if (std::isfinite(durSeconds) && durSeconds > 0.0) {
-            indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
-          }
-        }
-      }
-    }
-    for (const auto& setEl : group.sets) {
-      Frame endFrame = 0;
-      bool additive = (ctx.getAttribute(setEl, "additive") == "sum");
-      std::string targetId;
-      auto parsedChannels = parseSet(
-          ctx, doc, setEl, nodeInfo, frameRate,
-          timings.count(setEl.get()) ? timings[setEl.get()] : defaultTiming, endFrame, targetId);
-      for (auto* ch : parsedChannels) {
-        layerEntries.push_back({ch, additive, targetId});
-      }
-      if (endFrame > layerEndFrame) {
-        layerEndFrame = endFrame;
-      }
-    }
-
-    // animateTransform/animateMotion bake Matrix keyframes onto the Layer's runtime "matrix"
-    // channel. Collect them into layerEntries so they share the Layer-targeted AnimationObject
-    // with <animate>/<set> channels (e.g. opacity), and MergeAdditiveChannels composes multiple
-    // additive matrix channels.
-    if (nodeInfo.targetLayer != nullptr &&
-        (!group.animateTransforms.empty() || !group.animateMotions.empty())) {
-      for (const auto& transformEl : group.animateTransforms) {
+      for (const auto& animEl : group.animates) {
         Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
-        auto parsedChannels = parseAnimateTransform(
-            ctx, doc, transformEl, nodeInfo, frameRate,
-            timings.count(transformEl.get()) ? timings[transformEl.get()] : defaultTiming,
-            endFrame);
+        bool additive = (ctx.getAttribute(animEl, "additive") == "sum");
+        std::string targetId;
+        auto parsedChannels =
+            parseAnimate(ctx, doc, animEl, nodeInfo, frameRate,
+                         timings.count(animEl.get()) ? timings[animEl.get()] : defaultTiming,
+                         endFrame, targetId);
         for (auto* ch : parsedChannels) {
-          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+          layerEntries.push_back({ch, additive, targetId});
         }
         if (endFrame > layerEndFrame) {
           layerEndFrame = endFrame;
         }
-        auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
+        auto repeatCount = ctx.getAttribute(animEl, "repeatCount");
         if (repeatCount == "indefinite") {
           hasIndefiniteLoop = true;
           elementIndefinite = true;
           if (indefinitePeriod <= 0) {
-            auto durSeconds = parseSMILClockValue(ctx.getAttribute(transformEl, "dur"));
+            auto durSeconds = parseSMILClockValue(ctx.getAttribute(animEl, "dur"));
             if (std::isfinite(durSeconds) && durSeconds > 0.0) {
               indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
             }
           }
         }
       }
-      for (const auto& motionEl : group.animateMotions) {
+      for (const auto& setEl : group.sets) {
         Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
-        auto parsedChannels = parseAnimateMotion(
-            ctx, doc, motionEl, nodeInfo, frameRate,
-            timings.count(motionEl.get()) ? timings[motionEl.get()] : defaultTiming, endFrame);
+        bool additive = (ctx.getAttribute(setEl, "additive") == "sum");
+        std::string targetId;
+        auto parsedChannels = parseSet(
+            ctx, doc, setEl, nodeInfo, frameRate,
+            timings.count(setEl.get()) ? timings[setEl.get()] : defaultTiming, endFrame, targetId);
         for (auto* ch : parsedChannels) {
-          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+          layerEntries.push_back({ch, additive, targetId});
         }
         if (endFrame > layerEndFrame) {
           layerEndFrame = endFrame;
         }
-        auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
-        if (repeatCount == "indefinite") {
-          hasIndefiniteLoop = true;
-          elementIndefinite = true;
-          if (indefinitePeriod <= 0) {
-            auto durSeconds = parseSMILClockValue(ctx.getAttribute(motionEl, "dur"));
-            if (std::isfinite(durSeconds) && durSeconds > 0.0) {
-              indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+      }
+
+      // animateTransform/animateMotion bake Matrix keyframes onto the Layer's runtime "matrix"
+      // channel. Collect them into layerEntries so they share the Layer-targeted AnimationObject
+      // with <animate>/<set> channels (e.g. opacity), and MergeAdditiveChannels composes multiple
+      // additive matrix channels.
+      if (nodeInfo.targetLayer != nullptr &&
+          (!group.animateTransforms.empty() || !group.animateMotions.empty())) {
+        for (const auto& transformEl : group.animateTransforms) {
+          Frame endFrame = 0;
+          bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
+          auto parsedChannels = parseAnimateTransform(
+              ctx, doc, transformEl, nodeInfo, frameRate,
+              timings.count(transformEl.get()) ? timings[transformEl.get()] : defaultTiming,
+              endFrame);
+          for (auto* ch : parsedChannels) {
+            layerEntries.push_back({ch, additive, nodeInfo.targetId});
+          }
+          if (endFrame > layerEndFrame) {
+            layerEndFrame = endFrame;
+          }
+          auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
+          if (repeatCount == "indefinite") {
+            hasIndefiniteLoop = true;
+            elementIndefinite = true;
+            if (indefinitePeriod <= 0) {
+              auto durSeconds = parseSMILClockValue(ctx.getAttribute(transformEl, "dur"));
+              if (std::isfinite(durSeconds) && durSeconds > 0.0) {
+                indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+              }
+            }
+          }
+        }
+        for (const auto& motionEl : group.animateMotions) {
+          Frame endFrame = 0;
+          bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
+          auto parsedChannels = parseAnimateMotion(
+              ctx, doc, motionEl, nodeInfo, frameRate,
+              timings.count(motionEl.get()) ? timings[motionEl.get()] : defaultTiming, endFrame);
+          for (auto* ch : parsedChannels) {
+            layerEntries.push_back({ch, additive, nodeInfo.targetId});
+          }
+          if (endFrame > layerEndFrame) {
+            layerEndFrame = endFrame;
+          }
+          auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
+          if (repeatCount == "indefinite") {
+            hasIndefiniteLoop = true;
+            elementIndefinite = true;
+            if (indefinitePeriod <= 0) {
+              auto durSeconds = parseSMILClockValue(ctx.getAttribute(motionEl, "dur"));
+              if (std::isfinite(durSeconds) && durSeconds > 0.0) {
+                indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
+              }
             }
           }
         }
       }
-    }
 
-    // Group channels by targetId and create one AnimationObject per target.
-    std::unordered_map<std::string, std::vector<ChannelWithAdditive>> groupedByTarget;
-    for (const auto& entry : layerEntries) {
-      groupedByTarget[entry.targetId].push_back({entry.channel, entry.additive});
-    }
-    // Emit targets in id order so the AnimationObject list is reproducible; the iteration order of
-    // an unordered_map would otherwise leak into the exported document.
-    std::vector<std::string> targetIds = {};
-    targetIds.reserve(groupedByTarget.size());
-    for (const auto& entry : groupedByTarget) {
-      targetIds.push_back(entry.first);
-    }
-    std::sort(targetIds.begin(), targetIds.end());
-    for (const auto& targetId : targetIds) {
-      auto& channels = groupedByTarget[targetId];
-      auto* obj = doc->makeNode<AnimationObject>();
-      obj->target = targetId;
-      obj->channels = MergeAdditiveChannels(&channels);
-      if (!obj->channels.empty()) {
-        animation->objects.push_back(obj);
-        if (elementIndefinite && layerEndFrame > 0) {
-          infiniteObjects.push_back({obj, indefinitePeriod > 0 ? indefinitePeriod : layerEndFrame});
+      // Group channels by targetId and create one AnimationObject per target.
+      std::unordered_map<std::string, std::vector<ChannelWithAdditive>> groupedByTarget;
+      for (const auto& entry : layerEntries) {
+        groupedByTarget[entry.targetId].push_back({entry.channel, entry.additive});
+      }
+      // Emit targets in id order so the AnimationObject list is reproducible; the iteration order of
+      // an unordered_map would otherwise leak into the exported document.
+      std::vector<std::string> targetIds = {};
+      targetIds.reserve(groupedByTarget.size());
+      for (const auto& entry : groupedByTarget) {
+        targetIds.push_back(entry.first);
+      }
+      std::sort(targetIds.begin(), targetIds.end());
+      for (const auto& targetId : targetIds) {
+        auto& channels = groupedByTarget[targetId];
+        auto* obj = doc->makeNode<AnimationObject>();
+        obj->target = targetId;
+        obj->channels = MergeAdditiveChannels(&channels);
+        if (!obj->channels.empty()) {
+          animation->objects.push_back(obj);
+          if (elementIndefinite && layerEndFrame > 0) {
+            infiniteObjects.push_back(
+                {obj, indefinitePeriod > 0 ? indefinitePeriod : layerEndFrame});
+          }
         }
       }
-    }
-    if (layerEndFrame > maxEndFrame) {
-      maxEndFrame = layerEndFrame;
+      if (layerEndFrame > maxEndFrame) {
+        maxEndFrame = layerEndFrame;
+      }
     }
   }
 

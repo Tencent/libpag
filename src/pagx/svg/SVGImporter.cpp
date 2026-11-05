@@ -571,6 +571,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     }
     if (!handledAsContainer) {
       convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
+      // A <use> referencing a shape converts that shape's content into this layer, so the
+      // referenced element's SMIL animations belong to this instance as well.
+      if (refIt != _elementsById.end() && refIt->second != element) {
+        registerAnimatedElement(refIt->second, layer);
+      }
     }
   } else {
     // Shape element: convert to vector contents.
@@ -3249,7 +3254,7 @@ void SVGParserContext::registerFeAnimationTarget(const std::shared_ptr<DOMNode>&
   info.targetFilter = filterNode;
   info.targetId = filterNode->id;
   info.domElement = feElement;
-  _animatedNodeMap[feElement.get()] = std::move(info);
+  _animatedNodeMap[feElement.get()].push_back(std::move(info));
 }
 
 // Parse a CSS style string into a property map. Later properties override earlier ones.
@@ -3773,7 +3778,7 @@ std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMN
   // runtime "matrix" channel (see SMILAnimationParser::parseAnimateTransform), so no Group host
   // node is needed — the Layer itself carries the transform animation.
 
-  _animatedNodeMap[element.get()] = std::move(info);
+  _animatedNodeMap[element.get()].push_back(std::move(info));
   return layer->id;
 }
 

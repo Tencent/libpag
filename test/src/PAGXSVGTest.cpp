@@ -5488,7 +5488,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
  * instead of falling back to the SVG default black.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_TspanFillOnly) {
-  auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/text/tspan_fill_only.svg"));
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/text/tspan_fill_only.svg"));
   ASSERT_NE(doc, nullptr);
   auto xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_NE(xml.find("#FF0000"), std::string::npos) << xml;
@@ -5730,6 +5731,30 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
   // end of the line.
   EXPECT_NEAR(ch->keyframes.front().value.tx, 0.0f, 0.01f);
   EXPECT_NEAR(ch->keyframes.back().value.tx, 100.0f, 0.01f);
+}
+
+/**
+ * use_instance_animations.svg: two <use> references convert the same animated rect, and each
+ * instance keeps its own AnimationObject instead of the last instance overwriting the earlier one.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_UseInstanceAnimations) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/use_instance_animations.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 2u);
+  std::set<std::string> targets;
+  for (auto* obj : anim->objects) {
+    targets.insert(obj->target);
+    ASSERT_EQ(obj->channels.size(), 1u);
+    EXPECT_EQ(obj->channels[0]->name, "alpha");
+    auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+    ASSERT_EQ(ch->keyframes.size(), 2u);
+    EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+    EXPECT_NEAR(ch->keyframes[1].value, 0.2f, 1e-6f);
+  }
+  EXPECT_EQ(targets.size(), 2u);
 }
 
 /**
