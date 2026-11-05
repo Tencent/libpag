@@ -168,15 +168,15 @@ for (int64_t frame = 0; frame < frameCount; frame++) {
 | 场景 | 推荐路径 | 原因 |
 |---|---|---|
 | CLI | `PAGSurface::MakeOffscreen(w, h)` | 进程独占，可自建 device；但必须**只建一次**，见下方说明 |
-| ardot | `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Record(context, scene, surface, autoClear)` | wasm 下 device 必须在主 runtime 线程创建，且应与画布 device 同源 |
+| ardot | `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Record(context, scene, surface, autoClear)` | wasm 下无法新建 device，只能使用当前线程已有的那个 |
 
-`PAGSurface::MakeOffscreen` 的 device 来源是 `OffscreenDrawable::Make` → `pag::Devices::MakeDefault()`（`src/pagx/runtime/OffscreenDrawable.cpp:28`）。**`MakeDefault()` 不是进程级单例**：OpenGL 后端走 `tgfx::GLDevice::MakeWithFallback()`、WebGPU 走 `WebGPUDevice::Make()`、Metal 走 `MetalDevice::Make()`，每次调用都会新建 device 及其 context。因此「每帧新建 scene + 新建 surface」的旧路径实际每帧都在重建 device/context/texture，这是旧路径 400ms 单帧的主要浪费之一；复用 scene + surface 后这部分只付一次。
+`PAGSurface::MakeOffscreen` 的 device 来源是 `OffscreenDrawable::Make` → `pag::Devices::MakeDefault()`（`src/pagx/runtime/OffscreenDrawable.cpp:28`）。**`MakeDefault()` 不是进程级单例**：native 后端每次调用都会新建 device 及其 context（OpenGL 走 `tgfx::GLDevice::MakeWithFallback()`、WebGPU 走 `WebGPUDevice::Make()`、Metal 走 `MetalDevice::Make()`）。因此「每帧新建 scene + 新建 surface」的旧路径实际每帧都在重建 device/context/texture，这是旧路径 400ms 单帧的主要浪费之一；复用 scene + surface 后这部分只付一次。
 
 `pagx::MakeFrom` / `pagx::Record` 见 `include/pagx/tgfx.h:50-67`，目前只有测试在用，正是为「宿主已有 device、想批量提交」设计的。
 
 **禁止嵌套 context lock**：`PAGScene::draw` 与 `PAGSurface::readPixels` 内部都会自行加锁，调用方不能已持有同一 device 的锁。
 
-**WebGPU 的额外限制**：`pag::Devices::MakeDefault()` 在 WebGPU 后端只能由主 runtime 线程调用（`src/rendering/gpu/webgpu/Devices.cpp:26-28`，tgfx 在非主线程直接报错返回 nullptr）。ardot 属于这一情形，`MakeOffscreen` 在子线程里不可用。
+**wasm 下 `MakeDefault()` 的语义完全不同**：它不创建 device，只返回「当前线程已绑定的 device」，其他线程一律 nullptr。WebGL 与 WebGPU 两个后端都是如此（细节与线程模型见 §6.3）。
 
 ### 4.4 CLI 实现
 
@@ -301,9 +301,51 @@ C++ 逐帧渲染 → RGBA → bridge 回调 → JS WebCodecs VideoEncoder(avc1) 
 
 ### 6.3 设备与锁
 
-ardot 导出时必须使用 `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Record(...)`，不能使用 `PAGSurface::MakeOffscreen`（后者内部 `Devices::MakeDefault()`，wasm 下可能与画布 device 不同源，WebGPU 后端还限制只能在主 runtime 线程建设备）。
+**结论先行：wasm 下不存在「在子线程自己建设备」这条路。**
 
-同时注意与现有导出流程的锁生命周期错开：`bakeImagePaintFilters` 是 RAII 持锁、函数返回即释放，MP4 任务应在之后提交。
+`GLDevice::Make()` 在 WebGL 构建里是空实现：
+
+```76:78:third_party/tgfx/src/gpu/opengl/webgl/WebGLDevice.cpp
+std::shared_ptr<GLDevice> GLDevice::Make(void*) {
+  return nullptr;
+}
+```
+
+因此 `Devices::MakeDefault()` → `GLDevice::MakeWithFallback()` 在 wasm 上会退化为 `GLDevice::Current()`：
+
+```34:38:third_party/tgfx/include/tgfx/gpu/opengl/GLDevice.h
+  /**
+   * Returns an GLDevice associated with current OpenGL context. Returns nullptr if there is no
+   * current OpenGL context on the calling thread.
+   */
+  static std::shared_ptr<GLDevice> Current();
+```
+
+也就是说：**只有已经绑定 GL context 的线程才能拿到 device，其他线程一律 nullptr**。`PAGSurface::MakeOffscreen` 因此在没有 GL context 的 worker 线程里会失败（`OffscreenDrawable::Make` 中 device 为空即返回 nullptr）。
+
+ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投递到 `TaskKind::Concurrent` 通道。wasm 线上预算是 `BudgetForWasmMt`（`write=1`、`compute=side-1`，其中 `side = min(2, (cores-1)/2)`）：
+
+| hardwareConcurrency | side | compute_workers | 导出任务实际线程 |
+|---|---|---|---|
+| ≤4 | 1 | 0 | **inline，主线程** |
+| ≥6 | 2 | 1 | **compute worker** |
+
+桌面端 `compute = max(1, hw-1)`，导出确实在子线程；但桌面走 EGL/WGL，`GLDevice::Make()` 能正常新建 pbuffer context，所以子线程 bake 可行。**wasm 没有这个能力**。
+
+两个后果：
+
+1. **现有 bake 路径在 wasm 上可能是降级状态**。`bakeUnsupported` 开启时（SVG/HTML/PPT 默认），exporter 内部的 `GPUContext` 若拿不到 device，bake 只会打 warning 并降级（丢失 `ImagePattern` tiling、带 mask 图层、backdrop 混合等效果）。6 核以上的机器上，这类导出任务会落到 compute worker，存在静默降级的风险，需要实测确认产物完整度。
+2. **MP4 渲染必须保证在有 GL context 的线程执行**，可选模型：
+
+| 模型 | 做法 | 代价 |
+|---|---|---|
+| A（推荐） | 主线程 inline 渲染，每帧结束后 `Submit` 下一帧，让 UI 有喘息 | 8 秒 1080p 需 20~60 秒，期间主导航仍可交互 |
+| B | 主线程建设备与 surface，worker 用 `pagx::MakeFrom(device, surface)` + `Record` | wasm GL context 不跨线程共享，纹理可见性需验证 |
+| C | worker 建 OffscreenCanvas + 独立 GL context | 依赖 `-sOFFSCREENCANVAS_SUPPORT`（ardot 仅在 hop 构建打开），且像素要 readPixels 回传 |
+
+推荐 A：改动最小，不依赖 OffscreenCanvas 编译开关，也不涉及跨线程纹理共享。
+
+锁生命周期仍需错开：`bakeImagePaintFilters` 是 RAII 持锁、函数返回即释放，MP4 任务应在之后提交。
 
 ---
 
@@ -318,6 +360,8 @@ ardot 导出时必须使用 `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Rec
 | 多动画周期不一致 | 无法自然定长 | 默认取最长动画一个周期，允许 `--duration` 覆盖 |
 | 状态机驱动的动效 | 交互逻辑无法离线复现 | 只渲染时间轴，不模拟状态转换（当前样例的 StateMachine 未被引用，无影响） |
 | wasm 跨语言传帧 | 内存带宽开销 | 分批回调 / 必要时降采样 |
+| wasm 无 GL context 的线程拿不到 device | 渲染任务落错线程会直接失败 | 渲染固定在主线程（分帧让出），或由主线程传 device（见 §6.3） |
+| wasm 6 核以上导出任务可能进 compute worker | 现有 SVG/HTML/PPT bake 可能静默降级 | 实测确认产物完整度，必要时把 bake 拉回主线程 |
 
 ---
 
