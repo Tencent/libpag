@@ -59,6 +59,7 @@ class RadialGradient;
 class ConicGradient;
 class Polystar;
 class Repeater;
+class RoundCorner;
 class Text;
 class TextBox;
 class TextModifier;
@@ -301,6 +302,9 @@ class HTMLWriterContext {
     std::unordered_map<const Path*, std::string> maskPathIds = {};
     // Masked layer -> id of the inline <mask> generated for it.
     std::unordered_map<const Layer*, std::string> svgMaskIds = {};
+    // RoundCorner node -> the single shape it rounds. The radius animation rebuilds that shape's
+    // path per frame, so the emitter needs the geometry the modifier applies to.
+    std::unordered_map<const RoundCorner*, const Element*> roundCornerShapes = {};
 
     struct Instance {
       const Composition* composition = nullptr;
