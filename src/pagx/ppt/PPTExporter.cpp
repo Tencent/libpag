@@ -890,12 +890,19 @@ void PPTWriter::writeDocument(XMLBuilder& out) {
   // Composition is referenced multiple times.
   const auto* topChildren = buildResult.root ? &buildResult.root->children() : nullptr;
   size_t topIndex = 0;
+  std::unordered_set<const Layer*> maskReferenceLayers = {};
+  CollectMaskReferenceLayers(*_doc, &maskReferenceLayers);
   for (const auto* layer : _doc->layers) {
     std::shared_ptr<tgfx::Layer> tgfxLayer;
     if (topChildren && topIndex < topChildren->size()) {
       tgfxLayer = (*topChildren)[topIndex];
     }
     ++topIndex;
+    // A layer referenced as another layer's mask is a clip shape, not content. Importers keep it
+    // visible for downstream consumers, so the visibility check alone cannot skip it.
+    if (maskReferenceLayers.count(layer) != 0) {
+      continue;
+    }
     writeLayer(out, layer, tgfxLayer);
   }
 }
