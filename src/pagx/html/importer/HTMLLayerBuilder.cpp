@@ -699,10 +699,20 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
     return;
   }
   const auto& pose = box.transform.pose;
-  // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a
-  // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
-  // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or
-  // pure projection) is unaffected by the pivot, so it keeps the legacy matrix-only form.
+  // CSS conjugates the whole function list with `transform-origin`, including `perspective()`,
+  // while PAGX keeps the projection outside `anchor`. A pose that carries its own projection is
+  // therefore baked instead of anchored: `T(origin) * pose * T(-origin)` reproduces the CSS order
+  // exactly, whereas anchoring would shift the result by the `origin x projection` term.
+  if (HasProjection(pose)) {
+    layer->matrix3D = box.transform.originResolved
+                          ? BakeTransformOrigin(pose, box.transform.origin, box.transform.originZ)
+                          : pose;
+    return;
+  }
+  // Poses without a projection are equivalent under both encodings, so they keep the anchor form:
+  // the matrix `tx`/`ty` stay a pure translation and the runtime applies the pivot once, after the
+  // keyframes have been interpolated. A pose whose linear part is the identity (pure translation)
+  // is unaffected by the pivot, so it keeps the legacy matrix-only form.
   const bool needsAnchor = box.transform.originResolved && !IsLinearIdentity(pose);
   if (IsFlatTransform(pose)) {
     const Matrix affine = ToAffine2D(pose);
