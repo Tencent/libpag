@@ -570,6 +570,77 @@ PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostResolvesCenterAnchor) {
 }
 
 /**
+ * Test case: a `perspective` declared on the parent projects the child pose. PAGX keeps the
+ * projection on the layer that owns the pose, so the importer pushes `P` into the child matrix3D
+ * while the pivot stays on the child `anchor` — exactly the CSS "parent camera + child origin"
+ * order (and the AE / Lottie one).
+ */
+PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsTheChildPose) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:160px">
+      <div style="position:absolute;left:40px;top:40px;width:120px;height:80px;
+           perspective:600px">
+        <div id="card" style="width:120px;height:80px;background-color:#38BDF8;
+             transform:rotateY(30deg);transform-origin:0px 40px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  const auto& pose = card->matrix3D;
+  // T(60, 40) * P(600) * T(-60, -40) * rotateY(30): the projection is conjugated with the parent's
+  // `perspective-origin` (its centre by default), which also mixes into the linear rows.
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 0), 0.916025f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 2), 0.413397f, 0.001f));
+  // The projection row is `-1/600` times the rotation's Z row: (sin30, 0, -cos30) / 600.
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.000833f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 1), 0.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), -0.001443f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(card->anchor.x, 0.0f));
+  EXPECT_TRUE(NearlyEqual(card->anchor.y, 40.0f));
+}
+
+/**
+ * Test case: the parent `perspective` also projects animated keyframes, and the pivot stays on the
+ * child layer so the interpolation never carries a pivot translation.
+ */
+PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes flip {
+        0%   { transform: rotateY(0deg); }
+        100% { transform: rotateY(60deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:160px">
+      <div style="position:absolute;left:40px;top:40px;width:120px;height:80px;
+           perspective:600px">
+        <div id="card" style="width:120px;height:80px;background-color:#38BDF8;
+             transform-origin:0px 40px;animation:flip 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->keyframes.size(), 2u);
+  const auto& start = channel->keyframes.front().value;
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(3, 2), -0.001667f, 1e-5f))
+      << "the projection row comes from the parent perspective, not from the keyframe";
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(0, 3), 0.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(2, 3), 0.0f, 1e-5f));
+  const auto& end = channel->keyframes.back().value;
+  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 0), 0.001443f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 2), -0.000833f, 1e-5f));
+  auto* target = FindLayerById(doc, ChannelTarget(animation, "matrix3D"));
+  ASSERT_NE(target, nullptr);
+  EXPECT_TRUE(NearlyEqual(target->anchor.y, 40.0f));
+}
+
+/**
  * Test case: an inline `<svg>` host carries its CSS 3D transform the same way a plain box does.
  */
 PAG_TEST(PAGXHTML3DTest, InlineSvgHostWithPerspectiveEmitsMatrix3D) {

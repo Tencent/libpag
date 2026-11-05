@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Perspective Property Pivot</title>
+    <!--
+      The camera is declared on the parent (`perspective: 600px`), the pivot on the child. This is the
+      CSS form whose origin does NOT conjugate the projection, so it maps one-to-one onto PAGX
+      (`Layer.matrix3D` already carries `P`, `Layer.anchor` carries the pivot) — the expected result
+      is a pixel-accurate match, unlike `transform: perspective(...)` written inside the child.
+    -->
+    <style>
+      @keyframes flip3d {
+        0%   { transform: rotateY(-45deg); }
+        50%  { transform: rotateY(45deg); }
+        100% { transform: rotateY(-45deg); }
+      }
+      #stage {
+        position: absolute;
+        left: 60px;
+        top: 40px;
+        width: 120px;
+        height: 80px;
+        perspective: 600px;
+      }
+      #card {
+        width: 120px;
+        height: 80px;
+        border-radius: 12px;
+        background-color: #38BDF8;
+        transform-origin: 0px 40px;
+        animation: flip3d 2s ease-in-out infinite;
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <div id="stage">
+      <div id="card">
+        <div style="position: absolute; left: 24px; top: 24px;
+                    width: 72px; height: 32px; border-radius: 8px;
+                    background-color: #F472B6;"></div>
+      </div>
+    </div>
+  </body>
+</html>
