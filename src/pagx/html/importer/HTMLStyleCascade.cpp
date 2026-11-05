@@ -277,6 +277,11 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
                                                            const HTMLInheritedStyle& parent,
                                                            bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
+  // `perspective` applies to direct children only, so it never travels with the inherited bag; the
+  // parent re-applies it on the bag it hands to its own children.
+  out.parentPerspectivePx = 0.0f;
+  out.parentPerspectiveOriginX = NAN;
+  out.parentPerspectiveOriginY = NAN;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
@@ -777,7 +782,23 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* VisualsDisallowed[] = {"outline", "perspective"};
+  // CSS `perspective` on this element projects its children; the value rides on the box so the
+  // parser context can push `P` into each child pose. `perspective-origin` has no PAGX equivalent.
+  const std::string perspective = LookupLowerTrimmed(props, "perspective");
+  if (!perspective.empty() && perspective != "none") {
+    const float distance = _valueParser.parseAbsoluteLengthPx(perspective);
+    if (std::isfinite(distance) && distance > 0.0f) {
+      box.perspectivePx = distance;
+    } else {
+      _diagnostics.warn("html: perspective '" + perspective +
+                        "' must be a positive length; ignored [subset:unsupported-property]");
+    }
+  }
+  if (!LookupProperty(props, "perspective-origin").empty()) {
+    _diagnostics.warn("html: perspective-origin is not supported; ignored");
+  }
+
+  static const char* VisualsDisallowed[] = {"outline"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");

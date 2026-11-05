@@ -80,6 +80,20 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out);
 
 /**
+ * Returns the projection matrix `P` for the CSS perspective distance `distance`: the identity with
+ * its bottom row set to `(0, 0, -1/distance, 1)`. `Layer.perspective` builds the same matrix, but a
+ * CSS `perspective` declaration lives on the parent and must be pushed into the child pose instead.
+ */
+Matrix3D PerspectiveMatrix(float distance);
+
+/**
+ * Returns `P * pose` for a CSS `perspective` declared on the pose's parent. The projection is pushed
+ * into the child pose because PAGX keeps it on the layer that owns the pose; `Layer.perspective`
+ * cannot be used for that, as it would only project the declaring layer itself.
+ */
+Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY);
+
+/**
  * Returns true when the pose only acts on the z = 0 plane: no depth translation, no z-dependent
  * linear terms and no projection row. Such a pose is written as a 2D affine, which keeps documents
  * whose 4x4 is only pedantically 3D on the cheap path.

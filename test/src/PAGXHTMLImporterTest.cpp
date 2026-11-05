@@ -3106,6 +3106,8 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedLayoutPropertiesEmitWarnings) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
+  // `perspective` is supported now, so it no longer warns; `outline` and the geometric clip-path
+  // forms still do.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;clip-path:margin-box;
@@ -3121,7 +3123,7 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   }
   EXPECT_TRUE(outlineWarn);
   EXPECT_TRUE(clipWarn);
-  EXPECT_TRUE(perspectiveWarn);
+  EXPECT_FALSE(perspectiveWarn);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginBecomesAnchor) {
@@ -12924,6 +12926,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawDisallowedLayoutPropertiesWarn) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawDisallowedVisualPropertiesWarn) {
+  // `perspective` is supported now (it projects the children), so only `outline` still warns here.
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;perspective:100px;width:50px;height:50px"></div>
@@ -12931,7 +12934,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawDisallowedVisualPropertiesWarn) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(HasDiagnosticContaining(doc, "outline not supported; ignored"));
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "perspective not supported; ignored"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "perspective not supported"));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawDisallowedTextPropertiesWarn) {

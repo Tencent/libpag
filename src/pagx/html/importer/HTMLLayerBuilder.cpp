@@ -698,7 +698,10 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   if (!box.transform.valid) {
     return;
   }
-  const auto& pose = box.transform.pose;
+  // A `perspective` declared on the parent projects this element's pose. PAGX keeps the projection
+  // on the layer that owns the pose, so it is folded in here rather than read from the parent.
+  const Matrix3D pose = PushPerspective(box.transform.pose, box.parentPerspectivePx,
+                                        box.parentPerspectiveOriginX, box.parentPerspectiveOriginY);
   // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a
   // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
   // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or

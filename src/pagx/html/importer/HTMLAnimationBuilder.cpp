@@ -1075,7 +1075,8 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 
 bool HTMLAnimationBuilder::buildForElement(
     const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
-    const HTMLTransformReference& reference) {
+    const HTMLTransformReference& reference, float parentPerspectivePx,
+    float parentPerspectiveOriginX, float parentPerspectiveOriginY) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
 
   // Gather the animation spec from the shorthand and/or longhands.
@@ -1253,7 +1254,9 @@ bool HTMLAnimationBuilder::buildForElement(
         bool pureTranslate = false;
         bool flat = true;
         if (ParseTransformPose(val, _valueParser, _diagnostics, pose, pureTranslate, flat)) {
-          transformStops.push_back({time, pose});
+          transformStops.push_back(
+              {time, PushPerspective(pose, parentPerspectivePx, parentPerspectiveOriginX,
+                                     parentPerspectiveOriginY)});
           if (!pureTranslate) transformAllPureTranslate = false;
           if (!flat) transformAllFlat = false;
         } else if (!warnedTransform) {
