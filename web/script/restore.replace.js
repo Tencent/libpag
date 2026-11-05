@@ -1,14 +1,13 @@
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const filePath = path.resolve(__dirname, '../src/pag.ts');
 const argv = require('minimist')(process.argv.slice(2));
 
 function restoreFile(file) {
-    const command = `git restore ${file}`;
-    console.log(`${command}`);
+    console.log(`git restore ${file}`);
 
-    exec(command, (error, stdout, stderr) => {
+    execFile('git', ['restore', file], (error, stdout, stderr) => {
         if (error) {
             console.error(`error:${error.message}`);
             return;

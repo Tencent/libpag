@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const path = require('path');
+const { execFile } = require('child_process');
 
 // Enable SharedArrayBuffer
 app.use((req, res, next) => {
@@ -22,6 +23,16 @@ app.get('/', (req, res) => {
   res.send('Hello, libpag demo!');
 });
 
+function OpenBrowser(url) {
+  if (process.platform === 'darwin') {
+    execFile('open', [url]);
+    return;
+  }
+  // `start` is a cmd.exe builtin, so it can only be reached through the shell interpreter while
+  // the URL itself stays a separate argument that cmd never parses.
+  execFile('cmd', ['/c', 'start', '', url]);
+}
+
 const port = 8081;
 const args = process.argv.slice(2);
 const target = require('./script/targets').resolveTarget(
@@ -30,8 +41,5 @@ const target = require('./script/targets').resolveTarget(
 );
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
-
-  const url = `http://localhost:${port}/demo/${target.demoHtml}`;
-  const start = (process.platform === 'darwin'? 'open': 'start');
-  require('child_process').exec(start + ' ' + url);
+  OpenBrowser(`http://localhost:${port}/demo/${target.demoHtml}`);
 });
