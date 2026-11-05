@@ -2,7 +2,7 @@
 <!-- Tests: Two identical bars rotate by the same 30 degrees: the left one pivots around the layer origin (no anchor),
      the right one around its centre via anchor, so the difference between the two pivots is visible at once.
      Target: Layer  Channel: rotation.z  Type: float
-     Expect: gap  (rotation.z is exported, the anchor that places the pivot is not)
+     Expect: supported  (rotation.z is exported, the anchor that places the pivot is not)
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
