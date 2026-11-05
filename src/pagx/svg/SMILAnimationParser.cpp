@@ -307,10 +307,9 @@ static double ResolveRepeatCount(const std::string& repeatCountStr, const std::s
   }
   double repeatDurSeconds = SMILAnimationParser::parseSMILClockValue(repeatDurStr);
   if (repeatDurSeconds > 0.0 && durSeconds > 0.0) {
+    // A repeatDur shorter than one iteration is a truncated first pass, so the fraction is kept
+    // rather than clamped to 1; callers end the track at that point.
     double fromDur = repeatDurSeconds / durSeconds;
-    if (fromDur < 1.0) {
-      fromDur = 1.0;
-    }
     // repeatCount unset (count == 1 with an empty attribute) → repeatDur alone; both set → the
     // earlier expiry wins (the smaller count).
     if (repeatCountStr.empty() || fromDur < count) {
@@ -466,6 +465,68 @@ static void ApplyEndTimeLimitTo(TypedChannel<T>* channel, Frame endFrame) {
   key.value = value;
   key.interpolation = KeyframeInterpolationType::Hold;
   channel->keyframes.push_back(key);
+}
+
+template <typename T>
+static bool KeyframeTimeLess(const Keyframe<T>& a, const Keyframe<T>& b) {
+  return a.time < b.time;
+}
+
+template <typename T>
+static void AppendTypedKeyframes(TypedChannel<T>* base, const TypedChannel<T>* extra) {
+  if (base == nullptr || extra == nullptr) {
+    return;
+  }
+  base->keyframes.insert(base->keyframes.end(), extra->keyframes.begin(), extra->keyframes.end());
+}
+
+static Frame ChannelStartFrame(const Channel* channel) {
+  if (channel == nullptr) {
+    return 0;
+  }
+  switch (channel->valueType()) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<const TypedChannel<float>*>(channel);
+      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<const TypedChannel<Color>*>(channel);
+      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<const TypedChannel<Matrix>*>(channel);
+      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+    }
+    case ChannelValueType::Bool: {
+      auto* ch = static_cast<const TypedChannel<bool>*>(channel);
+      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+    }
+    default:
+      return 0;
+  }
+}
+
+// Rotates a typed track by phaseShift of one iteration. A negative begin on a looping animation
+// means the animation already started before frame 0, so the values are re-sampled at the wrapped
+// positions and the track then starts at frame 0.
+template <typename T>
+static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double phaseShift) {
+  if (channel == nullptr || channel->keyframes.empty() || phaseShift <= 0.0 || durFrames <= 0) {
+    return;
+  }
+  std::vector<Keyframe<T>> shifted = {};
+  shifted.reserve(channel->keyframes.size());
+  for (const auto& key : channel->keyframes) {
+    double u = static_cast<double>(key.time) / static_cast<double>(durFrames) + phaseShift;
+    u -= std::floor(u);
+    Frame time = static_cast<Frame>(std::round(u * static_cast<double>(durFrames)));
+    auto shiftedKey = key;
+    shiftedKey.time = time;
+    shiftedKey.value = std::get<T>(channel->evaluateAt(time));
+    shifted.push_back(shiftedKey);
+  }
+  std::stable_sort(shifted.begin(), shifted.end(), KeyframeTimeLess<T>);
+  channel->keyframes = std::move(shifted);
 }
 
 static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Frame endFrame) {
@@ -1252,8 +1313,37 @@ static std::vector<Channel*> MergeAdditiveChannels(std::vector<ChannelWithAdditi
           MergeAdditiveBool(base, (*channels)[idx].channel);
         }
       } else {
-        // additive="replace": this channel becomes the new base.
-        base = (*channels)[idx].channel;
+        // additive="replace": the previous segment stays active until the new one starts. Truncate
+        // the old track at the handover and append the new keys so both halves survive instead of
+        // the earlier segment disappearing.
+        auto* next = (*channels)[idx].channel;
+        Frame handover = ChannelStartFrame(next);
+        if (handover <= ChannelStartFrame(base)) {
+          // Both segments start at the same time, so the later one simply replaces the earlier.
+          base = next;
+          continue;
+        }
+        ApplyEndTimeLimit(base, base->valueType(), handover);
+        switch (base->valueType()) {
+          case ChannelValueType::Float:
+            AppendTypedKeyframes(static_cast<TypedChannel<float>*>(base),
+                                 static_cast<TypedChannel<float>*>(next));
+            break;
+          case ChannelValueType::Color:
+            AppendTypedKeyframes(static_cast<TypedChannel<Color>*>(base),
+                                 static_cast<TypedChannel<Color>*>(next));
+            break;
+          case ChannelValueType::Matrix:
+            AppendTypedKeyframes(static_cast<TypedChannel<Matrix>*>(base),
+                                 static_cast<TypedChannel<Matrix>*>(next));
+            break;
+          case ChannelValueType::Bool:
+            AppendTypedKeyframes(static_cast<TypedChannel<bool>*>(base),
+                                 static_cast<TypedChannel<bool>*>(next));
+            break;
+          default:
+            break;
+        }
       }
     }
     result.push_back(base);
@@ -1836,6 +1926,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // their targets). Negative values keep negative keyframe times: the animation started before
   // the timeline origin, so evaluation at time 0 lands mid-animation via the natural clamp.
   Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
+  // A negative begin on an indefinitely repeating animation is a phase offset: fold it into the
+  // values and start the track at frame 0, matching the transform and motion paths.
+  double phaseShift = 0.0;
+  if (beginFrames < 0 && durFrames > 0 && IsIndefiniteRepeat(animElement)) {
+    phaseShift = std::fmod(static_cast<double>(-beginFrames) / static_cast<double>(durFrames), 1.0);
+    beginFrames = 0;
+  }
 
   // Parse values: either explicit `values` list or from/to/by.
   auto valuesStr = ctx.getAttribute(animElement, "values");
@@ -2084,6 +2181,17 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     }
   }
 
+  // Fold the negative-begin phase into the values so the track starts at frame 0.
+  if (phaseShift > 0.0) {
+    for (auto* ch : channels) {
+      if (ch->valueType() == ChannelValueType::Float) {
+        ShiftChannelPhase(static_cast<TypedChannel<float>*>(ch), durFrames, phaseShift);
+      } else if (ch->valueType() == ChannelValueType::Color) {
+        ShiftChannelPhase(static_cast<TypedChannel<Color>*>(ch), durFrames, phaseShift);
+      }
+    }
+  }
+
   // Expand repeatCount (resolved against repeatDur): integer N replicates the keyframe sequence
   // N times with time offset. accumulate="sum" offsets each repetition's values by
   // k*(lastValue - firstValue). "indefinite" is handled by buildAnimation (sets LoopMode::Loop),
@@ -2096,6 +2204,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
       ExpandRepeatCount(ch, target.valueType, durFrames, repeatCount, accumulate);
     }
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else if (repeatCount > 0.0 && repeatCount < 1.0) {
+    // A repeatDur shorter than one iteration truncates the single pass.
+    Frame limit = beginFrames + static_cast<Frame>(std::round(repeatCount * durFrames));
+    for (auto* ch : channels) {
+      ApplyEndTimeLimit(ch, target.valueType, limit);
+    }
+    outEndFrame = limit;
   } else {
     outEndFrame = beginFrames + durFrames;
   }
@@ -2419,6 +2534,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else if (repeatCount > 0.0 && repeatCount < 1.0) {
+    // A repeatDur shorter than one iteration truncates the single pass.
+    Frame limit = beginFrames + static_cast<Frame>(std::round(repeatCount * durFrames));
+    ApplyEndTimeLimit(ch, ChannelValueType::Matrix, limit);
+    outEndFrame = limit;
   } else {
     outEndFrame = beginFrames + durFrames;
   }
@@ -2687,6 +2807,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
+  } else if (repeatCount > 0.0 && repeatCount < 1.0) {
+    // A repeatDur shorter than one iteration truncates the single pass.
+    Frame limit = beginFrames + static_cast<Frame>(std::round(repeatCount * durFrames));
+    ApplyEndTimeLimit(ch, ChannelValueType::Matrix, limit);
+    outEndFrame = limit;
   } else {
     outEndFrame = beginFrames + durFrames;
   }
