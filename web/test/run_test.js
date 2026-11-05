@@ -48,13 +48,18 @@ function ReadExpectedCache(directory, backend) {
 }
 
 function StartServer(directory) {
-  // The request URL is only used as a lookup key against this table: every path handed to the
-  // file system is resolved from the artifact names above, so no request string ever reaches
-  // path.join or fs directly. path.basename additionally strips any directory component.
-  const files = new Map();
-  for (const name of [...ArtifactNames, 'build-info.json']) files.set(name, path.join(directory, name));
+  const allowed = [...ArtifactNames, 'build-info.json'];
+  // The request URL only ever participates in an equality test: the returned path is built from
+  // an element of the constant list above, so no request string can reach the file system.
+  function ResolveArtifact(url) {
+    const name = url?.slice(1);
+    for (const candidate of allowed) {
+      if (candidate === name) return path.join(directory, candidate);
+    }
+    return null;
+  }
   function handleRequest(request, response) {
-    const file = files.get(path.basename(request.url?.slice(1) ?? ''));
+    const file = ResolveArtifact(request.url);
     if (!['GET', 'HEAD'].includes(request.method) || !file) {
       response.writeHead(404).end();
       return;
