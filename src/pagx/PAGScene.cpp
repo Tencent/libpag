@@ -100,27 +100,6 @@ void ReapplyCompositionTreeDataBinds(
   }
 }
 
-// Maps the tgfx probe results back to PAGLayer handles without a persistent registry. The runtime
-// tree can contain helper layers (mask owners, composition slots) that have no PAGLayer, so only
-// hits present in the order map are kept. A single walk keeps the mapping in sync with the current
-// tree without register/unregister bookkeeping.
-void MapRuntimeHits(const std::shared_ptr<PAGLayer>& layer,
-                    const std::unordered_map<const tgfx::Layer*, size_t>& hitOrder,
-                    std::vector<std::shared_ptr<PAGLayer>>* out) {
-  if (layer == nullptr) {
-    return;
-  }
-  if (layer->runtimeLayer != nullptr) {
-    auto it = hitOrder.find(layer->runtimeLayer.get());
-    if (it != hitOrder.end()) {
-      (*out)[it->second] = layer;
-    }
-  }
-  for (const auto& child : layer->getChildren()) {
-    MapRuntimeHits(child, hitOrder, out);
-  }
-}
-
 bool BindingCoversDirtyNodes(const RuntimeBinding* binding,
                              const std::unordered_set<const Node*>& dirtySet) {
   if (binding == nullptr) {
@@ -832,6 +811,10 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
+// Maps the tgfx probe results back to PAGLayer handles without a persistent registry. The runtime
+// tree can contain helper layers (mask owners, composition slots) that have no PAGLayer, so only
+// hits present in the order map are kept. A single walk keeps the mapping in sync with the current
+// tree without register/unregister bookkeeping.
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   float rootX = 0;
@@ -849,7 +832,23 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   }
   std::vector<std::shared_ptr<PAGLayer>> mapped = {};
   mapped.resize(runtimeHits.size());
-  MapRuntimeHits(_rootComposition, hitOrder, &mapped);
+  std::vector<std::shared_ptr<PAGLayer>> pending = {};
+  pending.push_back(_rootComposition);
+  while (!pending.empty()) {
+    auto layer = pending.back();
+    pending.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->runtimeLayer != nullptr) {
+      auto it = hitOrder.find(layer->runtimeLayer.get());
+      if (it != hitOrder.end()) {
+        mapped[it->second] = layer;
+      }
+    }
+    const auto& children = layer->getChildren();
+    pending.insert(pending.end(), children.rbegin(), children.rend());
+  }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
   result.reserve(runtimeHits.size());
   for (auto& layer : mapped) {
