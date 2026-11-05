@@ -137,6 +137,12 @@ bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
   return false;
 }
 
+void ExpectPose(const pagx::Matrix3D& pose, const float (&expected)[16]) {
+  for (int index = 0; index < 16; ++index) {
+    EXPECT_TRUE(NearlyEqual(pose.values[index], expected[index], 1e-4f)) << "index " << index;
+  }
+}
+
 pagx::Animation* FirstAnimation(const std::shared_ptr<pagx::PAGXDocument>& doc) {
   if (doc == nullptr || doc->animations.empty()) {
     return nullptr;
@@ -361,7 +367,7 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveFunctionEntersProjectionRow) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:100px">
       <div id="box" style="width:100px;height:60px;background-color:#6366F1;
-           transform:perspective(500px) rotateY(30deg)"></div>
+           transform:perspective(500px) rotateY(30deg);transform-origin:0px 0px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
@@ -421,7 +427,8 @@ PAG_TEST(PAGXHTML3DTest, Matrix3DPassesThroughUnprojected) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:100px">
       <div id="box" style="width:100px;height:60px;background-color:#6366F1;
-           transform:matrix3d(1,0,0,0, 0,1,0,0, 0,0,1,-0.002, 10,20,30,1)"></div>
+           transform:matrix3d(1,0,0,0, 0,1,0,0, 0,0,1,-0.002, 10,20,30,1);
+           transform-origin:0px 0px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
@@ -541,10 +548,10 @@ PAG_TEST(PAGXHTML3DTest, TransformStylePreserve3DMapsToLayer) {
 }
 
 /**
- * Test case: an inline `<svg>` host sized by its `width` / `height` attributes (not CSS) still
- * resolves the box centre for the pivot, so a 3D animation keeps `anchor` at (w/2, h/2).
+ * Test case: an `<svg>` sized by its attributes still resolves the box centre for the pivot, so a
+ * perspective animation keeps `(w/2, h/2)` as the anchor.
  */
-PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostResolvesCenterAnchor) {
+PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostKeepsTheAttributePivot) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes flip3d {
@@ -561,9 +568,12 @@ PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostResolvesCenterAnchor) {
   ASSERT_NE(doc, nullptr);
   auto* animation = FirstAnimation(doc);
   ASSERT_NE(animation, nullptr);
-  ASSERT_NE(FindMatrix3DChannel(animation), nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
   auto* target = FindLayerById(doc, ChannelTarget(animation, "matrix3D"));
   ASSERT_NE(target, nullptr);
+  // Baking would drift here (the pivot-induced translation differs between the keys), so the pivot
+  // stays on the layer as `anchor` and the attribute-sized `<svg>` box supplied the reference size.
   EXPECT_TRUE(NearlyEqual(target->anchor.x, 40.0f));
   EXPECT_TRUE(NearlyEqual(target->anchor.y, 30.0f));
   EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
@@ -1012,7 +1022,7 @@ PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgShapeKeepsScalarRotation) {
  * Test case: 3D keyframes with a non-centre origin keep the pivot on the layer: the translation
  * column stays zero and the projection row is untouched by the anchor.
  */
-PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesKeepAnchorOutsideProjection) {
+PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesBakeThePerspectivePivot) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes flip {
@@ -1029,26 +1039,18 @@ PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesKeepAnchorOutsideProjection) {
   ASSERT_NE(doc, nullptr);
   auto* layer = FindLayerById(doc, "card");
   ASSERT_NE(layer, nullptr);
-  EXPECT_TRUE(NearlyEqual(layer->anchor.x, 0.0f));
-  EXPECT_TRUE(NearlyEqual(layer->anchor.y, 40.0f));
-  auto* animation = FirstAnimation(doc);
-  ASSERT_NE(animation, nullptr);
-  auto* channel = FindMatrix3DChannel(animation);
+  // `matrix3D` may not carry the pivot here: the runtime would keep the projection outside it,
+  // which is not what CSS does. The keyframes therefore hold T(a) * P * R * T(-a) with a = (0, 40).
+  EXPECT_TRUE(HasZeroAnchor(layer));
+  auto* channel = FindMatrix3DChannel(FirstAnimation(doc));
   ASSERT_NE(channel, nullptr);
   ASSERT_EQ(channel->keyframes.size(), 2u);
-  const auto& start = channel->keyframes.front().value;
-  // rotateY(0): row3 = (0, 0, -0.002, 1); the pivot must not leak into the translation column.
-  EXPECT_TRUE(NearlyEqual(start.getRowColumn(3, 2), -0.002f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(start.getRowColumn(0, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(start.getRowColumn(1, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(start.getRowColumn(2, 3), 0.0f, 1e-5f));
-  const auto& end = channel->keyframes.back().value;
-  // rotateY(60): the projection row follows the rotation, it is not conjugated by the pivot.
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 2), -0.001f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(0, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(2, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(0, 0), 0.5f, 0.001f));
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(2, 0), -0.866025f, 0.001f));
+  const float startPose[16] = {1.0f, 0.0f,   0.0f, 0.0f,    0.0f, 1.0f, 0.0f, 0.0f,
+                               0.0f, -0.08f, 1.0f, -0.002f, 0.0f, 0.0f, 0.0f, 1.0f};
+  ExpectPose(channel->keyframes.front().value, startPose);
+  const float endPose[16] = {0.5f,      0.069282f, -0.866025f, 0.001732f, 0.0f, 1.0f, 0.0f, 0.0f,
+                             0.866025f, -0.04f,    0.5f,       -0.001f,   0.0f, 0.0f, 0.0f, 1.0f};
+  ExpectPose(channel->keyframes.back().value, endPose);
 }
 
 /**
@@ -1056,7 +1058,7 @@ PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesKeepAnchorOutsideProjection) {
  * the layer plane, so rotating about X also slides the plane along Z by `anchorZ - L_z * anchorZ`
  * while the stored pose stays un-pivoted.
  */
-PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
+PAG_TEST(PAGXHTML3DTest, DepthPivotBakesTheCssOrder) {
   const std::string templateHtml = R"HTML(
     <html><body style="width:200px;height:200px">
       <div id="card" style="width:120px;height:80px;background-color:#6366F1;
@@ -1072,33 +1074,26 @@ PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
   ASSERT_NE(doc, nullptr);
   auto* layer = FindLayerById(doc, "card");
   ASSERT_NE(layer, nullptr);
-  EXPECT_TRUE(NearlyEqual(layer->anchor.x, 20.0f));
-  EXPECT_TRUE(NearlyEqual(layer->anchor.y, 10.0f));
-  EXPECT_TRUE(NearlyEqual(layer->anchorZ, 30.0f));
+  EXPECT_TRUE(HasZeroAnchor(layer)) << "a projection pose is baked, never anchored";
+  // Expected matrix: T(20, 10, 30) * perspective(600) * rotateX(60) * T(-20, -10, -30), i.e. the CSS
+  // order where `transform-origin` conjugates the projection as well.
+  const float expected[16] = {1.0f,      0.0f,       0.0f,       0.0f,       -0.028868f, 0.485566f,
+                              0.822724f, -0.001443f, -0.016667f, -0.874359f, 0.475f,     -0.000833f,
+                              0.788675f, 31.3751f,   7.522759f,  1.039434f};
+  ExpectPose(layer->matrix3D, expected);
 
-  // The stored pose is the raw CSS value: a depth pivot must not leak into the translation column.
-  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(0, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(1, 3), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(2, 3), 0.0f, 1e-5f));
-
-  // The pivot is applied once, after the projection: t' = a - L * a with L = rotateX(60).
-  const auto local = pagx::BuildLayerTransform3DWithAnchor(layer);
-  EXPECT_TRUE(NearlyEqual(local.getRowColumn(0, 3), 0.0f, 0.01f));
-  EXPECT_TRUE(NearlyEqual(local.getRowColumn(1, 3), 30.980762f, 0.01f));
-  EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3), 6.339746f, 0.01f));
-
-  // The depth itself is what moves the plane: dropping anchorZ pulls the pivot back onto the layer,
-  // which changes the composed translation by (0, 0, anchorZ) - L * (0, 0, anchorZ). rotateX(60)
-  // mixes Y and Z, so both components move: Z by (1 - cos60) * 30 = 15, Y by sin60 * 30 = 25.98.
+  // Dropping the pivot depth changes the same expression with a = (20, 10, 0), which moves the
+  // plane by a - L * a in both Y and Z.
   auto flatDoc = ParseHtml(withoutDepth);
   ASSERT_NE(flatDoc, nullptr);
   auto* flatLayer = FindLayerById(flatDoc, "card");
   ASSERT_NE(flatLayer, nullptr);
-  ASSERT_TRUE(NearlyEqual(flatLayer->anchorZ, 0.0f));
-  const auto flatLocal = pagx::BuildLayerTransform3DWithAnchor(flatLayer);
-  EXPECT_TRUE(NearlyEqual(local.getRowColumn(2, 3) - flatLocal.getRowColumn(2, 3), 15.0f, 0.01f));
   EXPECT_TRUE(
-      NearlyEqual(local.getRowColumn(1, 3) - flatLocal.getRowColumn(1, 3), 25.980762f, 0.01f));
+      NearlyEqual(layer->matrix3D.getRowColumn(1, 3) - flatLayer->matrix3D.getRowColumn(1, 3),
+                  26.230762f, 0.01f));
+  EXPECT_TRUE(
+      NearlyEqual(layer->matrix3D.getRowColumn(2, 3) - flatLayer->matrix3D.getRowColumn(2, 3),
+                  16.183012f, 0.01f));
 }
 
 /**
@@ -1197,10 +1192,11 @@ PAGX_TEST(PAGXHTML3DRenderTest, Animated2DAnchorRendersLikeBakedMatrix) {
 }
 
 /**
- * Test case: a static 3D pose with a non-centre origin renders exactly like the same document with
- * the pivot baked into `matrix3D`, which pins "anchor is applied once, outside the projection".
+ * Test case: a static perspective pose with a non-centre origin is written as the CSS-order matrix
+ * `T(origin) * P * R * T(-origin)` and renders exactly like a document that carries that matrix
+ * directly with no `anchor`, which pins "the pivot is baked, not applied twice".
  */
-PAGX_TEST(PAGXHTML3DRenderTest, Imported3DAnchorRendersLikeBakedMatrix3D) {
+PAGX_TEST(PAGXHTML3DRenderTest, Imported3DPerspectivePoseMatchesCssOrder) {
   const std::string html = R"HTML(
     <html><body style="width:200px;height:200px">
       <div id="box" style="position:absolute;left:60px;top:50px;width:80px;height:60px;
@@ -1208,29 +1204,35 @@ PAGX_TEST(PAGXHTML3DRenderTest, Imported3DAnchorRendersLikeBakedMatrix3D) {
            transform:perspective(500px) rotateY(25deg);transform-origin:10px 40px"></div>
     </body></html>
   )HTML";
-  auto anchored = ParseHtml(html);
-  auto baked = ParseHtml(html);
-  ASSERT_NE(anchored, nullptr);
-  ASSERT_NE(baked, nullptr);
-  auto* anchoredLayer = FindLayerById(anchored, "box");
-  auto* bakedLayer = FindLayerById(baked, "box");
-  ASSERT_NE(anchoredLayer, nullptr);
-  ASSERT_NE(bakedLayer, nullptr);
-  ASSERT_FALSE(anchoredLayer->matrix3D.isIdentity());
-  ASSERT_FALSE(HasZeroAnchor(anchoredLayer)) << "the HTML origin must produce an anchor";
+  auto imported = ParseHtml(html);
+  ASSERT_NE(imported, nullptr);
+  auto* importedLayer = FindLayerById(imported, "box");
+  ASSERT_NE(importedLayer, nullptr);
+  EXPECT_TRUE(HasZeroAnchor(importedLayer)) << "a projection pose is baked, never anchored";
+  // T(10, 40) * perspective(500) * rotateY(25) * T(-10, -40).
+  const float expected[16] = {0.91476f,  0.033809f,  -0.422618f, 0.000845f,  0.0f,      1.0f,
+                              0.0f,      0.0f,       0.404492f,  -0.072505f, 0.906308f, -0.001813f,
+                              0.852398f, -0.338095f, 4.226183f,  0.991548f};
+  ExpectPose(importedLayer->matrix3D, expected);
 
-  bakedLayer->matrix3D =
-      pagx::ApplyAnchorToMatrix(pagx::ComposeLayerTransform3DWithoutAnchor(bakedLayer),
-                                bakedLayer->anchor, bakedLayer->anchorZ);
-  bakedLayer->matrix = {};
-  bakedLayer->anchor = {};
-  bakedLayer->anchorZ = 0.0f;
+  auto reference = ParseHtml(html);
+  ASSERT_NE(reference, nullptr);
+  auto* referenceLayer = FindLayerById(reference, "box");
+  ASSERT_NE(referenceLayer, nullptr);
+  pagx::Matrix3D pose = {};
+  for (int index = 0; index < 16; ++index) {
+    pose.values[index] = expected[index];
+  }
+  referenceLayer->matrix3D = pose;
+  referenceLayer->anchor = {};
+  referenceLayer->anchorZ = 0.0f;
 
-  auto anchoredPixels = RenderFrame(anchored);
-  auto bakedPixels = RenderFrame(baked);
-  ASSERT_FALSE(anchoredPixels.empty());
-  ASSERT_EQ(anchoredPixels.size(), bakedPixels.size());
-  EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+  auto importedPixels = RenderFrame(imported);
+  auto referencePixels = RenderFrame(reference);
+  ASSERT_FALSE(importedPixels.empty());
+  ASSERT_FALSE(referencePixels.empty());
+  ASSERT_EQ(importedPixels.size(), referencePixels.size());
+  EXPECT_EQ(CountDifferentPixels(importedPixels, referencePixels), 0u);
 }
 
 }  // namespace pag
