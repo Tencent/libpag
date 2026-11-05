@@ -5734,6 +5734,37 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
 }
 
 /**
+ * rect_mask_optimization.svg: imported mask layers stay visible for downstream consumers, and the
+ * optimizer only rewrites hidden masks into a scrollRect. An SVG rect mask therefore keeps its
+ * mask reference instead of being folded into a scrollRect — the known limitation this test pins
+ * so a future change makes the trade-off explicit.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_RectMaskIsNotFoldedIntoScrollRect) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/text/rect_mask_optimization.svg"));
+  ASSERT_NE(doc, nullptr);
+
+  pagx::Layer* masked = nullptr;
+  pagx::Layer* maskLayer = nullptr;
+  for (auto* layer : doc->layers) {
+    if (layer->mask != nullptr) {
+      masked = layer;
+      maskLayer = layer->mask;
+      break;
+    }
+  }
+  ASSERT_NE(masked, nullptr);
+  ASSERT_NE(maskLayer, nullptr);
+  EXPECT_TRUE(maskLayer->visible);
+
+  pagx::PAGXOptimizer::Optimize(doc.get());
+
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->mask, maskLayer);
+  EXPECT_FALSE(masked->hasScrollRect);
+}
+
+/**
  * repeat_count_fractional_tail.svg: the fractional tail rounds to zero frames, so it would land on
  * the previous period's last keyframe. Keyframe times must stay strictly increasing or a track
  * keyed by timestamp drops one of the two.
