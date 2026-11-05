@@ -3907,7 +3907,14 @@ CLI_TEST(PAGXHtmlTest, AnimationLayer3DChannelsEmitMatrix3D) {
     ASSERT_FALSE(tag.empty()) << id;
     auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
     ASSERT_FALSE(rule.empty()) << id << html;
-    EXPECT_NE(rule.find("matrix3d("), std::string::npos) << id << rule;
+    // The frame is a function list so the browser interpolates the parameters, not a decomposed
+    // matrix; a projected channel keeps perspective() as the outermost function.
+    EXPECT_EQ(rule.find("matrix3d("), std::string::npos) << id << rule;
+    bool has3DFunction = rule.find("rotateX(") != std::string::npos ||
+                         rule.find("rotateY(") != std::string::npos ||
+                         rule.find("translate3d(") != std::string::npos ||
+                         rule.find("perspective(") != std::string::npos;
+    EXPECT_TRUE(has3DFunction) << id << rule;
     auto first = KeyframeStopOf(html, std::string("id=\"") + id + "\"", "0%");
     auto last = KeyframeStopOf(html, std::string("id=\"") + id + "\"", "100%");
     ASSERT_FALSE(first.empty()) << id;

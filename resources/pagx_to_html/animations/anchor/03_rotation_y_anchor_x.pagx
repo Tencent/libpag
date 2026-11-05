@@ -2,7 +2,7 @@
 <!-- Tests: rotation.y turns the card around a vertical axis that sits on its left edge, so the projection must keep
      that edge fixed while the right edge foreshortens.
      Target: Layer  Channel: rotation.y  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
