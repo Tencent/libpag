@@ -109,8 +109,8 @@ ardot 侧「动效 → PAGX」的引擎代码已完整：`exporter/src/pagx/util
    │  交付 RGBA
    ▼
 ② 编码 + 封装（按宿主实现）
-   CLI（native）    ：H.264 编码器（路线待决策，见 §5.1）
-                      + pag::MP4BoxHelper 封装（当前产出 fMP4，见 §5.2）
+   CLI（native）    ：S1 外部 ffmpeg 进程 + rawvideo 管道，编码与封装一次完成（见 §5.1）
+                      备选 S3 内置 openh264 + pag::MP4BoxHelper 封装（当前产出 fMP4，见 §5.2）
    ardot（wasm）    ：JS WebCodecs VideoEncoder + mp4-muxer 封装
    ▼
 MP4
@@ -235,21 +235,72 @@ ffmpeg -framerate 60 -i /tmp/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p out
 
 ---
 
-## 5. 编码层：方案（待决策）
+## 5. 编码层：方案与选型
 
-### 5.1 候选路线
+### 5.1 候选路线全清单
 
 仓库目前**没有任何视频编码能力**：`third_party` 只有解码类库（`libavc` 的 target 名为 `libavcdec`），平台原生编码 API（`AVAssetWriter` / `VTCompressionSession` / `IMFTransform` / Android `MediaCodec`）零使用，`exporter/` 的 `OfflineVideoEncoder` 是 AE 插件专用（`QProcess` 调外部 x264），且 **x264 为 GPL-2.0，不能进 Apache-2.0 的 libpag 主库**。
 
-| 路线 | 优点 | 代价 |
+按「编码器从哪来」和「跑在谁里面」两个维度拆开，可选方案共 7 条：
+
+| 编号 | 方案 | 编码器来源 | 运行形态 | 许可证 | 直接产出 |
+|---|---|---|---|---|---|
+| S1 | 外部 ffmpeg（用户环境已有） | 用户安装的 ffmpeg（通常带 libx264） | 子进程 + rawvideo 管道 | 不随包分发，主库干净 | 标准 MP4（含 faststart） |
+| S2 | 随包分发 ffmpeg（LGPL 构建） | 随包的 ffmpeg | 子进程 | LGPL-2.1，需声明且允许替换 | 标准 MP4 |
+| S3 | 内置 openh264 | 链进主库 | 进程内 | BSD-2，兼容 Apache-2.0；专利需法务 | Annex-B 裸流 |
+| S4 | 平台硬编 | VideoToolbox / Media Foundation / VAAPI | 进程内 | 系统 API，专利由 OS 承担 | Annex-B 或平台样本缓冲 |
+| S5 | 随包分发 H264EncoderTools | 独立 GPL 可执行文件（x264） | 子进程 + 文件握手 | GPL-2.0，须提供该工具源码 | Annex-B 裸流 |
+| S6 | 链接 / dlopen 系统 x264 | 系统 `libx264` | 进程内 | GPL-2.0 与 Apache-2.0 不兼容 | Annex-B 裸流 |
+| S7 | 只出帧序列（当前 `--frames-dir`） | 无 | 无 | 干净 | PNG / JPEG / WEBP 序列 |
+
+**S1 外部 ffmpeg（推荐）**：`ffmpeg -f rawvideo -pixel_format rgba -video_size WxH -framerate N -i pipe:0 -c:v libx264 -pix_fmt yuv420p -crf Q -movflags +faststart out.mp4`，C++ 侧把 `readPixels` 的结果直接写进子进程 stdin，跳过中间图片编码（实测 PNG 编码占单帧 62%），同时省掉自研 muxer。代价是 npm 包不能无条件开箱即用，需检测 `ffmpeg` 是否存在并给出安装指引。注意三点：背景色在 CLI 侧先清屏合成（tgfx 输出是预乘 alpha，交给 ffmpeg 做 unpremultiply 容易错）、`write` 阻塞天然形成背压故单线程即可、结束必须 `waitpid` 校验退出码否则「文件损坏也报成功」。
+
+**S2 随包分发 ffmpeg（排除）**：体积增加数十 MB，且 LGPL 构建的 ffmpeg 不能带 `libx264`（GPL），H.264 编码只剩 `h264_videotoolbox` / `h264_vaapi` / `h264_openh264` 等 wrapper —— 等于绕回 S4 或 S3，还额外背一条「动态链接 + 允许替换」的 LGPL 义务。
+
+**S3 内置 openh264（备选）**：唯一能同时满足「Apache-2.0 兼容」和「开箱即用」的软件编码器。代价是新增 DEPS + vendor target + 6 个平台/架构构建矩阵；码率控制只有 CBR/VBR，没有 x264 的 CRF 恒质量模式；Cisco 的 H.264 专利补偿只覆盖其官方预编译二进制，自行编译需法务单独确认。**前提：产品明确要求零外部依赖。**
+
+**S4 平台硬编（不推荐）**：mac 一套 `VTCompressionSession`、win 一套 Media Foundation MFT（COM + 异步事件），Linux 还要第四套兜底。pagx 的产物是独立 MP4，通用播放器本就不支持 alpha，所以这里不存在 exporter 那种「硬编给不了 alpha」的死结；否决理由纯粹是工程量与收益不匹配 —— 离线导出对编码速度不敏感，而同码率画质不如 x264 的 CRF。
+
+**S5 随包分发 H264EncoderTools（不推荐，见 §5.1.1）**：编码器现成、参数可控（quality 0-100 映射 x264 CRF/VBV/keyint，工具协议与产物见 §5.4），但必须自备 muxer，且要履行 GPL 源码提供义务。
+
+**S6 链接 / dlopen 系统 x264（否决）**：GPL-2.0 没有「系统库例外」（那是 GPLv3 的条款），动态链接与 `dlopen` 都不能豁免；更硬的一条是 Apache-2.0 与 GPL-2.0 单向不兼容，主库不可能为此改许可证。
+
+**S7 只出帧序列（兜底）**：即当前的 `--frames-dir`，由用户自行 `ffmpeg -i f_%04d.png` 合成。零依赖、零许可证风险，但多一步手工操作且要多付一次图片编解码。
+
+### 5.1.1 H264EncoderTools 属于哪一套
+
+**它属于 S5，不是 S1。** 两者的分界线是「谁提供那个二进制、谁承担 GPL 义务」：
+
+- S1 的编码器由用户环境提供，我们不随包分发、不链接，因此不承担 x264 的分发义务。
+- S5 是我们随产品投递一个 GPL 可执行文件，必须履行 GPL-2.0 义务（提供该工具的完整对应源码或书面 offer）。进程边界只能把义务限制在工具自身、不污染 CLI 本体，不能免除义务。exporter 现在就是这么做的：工具放在 `~/Library/Application Support/H264EncoderTools`（mac）与 `%APPDATA%\H264EncoderTools`（win），不进 plugin bundle。
+
+**在 CLI 上照搬 S5 的成本比 exporter 高**，原因有三：
+
+1. exporter 只要 Annex-B 裸流，直接塞进 `.pag` 的 `VideoSequence` 即可；CLI 要的是独立 MP4，裸流必须自己 mux，而 `MP4BoxHelper` 只产 fMP4（§5.2），所以 S5 天然绑定「改造 muxer（300~500 行）或强制 remux」。
+2. `OfflineVideoEncoder` 依赖 Qt 的 `QProcess` / `QFile` / `QJsonDocument`，CLI 不能引 Qt，需改 `posix_spawn` / `CreateProcess` 并自带 JSON 解析。
+3. 文件握手（`YUV-<n>.yuv` + `InFrameInfo-<n>.txt` ↔ `H264-<n>.264` + `OutFrameInfo-<n>.txt`，1ms 轮询）在 CLI 上应改成 stdin/stdout 管道，否则每帧都要多一次写盘。
+
+结论：S5 只在「必须开箱即用」且「法务接受随包分发 GPL 工具」两个条件同时成立时才选，且必须同步改造 muxer。相比之下 S1 是同样的「外部进程 + 裸帧」，但把编码器来源换成用户环境，许可证与 muxer 两个成本同时消失。
+
+### 5.1.2 与 exporter 的选型差异
+
+exporter 选 S5、CLI 选 S1，不是标准不一致，而是产物和播放方不同：
+
+| 维度 | exporter（AE 插件） | pagx CLI |
 |---|---|---|
-| A. 外部 ffmpeg 进程 | 零新依赖、无许可证问题、最快落地 | 破坏 npm CLI 开箱即用；三平台行为不一致 |
-| B. 内置 openh264（BSD-2） | 三平台一致、单份代码 | 新增 DEPS + vendor target + 6 个平台/架构构建矩阵；专利授权需法务确认 |
-| C. 平台硬编 | 质量与速度最好、mac/win 零新增依赖 | 三份平台代码；Linux 无 GPU 时仍需软件兜底 |
+| 产物 | `.pag` 里内嵌的 H.264 | 独立 `.mp4` 文件 |
+| 播放方 | PAG runtime（Android / iOS / Web / Windows / mac） | 通用播放器、浏览器、剪辑软件 |
+| 格式约束 | 所有端解码能力的交集 = H.264 + 自带 alpha 灰度区 | H.264 yuv420p 最稳；alpha 不支持 |
+| 平台硬编能否满足 | 不能：Windows / Web 只有 H.264 软解，mac 硬解输出固定 BGRA 无 alpha 平面 | 能满足（MP4 本就不带 alpha），但工程量与收益不匹配 |
+| alpha 方案 | 画布扩 2 倍 + alpha 灰度区（`(a*219>>8)+16`） | 不支持；透明动效需另开 WebM / MOV 链路 |
+| 最终选择 | S5（x264 进程隔离，唯一能出带 alpha 的 H.264 的路） | S1（外部 ffmpeg，零依赖零许可证风险） |
 
-建议：先以 A 打通端到端（`--frames-dir` 已具备，只差一次进程调用），再按产品节奏评估 B/C。
+### 5.1.3 选型结论
 
-A 路线有两种现成实现（见 §5.4）：直接调外部 `ffmpeg`（一条命令同时解决编码与封装），或调 `H264EncoderTools`（libpag 生态现成的 x264 工具，但只吐裸流，需要自带 muxer）。
+1. **默认 S1**：CLI 直出 MP4 走外部 ffmpeg + rawvideo 管道，`--frames-dir` 保留为无 ffmpeg 时的降级路径（S7）。
+2. **S2、S6 排除**；**S5 不推荐**（GPL 义务 + 自备 muxer + Qt 依赖替换）；**S4 仅在明确要求零外部依赖且接受三套平台代码时评估**。
+3. **S3 作为 S1 的产品化备选**：只有当「npm 装完必须能直接出片」是硬需求时才启动，且法务须先给专利口径。
+4. 无论选哪条，编码器输出的都是 Annex-B，与 §5.2 的 `VideoSequence` 结构天然匹配；S1/S2 由 ffmpeg 顺带解决封装，S3/S4/S5 必须自带 muxer。
 
 ### 5.2 MP4 封装：fMP4 与普通 MP4
 
@@ -465,6 +516,8 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 
 | 风险 | 影响 | 对策 |
 |---|---|---|
+| 编码器许可证 | 误链或误 dlopen GPL 的 x264，会迫使整个主库按 GPL 分发 | 只走外部进程（S1），不链接不 dlopen；随包分发 GPL 工具时须履行源码提供义务（§5.1.1） |
+| CLI 依赖外部 ffmpeg | 用户环境未安装时无法出片 | 启动时探测并给出安装指引，降级到 `--frames-dir`（S7） |
 | H.264 无 alpha | 透明动效无法导出 | 明确不支持，或另开 WebM/MOV 链路 |
 | PNG 中间编码占单帧成本 62% | 出片慢 | 接编码器时直接 RGBA → YUV，跳过图片编码 |
 | fMP4 兼容性 | 部分播放器/剪辑软件打不开 | 需要时改造为普通 MP4 |
@@ -482,7 +535,7 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P0 | `pagx render --frames-dir` 复用 scene 逐帧渲染 + 一致性验证 | ✅ 已完成（`9b5a1262c`） |
-| P1 | CLI 接入编码器（ffmpeg 或 openh264），一条命令直接产 MP4；含 §5.2 的封装选型（普通 MP4 改造 或 remux） | 待决策 |
+| P1 | 按 §5.1 落地 S1：CLI 接外部 ffmpeg + rawvideo 管道直出 MP4（`--frames-dir` 降级保留），编码与封装一并解决 | 方案已定，待实施 |
 | P2 | ardot 接入：新策略 + `VideoExportTask` + WebCodecs + 进度通道 | 待上游动效 PAGX 通道打通 |
 | P3 | 性能优化：跳过图片编码、异步读回、多线程编码 | 待 P1/P2 之后 |
 | P4 | 质量档位与码率映射（对齐 Figma 的 LOW/MEDIUM/HIGH） | 待 P1 |
