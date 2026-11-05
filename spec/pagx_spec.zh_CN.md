@@ -2447,6 +2447,8 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `Bezier` | 使用 `bezierOut` 和下一个关键帧的 `bezierIn` 控制柄进行三次贝塞尔缓动 |
 | `Hold` | 保持当前值直到下一个关键帧，然后跳变 |
 
+**插值空间**：通道在它所承载的量所处的空间里插值关键帧值。除一个例外，所有通道都直接插值数值本身：图层的 `perspective` 最终以投影系数 `-1/d` 进入渲染，因此它的关键帧插值的是该系数——从 1000 变化到 200 的透视距离在中点经过约 333 而不是 600，这与浏览器对 CSS 关键帧动画中 `perspective()` 变换函数的插值方式一致。缓动作用于该系数，因此 `Linear`、`Bezier`、`Hold` 的含义不变。距离为 0（无透视）的关键帧没有可插值的系数，因此一端为该值的区间改为直接插值距离。
+
 **Key 属性**：
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -3130,7 +3132,7 @@ Layer / Group
 | `rotation.x` / `rotation.y` / `rotation.z` | float | 旋转角，单位为度（`rotationX`/`rotationY`/`rotationZ`） |
 | `scale.x` / `scale.y` / `scale.z` | float | 缩放（`scaleX`/`scaleY`/`scaleZ`） |
 | `skew.x` / `skew.y` | float | 剪切角，单位为度（`skewX`/`skewY`） |
-| `perspective` | float | 透视距离（`perspective`）；0 表示无透视 |
+| `perspective` | float | 透视距离（`perspective`）；0 表示无透视。关键帧插值的是投影系数 `-1/d` 而不是距离，见 §8.1.4 |
 | `anchor.x` / `anchor.y` | float | 局部变换支点（图层本地像素），按分量线性插值 |
 | `anchor.z` | float | 支点深度；需要 Z 向分量，纯 2D 下被精确抵消 |
 

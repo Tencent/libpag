@@ -2457,6 +2457,8 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
 | `Hold` | Holds value until the next keyframe, then jumps |
 
+**Interpolation space**: a channel interpolates its keyframe values in the space of the quantity it drives. Every channel interpolates the values themselves, with one exception: a `Layer`'s `perspective` reaches the renderer as the projection coefficient `-1/d`, so its keyframes interpolate that coefficient — a distance animating from 1000 to 200 passes through about 333 at the midpoint instead of 600, which is how a browser interpolates the `perspective()` transform function of a CSS keyframe animation. The easing applies to the coefficient, so `Linear`, `Bezier` and `Hold` keep their meaning. A keyframe whose distance is 0 (no projection) has no coefficient to interpolate, so a segment touching such a value interpolates the distances instead.
+
 **Key attributes**:
 
 | Attribute | Type | Default | Description |
@@ -3138,7 +3140,7 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `rotation.x` / `rotation.y` / `rotation.z` | float | Rotation in degrees (`rotationX`/`rotationY`/`rotationZ`) |
 | `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
 | `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |
-| `perspective` | float | Perspective distance (`perspective`); 0 means none |
+| `perspective` | float | Perspective distance (`perspective`); 0 means none. Keyframes interpolate the projection coefficient `-1/d` instead of the distance, see §8.1.4 |
 | `anchor.x` / `anchor.y` | float | Local transform pivot in layer-local pixels, interpolated per component |
 | `anchor.z` | float | Pivot depth; needs a Z component, a purely 2D transform cancels it out |
 

@@ -428,7 +428,7 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 #define FIELD_SKEW(T, name, member, cls) \
   { name, cls, &AccessSkewAngle<T, &T::member> }
 #define FIELD_PERSPECTIVE(T, name, member, cls) \
-  { name, cls, &AccessPerspectiveDistance<T, &T::member> }
+  { name, cls, &AccessPerspectiveDistance<T, &T::member>, KeyframeInterpolationSpace::Reciprocal }
 #define FIELD_BOOL(T, name, member, cls) \
   { name, cls, &AccessBool<T, &T::member> }
 #define FIELD_INT(T, name, member, cls) \
@@ -1173,6 +1173,11 @@ bool ResetNodeChannel(Node* node, const std::string& channel) {
     return false;
   }
   return true;
+}
+
+KeyframeInterpolationSpace GetChannelInterpolationSpace(NodeType type, const std::string& channel) {
+  const auto* field = FindChannel(type, channel);
+  return field != nullptr ? field->interpolationSpace : KeyframeInterpolationSpace::Value;
 }
 
 bool IsAnimatableChannel(NodeType type, const std::string& channel) {
