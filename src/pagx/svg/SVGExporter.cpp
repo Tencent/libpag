@@ -1886,27 +1886,6 @@ static void CollectLayerParents(const Layer* parent,
   }
 }
 
-// Collects every layer referenced through Layer::mask, recursing into the mask subtree so nested
-// mask-of-mask references are covered. `visited` guards against cycles.
-static void CollectMaskReferences(const Layer* node, std::unordered_set<const Layer*>* refs,
-                                  std::unordered_set<const Layer*>* visited) {
-  if (node == nullptr || !visited->insert(node).second) {
-    return;
-  }
-  if (node->mask != nullptr) {
-    refs->insert(node->mask);
-    CollectMaskReferences(node->mask, refs, visited);
-  }
-  for (const auto* child : node->children) {
-    CollectMaskReferences(child, refs, visited);
-  }
-  if (node->composition != nullptr) {
-    for (const auto* compLayer : node->composition->layers) {
-      CollectMaskReferences(compLayer, refs, visited);
-    }
-  }
-}
-
 const Layer* SVGWriter::findLayerParent(const Layer* layer) {
   if (layer == nullptr || _doc == nullptr) {
     return nullptr;
@@ -1940,16 +1919,10 @@ bool SVGWriter::isMaskReferenceLayer(const Layer* layer) {
   }
   if (!_context->maskReferencesReady) {
     auto& refs = _context->maskReferenceLayers;
+    CollectMaskReferenceLayers(*_doc, &refs);
     // Walk every Layer node in the document (top-level plus children/composition subtrees) and
     // register each Layer::mask reference target, recursing into the mask's own subtree so
     // nested mask-of-mask references are covered. `visited` guards against cycles.
-    std::unordered_set<const Layer*> visited;
-    for (const auto& nodePtr : _doc->nodes) {
-      if (nodePtr->nodeType() != NodeType::Layer) {
-        continue;
-      }
-      CollectMaskReferences(static_cast<Layer*>(nodePtr.get()), &refs, &visited);
-    }
     _context->maskReferencesReady = true;
   }
   return _context->maskReferenceLayers.count(layer) > 0;
