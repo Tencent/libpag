@@ -4655,12 +4655,37 @@ function cameraDistanceForElement(opts, computed) {
 // Wraps the element in the camera layer the CSS `perspective` property needs. Falls back to the
 // unwrapped html when the element did not render as a plain positioned <div> (flex items, inline
 // text runs, replaced elements), which keeps those paths exactly as they were.
+// The camera wrapper only reproduces `transform-origin` in the plane: `perspective-origin` takes two
+// components, so a pivot with depth (`transform-origin: 0 80 30px`) cannot be carried over. Rewriting
+// such an element would silently re-place its vanishing point and move the painted box, so the
+// function form is kept instead (the importer then anchors the pivot, which is off by the
+// CSS-vs-PAGX projection order but keeps the geometry).
+function transformOriginDepth(computed) {
+  const parts = String((computed && computed.transformOrigin) || '')
+    .trim()
+    .split(/\s+/);
+  if (parts.length < 3) return 0;
+  const depth = parseFloat(parts[2]);
+  return isFinite(depth) ? depth : 0;
+}
+
+// `perspective-origin` accepts at most two components; passing the computed `transform-origin`
+// through verbatim would emit an invalid declaration that browsers drop, which silently moves the
+// vanishing point to the wrapper's centre.
+function perspectiveOriginXY(computed) {
+  const parts = String((computed && computed.transformOrigin) || '50% 50%')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2);
+  return parts.length === 2 ? parts[0] + ' ' + parts[1] : '50% 50%';
+}
+
 function withPerspectiveCamera(el, html, opts, computed) {
   if (!html) return html;
   const distance = cameraDistanceForElement(opts, computed);
   if (!distance) return html;
-  const origin = ((computed && computed.transformOrigin) || '50% 50%').trim();
-  const wrapped = liftBoxOntoCameraWrapper(html, distance, origin);
+  if (Math.abs(transformOriginDepth(computed)) > 1e-6) return html;
+  const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
   if (!wrapped) return html;
   return wrapped;
 }
@@ -5378,6 +5403,8 @@ const HELPER_FNS = [
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
   cameraDistanceForElement,
+  transformOriginDepth,
+  perspectiveOriginXY,
   withPerspectiveCamera,
   normalizeFontFamily,
   normalizeOverflow,
@@ -6652,6 +6679,8 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  transformOriginDepth,
+  perspectiveOriginXY,
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
