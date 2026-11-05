@@ -3842,6 +3842,123 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
   return end == std::string::npos ? "" : rule.substr(start + 1, end - start - 1);
 }
 
+// A Layer rotation.z channel is the 2D spin around the layer's own origin; the runtime applies it
+// per frame and CSS expresses it as a plain rotate(). PAGX names the channel "rotation.z", so the
+// binding has to accept that spelling instead of only "rotation".
+CLI_TEST(PAGXHtmlTest, AnimationLayerRotationZChannel) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="spinBoxZ" x="120" y="60" width="80" height="80">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#4F46E5"/>
+    </Layer>
+    <Animations>
+      <Animation id="spinZ" duration="60" frameRate="60" loop="once">
+        <Object target="spinBoxZ">
+          <Channel name="rotation.z" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"spinBoxZ\"");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("rotate(0deg)"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("rotate(40deg)"), std::string::npos) << rule;
+}
+
+// Layer skew.x / skew.y shear the layer, the same way the Group channels do. The runtime applies the
+// shear with the opposite sign to the CSS skew function, so the emitted functions carry the negation.
+CLI_TEST(PAGXHtmlTest, AnimationLayerSkewChannels) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="shearBoxX" x="60" y="60" width="80" height="80">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#4F46E5"/>
+    </Layer>
+    <Layer id="shearBoxY" x="200" y="60" width="80" height="80">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#0EA5E9"/>
+    </Layer>
+    <Animations>
+      <Animation id="shear" duration="60" frameRate="60" loop="once">
+        <Object target="shearBoxX">
+          <Channel name="skew.x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="30"/>
+          </Channel>
+        </Object>
+        <Object target="shearBoxY">
+          <Channel name="skew.y" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="20"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tagX = FindTagContaining(html, "id=\"shearBoxX\"");
+  auto tagY = FindTagContaining(html, "id=\"shearBoxY\"");
+  ASSERT_FALSE(tagX.empty());
+  ASSERT_FALSE(tagY.empty());
+  auto ruleX = KeyframesRuleNamed(html, AnimationNameOfTag(tagX));
+  auto ruleY = KeyframesRuleNamed(html, AnimationNameOfTag(tagY));
+  ASSERT_FALSE(ruleX.empty()) << html;
+  ASSERT_FALSE(ruleY.empty()) << html;
+  // Layer skew values are the CSS angles themselves, so they keep their sign.
+  EXPECT_NE(ruleX.find("skewX(30deg)"), std::string::npos) << ruleX;
+  EXPECT_NE(ruleY.find("skewY(20deg)"), std::string::npos) << ruleY;
+}
+
+// TrimPath start eats the stroke from its beginning while end stays put: the visible run is
+// [start, end], so the dasharray is the visible length and the dashoffset shifts it by -start.
+CLI_TEST(PAGXHtmlTest, AnimationTrimPathStartCutsFromBeginning) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Polystar position="160,100" type="star" pointCount="5" outerRadius="80" innerRadius="34"
+                rotation="-90"/>
+      <TrimPath id="trimStart" type="separate" start="0" end="1"/>
+      <Stroke color="#9333EA" width="14" cap="round"/>
+    </Layer>
+    <Animations>
+      <Animation id="trimIn" duration="60" frameRate="60" loop="once">
+        <Object target="trimStart">
+          <Channel name="start" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="0.5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto pathTag = FindTagContaining(html, "stroke=\"#9333EA\"");
+  ASSERT_FALSE(pathTag.empty()) << html;
+  EXPECT_NE(pathTag.find("animation:"), std::string::npos) << pathTag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(pathTag));
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("stroke-dasharray: 1 0"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("stroke-dasharray: 0.5 0.5"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("stroke-dashoffset: -0.5"), std::string::npos) << rule;
+}
+
 // Multiplies two 2D affine matrices stored as [a b c d e f], matching the CSS matrix() order.
 static std::array<double, 6> MultiplyCssMatrix(const std::array<double, 6>& m,
                                                const std::array<double, 6>& n) {

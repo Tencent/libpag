@@ -226,21 +226,21 @@ Repeater / TextModifier / RangeSelector / 渐变色源 / 图层样式这几族�
 
 | 缺口族 | `Expect: gap` 用例 | 尚未覆盖 |
 |--------|--------------------|----------|
-| Layer 变换分量 / 3D | `layer/10`（rotation.z）、`layer/11`（rotation.y）、`layer/17`（rotation.x）、`layer/12`（perspective）、`layer/13`（matrix3D）、`layer/14`（z）、`layer/15`（skew.x）、`layer/16`（skew.y） | `scale.z` |
+| Layer 变换分量 / 3D | `layer/11`（rotation.y）、`layer/17`（rotation.x）、`layer/12`（perspective）、`layer/13`（matrix3D）、`layer/14`（z） | `scale.z` |
 | Layer 支点（`anchor.*`） | `anchor/01`~`anchor/08` | — |
 | Layer 混合模式 | `layer/07` | — |
 | Stroke 尖角限制 | `stroke/05` | — |
 | 几何尺寸 / 位置 | **无** | `size.height`、Rectangle/Ellipse 的 `position.x/y` |
 | Polystar | **无** | `pointCount`、`outerRadius`、`innerRadius`、`rotation`、内外圆角 |
 | 渐变色源 | `gradient/01`~`gradient/06` | 中心点通道 |
-| 修改器 | `modifier/01`（RoundCorner.radius）、`modifier/02`（TrimPath.start）、`modifier/03`（Repeater.copies）、`modifier/04`（Repeater.rotation）、`modifier/05`（RangeSelector.start） | `TrimPath.offset`、continuous、Repeater 其余通道、RangeSelector 缓动 |
+| 修改器 | `modifier/01`（RoundCorner.radius）、`modifier/03`（Repeater.copies）、`modifier/04`（Repeater.rotation）、`modifier/05`（RangeSelector.start） | `TrimPath.offset`、continuous、Repeater 其余通道、RangeSelector 缓动 |
 | 文本 | `text/01`（TextModifier.fillColor）、`text/02`（TextModifier.alpha）、`text/03`（Text.text） | 其余 TextModifier / Text 通道 |
 | 图层样式 | `style/01`（DropShadowStyle.offsetX）、`style/02`（InnerShadowStyle.blur）、`style/03`（BackgroundBlurStyle.blurX）、`style/04`（GlassStyle.refraction） | `NoiseStyle`、`GlassStyle` 其余通道 |
 | 滤镜 | `filter/07`（shadowOnly）、`filter/08`（InnerShadowFilter.offsetX）、`filter/09`（BlendFilter.color）、`filter/10`（NoiseFilter.density） | 其余滤镜通道 |
 
-其中 `rotation.z` 最容易被忽略：`kChannelBindingTable` 里写的是 `{Layer, "rotation"}`，而 PAGX 的 Layer 只有
-`rotation.x/y/z`，因此这条映射永不命中，**Layer 旋转动画在导出时被静默丢弃**。用一张 `rotation.z` 从 0→90
-的文档实测：`pagx render --time` 会转，导出 HTML 无任何 `@keyframes`。
+`Layer.rotation.z`、`skew.x/y` 与 `TrimPath.start` 已补齐：前两者原先因绑定表只登记了 `rotation`、缺少 skew 条目而
+静默丢弃，`start` 只有 `end` 有实现。补齐后 `layer/10`、`layer/15`、`layer/16`、`modifier/02` 的 SSIM 从
+0.49 / 0.79 / 0.86 / 0.85 提升到 0.999 / 0.999 / 0.999 / 0.996，语料的 `Expect` 已改为 `supported`。
 
 ## 六、冗余与重叠分析
 
