@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: NoiseFilter density turns the card from clean into fully grained.
-     Target: Layer  Channel: density  Type: float
+     Target: NoiseFilter  Channel: density  Type: float
      Expect: gap
      Ref: - -->
 <pagx width="320" height="200">
