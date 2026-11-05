@@ -3,6 +3,7 @@
      miter spikes.
      Target: Stroke  Channel: miterLimit  Type: float
      Expect: gap
+     Known-gap: static-miter-join-rendering
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

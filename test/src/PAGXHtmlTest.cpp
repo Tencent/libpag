@@ -3852,6 +3852,38 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
 // A Layer's anchor is the pivot of its own pose: the runtime composes
 // T(x, y) * T(anchor) * R * S * T(-anchor), so an animated anchor has to be part of the per-frame
 // transform list instead of being read once from the authored value.
+// miterLimit only affects the outline of a sharp join, and CSS exposes it as an animatable
+// presentation property, so the frame can carry it directly.
+CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Polystar position="160,100" type="star" pointCount="5" outerRadius="60" innerRadius="24"
+                rotation="-90"/>
+      <Stroke id="miterStroke" color="#0E7490" width="14" join="miter" miterLimit="1"/>
+    </Layer>
+    <Animations>
+      <Animation id="miterGrow" duration="60" frameRate="60" loop="once">
+        <Object target="miterStroke">
+          <Channel name="miterLimit" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="20" interpolation="linear"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto rule =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"miterStroke\"")));
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("stroke-miterlimit: 1;"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("stroke-miterlimit: 20;"), std::string::npos) << rule;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayerAnchorXSlidesPivot) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="handSlide" x="150" y="100" width="120" height="16" anchor="0,8" rotationZ="20">
@@ -5300,7 +5332,8 @@ CLI_TEST(PAGXHtmlTest, AnimationSharedDivKeepsGeometryAndFill) {
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",
-      "stroke/05_miter_limit.pagx",
+      // NoiseStyle has no CSS mapping at all, so its channels stay unexported.
+      "style/05_noise_style_density.pagx",
   };
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
@@ -5410,11 +5443,13 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
-  const char* miterChannel = R"(
-        <Channel name="miterLimit" type="float">
-          <Key time="0" value="4" interpolation="hold"/>
-          <Key time="45" value="1" interpolation="hold"/>
-          <Key time="60" value="1"/>
+  // miterLimit is exported now, so the sample unsupported channel is the stroke cap (an enum the
+  // exporter has no CSS mapping for).
+  const char* unsupportedChannel = R"(
+        <Channel name="cap" type="int">
+          <Key time="0" value="1" interpolation="hold"/>
+          <Key time="45" value="2" interpolation="hold"/>
+          <Key time="60" value="2"/>
         </Channel>)";
   std::string xml = std::string(R"(<pagx width="320" height="200">
     <Layer width="320" height="200">
@@ -5428,12 +5463,12 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
             <Key time="0" value="8" interpolation="linear"/>
             <Key time="60" value="16"/>
           </Channel>)") +
-                    miterChannel + R"(
+                    unsupportedChannel + R"(
         </Object>
       </Animation>
     </Animations>
   </pagx>)";
-  ExpectUnsupportedChannelIgnored(xml, miterChannel, "id=\"mixStroke\"");
+  ExpectUnsupportedChannelIgnored(xml, unsupportedChannel, "id=\"mixStroke\"");
 }
 
 // PAGX composes a Group transform as
