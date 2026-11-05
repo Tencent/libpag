@@ -5734,6 +5734,28 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionSingleKeyPointFallsBack) {
 }
 
 /**
+ * repeat_count_fractional_tail.svg: the fractional tail rounds to zero frames, so it would land on
+ * the previous period's last keyframe. Keyframe times must stay strictly increasing or a track
+ * keyed by timestamp drops one of the two.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FractionalRepeatCountTail) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/repeat_count_fractional_tail.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(anim->objects[0]->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 3u);
+  // Period boundaries legitimately repeat a timestamp; only the fractional tail must move past the
+  // previous period's last key instead of collapsing onto it.
+  const auto& tail = ch->keyframes.back();
+  const auto& beforeTail = ch->keyframes[ch->keyframes.size() - 2];
+  EXPECT_LT(beforeTail.time, tail.time);
+  EXPECT_EQ(tail.time, 1201);
+}
+
+/**
  * text_fill_change_inline.svg: a fill change without an explicit x keeps one Text for the line.
  * Splitting there would need the previous run's advance width, which the importer cannot measure,
  * and the two runs would overlap.
