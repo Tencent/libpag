@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include "pagx/PAGXDocument.h"
+#include "pagx/types/Data.h"
 
 namespace pagx {
 
@@ -47,6 +49,23 @@ class PAGXExporter {
    * The output faithfully reflects the structure of the input document.
    */
   static std::string ToXML(const PAGXDocument& document, const Options& options = {});
+
+  /**
+   * Exports a PAGXDocument to an in-memory ZIP archive. The archive always contains
+   * `document.pagx`, and every serialized Image that carries inline data is also written as
+   * `images/<name>.<ext>` with the XML referring to that entry instead of a data URI.
+   *
+   * Images are packed only when Image::data is set: nothing is read from disk or downloaded, so
+   * an Image without data keeps its original `filePath` and the archive is self-contained only
+   * when the caller has supplied every referenced image. The document itself is not modified.
+   *
+   * @param document the document to export
+   * @param options export options
+   * @param errorMsg optional output for the failure reason when nullptr is returned
+   * @return the ZIP bytes, or nullptr on failure
+   */
+  static std::shared_ptr<Data> ToData(const PAGXDocument& document, const Options& options = {},
+                                      std::string* errorMsg = nullptr);
 };
 
 }  // namespace pagx

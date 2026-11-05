@@ -10,7 +10,7 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "AS IS" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -27,18 +27,18 @@
 
 namespace pagx {
 
-// ZIP output used exclusively by HTMLExporter::ToData. The writer owns the
+// In-memory ZIP output shared by the exporters that produce a single archive. The writer owns the
 // partial archive until finish() transfers its allocation into a Data object.
-class HTMLZipWriter {
+class MemZipWriter {
  public:
-  HTMLZipWriter();
-  ~HTMLZipWriter();
+  MemZipWriter();
+  ~MemZipWriter();
 
-  HTMLZipWriter(const HTMLZipWriter&) = delete;
-  HTMLZipWriter& operator=(const HTMLZipWriter&) = delete;
+  MemZipWriter(const MemZipWriter&) = delete;
+  MemZipWriter& operator=(const MemZipWriter&) = delete;
 
   // entryPath is the complete, '/'-separated path inside the archive, such as
-  // "index.html" or "assets/img0.png".
+  // "index.html" or "images/img0.png".
   bool write(const std::string& entryPath, const void* bytes, size_t size, std::string* errorMsg);
 
   // Closes the archive and transfers its bytes into Data without copying them.

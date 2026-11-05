@@ -10,13 +10,13 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "AS IS" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLZipWriter.h"
+#include "pagx/utils/MemZipWriter.h"
 #include <limits>
 
 namespace pagx {
@@ -38,50 +38,50 @@ bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size) 
 
 }  // namespace
 
-HTMLZipWriter::HTMLZipWriter() {
+MemZipWriter::MemZipWriter() {
   zlib_filefunc_def fileFunc = MakeMemZipFileFunc(&_buffer);
-  _zip = zipOpen2("in-memory.html", APPEND_STATUS_CREATE, nullptr, &fileFunc);
+  _zip = zipOpen2("in-memory.zip", APPEND_STATUS_CREATE, nullptr, &fileFunc);
 }
 
-HTMLZipWriter::~HTMLZipWriter() {
+MemZipWriter::~MemZipWriter() {
   if (_zip != nullptr) {
     zipClose(_zip, nullptr);
   }
 }
 
-bool HTMLZipWriter::write(const std::string& entryPath, const void* bytes, size_t size,
-                          std::string* errorMsg) {
+bool MemZipWriter::write(const std::string& entryPath, const void* bytes, size_t size,
+                         std::string* errorMsg) {
   if (_zip == nullptr) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: archive not open.";
+      *errorMsg = "MemZipWriter: archive not open.";
     }
     return false;
   }
   if (size > std::numeric_limits<unsigned>::max()) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: entry too large: " + entryPath;
+      *errorMsg = "MemZipWriter: entry too large: " + entryPath;
     }
     return false;
   }
   if (!AddZipEntry(_zip, entryPath.c_str(), bytes, static_cast<unsigned>(size))) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: failed to add entry: " + entryPath;
+      *errorMsg = "MemZipWriter: failed to add entry: " + entryPath;
     }
     return false;
   }
   return true;
 }
 
-std::shared_ptr<Data> HTMLZipWriter::finish(std::string* errorMsg) {
+std::shared_ptr<Data> MemZipWriter::finish(std::string* errorMsg) {
   if (_zip == nullptr) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: archive not open.";
+      *errorMsg = "MemZipWriter: archive not open.";
     }
     return nullptr;
   }
   if (_buffer.size() == 0) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: archive is empty.";
+      *errorMsg = "MemZipWriter: archive is empty.";
     }
     zipClose(_zip, nullptr);
     _zip = nullptr;
@@ -90,7 +90,7 @@ std::shared_ptr<Data> HTMLZipWriter::finish(std::string* errorMsg) {
   if (zipClose(_zip, nullptr) != ZIP_OK) {
     _zip = nullptr;
     if (errorMsg) {
-      *errorMsg = "HTMLZipWriter: failed to close archive.";
+      *errorMsg = "MemZipWriter: failed to close archive.";
     }
     return nullptr;
   }

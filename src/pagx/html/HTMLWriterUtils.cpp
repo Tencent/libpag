@@ -27,7 +27,7 @@
 #include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-#include "pagx/html/HTMLZipWriter.h"
+#include "pagx/utils/MemZipWriter.h"
 #endif
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
