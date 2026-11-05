@@ -110,8 +110,7 @@ ardot 侧「动效 → PAGX」的引擎代码已完整：`exporter/src/pagx/util
    ▼
 ② 编码 + 封装（按宿主实现）
    CLI（native）    ：S1 外部 ffmpeg 进程 + rawvideo 管道，编码与封装一次完成（见 §5.1）
-                      备选 S3 openh264（受限：须运行时下载官方二进制并署名，见 §5.1）
-                      + pag::MP4BoxHelper 封装（当前产出 fMP4，见 §5.2）
+                      需要开箱即用时改用 S2a：随包分发裁剪版 GPL 构建 ffmpeg（见 §5.1）
    ardot（wasm）    ：JS WebCodecs VideoEncoder + mp4-muxer 封装
    ▼
 MP4
@@ -247,7 +246,8 @@ ffmpeg -framerate 60 -i /tmp/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p out
 | 编号 | 方案 | 编码器来源 | 运行形态 | 许可证 | 直接产出 |
 |---|---|---|---|---|---|
 | S1 | 外部 ffmpeg（用户环境已有） | 用户安装的 ffmpeg（通常带 libx264） | 子进程 + rawvideo 管道 | 不随包分发，主库干净 | 标准 MP4（含 faststart） |
-| S2 | 随包分发 ffmpeg（LGPL 构建） | 随包的 ffmpeg | 子进程 | LGPL-2.1，需声明且允许替换 | 标准 MP4 |
+| S2a | 随包分发 ffmpeg（GPL 构建） | 随包的 `--enable-gpl --enable-libx264` 构建 | 子进程 | GPL-2.0，须提供源码或书面 offer | 标准 MP4 |
+| S2b | 随包分发 ffmpeg（LGPL 构建） | 随包的 `--disable-gpl` 构建 | 子进程 | LGPL-2.1，需声明且允许替换 | 标准 MP4，但无软件 H.264 编码器 |
 | S3 | 内置 openh264 | 自编译链入主库，或运行时下载官方二进制 | 进程内 | BSD-2 版权宽松；专利仅覆盖 Cisco 官方二进制且附四条件 | Annex-B 裸流 |
 | S4 | 平台硬编 | VideoToolbox / Media Foundation / VAAPI | 进程内 | 系统 API，专利由 OS 承担 | Annex-B 或平台样本缓冲 |
 | S5 | 随包分发 H264EncoderTools | 独立 GPL 可执行文件（x264） | 子进程 + 文件握手 | GPL-2.0，须提供该工具源码 | Annex-B 裸流 |
@@ -256,7 +256,9 @@ ffmpeg -framerate 60 -i /tmp/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p out
 
 **S1 外部 ffmpeg（推荐）**：`ffmpeg -f rawvideo -pixel_format rgba -video_size WxH -framerate N -i pipe:0 -c:v libx264 -pix_fmt yuv420p -crf Q -movflags +faststart out.mp4`，C++ 侧把 `readPixels` 的结果直接写进子进程 stdin，跳过中间图片编码（实测 PNG 编码占单帧 62%），同时省掉自研 muxer。代价是 npm 包不能无条件开箱即用，需检测 `ffmpeg` 是否存在并给出安装指引。注意三点：背景色在 CLI 侧先清屏合成（tgfx 输出是预乘 alpha，交给 ffmpeg 做 unpremultiply 容易错）、`write` 阻塞天然形成背压故单线程即可、结束必须 `waitpid` 校验退出码否则「文件损坏也报成功」。
 
-**S2 随包分发 ffmpeg（排除）**：体积增加数十 MB，且 LGPL 构建的 ffmpeg 不能带 `libx264`（GPL），H.264 编码只剩 `h264_videotoolbox` / `h264_vaapi` / `h264_openh264` 等 wrapper —— 等于绕回 S4 或 S3，还额外背一条「动态链接 + 允许替换」的 LGPL 义务。
+**S2a 随包分发 ffmpeg（GPL 构建，可行）**：随包的 ffmpeg 作为**独立可执行文件**分发，CLI 用子进程 + rawvideo 管道调用，属于 GPL 所说的聚合，`libpag` 与 `pagx` 仍保持 Apache-2.0。它的价值不止「有编码器」——ffmpeg 一次解决编码、封装、缩放、色彩与 faststart，正好补上 S5 缺失的全部后半段。代价是：须履行 GPL-2.0 源码义务（提供完整对应源码或书面 offer，建议自建 GPL 构建并归档源码与 configure 参数）、mac 需单独签名与公证、Windows 建议代码签名、Linux 需注意 glibc 基线，以及随包分发含 H.264 编码器的二进制所触发的专利评估。体积用 `--disable-everything` 裁剪后可压到 10~20MB 量级。
+
+**S2b 随包分发 ffmpeg（LGPL 构建，不满足需求）**：体积与 S2a 相同，但 LGPL 构建的 ffmpeg 不能带 `libx264`（GPL），H.264 编码只剩 `h264_videotoolbox` / `h264_vaapi` / `h264_openh264` 等 wrapper —— 等于绕回 S4 或 S3，Linux 无 GPU 时直接编不出来，还额外背一条「动态链接 + 允许替换」的 LGPL 义务。一句话区分：**S2b 是「合规但没编码器」，S2a 是「有编码器但要履行 GPL」**。
 
 **S3 内置 openh264（受限备选）**：版权与专利是两层独立授权。源码为 BSD-2（兼容 Apache-2.0，可改可再分发），但 **Cisco 的 AVC/H.264 专利许可只覆盖 Cisco 提供的二进制**，且附加四个前提条件：① 二进制须单独下载到最终用户设备，不得在下载前集成进第三方软件；② 最终用户须能启用/禁用该二进制；③ 软件须在可控位置显示 `OpenH264 Video Codec provided by Cisco Systems, Inc.`；④ EULA 或其他许可信息位置须复现完整条款及该条件本身。用途还限于「个人使用或其他不获取报酬的用途」，内容提供方需另行取得 MPEG LA 子许可。
 
@@ -303,21 +305,22 @@ exporter 选 S5、CLI 选 S1，不是标准不一致，而是产物和播放方�
 | 方案 | 优点 | 缺点 |
 |---|---|---|
 | S1 外部 ffmpeg（用户环境） | 零新增依赖与包体；不随包分发、不链接，主库无许可证义务；编码与封装一次完成，直接产标准 MP4（faststart、色彩矩阵、B 帧都由 ffmpeg 负责）；rawvideo 管道跳过中间图片编码，省掉实测占单帧 62% 的成本；实现量最小，只差一次进程调用 | 未安装 ffmpeg 时无法出片，破坏开箱即用；用户环境的 ffmpeg 版本与构建不一致，同参数输出可能不同；需自行处理管道背压、子进程退出码与写入失败；跨平台进程创建要各写一遍；用户若装的是 GPL 构建，合规责任在用户侧，但容易被误认为由我们分发 |
-| S2 随包分发 ffmpeg（LGPL 构建） | 开箱即用；直接产标准 MP4；参数与行为统一可控；无需用户额外安装 | 包体增加数十 MB 且要覆盖多平台；LGPL 构建不能带 libx264，H.264 编码只剩 `h264_videotoolbox` / `h264_vaapi` / `h264_openh264` 等 wrapper，等于退回 S3 或 S4；额外承担 LGPL 声明与可替换义务；mac 签名公证、Linux glibc 基线、Windows 杀软误报都要处理；第三方预编译二进制带来供应链风险 |
+| S2a 随包分发 ffmpeg（GPL 构建） | 开箱即用；编码、封装、缩放、色彩一次解决，不用自研 muxer；参数与行为统一可控；产物标准 MP4；源码与构建脚本都在自己手里，GPL 义务最好履行 | 包体增加 10~20MB（裁剪后）× 多平台；须提供 GPL 对应源码或书面 offer；mac 签名公证、Windows 代码签名、Linux glibc 基线都要处理；随包分发含编码器的二进制需专利评估 |
+| S2b 随包分发 ffmpeg（LGPL 构建） | 开箱即用；直接产标准 MP4；LGPL 义务比 GPL 轻 | **没有软件 H.264 编码器**（不能带 libx264），只剩硬件 wrapper，Linux 无 GPU 时编不出来；等于退回 S3 或 S4，再加一条 LGPL 可替换义务；包体同样数十 MB |
 | S3 内置 openh264 | BSD-2 版权宽松，兼容 Apache-2.0，可改可再分发；体积仅几 MB；一套代码三平台一致 | 专利许可只覆盖 Cisco 官方二进制，且要求运行时单独下载、用户可开关、指定署名、EULA 复现条款，用途限于个人/非获酬；自编译或静态链接不享专利豁免，随包分发违反「不得预集成」；只有 CBR/VBR，无 CRF 恒质量；新增 DEPS + vendor target + 6 个平台/架构构建矩阵；仍需自备 muxer（复用 `MP4BoxHelper` 只能出 fMP4） |
 | S4 平台硬编 | 编码速度最快、CPU 占用最低；H.264 专利由 OS / 芯片厂商承担；mac 与 win 不引入额外二进制；可选用硬件支持的高 profile 与 10bit | 三套平台代码（VideoToolbox / Media Foundation / VAAPI）；Linux 无 GPU 时仍需软件兜底；参数模型弱（无 CRF），同码率画质通常低于 x264；异步回调 + B 帧重排接入复杂；输出仍需自备 muxer；不同 GPU 与驱动输出不一致 |
 | S5 随包分发 H264EncoderTools | 编码器现成且经生产验证（AE 插件长期使用）；参数精细（quality 0-100 映射 CRF/VBV/keyint）；mac / win 已有工程与打包脚本；画质与 x264 一致 | GPL-2.0，须提供该工具的完整对应源码或书面 offer；只能进程隔离，文件握手 1ms 轮询 + 每帧写盘；只吐 Annex-B，必须自备 muxer；依赖 Qt，CLI 需替换掉；vendored x264 冻结在 0.164.x，构建不可复现；mac 产物已签名，替换二进制会破坏签名 |
 | S6 链接 / dlopen 系统 x264 | 画质与参数控制最好；不新增编码器代码 | GPL-2.0 与 Apache-2.0 单向不兼容，动态链接与 `dlopen` 都无法豁免（GPLv2 没有系统库例外）；链入即要求主库整体按 GPL 分发；用户环境不一定有 `libx264`；版本与 ABI 不可控；法务风险最高 |
 | S7 只出帧序列（`--frames-dir`） | 零依赖、零许可证风险；已实现可直接使用；用户可自选编码器、容器与参数；逐帧文件便于排查问题 | 不能一条命令出片；帧落盘带来 IO 与磁盘占用；PNG 编码占单帧成本 62%，是全部方案里最慢的；没有进度与错误汇总 |
 
-按落地成本与风险从低到高排列：**S7 ≈ S1 < S5 < S4 < S2 < S3 < S6（S6 不可行）**。S3 排在最后一位非因工程量，而是其专利许可要求运行时下载与开关声明，与「内置」这一目标本身冲突。
+按落地成本与风险从低到高排列：**S7 ≈ S1 < S2a < S5 < S4 < S3 < S6**。S2a 排在 S5 之前，是因为它把 muxer、YUV 转换、色彩一并解决；S3 靠后并非工程量问题，而是其专利许可要求运行时下载与开关声明，与「内置」目标本身冲突；S2b 不满足需求、S6 不可行，均不参与排序。
 
 ### 5.1.4 选型结论
 
 1. **默认 S1**：CLI 直出 MP4 走外部 ffmpeg + rawvideo 管道，`--frames-dir` 保留为无 ffmpeg 时的降级路径（S7）。
-2. **S2、S6 排除**；**S5 不推荐**（GPL 义务 + 自备 muxer + Qt 依赖替换）；**S4 仅在明确要求零外部依赖且接受三套平台代码时评估**。
+2. **S6 排除；S2b 不满足需求**（无软件 H.264 编码器）；**S2a 作为「开箱即用」的首选**，前提是接受 GPL 源码义务与 H.264 专利评估；**S5 不推荐**（同样是 GPL 义务，却只完成编码一段，muxer、YUV 转换、色彩都要自研）；**S4 仅在明确要求零外部依赖且接受三套平台代码时评估**。
 3. **S3 不再是「内置编码器」备选**：其专利许可要求运行时下载 Cisco 官方二进制、用户可开关、指定署名并在 EULA 中复现条款，且用途限于个人/非获酬；静态链接与随包分发都不享专利豁免。只有当产品愿意改成「运行时下载 + 开关 + 署名」形态、且法务确认商业用途被覆盖时才重新评估。
-4. 无论选哪条，编码器输出的都是 Annex-B，与 §5.2 的 `VideoSequence` 结构天然匹配；S1/S2 由 ffmpeg 顺带解决封装，S3/S4/S5 必须自带 muxer。
+4. 无论选哪条，编码器输出的都是 Annex-B，与 §5.2 的 `VideoSequence` 结构天然匹配；S1/S2a/S2b 由 ffmpeg 顺带解决封装，S3/S4/S5 必须自带 muxer。
 
 ### 5.2 MP4 封装：fMP4 与普通 MP4
 
@@ -533,7 +536,8 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 
 | 风险 | 影响 | 对策 |
 |---|---|---|
-| 编码器许可证 | 误链或误 dlopen GPL 的 x264，会迫使整个主库按 GPL 分发 | 只走外部进程（S1），不链接不 dlopen；随包分发 GPL 工具时须履行源码提供义务（§5.1.1） |
+| 编码器许可证 | 误链或误 dlopen GPL 的 x264 会迫使整个主库按 GPL 分发；随包分发 GPL 的 ffmpeg 或 H264EncoderTools 需履行源码义务 | 只走独立可执行文件 + 子进程（S1/S2a/S5），不链接不 dlopen；随包时提供完整对应源码或书面 offer（§5.1、§5.1.1） |
+| 随包 ffmpeg 的签名与公证 | mac 上 hardened runtime 会拦未签名的子进程；Windows 自编译 exe 易被杀软误报 | sidecar 单独 `codesign` + 公证；Windows 配代码签名（S2a） |
 | CLI 依赖外部 ffmpeg | 用户环境未安装时无法出片 | 启动时探测并给出安装指引，降级到 `--frames-dir`（S7） |
 | H.264 无 alpha | 透明动效无法导出 | 明确不支持，或另开 WebM/MOV 链路 |
 | PNG 中间编码占单帧成本 62% | 出片慢 | 接编码器时直接 RGBA → YUV，跳过图片编码 |
@@ -552,7 +556,7 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P0 | `pagx render --frames-dir` 复用 scene 逐帧渲染 + 一致性验证 | ✅ 已完成（`9b5a1262c`） |
-| P1 | 按 §5.1 落地 S1：CLI 接外部 ffmpeg + rawvideo 管道直出 MP4（`--frames-dir` 降级保留），编码与封装一并解决 | 方案已定，待实施 |
+| P1 | 按 §5.1 落地 S1（默认：外部 ffmpeg + rawvideo 管道直出 MP4）；需要开箱即用时启用 S2a（随包裁剪版 GPL 构建 ffmpeg，附源码与 `SOURCE.txt`）；`--frames-dir` 降级保留 | 方案已定，待实施 |
 | P2 | ardot 接入：新策略 + `VideoExportTask` + WebCodecs + 进度通道 | 待上游动效 PAGX 通道打通 |
 | P3 | 性能优化：跳过图片编码、异步读回、多线程编码 | 待 P1/P2 之后 |
 | P4 | 质量档位与码率映射（对齐 Figma 的 LOW/MEDIUM/HIGH） | 待 P1 |
