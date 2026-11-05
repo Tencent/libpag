@@ -42,8 +42,9 @@ CLI 入口在 `src/cli/main.cpp`，导出命令分发在 `src/cli/CommandExport.
 | `export --format pptx` | `PPTExporter::ToFile` | 节点树 → OOXML | 同上 |
 | `render` | `LayerBuilder::Build` → `tgfx::DisplayList` → `readPixels` → `ImageCodec::Encode` | 静态光栅化单帧 | 始终 |
 | `render --time <s>` | `PAGScene::Make` → `setCurrentTime` + `apply` → `advanceAndApply` → `draw` | 动画某一时刻的单帧 | 始终 |
+| `render --frames-dir` | 一次 `PAGScene` + 一次 `PAGSurface`，逐帧 seek + `advanceAndApply` + `draw` + `readPixels`（§4.2） | 动效全帧序列 | 始终 |
 
-前三条是**静态快照序列化，没有时序能力**；只有 `render --time` 具备时间轴能力，但它每次调用都重建 scene，不适合批量出帧。
+前三条是**静态快照序列化，没有时序能力**。时间轴能力来自后两条：`render --time` 每次调用都重建 scene（`PAGScene::Make` + `PAGSurface::MakeOffscreen`），不适合批量出帧；`render --frames-dir` 是本项目的产物，复用同一 scene/surface 输出整段序列，即 §4 的渲染层实现。
 
 **注意：这三条 export 并非完全不碰 GPU。** `bakeUnsupported` 开启时（SVG/HTML/PPT 的默认值），凡目标格式无法表达的效果都会通过 `pagx::GPUContext` 懒创建一个 device 做离屏光栅化，结果以 base64 PNG 内嵌到产物中（典型场景：`ImagePattern` 的 tiling、带 mask 的图层、依赖 backdrop 的混合模式）。这一机制的用途与设计意图写在 `src/pagx/utils/RasterUtils.h:37-43`：
 
@@ -108,7 +109,8 @@ ardot 侧「动效 → PAGX」的引擎代码已完整：`exporter/src/pagx/util
    │  交付 RGBA
    ▼
 ② 编码 + 封装（按宿主实现）
-   CLI（native）    ：内置 H.264 编码器 + 复用 pag::MP4BoxHelper 封装
+   CLI（native）    ：H.264 编码器（路线待决策，见 §5.1）
+                      + pag::MP4BoxHelper 封装（当前产出 fMP4，见 §5.2）
    ardot（wasm）    ：JS WebCodecs VideoEncoder + mp4-muxer 封装
    ▼
 MP4
@@ -168,7 +170,7 @@ for (int64_t frame = 0; frame < frameCount; frame++) {
 | 场景 | 推荐路径 | 原因 |
 |---|---|---|
 | CLI | `PAGSurface::MakeOffscreen(w, h)` | 进程独占，可自建 device；但必须**只建一次**，见下方说明 |
-| ardot | `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Record(context, scene, surface, autoClear)` | wasm 下无法新建 device，只能使用当前线程已有的那个 |
+| ardot | 当前线程内 `PAGScene::draw` + `PAGSurface::readPixels`（§6.3 模型 A）；只有跨线程时才用 `pagx::MakeFrom(device, surface)` + `pagx::Record(context, scene, surface, autoClear)` | wasm 下无法新建 device，只能使用当前线程已有的那个 |
 
 `PAGSurface::MakeOffscreen` 的 device 来源是 `OffscreenDrawable::Make` → `pag::Devices::MakeDefault()`（`src/pagx/runtime/OffscreenDrawable.cpp:28`）。**`MakeDefault()` 不是进程级单例**：native 后端每次调用都会新建 device 及其 context（OpenGL 走 `tgfx::GLDevice::MakeWithFallback()`、WebGPU 走 `WebGPUDevice::Make()`、Metal 走 `MetalDevice::Make()`）。因此「每帧新建 scene + 新建 surface」的旧路径实际每帧都在重建 device/context/texture，这是旧路径 400ms 单帧的主要浪费之一；复用 scene + surface 后这部分只付一次。
 
@@ -247,7 +249,9 @@ ffmpeg -framerate 60 -i /tmp/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p out
 
 建议：先以 A 打通端到端（`--frames-dir` 已具备，只差一次进程调用），再按产品节奏评估 B/C。
 
-### 5.2 MP4 封装
+A 路线有两种现成实现（见 §5.4）：直接调外部 `ffmpeg`（一条命令同时解决编码与封装），或调 `H264EncoderTools`（libpag 生态现成的 x264 工具，但只吐裸流，需要自带 muxer）。
+
+### 5.2 MP4 封装：fMP4 与普通 MP4
 
 `src/codec/mp4/MP4BoxHelper::CovertToMP4` 已在主库，输入为 `pag::VideoSequence`：
 
@@ -255,14 +259,122 @@ ffmpeg -framerate 60 -i /tmp/frames/f_%04d.png -c:v libx264 -pix_fmt yuv420p out
 - `frames`：每帧 `VideoFrame`，含 `frame`（pts）、`isKeyframe`、`fileBytes`（Annex-B NALU）
 - `width` / `height` / `frameRate`：取自 `Sequence` 的 public 字段，需自行填充（不从 SPS 解析）
 
-`headers` / `frames` / `width` / `height` 均为 public，可直接构造实例后调用，无需改动现有代码。openh264 / x264 默认输出即 Annex-B，天然匹配。
+以上字段均为 public，可直接构造实例后调用，无需改动现有代码。x264 / openh264 默认输出即 Annex-B，天然匹配。
 
-注意 `MP4BoxHelper` 产出的是 **fragmented MP4**（`ftyp+moov+moof+mdat`）。微信、QuickTime、部分剪辑软件对 fMP4 兼容性参差，若目标场景要求普通 MP4（`moov` 前置、单 `mdat`），需要改造或另写 muxer。
+**但它产出的是 fragmented MP4**。两种容器的差异：
+
+| | 普通 MP4 | fMP4（当前实现） |
+|---|---|---|
+| 结构 | `ftyp + moov(含完整 stbl) + mdat` | `ftyp + moov(mvex/trex) + (moof + mdat)*` |
+| sample 索引 | `moov.stbl` 的 `stts/stss/stsc/stsz/stco` | 每段的 `moof.traf.trun` |
+| 写入时机 | 需知道全部 sample 布局后写，或回填 `stco`/`stsz` | 边写边生成，无需回填 |
+| 随机 seek | `stco` + `stss` 直接定位 | 依赖逐段解析，通常还需 `sidx` |
+| 典型用途 | 文件分发、剪辑软件 | 直播、录制、DASH/HLS/CMAF |
+
+代码实证：
+
+```82:92:src/codec/mp4/MP4Generator.cpp
+int MP4Generator::moov(EncodeStream* stream, bool write) {
+  ...
+  PushInWriteFun(mvex);      // 有 mvex 即分片 MP4
+```
+
+```321:335:src/codec/mp4/MP4Generator.cpp
+int MP4Generator::stsc(EncodeStream* stream, bool write) {
+  ...
+    stream->writeInt32(0);
+    stream->writeInt32(0);   // entry_count = 0，空表
+```
+
+`stsc` / `stsz` / `stco` 全部写空表，sample 信息都在 `moof` 里。
+
+**兼容性风险**：现代浏览器、QuickTime Player、VLC 都能播 fMP4；但微信内置播放器（老 X5 内核）可能进度条不可拖或只播首段，Premiere / Final Cut 等剪辑软件可能拒绝导入或时长识别错误，Android 老播放器 / SmartTV 可能不认 `moof`。
+
+**三条出路**：
+
+| 方案 | 做法 | 成本 |
+|---|---|---|
+| A. 改造 muxer | 两遍写：`box(write=false)` 先算 `stbl` 大小（机制已存在），写 `mdat` 时记录每个 sample 的 offset/size，最后回填 `stbl` | 约 300~500 行 |
+| B. remux | 先出 fMP4，再 `ffmpeg -i in.mp4 -c copy -movflags +faststart out.mp4` | 零编码成本，需 ffmpeg |
+| C. 换 muxer | 用 ffmovie 的 `FFMediaMuxer`（内部 `movflags=faststart`） | 见 §5.4 |
 
 ### 5.3 色彩与 alpha
 
-- H.264 不支持 alpha，MP4 输出恒为不透明。RGBA 需先 unpremultiply，再与 `--background` 指定颜色合成，最后转 I420（BT.709 有限范围）
-- 若产品必须支持透明动效，只能走 WebM（VP9 alpha）或 MOV（ProRes 4444），与 MP4 是两条链路
+- H.264 本身不带 alpha，默认输出不透明。RGBA 需先 unpremultiply，再与 `--background` 指定颜色合成，最后转 I420（BT.709 有限范围）
+- 若需要透明动效，PAG 生态已有成熟方案：**画布扩展 + alpha 灰度区**（见 §5.5 的 `PAGEncoder`），把 alpha 量化后贴在主画面旁边，编码面积 ×2，播放侧按 `alphaStartXY` 裁切还原。不需要 WebM/ProRes
+- 该方案对 mp4 同样成立（因为本质是普通 H.264），代价是分辨率与码率翻倍
+- **色彩矩阵必须与编码路径一致**：`MP4BoxHelper` 不写 `colr`/`nclx` box（`src/codec/mp4/` 内无相关代码），播放器按容器缺省规则猜。若改用 ffmovie 的 `FFVideoEncoder`，其 `libyuv::ABGRToI420` 固定 BT.601 有限范围，与上面约定的 BT.709 不符，肤色与橙色会明显偏移 —— 要么自己做 709 转换，要么把约定改成 601 并接受播放器的猜测行为
+
+### 5.4 现成资产盘点：ffmovie / ffaudio / H264EncoderTools
+
+libpag 主库没有视频编码能力，但生态里有三个相关仓库。源码级核实后的结论：
+
+| | ffmovie | ffaudio | H264EncoderTools |
+|---|---|---|---|
+| 定位 | FFmpeg 封装的**多媒体库**（解封装 / 解码 / 编码 / muxer） | FFmpeg 封装的**音频编码库** | 独立进程的 **x264 编码命令行工具** |
+| 产物 | `libffmovie`（LGPL-2.1） | `libffaudio`（LGPL-2.1） | 可执行文件（GPL-2.0） |
+| 视频编码输入 | `FFVideoEncoder::onSendData(rgba, w, h, rowBytes, pts)`，内部 `libyuv::ABGRToI420` | 无 | 裸 YUV420p 文件 |
+| 封装 | `FFMediaMuxer`，`movflags=faststart` → 普通 MP4 | 音频 muxer | 无（只吐 Annex-B 裸流） |
+| 质量控制 | 仅 `videoBitrate` + profile | bitrate | CRF（Quality 0-100）+ VBV + keyint |
+| 进程模型 | 库内调用 | 库内调用 | 独立进程 + 文件握手 |
+| 平台 | android/ios/mac/win/linux/web 构建脚本齐全 | 同 | mac arm64/x86_64 + VS2019 预编译 x264 |
+
+三个判定：
+
+1. **ffaudio 与本需求无关** —— PAGX 规范里没有音频节点，也不需要音轨。
+2. **H264EncoderTools 是唯一现成的编码器**，且输出协议（`Header-0.dat` = SPS、`Header-1.dat` = PPS、`H264-<n>.264` = 每帧 Annex-B）与 `pag::VideoSequence` 的 `headers`/`frames` 完全一致，与 `MP4BoxHelper` 零摩擦对接。代价：GPL 必须进程隔离、只收 YUV、每帧一次文件读写。
+3. **ffmovie 当前配置下视频编码不可用**。它走 `avcodec_find_encoder(AV_CODEC_ID_H264)`，而各平台 `scripts/build_ffmpeg_*.sh` 只写了 `--enable-encoder=h264,mpeg4`，没有任何 H.264 encoder wrapper（`libx264` / `libopenh264` / `h264_videotoolbox`）。FFmpeg 不存在名为 `h264` 的 encoder，因此 `find_encoder` 会返回 nullptr，`initCodec()` 失败。**它唯一能立即复用的是 `FFMediaMuxer`（普通 MP4 + faststart）。**
+
+**ffmovie 的引入方式：预编译二进制 + Git LFS**，不走 `DEPS` / `vendor.json`：
+
+```
+viewer/vendor/ffmovie/
+├── include/            ffmovie/movie.h + pag/decoder.h + ffavc.h
+├── mac/x64/libffmovie.dylib      3.4 MB   (Git LFS)
+├── mac/arm64/libffmovie.dylib    3.4 MB   (Git LFS)
+└── win/x64/ffmovie.dll + .lib    7.2 MB   (Git LFS)
+```
+
+exporter 与 viewer 各自手写一份引用（`exporter/CMakeLists.txt:149`、`:170-173`，`viewer/CMakeLists.txt:196-218`）：mac 直接链 `.dylib`，win 链导入库；mac 部署时 POST_BUILD 拷进 `Contents/Frameworks` 并 `install_name_tool -add_rpath '@loader_path/../Frameworks'`；win 的 `deployqt.bat` 只处理 Qt，`ffmovie.dll` 由发布流程另行处理。仓库内没有构建 ffmovie 的脚本，升级靠人工替换二进制，无版本锁定与 hash 校验。
+
+若要把 ffmovie 引入 CLI，成本是：先跑它自己的 `build_ffmpeg.sh` 生成 FFmpeg 静态库 → 各平台产出动态库 → npm 包体 +3.4MB(mac) / +7.2MB(win) → 处理 rpath 与 LGPL 声明（LGPL 要求动态链接，静态链接会触发重新链接义务）。
+
+### 5.5 exporter 的视频导出链路（可复用性分析）
+
+`exporter/` 是 AE 插件，**没有「导出 mp4 文件」的功能**：它把 AE 里的视频素材逐帧编码成 H.264 后**内嵌进 `.pag` 的 `VideoComposition`**。完整链路：
+
+```
+AE footage
+  │ GetVideoSequence()      exporter/src/export/sequence/VideoSequence.cpp:240-390
+  ├─ AE 渲染 GetRenderFrame() → RGBA（:308）
+  ├─ 可见性裁剪 / 尺寸对齐 / alpha 探测 / 静止帧判定
+  ▼
+PAGEncoder::encodeRGBA()    exporter/src/export/encode/VideoEncoder.cpp:106-124
+  ├─ RGBAToYUV420
+  └─ hasAlpha 时画布扩 2 倍，alpha 灰度写进扩展区
+  ▼
+OfflineVideoEncoder         exporter/src/export/encode/OfflineVideoEncoder.cpp:77-135
+  └─ QProcess 启动 H264EncoderTools，逐帧写 YUV 文件、轮询读 .264 文件
+  ▼
+PAGEncodeThread（QThread）  encode/PAGEncodeThread.cpp
+  └─ 回调 → pag::VideoFrame{fileBytes, isKeyframe, frame}
+  ▼
+MP4BoxHelper::WriteMP4Header(sequence)   VideoSequence.cpp:386
+composition->sequences.push_back(sequence)  ← 进 .pag，不落 mp4
+```
+
+值得借鉴的机制：
+
+| 机制 | 说明 | 对本项目的意义 |
+|---|---|---|
+| alpha 画布扩展 | 主画面 + 旁边一块 alpha 灰度图（`(a*219>>8)+16`），记录 `alphaStartXY` | 若 mp4 需要透明，这是 PAG 生态已验证的方案 |
+| 静止帧合并 | `ImageIsStatic` 比较相邻帧，静止段降级为 P 帧并合并成静态区间（`staticTimeRange`） | 长静止 + 短动效的稿件可显著减体积 |
+| 渲染/编码流水线 | 编码在独立线程，主线程渲染下一帧，1ms 轮询节流 | CLI 侧可用 `std::thread` + 环形缓冲复刻 |
+| 外部进程编码 | GPL 的 x264 隔离在独立进程 | 与 §5.4 的结论一致 |
+
+**不可复用的部分**：渲染源是 AE 的 `GetRenderFrame`（需换成 `PAGScene::draw`）；Qt 依赖（`QProcess` / `QThread` / `QApplication::processEvents`）在 CLI 里必须替换；最后一步没有 `avformat` mux，产出的是 PAG 内部结构而非独立文件。
+
+另注：exporter 里 ffmovie 只用于**音频**（`AudioSequence.cpp:45-111` 把 AE 音频采样经 `FFAudioEncoder` + `FFMediaMuxer` 写成临时 mp4，再读进 `composition->audioBytes`），完全不参与视频编码 —— 与上面「视频编码器配置缺失」的判断一致。
 
 ---
 
@@ -370,7 +482,7 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P0 | `pagx render --frames-dir` 复用 scene 逐帧渲染 + 一致性验证 | ✅ 已完成（`9b5a1262c`） |
-| P1 | CLI 接入编码器（ffmpeg 或 openh264），一条命令直接产 MP4 | 待决策 |
+| P1 | CLI 接入编码器（ffmpeg 或 openh264），一条命令直接产 MP4；含 §5.2 的封装选型（普通 MP4 改造 或 remux） | 待决策 |
 | P2 | ardot 接入：新策略 + `VideoExportTask` + WebCodecs + 进度通道 | 待上游动效 PAGX 通道打通 |
 | P3 | 性能优化：跳过图片编码、异步读回、多线程编码 | 待 P1/P2 之后 |
 | P4 | 质量档位与码率映射（对齐 Figma 的 LOW/MEDIUM/HIGH） | 待 P1 |
