@@ -24,8 +24,7 @@ namespace pagx {
 
 template <typename T>
 KeyValue TypedChannel<T>::onEvaluateAtFrame(Frame frame) const {
-  return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame),
-                                     pivotInterpolation);
+  return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame), pivotInterpolation);
 }
 
 template <typename T>
