@@ -104,7 +104,25 @@ inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double
   auto mixed = MixDecomposed(da, db, static_cast<float>(t));
   Matrix result = {};
   RecomposeAffine(mixed, &result.a, &result.b, &result.c, &result.d, &result.tx, &result.ty);
+  return result;
+}
 
+// Mode-aware lerp used by the evaluator. Only Matrix reacts to `pivotInterpolation`: SVG transform
+// animations rotate about a fixed point, while CSS-style transforms interpolate the decomposed
+// translation linearly. Keeping the spelling opt-in avoids changing the latter.
+template <typename T>
+inline T LerpKeyframeValueWithMode(const T& a, const T& b, double t, bool pivotInterpolation) {
+  (void)pivotInterpolation;
+  return LerpKeyframeValue<T>(a, b, t);
+}
+
+template <>
+inline Matrix LerpKeyframeValueWithMode<Matrix>(const Matrix& a, const Matrix& b, double t,
+                                                bool pivotInterpolation) {
+  Matrix result = LerpKeyframeValue<Matrix>(a, b, t);
+  if (!pivotInterpolation) {
+    return result;
+  }
   // Spell out the translation from the shared pivot instead of lerping it, so rotation and scale
   // happen in place. Sampling interpolates between two poses only, hence a keyframe that starts at
   // the identity pose contributes the other pose's pivot.
@@ -154,7 +172,8 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
 // plan's ownership rule: keyframes[i].interpolation describes the i -> i+1 segment, with
 // keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles.
 template <typename T>
-T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition) {
+T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                           bool pivotInterpolation = false) {
   if (keyframes.empty()) {
     return T{};
   }
@@ -180,14 +199,16 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     case KeyframeInterpolationType::Hold:
       return left->value;
     case KeyframeInterpolationType::Bezier:
-      return LerpKeyframeValue<T>(left->value, right->value,
-                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                                                    static_cast<double>(left->bezierOut.y),
-                                                    static_cast<double>(right->bezierIn.x),
-                                                    static_cast<double>(right->bezierIn.y), rawT));
+      return LerpKeyframeValueWithMode<T>(
+          left->value, right->value,
+          SolveBezierEasing(static_cast<double>(left->bezierOut.x),
+                            static_cast<double>(left->bezierOut.y),
+                            static_cast<double>(right->bezierIn.x),
+                            static_cast<double>(right->bezierIn.y), rawT),
+          pivotInterpolation);
     case KeyframeInterpolationType::Linear:
     default:
-      return LerpKeyframeValue<T>(left->value, right->value, rawT);
+      return LerpKeyframeValueWithMode<T>(left->value, right->value, rawT, pivotInterpolation);
   }
 }
 

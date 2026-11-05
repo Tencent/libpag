@@ -293,6 +293,7 @@ static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
   xml.addAttribute("id", channel->id);
   xml.addRequiredAttribute("name", channel->name);
   xml.addAttribute("type", typeName);
+  xml.addAttribute("pivotInterpolation", channel->pivotInterpolation, false);
   xml.closeElementStart();
   for (const auto& key : channel->keyframes) {
     xml.openElement("Key");

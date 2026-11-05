@@ -42,6 +42,14 @@ class Channel : public Node {
   std::string name = {};
 
   /**
+   * Matrix interpolation mode. When true, the intermediate translation is spelled from the target
+   * pose's fixed point so rotation and scale happen in place; SVG transform animations rotate about
+   * their anchor, while CSS-style transforms expect the decomposed translation to interpolate
+   * linearly. Ignored by non-Matrix channels.
+   */
+  bool pivotInterpolation = false;
+
+  /**
    * Returns the value type of this Channel's keyframes. Each TypedChannel<T> specialization
    * reports a distinct ChannelValueType so callers can dispatch on the concrete type without
    * dynamic_cast or RTTI.
