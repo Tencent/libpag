@@ -1,4 +1,5 @@
 // Copyright (C) 2026 Tencent. Licensed under the Apache License, Version 2.0.
+import { withConversionTask } from './conversion-task';
 import * as fs from 'fs';
 import * as path from 'path';
 import { collectBatchInputs, runBatch } from './batch';
@@ -160,22 +161,24 @@ export async function runImportRequest(opts: ImportRequest, scriptDir: string): 
       const result = await runBatch({ ...opts, inputDir: opts.batchDir, outputRoot: opts.outputDir, scriptDir, log });
       return result.failed ? 1 : 0;
     }
-    if (opts.scenario) {
-      await runScenarioToPagx({ ...opts, scriptDir, log });
+    return withConversionTask(opts.task, async task => {
+      if (opts.scenario) {
+        await runScenarioToPagx({ ...opts, task, scriptDir, log });
+        return 0;
+      }
+      const options = { ...opts, task, scriptDir, log };
+      const result = opts.format === 'html' && !opts.htmlNoSnapshot
+        ? await runHtmlToPagx(options) : await convertToArtifacts(options, opts.input);
+      if (opts.preview) {
+        if (!result.png) throw new Error('preview requires a rendered PNG');
+        const base = path.parse(result.pagx).name;
+        const preview = await generateContactSheet([{ name: base, png: result.png }], {
+          outputDir: path.join(path.dirname(result.pagx), `${base}.preview`),
+          columns: opts.previewColumns, pagxBin: opts.pagxBin, log, task,
+        });
+        for (const page of preview.pages) log(`[done] ${page.file}`);
+      }
       return 0;
-    }
-    const options = { ...opts, scriptDir, log };
-    const result = opts.format === 'html' && !opts.htmlNoSnapshot
-      ? await runHtmlToPagx(options) : await convertToArtifacts(options, opts.input);
-    if (opts.preview) {
-      if (!result.png) throw new Error('preview requires a rendered PNG');
-      const base = path.parse(result.pagx).name;
-      const preview = await generateContactSheet([{ name: base, png: result.png }], {
-        outputDir: path.join(path.dirname(result.pagx), `${base}.preview`),
-        columns: opts.previewColumns, pagxBin: opts.pagxBin, log,
-      });
-      for (const page of preview.pages) log(`[done] ${page.file}`);
-    }
-    return 0;
+    });
   });
 }

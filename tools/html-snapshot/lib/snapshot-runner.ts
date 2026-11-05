@@ -55,6 +55,7 @@ import type {
   EngineWrapper,
 } from './browser-engine';
 import { ResourceCache, type CachedResource } from './resource-cache';
+import { ConversionTask, withConversionTask } from './conversion-task';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -192,6 +193,7 @@ export function makeResourceCacheListener(
 }
 
 export interface RunSnapshotOptions {
+  task?: ConversionTask;
   viewportWidth?: number;
   viewportHeight?: number;
   waitMs?: number;
@@ -363,7 +365,12 @@ async function bestEffortSave<TItem, TCache>(
 // Run the full snapshot pipeline against `targetUrl` using the already-
 // launched browser in `engineHandle`. The page is always closed before this
 // function returns (success or failure); the browser stays open.
-export async function runSnapshot(
+export function runSnapshot(engineHandle: EngineWrapper, targetUrl: string,
+    opts: RunSnapshotOptions = {}): Promise<RunSnapshotResult> {
+  return withConversionTask(opts.task, task => captureSnapshot(engineHandle, targetUrl, { ...opts, task }));
+}
+
+async function captureSnapshot(
   engineHandle: EngineWrapper,
   targetUrl: string,
   opts?: RunSnapshotOptions,
@@ -397,6 +404,7 @@ export async function runSnapshot(
   } = opts || {};
 
   const { engine } = engineHandle;
+  const task = opts!.task!;
   const imageBytesByUrl = new Map<string, ImageCaptureValue>();
   const fontBytesByUrl = new Map<string, Buffer>();
   // Image capture is always on; font capture only when the caller asked for
@@ -426,6 +434,7 @@ export async function runSnapshot(
       }
     : (resp: BrowserResponse) => { void captureImage(resp); };
   const page = await openAndSettlePage(engineHandle, targetUrl, {
+    task,
     viewportWidth,
     viewportHeight,
     waitMs,
@@ -465,6 +474,15 @@ export async function runSnapshot(
   });
 
   try {
+    task.checkpoint();
+    // Keep the original expression intact when serializing browser functions.
+    const evaluate = page.evaluate.bind(page);
+    page.evaluate = async (...args: any[]) => {
+      task.checkpoint();
+      const value = await evaluate(...args);
+      task.checkpoint();
+      return value;
+    };
     // With the virtual clock installed the page's timers are frozen at t=0.
     // Flush zero-delay init timers (advanceTo(0)) before measuring the body so
     // the canvas size reflects the same t=0 layout the eval baseline measures
@@ -803,6 +821,7 @@ export async function runSnapshot(
     // already in `fontBytesByUrl` by now (no page interaction needed). This
     // is best-effort: a decode/write failure degrades to "no fonts on disk"
     // and the rest of the snapshot still returns.
+    task.checkpoint();
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does

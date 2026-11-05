@@ -25,6 +25,7 @@ import {
   type Page,
 } from './browser-engine';
 import { MAX_CAPTURE_HEIGHT_PX } from './common';
+import type { ConversionTask } from './conversion-task';
 
 // Default React-CDN apps mount under <div id="root">. If the page has such a
 // root, wait until it has at least one child; otherwise resolve immediately.
@@ -179,6 +180,7 @@ export type PageErrorListener = (err: Error) => void;
 export type ResponseListener = (resp: BrowserResponse) => void | Promise<void>;
 
 export interface OpenAndSettlePageOptions {
+  task?: ConversionTask;
   viewportWidth?: number;
   viewportHeight?: number;
   waitMs?: number;
@@ -306,128 +308,146 @@ export async function openAndSettlePage(
   } = opts || {};
 
   const { engine } = unwrap(browserOrWrapper);
-  const page = await newPage(browserOrWrapper, {
+  const task = opts?.task;
+  task?.checkpoint('prepare');
+  const create = () => newPage(browserOrWrapper, {
     viewport: { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 },
   });
-  // Set the media preference before navigation so inline boot scripts and
-  // `@media (prefers-reduced-motion: reduce)` rules see it on first paint.
-  // Presentation/deck pages commonly use this branch to reveal every slide's
-  // content instead of leaving inactive slides at their entrance opacity.
-  await emulateReducedMotion(page, engine, reducedMotion);
-  if (onConsole) page.on('console', onConsole);
-  if (onPageError) page.on('pageerror', onPageError);
-  // Register onResponse before any navigation so the listener captures the
-  // very first request's bytes (favicon, document, …). Used by snapshot.js
-  // to cache image responses for later in-page inlining without paying the
-  // CORS round-trip a second time.
-  if (onResponse) page.on('response', onResponse);
-  // Init scripts must be registered before `page.goto` so the page's own
-  // inline scripts see the helper bundles already on `window`. Each entry
-  // is a self-contained source string (callers prepare it with
-  // `windowAttachScript` from lib/browser-snapshot.ts / lib/icon-font.ts).
-  // Always register the Babel classic-runtime shim first so it is in place
-  // before any caller-supplied init scripts and before the page's own scripts.
-  await addInitScript(page, engine, BABEL_CLASSIC_RUNTIME_SHIM);
-  for (const script of initScripts) {
-    if (script) await addInitScript(page, engine, script);
-  }
-
-  if (headers.length > 0) {
-    const headerMap: Record<string, string> = {};
-    for (const [key, value] of headers) headerMap[key] = value;
-    await page.setExtraHTTPHeaders(headerMap);
-  }
-  if (cookies.length > 0) {
-    // Scope cookies to the navigation target so they travel on the very first
-    // request. Both engines accept `{ name, value, url }` here.
-    const scoped = cookies.map((c) => ({ ...c, url }));
-    await addCookies(page, engine, scoped);
-  }
-
-  // Navigate gating on `load` (document + all subresources fetched), not
-  // `networkidle`. `networkidle` is fragile: it resolves only after the
-  // network stays quiet for ~500ms, which is easily defeated by pages that
-  // keep connections open or stream a long tail of external requests (CDN
-  // keep-alive, Google Fonts, icon webfonts, the Tailwind Play CDN, image
-  // hosts). Worse, when many pages load concurrently the shared CDNs saturate
-  // and even reaching `<body>` can blow past the 30s deadline — a
-  // parser-blocking `<script src="cdn…">` placed after slow stylesheets stalls
-  // the parser, so the timeout fallback would see no body and fail the whole
-  // render. `load` is reliable under that contention and guarantees a body.
+  const owned = task ? await task.own(async () => {
+    const page = await create();
+    return { page, close: page.close.bind(page) };
+  }, resource => resource.close()) : undefined;
+  const page = owned ? owned.value.page : await create();
+  if (owned) page.close = owned.close;
   try {
-    await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: 30000 });
-  } catch (err) {
-    // A navigation *timeout* should still not fail the whole render: the
-    // document is usually parsed and painted well before every last subresource
-    // resolves, so fall back to whatever is rendered as long as a body exists
-    // and let the waitForRoot + waitMs steps below give async apps time to
-    // mount. Anything that is not a timeout (a genuinely broken navigation) is
-    // re-thrown.
-    const msg = err && (err as Error).message ? (err as Error).message : String(err);
-    if (!/timeout/i.test(msg)) throw err;
-    let hasBody = await page.evaluate(() => !!document.body).catch(() => false);
-    if (!hasBody) {
-      // No `<body>` yet usually means a parser-blocking `<script src="cdn…">`
-      // queued behind slow external stylesheets stalled the HTML parser before
-      // it reached `<body>` (common under high concurrency when shared CDNs are
-      // saturated). The document is still live — give the parser a bounded
-      // extra window to finish rather than failing the whole render, then
-      // re-check. Only if the body never materialises is this a genuine dead
-      // navigation worth re-throwing.
-      hasBody = await page
-        .waitForSelector('body', { timeout: 15000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!hasBody) throw err;
+    // Set the media preference before navigation so inline boot scripts and
+    // `@media (prefers-reduced-motion: reduce)` rules see it on first paint.
+    // Presentation/deck pages commonly use this branch to reveal every slide's
+    // content instead of leaving inactive slides at their entrance opacity.
+    await emulateReducedMotion(page, engine, reducedMotion);
+    if (onConsole) page.on('console', onConsole);
+    if (onPageError) page.on('pageerror', onPageError);
+    // Register onResponse before any navigation so the listener captures the
+    // very first request's bytes (favicon, document, …). Used by snapshot.js
+    // to cache image responses for later in-page inlining without paying the
+    // CORS round-trip a second time.
+    if (onResponse) page.on('response', onResponse);
+    // Init scripts must be registered before `page.goto` so the page's own
+    // inline scripts see the helper bundles already on `window`. Each entry
+    // is a self-contained source string (callers prepare it with
+    // `windowAttachScript` from lib/browser-snapshot.ts / lib/icon-font.ts).
+    // Always register the Babel classic-runtime shim first so it is in place
+    // before any caller-supplied init scripts and before the page's own scripts.
+    await addInitScript(page, engine, BABEL_CLASSIC_RUNTIME_SHIM);
+    for (const script of initScripts) {
+      if (script) await addInitScript(page, engine, script);
     }
-  }
 
-  // Best-effort settle: give the network a short, bounded chance to go quiet so
-  // late `@font-face` fetches and SPA XHRs land before we screenshot. This is
-  // non-fatal — `waitForNetworkIdle` resolves either way — so a chatty CDN only
-  // costs the settle budget instead of failing navigation the way a
-  // `networkidle`-gated `goto` would.
-  await waitForNetworkIdle(page, engine, 5000);
+    if (headers.length > 0) {
+      const headerMap: Record<string, string> = {};
+      for (const [key, value] of headers) headerMap[key] = value;
+      await page.setExtraHTTPHeaders(headerMap);
+    }
+    if (cookies.length > 0) {
+      // Scope cookies to the navigation target so they travel on the very first
+      // request. Both engines accept `{ name, value, url }` here.
+      const scoped = cookies.map((c) => ({ ...c, url }));
+      await addCookies(page, engine, scoped);
+    }
 
-  // A quiet network does not guarantee Chromium has re-laid-out text with the
-  // real webfaces yet: when the idle window opens mid-download, every subsequent
-  // rect measurement runs on fallback metrics, whose narrower glyphs shift wrap
-  // points (getflect.app's clamp()-scaled, NBSP-glued hero copy wraps "But
-  // nowhere" onto line 1 under fallback metrics but onto line 2 once the
-  // webfont lands — both fill the same ~708px line, so the divergence is
-  // invisible until the snapshot's own fonts re-typeset the text).
-  // `document.fonts.ready` resolves once all pending font loads finish — or
-  // fail, which settles too — matching what a visitor's browser shows after
-  // first paint. Bounded by a real-clock timeout (the virtual-clock init script
-  // may have frozen the page's own setTimeout) so a stalled font request
-  // degrades to the pre-fix behaviour instead of hanging the snapshot.
-  try {
-    await page.evaluate(
-      `Promise.race([document.fonts.ready, ` +
-        `new Promise((r) => (window.__pagxRealSetTimeout || setTimeout)(r, 10000))])`,
-    );
-  } catch (_) { /* best-effort: proceed with whatever fonts are loaded */ }
-
-  if (selector) {
-    await page.waitForSelector(selector, { timeout: 15000 });
-  } else {
+    // Navigate gating on `load` (document + all subresources fetched), not
+    // `networkidle`. `networkidle` is fragile: it resolves only after the
+    // network stays quiet for ~500ms, which is easily defeated by pages that
+    // keep connections open or stream a long tail of external requests (CDN
+    // keep-alive, Google Fonts, icon webfonts, the Tailwind Play CDN, image
+    // hosts). Worse, when many pages load concurrently the shared CDNs saturate
+    // and even reaching `<body>` can blow past the 30s deadline — a
+    // parser-blocking `<script src="cdn…">` placed after slow stylesheets stalls
+    // the parser, so the timeout fallback would see no body and fail the whole
+    // render. `load` is reliable under that contention and guarantees a body.
     try {
-      await page.waitForFunction(ROOT_HAS_CHILDREN_SCRIPT, { timeout: 10000 });
-    } catch (_) { /* not fatal — pages without #root simply skip this wait */ }
-  }
+      await page.goto(url, { waitUntil: mapWaitUntil(engine, 'load'), timeout: task?.remaining(30000) ?? 30000 });
+    } catch (err) {
+      // A navigation *timeout* should still not fail the whole render: the
+      // document is usually parsed and painted well before every last subresource
+      // resolves, so fall back to whatever is rendered as long as a body exists
+      // and let the waitForRoot + waitMs steps below give async apps time to
+      // mount. Anything that is not a timeout (a genuinely broken navigation) is
+      // re-thrown.
+      task?.checkpoint();
+      const msg = err && (err as Error).message ? (err as Error).message : String(err);
+      if (!/timeout/i.test(msg)) throw err;
+      if (typeof page.url === 'function' && /^(about:blank|chrome-error:)/.test(page.url())) throw err;
+      let hasBody = await page.evaluate(() => !!document.body).catch(() => false);
+      if (!hasBody) {
+        // No `<body>` yet usually means a parser-blocking `<script src="cdn…">`
+        // queued behind slow external stylesheets stalled the HTML parser before
+        // it reached `<body>` (common under high concurrency when shared CDNs are
+        // saturated). The document is still live — give the parser a bounded
+        // extra window to finish rather than failing the whole render, then
+        // re-check. Only if the body never materialises is this a genuine dead
+        // navigation worth re-throwing.
+        hasBody = await page
+          .waitForSelector('body', { timeout: task?.remaining(15000) ?? 15000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!hasBody) throw err;
+      }
+    }
 
-  if (waitMs > 0) {
-    await new Promise((r) => setTimeout(r, waitMs));
-  }
+    // Best-effort settle: give the network a short, bounded chance to go quiet so
+    // late `@font-face` fetches and SPA XHRs land before we screenshot. This is
+    // non-fatal — `waitForNetworkIdle` resolves either way — so a chatty CDN only
+    // costs the settle budget instead of failing navigation the way a
+    // `networkidle`-gated `goto` would.
+    await waitForNetworkIdle(page, engine, 5000);
 
-  // Realise lazy-loaded content by walking the viewport top-to-bottom. Done
-  // after the initial settle (app mounted, first paint done) so observers are
-  // registered, and before returning so the caller screenshots/measures the
-  // fully-populated page. Runs for baseline, snapshot, and the flex counter
-  // alike, keeping every measurement on the same page state.
-  if (autoScroll) {
-    await settleLazyContent(page, engine);
-  }
+    // A quiet network does not guarantee Chromium has re-laid-out text with the
+    // real webfaces yet: when the idle window opens mid-download, every subsequent
+    // rect measurement runs on fallback metrics, whose narrower glyphs shift wrap
+    // points (getflect.app's clamp()-scaled, NBSP-glued hero copy wraps "But
+    // nowhere" onto line 1 under fallback metrics but onto line 2 once the
+    // webfont lands — both fill the same ~708px line, so the divergence is
+    // invisible until the snapshot's own fonts re-typeset the text).
+    // `document.fonts.ready` resolves once all pending font loads finish — or
+    // fail, which settles too — matching what a visitor's browser shows after
+    // first paint. Bounded by a real-clock timeout (the virtual-clock init script
+    // may have frozen the page's own setTimeout) so a stalled font request
+    // degrades to the pre-fix behaviour instead of hanging the snapshot.
+    try {
+      await page.evaluate(
+        `Promise.race([document.fonts.ready, ` +
+          `new Promise((r) => (window.__pagxRealSetTimeout || setTimeout)(r, 10000))])`,
+      );
+    } catch (_) { /* best-effort: proceed with whatever fonts are loaded */ }
 
-  return page;
+    if (selector) {
+      await page.waitForSelector(selector, { timeout: 15000 });
+    } else {
+      try {
+        await page.waitForFunction(ROOT_HAS_CHILDREN_SCRIPT, { timeout: 10000 });
+      } catch (_) { /* not fatal — pages without #root simply skip this wait */ }
+    }
+
+    if (waitMs > 0) {
+      if (task) await task.wait(waitMs);
+      else await new Promise((r) => setTimeout(r, waitMs));
+    }
+
+    // Realise lazy-loaded content by walking the viewport top-to-bottom. Done
+    // after the initial settle (app mounted, first paint done) so observers are
+    // registered, and before returning so the caller screenshots/measures the
+    // fully-populated page. Runs for baseline, snapshot, and the flex counter
+    // alike, keeping every measurement on the same page state.
+    if (autoScroll) {
+      await settleLazyContent(page, engine);
+    }
+
+    task?.checkpoint();
+    return page;
+  } catch (error) {
+    await page.close().catch(() => {});
+    task?.checkpoint();
+    throw error;
+  }
 }

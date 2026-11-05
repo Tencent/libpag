@@ -14,6 +14,7 @@ const { runHtmlToPagx } = require('../dist/lib/pipeline');
 const { generateContactSheet } = require('../dist/lib/contact-sheet');
 const { runBatch } = require('../dist/lib/batch');
 const { withCliLifecycle } = require('../dist/lib/cli-lifecycle');
+const { withConversionTask } = require('../dist/lib/conversion-task');
 let dir, options, browser, contexts, stderr;
 beforeEach(() => {
   jest.resetAllMocks();
@@ -30,15 +31,15 @@ beforeEach(() => {
   browser = { createBrowserContext: jest.fn(createContext), newContext: jest.fn(createContext), close: jest.fn().mockResolvedValue() };
   launchBrowser.mockResolvedValue({ engine: 'puppeteer', browser });
   runSnapshot.mockResolvedValue({ html: '<html>captured</html>', fonts: [] });
-  runHtmlToPagx.mockImplementation(async opts => {
+  runHtmlToPagx.mockImplementation(opts => withConversionTask(opts.task, async task => {
     const subsetHtml = path.join(opts.outputDir, `${opts.outputName}.subset.html`);
-    const captured = await opts.snapshotImpl({ input: opts.input, output: subsetHtml, captureAnimations: opts.captureAnimations });
+    const captured = await opts.snapshotImpl({ task, input: opts.input, output: subsetHtml, captureAnimations: opts.captureAnimations });
     if (captured.code) throw new Error(captured.stderr);
     fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.pagx`), '<pagx/>');
     fs.writeFileSync(path.join(opts.outputDir, `${opts.outputName}.png`), 'PNG');
     return { subsetHtml, pagx: path.join(opts.outputDir, `${opts.outputName}.pagx`),
       png: path.join(opts.outputDir, `${opts.outputName}.png`), fonts: captured.fontFiles };
-  });
+  }));
   generateContactSheet.mockImplementation(async (items, opts) => ({ pages: [{
     file: path.join(opts.outputDir, 'sheet-001.png'), items: items.map(item => item.name),
   }] }));

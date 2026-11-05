@@ -3,13 +3,14 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { runProcess, type ProcessOptions } from './process-runner';
+import { ConversionTask, withConversionTask } from './conversion-task';
 
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
 import type { FontReplacement } from './snapshot-fonts';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
-import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
+import { throwIfCancelled } from './cli-lifecycle';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -31,16 +32,8 @@ export class PipelineStepError extends ChildProcessError {
   }
 }
 
-// Default per-child timeout. eval/run.js used 180s for years; matching it here
-// keeps a stuck pagx invocation from hanging the parent forever without
-// changing the eval's observed behaviour. The orchestrator forwards this to
-// every step; callers that want a different ceiling pass `timeoutMs`.
-const DEFAULT_STEP_TIMEOUT_MS = 180000;
-
-export interface SpawnCaptureOptions {
+export interface SpawnCaptureOptions extends ProcessOptions {
   stderrPath?: string;
-  timeoutMs?: number;
-  env?: NodeJS.ProcessEnv;
 }
 
 export interface SpawnCaptureResult {
@@ -56,62 +49,17 @@ export interface SpawnCaptureResult {
 // file (eval needs it on disk for compare.countImporterWarnings), enforce a
 // timeout, and resolve with `{ code, durationMs, stdout, stderr }`. Never
 // rejects on a child failure — the resolve shape is the per-step contract.
-export function spawnCapture(
-  cmd: string,
-  args: string[],
-  opts: SpawnCaptureOptions = {},
-): Promise<SpawnCaptureResult> {
-  throwIfCancelled();
-  const stderrPath = opts.stderrPath || '';
-  const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : DEFAULT_STEP_TIMEOUT_MS;
-  return new Promise<SpawnCaptureResult>((resolve) => {
-    const startedAt = Date.now();
-    let child;
-    try {
-      child = spawn(cmd, args, {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: opts.env || process.env,
-      });
-    } catch (err) {
-      const stderr = `\n${(err as Error).message || String(err)}`;
-      if (stderrPath) {
-        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
-      }
-      resolve({ code: null, durationMs: Date.now() - startedAt, stdout: '', stderr });
-      return;
-    }
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-    let killedByTimeout = false;
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-    const stop = () => {
-      if (killTimer) return;
-      child.kill('SIGTERM');
-      killTimer = setTimeout(() => child.kill('SIGKILL'), 5000);
-      killTimer.unref();
-    };
-    const release = trackCliResource(stop);
-    const timer = setTimeout(() => {
-      killedByTimeout = true;
-      stop();
-    }, timeoutMs);
-    child.on('error', (err: Error) => { stderr += `\n${err.message || String(err)}`; });
-    child.on('close', (code: number | null) => {
-      release();
-      if (killTimer) clearTimeout(killTimer);
-      clearTimeout(timer);
-      if (killedByTimeout) stderr += `\n[pipeline] killed by timeout (${timeoutMs}ms)`;
-      if (stderrPath) {
-        try { fs.writeFileSync(stderrPath, stderr, 'utf8'); } catch (_e) { /* ignore */ }
-      }
-      resolve({ code, durationMs: Date.now() - startedAt, stdout, stderr });
-    });
-  });
+export async function spawnCapture(cmd: string, args: string[],
+    opts: SpawnCaptureOptions = {}): Promise<SpawnCaptureResult> {
+  const result = await runProcess(cmd, args, opts);
+  if (opts.stderrPath) {
+    try { fs.writeFileSync(opts.stderrPath, result.stderr, 'utf8'); } catch { /* Diagnostics cannot mask the process result. */ }
+  }
+  return result;
 }
 
 export interface BuildSnapshotArgsOptions {
+  task?: ConversionTask;
   scriptDir: string;
   input: string;
   scenario?: string;
@@ -189,7 +137,7 @@ export async function forkSnapshotCli(opts: Partial<ForkSnapshotCliOptions> = {}
   const args = buildSnapshotArgs(opts as BuildSnapshotArgsOptions);
   return spawnCapture(nodeBin, args, {
     stderrPath: opts.stderrPath,
-    timeoutMs: opts.timeoutMs,
+    timeoutMs: opts.timeoutMs, task: opts.task, env: opts.task?.childEnvironment(),
   });
 }
 
@@ -226,7 +174,7 @@ export async function runPagxImportToFile(opts: RunPagxImportToFileOptions = {})
       String(replacement.weight),
       replacement.style, replacement.targetFamily, replacement.targetStyle);
   }
-  const result = await spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
+  const result = await spawnCapture(pagxBin, args, { stderrPath, timeoutMs, task: opts.task });
   if (log) {
     const filtered = filterKnownWarnings(result.stderr);
     if (filtered) log(filtered);
@@ -254,7 +202,7 @@ export async function runPagxResolve(opts: RunPagxResolveOptions = {}): Promise<
   const args = ['resolve', pagxFile];
   if (imageStorage) args.push('--images', imageStorage);
   if (imageBaseDir) args.push('--image-base-dir', imageBaseDir);
-  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
+  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs, task: opts.task });
 }
 
 export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
@@ -271,7 +219,7 @@ export async function runPagxFontEmbed(opts: RunPagxFontEmbedOptions = {}): Prom
   if (!pagxFile) throw new Error('runPagxFontEmbed: pagxFile is required');
   const args = ['embed', pagxFile, '--skip-images'];
   for (const f of fontFiles) args.push('--fallback', f);
-  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
+  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs, task: opts.task });
 }
 
 export interface RunPagxRenderOptions extends SpawnCaptureOptions {
@@ -290,7 +238,7 @@ export async function runPagxRender(opts: RunPagxRenderOptions = {}): Promise<Sp
   if (!output) throw new Error('runPagxRender: output is required');
   const args = ['render', pagxFile, '--output', output, '--scale', String(scale)];
   for (const f of fontFallbacks) args.push('--fallback', f);
-  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
+  return spawnCapture(pagxBin, args, { stderrPath, timeoutMs, task: opts.task });
 }
 
 // Glob a directory for SFNT files (TTF / OTF / TTC).
@@ -345,6 +293,7 @@ function assertStepOk(stepName: string, result: SpawnCaptureResult): void {
 export type SnapshotImpl = (args: BuildSnapshotArgsOptions) => Promise<SpawnCaptureResult>;
 
 export interface RunHtmlToPagxOptions {
+  task?: ConversionTask;
   fontReplacements?: FontReplacement[];
   log?: (line: string) => void;
   pagxBin?: string;
@@ -396,14 +345,20 @@ export interface RunHtmlToPagxResult {
   fonts: string[];
 }
 
+export function convertToArtifacts(opts: RunHtmlToPagxOptions, input: string, fonts: string[] = []):
+    Promise<Omit<RunHtmlToPagxResult, 'subsetHtml'>> {
+  return withConversionTask(opts.task, task => convertArtifacts({ ...opts, task }, input, fonts));
+}
+
 // Snapshot acquisition and native conversion share the same artifact finalizer.
-export async function convertToArtifacts(opts: RunHtmlToPagxOptions, input: string,
+async function convertArtifacts(opts: RunHtmlToPagxOptions, input: string,
     fonts: string[] = []): Promise<Omit<RunHtmlToPagxResult, 'subsetHtml'>> {
   const pagxBin = opts.pagxBin || defaultPagxBin();
   const pagxFile = path.resolve(opts.outputFile || path.join(opts.outputDir!, `${opts.outputName}.pagx`));
   await fs.promises.mkdir(path.dirname(pagxFile), { recursive: true });
+  opts.task?.checkpoint('import');
   const result = await runPagxImportToFile({
-    pagxBin, input, pagxFile, format: opts.format || 'html', resolve: opts.doResolve,
+    task: opts.task, pagxBin, input, pagxFile, format: opts.format || 'html', resolve: opts.doResolve,
     imageStorage: opts.pagxImages || 'external',
     imageBaseDir: opts.pagxImageBaseDir || (isHttpUrl(opts.input!) ? '' : path.dirname(path.resolve(opts.input!))),
     svgOptions: opts.svgOptions, verbose: opts.verbose,
@@ -411,18 +366,27 @@ export async function convertToArtifacts(opts: RunHtmlToPagxOptions, input: stri
   });
   assertStepOk('pagx import', result);
   if (!fs.existsSync(pagxFile)) throw new PipelineStepError('pagx import produced no output', { step: 'pagx import' });
-  if (opts.embedFonts) assertStepOk('pagx embed', await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts }));
+  if (opts.embedFonts) {
+    opts.task?.checkpoint('embed');
+    assertStepOk('pagx embed', await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts, task: opts.task }));
+  }
   let png: string | null = null;
   if (opts.doRender !== false && opts.doResolve !== false) {
     png = path.join(path.dirname(pagxFile), `${path.parse(pagxFile).name}.png`);
-    assertStepOk('pagx render', await runPagxRender({ pagxBin, pagxFile, output: png,
+    opts.task?.checkpoint('render');
+    assertStepOk('pagx render', await runPagxRender({ pagxBin, pagxFile, output: png, task: opts.task,
       scale: opts.scale || 1, fontFallbacks: fonts }));
   }
+  opts.task?.checkpoint();
   opts.log?.(`[done] ${png || pagxFile}`);
   return { pagx: pagxFile, png, fonts };
 }
 
-export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
+export function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
+  return withConversionTask(opts.task, task => convertHtml({ ...opts, task }));
+}
+
+async function convertHtml(opts: RunHtmlToPagxOptions): Promise<RunHtmlToPagxResult> {
   throwIfCancelled();
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
   const scriptDir = opts.scriptDir;
@@ -488,7 +452,9 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
 
   try {
     log(`[snapshot] ${opts.input}`);
+    opts.task?.checkpoint('snapshot');
     const snapshotResult = await snapshotImpl({
+      task: opts.task,
       input: opts.input,
       scenario: opts.scenario,
       checkpoint: opts.checkpoint,
@@ -527,7 +493,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     return { subsetHtml, ...artifacts };
   } finally {
     if (tempDir) {
-      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_e) { /* ignore */ }
+      opts.task!.deferCleanup(() => fs.promises.rm(tempDir, { recursive: true, force: true }));
     }
   }
 }

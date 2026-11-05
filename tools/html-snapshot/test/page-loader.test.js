@@ -80,4 +80,25 @@ describe('openAndSettlePage — reduced motion', () => {
       expect(expression).toContain('scrollTop = 0');
     }
   });
+
+  test('closes a newly created page when navigation fails without masking its cause', async () => {
+    const error = new Error('net::ERR_NAME_NOT_RESOLVED');
+    const page = { on: jest.fn(), goto: jest.fn().mockRejectedValue(error),
+      close: jest.fn().mockRejectedValue(new Error('cleanup error')) };
+    browserEngine.newPage.mockResolvedValue(page);
+    await expect(openAndSettlePage({ browser: {}, engine: 'puppeteer' }, 'https://invalid.example'))
+      .rejects.toBe(error);
+    expect(page.close).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not capture about:blank when a main document never commits', async () => {
+    const error = new Error('Navigation timeout');
+    const page = { on: jest.fn(), goto: jest.fn().mockRejectedValue(error), url: () => 'about:blank',
+      evaluate: jest.fn().mockResolvedValue(true), close: jest.fn().mockResolvedValue(undefined) };
+    browserEngine.newPage.mockResolvedValue(page);
+    await expect(openAndSettlePage({ browser: {}, engine: 'puppeteer' }, 'https://pending.example'))
+      .rejects.toBe(error);
+    expect(page.evaluate).not.toHaveBeenCalled();
+    expect(page.close).toHaveBeenCalledTimes(1);
+  });
 });

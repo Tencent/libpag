@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+import { withConversionTask } from './conversion-task';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -36,7 +37,12 @@ export interface ScenarioExport {
 }
 
 /** Replay once, then convert each captured state with the existing native pipeline. */
-export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise<ScenarioExport> {
+export function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise<ScenarioExport> {
+  return withConversionTask(opts.task, task => convertScenario({ ...opts, task }));
+}
+
+async function convertScenario(opts: RunScenarioToPagxOptions): Promise<ScenarioExport> {
+  const task = opts.task!;
   if (!opts.input || !opts.scenario) throw new Error('input and scenario are required');
   throwIfCancelled();
   validatePreviewOptions(opts);
@@ -72,19 +78,22 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
       const write = (async () => {
         throwIfCancelled();
         if (!accepting) throw new Error('capture session has ended');
+        task.checkpoint();
         const { html, ...metadata } = result;
         const snapshot = path.join(staging, `${result.name}.subset.html`);
         await writeFileAtomic(snapshot, html, { reuseExisting: false });
         // A scenario deadline may fire while the disk write is in flight.
         // Late callbacks must never add results to a finished session.
         throwIfCancelled();
+        task.checkpoint();
         if (accepting) checkpoints.push({ ...metadata, snapshot });
       })();
       pendingWrites.add(write);
       void write.finally(() => pendingWrites.delete(write)).catch(() => {});
       return write;
     };
-    const engine = await launchBrowser({ engine: opts.browserEngine as EngineName | undefined });
+    const ownedEngine = await task.own(() => launchBrowser({ engine: opts.browserEngine as EngineName | undefined }), handle => handle.browser.close());
+    const engine = ownedEngine.value;
     let captureError: unknown;
     try {
       await runScenario(engine, isUrl ? opts.input : pathToFileURL(path.resolve(opts.input)).href,
@@ -95,13 +104,14 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
     } finally {
       accepting = false;
       await Promise.allSettled(pendingWrites);
-      try { await engine.browser.close(); }
+      try { await ownedEngine.close(); }
       catch (error) { captureError ??= error instanceof Error ? error : new Error(String(error)); }
     }
     throwIfCancelled();
 
     for (const result of checkpoints) {
       throwIfCancelled();
+      task.checkpoint();
       for (const warning of result.warnings) opts.log?.(`${result.name}: ${warning}`);
       const files = await runHtmlToPagx({
         ...opts, fontDir, imageDir, outputDir, outputName: `${base}.${result.name}`,
@@ -143,6 +153,7 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
       }
     }
     throwIfCancelled();
+    task.checkpoint('publish');
     data.status = 'complete';
     await writeManifest();
     opts.log?.(`[done] ${manifest}`);
@@ -159,6 +170,6 @@ export async function runScenarioToPagx(opts: RunScenarioToPagxOptions): Promise
   } finally {
     accepting = false;
     await Promise.allSettled(pendingWrites);
-    if (staging) await fs.promises.rm(staging, { recursive: true, force: true });
+    if (staging) task.deferCleanup(() => fs.promises.rm(staging, { recursive: true, force: true }));
   }
 }

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+import { ConversionTask, withConversionTask } from './conversion-task';
 import { openAndSettlePage } from './page-loader';
 import { captureCurrentPage, type CaptureOptions, type CurrentStateResult } from './current-state';
 import { launchBrowser, type EngineWrapper, type Page, type CookieParam } from './browser-engine';
@@ -366,6 +367,7 @@ export async function waitForCaptureReady(page: Page, timeoutMs: number, stableM
 }
 
 export interface RunScenarioOptions {
+  task?: ConversionTask;
   checkpoint?: string;
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
@@ -378,8 +380,13 @@ export interface RunScenarioOptions {
   onCheckpoint?: (result: Checkpoint) => Promise<void>;
 }
 
+export function runScenario(engineHandle: EngineWrapper, url: string, input: unknown,
+    options: RunScenarioOptions = {}): Promise<Checkpoint[]> {
+  return withConversionTask(options.task, task => captureScenario(engineHandle, url, input, { ...options, task }));
+}
+
 /** One isolated context per scenario; all steps/checkpoints share its page. */
-export async function runScenario(
+async function captureScenario(
   engineHandle: EngineWrapper, url: string, input: unknown, options: RunScenarioOptions = {},
 ): Promise<Checkpoint[]> {
   const scenario = parseScenario(input);
@@ -393,14 +400,18 @@ export async function runScenario(
   if (engine !== 'playwright' && scenario.steps.some(s => s.target?.role)) {
     throw new Error('Role locators require --browser-engine playwright');
   }
-  const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
+  const task = options.task!;
+  const ownedContext = await task.own<EngineWrapper['browser']>(() => engine === 'playwright' ? browser.newContext() : browser.createBrowserContext(), context => context.close());
+  const context = ownedContext.value;
   let mirror: EngineWrapper | undefined;
+  let closeMirror: (() => Promise<void>) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelled = false;
   const deadline = Date.now() + scenario.timeoutMs;
-  const remaining = (step?: Step) => Math.max(1, Math.min(step?.timeoutMs ?? scenario.stepTimeoutMs, deadline - Date.now()));
+  const remaining = (step?: Step) => Math.max(1, Math.min(step?.timeoutMs ?? scenario.stepTimeoutMs, deadline - Date.now(), task.remaining()));
   const work = async () => {
     const page = await openAndSettlePage({ engine, browser: context }, url, {
+      task,
       viewportWidth: scenario.viewport.width, viewportHeight: scenario.viewport.height,
       waitMs: 0, reducedMotion: false, autoScroll: false,
       cookies: options.cookies, headers: options.headers,
@@ -408,24 +419,29 @@ export async function runScenario(
     });
     const results: Checkpoint[] = [];
     for (let index = 0; index < scenario.steps.length; index++) {
+      task.checkpoint('scenario');
       if (cancelled || Date.now() >= deadline) throw new Error('Scenario timed out');
       const step = scenario.steps[index];
       let stepTimer: ReturnType<typeof setTimeout> | undefined;
       options.log?.(`step ${index + 1}/${scenario.steps.length}: ${step.type}${step.name ? ` ${step.name}` : ''}`);
       try {
-        const task = (async (): Promise<boolean> => {
+        const stepWork = (async (): Promise<boolean> => {
           if (step.type === 'capture') {
             if (options.checkpoint && step.name !== options.checkpoint) return false;
             const readinessWarnings = await waitForCaptureReady(page, remaining(step), scenario.stableMs, step.extent);
             const resources = await resourceCapture.snapshot(remaining(step));
+            task.checkpoint();
             if (cancelled) throw new Error('Scenario timed out');
-            if (!mirror) mirror = await launchBrowser({ engine });
+            if (!mirror) {
+              const owned = await task.own(() => launchBrowser({ engine }), handle => handle.browser.close());
+              mirror = owned.value; closeMirror = owned.close;
+            }
             if (cancelled) {
-              await mirror.browser.close();
+              await closeMirror!();
               throw new Error('Scenario timed out');
             }
             const result: Checkpoint = { ...await captureCurrentPage(page, {
-              mirror, engine, extent: step.extent, timeoutMs: remaining(step),
+              task, mirror, engine, extent: step.extent, timeoutMs: remaining(step),
               inlineIconFonts: options.inlineIconFonts,
               resources,
             }), name: step.name! };
@@ -447,6 +463,7 @@ export async function runScenario(
               }
             }
             result.warnings = Array.from(new Set([...readinessWarnings, ...result.warnings]));
+            task.checkpoint();
             if (cancelled) throw new Error('Scenario timed out');
             results.push(result);
             if (options.onCheckpoint) await options.onCheckpoint(result);
@@ -463,7 +480,7 @@ export async function runScenario(
           }
           return false;
         })();
-        const stop = await Promise.race([task, new Promise<never>((_, reject) => {
+        const stop = await Promise.race([stepWork, new Promise<never>((_, reject) => {
           const timeout = remaining(step);
           stepTimer = setTimeout(() => {
             cancelled = true;
@@ -485,8 +502,8 @@ export async function runScenario(
   } finally {
     cancelled = true;
     if (timer) clearTimeout(timer);
-    await context.close();
-    if (mirror) await mirror.browser.close();
+    await ownedContext.close();
+    if (mirror) await closeMirror!();
     // A consumer callback need not be cancellable. Do not let it defeat the
     // deadline; source/mirror pages have already been closed. A late browser
     // launch is closed by the cancellation guard immediately after launching.

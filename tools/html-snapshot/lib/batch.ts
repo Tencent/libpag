@@ -107,9 +107,12 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
     const cookieParams = (snapshotArgs.cookies || []).map(value => parseCookie('--cookie', value, fail));
     const headerPairs = (snapshotArgs.headers || []).map(value => parseHeader('--header', value, fail));
     const { engine, browser } = engineHandle;
-    const context = engine === 'playwright' ? await browser.newContext() : await browser.createBrowserContext();
+    const task = snapshotArgs.task!;
+    const owned = await task.own<EngineWrapper['browser']>(() => engine === 'playwright' ? browser.newContext() : browser.createBrowserContext(), context => context.close());
+    const context = owned.value;
     try {
       const result = await runSnapshot({ engine, browser: context }, targetUrl, {
+        task,
         viewportWidth: snapshotArgs.viewportWidth,
         viewportHeight: snapshotArgs.viewportHeight,
         waitMs: snapshotArgs.waitMs,
@@ -126,7 +129,9 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         imageDir: snapshotArgs.imageDir,
         log,
       });
+      task.checkpoint();
       await writeFileAtomic(snapshotArgs.output, result.html, { reuseExisting: false });
+      task.checkpoint();
       const stderr = stderrChunks.join('\n');
       if (stderr) process.stderr.write(stderr + '\n');
       return { code: 0, durationMs: Date.now() - startedAt, stdout: '', stderr: '',
@@ -134,7 +139,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
     } catch (err) {
       const stderr = stderrChunks.concat([errMessage(err)]).join('\n');
       return { code: 1, durationMs: Date.now() - startedAt, stdout: '', stderr };
-    } finally { await context.close(); }
+    } finally { await owned.close(); }
   };
 }
 

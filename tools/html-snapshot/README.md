@@ -5,6 +5,15 @@ absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
 fed directly to `pagx import --format html`.
 
+HTML conversions share one task deadline across capture, import, font embedding and
+requested rendering/preview work. `HTML_SNAPSHOT_TIMEOUT_MS` defaults to 180000 ms.
+The deadline starts before request-owned browser creation; each batch input has its
+own task, while a scenario's checkpoints share one task. Nested stages and snapshot
+child processes receive the remaining time rather than restarting the clock.
+Cancellation stops owned browser resources and native processes. Cleanup has one
+5000 ms grace period; temporary files remain until their users have actually exited.
+An explicit `waitMs` is never silently shortened into a successful capture.
+
 Text capture uses Chromium layout text fragments for source boundaries and effective styles
 (including `::first-letter`), then measures the corresponding DOM Ranges in CSS pixels.
 This preserves drop caps, columns, and overlapping line boxes without relying on global

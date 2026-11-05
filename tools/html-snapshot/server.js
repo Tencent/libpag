@@ -78,6 +78,7 @@ const path = require('path');
 require('./ensure-built').ensureBuilt();
 
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./dist/lib/browser-engine');
+const { ConversionTask, ConversionTimeoutError } = require('./dist/lib/conversion-task');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./dist/lib/pagx-runner');
@@ -493,10 +494,23 @@ function resolveOptions(reqOptions, forUrl) {
 // `pagx import`, and shape the response — all wrapped in a single
 // try/finally so the temp dir always gets cleaned up.
 async function handleSnapshot(req, res, ctx, source) {
+  const task = new ConversionTask();
+  const disconnect = () => { if (!res.writableEnded) task.abort(new Error('Snapshot client disconnected')); };
+  req.once('aborted', disconnect);
+  res.once('close', disconnect);
+  try { return await task.run(() => convertSnapshot(req, res, ctx, source, task)); }
+  catch (error) { task.abort(error); throw error; }
+  finally {
+    req.off('aborted', disconnect); res.off('close', disconnect);
+    if (!(await task.finish())) log('conversion cleanup did not complete');
+  }
+}
+
+async function convertSnapshot(req, res, ctx, source, task) {
   let tmp = null;
   try {
     const isUrlSource = typeof source.url === 'string';
-    const runOpts = resolveOptions(source.options, isUrlSource);
+    const runOpts = { ...resolveOptions(source.options, isUrlSource), task };
     const format = source.format || DEFAULT_FORMAT;
     const wantsPagx = format === 'pagx' || format === 'both';
     const wantsHtml = format === 'html' || format === 'both';
@@ -527,9 +541,10 @@ async function handleSnapshot(req, res, ctx, source) {
       // Browser contexts isolate storage but share window focus. Give an
       // interactive request its own process so another request opening a tab
       // cannot blur its controls or close focus-dependent menus.
-      const session = await launchBrowser({ engine: ctx.opts.browserEngine });
+      const owned = await task.own(() => launchBrowser({ engine: ctx.opts.browserEngine }), handle => handle.browser.close());
+      const session = owned.value;
       try { result = (await runScenario(session, targetUrl, runOpts.scenario, runOpts))[0]; }
-      finally { await session.browser.close(); }
+      finally { await owned.close(); }
     } else {
       result = await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
     }
@@ -538,7 +553,7 @@ async function handleSnapshot(req, res, ctx, source) {
     if (wantsPagx) {
       try {
         pagx = await runPagxImport({
-          pagxBin: ctx.opts.pagxBin,
+          task, pagxBin: ctx.opts.pagxBin,
           html: result.html,
           log: (msg) => log(`pagx: ${msg}`),
         });
@@ -547,6 +562,7 @@ async function handleSnapshot(req, res, ctx, source) {
         // (bad gateway) is the closest fit — pagx is the upstream that
         // misbehaved, and the caller can tell snapshot-vs-pagx failures
         // apart by the status code without parsing the message body.
+        task.checkpoint();
         const detail = err instanceof PagxImportError && err.stderr
           ? `${err.message}: ${err.stderr.trim().split('\n').slice(-3).join(' / ')}`
           : errMessage(err);
@@ -560,6 +576,7 @@ async function handleSnapshot(req, res, ctx, source) {
       + `pagx=${pagx ? pagx.length : 0}B ${Date.now() - source.startedAt}ms`,
     );
 
+    task.checkpoint('publish');
     res.setHeader('X-Snapshot-Width', String(result.width));
     res.setHeader('X-Snapshot-Height', String(result.height));
     res.setHeader('X-Snapshot-Format', format);
@@ -590,7 +607,7 @@ async function handleSnapshot(req, res, ctx, source) {
       res.end(result.html);
     }
   } finally {
-    if (tmp) tmp.cleanup();
+    if (tmp) task.deferCleanup(async () => tmp.cleanup());
   }
 }
 
@@ -604,7 +621,7 @@ async function runRoute(req, res, ctx, sourceFactory) {
     source.startedAt = startedAt;
     await handleSnapshot(req, res, ctx, source);
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
+    const status = err instanceof HttpError || err instanceof ConversionTimeoutError ? err.status : 500;
     const message = errMessage(err);
     log(`${req.method} ${(req.url || '').split('?')[0]} ${status} ${message}`);
     if (!res.headersSent) {

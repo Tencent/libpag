@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (the "License").
 // You may obtain a copy at http://www.apache.org/licenses/LICENSE-2.0
 
+import { ConversionTask, withConversionTask } from './conversion-task';
 import { launchBrowser, newPage, type EngineName, type EngineWrapper, type Page } from './browser-engine';
 import {
   SNAPSHOT_INIT_SCRIPT, inlineExternalImages, inlineCanvases,
@@ -12,6 +13,7 @@ import type { StateResource } from './state-resources';
 import type { SavedFont } from './font-download';
 
 export interface CaptureOptions {
+  task?: ConversionTask;
   extent?: 'viewport' | 'document';
   timeoutMs?: number;
   inlineIconFonts?: boolean;
@@ -308,12 +310,18 @@ export function collectCurrentState(resources: CaptureResources = {}): CapturedP
 }
 
 /** Rebuild only the captured state. Never runs the source application's scripts. */
-export async function renderCapturedPage(
+export function renderCapturedPage(mirror: EngineWrapper, captured: CapturedPage,
+    options: CaptureOptions = {}): Promise<CurrentStateResult> {
+  return withConversionTask(options.task, task => renderPage(mirror, captured, { ...options, task }));
+}
+
+async function renderPage(
   mirror: EngineWrapper, captured: CapturedPage, options: CaptureOptions = {},
 ): Promise<CurrentStateResult> {
   if (captured.version !== 1) throw new Error('Unsupported captured-page version');
   const warnings = [...captured.unsupported];
-  const page = await newPage(mirror, { viewport: captured.viewport });
+  const owned = await options.task!.own(() => newPage(mirror, { viewport: captured.viewport }), page => page.close());
+  const page = owned.value;
   try {
     // An inert copy must not refetch authenticated/mutable resources under a
     // different session. Block any remaining external requests and report them.
@@ -451,11 +459,16 @@ export async function renderCapturedPage(
     if (captured.webFonts?.length) warnings.push(
       'Web fonts require native font fallbacks; use pagx import --html-embed-fonts for a portable PAGX file.');
     return { ...snapshot, warnings: Array.from(new Set(warnings)), url: captured.url };
-  } finally { await page.close(); }
+  } finally { await owned.close(); }
 }
 
 /** Captures an already-open page without navigating, closing, or mutating it. */
-export async function captureCurrentPage(
+export function captureCurrentPage(page: Page,
+    options: CaptureOptions & { engine?: EngineName; mirror?: EngineWrapper } = {}): Promise<CurrentStateResult> {
+  return withConversionTask(options.task, task => capturePage(page, { ...options, task }));
+}
+
+async function capturePage(
   page: Page, options: CaptureOptions & { engine?: EngineName; mirror?: EngineWrapper } = {},
 ): Promise<CurrentStateResult> {
   const sourceBrowser = typeof page.browser === 'function' ? page.browser() : page.context().browser();
@@ -468,7 +481,10 @@ export async function captureCurrentPage(
     else resources.urls![url] = `data:${entry.contentType};base64,${entry.buffer.toString('base64')}`;
   }
   const captured = await page.evaluate(collectCurrentState, resources) as CapturedPage;
-  const mirror = options.mirror || await launchBrowser({ engine: options.engine });
+  options.task!.checkpoint();
+  const owned = options.mirror ? undefined : await options.task!.own(
+    () => launchBrowser({ engine: options.engine }), handle => handle.browser.close());
+  const mirror = options.mirror || owned!.value;
   try { return await renderCapturedPage(mirror, captured, options); }
-  finally { if (!options.mirror) await mirror.browser.close(); }
+  finally { if (owned) await owned.close(); }
 }

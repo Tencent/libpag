@@ -24,7 +24,8 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { runProcess } from './process-runner';
+import { ConversionTask, withConversionTask } from './conversion-task';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import { prepareSnapshotFontReplacements } from './snapshot-fonts';
 import type { FontReplacement } from './snapshot-fonts';
@@ -60,6 +61,7 @@ export class PagxImportError extends ChildProcessError {
 }
 
 interface SpawnPagxImportArgs {
+  task?: ConversionTask;
   pagxBin: string;
   htmlPath: string;
   outPath: string;
@@ -75,58 +77,28 @@ interface SpawnPagxImportResult {
 // just because pagx printed a warning — only the exit code and the
 // existence of the output file matter.
 function spawnPagxImport(
-  { pagxBin, htmlPath, outPath, fontReplacements = [] }: SpawnPagxImportArgs,
+  { pagxBin, htmlPath, outPath, fontReplacements = [], task }: SpawnPagxImportArgs,
 ): Promise<SpawnPagxImportResult> {
-  return new Promise<SpawnPagxImportResult>((resolve, reject) => {
-    const args = [
-      'import',
-      '--format', 'html',
-      '--input', htmlPath,
-      '--output', outPath,
-      // `pagx import` resolves import directives by default; the server returns the raw imported
-      // PAGX and leaves resolution to the caller (see the response comment in server.js), so opt
-      // out here to preserve that contract and avoid work the caller may not want.
-      '--no-resolve', '--html-no-snapshot',
-    ];
-    for (const replacement of fontReplacements) {
-      args.push(...(replacement.families.startsWith('-')
-      ? [`--font-replacement=${replacement.families}`] : ['--font-replacement', replacement.families]),
-      String(replacement.weight),
-        replacement.style, replacement.targetFamily, replacement.targetStyle);
-    }
-    const child = spawn(pagxBin, args, {
-      // stdin: not needed (input is a file path); stdout/stderr piped so we
-      // can capture pagx's diagnostics for forwarding into our own log.
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const stderrChunks: Buffer[] = [];
-    // We pipe stdout to /dev/null effectively — pagx import only writes a
-    // few human-readable lines there ("wrote …") which we don't surface.
-    child.stdout?.on('data', () => {});
-    child.stderr?.on('data', (c: Buffer) => stderrChunks.push(c));
-
-    child.on('error', (err: Error) => {
-      // ENOENT (binary missing) and EACCES (not executable) land here. The
-      // exit handler will not fire in this case, so produce a final error
-      // ourselves so the promise never hangs.
-      reject(new PagxImportError(
-        `failed to spawn pagx (${pagxBin}): ${err.message}`,
-        { stderr: Buffer.concat(stderrChunks).toString('utf8') },
-      ));
-    });
-
-    child.on('close', (code: number | null) => {
-      const stderr = Buffer.concat(stderrChunks).toString('utf8');
-      if (code !== 0) {
-        reject(new PagxImportError(
-          `pagx import exited with code ${code}`,
-          { stderr, code },
-        ));
-        return;
-      }
-      resolve({ stderr });
-    });
+  const args = [
+    'import',
+    '--format', 'html',
+    '--input', htmlPath,
+    '--output', outPath,
+    // `pagx import` resolves import directives by default; the server returns the raw imported
+    // PAGX and leaves resolution to the caller (see the response comment in server.js), so opt
+    // out here to preserve that contract and avoid work the caller may not want.
+    '--no-resolve', '--html-no-snapshot',
+  ];
+  for (const replacement of fontReplacements) {
+    args.push(...(replacement.families.startsWith('-')
+    ? [`--font-replacement=${replacement.families}`] : ['--font-replacement', replacement.families]),
+    String(replacement.weight),
+      replacement.style, replacement.targetFamily, replacement.targetStyle);
+  }
+  return runProcess(pagxBin, args, { task }).then(result => {
+    task?.checkpoint();
+    if (result.code !== 0) throw new PagxImportError('pagx import failed', result);
+    return { stderr: result.stderr };
   });
 }
 
@@ -147,6 +119,7 @@ export function filterKnownWarnings(stderr: string | null | undefined): string {
 }
 
 export interface RunPagxImportOptions {
+  task?: ConversionTask;
   pagxBin?: string;
   html?: string;
   log?: ((msg: string) => void) | null;
@@ -163,9 +136,12 @@ export interface RunPagxImportOptions {
 //   html       — snapshot HTML payload (required)
 //   log        — optional `(string) => void` for non-fatal diagnostics
 //                (e.g. filtered pagx stderr). When omitted, runs silently.
-export async function runPagxImport(
-  { pagxBin, html, log, availableFonts }: RunPagxImportOptions = {},
-): Promise<string> {
+export function runPagxImport(options: RunPagxImportOptions = {}): Promise<string> {
+  return withConversionTask(options.task, task => importSnapshot({ ...options, task }));
+}
+
+async function importSnapshot({ pagxBin, html, log, availableFonts, task }: RunPagxImportOptions): Promise<string> {
+  task!.checkpoint('import');
   if (typeof pagxBin !== 'string' || !pagxBin) {
     throw new PagxImportError('pagxBin is required');
   }
@@ -178,7 +154,9 @@ export async function runPagxImport(
   const pagxPath = path.join(dir, 'output.pagx');
   try {
     fs.writeFileSync(htmlPath, html, 'utf8');
+    task!.checkpoint();
     const { stderr } = await spawnPagxImport({
+      task,
       pagxBin,
       htmlPath,
       outPath: pagxPath,
@@ -198,13 +176,10 @@ export async function runPagxImport(
       const { replaced, unmatched, missingRequests } = prepared.mapping;
       log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
     }
-    return fs.readFileSync(pagxPath, 'utf8');
+    const result = fs.readFileSync(pagxPath, 'utf8');
+    task!.checkpoint();
+    return result;
   } finally {
-    try {
-      fs.rmSync(dir, { recursive: true, force: true });
-    } catch (_) {
-      // Best-effort. A stale temp dir is annoying but not fatal —
-      // the OS cleans $TMPDIR on reboot.
-    }
+    task!.deferCleanup(() => fs.promises.rm(dir, { recursive: true, force: true }));
   }
 }

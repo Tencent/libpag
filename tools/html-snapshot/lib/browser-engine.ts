@@ -236,20 +236,22 @@ export async function newPage(
       );
     }
     const page = await browser.newPage();
-    if (viewport) {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    }
+    try {
+      if (viewport) await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    } catch (error) { await page.close().catch(() => {}); throw error; }
     return page;
   }
   const page = await browser.newPage();
-  if (viewport) {
-    await page.setViewport({
-      width: viewport.width,
-      height: viewport.height,
-      deviceScaleFactor: typeof viewport.deviceScaleFactor === 'number'
-        ? viewport.deviceScaleFactor : 1,
-    });
-  }
+  try {
+    if (viewport) {
+      await page.setViewport({
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: typeof viewport.deviceScaleFactor === 'number'
+          ? viewport.deviceScaleFactor : 1,
+      });
+    }
+  } catch (error) { await page.close().catch(() => {}); throw error; }
   return page;
 }
 

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+import { ConversionTask, withConversionTask } from './conversion-task';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PNG } from 'pngjs';
@@ -26,6 +27,7 @@ export interface ContactSheetLayoutOptions {
 }
 
 export interface ContactSheetOptions extends ContactSheetLayoutOptions {
+  task?: ConversionTask;
   outputDir: string;
   pagxBin?: string;
   log?: (line: string) => void;
@@ -218,7 +220,11 @@ function checkerPng(): Buffer {
 }
 
 /** Render only the supplied PNGs, without a browser, directory scan, or scenario replay. */
-export async function generateContactSheet(
+export function generateContactSheet(items: readonly ContactSheetItem[], options: ContactSheetOptions): Promise<ContactSheetResult> {
+  return withConversionTask(options.task, task => renderContactSheet(items, { ...options, task }));
+}
+
+async function renderContactSheet(
   items: readonly ContactSheetItem[], options: ContactSheetOptions,
 ): Promise<ContactSheetResult> {
   const limits = layoutOptions(options);
@@ -252,7 +258,7 @@ export async function generateContactSheet(
       const pagxFile = path.join(staging, 'sheet.pagx'), output = path.join(staging, fileName);
       await fs.writeFile(pagxFile, sheetDocument(layout));
       options.log?.(`[preview] ${index + 1}/${layouts.length}: ${layout.items.length} images, ${layout.width}x${layout.height}`);
-      const result = await runPagxRender({ pagxBin: options.pagxBin || defaultPagxBin(), pagxFile, output, scale: 1 });
+      const result = await runPagxRender({ pagxBin: options.pagxBin || defaultPagxBin(), pagxFile, output, scale: 1, task: options.task });
       if (result.code !== 0) throw new Error(`preview render failed (exit ${result.code}): ${result.stderr || result.stdout}`);
       const rendered = await validatePng(output, limits.maxPixels);
       if (rendered.width !== layout.width || rendered.height !== layout.height) {
@@ -263,7 +269,8 @@ export async function generateContactSheet(
     }
     // No previously published sheet is touched until every page has rendered successfully.
     // The caller's manifest is the authoritative list; older, unlisted sheets are not deleted.
+    options.task!.checkpoint('publish');
     for (const page of pages) await fs.rename(path.join(staging, path.basename(page.file)), page.file);
     return { pages };
-  } finally { await fs.rm(staging, { recursive: true, force: true }); }
+  } finally { options.task!.deferCleanup(() => fs.rm(staging, { recursive: true, force: true })); }
 }

@@ -37,10 +37,11 @@ require('./ensure-built').ensureBuilt();
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
+const { ConversionTask } = require('./dist/lib/conversion-task');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
 
-async function main() {
+async function main(task) {
   const opts = parseArgs(process.argv);
   const scenario = opts.scenario ? parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8'))) : null;
   const checkpoint = scenario ? selectCheckpoint(scenario, opts.checkpoint) : '';
@@ -54,9 +55,10 @@ async function main() {
   // here so the runner stays scheme-agnostic.
   const targetUrl = opts.isUrl ? opts.input : pathToFileURL(opts.input).href;
 
-  let engineHandle;
+  let engineHandle, ownedEngine;
   try {
-    engineHandle = await launchBrowser({ engine: opts.browserEngine });
+    ownedEngine = await task.own(() => launchBrowser({ engine: opts.browserEngine }), handle => handle.browser.close());
+    engineHandle = ownedEngine.value;
   } catch (err) {
     // Most launch failures are missing-browser errors after a sandboxed
     // `npm install` redirected the engine's download cache. Surface a one-line
@@ -71,6 +73,7 @@ async function main() {
 
   try {
     const runOpts = {
+      task,
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
@@ -92,6 +95,7 @@ async function main() {
       : await runSnapshot(engineHandle, targetUrl, runOpts);
     for (const warning of result.warnings || []) console.error(`${LOG_PREFIX}${warning}`);
 
+    task.checkpoint('publish');
     if (opts.outputToStdout) {
       // Stdout mode (triggered by `-o -`, used by pagx's html-snapshot
       // bridge for HTML import): the HTML is the sole stdout payload, and the
@@ -113,12 +117,17 @@ async function main() {
       fs.writeFileSync(opts.fontManifest, lines.length ? lines.join('\n') + '\n' : '', 'utf8');
     }
   } finally {
-    await engineHandle.browser.close();
+    await ownedEngine.close();
   }
 }
 
 const { withCliLifecycle } = require('./dist/lib/cli-lifecycle');
-withCliLifecycle(main).catch((err) => {
+withCliLifecycle(async () => {
+  const task = ConversionTask.fromEnvironment();
+  try { return await task.run(() => main(task)); }
+  catch (error) { task.abort(error); throw error; }
+  finally { if (!(await task.finish())) console.error(`${LOG_PREFIX}conversion cleanup did not complete`); }
+}).catch((err) => {
   console.error(err && err.stack ? err.stack : err);
   process.exitCode = err.exitCode || 1;
 });
