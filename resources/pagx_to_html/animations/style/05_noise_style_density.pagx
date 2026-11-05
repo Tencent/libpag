@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: NoiseStyle density turns a clean card into a grained one; the style family had no Noise case, so this
+     stands in for the NoiseStyle channels the exporter leaves alone.
+     Target: NoiseStyle  Channel: density  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="180,130" roundness="18"/>
+    <Fill color="#FFFFFF"/>
+    <NoiseStyle id="cardNoise" mode="mono" size="4" density="0" color="#4338CA"/>
+  </Layer>
+  <Animations>
+    <Animation id="grainRamp" duration="60" frameRate="60" loop="once">
+      <Object target="cardNoise">
+        <Channel name="density" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: BlendFilter color tints the card from its own green towards yellow with a multiply blend.
-     Target: Layer  Channel: color  Type: color
+     Target: BlendFilter  Channel: color  Type: color
      Expect: gap
      Ref: - -->
 <pagx width="320" height="200">
