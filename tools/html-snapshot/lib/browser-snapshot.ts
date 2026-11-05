@@ -1888,6 +1888,205 @@ function readBoxTransform(computed) {
   return { transform: t, transformOrigin: o };
 }
 
+// ===== Perspective cameras =====
+//
+// CSS `transform: perspective(d) ...` puts the camera *inside* the function list, so
+// `transform-origin` conjugates the projection and PAGX (which keeps the projection outside
+// `anchor`, like AE / Lottie) cannot reproduce it. The subset therefore rewrites that form into the
+// equivalent `perspective` *property* on a wrapper element: CSS then projects the child's result
+// instead of conjugating it with the child's origin, and PAGX models it exactly (the importer
+// pushes `T(origin) * P * T(-origin)` into the child pose).
+//
+// The rewrite is exact because
+//   T(o) * P * T(-o) * [T(o) * L * T(-o)]  ==  T(o) * P * L * T(-o)
+// when the wrapper's `perspective-origin` is the child's `transform-origin` (o).
+
+function parseMatrix3DValues(transform) {
+  const m = /^matrix3d\(([^)]*)\)$/i.exec((transform || '').trim());
+  if (!m) return null;
+  const parts = m[1].split(',').map((x) => parseFloat(x.trim()));
+  if (parts.length !== 16 || parts.some((v) => !isFinite(v))) return null;
+  return parts;
+}
+
+function invert3x3(matrix) {
+  const [a, b, c] = matrix[0];
+  const [d0, e, f] = matrix[1];
+  const [g, h, i] = matrix[2];
+  const det = a * (e * i - f * h) - b * (d0 * i - f * g) + c * (d0 * h - e * g);
+  if (!isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const s = 1 / det;
+  return [
+    [(e * i - f * h) * s, (c * h - b * i) * s, (b * f - c * e) * s],
+    [(f * g - d0 * i) * s, (a * i - c * g) * s, (c * d0 - a * f) * s],
+    [(d0 * h - e * g) * s, (b * g - a * h) * s, (a * e - b * d0) * s],
+  ];
+}
+
+// Splits `matrix3d` into the projection distance and the affine remainder. Returns null when the
+// matrix carries no projection (the common case) or when the projection is not a plain
+// `perspective(d)` (mixed projection terms keep the old behaviour).
+function splitProjectiveTransform(transform) {
+  const values = parseMatrix3DValues(transform);
+  if (!values) return null;
+  const row3 = [values[3], values[7], values[11]];
+  if (row3.every((v) => Math.abs(v) < 1e-9)) return null;
+  const linear = [
+    [values[0], values[4], values[8]],
+    [values[1], values[5], values[9]],
+    [values[2], values[6], values[10]],
+  ];
+  const inverse = invert3x3(linear);
+  if (!inverse) return null;
+  // `pose = P * L` with `P` differing from the identity only in row 3, so the projection
+  // coefficients are row3(pose) premultiplied by L^-1.
+  const projection = [0, 1, 2].map(
+    (column) =>
+      row3[0] * inverse[0][column] + row3[1] * inverse[1][column] + row3[2] * inverse[2][column],
+  );
+  if (Math.abs(projection[0]) > 1e-6 || Math.abs(projection[1]) > 1e-6) return null;
+  const distance = projection[2] < -1e-9 ? -1 / projection[2] : 0;
+  if (!(distance > 0)) return null;
+  // The distance is recovered from a float matrix, so keep it to sub-pixel precision (600 not
+  // 600.0008485) to keep the emitted subset readable and stable across runs.
+  const roundedDistance = Math.round(distance * 1000) / 1000;
+  const affine = values.slice();
+  for (let column = 0; column < 4; column++) {
+    affine[column * 4 + 3] =
+      values[column * 4 + 3] -
+      (projection[0] * values[column * 4] +
+        projection[1] * values[column * 4 + 1] +
+        projection[2] * values[column * 4 + 2]);
+  }
+  const flat =
+    Math.abs(affine[2]) < 1e-6 && Math.abs(affine[6]) < 1e-6 && Math.abs(affine[10] - 1) < 1e-6 &&
+    Math.abs(affine[14]) < 1e-6 && Math.abs(affine[8]) < 1e-6 && Math.abs(affine[9]) < 1e-6 &&
+    Math.abs(affine[3]) < 1e-6 && Math.abs(affine[7]) < 1e-6 && Math.abs(affine[11]) < 1e-6;
+  const text = flat
+    ? 'matrix(' +
+      [affine[0], affine[1], affine[4], affine[5], affine[12], affine[13]]
+        .map((v) => String(Math.round(v * 1e6) / 1e6))
+        .join(', ') +
+      ')'
+    : 'matrix3d(' +
+      affine.map((v) => String(Math.round(v * 1e6) / 1e6)).join(', ') +
+      ')';
+  return { distance: roundedDistance, affine: text };
+}
+
+// Moves the element's box onto a wrapper that declares the camera and shrinks the element itself to
+// fill it. Returns null when the emitted html is not a plain absolutely-positioned <div>, so the
+// caller can fall back to the old behaviour instead of corrupting the layout.
+function liftBoxOntoCameraWrapper(html, distance, origin) {
+  const match = /^<div style="([^"]*)"/.exec(html);
+  if (!match) return null;
+  const style = match[1];
+  const box = {};
+  for (const key of ['left', 'top', 'width', 'height']) {
+    const found = new RegExp('(?:^|;\\s*)' + key + ':\\s*([^;]+)').exec(style);
+    if (!found) return null;
+    box[key] = found[1].trim();
+  }
+  let inner = style;
+  for (const key of Object.keys(box)) {
+    const fill = key === 'width' || key === 'height' ? '100%' : '0px';
+    inner = inner.replace(new RegExp('(^|;\\s*)' + key + ':\\s*[^;]+'), '$1' + key + ': ' + fill);
+  }
+  const wrapperStyle = [
+    'position: absolute',
+    'left: ' + box.left,
+    'top: ' + box.top,
+    'width: ' + box.width,
+    'height: ' + box.height,
+    'perspective: ' + distance + 'px',
+    'perspective-origin: ' + origin,
+  ].join('; ');
+  // `html.slice(...)` starts at the original opening tag's closing quote and already ends with the
+  // element's own `</div>`, so only the wrapper's closing tag is appended.
+  return '<div style="' + wrapperStyle + '"><div style="' + inner + '"' + html.slice(match[0].length) + '</div>';
+}
+
+// Distance of the camera a captured animation carries, keyed by animation name. Kept on `window`
+// because the helpers below are stringified into the page payload, where module state does not
+// exist.
+function pagxAnimCameras() {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) {
+    return {};
+  }
+  if (!scope.__pagxAnimCameras) {
+    scope.__pagxAnimCameras = {};
+  }
+  return scope.__pagxAnimCameras;
+}
+
+// Rewrites every `matrix3d` keyframe that carries its own projection into its affine part and
+// records the camera distance per animation name, so the elements using it can emit a camera
+// wrapper. A block whose stops disagree on the distance keeps the old (projected) form.
+function rewritePerspectiveKeyframes(cssText) {
+  const cameras = pagxAnimCameras();
+  for (const name of Object.keys(cameras)) {
+    delete cameras[name];
+  }
+  if (!cssText) return cssText;
+  let out = '';
+  let index = 0;
+  for (;;) {
+    const at = cssText.indexOf('@keyframes', index);
+    if (at < 0) {
+      out += cssText.slice(index);
+      break;
+    }
+    const open = cssText.indexOf('{', at);
+    if (open < 0) {
+      out += cssText.slice(index);
+      break;
+    }
+    let depth = 0;
+    let close = open;
+    for (; close < cssText.length; close++) {
+      if (cssText[close] === '{') depth++;
+      else if (cssText[close] === '}' && --depth === 0) break;
+    }
+    const nameMatch = /@keyframes\s+([^\s{]+)/.exec(cssText.slice(at, open));
+    const name = nameMatch ? nameMatch[1] : '';
+    const block = cssText.slice(open + 1, close);
+    // Every stop must carry the same camera, otherwise a single wrapper would retime the ones that
+    // do not; counting the transform declarations catches stops that carry no projection at all.
+    const transformCount = (block.match(/transform\s*:/g) || []).length;
+    let projectedCount = 0;
+    let distance = 0;
+    let consistent = true;
+    const rewritten = block.replace(/matrix3d\([^)]*\)/g, (value) => {
+      const split = splitProjectiveTransform(value);
+      if (!split) {
+        if (/transform\s*:/.test(block.slice(Math.max(0, block.indexOf(value) - 40), block.indexOf(value)))) {
+          consistent = false;
+        }
+        return value;
+      }
+      projectedCount++;
+      if (distance === 0) {
+        distance = split.distance;
+      } else if (Math.abs(distance - split.distance) > 0.5) {
+        consistent = false;
+      }
+      return split.affine;
+    });
+    if (projectedCount !== transformCount) {
+      consistent = false;
+    }
+    if (distance > 0 && consistent) {
+      if (name) cameras[name] = distance;
+      out += cssText.slice(index, open + 1) + rewritten + '}';
+    } else {
+      out += cssText.slice(index, close + 1);
+    }
+    index = close + 1;
+  }
+  return out;
+}
+
 // Run `fn` with the element's inline transform temporarily cleared, then
 // restore the original declarations. Used by the text path to obtain
 // pre-transform `getBoundingClientRect()` / `Range.getClientRects()`
@@ -4431,8 +4630,39 @@ function applyLayerName(el, html, opts, precomputed) {
 // children, absolute children, body roots, stripped-transform re-entry) picks up name
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
-  const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  const computed = precomputed || getComputedStyle(el);
+  const html = withPerspectiveCamera(el, renderElementBox(el, parentRect, opts, computed),
+                                     opts, computed);
+  return applyLayerName(el, html, opts, computed);
+}
+
+// Distance of the camera this element needs, either because its own transform carries a
+// `perspective()` (already split out by `renderElementBox`) or because its animation does.
+function cameraDistanceForElement(opts, computed) {
+  const forwarded = opts && opts._cameraDistance;
+  if (forwarded) return forwarded;
+  const names = String((computed && computed.animationName) || '')
+    .split(',')
+    .map((name) => name.trim());
+  const cameras = pagxAnimCameras();
+  for (const name of names) {
+    const distance = cameras[name];
+    if (distance) return distance;
+  }
+  return 0;
+}
+
+// Wraps the element in the camera layer the CSS `perspective` property needs. Falls back to the
+// unwrapped html when the element did not render as a plain positioned <div> (flex items, inline
+// text runs, replaced elements), which keeps those paths exactly as they were.
+function withPerspectiveCamera(el, html, opts, computed) {
+  if (!html) return html;
+  const distance = cameraDistanceForElement(opts, computed);
+  if (!distance) return html;
+  const origin = ((computed && computed.transformOrigin) || '50% 50%').trim();
+  const wrapped = liftBoxOntoCameraWrapper(html, distance, origin);
+  if (!wrapped) return html;
+  return wrapped;
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -4474,8 +4704,15 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   if (!opts._strippedTransform) {
     const boxTransform = readBoxTransform(computed);
     if (boxTransform) {
+      // A transform that carries `perspective()` is split so the projection can move onto a wrapper
+      // (`perspective` property), which is the encoding PAGX reproduces exactly.
+      const split = splitProjectiveTransform(boxTransform.transform);
+      const forwarded = split
+        ? { transform: split.affine, transformOrigin: boxTransform.transformOrigin }
+        : boxTransform;
+      const camera = split ? split.distance : 0;
       return withStrippedTransform(el, () => render(el, parentRect, {
-        ...opts, _strippedTransform: true, transform: boxTransform,
+        ...opts, _strippedTransform: true, transform: forwarded, _cameraDistance: camera,
       }, getComputedStyle(el)));
     }
   }
@@ -4853,6 +5090,12 @@ function visibleContentExtent() {
 
 function snapshotMainImpl(opts) {
   opts = opts || {};
+  // Rewrite captured keyframes that carry their own `perspective()` into the camera-wrapper form
+  // before any element is rendered: the elements consult `pagxAnimCameras()` while emitting.
+  const keyframeNode = document.getElementById('__pagx_anim_keyframes');
+  window.__pagxAnimKeyframesText = rewritePerspectiveKeyframes(
+    keyframeNode && keyframeNode.textContent ? keyframeNode.textContent : '',
+  );
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
   // passes the dimensions it measured *before* the resize via
@@ -4947,9 +5190,9 @@ function snapshotMainImpl(opts) {
   // StyleSheetCollectorPass picks them up alongside the `animation-*` longhands
   // that appendAnimation() forwarded onto each element. The block is appended
   // (not prepended) so element selectors above keep their precedence.
-  const animKeyframes = document.getElementById('__pagx_anim_keyframes');
-  if (animKeyframes && animKeyframes.textContent) {
-    styleBlock += animKeyframes.textContent.trim();
+  const animKeyframesText = window.__pagxAnimKeyframesText || '';
+  if (animKeyframesText) {
+    styleBlock += animKeyframesText.trim();
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -5128,6 +5371,14 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  pagxAnimCameras,
+  parseMatrix3DValues,
+  invert3x3,
+  splitProjectiveTransform,
+  liftBoxOntoCameraWrapper,
+  rewritePerspectiveKeyframes,
+  cameraDistanceForElement,
+  withPerspectiveCamera,
   normalizeFontFamily,
   normalizeOverflow,
   normalizeBorderRadius,
@@ -6401,6 +6652,9 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  splitProjectiveTransform,
+  liftBoxOntoCameraWrapper,
+  rewritePerspectiveKeyframes,
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,
