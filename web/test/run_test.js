@@ -48,17 +48,14 @@ function ReadExpectedCache(directory, backend) {
 }
 
 function StartServer(directory) {
-  const allowed = new Set([...ArtifactNames, 'build-info.json']);
+  // The request URL is only used as a lookup key against this table: every path handed to the
+  // file system is resolved from the artifact names above, so no request string ever reaches
+  // path.join or fs directly. path.basename additionally strips any directory component.
+  const files = new Map();
+  for (const name of [...ArtifactNames, 'build-info.json']) files.set(name, path.join(directory, name));
   function handleRequest(request, response) {
-    const name = request.url?.slice(1);
-    if (!['GET', 'HEAD'].includes(request.method) || !allowed.has(name)) {
-      response.writeHead(404).end();
-      return;
-    }
-    const file = path.join(directory, name);
-    // The allowlist above already rejects traversal sequences; keep this containment check
-    // explicit so the request URL can never reach the file system unsanitized.
-    if (path.dirname(file) !== directory) {
+    const file = files.get(path.basename(request.url?.slice(1) ?? ''));
+    if (!['GET', 'HEAD'].includes(request.method) || !file) {
       response.writeHead(404).end();
       return;
     }
