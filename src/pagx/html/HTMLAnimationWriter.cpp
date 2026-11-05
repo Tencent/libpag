@@ -664,6 +664,7 @@ enum class TargetChannelRole {
   StrokeAlpha,
   StrokeWidth,
   StrokeDashOffset,
+  StrokeMiterLimit,
   SolidColorValue,
   SolidColorAlpha,
   FilterBlurX,
@@ -754,6 +755,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Stroke, "alpha", TargetChannelRole::StrokeAlpha},
     {NodeType::Stroke, "width", TargetChannelRole::StrokeWidth},
     {NodeType::Stroke, "dashOffset", TargetChannelRole::StrokeDashOffset},
+    {NodeType::Stroke, "miterLimit", TargetChannelRole::StrokeMiterLimit},
     {NodeType::SolidColor, "color", TargetChannelRole::SolidColorValue},
     {NodeType::SolidColor, "alpha", TargetChannelRole::SolidColorAlpha},
 
@@ -835,6 +837,7 @@ struct BundleChannelSet {
   const Channel* strokeAlphaCh = nullptr;
   const Channel* strokeWidthCh = nullptr;
   const Channel* dashOffsetCh = nullptr;
+  const Channel* miterLimitCh = nullptr;
   const Fill* fillPainter = nullptr;
   const Stroke* strokePainter = nullptr;
   // Text shaping channels that map to a single CSS property. Text content, font family and font
@@ -1018,6 +1021,9 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::StrokeWidth:
       out.strokeWidthCh = ch;
+      return true;
+    case TargetChannelRole::StrokeMiterLimit:
+      out.miterLimitCh = ch;
       return true;
     case TargetChannelRole::StrokeDashOffset:
       out.dashOffsetCh = ch;
@@ -1481,6 +1487,12 @@ void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagNa
   if (chSet.strokeWidthCh != nullptr) {
     float sw = EvalFloatChannel(chSet.strokeWidthCh, t, 1.0f);
     AppendCssDecl(decls, "stroke-width", CssFloatToString(sw) + "px");
+  }
+  if (chSet.miterLimitCh != nullptr) {
+    const Stroke* miterStroke = chSet.strokePainter;
+    float limit = EvalFloatChannel(chSet.miterLimitCh, t,
+                                   miterStroke != nullptr ? miterStroke->miterLimit : 4.0f);
+    AppendCssDecl(decls, "stroke-miterlimit", CssFloatToString(limit));
   }
   if (chSet.dashOffsetCh != nullptr) {
     float doff = EvalFloatChannel(chSet.dashOffsetCh, t, 0.0f);
