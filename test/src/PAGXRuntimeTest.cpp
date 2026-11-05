@@ -20,6 +20,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -544,6 +545,95 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
   linear.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   linear.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(linear, 30.0), 15.0f);
+}
+
+/**
+ * Test case: a segment interpolated in the reciprocal space blends the projection coefficient
+ * -1/d instead of the distance, so a perspective going from 1000 to 200 passes through 333.33 at
+ * the midpoint instead of 600. This is how a browser interpolates the perspective() transform
+ * function, and the value space stays the default for every other channel.
+ */
+PAGX_TEST(PAGXRuntimeTest, ReciprocalKeyframesBlendTheProjectionCoefficient) {
+  std::vector<pagx::Keyframe<float>> keyframes;
+  keyframes.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  EXPECT_NEAR(
+      pagx::EvaluateKeyframeSequence(keyframes, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
+      333.3333f, 0.001f);
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 30.0), 600.0f);
+
+  // Bezier easing shapes the same fraction, so an identity curve reproduces the linear result.
+  std::vector<pagx::Keyframe<float>> eased;
+  eased.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Bezier, {0.5f, 0.5f}, {}});
+  eased.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {0.5f, 0.5f}});
+  EXPECT_NEAR(
+      pagx::EvaluateKeyframeSequence(eased, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
+      333.3333f, 0.001f);
+}
+
+/**
+ * Test case: a perspective of 0 is the "no projection" state (coefficient 0, i.e. an infinite
+ * distance), so a segment ending there has no reciprocal and keeps the value-space blend instead of
+ * dividing by zero.
+ */
+PAGX_TEST(PAGXRuntimeTest, ReciprocalKeyframesFallBackWithoutAProjection) {
+  std::vector<pagx::Keyframe<float>> keyframes;
+  keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  EXPECT_FLOAT_EQ(
+      pagx::EvaluateKeyframeSequence(keyframes, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
+      100.0f);
+}
+
+/**
+ * Test case: importing a document derives each channel's interpolation space from the field the
+ * channel drives, so a Layer perspective animation blends like a CSS perspective() while every
+ * other channel of the same object keeps blending its values.
+ */
+PAGX_TEST(PAGXRuntimeTest, ImportDerivesChannelInterpolationSpace) {
+  std::string xml =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<pagx width=\"320\" height=\"200\">\n"
+      "  <Layer id=\"box\" x=\"120\" y=\"60\" width=\"80\" height=\"80\" rotationY=\"45\">\n"
+      "    <Rectangle left=\"0\" right=\"0\" top=\"0\" bottom=\"0\"/>\n"
+      "  </Layer>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"pull\" duration=\"60\" frameRate=\"60\" loop=\"once\">\n"
+      "      <Object target=\"box\">\n"
+      "        <Channel name=\"perspective\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"1000\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"200\"/>\n"
+      "        </Channel>\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  ASSERT_EQ(animation->objects.size(), 1u);
+  pagx::Channel* perspective = nullptr;
+  pagx::Channel* alpha = nullptr;
+  for (auto* channel : animation->objects.front()->channels) {
+    if (channel->name == "perspective") {
+      perspective = channel;
+    } else if (channel->name == "alpha") {
+      alpha = channel;
+    }
+  }
+  ASSERT_NE(perspective, nullptr);
+  ASSERT_NE(alpha, nullptr);
+  EXPECT_EQ(perspective->interpolationSpace, pagx::KeyframeInterpolationSpace::Reciprocal);
+  EXPECT_EQ(alpha->interpolationSpace, pagx::KeyframeInterpolationSpace::Value);
+  EXPECT_NEAR(std::get<float>(perspective->evaluateAt(pagx::Frame{30})), 333.3333f, 0.001f);
+  EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
 }
 
 /**

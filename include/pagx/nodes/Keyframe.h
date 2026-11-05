@@ -60,6 +60,27 @@ enum class KeyframeInterpolationType : uint8_t {
 };
 
 /**
+ * KeyframeInterpolationSpace selects the space a keyframe sequence is interpolated in: either the
+ * values themselves or their reciprocals. It describes the quantity behind a channel rather than
+ * the easing, so it is fixed per channel and independent of KeyframeInterpolationType.
+ */
+enum class KeyframeInterpolationSpace : uint8_t {
+  /**
+   * Interpolate the keyframe values directly. The space of every channel that stores the quantity
+   * it renders, e.g. an opacity of 0 to 1 passes through 0.5 at the midpoint.
+   */
+  Value = 0,
+  /**
+   * Interpolate the reciprocals of the keyframe values, then invert the result. Used by channels
+   * holding a projection distance, whose matrix coefficient is -1/d: Layer::perspective going from
+   * 1000 to 200 passes through 333.3 at the midpoint instead of 600, so the projection tightens at
+   * a constant rate in the matrix instead of accelerating. This matches how a browser interpolates
+   * the perspective() transform function of a CSS keyframe animation.
+   */
+  Reciprocal = 1,
+};
+
+/**
  * ImageRef references an image resource by id. Used as a KeyValue alternative for image-valued
  * properties so keyframes can switch between image resources over time.
  */

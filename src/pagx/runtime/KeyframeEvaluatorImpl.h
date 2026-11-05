@@ -88,6 +88,36 @@ inline Matrix3D LerpKeyframeValue<Matrix3D>(const Matrix3D& a, const Matrix3D& b
   return LerpMatrix3D(a, b, t);
 }
 
+// Interpolates two keyframe values in the channel's interpolation space. Only float has a
+// non-trivial space; every other value type ignores it and interpolates its values.
+template <typename T>
+T LerpKeyframeValueInSpace(const T& a, const T& b, double t, KeyframeInterpolationSpace /*space*/) {
+  return LerpKeyframeValue<T>(a, b, t);
+}
+
+template <>
+inline float LerpKeyframeValueInSpace<float>(const float& a, const float& b, double t,
+                                             KeyframeInterpolationSpace space) {
+  if (space == KeyframeInterpolationSpace::Value) {
+    return LerpKeyframeValue<float>(a, b, t);
+  }
+  // A projection distance has no reciprocal at zero: d = 0 is the "no projection" state, whose
+  // coefficient is 0, i.e. the d -> infinity end of the space. Blending a segment with such an end
+  // in the reciprocal space cannot preserve that meaning, so it keeps the value-space blend.
+  if (!(a > 0.0f) || !(b > 0.0f)) {
+    return LerpKeyframeValue<float>(a, b, t);
+  }
+  // Linear interpolation of the reciprocals, inverted. A bezier segment arrives here with the
+  // eased fraction, so the easing shapes the coefficient exactly as it shapes a value.
+  double mixed = (1.0 - t) / static_cast<double>(a) + t / static_cast<double>(b);
+  // Extrapolating past either key can drive the coefficient through zero; fall back so the
+  // projection never flips its direction.
+  if (!(mixed > 0.0)) {
+    return LerpKeyframeValue<float>(a, b, t);
+  }
+  return static_cast<float>(1.0 / mixed);
+}
+
 // Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.
 // Defined as a named function template because the project forbids lambdas.
 template <typename T>
@@ -102,8 +132,12 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
 // `interpolation` and bezier control points come from `keyframes[i]` (the segment start) per the
 // plan's ownership rule: keyframes[i].interpolation describes the i -> i+1 segment, with
 // keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles.
+//
+// `space` selects what the eased fraction blends: the values themselves, or their reciprocals for
+// a channel holding a projection distance.
 template <typename T>
-T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition) {
+T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                           KeyframeInterpolationSpace space = KeyframeInterpolationSpace::Value) {
   if (keyframes.empty()) {
     return T{};
   }
@@ -129,14 +163,15 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     case KeyframeInterpolationType::Hold:
       return left->value;
     case KeyframeInterpolationType::Bezier:
-      return LerpKeyframeValue<T>(left->value, right->value,
-                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                                                    static_cast<double>(left->bezierOut.y),
-                                                    static_cast<double>(right->bezierIn.x),
-                                                    static_cast<double>(right->bezierIn.y), rawT));
+      return LerpKeyframeValueInSpace<T>(
+          left->value, right->value,
+          SolveBezierEasing(
+              static_cast<double>(left->bezierOut.x), static_cast<double>(left->bezierOut.y),
+              static_cast<double>(right->bezierIn.x), static_cast<double>(right->bezierIn.y), rawT),
+          space);
     case KeyframeInterpolationType::Linear:
     default:
-      return LerpKeyframeValue<T>(left->value, right->value, rawT);
+      return LerpKeyframeValueInSpace<T>(left->value, right->value, rawT, space);
   }
 }
 

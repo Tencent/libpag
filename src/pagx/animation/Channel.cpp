@@ -24,7 +24,7 @@ namespace pagx {
 
 template <typename T>
 KeyValue TypedChannel<T>::onEvaluateAtFrame(Frame frame) const {
-  return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame));
+  return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame), interpolationSpace);
 }
 
 template <typename T>
@@ -32,7 +32,7 @@ KeyValue TypedChannel<T>::onEvaluateAtMicros(int64_t microseconds, float frameRa
   double framePosition =
       frameRate > 0.0f ? static_cast<double>(microseconds) * static_cast<double>(frameRate) / 1.0e6
                        : 0.0;
-  return EvaluateKeyframeSequence<T>(keyframes, framePosition);
+  return EvaluateKeyframeSequence<T>(keyframes, framePosition, interpolationSpace);
 }
 
 template <>
