@@ -3286,15 +3286,24 @@ PAG_TEST(PAGXHtmlAnimationTest, AnimatedPerspectiveInterpolatesInDistanceNotReci
       {0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
       {60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
   };
-  const double pagxMidpoint = pagx::EvaluateKeyframeSequence(keys, 30.0);
-  EXPECT_NEAR(pagxMidpoint, 600.0, 0.01) << "PAGX interpolates the distance linearly";
+
+  // Value space (the default, and the space every channel starts in): the distance itself is what
+  // interpolates, so the midpoint is the arithmetic mean.
+  const double valueMidpoint = pagx::EvaluateKeyframeSequence(keys, 30.0);
+  EXPECT_NEAR(valueMidpoint, 600.0, 0.01) << "Value space interpolates the distance linearly";
 
   // What a browser renders for the same pair of `perspective` keyframes: the reciprocal of the
   // distance is what interpolates, so the midpoint is the harmonic mean of the endpoints.
   const float cssMidpoint = 1.0f / ((1.0f / 1000.0f + 1.0f / 200.0f) * 0.5f);
   EXPECT_NEAR(cssMidpoint, 333.33f, 0.05f);
-  EXPECT_GT(std::fabs(static_cast<float>(pagxMidpoint) - cssMidpoint), 200.0f)
-      << "endpoints agree, mid-frames diverge; tracked as a separate export/runtime item";
+
+  // `feature/mite085_perspective_interp` adds `KeyframeInterpolationSpace::Reciprocal` and makes an
+  // imported document drive `Layer::perspective` in that space, which lands the midpoint on
+  // `cssMidpoint` and closes this gap. Once it merges, extend this test with
+  //   EvaluateKeyframeSequence(keys, 30.0, KeyframeInterpolationSpace::Reciprocal) == cssMidpoint
+  // and keep the Value-space assertion above as the record of the previous default.
+  EXPECT_GT(std::fabs(static_cast<float>(valueMidpoint) - cssMidpoint), 200.0f)
+      << "Value space diverges from CSS in the mid frames; the Reciprocal space closes it";
 }
 
 }  // namespace pag
