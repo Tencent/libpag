@@ -664,6 +664,103 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
 }
 
 /**
+ * Test case: the pivot / camera reference box is resolved once, so the sizing diagnostics of an
+ * element are reported once instead of twice (the reference size used to re-run `parseBoxSizing`).
+ */
+PAG_TEST(PAGXHTML3DTest, ReferenceBoxResolutionDoesNotDuplicateDiagnostics) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:10px;top:10px;width:80px;height:40px;
+           box-sizing:content-box;min-width:10px;background-color:#38BDF8;
+           transform:rotate(15deg);transform-origin:0px 20px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int boxSizingWarnings = 0;
+  int minWidthWarnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("box-sizing") != std::string::npos) boxSizingWarnings++;
+    if (message.find("min-width") != std::string::npos) minWidthWarnings++;
+  }
+  EXPECT_EQ(boxSizingWarnings, 1);
+  EXPECT_EQ(minWidthWarnings, 1);
+}
+
+/**
+ * Test case: a `perspective` element whose own box has no px size (percentage / auto) cannot resolve
+ * the default `perspective-origin` (the box centre). That has to be reported once per declaring
+ * element instead of silently projecting about the layer origin.
+ */
+PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeWarnsAboutTheVanishingPoint) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:160px">
+      <div style="position:absolute;left:0;top:0;width:100%;height:100%;perspective:600px">
+        <div id="card" style="position:absolute;left:10px;top:10px;width:80px;height:40px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "vanishing point"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "perspective-origin"));
+  // The documented fallback is the layer origin, i.e. the plain projection: no centre conjugation.
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 0), 0.000833f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), -0.001443f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
+}
+
+/**
+ * Test case: a `data-pagx-text` host is converted outside `convertElement`, so the parent camera has
+ * to be folded in explicitly; otherwise a 3D transform on a restored text host loses its projection.
+ */
+PAG_TEST(PAGXHTML3DTest, PAGXTextHostKeepsParentPerspective) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div data-pagx-text="Kept" data-pagx-font-family="CustomFont" data-pagx-font-style=""
+             data-pagx-faux-bold="0" data-pagx-faux-italic="0"
+             style="position:absolute;left:10px;top:20px;width:80px;height:40px;font-size:16px;
+                    transform:rotateY(25deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+  auto layers = LayersWithNonIdentityMatrix3D(doc);
+  ASSERT_FALSE(layers.empty()) << "the restored text host must carry its 3D pose";
+  bool sawProjection = false;
+  for (auto* layer : layers) {
+    if (std::fabs(layer->matrix3D.getRowColumn(3, 2)) > 1e-6f) {
+      sawProjection = true;
+    }
+  }
+  EXPECT_TRUE(sawProjection) << "the parent perspective must reach the text host pose";
+}
+
+/**
+ * Test case: `scale(0)` under a perspective parent only becomes non-invertible after the camera is
+ * folded in. PAGX requires a 3D pose to be invertible, so it has to be rejected with a diagnostic
+ * rather than written out.
+ */
+PAG_TEST(PAGXHTML3DTest, ScaleZeroUnderPerspectiveIsRejected) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:160px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:160px;perspective:600px">
+        <div id="card" style="position:absolute;left:10px;top:10px;width:80px;height:40px;
+             background-color:#38BDF8;transform:scale(0)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "non-invertible"));
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(card->matrix3D.isIdentity()) << "an invalid 3D pose must not be written";
+}
+
+/**
  * Test case: an inline `<svg>` host carries its CSS 3D transform the same way a plain box does.
  */
 PAG_TEST(PAGXHTML3DTest, InlineSvgHostWithPerspectiveEmitsMatrix3D) {
