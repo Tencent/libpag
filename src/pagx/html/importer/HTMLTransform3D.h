@@ -97,17 +97,4 @@ Matrix ToAffine2D(const Matrix3D& matrix);
  */
 bool IsLinearIdentity(const Matrix3D& matrix);
 
-/**
- * Returns true when the pose carries a projection row of its own (anything other than
- * `(0, 0, 0, 1)`), i.e. it contains a `perspective()` transform.
- */
-bool HasProjection(const Matrix3D& matrix);
-
-/**
- * Returns `T(origin) * pose * T(-origin)`, i.e. the pose with the pivot folded in. Used for poses
- * that carry their own projection: CSS conjugates `perspective()` with `transform-origin` while
- * PAGX keeps the projection outside `anchor`, so baking is the only exact encoding.
- */
-Matrix3D BakeTransformOrigin(const Matrix3D& pose, const Point& origin, float originZ);
-
 }  // namespace pagx
