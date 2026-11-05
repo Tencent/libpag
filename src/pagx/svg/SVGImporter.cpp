@@ -1331,8 +1331,7 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
       // continue the previous run's advance, which the importer cannot measure, and the two runs
       // would overlap. In that case the line keeps the first run's paint.
       auto* currentLine = opensLine ? nullptr : &state->lines[state->currentLineIndex];
-      bool fillChanged =
-          currentLine != nullptr && currentLine->fill != fill && state->positioned;
+      bool fillChanged = currentLine != nullptr && currentLine->fill != fill && state->positioned;
       if (opensLine || fillChanged) {
         state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill});
         state->currentLineIndex = static_cast<int>(state->lines.size()) - 1;

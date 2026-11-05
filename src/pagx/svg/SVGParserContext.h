@@ -295,7 +295,8 @@ class SVGParserContext {
 
   // Records one fe* primitive → filter mapping and, when the primitive carries SMIL animation
   // children, the AnimatedNodeInfo buildAnimation needs to emit its channels.
-  void registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement, LayerFilter* filterNode);
+  void registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement,
+                                 LayerFilter* filterNode);
 
   // Whether the given SVG element has collected SMIL animation children.
   bool hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const;
@@ -339,22 +340,22 @@ class SVGParserContext {
   bool _contentMatrixBakedIntoLayer = false;
 
  public:
-   /** Returns the document viewBox width used for unit conversions (parseLength). */
-   float getViewBoxWidth() const {
-     return _viewBoxWidth;
-   }
-   /** Returns the document viewBox height used for unit conversions (parseLength). */
-   float getViewBoxHeight() const {
-     return _viewBoxHeight;
-   }
-   /** Returns the viewBox mapping pre-multiplied onto a single top-level layer. */
-   const Matrix& getContentMatrix() const {
-     return _contentMatrix;
-   }
-   /** Whether the viewBox mapping was baked into the animated top-level layer itself. */
-   bool isContentMatrixBakedIntoLayer() const {
-     return _contentMatrixBakedIntoLayer;
-   }
+  /** Returns the document viewBox width used for unit conversions (parseLength). */
+  float getViewBoxWidth() const {
+    return _viewBoxWidth;
+  }
+  /** Returns the document viewBox height used for unit conversions (parseLength). */
+  float getViewBoxHeight() const {
+    return _viewBoxHeight;
+  }
+  /** Returns the viewBox mapping pre-multiplied onto a single top-level layer. */
+  const Matrix& getContentMatrix() const {
+    return _contentMatrix;
+  }
+  /** Whether the viewBox mapping was baked into the animated top-level layer itself. */
+  bool isContentMatrixBakedIntoLayer() const {
+    return _contentMatrixBakedIntoLayer;
+  }
 
  private:
   // CSS class rules: key is class name (without dot), value is style properties.
