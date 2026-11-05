@@ -43,9 +43,11 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -294,8 +296,11 @@ void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
                                     timesOut, easingOut);
       break;
     case ChannelValueType::Matrix3D:
+      CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Matrix3D>*>(ch)->keyframes,
+                                    timesOut, easingOut);
+      break;
     case ChannelValueType::PAGImage:
-      // Neither channel value type currently maps to a CSS animation channel.
+      // An image reference has no CSS animation channel.
       break;
   }
 }
@@ -333,6 +338,15 @@ Matrix EvalMatrixChannel(const Channel* ch, Frame frame, const Matrix& fallback)
   }
   KeyValue kv = ch->evaluateAt(frame);
   const auto* v = std::get_if<Matrix>(&kv);
+  return v != nullptr ? *v : fallback;
+}
+
+Matrix3D EvalMatrix3DChannel(const Channel* ch, Frame frame, const Matrix3D& fallback) {
+  if (ch == nullptr) {
+    return fallback;
+  }
+  KeyValue kv = ch->evaluateAt(frame);
+  const auto* v = std::get_if<Matrix3D>(&kv);
   return v != nullptr ? *v : fallback;
 }
 
@@ -614,6 +628,16 @@ std::string BuildLiftedSvgTag(const std::string& svgTag) {
 //   2. Register `{NodeType::..., "channelName", TargetChannelRole::...}` in `kChannelBindingTable`.
 //   3. Handle the role in `BindChannelToBundleSet` and the corresponding `Emit*Css` helper.
 
+// True when the layer has a pivot, which the matrix3d keyframes cannot reproduce yet.
+bool LayerHasAnchorFor3D(const Node* target) {
+  if (target == nullptr || target->nodeType() != NodeType::Layer) {
+    return false;
+  }
+  auto* layer = static_cast<const Layer*>(target);
+  return !FloatNearlyZero(layer->anchor.x) || !FloatNearlyZero(layer->anchor.y) ||
+         !FloatNearlyZero(layer->anchorZ);
+}
+
 enum class TargetChannelRole {
   Unknown = 0,
   Opacity,
@@ -652,6 +676,12 @@ enum class TargetChannelRole {
   LayerSkewX,
   LayerSkewY,
   RoundCornerRadius,
+  // Layer 3D channels: no 2D transform function expresses them, so the frame emits a matrix3d.
+  LayerRotationX,
+  LayerRotationY,
+  LayerZ,
+  LayerPerspective,
+  LayerMatrix3D,
   FontSize,
   LetterSpacing,
 };
@@ -673,6 +703,11 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "rotation.z", TargetChannelRole::Rotation},
     {NodeType::Layer, "skew.x", TargetChannelRole::LayerSkewX},
     {NodeType::Layer, "skew.y", TargetChannelRole::LayerSkewY},
+    {NodeType::Layer, "rotation.x", TargetChannelRole::LayerRotationX},
+    {NodeType::Layer, "rotation.y", TargetChannelRole::LayerRotationY},
+    {NodeType::Layer, "z", TargetChannelRole::LayerZ},
+    {NodeType::Layer, "perspective", TargetChannelRole::LayerPerspective},
+    {NodeType::Layer, "matrix3D", TargetChannelRole::LayerMatrix3D},
     {NodeType::Layer, "scale.x", TargetChannelRole::ScaleX},
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
 
@@ -781,6 +816,11 @@ struct BundleChannelSet {
   const Channel* skewCh = nullptr;
   const Channel* layerSkewXCh = nullptr;
   const Channel* layerSkewYCh = nullptr;
+  const Channel* layerRotXCh = nullptr;
+  const Channel* layerRotYCh = nullptr;
+  const Channel* layerZCh = nullptr;
+  const Channel* layerPerspectiveCh = nullptr;
+  const Channel* layerMatrix3DCh = nullptr;
   const Channel* skewAxisCh = nullptr;
   const Channel* posXCh = nullptr;
   const Channel* posYCh = nullptr;
@@ -871,6 +911,39 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::RoundCornerRadius:
       out.roundCornerCh = ch;
       out.roundCornerTarget = static_cast<const RoundCorner*>(objTarget);
+      return true;
+    // A 3D channel is emitted as one composed matrix3d. Anchored layers need the pivot folded into
+    // that matrix differently than the static path does, so they keep the previous behaviour (the
+    // channel is not exported) until anchor support lands.
+    case TargetChannelRole::LayerRotationX:
+      if (LayerHasAnchorFor3D(objTarget)) {
+        return false;
+      }
+      out.layerRotXCh = ch;
+      return true;
+    case TargetChannelRole::LayerRotationY:
+      if (LayerHasAnchorFor3D(objTarget)) {
+        return false;
+      }
+      out.layerRotYCh = ch;
+      return true;
+    case TargetChannelRole::LayerZ:
+      if (LayerHasAnchorFor3D(objTarget)) {
+        return false;
+      }
+      out.layerZCh = ch;
+      return true;
+    case TargetChannelRole::LayerPerspective:
+      if (LayerHasAnchorFor3D(objTarget)) {
+        return false;
+      }
+      out.layerPerspectiveCh = ch;
+      return true;
+    case TargetChannelRole::LayerMatrix3D:
+      if (LayerHasAnchorFor3D(objTarget)) {
+        return false;
+      }
+      out.layerMatrix3DCh = ch;
       return true;
     case TargetChannelRole::LayerSkewX:
       out.layerSkewXCh = ch;
@@ -1087,11 +1160,46 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
 
 void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                              std::string& decls, bool& needsZeroOrigin) {
-  if (chSet.matrixCh != nullptr || chSet.xCh != nullptr || chSet.yCh != nullptr) {
-    const Layer* hostLayer = nullptr;
-    if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer) {
-      hostLayer = static_cast<const Layer*>(bundle.primaryHost);
+  const Layer* hostLayer = nullptr;
+  if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer) {
+    hostLayer = static_cast<const Layer*>(bundle.primaryHost);
+  }
+  bool has3DChannel = chSet.layerRotXCh != nullptr || chSet.layerRotYCh != nullptr ||
+                      chSet.layerZCh != nullptr || chSet.layerPerspectiveCh != nullptr ||
+                      chSet.layerMatrix3DCh != nullptr;
+  if (has3DChannel && hostLayer != nullptr) {
+    // Nothing in 2D CSS can express a depth rotation or a perspective, so the frame composes the
+    // same 3D matrix the static export uses and emits it whole.
+    Matrix3D matrix = {};
+    if (chSet.layerMatrix3DCh != nullptr) {
+      matrix = EvalMatrix3DChannel(chSet.layerMatrix3DCh, t, hostLayer->matrix3D);
+    } else {
+      Matrix3DComponents components = {};
+      Matrix3D ignored = {};
+      LayerTransformComponents(hostLayer, &components, &ignored);
+      if (chSet.layerRotXCh != nullptr) {
+        components.rotation[0] = EvalFloatChannel(chSet.layerRotXCh, t, hostLayer->rotationX);
+      }
+      if (chSet.layerRotYCh != nullptr) {
+        components.rotation[1] = EvalFloatChannel(chSet.layerRotYCh, t, hostLayer->rotationY);
+      }
+      if (chSet.layerZCh != nullptr) {
+        components.translate[2] = EvalFloatChannel(chSet.layerZCh, t, hostLayer->z);
+      }
+      if (chSet.layerPerspectiveCh != nullptr) {
+        components.perspective =
+            EvalFloatChannel(chSet.layerPerspectiveCh, t, hostLayer->perspective);
+      }
+      if (!ComposeMatrix3DComponents(components, &matrix)) {
+        return;
+      }
     }
+    auto anchored = ApplyAnchorToMatrix(matrix, hostLayer->anchor, hostLayer->anchorZ);
+    AppendCssDecl(decls, "transform", Matrix3DToCSS(anchored));
+    needsZeroOrigin = true;
+    return;
+  }
+  if (chSet.matrixCh != nullptr || chSet.xCh != nullptr || chSet.yCh != nullptr) {
     // The runtime composes the layer transform as Translate(x, y) * matrix (see
     // LayerRuntimeTarget::recompose). A keyframe `transform` replaces the element's inline transform
     // instead of stacking on it, so every frame re-emits the full chain: the animated translation

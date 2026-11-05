@@ -3847,6 +3847,110 @@ static std::string KeyframeStopOf(const std::string& html, const std::string& id
 // binding has to accept that spelling instead of only "rotation".
 // RoundCorner radius rounds the geometry in place, so a CSS equivalent has to rebuild the path:
 // every stop carries a `d` with that frame's radius applied.
+// 3D channels (rotation.x/y, z, perspective) cannot be expressed with 2D transform functions, so each
+// frame is emitted as a matrix3d. The static path already builds one from the same components.
+CLI_TEST(PAGXHtmlTest, AnimationLayer3DChannelsEmitMatrix3D) {
+  const char* xml = R"(<pagx width="400" height="200">
+    <Layer id="tipX" x="60" y="60" width="80" height="80" perspective="500">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#4F46E5"/>
+    </Layer>
+    <Layer id="spinY" x="160" y="60" width="80" height="80" perspective="500">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#0EA5E9"/>
+    </Layer>
+    <Layer id="depthBox" x="260" y="60" width="80" height="80" perspective="400">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#22C55E"/>
+    </Layer>
+    <Layer id="perspBox" x="340" y="60" width="80" height="80" rotationY="45">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#F97316"/>
+    </Layer>
+    <Animations>
+      <Animation id="spin3d" duration="60" frameRate="60" loop="once">
+        <Object target="tipX">
+          <Channel name="rotation.x" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="50"/>
+          </Channel>
+        </Object>
+        <Object target="spinY">
+          <Channel name="rotation.y" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="60"/>
+          </Channel>
+        </Object>
+        <Object target="depthBox">
+          <Channel name="z" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="200"/>
+          </Channel>
+        </Object>
+        <Object target="perspBox">
+          <Channel name="perspective" type="float">
+            <Key time="0" value="1000" interpolation="linear"/>
+            <Key time="60" value="200"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  const char* ids[] = {"tipX", "spinY", "depthBox", "perspBox"};
+  for (const auto* id : ids) {
+    auto tag = FindTagContaining(html, std::string("id=\"") + id + "\"");
+    ASSERT_FALSE(tag.empty()) << id;
+    auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+    ASSERT_FALSE(rule.empty()) << id << html;
+    EXPECT_NE(rule.find("matrix3d("), std::string::npos) << id << rule;
+    auto first = KeyframeStopOf(html, std::string("id=\"") + id + "\"", "0%");
+    auto last = KeyframeStopOf(html, std::string("id=\"") + id + "\"", "100%");
+    ASSERT_FALSE(first.empty()) << id;
+    ASSERT_FALSE(last.empty()) << id;
+    EXPECT_NE(first, last) << id;
+  }
+}
+
+// A matrix3D channel supplies the whole matrix per key; CSS takes the same column-major values.
+CLI_TEST(PAGXHtmlTest, AnimationLayerMatrix3DChannelValue) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="matrix3DBox" x="120" y="60" width="80" height="80" perspective="400">
+      <Path data="M 8,12 L 72,34 L 24,72 Z"/>
+      <Fill color="#4F46E5"/>
+    </Layer>
+    <Animations>
+      <Animation id="spin3d" duration="60" frameRate="60" loop="once">
+        <Object target="matrix3DBox">
+          <Channel name="matrix3D" type="matrix3D">
+            <Key time="0" value="1,0,0,0,0,1,0,0,0,0,1,0,120,60,0,1" interpolation="linear"/>
+            <Key time="60" value="0.5,0,-0.866,0,0,1,0,0,0.866,0,0.5,0,120,60,0,1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"matrix3DBox\"");
+  ASSERT_FALSE(tag.empty());
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("matrix3d("), std::string::npos) << rule;
+  auto first = KeyframeStopOf(html, "id=\"matrix3DBox\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"matrix3DBox\"", "100%");
+  ASSERT_FALSE(first.empty());
+  ASSERT_FALSE(last.empty());
+  EXPECT_NE(first, last);
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationRoundCornerRadiusRebuildsPath) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">
