@@ -794,8 +794,27 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
                         "' must be a positive length; ignored [subset:unsupported-property]");
     }
   }
-  if (!LookupProperty(props, "perspective-origin").empty()) {
-    _diagnostics.warn("html: perspective-origin is not supported; ignored");
+  if (box.perspectivePx > 0.0f) {
+    // CSS projects about `perspective-origin`, which defaults to the centre of the declaring box.
+    const std::string perspectiveOrigin = Trim(LookupProperty(props, "perspective-origin"));
+    float referenceWidth = box.widthPx;
+    float referenceHeight = box.heightPx;
+    if (perspectiveOrigin.empty()) {
+      box.perspectiveOriginX = referenceWidth * 0.5f;
+      box.perspectiveOriginY = referenceHeight * 0.5f;
+    } else {
+      const auto origin =
+          ResolveTransformOrigin(perspectiveOrigin, referenceWidth, referenceHeight, _valueParser);
+      if (origin.resolved) {
+        box.perspectiveOriginX = origin.point.x;
+        box.perspectiveOriginY = origin.point.y;
+      } else {
+        _diagnostics.warn("html: perspective-origin '" + perspectiveOrigin +
+                          "' cannot be resolved against the box size; using the box centre");
+        box.perspectiveOriginX = referenceWidth * 0.5f;
+        box.perspectiveOriginY = referenceHeight * 0.5f;
+      }
+    }
   }
 
   static const char* VisualsDisallowed[] = {"outline"};
