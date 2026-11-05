@@ -301,6 +301,10 @@ static double ResolveRepeatCount(const std::string& repeatCountStr, const std::s
   if (count < 0.0) {
     return -1.0;
   }
+  // repeatDur="indefinite" is the duration-side spelling of an endless repeat.
+  if (repeatDurStr == "indefinite") {
+    return repeatCountStr.empty() ? -1.0 : count;
+  }
   double repeatDurSeconds = SMILAnimationParser::parseSMILClockValue(repeatDurStr);
   if (repeatDurSeconds > 0.0 && durSeconds > 0.0) {
     double fromDur = repeatDurSeconds / durSeconds;
@@ -440,59 +444,44 @@ static std::vector<float> SampleTransformParams(const std::vector<std::vector<fl
   return sets.back();
 }
 
+// Truncates one typed channel at endFrame. When a keyframe already sits on endFrame its value is
+// overwritten instead of appended, so tracks keyed by timestamp do not drop a duplicate key.
+template <typename T>
+static void ApplyEndTimeLimitTo(TypedChannel<T>* channel, Frame endFrame) {
+  if (channel == nullptr || channel->keyframes.empty() ||
+      channel->keyframes.back().time <= endFrame) {
+    return;
+  }
+  auto value = std::get<T>(channel->evaluateAt(endFrame));
+  while (!channel->keyframes.empty() && channel->keyframes.back().time > endFrame) {
+    channel->keyframes.pop_back();
+  }
+  if (!channel->keyframes.empty() && channel->keyframes.back().time == endFrame) {
+    channel->keyframes.back().value = value;
+    channel->keyframes.back().interpolation = KeyframeInterpolationType::Hold;
+    return;
+  }
+  Keyframe<T> key = {};
+  key.time = endFrame;
+  key.value = value;
+  key.interpolation = KeyframeInterpolationType::Hold;
+  channel->keyframes.push_back(key);
+}
+
 static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Frame endFrame) {
   switch (valueType) {
-    case ChannelValueType::Float: {
-      auto* ch = static_cast<TypedChannel<float>*>(channel);
-      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
-        return;
-      }
-      float value = std::get<float>(ch->evaluateAt(endFrame));
-      ch->keyframes.erase(
-          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
-                         [endFrame](const Keyframe<float>& k) { return k.time > endFrame; }),
-          ch->keyframes.end());
-      Keyframe<float> key = {};
-      key.time = endFrame;
-      key.value = value;
-      key.interpolation = KeyframeInterpolationType::Hold;
-      ch->keyframes.push_back(key);
+    case ChannelValueType::Float:
+      ApplyEndTimeLimitTo(static_cast<TypedChannel<float>*>(channel), endFrame);
       break;
-    }
-    case ChannelValueType::Color: {
-      auto* ch = static_cast<TypedChannel<Color>*>(channel);
-      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
-        return;
-      }
-      Color value = std::get<Color>(ch->evaluateAt(endFrame));
-      ch->keyframes.erase(
-          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
-                         [endFrame](const Keyframe<Color>& k) { return k.time > endFrame; }),
-          ch->keyframes.end());
-      Keyframe<Color> key = {};
-      key.time = endFrame;
-      key.value = value;
-      key.interpolation = KeyframeInterpolationType::Hold;
-      ch->keyframes.push_back(key);
+    case ChannelValueType::Color:
+      ApplyEndTimeLimitTo(static_cast<TypedChannel<Color>*>(channel), endFrame);
       break;
-    }
-    case ChannelValueType::Matrix: {
-      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
-      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
-        return;
-      }
-      Matrix value = std::get<Matrix>(ch->evaluateAt(endFrame));
-      ch->keyframes.erase(
-          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
-                         [endFrame](const Keyframe<Matrix>& k) { return k.time > endFrame; }),
-          ch->keyframes.end());
-      Keyframe<Matrix> key = {};
-      key.time = endFrame;
-      key.value = value;
-      key.interpolation = KeyframeInterpolationType::Hold;
-      ch->keyframes.push_back(key);
+    case ChannelValueType::Matrix:
+      ApplyEndTimeLimitTo(static_cast<TypedChannel<Matrix>*>(channel), endFrame);
       break;
-    }
+    case ChannelValueType::Bool:
+      ApplyEndTimeLimitTo(static_cast<TypedChannel<bool>*>(channel), endFrame);
+      break;
     default:
       break;
   }
@@ -916,12 +905,33 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
       }
       break;
     }
-    default: {
-      // For non-numeric types, repeat keyframes without accumulation. Use float as a generic
-      // channel since we cannot easily template-dispatch here; but bool/string channels need
-      // their own handling. For now, only float and color support repeat expansion.
+    case ChannelValueType::Bool: {
+      auto* ch = static_cast<TypedChannel<bool>*>(channel);
+      auto original = ch->keyframes;
+      if (original.empty()) {
+        break;
+      }
+      int fullRepeats = static_cast<int>(std::floor(repeatCount));
+      double fraction = repeatCount - std::floor(repeatCount);
+      ch->keyframes.clear();
+      for (int k = 0; k < fullRepeats; ++k) {
+        Frame timeOffset = static_cast<Frame>(k) * durFrames;
+        for (size_t idx = 0; idx < original.size(); ++idx) {
+          auto key = original[idx];
+          key.time += timeOffset;
+          ch->keyframes.push_back(key);
+        }
+      }
+      if (fraction > 0.0 && original.size() >= 2) {
+        auto key = original.front();
+        key.time = static_cast<Frame>(fullRepeats) * durFrames +
+                   static_cast<Frame>(std::round(fraction * durFrames));
+        ch->keyframes.push_back(key);
+      }
       break;
     }
+    default:
+      break;
   }
 }
 
@@ -2735,6 +2745,9 @@ static void TileChannelKeyframes(Channel* channel, Frame period, Frame maxEnd) {
     case ChannelValueType::Matrix:
       TileTypedChannel(static_cast<TypedChannel<Matrix>*>(channel), period, maxEnd);
       break;
+    case ChannelValueType::Bool:
+      TileTypedChannel(static_cast<TypedChannel<bool>*>(channel), period, maxEnd);
+      break;
     default:
       break;
   }
@@ -2897,7 +2910,16 @@ Animation* SMILAnimationParser::buildAnimation(
     for (const auto& entry : layerEntries) {
       groupedByTarget[entry.targetId].push_back({entry.channel, entry.additive});
     }
-    for (auto& [targetId, channels] : groupedByTarget) {
+    // Emit targets in id order so the AnimationObject list is reproducible; the iteration order of
+    // an unordered_map would otherwise leak into the exported document.
+    std::vector<std::string> targetIds = {};
+    targetIds.reserve(groupedByTarget.size());
+    for (const auto& entry : groupedByTarget) {
+      targetIds.push_back(entry.first);
+    }
+    std::sort(targetIds.begin(), targetIds.end());
+    for (const auto& targetId : targetIds) {
+      auto& channels = groupedByTarget[targetId];
       auto* obj = doc->makeNode<AnimationObject>();
       obj->target = targetId;
       obj->channels = MergeAdditiveChannels(&channels);
