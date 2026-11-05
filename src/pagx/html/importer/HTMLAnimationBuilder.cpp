@@ -1254,11 +1254,28 @@ bool HTMLAnimationBuilder::buildForElement(
         bool pureTranslate = false;
         bool flat = true;
         if (ParseTransformPose(val, _valueParser, _diagnostics, pose, pureTranslate, flat)) {
-          transformStops.push_back(
-              {time, PushPerspective(pose, parentPerspectivePx, parentPerspectiveOriginX,
-                                     parentPerspectiveOriginY)});
-          if (!pureTranslate) transformAllPureTranslate = false;
-          if (!flat) transformAllFlat = false;
+          const Matrix3D pushed = PushPerspective(
+              pose, parentPerspectivePx, parentPerspectiveOriginX, parentPerspectiveOriginY);
+          // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
+          // depth here: refresh the classification instead of routing the keyframe to the 2D
+          // `matrix` channel, which would silently drop the projection.
+          if (!IsFlatTransform(pushed)) {
+            flat = false;
+            pureTranslate = false;
+          }
+          // PAGX requires a 3D pose to be invertible; the parser only validated the pose it saw.
+          if (!flat && !IsInvertiblePose(pushed)) {
+            if (!warnedTransform) {
+              _diagnostics.warn(
+                  "html: a @keyframes transform becomes non-invertible under the parent "
+                  "perspective; dropped [subset:animation-unsupported-property]");
+              warnedTransform = true;
+            }
+          } else {
+            transformStops.push_back({time, pushed});
+            if (!pureTranslate) transformAllPureTranslate = false;
+            if (!flat) transformAllFlat = false;
+          }
         } else if (!warnedTransform) {
           _diagnostics.warn("html: unsupported 'transform' value '" + Trim(val) +
                             "' in @keyframes; dropped [subset:animation-unsupported-property]");

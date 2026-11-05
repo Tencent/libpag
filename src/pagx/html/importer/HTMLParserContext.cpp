@@ -698,16 +698,13 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    box.parentPerspectivePx = inherited.parentPerspectivePx;
-    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
-        std::isfinite(inherited.parentPerspectiveOriginY)) {
-      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
-      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
-      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
-      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
-    }
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY);
     return _layerBuilder->wrapForMargin(
-        _textFragmentBuilder->convertPAGXTextHost(element, inherited), box);
+        _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
+                                                  box.parentPerspectiveOriginX,
+                                                  box.parentPerspectiveOriginY),
+        box);
   }
 
   if (tag == "br") {
@@ -725,40 +722,22 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    box.parentPerspectivePx = inherited.parentPerspectivePx;
-    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
-        std::isfinite(inherited.parentPerspectiveOriginY)) {
-      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
-      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
-      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
-      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
-    }
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    box.parentPerspectivePx = inherited.parentPerspectivePx;
-    if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
-        std::isfinite(inherited.parentPerspectiveOriginY)) {
-      const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
-      const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
-      box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
-      box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
-    }
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-  box.parentPerspectivePx = inherited.parentPerspectivePx;
-  if (inherited.parentPerspectivePx > 0.0f && std::isfinite(inherited.parentPerspectiveOriginX) &&
-      std::isfinite(inherited.parentPerspectiveOriginY)) {
-    const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
-    const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
-    box.parentPerspectiveOriginX = inherited.parentPerspectiveOriginX - ownLeft;
-    box.parentPerspectiveOriginY = inherited.parentPerspectiveOriginY - ownTop;
-  }
+  ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                         inherited.parentPerspectiveOriginY);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
