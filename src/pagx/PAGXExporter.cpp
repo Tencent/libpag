@@ -174,12 +174,19 @@ static std::string ToLowerAscii(std::string value) {
   return value;
 }
 
+// Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
+// extension and for the "_<n>" suffix that resolves name collisions.
+static constexpr size_t MAX_ENTRY_STEM_LENGTH = 128;
+
 // Reserves a unique path under images/. Comparison keys are ASCII-lowercased so an archive that
 // lands on a case-insensitive filesystem cannot extract one entry over another; the returned path
 // keeps the original case for the XML and the archive itself.
 static std::string AllocateEntryPath(PAGXPackContext* pack, const std::string& baseName,
                                      const std::string& extension) {
   std::string stem = baseName.empty() ? "img_" + std::to_string(pack->nextImageIndex++) : baseName;
+  if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
+    stem.resize(MAX_ENTRY_STEM_LENGTH);
+  }
   std::string prefix = "images/" + stem;
   std::string path = prefix + "." + extension;
   for (size_t suffix = 2; pack->usedPaths.count(ToLowerAscii(path)) > 0; suffix++) {
@@ -187,6 +194,62 @@ static std::string AllocateEntryPath(PAGXPackContext* pack, const std::string& b
   }
   pack->usedPaths.insert(ToLowerAscii(path));
   return path;
+}
+
+// Folds a relative resource path into the form a loader would resolve inside the document
+// directory: backslashes become separators, "." segments and repeated separators disappear, and
+// ".." segments cancel the segment before them when possible. Paths that cannot name a file in the
+// archive (absolute paths, URLs, scheme-qualified ids) yield a form that never starts with
+// "images/", so the caller's prefix test drops them.
+static std::string NormalizeRelativePath(const std::string& path) {
+  if (path.empty() || path[0] == '/' || path[0] == '\\') {
+    return {};
+  }
+  std::vector<std::string> segments;
+  std::string segment;
+  for (size_t i = 0; i <= path.size(); i++) {
+    char c = i < path.size() ? path[i] : '/';
+    if (c != '/' && c != '\\') {
+      segment += c;
+      continue;
+    }
+    if (!segment.empty() && segment != ".") {
+      if (segment == ".." && !segments.empty() && segments.back() != "..") {
+        segments.pop_back();
+      } else {
+        segments.push_back(segment);
+      }
+    }
+    segment.clear();
+  }
+  std::string normalized;
+  for (const auto& part : segments) {
+    if (!normalized.empty()) {
+      normalized += '/';
+    }
+    normalized += part;
+  }
+  return normalized;
+}
+
+// Reserves the paths that unresolved images keep referring to, so a packed entry can never be
+// written at a path an unpacked image already points to. Reservation must happen before any entry
+// is allocated, otherwise the entry's data would silently replace that external reference inside
+// the archive.
+static void ReserveKeptImagePaths(const PAGXDocument& doc, PAGXPackContext* pack) {
+  for (const auto& node : doc.nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    const auto* image = static_cast<const Image*>(node.get());
+    if (image->data != nullptr || image->filePath.empty()) {
+      continue;
+    }
+    auto key = ToLowerAscii(NormalizeRelativePath(image->filePath));
+    if (key.rfind("images/", 0) == 0) {
+      pack->usedPaths.insert(std::move(key));
+    }
+  }
 }
 
 // Produces the actual image source: the external path in XML mode, or a ZIP entry path once the
@@ -2052,6 +2115,9 @@ std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Option
 
 static std::string Serialize(const PAGXDocument& doc, const Options& options,
                              PAGXPackContext* pack) {
+  if (pack != nullptr) {
+    ReserveKeptImagePaths(doc, pack);
+  }
   XMLBuilder xml(true);
   xml.appendDeclaration();
 

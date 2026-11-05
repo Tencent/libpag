@@ -304,6 +304,56 @@ PAGX_TEST(PAGXExporterTest, ToDataResolvesEntryNameCollisions) {
   }
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataAvoidsPathsKeptByUnpackedImages) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto packedData = MakeImageData(0xB1);
+  AddImage(doc.get(), "img_1", "", packedData);
+  // No data: this image keeps referring to its external path, which normalizes (and lowercases)
+  // to the same archive path the packed image would otherwise take.
+  auto* kept = AddImage(doc.get(), "", "./Images/./img_1.PNG");
+  AddPatternLayer(doc.get(), kept);
+
+  auto zip = pagx::PAGXExporter::ToData(*doc);
+  ASSERT_NE(zip, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 2u);
+  EXPECT_EQ(entries.find("images/img_1.png"), entries.end());
+  ASSERT_NE(entries.find("images/img_1_2.png"), entries.end());
+  EXPECT_EQ(entries["images/img_1_2.png"], BytesOf(packedData));
+
+  const auto& xml = entries["document.pagx"];
+  EXPECT_NE(xml.find("image=\"./Images/./img_1.PNG\""), std::string::npos);
+  EXPECT_NE(xml.find("source=\"images/img_1_2.png\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXExporterTest, ToDataLimitsEntryNameLength) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::string longId(300, 'a');
+  AddImage(doc.get(), longId, "", MakeImageData(0xC1));
+  std::string otherLongId = longId;
+  otherLongId[299] = 'b';
+  AddImage(doc.get(), otherLongId, "", MakeImageData(0xC2));
+
+  auto zip = pagx::PAGXExporter::ToData(*doc);
+  ASSERT_NE(zip, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 3u);
+  std::string truncatedStem(128, 'a');
+  ASSERT_NE(entries.find("images/" + truncatedStem + ".png"), entries.end());
+  ASSERT_NE(entries.find("images/" + truncatedStem + "_2.png"), entries.end());
+  EXPECT_EQ(entries["images/" + truncatedStem + ".png"], BytesOf(MakeImageData(0xC1)));
+  EXPECT_EQ(entries["images/" + truncatedStem + "_2.png"], BytesOf(MakeImageData(0xC2)));
+  // Every name fits the 255-byte component limit most filesystems enforce.
+  for (const auto& entry : entries) {
+    auto separator = entry.first.find_last_of('/');
+    auto fileNameLength =
+        separator == std::string::npos ? entry.first.size() : entry.first.size() - separator - 1;
+    EXPECT_LT(fileNameLength, 255u) << entry.first;
+  }
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataLeavesImagesWithoutDataAsExternalReferences) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   AddImage(doc.get(), "img_hash", "hash:0123456789abcdef");
