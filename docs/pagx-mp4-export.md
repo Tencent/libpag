@@ -161,12 +161,16 @@ for (int64_t frame = 0; frame < frameCount; frame++) {
 
 | 场景 | 推荐路径 | 原因 |
 |---|---|---|
-| CLI | `PAGSurface::MakeOffscreen(w, h)` | 内部自建 `pag::Devices::MakeDefault()` 并缓存，适合进程内独占 |
+| CLI | `PAGSurface::MakeOffscreen(w, h)` | 进程独占，可自建 device；但必须**只建一次**，见下方说明 |
 | ardot | `pagx::MakeFrom(device, tgfx::Surface)` + `pagx::Record(context, scene, surface, autoClear)` | wasm 下 device 必须在主 runtime 线程创建，且应与画布 device 同源 |
+
+`PAGSurface::MakeOffscreen` 的 device 来源是 `OffscreenDrawable::Make` → `pag::Devices::MakeDefault()`（`src/pagx/runtime/OffscreenDrawable.cpp:28`）。**`MakeDefault()` 不是进程级单例**：OpenGL 后端走 `tgfx::GLDevice::MakeWithFallback()`、WebGPU 走 `WebGPUDevice::Make()`、Metal 走 `MetalDevice::Make()`，每次调用都会新建 device 及其 context。因此「每帧新建 scene + 新建 surface」的旧路径实际每帧都在重建 device/context/texture，这是旧路径 400ms 单帧的主要浪费之一；复用 scene + surface 后这部分只付一次。
 
 `pagx::MakeFrom` / `pagx::Record` 见 `include/pagx/tgfx.h:50-67`，目前只有测试在用，正是为「宿主已有 device、想批量提交」设计的。
 
 **禁止嵌套 context lock**：`PAGScene::draw` 与 `PAGSurface::readPixels` 内部都会自行加锁，调用方不能已持有同一 device 的锁。
+
+**WebGPU 的额外限制**：`pag::Devices::MakeDefault()` 在 WebGPU 后端只能由主 runtime 线程调用（`src/rendering/gpu/webgpu/Devices.cpp:26-28`，tgfx 在非主线程直接报错返回 nullptr）。ardot 属于这一情形，`MakeOffscreen` 在子线程里不可用。
 
 ### 4.4 CLI 实现
 
