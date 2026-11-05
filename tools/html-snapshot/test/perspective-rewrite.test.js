@@ -4,6 +4,8 @@ const {
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
+  transformOriginDepth,
+  perspectiveOriginXY,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -89,5 +91,23 @@ describe('rewritePerspectiveKeyframes', () => {
   test('leaves flights without a projection alone', () => {
     const css = '@keyframes pagxAnim2 { 0% { transform: matrix(1, 0, 0, 1, 10, 0); } }';
     expect(rewritePerspectiveKeyframes(css)).toBe(css);
+  });
+});
+
+describe('camera wrapper guards', () => {
+  test('a pivot with depth disables the rewrite', () => {
+    // `perspective-origin` has no depth component, so a z pivot cannot be carried over; the element
+    // keeps its function form instead of being re-placed.
+    expect(transformOriginDepth({ transformOrigin: '0px 80px 30px' })).toBeCloseTo(30, 6);
+    expect(transformOriginDepth({ transformOrigin: '0px 80px' })).toBe(0);
+    expect(transformOriginDepth({ transformOrigin: '50% 50% 0px' })).toBe(0);
+  });
+
+  test('perspective-origin is emitted with two components', () => {
+    // A three-value declaration is invalid CSS and browsers drop it, which would move the vanishing
+    // point to the wrapper centre.
+    expect(perspectiveOriginXY({ transformOrigin: '0px 80px 30px' })).toBe('0px 80px');
+    expect(perspectiveOriginXY({ transformOrigin: '10px 20px' })).toBe('10px 20px');
+    expect(perspectiveOriginXY({})).toBe('50% 50%');
   });
 });
