@@ -688,6 +688,17 @@ Matrix ToAffine2D(const Matrix3D& matrix) {
   return affine;
 }
 
+bool HasProjection(const Matrix3D& matrix) {
+  return !NearlyZero(matrix.getRowColumn(3, 0)) || !NearlyZero(matrix.getRowColumn(3, 1)) ||
+         !NearlyZero(matrix.getRowColumn(3, 2)) || !NearlyOne(matrix.getRowColumn(3, 3));
+}
+
+Matrix3D BakeTransformOrigin(const Matrix3D& pose, const Point& origin, float originZ) {
+  const Matrix3D toOrigin = MakeTranslation(origin.x, origin.y, originZ);
+  const Matrix3D fromOrigin = MakeTranslation(-origin.x, -origin.y, -originZ);
+  return Multiply(Multiply(toOrigin, pose), fromOrigin);
+}
+
 bool IsLinearIdentity(const Matrix3D& matrix) {
   for (int row = 0; row < 3; ++row) {
     for (int column = 0; column < 3; ++column) {
