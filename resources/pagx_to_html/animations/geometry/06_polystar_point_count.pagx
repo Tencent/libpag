@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Polystar pointCount grows a pentagon into a nine-sided polygon; the geometry family had no Star case at
+     all, so this stands in for every Polystar channel the exporter leaves alone.
+     Target: Polystar  Channel: pointCount  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="starGrow" position="160,100" type="polygon" pointCount="5" outerRadius="80"
+              rotation="-90"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="starPoints" duration="60" frameRate="60" loop="once">
+      <Object target="starGrow">
+        <Channel name="pointCount" type="float">
+          <Key time="0" value="5" interpolation="linear"/>
+          <Key time="60" value="9"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: DropShadowFilter shadowOnly drops the card itself and keeps only the shadow, switching on at the
      middle of the timeline.
-     Target: Layer  Channel: shadowOnly  Type: bool
+     Target: DropShadowFilter  Channel: shadowOnly  Type: bool
      Expect: gap
      Ref: - -->
 <pagx width="320" height="200">

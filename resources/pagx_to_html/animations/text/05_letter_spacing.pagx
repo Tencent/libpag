@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A letter spacing channel spreads the glyphs apart, which no static text layout can express.
+     Target: Text  Channel: letterSpacing  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="spreadText" text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="48"
+          position="40,120"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="letterSpread" duration="60" frameRate="60" loop="once">
+      <Object target="spreadText">
+        <Channel name="letterSpacing" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="16"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

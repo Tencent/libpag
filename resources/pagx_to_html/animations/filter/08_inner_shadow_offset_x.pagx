@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: InnerShadowFilter offsetX moves the inner shadow from the top edge towards the right edge.
-     Target: Layer  Channel: offsetX  Type: float
+     Target: InnerShadowFilter  Channel: offsetX  Type: float
      Expect: gap
      Ref: - -->
 <pagx width="320" height="200">
