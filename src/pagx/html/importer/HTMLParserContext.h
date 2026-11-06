@@ -304,13 +304,13 @@ class HTMLParserContext {
   // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
   std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
 
-  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
-  // Recorded during `assignElementId` and processed after the whole tree is built (so background
-  // fills used by `color` channels already exist).
   // A `perspective` parent whose child is placed by layout cannot be projected exactly; the first
   // such child reports it, the rest stay quiet (see ApplyParentPerspective).
   bool _flowChildPerspectiveWarned = false;
 
+  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Recorded during `assignElementId` and processed after the whole tree is built (so background
+  // fills used by `color` channels already exist).
   struct PendingAnimation {
     std::shared_ptr<DOMNode> element = nullptr;
     Layer* layer = nullptr;
