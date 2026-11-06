@@ -45,17 +45,31 @@ describe('splitProjectiveTransform', () => {
 describe('liftBoxOntoCameraWrapper', () => {
   const html = '<div style="position: absolute; left: 60px; top: 40px; width: 120px; height: 80px; background-color: #38BDF8">x</div>';
 
-  test('moves the box onto the camera layer and lets the child fill it', () => {
+  test('moves only the offset onto the camera layer', () => {
     const wrapped = liftBoxOntoCameraWrapper(html, 600, '0px 40px');
     expect(wrapped).not.toBeNull();
     expect(wrapped).toContain('perspective: 600px');
     expect(wrapped).toContain('perspective-origin: 0px 40px');
-    // Wrapper keeps the layout slot; the child is pinned to it.
+    // Wrapper keeps the layout slot; the child is pinned to its origin.
     expect(wrapped.startsWith('<div style="position: absolute; left: 60px; top: 40px;')).toBe(true);
-    expect(wrapped).toContain('left: 0px; top: 0px; width: 100%; height: 100%');
+    expect(wrapped).toContain('left: 0px; top: 0px;');
+    // The element box keeps its absolute size: `width: 100%` would make `box.widthPx` NaN and break
+    // percentage-derived properties such as `border-radius: 50%` and `background-size`.
+    expect(wrapped).toContain('width: 120px');
+    expect(wrapped).toContain('height: 80px');
+    expect(wrapped).not.toContain('width: 100%');
     // Balanced tags: one wrapper div plus the original element div.
     expect((wrapped.match(/<div /g) || []).length).toBe(2);
     expect((wrapped.match(/<\/div>/g) || []).length).toBe(2);
+  });
+
+  test('declines when the box has no absolute size', () => {
+    const relative =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 100%; height: 100%">x</div>';
+    expect(liftBoxOntoCameraWrapper(relative, 600, '0px 40px')).toBeNull();
+    const auto =
+      '<div style="position: absolute; left: 0px; top: 0px; width: auto; height: 80px">x</div>';
+    expect(liftBoxOntoCameraWrapper(auto, 600, '0px 40px')).toBeNull();
   });
 
   test('keeps an authored attribute on the element box, not on the camera layer', () => {

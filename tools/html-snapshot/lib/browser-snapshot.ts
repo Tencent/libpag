@@ -1988,12 +1988,19 @@ function liftBoxOntoCameraWrapper(html, distance, origin) {
   for (const key of ['left', 'top', 'width', 'height']) {
     const found = new RegExp('(?:^|;\\s*)' + key + ':\\s*([^;]+)').exec(style);
     if (!found) return null;
-    box[key] = found[1].trim();
+    const value = found[1].trim();
+    // A percentage / auto size has no absolute reference box, so the camera layer could not be sized
+    // and the element's own percentage-derived properties (`border-radius: 50%`, `background-size`)
+    // would lose their reference anyway. Keep the function form instead.
+    if ((key === 'width' || key === 'height') && !/^-?\d+(\.\d+)?px$/.test(value)) return null;
+    box[key] = value;
   }
+  // Only the offset moves onto the camera layer: the element box keeps its own absolute width and
+  // height. Rewriting them to `100%` would turn `box.widthPx` into NaN downstream and make
+  // percentage-derived properties resolve against the canvas or drop out.
   let inner = style;
-  for (const key of Object.keys(box)) {
-    const fill = key === 'width' || key === 'height' ? '100%' : '0px';
-    inner = inner.replace(new RegExp('(^|;\\s*)' + key + ':\\s*[^;]+'), '$1' + key + ': ' + fill);
+  for (const key of ['left', 'top']) {
+    inner = inner.replace(new RegExp('(^|;\\s*)' + key + ':\\s*[^;]+'), '$1' + key + ': 0px');
   }
   const wrapperStyle = [
     'position: absolute',
@@ -4714,7 +4721,7 @@ function withPerspectiveCamera(el, html, opts, computed) {
   }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
   if (!wrapped) {
-    recordCameraSkip('not-a-box-div');
+    recordCameraSkip('not-a-sized-div');
     return html;
   }
   return wrapped;
@@ -5148,7 +5155,10 @@ function snapshotMainImpl(opts) {
   // Rewrite captured keyframes that carry their own `perspective()` into the camera-wrapper form
   // before any element is rendered: the elements consult `pagxAnimCameras()` while emitting.
   const keyframeNode = document.getElementById('__pagx_anim_keyframes');
+  // Per-run registries: reset both here so the ordering stays visible in one place (the keyframe
+  // walker only reads them).
   window.__pagxCameraSkips = {};
+  window.__pagxAnimCameras = {};
   window.__pagxAnimKeyframesText = rewritePerspectiveKeyframes(
     keyframeNode && keyframeNode.textContent ? keyframeNode.textContent : '',
   );
