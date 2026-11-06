@@ -23,6 +23,8 @@
 #include <list>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
+#include "platform/cocoa/private/HardwareDecodeContext.h"
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
@@ -80,6 +82,7 @@ class HardwareDecoder : public VideoDecoder {
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
+  std::vector<HardwareDecodeContext*> staleContexts = {};
 
   friend class HardwareDecoderFactory;
 };
