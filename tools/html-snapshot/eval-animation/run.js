@@ -198,7 +198,7 @@ function countAnimationsCaptured(stderrPath) {
 }
 
 // Perspective elements whose `perspective()` form the snapshot kept instead of rewriting it into a
-// camera wrapper (`depth-pivot`, `not-a-box-div`, `keyframes-mixed`).
+// camera wrapper (`depth-pivot`, `not-a-sized-div`, `keyframes-mixed`).
 function countCameraSkips(stderrPath) {
   if (!fs.existsSync(stderrPath)) return 0;
   const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: (\d+)/);
