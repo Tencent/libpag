@@ -928,6 +928,10 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
 }
 
 Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
+  return BuildRepeaterCopyMatrix(rep, i, rep->rotation);
+}
+
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation) {
   // Mirror the per-copy transform formula writeRepeater applies in HTMLWriterText.cpp. The
   // factoring is deliberate: anchor-out → scale → rotate → translate → anchor-in, composed
   // right-to-left so the anchor (0,0) by default) stays fixed while each copy moves by a
@@ -945,7 +949,7 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
   if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
     m = Matrix::Scale(sx, sy) * m;
   }
-  float rot = rep->rotation * prog;
+  float rot = rotation * prog;
   if (!FloatNearlyZero(rot)) {
     m = Matrix::Rotate(rot) * m;
   }

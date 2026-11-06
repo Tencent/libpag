@@ -100,6 +100,9 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   _ctx->savedChildLayerOffsetY = 0;
   int n = static_cast<int>(std::ceil(rep->copies));
   float frac = rep->copies - std::floor(rep->copies);
+  // An animated repeater channel is fanned out per copy, so every copy needs a tag of its own; the
+  // weaver later attaches one keyframes rule to each of them.
+  const bool animated = _ctx->animation.animatedRepeaters.count(rep) > 0;
   for (int i = 0; i < n; i++) {
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
     Matrix m = BuildRepeaterCopyMatrix(rep, i);
@@ -118,8 +121,16 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       ca = frac;
     }
     float ea = ca * alpha;
-    if (!m.isIdentity() || ea < 1.0f) {
+    std::string copyId = {};
+    if (animated) {
+      copyId = rep->id + "_copy" + std::to_string(i);
+    }
+    if (animated || !m.isIdentity() || ea < 1.0f) {
       out.openTag("div");
+      if (!copyId.empty()) {
+        out.addAttr("id", copyId);
+        _ctx->animation.repeaterCopies.push_back({rep, i, copyId});
+      }
       std::string s = "position:absolute";
       if (!m.isIdentity()) {
         s += ";transform:" + MatrixTransformToCSS(m);
