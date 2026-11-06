@@ -21,7 +21,6 @@
 #include <cmath>
 #include <string>
 #include <vector>
-#include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 #include "pagx/types/Point.h"
@@ -88,21 +87,10 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
 Matrix3D PerspectiveMatrix(float distance);
 
 /**
- * Returns true when the pose's 3x3 linear block can be inverted. PAGX requires a 3D pose to be
- * invertible, so a pose that gains a projection after parsing (see PushPerspective) has to be
- * re-checked.
+ * Returns true when the pose is invertible. PAGX requires a 3D pose to be invertible, so a pose that
+ * gains a projection after parsing (see PushPerspective) has to be re-checked.
  */
-bool IsInvertiblePose(const Matrix3D& matrix);
-
-/**
- * Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
- * re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
- * absolutely positioned child resolves its own offset; an in-flow or flex child reports NaN
- * `leftPx` / `topPx` because layout places it, and the parent coordinates are kept unchanged.
- * A non-finite origin means the declaring box had no absolute size, which leaves the vanishing
- * point at the layer origin.
- */
-void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY);
+bool IsInvertible(const Matrix3D& matrix);
 
 /**
  * Returns `P * pose` for a CSS `perspective` declared on the pose's parent. The projection is pushed
