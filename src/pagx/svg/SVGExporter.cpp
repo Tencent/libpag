@@ -3280,10 +3280,7 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
-  // Mask reference layers are skipped: their content is emitted through writeMaskDef into
-  // <defs> when the owning layer references them, so emitting them here would duplicate the
-  // mask geometry. Their visible flag is true in imported documents, so the visibility check
-  // below cannot take over this skip.
+  // See maskReferenceLayers: a mask target is emitted into <defs>, not as content.
   if (isMaskReferenceLayer(layer)) {
     return;
   }
