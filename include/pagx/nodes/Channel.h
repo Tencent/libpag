@@ -42,15 +42,6 @@ class Channel : public Node {
   std::string name = {};
 
   /**
-   * The space this Channel's keyframes are interpolated in. Importing a document derives it from
-   * the field the channel drives rather than reading it from the XML: a channel over a projection
-   * distance (Layer::perspective) interpolates in Reciprocal, every other channel in Value. A
-   * channel constructed programmatically keeps the Value default, so a caller creating a
-   * perspective channel by hand must set this itself.
-   */
-  KeyframeInterpolationSpace interpolationSpace = KeyframeInterpolationSpace::Value;
-
-  /**
    * Returns the value type of this Channel's keyframes. Each TypedChannel<T> specialization
    * reports a distinct ChannelValueType so callers can dispatch on the concrete type without
    * dynamic_cast or RTTI.
