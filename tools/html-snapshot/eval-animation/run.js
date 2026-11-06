@@ -205,6 +205,13 @@ function countCameraSkips(stderrPath) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+// Per-reason breakdown of the skipped perspective rewrites, e.g. `depth-pivot:1`.
+function cameraSkipReasons(stderrPath) {
+  if (!fs.existsSync(stderrPath)) return '';
+  const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: \d+ \(([^)]*)\)/);
+  return m ? m[1].trim() : '';
+}
+
 function countAnimationWarnings(stderrPath) {
   if (!fs.existsSync(stderrPath)) return { animWarnings: 0, animDropped: 0 };
   const text = fs.readFileSync(stderrPath, 'utf8');
@@ -279,6 +286,7 @@ async function processCase(entry, outDir, opts) {
     animWarnings: 0,
     animDropped: 0,
     cameraSkips: 0,
+    camSkipReasons: '',
     width: 0,
     height: 0,
     // Per-frame sample times (seconds) + the global timeline length, so the HTML report can play
@@ -351,6 +359,7 @@ async function processCase(entry, outDir, opts) {
   }
   row.animCaptured = countAnimationsCaptured(snapshotStderr);
   row.cameraSkips = countCameraSkips(snapshotStderr);
+  row.camSkipReasons = cameraSkipReasons(snapshotStderr);
 
   // 3. import
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
@@ -435,7 +444,8 @@ async function processCase(entry, outDir, opts) {
 function writeCsv(rows, outPath) {
   const headers = [
     'name', 'frames', 'ssimMean', 'pixelDiffMean', 'motion',
-    'animCaptured', 'animWarnings', 'animDropped', 'cameraSkips', 'width', 'height', 'error',
+    'animCaptured', 'animWarnings', 'animDropped', 'cameraSkips', 'camSkipReasons', 'width', 'height',
+    'error',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -473,7 +483,7 @@ function summarize(rows) {
 
 function writeMarkdown(rows, outPath, label) {
   const s = summarize(rows);
-  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'camSkip', 'error'];
+  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'camSkip', 'camSkipWhy', 'error'];
   const lines = [];
   lines.push(`# Animation eval report — ${label}`);
   lines.push('');
@@ -497,6 +507,7 @@ function writeMarkdown(rows, outPath, label) {
       String(r.animWarnings),
       String(r.animDropped),
       String(r.cameraSkips || 0),
+      r.camSkipReasons || '',
       r.error || '',
     ];
     lines.push('| ' + cells.join(' | ') + ' |');
