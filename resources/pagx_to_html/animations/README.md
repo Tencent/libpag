@@ -265,7 +265,8 @@ node tools/html-snapshot/eval-animation/run.js \
 **不要这样写**
 
 - **不要依赖字体的 kerning**：把字符串拆成多个独立元素、或让浏览器自行排版相邻字形时，`WA` / `AV` / `VE`
-  这类字对会和 PAGX 差 2~3px（56px 字号下 4 个字累计 8px）。这类差异属于字体排版引擎行为，不是导出缺陷；
+  这类字对会和 PAGX 差 2~3px（56px 字号下 4 个字累计 8px）。这类差异属于字体排版引擎行为，不是导出缺陷。
+  需要 `TextModifier` 逐字动画的用例不受此影响——那条路径已改为按 `layoutRuns` 的坐标输出 SVG `<text>`；
 - 不要用 `display:inline-block` 的逐字盒子作为对照用例的参照实现；
 - 不要在同一个用例里混用“整串文本”和“逐字文本”两种写法做视觉对比。
 
