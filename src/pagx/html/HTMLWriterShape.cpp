@@ -927,19 +927,12 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
   return PathDataToSVGString(result);
 }
 
-Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
-  return BuildRepeaterCopyMatrix(rep, i, rep->rotation);
-}
-
-Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation) {
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation) {
   // Mirror the per-copy transform formula writeRepeater applies in HTMLWriterText.cpp. The
   // factoring is deliberate: anchor-out → scale → rotate → translate → anchor-in, composed
   // right-to-left so the anchor (0,0) by default) stays fixed while each copy moves by a
   // progressive delta. Using a shared helper keeps path-level geometry expansion (used when
   // a Repeater lives inside a Group) in lockstep with DOM-level copy emission (outer path).
-  int n = static_cast<int>(std::ceil(rep->copies));
-  int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
-  float prog = static_cast<float>(idx) + rep->offset;
   Matrix m = {};
   if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
     m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
@@ -962,6 +955,16 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation) {
     m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
   }
   return m;
+}
+
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation) {
+  int n = static_cast<int>(std::ceil(rep->copies));
+  int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
+  return BuildRepeaterCopyMatrixAtProg(rep, static_cast<float>(idx) + rep->offset, rotation);
+}
+
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
+  return BuildRepeaterCopyMatrix(rep, i, rep->rotation);
 }
 
 void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
