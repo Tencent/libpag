@@ -59,7 +59,11 @@ void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float orig
     // The declaring box had no absolute size; the projection step reports that once.
     return;
   }
-  if (!box.absolute && !warnedFlowChild) {
+  // The camera only changes the result when the child's pose leaves the z = 0 plane (or its pivot
+  // sits in front of it); a plain child of a `perspective` flex container is unaffected.
+  const bool cameraAffectsPose = box.transform.valid && (!IsFlatTransform(box.transform.pose) ||
+                                                         std::fabs(box.transform.originZ) > 0.0f);
+  if (!box.absolute && cameraAffectsPose && !warnedFlowChild) {
     // One diagnostic per document: a flex container with many children would otherwise repeat it.
     diagnostics.warn(
         "html: perspective on the parent of <" + elementName +

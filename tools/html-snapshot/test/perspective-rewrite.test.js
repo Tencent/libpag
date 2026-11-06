@@ -149,8 +149,8 @@ describe('camera skip accounting', () => {
   test('counts one entry per skipped element and reason', () => {
     recordCameraSkip('depth-pivot');
     recordCameraSkip('depth-pivot');
-    recordCameraSkip('not-a-box-div');
-    expect(pagxCameraSkips()).toEqual({ 'depth-pivot': 2, 'not-a-box-div': 1 });
+    recordCameraSkip('not-a-sized-div');
+    expect(pagxCameraSkips()).toEqual({ 'depth-pivot': 2, 'not-a-sized-div': 1 });
   });
 
   test('reports an empty map before anything was skipped', () => {
