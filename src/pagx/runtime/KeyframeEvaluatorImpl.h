@@ -26,6 +26,7 @@
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
+#include "pagx/runtime/MixUtils.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/utils/ColorSpaceUtils.h"
@@ -95,6 +96,42 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
   return value < static_cast<double>(kf.time);
 }
 
+// Locates the segment that contains framePosition and resolves the fraction to blend with, the
+// segment's easing already applied. Returns false when the segment holds its left value; *left is
+// still set so the caller can return it. The caller must have handled the empty sequence and the
+// clamp-to-end positions, so at least two keyframes span the position.
+template <typename T>
+static bool ResolveKeyframeSegment(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                                   const Keyframe<T>** left, const Keyframe<T>** right,
+                                   double* fraction) {
+  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
+                                FramePositionBeforeKeyframe<T>);
+  *right = &(*upper);
+  *left = &(*(upper - 1));
+  *fraction = 0.0;
+  double leftTime = static_cast<double>((*left)->time);
+  double span = static_cast<double>((*right)->time) - leftTime;
+  if (span <= 0.0) {
+    return false;
+  }
+  double rawT = (framePosition - leftTime) / span;
+  switch ((*left)->interpolation) {
+    case KeyframeInterpolationType::None:
+    case KeyframeInterpolationType::Hold:
+      return false;
+    case KeyframeInterpolationType::Bezier:
+      *fraction = SolveBezierEasing(static_cast<double>((*left)->bezierOut.x),
+                                    static_cast<double>((*left)->bezierOut.y),
+                                    static_cast<double>((*right)->bezierIn.x),
+                                    static_cast<double>((*right)->bezierIn.y), rawT);
+      return true;
+    case KeyframeInterpolationType::Linear:
+    default:
+      *fraction = rawT;
+      return true;
+  }
+}
+
 // Evaluates a Hold/None/Linear/Bezier-segmented keyframe sequence at the given continuous frame
 // position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
 // keyframes.back().time] return the boundary value.
@@ -113,31 +150,36 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   if (framePosition >= static_cast<double>(keyframes.back().time)) {
     return keyframes.back().value;
   }
-  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
-                                FramePositionBeforeKeyframe<T>);
-  auto right = upper;
-  auto left = upper - 1;
-  double leftTime = static_cast<double>(left->time);
-  double rightTime = static_cast<double>(right->time);
-  double span = rightTime - leftTime;
-  if (span <= 0.0) {
+  const Keyframe<T>* left = nullptr;
+  const Keyframe<T>* right = nullptr;
+  double fraction = 0.0;
+  if (!ResolveKeyframeSegment(keyframes, framePosition, &left, &right, &fraction)) {
     return left->value;
   }
-  double rawT = (framePosition - leftTime) / span;
-  switch (left->interpolation) {
-    case KeyframeInterpolationType::None:
-    case KeyframeInterpolationType::Hold:
-      return left->value;
-    case KeyframeInterpolationType::Bezier:
-      return LerpKeyframeValue<T>(left->value, right->value,
-                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                                                    static_cast<double>(left->bezierOut.y),
-                                                    static_cast<double>(right->bezierIn.x),
-                                                    static_cast<double>(right->bezierIn.y), rawT));
-    case KeyframeInterpolationType::Linear:
-    default:
-      return LerpKeyframeValue<T>(left->value, right->value, rawT);
+  return LerpKeyframeValue<T>(left->value, right->value, fraction);
+}
+
+// Evaluates a perspective distance sequence. Segment selection, easing and the clamp-to-end
+// boundary policy are EvaluateKeyframeSequence's; only the blend differs, because a perspective
+// distance has to mix its projection coefficient to stay in step with a browser's perspective().
+inline float EvaluatePerspectiveSequence(const std::vector<Keyframe<float>>& keyframes,
+                                         double framePosition) {
+  if (keyframes.empty()) {
+    return 0.0f;
   }
+  if (framePosition <= static_cast<double>(keyframes.front().time)) {
+    return keyframes.front().value;
+  }
+  if (framePosition >= static_cast<double>(keyframes.back().time)) {
+    return keyframes.back().value;
+  }
+  const Keyframe<float>* left = nullptr;
+  const Keyframe<float>* right = nullptr;
+  double fraction = 0.0;
+  if (!ResolveKeyframeSegment(keyframes, framePosition, &left, &right, &fraction)) {
+    return left->value;
+  }
+  return MixPerspectiveDistance(left->value, right->value, static_cast<float>(fraction));
 }
 
 }  // namespace pagx

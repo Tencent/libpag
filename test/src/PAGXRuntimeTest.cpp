@@ -20,6 +20,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -32,6 +33,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
+#include "pagx/runtime/MixUtils.h"
 #include "pagx/tgfx.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
@@ -544,6 +546,98 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
   linear.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   linear.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(linear, 30.0), 15.0f);
+}
+
+/**
+ * Test case: a perspective distance mixes its projection coefficient -1/d instead of the distance,
+ * so a distance going from 1000 to 200 passes through 333.33 at the midpoint instead of 600. This is
+ * how a browser interpolates the perspective() transform function, and it is the only channel that
+ * blends this way.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveKeyframesBlendTheProjectionCoefficient) {
+  std::vector<pagx::Keyframe<float>> keyframes;
+  keyframes.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 30.0), 333.3333f, 0.001f);
+  // The same keys read by a channel that does not carry a projection blend the distances.
+  EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 30.0), 600.0f);
+
+  // Bezier easing shapes the same fraction, so an identity curve reproduces the linear result.
+  std::vector<pagx::Keyframe<float>> eased;
+  eased.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Bezier, {0.5f, 0.5f}, {}});
+  eased.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {0.5f, 0.5f}});
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(eased, 30.0), 333.3333f, 0.001f);
+
+  // The projection mix is shared with the component writer, so a weighted write agrees with a
+  // keyframe blend at the same fraction.
+  EXPECT_NEAR(pagx::MixPerspectiveDistance(1000.0f, 200.0f, 0.5f), 333.3333f, 0.001f);
+  EXPECT_FLOAT_EQ(pagx::MixPerspectiveDistance(500.0f, 500.0f, 0.25f), 500.0f);
+}
+
+/**
+ * Test case: perspective 0 means no projection, which is the coefficient 0, i.e. the infinite
+ * distance end of the coefficient space. A segment touching it stays continuous there instead of
+ * snapping to a near camera: blending 0 with 200 halfway yields 400, and one frame in yields a
+ * distance far beyond the endpoint.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveZeroIsTheInfiniteDistanceEnd) {
+  std::vector<pagx::Keyframe<float>> keyframes;
+  keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 30.0), 400.0f, 0.001f);
+  // Frame 1 of 60 holds a sixtieth of the target coefficient, i.e. d = 12000: still almost no
+  // projection, where a linear distance blend would already sit at d = 3.33.
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 1.0), 12000.0f, 1.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(keyframes, 0.0), 0.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(keyframes, 60.0), 200.0f);
+}
+
+/**
+ * Test case: a channel named "perspective" blends its keyframes through the projection coefficient
+ * end to end, while the other channels of the same object keep blending their values.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelBlendsThroughEvaluation) {
+  std::string xml =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<pagx width=\"320\" height=\"200\">\n"
+      "  <Layer id=\"box\" x=\"120\" y=\"60\" width=\"80\" height=\"80\" rotationY=\"45\">\n"
+      "    <Rectangle left=\"0\" right=\"0\" top=\"0\" bottom=\"0\"/>\n"
+      "  </Layer>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"pull\" duration=\"60\" frameRate=\"60\" loop=\"once\">\n"
+      "      <Object target=\"box\">\n"
+      "        <Channel name=\"perspective\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"1000\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"200\"/>\n"
+      "        </Channel>\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" interpolation=\"linear\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  ASSERT_EQ(animation->objects.size(), 1u);
+  pagx::Channel* perspective = nullptr;
+  pagx::Channel* alpha = nullptr;
+  for (auto* channel : animation->objects.front()->channels) {
+    if (channel->name == "perspective") {
+      perspective = channel;
+    } else if (channel->name == "alpha") {
+      alpha = channel;
+    }
+  }
+  ASSERT_NE(perspective, nullptr);
+  ASSERT_NE(alpha, nullptr);
+  EXPECT_NEAR(std::get<float>(perspective->evaluateAt(pagx::Frame{30})), 333.3333f, 0.001f);
+  EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
 }
 
 /**

@@ -22,9 +22,31 @@
 
 namespace pagx {
 
+namespace {
+
+// Evaluates a channel's keyframes. A Layer's perspective is the one channel whose value reaches the
+// renderer as a projection coefficient (-1/d), so its keyframes blend that coefficient; every other
+// channel blends its values. Kept here rather than in the evaluator because the channel name is what
+// identifies the field, the same way Matrix3DComponentFromChannel maps names to components.
+KeyValue EvaluateChannel(const std::vector<Keyframe<float>>& keyframes, double framePosition,
+                         const std::string& name) {
+  if (name == "perspective") {
+    return EvaluatePerspectiveSequence(keyframes, framePosition);
+  }
+  return EvaluateKeyframeSequence<float>(keyframes, framePosition);
+}
+
+template <typename T>
+KeyValue EvaluateChannel(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                         const std::string& /*name*/) {
+  return EvaluateKeyframeSequence<T>(keyframes, framePosition);
+}
+
+}  // namespace
+
 template <typename T>
 KeyValue TypedChannel<T>::onEvaluateAtFrame(Frame frame) const {
-  return EvaluateKeyframeSequence<T>(keyframes, static_cast<double>(frame));
+  return EvaluateChannel(keyframes, static_cast<double>(frame), name);
 }
 
 template <typename T>
@@ -32,7 +54,7 @@ KeyValue TypedChannel<T>::onEvaluateAtMicros(int64_t microseconds, float frameRa
   double framePosition =
       frameRate > 0.0f ? static_cast<double>(microseconds) * static_cast<double>(frameRate) / 1.0e6
                        : 0.0;
-  return EvaluateKeyframeSequence<T>(keyframes, framePosition);
+  return EvaluateChannel(keyframes, framePosition, name);
 }
 
 template <>
