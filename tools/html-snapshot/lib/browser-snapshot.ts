@@ -2009,6 +2009,25 @@ function liftBoxOntoCameraWrapper(html, distance, origin) {
 // Distance of the camera a captured animation carries, keyed by animation name. Kept on `window`
 // because the helpers below are stringified into the page payload, where module state does not
 // exist.
+// Why the snapshot kept the function form of a `perspective()` transform instead of rewriting it
+// into a camera wrapper. Counted per reason and surfaced in the eval report, so "this page has 12
+// perspective elements, 5 of them fell back" is visible instead of silent.
+function recordCameraSkip(reason) {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) {
+    return;
+  }
+  if (!scope.__pagxCameraSkips) {
+    scope.__pagxCameraSkips = {};
+  }
+  scope.__pagxCameraSkips[reason] = (scope.__pagxCameraSkips[reason] || 0) + 1;
+}
+
+function pagxCameraSkips() {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  return scope && scope.__pagxCameraSkips ? scope.__pagxCameraSkips : {};
+}
+
 function pagxAnimCameras() {
   const scope = typeof globalThis === 'undefined' ? null : globalThis;
   if (!scope) {
@@ -2077,6 +2096,9 @@ function rewritePerspectiveKeyframes(cssText) {
       if (name) cameras[name] = distance;
       out += cssText.slice(index, open + 1) + rewritten + '}';
     } else {
+      if (distance > 0) {
+        recordCameraSkip('keyframes-mixed');
+      }
       out += cssText.slice(index, close + 1);
     }
     index = close + 1;
@@ -4681,9 +4703,15 @@ function withPerspectiveCamera(el, html, opts, computed) {
   if (!html) return html;
   const distance = cameraDistanceForElement(opts, computed);
   if (!distance) return html;
-  if (Math.abs(transformOriginDepth(computed)) > 1e-6) return html;
+  if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
+    recordCameraSkip('depth-pivot');
+    return html;
+  }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
-  if (!wrapped) return html;
+  if (!wrapped) {
+    recordCameraSkip('not-a-box-div');
+    return html;
+  }
   return wrapped;
 }
 
@@ -5115,6 +5143,7 @@ function snapshotMainImpl(opts) {
   // Rewrite captured keyframes that carry their own `perspective()` into the camera-wrapper form
   // before any element is rendered: the elements consult `pagxAnimCameras()` while emitting.
   const keyframeNode = document.getElementById('__pagx_anim_keyframes');
+  window.__pagxCameraSkips = {};
   window.__pagxAnimKeyframesText = rewritePerspectiveKeyframes(
     keyframeNode && keyframeNode.textContent ? keyframeNode.textContent : '',
   );
@@ -5246,6 +5275,8 @@ ${clipDefsSvg}${parts.join('')}
 `,
     width: canvasWidth,
     height: canvasHeight,
+    // Per-reason counts of perspective elements that kept the function form (see recordCameraSkip).
+    cameraSkips: pagxCameraSkips(),
   };
 }
 
@@ -5393,6 +5424,8 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  recordCameraSkip,
+  pagxCameraSkips,
   pagxAnimCameras,
   parseMatrix3DValues,
   invert3x3,
@@ -6676,6 +6709,8 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  recordCameraSkip,
+  pagxCameraSkips,
   transformOriginDepth,
   perspectiveOriginXY,
   splitProjectiveTransform,
