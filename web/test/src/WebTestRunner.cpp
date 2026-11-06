@@ -53,13 +53,15 @@ static int ExecuteTests(const char* filter) {
     return 1;
   }
   Initialized = true;
-  int argc = 1;
+  // The JSON report listener is created from the output flag inside InitGoogleTest
+  // (PostFlagParsingInit), so it must be passed via argv; setting it afterwards is too late.
+  int argc = 2;
   char name[] = "pag-test";
-  char* argv[] = {name, nullptr};
+  char output[] = "--gtest_output=json:/test/report.json";
+  char* argv[] = {name, output, nullptr};
   testing::AddGlobalTestEnvironment(new pag::TestEnvironment());
   testing::InitGoogleTest(&argc, argv);
   testing::GTEST_FLAG(filter) = filter && filter[0] ? filter : "*";
-  testing::GTEST_FLAG(output) = "json:/test/report.json";
   auto exitCode = RUN_ALL_TESTS();
   const auto* tests = testing::UnitTest::GetInstance();
   auto stats = pag::Baseline::GetComparisonStats();
