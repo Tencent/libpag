@@ -318,7 +318,9 @@ exporter 选 S5、CLI 选 S1，不是标准不一致，而是产物和播放方�
 ### 5.1.4 选型结论
 
 1. **默认 S1**：CLI 直出 MP4 走外部 ffmpeg + rawvideo 管道，`--frames-dir` 保留为无 ffmpeg 时的降级路径（S7）。
-2. **S6 排除；S2b 不满足需求**（无软件 H.264 编码器）；**S2a 作为「开箱即用」的首选**，前提是接受 GPL 源码义务与 H.264 专利评估；**S5 不推荐**（同样是 GPL 义务，却只完成编码一段，muxer、YUV 转换、色彩都要自研）；**S4 仅在明确要求零外部依赖且接受三套平台代码时评估**。
+2. **S6 排除；S2b 当前不满足需求**（无软件 H.264 编码器）；**S2a 作为「开箱即用」的首选**，前提是接受 GPL 源码义务与 H.264 专利评估；**S5 不推荐**（同样是 GPL 义务，却只完成编码一段，muxer、YUV 转换、色彩都要自研）；**S4 仅在明确要求零外部依赖且接受三套平台代码时评估**。
+
+   **2026-11 补充**：若引入腾讯自研编码器 O264RT（OpenH264 衍生，BSD-2-Clause），S2b 重新可行 —— 它的否决理由（LGPL 构建无软件 H.264 编码器）被 O264RT 补上，且 `libo264rt` 不是 GPL 组件，可用 `--disable-gpl` 构建出整体 LGPL 的 ffmpeg。前提是该 ffmpeg 只用于腾讯自有产品分发，不得进开源仓库或转授第三方（详见 §9.2）。
 3. **S3 不再是「内置编码器」备选**：其专利许可要求运行时下载 Cisco 官方二进制、用户可开关、指定署名并在 EULA 中复现条款，且用途限于个人/非获酬；静态链接与随包分发都不享专利豁免。只有当产品愿意改成「运行时下载 + 开关 + 署名」形态、且法务确认商业用途被覆盖时才重新评估。
 4. 无论选哪条，编码器输出的都是 Annex-B，与 §5.2 的 `VideoSequence` 结构天然匹配；S1/S2a/S2b 由 ffmpeg 顺带解决封装，S3/S4/S5 必须自带 muxer。
 
@@ -392,7 +394,7 @@ libpag 主库没有视频编码能力，但生态里有三个相关仓库。源�
 
 三个判定：
 
-1. **ffaudio 与本需求无关** —— PAGX 规范里没有音频节点，也不需要音轨。
+1. **ffaudio 在 P1 阶段与本需求无关** —— PAGX 规范里没有音频节点，P1 产出的 mp4 不含音轨（`-an`）。但 Figma 的动效导出已支持音频，pagx 后续大概率跟进，因此接口层要预留音轨通道（见 §9.6）。这里的结论仅适用于 P1。
 2. **H264EncoderTools 是唯一现成的编码器**，且输出协议（`Header-0.dat` = SPS、`Header-1.dat` = PPS、`H264-<n>.264` = 每帧 Annex-B）与 `pag::VideoSequence` 的 `headers`/`frames` 完全一致，与 `MP4BoxHelper` 零摩擦对接。代价：GPL 必须进程隔离、只收 YUV、每帧一次文件读写。
 3. **ffmovie 当前配置下视频编码不可用**。它走 `avcodec_find_encoder(AV_CODEC_ID_H264)`，而各平台 `scripts/build_ffmpeg_*.sh` 只写了 `--enable-encoder=h264,mpeg4`，没有任何 H.264 encoder wrapper（`libx264` / `libopenh264` / `h264_videotoolbox`）。FFmpeg 不存在名为 `h264` 的 encoder，因此 `find_encoder` 会返回 nullptr，`initCodec()` 失败。**它唯一能立即复用的是 `FFMediaMuxer`（普通 MP4 + faststart）。**
 
@@ -556,14 +558,238 @@ ardot 导出任务的线程由 `foundation::SubmitTask` 决定：它把任务投
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P0 | `pagx render --frames-dir` 复用 scene 逐帧渲染 + 一致性验证 | ✅ 已完成（`9b5a1262c`） |
-| P1 | 按 §5.1 落地 S1（默认：外部 ffmpeg + rawvideo 管道直出 MP4）；需要开箱即用时启用 S2a（随包裁剪版 GPL 构建 ffmpeg，附源码与 `SOURCE.txt`）；`--frames-dir` 降级保留 | 方案已定，待实施 |
+| P1 | 按 §9 落地：库层 `VideoExporter`（pull 式出帧）+ CLI `--video` + 外部 ffmpeg rawvideo 管道；`--frames-dir` 降级保留 | 设计定稿，待实施 |
+| P1.5 | 外部音轨混流（`--audio`，支持「只有部分时间段有声」），见 §9.6 | 待 P1 |
 | P2 | ardot 接入：新策略 + `VideoExportTask` + WebCodecs + 进度通道 | 待上游动效 PAGX 通道打通 |
 | P3 | 性能优化：跳过图片编码、异步读回、多线程编码 | 待 P1/P2 之后 |
 | P4 | 质量档位与码率映射（对齐 Figma 的 LOW/MEDIUM/HIGH） | 待 P1 |
 
 ---
 
-## 9. 附录：验证命令
+## 9. 实现方案（2026-11 定稿）
+
+§1-§8 是方案论证，本节是可直接照着编码的结论。P1 只做「视频 + 无音轨」，音轨按 §9.6 预留。
+
+### 9.1 决策摘要
+
+| 决策点 | 结论 |
+|---|---|
+| 编码器形态 | 外部 ffmpeg **可执行文件** + 子进程 rawvideo 管道（S1） |
+| ffmpeg 来源 | **暂不定**。用户环境自装、随包分发、内部构建均可，不改动下面任何代码结构 |
+| 编码 / 封装位置 | 主库之外。pagx 不链接任何 H.264 编码器，只出帧 |
+| 库层形态 | pull 式 `VideoExporter`，一次一帧，native 与 wasm 共用 |
+| native 编码 | ffmpeg 子进程（`libx264`，平台可换 `h264_videotoolbox` 等） |
+| web 编码 | JS WebCodecs `VideoEncoder` + mediabunny（与 Figma 同栈，见 §9.7） |
+| 音频 | P1 产出 `-an`；结构按 §9.6 预留 |
+
+### 9.2 为什么不直接用现成的 ffmpeg npm 包
+
+三个候选都评估过，均不适合作为**分发来源**（作为开发期工具则无妨）：
+
+| 候选 | 查证结果 | 判定 |
+|---|---|---|
+| `ffmpeg-static@5.3.0` | darwin-arm64 产物 `ffmpeg -L` 直接输出 "This version of ffmpeg has nonfree parts compiled in. Therefore it is not legally redistributable."；configuration 含 `--enable-gpl --enable-version3 --enable-nonfree`；压缩 19.2MB / 解压 45.6MB；本身只是**转载** osxexperts / evermeet.cx / johnvansickle / gyan.dev 的构建，不提供源码与 configure 参数；tag 写 `b6.1.1` 而实际产物是 6.0 | 仅限开发期自用，**不可随包分发** |
+| `txc_264_enc`（内部也叫 o264） | x264 fork：构建系统、CLI 参数、`libx264` API 全部沿用 x264。而 x264 已与公司停止合作，tlinux 下架相关软件包，官方替代方案指向 O264RT | 法务风险高于技术收益，不采用 |
+| `O264RT` | OpenH264 衍生（`openh264/LICENSE` 为 Cisco BSD-2-Clause），接口是 `ISVCEncoder`/`SFrameBSInfo`；ffmpeg 插件形态 `-c:v libo264rt`；Win/Linux 官方支持，macOS 代码（`generate_osx*_proj.sh` + `qci/mac` CI）完备但无对外发布的库；AVC 专利由公司池许可托底，**不可转授第三方** | 可用于腾讯自有产品分发，**不可进开源仓库**。作为"内部版 ffmpeg"的可选编码器 |
+
+结论：P1 只依赖"一个能跑的 ffmpeg 可执行文件"，把来源当作部署问题，代码里只做发现与报错。
+
+### 9.3 分层与文件落点
+
+```
+┌─ L3 装配 ─────────────────────────────────────────────────┐
+│ native CLI / 任意 C++ 宿主：VideoExporter + ffmpeg 子进程   │
+│ wasm (ardot)：VideoExporter + JS WebCodecs + mediabunny    │
+└───────────────────────────────────────────────────────────┘
+┌─ L2 编码后端（宿主实现，pagx 不感知）───────────────────────┐
+│ native：ffmpeg stdin 管道（rawvideo rgba）                  │
+│ web：   WebCodecs VideoEncoder(avc1) + muxer               │
+└───────────────────────────────────────────────────────────┘
+┌─ L1 帧产出（pagx 公开 API，native/wasm 完全一致）────────────┐
+│ include/pagx/VideoExporter.h + src/pagx/video/VideoExporter.cpp │
+└───────────────────────────────────────────────────────────┘
+```
+
+| 文件 | 职责 |
+|---|---|
+| `include/pagx/VideoExporter.h`（新增） | `VideoExportOptions` + `VideoExporter`，与 SVG/HTML/PPT 导出器同构 |
+| `src/pagx/video/VideoExporter.cpp`（新增） | 承载现有 `CommandRender.cpp` 的逐帧时间轴循环 |
+| `src/cli/VideoEncoder.h/.cpp`（新增） | ffmpeg 发现、命令行构建（纯函数）、子进程封装、帧写入 |
+| `src/cli/CommandRender.cpp`（改） | `--video` 解析、`RenderVideoSequence()`，`--frames-dir` 一并改用 `VideoExporter` |
+
+L1 必须放 `src/pagx`：ardot 的 `pagx.cmake` 只摘编 `src/pagx` + `src/renderer`，放 `src/cli` 会被漏掉。若该 cmake 是显式文件列表而非 GLOB，新增文件需同步登记。
+
+### 9.4 库层 API
+
+```cpp
+namespace pagx {
+
+/**
+ * Export options for VideoExporter.
+ *
+ * ABI stability: this struct is part of the public API. New optional fields must be appended at
+ * the end with sensible defaults so that callers compiled against an older header continue to
+ * link and behave correctly.
+ */
+struct VideoExportOptions {
+  /** Sampling frame rate; 0 means "use the document animation frame rate". */
+  int frameRate = 0;
+  /** Sequence length in seconds; <= 0 means "the longest animation's duration". */
+  float duration = -1.0f;
+  /** Output scale factor applied to the document size. */
+  float scale = 1.0f;
+  /** Opaque background. H.264 carries no alpha, so the video path requires alpha == 255. */
+  bool hasBackground = false;
+  Color background = {};
+};
+
+/**
+ * Produces an RGBA frame sequence from a document's animations. The scene and surface are created
+ * once and reused for every frame; frames are pulled one at a time so that hosts can interleave
+ * other work (a UI thread, an encoder queue) between them.
+ *
+ * The exporter only renders. Encoding and muxing are the host's responsibility: ffmpeg on native,
+ * WebCodecs on the web. No codec ships inside pagx.
+ *
+ * Constraints:
+ * - Make() must run on a thread that owns a GPU context; on wasm that is the main thread.
+ * - Callers must not hold the same device's context lock while calling nextFrame().
+ * - Layout is applied automatically if PAGXDocument::isLayoutApplied() is false.
+ */
+class VideoExporter {
+ public:
+  using Options = VideoExportOptions;
+
+  static std::shared_ptr<VideoExporter> Make(PAGXDocument& document, const Options& options = {},
+                                             std::string* errorMsg = nullptr);
+
+  int width() const;
+  int height() const;
+  int frameRate() const;
+  int64_t frameCount() const;
+  int64_t currentFrame() const;
+
+  /** Renders the next frame. Returns false at the end of the sequence or on failure. */
+  bool nextFrame();
+
+  /** RGBA8888 premultiplied. Valid until the next nextFrame() call. */
+  const uint8_t* pixels() const;
+  size_t rowBytes() const;
+};
+
+}  // namespace pagx
+```
+
+四条约束的理由：
+
+1. **必须 pull**：wasm 下 1080p 单帧渲染 + 回读约 50ms，整段一次跑完会阻塞主线程十几秒；ardot 需要每帧之间让出（§6.3 模型 A）。
+2. **`Make()` 绑定 GL 线程**：wasm 下 `Devices::MakeDefault()` 只返回"当前线程已绑定的 device"，其他线程是 nullptr。
+3. **背景必须不透明**：tgfx 输出预乘 RGBA，`alpha=255` 时预乘等于直通，可同时喂 ffmpeg 与 WebCodecs 而不需要 unpremultiply。
+4. **`pixels()` 只在下一帧前有效**：复用同一块 surface 内存，宿主必须当场消费。
+
+### 9.5 CLI 层
+
+```
+pagx render --video out.mp4 [--fps N] [--duration S] [--scale F]
+            [--background #RRGGBB] [--crf 0-51] [--preset medium]
+            [--encoder libx264] [--encoder-args "<extra args>"]
+            [--audio <file>] [--ffmpeg <path>] [--dry-run] <input.pagx>
+```
+
+- `--video` 与 `--frames-dir` / `--time` / `--id` / `--xpath` / `--crop` / `-o` 互斥。
+- `--ffmpeg` 显式路径 > `FFMPEG_BIN` 环境变量 > PATH 探测；全部失败时报错并给出安装指引与 `--frames-dir` 降级提示。
+- `--encoder` / `--encoder-args` 为内部版预留：换 `libo264rt` 或 `h264_videotoolbox` 时只改参数。
+- `--dry-run` 打印最终命令行而不执行，供调试与单测使用。
+
+命令模板：
+
+```bash
+ffmpeg -hide_banner -loglevel error -y \
+  -f rawvideo -pixel_format rgba -video_size {W}x{H} -framerate {fps} -i pipe:0 \
+  -an -c:v {encoder} -preset {preset} -crf {crf} -pix_fmt yuv420p \
+  -vf scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format=yuv420p \
+  -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
+  -movflags +faststart -f mp4 {out.mp4.part}
+```
+
+四个必须处理的细节：
+
+1. **rowBytes 对齐**：`rawvideo` 没有 stride 概念。若 `pixmap.rowBytes() != width * 4`，必须逐行打包再写，否则画面斜切。
+2. **SIGPIPE**：ffmpeg 提前退出时 `write()` 会触发 SIGPIPE 直接杀掉 CLI。视频路径启动前 `signal(SIGPIPE, SIG_IGN)`，把 `EPIPE` 转换为"ffmpeg 提前退出（退出码 N）"。
+3. **`-f mp4` 必须显式写**：临时文件后缀是 `.part`，ffmpeg 无法从后缀推断封装格式。
+4. **临时文件 + rename**：先写 `{out}.part`，`waitpid` 返回 0 后再改名，避免失败留下损坏文件。写入完成顺序必须是「关闭 stdin → 等待退出码 → 改名」。
+
+色彩必须双向指定：`-colorspace/-color_primaries` 只写容器元数据，真正决定 swscale 转换矩阵的是 `-vf scale=...in_color_matrix/out_color_matrix`，只写前者会在播放器里出现肤色偏移。
+
+### 9.6 音频（预留，P1.5 / P2）
+
+Figma 导出的 mp4 带 AAC 48kHz stereo 音轨，pagx 后续可能跟进，因此接口要预留，但音频**不进入 `VideoExporter`**：
+
+| 层 | 音频职责 |
+|---|---|
+| `VideoExporter` | 不感知音频，只出帧 |
+| CLI / 宿主装配 | 决定音频来源、起点、裁剪、循环 |
+| ffmpeg（native） | 解码、重采样、AAC 编码、混流一次完成 |
+| WebCodecs（web） | `AudioEncoder` + muxer 混流 |
+
+音频在时间轴上是**带起止的片段**，没有"有没有"这回事：
+
+```cpp
+struct AudioClip {
+  std::string filePath;   // 或内嵌资源引用（P2）
+  int64_t startUs = 0;    // 在文档时间轴上的起点
+  int64_t durationUs = 0; // 0 表示到素材结尾
+  float volume = 1.0f;
+};
+```
+
+单段（例：4s 视频，只有 2-3s 有声）：
+
+```bash
+ffmpeg ... -i clip.m4a -map 0:v:0 -map 1:a:0 \
+  -af "atrim=0:1,asetpts=PTS-STARTPTS,adelay=2000:all=1,apad" \
+  -c:a aac -b:a 128k -ar 48000 -ac 2 \
+  -t 4 -movflags +faststart -f mp4 out.mp4.part
+```
+
+- `atrim` 裁剪素材、`asetpts=PTS-STARTPTS` 重置时间戳（**裁完不重置会让 `adelay` 叠加出错**）
+- `adelay` 前置静音把音频摆到 2s，`apad` + `-t` 补齐尾部 —— 产物是一条 0→4s 的连续音轨，兼容性最好
+- 不使用 `-itsoffset` 制造"音轨从 2s 才开始"：那需要 edit list，老播放器与剪辑软件解释不一
+
+多段用 `filter_complex` + `amix`，`amix` 必须加 `normalize=0`，否则叠加区音量减半。
+
+web 侧同样处理：给 `AudioData` 补齐静音帧让音轨从 0 开始连续，不要把首段 timestamp 直接设成 2e6。AAC 编码前用 `AudioEncoder.isConfigSupported()` 探测，不支持则降级为无音轨（不要把 Opus 塞进 mp4）。
+
+AAC 的 encoder delay（约 20ms priming samples）由 ffmpeg 写 `elst` 补偿，这是它相对自研 muxer 的隐性优势。
+
+### 9.7 与 Figma 的对标实测
+
+对 Figma 导出的 808×332 / 30fps / 2.07s 样例逐项核对：
+
+| 项 | Figma 实际行为 | 我们的对策 |
+|---|---|---|
+| 背景色 | `#FFFFFF` 不透明（原始 YUV `Y=235 / Cb=Cr=128`，RGB 读到的 253 是 tv→pc 量化误差） | 视频路径默认**白底不透明**，与 Figma 一致 |
+| muxer | `handler_name: MediabunnyVideoHandler` —— WebCodecs + mediabunny | ardot 侧采用同一栈（§9.1） |
+| 色彩标记 | `yuv420p(tv, bt709/bt709/iec61966-2-1)` | 采用 bt709 matrix + tv range，`-color_trc` 写规范的 `bt709` |
+| 尺寸 | 808×332，非 16 整数倍 | 不做对齐约束，按 scale 后取整即可 |
+| 音轨 | AAC LC 48kHz stereo | 见 §9.6 |
+
+### 9.8 未决项
+
+1. **ffmpeg 来源**：用户环境 / 自建 LGPL 构建 / 内部版接 `libo264rt`，暂不影响代码结构，但决定了 CLI 的安装指引与包体积。
+2. **macOS 编码器**：若将来随包分发，mac 侧可能需要改用 `h264_videotoolbox`（O264RT 无对外 mac 库）。
+3. **ardot 摘编方式**：`pagx.cmake` 若为显式文件列表，需追加 `src/pagx/video/VideoExporter.cpp`。
+4. **音频来源形态**：内嵌资源还是外部文件，取决于 PAGX 规范是否扩展音频节点。
+
+### 9.9 落地顺序
+
+1. `include/pagx/VideoExporter.h` + `src/pagx/video/VideoExporter.cpp`，把 `CommandRender.cpp:568-713` 的时间轴循环搬进去。
+2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致（回归基线）。
+3. `src/cli/VideoEncoder.*`：ffmpeg 发现 + 命令行构建 + 子进程封装。
+4. `pagx render --video` 接线，`--dry-run` 先行验证命令行。
+5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做像素/时长对比。
+
+## 10. 附录：验证命令
 
 ```bash
 # 构建
