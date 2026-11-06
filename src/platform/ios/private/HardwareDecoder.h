@@ -23,6 +23,8 @@
 #include <list>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
+#include "platform/cocoa/private/HardwareDecodeContext.h"
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
@@ -46,6 +48,8 @@ class HardwareDecoder : public VideoDecoder {
    * Aborts any in-progress synchronous decompression by invalidating the underlying VT session.
    * Safe to call from any thread. Used by the willResignActive observer to unblock the worker
    * thread so it can release device.locker before the main thread enters EAGLDevice::finish().
+   * A decode that is still running is given a short grace period to return first, the session is
+   * only invalidated underneath it when it is really stuck.
    */
   void invalidateSession();
 
@@ -53,6 +57,7 @@ class HardwareDecoder : public VideoDecoder {
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
   std::mutex sessionLocker = {};
+  std::timed_mutex decodeLocker = {};
   CMFormatDescriptionRef videoFormatDescription = nullptr;
   tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
@@ -77,6 +82,7 @@ class HardwareDecoder : public VideoDecoder {
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
+  std::vector<HardwareDecodeContext*> staleContexts = {};
 
   friend class HardwareDecoderFactory;
 };

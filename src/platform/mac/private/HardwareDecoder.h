@@ -22,6 +22,8 @@
 #include <VideoToolbox/VideoToolbox.h>
 #include <list>
 #include <unordered_map>
+#include <vector>
+#include "platform/cocoa/private/HardwareDecodeContext.h"
 #include "rendering/video/VideoDecoderFactory.h"
 
 namespace pag {
@@ -70,6 +72,7 @@ class HardwareDecoder : public VideoDecoder {
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
+  std::vector<HardwareDecodeContext*> staleContexts = {};
 
   friend class HardwareDecoderFactory;
 };

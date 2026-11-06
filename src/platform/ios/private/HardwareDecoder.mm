@@ -26,6 +26,7 @@
 #import <UIKit/UIKit.h>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <vector>
 #include "base/utils/Log.h"
@@ -34,6 +35,11 @@
 namespace pag {
 
 namespace {
+// VTDecompressionSessionInvalidate may crash inside VideoToolbox when it runs while
+// VTDecompressionSessionDecodeFrame is still executing on the same session, so an in-flight decode
+// gets this long to return before the session is torn down underneath it.
+static constexpr int MAX_INVALIDATE_WAIT_TIME_MS = 200;
+
 std::mutex& GetActiveDecodersMutex() {
   static std::mutex m;
   return m;
@@ -83,20 +89,20 @@ void RegisterAppLifecycleObserversOnce() {
 }  // namespace
 
 void HardwareDecoder::invalidateSession() {
-  // Retain a reference under the lock so concurrent resetVideoToolBox()/dealloc cannot release
-  // the session pointer between our load and the VT call below. Then drop the lock before
-  // calling into VT to avoid blocking the worker thread that may also touch the session.
-  VTDecompressionSessionRef sessionToInvalidate = nullptr;
+  // VideoToolbox tears down the decoder state that VTDecompressionSessionDecodeFrame is still
+  // executing inside, which crashes inside the decoder plugin. Give a running decode the chance to
+  // return first, and only invalidate underneath it once it is really stuck, because unblocking a
+  // stuck decode is what this method exists for.
+  const bool hasDecodeLocker =
+      decodeLocker.try_lock_for(std::chrono::milliseconds(MAX_INVALIDATE_WAIT_TIME_MS));
   {
     std::lock_guard<std::mutex> lock(sessionLocker);
     if (session) {
-      CFRetain(session);
-      sessionToInvalidate = session;
+      VTDecompressionSessionInvalidate(session);
     }
   }
-  if (sessionToInvalidate) {
-    VTDecompressionSessionInvalidate(sessionToInvalidate);
-    CFRelease(sessionToInvalidate);
+  if (hasDecodeLocker) {
+    decodeLocker.unlock();
   }
 }
 
@@ -132,6 +138,12 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
+  // Released only after the session has been invalidated and released, so no callback delivered by
+  // VideoToolbox can write into them anymore.
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -162,10 +174,15 @@ void HardwareDecoder::cleanResources() {
 
 void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
                    CVImageBufferRef pixelBuffer, CMTime, CMTime) {
-  if (status == noErr && pixelBuffer) {
-    CVPixelBufferRef* outputPixelBuffer = static_cast<CVPixelBufferRef*>(sourceFrameRefCon);
-    *outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
+  auto* context = static_cast<HardwareDecodeContext*>(sourceFrameRefCon);
+  if (context == nullptr) {
+    return;
   }
+  CVPixelBufferRef outputPixelBuffer = nullptr;
+  if (status == noErr && pixelBuffer) {
+    outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
+  }
+  context->complete(outputPixelBuffer);
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
@@ -222,6 +239,11 @@ bool HardwareDecoder::resetVideoToolBox() {
       CFRelease(old);
     }
   }
+
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
 
   // create decompression session
   CFDictionaryRef attrs = NULL;
@@ -367,9 +389,22 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (sampleBuffer) {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
+    auto* context = new HardwareDecodeContext();
 
-    status =
-        VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
+    {
+      // Held so invalidateSession() can tell whether a decode is still running before tearing the
+      // session down.
+      std::lock_guard<std::timed_mutex> lock(decodeLocker);
+      status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, context, &infoFlags);
+    }
+
+    bool abandoned = false;
+    outputPixelBuffer = context->takeOutput(status == noErr, &abandoned);
+    if (abandoned) {
+      // VideoToolbox promised no callback for a failed call, but a late one would still write into
+      // this context, so it is only released together with the session.
+      staleContexts.push_back(context);
+    }
 
     if (status != noErr && !outputPixelBuffer) {
       if (status == kVTInvalidSessionErr) {
