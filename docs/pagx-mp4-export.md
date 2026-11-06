@@ -4,12 +4,13 @@
 
 - 输入：已带动画轨道的 `pagx::PAGXDocument` 或 `.pagx` 文件
 - 输出：MP4（H.264 + AAC）
-- 落点：`pagx` CLI（native）与 ardot 编辑器（wasm）
+- 落点：`pagx export --format mp4`（native）与 ardot 编辑器（wasm）
 
 ## 1. 方案概要
 
 | 项 | 结论 |
 |---|---|
+| 命令形态 | `pagx export --format mp4`（后续视频格式同走 `--format`） |
 | 编码器形态 | 外部 ffmpeg **可执行文件** + 子进程 rawvideo 管道 |
 | ffmpeg 来源 | 部署问题，可替换：用户环境 / 随包分发 / 内部构建，不影响代码结构 |
 | 编码与封装位置 | 主库之外。pagx 不链接任何 H.264 编码器，只出帧 |
@@ -17,6 +18,7 @@
 | native 编码 | ffmpeg 子进程（`libx264`，可按平台换 `h264_videotoolbox`） |
 | web 编码 | JS WebCodecs `VideoEncoder` + mediabunny |
 | 音频 | P1 不产出（`-an`），接口按 §5 预留 |
+| 其他视频格式 | P1 只支持 mp4，webm/gif 不做占位；扩展点见 §4.3 |
 
 形态由三条硬约束决定：
 
@@ -27,25 +29,28 @@
 ## 2. 架构
 
 ```
-┌─ L3 装配 ─────────────────────────────────────────────────┐
+┌─ 装配层 ──────────────────────────────────────────────────┐
 │ native CLI / 任意 C++ 宿主：VideoExporter + ffmpeg 子进程   │
 │ wasm（ardot）：VideoExporter + JS WebCodecs + mediabunny    │
 └───────────────────────────────────────────────────────────┘
-┌─ L2 编码后端（宿主实现，pagx 不感知）───────────────────────┐
+┌─ 编码后端（宿主实现，pagx 不感知）─────────────────────────┐
 │ native：ffmpeg stdin 管道（rawvideo rgba）                  │
 │ web：   WebCodecs VideoEncoder(avc1) + muxer               │
 └───────────────────────────────────────────────────────────┘
-┌─ L1 帧产出（pagx 公开 API，native/wasm 完全一致）───────────┐
+┌─ 帧产出（pagx 公开 API，native/wasm 完全一致）─────────────┐
 │ include/pagx/VideoExporter.h + src/pagx/video/VideoExporter.cpp │
 └───────────────────────────────────────────────────────────┘
 ```
+
+视频文件由编码后端产出（ffmpeg 进程直接写盘 / muxer `finalize()` 出字节），装配层不产出任何视频数据，只负责参数决策、驱动循环与错误编排。
 
 | 文件 | 职责 |
 |---|---|
 | `include/pagx/VideoExporter.h`（新增） | `VideoExportOptions` + `VideoExporter`，与 SVG/HTML/PPT 导出器同构 |
 | `src/pagx/video/VideoExporter.cpp`（新增） | 逐帧时间轴循环（承载现 `CommandRender.cpp` 的逻辑） |
-| `src/cli/VideoEncoder.h/.cpp`（新增） | ffmpeg 发现、命令行构建（纯函数）、子进程封装、帧写入 |
-| `src/cli/CommandRender.cpp`（改） | `--video` 解析、`RenderVideoSequence()`，`--frames-dir` 改用 `VideoExporter` |
+| `src/cli/VideoEncoder.h/.cpp`（新增） | ffmpeg 发现、格式表、命令行构建（纯函数）、子进程封装、帧写入 |
+| `src/cli/CommandExport.cpp`（改） | `--format mp4` 分支、视频相关参数解析 |
+| `src/cli/CommandRender.cpp`（改） | `--frames-dir` 改用 `VideoExporter` |
 
 L1 必须放 `src/pagx`：ardot 的 `pagx.cmake` 只摘编 `src/pagx` + `src/renderer`。若该 cmake 是显式文件列表而非 GLOB，新增文件需同步登记。
 
@@ -68,7 +73,8 @@ struct VideoExportOptions {
   float duration = -1.0f;
   /** Output scale factor applied to the document size. */
   float scale = 1.0f;
-  /** Opaque background. H.264 carries no alpha, so the video path requires alpha == 255. */
+  /** Background color drawn under the content. Whether it must be opaque is decided by the
+   *  output container, not here: H.264 carries no alpha, VP9 does. */
   bool hasBackground = false;
   Color background = {};
 };
@@ -80,6 +86,9 @@ struct VideoExportOptions {
  *
  * The exporter only renders. Encoding and muxing are the host's responsibility: ffmpeg on native,
  * WebCodecs on the web. No codec ships inside pagx.
+ *
+ * Frames are premultiplied RGBA. Containers that carry alpha need the host to unpremultiply;
+ * opaque output (the mp4 path) can pass the pixels through unchanged.
  *
  * Constraints:
  * - Make() must run on a thread that owns a GPU context; on wasm that is the main thread.
@@ -102,7 +111,7 @@ class VideoExporter {
   /** Renders the next frame. Returns false at the end of the sequence or on failure. */
   bool nextFrame();
 
-  /** RGBA8888 premultiplied. Valid until the next nextFrame() call. */
+  /** Premultiplied RGBA8888. Valid until the next nextFrame() call. */
   const uint8_t* pixels() const;
   size_t rowBytes() const;
 };
@@ -114,7 +123,7 @@ class VideoExporter {
 
 1. **必须 pull**：宿主一次取一帧，中间可以 `SubmitTask` 让出主线程。禁止一次跑完全部帧。
 2. **`Make()` 绑定 GL 线程**：wasm 下 `Devices::MakeDefault()` 只返回当前线程已绑定的 device，其他线程是 nullptr。
-3. **背景必须不透明**：tgfx 输出预乘 RGBA，`alpha=255` 时预乘等于直通，可同时喂 ffmpeg 与 WebCodecs，无需 unpremultiply。
+3. **是否要求不透明由输出格式决定**：mp4 要求不透明，`alpha=255` 时预乘等于直通，无需 unpremultiply；将来支持带 alpha 的容器时由宿主做 unpremultiply，库不参与该决策。
 4. **`pixels()` 只到下一次 `nextFrame()`**：复用同一块 surface 内存，宿主必须当场消费。
 
 宿主调用形态：
@@ -142,55 +151,89 @@ while (exporter.nextFrame()) {
 
 ## 4. CLI 层
 
+### 4.1 命令与参数
+
 ```
-pagx render --video out.mp4 [--fps N] [--duration S] [--scale F]
-            [--background #RRGGBB] [--crf 0-51] [--preset medium]
-            [--encoder libx264] [--encoder-args "<extra args>"]
-            [--audio <file>] [--ffmpeg <path>] [--dry-run] <input.pagx>
+pagx export --format mp4 --input in.pagx --output out.mp4
+            [--fps N] [--duration S] [--scale F] [--background #RRGGBB]
+            [--crf 0-51] [--preset medium] [--encoder libx264] [--encoder-args "<args>"]
+            [--font <path>] [--fallback <path|name>]
+            [--ffmpeg <path>] [--dry-run]
 ```
+
+`--format` 也可从 `--output` 扩展名推断（沿用现有机制）。多输入仅 pptx 允许，视频格式强制单输入。
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `--video <path>` | — | 输出 mp4，与 `--frames-dir` / `--time` / `--id` / `--xpath` / `--crop` / `-o` 互斥 |
+| `--input <file>` | 必填 | 单输入（视频格式不允许重复） |
+| `--output <file>` | `<input>.<format>` | 输出路径 |
+| `--format mp4` | 从 `--output` 推断 | 目前只接受 `mp4`，其他值走现有 unsupported 分支 |
 | `--fps <n>` | 文档动画帧率，缺省 60 | 采样帧率 |
 | `--duration <s>` | 最长动画一个周期 | 序列时长 |
-| `--scale <f>` | 1.0 | 缩放 |
-| `--background` | `#FFFFFF` 不透明 | 与 Figma 行为一致 |
+| `--scale <f>` | 1.0 | 缩放（`export` 此前无此参数，需新增） |
+| `--background` | `#FFFFFF` 不透明 | 与 Figma 行为一致；mp4 要求 alpha=255 |
 | `--crf <0-51>` | 20 | 质量 |
 | `--preset` | `medium` | x264 preset |
-| `--encoder` | `libx264` | 内部版可换 `libo264rt`，mac 可换 `h264_videotoolbox` |
+| `--encoder` | 取格式表默认值 | 内部版可换 `libo264rt`，mac 可换 `h264_videotoolbox` |
 | `--encoder-args` | 空 | 原样追加到命令行 |
-| `--audio <file>` | — | P1.5，见 §5 |
+| `--font` / `--fallback` | — | **必须新增**。`export` 现有路径不加载字体（靠文档内嵌 GlyphRun），而 mp4 是真实渲染，缺少时会 fallback 或渲染不出文本 |
 | `--ffmpeg <path>` | — | 显式路径，优先级最高 |
 | `--dry-run` | false | 打印最终命令行而不执行 |
 
 ffmpeg 发现顺序：`--ffmpeg` > `FFMPEG_BIN` 环境变量 > PATH 探测。全部失败时报错并给出安装指引与 `--frames-dir` 降级提示。
 
-命令模板：
+### 4.2 ffmpeg 命令
 
 ```bash
 ffmpeg -hide_banner -loglevel error -y \
   -f rawvideo -pixel_format rgba -video_size {W}x{H} -framerate {fps} -i pipe:0 \
-  -an -c:v {encoder} -preset {preset} -crf {crf} -pix_fmt yuv420p \
-  -vf scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format=yuv420p \
+  -an -c:v {encoder} -preset {preset} -crf {crf} -pix_fmt {pixFmt} \
+  -vf scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format={pixFmt} \
   -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
-  -movflags +faststart -f mp4 {out.mp4.part}
+  -movflags +faststart -f {container} {out}.part
 ```
 
 四个必须处理的细节：
 
 1. **rowBytes 对齐**：`rawvideo` 没有 stride 概念。若 `pixmap.rowBytes() != width * 4`，必须逐行打包再写，否则画面斜切。
 2. **SIGPIPE**：ffmpeg 提前退出时 `write()` 触发 SIGPIPE 会直接杀掉 CLI。视频路径启动前 `signal(SIGPIPE, SIG_IGN)`，把 `EPIPE` 转换为「ffmpeg 提前退出（退出码 N）」。
-3. **`-f mp4` 必须显式写**：临时文件后缀是 `.part`，ffmpeg 无法从后缀推断封装格式。
+3. **`-f {container}` 必须显式写**：临时文件后缀是 `.part`，ffmpeg 无法从后缀推断封装格式。
 4. **临时文件 + rename**：先写 `{out}.part`，`waitpid` 返回 0 后才改名。顺序必须是「关闭 stdin → 等待退出码 → 改名」。
 
 色彩必须双向指定：`-colorspace/-color_primaries` 只写容器元数据，真正决定 swscale 转换矩阵的是 `-vf scale=...in_color_matrix/out_color_matrix`。只写前者会在播放器里出现肤色偏移。
 
-`--frames-dir`（已实现）保留为无 ffmpeg 时的降级路径，并与 `--video` 共用 `VideoExporter` 的时间轴循环。当前实测性能（1200×738）：复用 scene 后单帧 133ms（PNG 编码占 62%），480 帧约 60s；走 rawvideo 管道可跳过图片编码。
+### 4.3 格式扩展点
+
+P1 只实现 mp4，但参数分派按一张格式表走，新增单遍编码格式（如 webm/VP9）只需追加一行：
+
+```cpp
+// src/cli/VideoEncoder.h
+/** Describes one output container. P1 ships mp4 only; new single-pass formats append a row. */
+struct VideoFormatSpec {
+  std::string name;           // --format value, e.g. "mp4"
+  std::string container;      // ffmpeg -f value
+  std::string defaultEncoder; // e.g. "libx264"
+  std::string pixelFormat;    // e.g. "yuv420p"
+  bool requiresOpaque;        // mp4: true (H.264 has no alpha)
+};
+
+const VideoFormatSpec* FindVideoFormat(const std::string& format);  // nullptr => unsupported
+```
+
+```cpp
+static const VideoFormatSpec kVideoFormats[] = {
+    {"mp4", "mp4", "libx264", "yuv420p", true},
+};
+```
+
+两点保留说明：
+
+- **webm** 属"追加一行"类型（`libvpx-vp9` + `yuva420p` + `requiresOpaque=false`），但透明输出需要宿主先 unpremultiply。
+- **gif 不能只靠加一行**：`palettegen` 需统计完整片段，`split` + `palettegen` 会把整段视频缓冲在滤镜图里，管道输入会 OOM。到时要么限制时长/尺寸，要么先出中间 mp4 再二次转码，是一个独立流程分支。
 
 ## 5. 音频
 
-P1 产出 `-an`。音频**不进入 `VideoExporter`**，由宿主装配后交给编码器：
+P1 产出 `-an`。音频**不进入 `VideoExporter`**，由宿主装配后交给编码器；将来走 `pagx export --format mp4 --audio <file>`：
 
 | 层 | 音频职责 |
 |---|---|
@@ -258,8 +301,8 @@ Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，�
 
 1. `include/pagx/VideoExporter.h` + `src/pagx/video/VideoExporter.cpp`，把 `CommandRender.cpp` 的时间轴循环搬进去。
 2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致。
-3. `src/cli/VideoEncoder.*`：ffmpeg 发现 + 命令行构建 + 子进程封装。
-4. 接入 `pagx render --video`，先跑 `--dry-run` 验证命令行。
+3. `src/cli/VideoEncoder.*`：格式表 + ffmpeg 发现 + 命令行构建 + 子进程封装。
+4. `CommandExport::exportMp4()`：新增视频参数与 `--format mp4` 分支，先跑 `--dry-run` 验证命令行。
 5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做时长与像素对比。
 
 ## 9. 验证命令
@@ -277,7 +320,7 @@ cmake --build cmake-build-debug --target pagx-cli
 ./cmake-build-debug/pagx render --frames-dir /tmp/frames --fps 60 input.pagx
 
 # 直出 MP4
-./cmake-build-debug/pagx render --video /tmp/out.mp4 --fps 60 --crf 20 input.pagx
+./cmake-build-debug/pagx export --format mp4 --input input.pagx --output /tmp/out.mp4 --fps 60 --crf 20
 
 # 校验产物
 ffmpeg -hide_banner -i /tmp/out.mp4 2>&1 | grep -E "Stream|Duration"
