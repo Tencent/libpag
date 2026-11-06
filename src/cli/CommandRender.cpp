@@ -34,18 +34,18 @@
 #include "cli/CliUtils.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
-#include "pagx/PAGAnimation.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/VideoExporter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -562,9 +562,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   return bitmap;
 }
 
-// Renders the document's animations as an image sequence into options.framesDir. The scene and
-// surface are built once and reused for every frame, so the per-frame cost is limited to timeline
-// evaluation, drawing and the pixel readback.
+// Renders the document's animations as an image sequence into options.framesDir. Frame production
+// is delegated to VideoExporter so that the timeline semantics stay identical to the video path.
 static int RenderFrameSequence(const RenderOptions& options) {
   auto document = LoadDocument(options.inputFile, "pagx render");
   if (document == nullptr) {
@@ -579,76 +578,24 @@ static int RenderFrameSequence(const RenderOptions& options) {
   if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
     return 1;
   }
+  // Fonts have to be registered before layout runs, and VideoExporter only applies layout when the
+  // document still has none.
   document->applyLayout(&fontConfig);
 
-  auto scene = PAGScene::Make(document);
-  if (scene == nullptr) {
-    std::cerr << "pagx render: failed to build animation scene\n";
-    return 1;
-  }
-
-  std::vector<std::shared_ptr<PAGAnimation>> animations = {};
-  int64_t longestDurationUs = 0;
-  float documentFrameRate = 0.0f;
-  for (const auto& id : scene->getAnimationIds()) {
-    auto animation = scene->getAnimation(id);
-    if (animation == nullptr) {
-      continue;
-    }
-    if (documentFrameRate <= 0.0f) {
-      documentFrameRate = animation->frameRate();
-    }
-    longestDurationUs = std::max(longestDurationUs, animation->duration());
-    animations.emplace_back(std::move(animation));
-  }
-  if (animations.empty()) {
-    std::cerr << "pagx render: the document has no top-level animation to sample\n";
-    return 1;
-  }
-
-  int frameRate = options.frameRate;
-  if (frameRate <= 0) {
-    frameRate = static_cast<int>(llround(static_cast<double>(documentFrameRate)));
-  }
-  if (frameRate <= 0) {
-    frameRate = 60;
-  }
-
-  float durationSeconds = options.duration;
-  if (durationSeconds <= 0.0f) {
-    if (longestDurationUs <= 0) {
-      std::cerr << "pagx render: the document's animations have no duration, pass --duration\n";
-      return 1;
-    }
-    durationSeconds = static_cast<float>(static_cast<double>(longestDurationUs) / 1000000.0);
-  }
-
-  int64_t frameCount = static_cast<int64_t>(
-      llround(static_cast<double>(durationSeconds) * static_cast<double>(frameRate)));
-  if (frameCount <= 0) {
-    std::cerr << "pagx render: the requested sequence is empty\n";
-    return 1;
-  }
-
-  int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
-  int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
-  if (outputWidth <= 0 || outputHeight <= 0) {
-    std::cerr << "pagx render: output dimensions are zero\n";
-    return 1;
-  }
-
-  auto surface = PAGSurface::MakeOffscreen(outputWidth, outputHeight);
-  if (surface == nullptr) {
-    std::cerr << "pagx render: failed to create surface (" << outputWidth << "x" << outputHeight
-              << ")\n";
-    return 1;
-  }
-
-  auto* displayOptions = scene->getDisplayOptions();
-  displayOptions->setZoomScale(options.scale);
+  VideoExportOptions videoOptions = {};
+  videoOptions.frameRate = options.frameRate;
+  videoOptions.duration = options.duration;
+  videoOptions.scale = options.scale;
+  videoOptions.hasBackground = options.hasBackground;
   if (options.hasBackground) {
-    displayOptions->setBackgroundColor(
-        Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB});
+    videoOptions.background = Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha,
+                                    ColorSpace::SRGB};
+  }
+  std::string errorMsg = {};
+  auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
+  if (exporter == nullptr) {
+    std::cerr << "pagx render: " << errorMsg << "\n";
+    return 1;
   }
 
   std::error_code createError = {};
@@ -658,36 +605,16 @@ static int RenderFrameSequence(const RenderOptions& options) {
     return 1;
   }
 
-  tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
-  if (bitmap.isEmpty()) {
-    std::cerr << "pagx render: failed to allocate bitmap\n";
-    return 1;
-  }
-  tgfx::Pixmap pixmap(bitmap);
   auto encodedFormat = GetEncodedFormat(options.format);
+  auto width = exporter->width();
+  auto height = exporter->height();
+  auto frameCount = exporter->frameCount();
+  auto frameInfo = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
+                                         tgfx::AlphaType::Premultiplied, exporter->rowBytes());
   int64_t progressStep = std::max<int64_t>(1, frameCount / 10);
-  int64_t previousUs = 0;
-  for (int64_t frame = 0; frame < frameCount; frame++) {
-    int64_t timeUs = static_cast<int64_t>(
-        llround(static_cast<double>(frame) * 1000000.0 / static_cast<double>(frameRate)));
-    for (const auto& animation : animations) {
-      animation->setCurrentTime(timeUs);
-      animation->apply(1.0f);
-    }
-    // Timelines mounted on Composition slots only advance incrementally, so the scene must be
-    // driven by the delta between consecutive frames even though the top-level animations above
-    // are seeked to an absolute time.
-    scene->advanceAndApply(timeUs - previousUs);
-    previousUs = timeUs;
-
-    if (!scene->draw(surface)) {
-      std::cerr << "pagx render: failed to draw frame " << frame << "\n";
-      return 1;
-    }
-    if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-      std::cerr << "pagx render: failed to read pixels for frame " << frame << "\n";
-      return 1;
-    }
+  while (exporter->nextFrame()) {
+    auto frame = exporter->currentFrame() - 1;
+    tgfx::Pixmap pixmap(frameInfo, exporter->pixels());
     auto encodedData = tgfx::ImageCodec::Encode(pixmap, encodedFormat, options.quality);
     if (encodedData == nullptr) {
       std::cerr << "pagx render: failed to encode frame " << frame << "\n";
@@ -705,9 +632,15 @@ static int RenderFrameSequence(const RenderOptions& options) {
                 << frameCount << ")" << std::endl;
     }
   }
+  if (exporter->currentFrame() < frameCount) {
+    std::cerr << "pagx render: failed to render frame " << exporter->currentFrame() << "\n";
+    return 1;
+  }
 
+  float durationSeconds =
+      static_cast<float>(static_cast<double>(frameCount) / exporter->frameRate());
   std::cout << "pagx render: wrote " << frameCount << " frames to " << options.framesDir << " ("
-            << outputWidth << "x" << outputHeight << ", " << frameRate << " fps, "
+            << width << "x" << height << ", " << exporter->frameRate() << " fps, "
             << durationSeconds << "s)\n";
   return 0;
 }
