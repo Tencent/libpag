@@ -3,6 +3,8 @@
      lifts letters one by one.
      Target: RangeSelector  Channel: start  Type: float
      Expect: gap
+     Known-gap: css-text-layout
+     Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
