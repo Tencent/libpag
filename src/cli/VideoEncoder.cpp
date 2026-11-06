@@ -300,9 +300,8 @@ struct VideoEncoder::ChildProcess {
   int exitCode = 0;
 };
 
-VideoEncoder::VideoEncoder(const VideoFormatSpec& formatSpec, const VideoEncodeOptions& options)
-    : format(formatSpec), width(options.width), height(options.height),
-      frameRate(options.frameRate), outputFile(options.outputFile),
+VideoEncoder::VideoEncoder(const VideoEncodeOptions& options)
+    : width(options.width), height(options.height), outputFile(options.outputFile),
       partFile(options.outputFile + kPartSuffix) {
 }
 
@@ -318,7 +317,7 @@ std::unique_ptr<VideoEncoder> VideoEncoder::Start(const std::string& ffmpegPath,
   if (!BuildFFmpegCommandLine(ffmpegPath, format, options, &arguments, errorMsg)) {
     return nullptr;
   }
-  std::unique_ptr<VideoEncoder> encoder(new VideoEncoder(format, options));
+  std::unique_ptr<VideoEncoder> encoder(new VideoEncoder(options));
   if (!encoder->spawnChild(arguments, errorMsg)) {
     return nullptr;
   }

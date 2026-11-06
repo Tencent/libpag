@@ -132,7 +132,7 @@ class VideoEncoder {
  private:
   struct ChildProcess;
 
-  VideoEncoder(const VideoFormatSpec& format, const VideoEncodeOptions& options);
+  explicit VideoEncoder(const VideoEncodeOptions& options);
 
   bool spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool writeAll(const uint8_t* data, size_t size, std::string* errorMsg);
@@ -141,10 +141,8 @@ class VideoEncoder {
   void killChild();
   void removePartFile();
 
-  VideoFormatSpec format = {};
   int width = 0;
   int height = 0;
-  int frameRate = 0;
   std::string outputFile = {};
   std::string partFile = {};
   std::vector<uint8_t> packedBuffer = {};
