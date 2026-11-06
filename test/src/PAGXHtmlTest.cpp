@@ -3884,6 +3884,51 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
   EXPECT_NE(rule.find("stroke-miterlimit: 20;"), std::string::npos) << rule;
 }
 
+// A Repeater paints one copy per repetition, so its rotation channel cannot ride on a single tag:
+// each copy recomposes the per-copy matrix (rotation * copy index) and needs its own rule.
+CLI_TEST(PAGXHtmlTest, AnimationRepeaterRotationFansOutToCopies) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle position="150,90" size="50,50" roundness="10"/>
+      <Fill color="#9333EA"/>
+      <Repeater id="copyFan" copies="3" offset="0" anchor="0,0" position="0,0" rotation="0"
+                scale="1,1" startAlpha="1" endAlpha="1"/>
+    </Layer>
+    <Animations>
+      <Animation id="fanOut" duration="60" frameRate="60" loop="once">
+        <Object target="copyFan">
+          <Channel name="rotation" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="20"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 3u) << html;
+  for (int i = 0; i < 3; ++i) {
+    auto tag = FindTagContaining(html, "id=\"copyFan_copy" + std::to_string(i) + "\"");
+    ASSERT_FALSE(tag.empty()) << i << html;
+    EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  }
+  // Copy i carries the repeater rotation multiplied by its own index, so the fan opens for real.
+  auto rule0 =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"copyFan_copy0\"")));
+  auto rule1 =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"copyFan_copy1\"")));
+  auto rule2 =
+      KeyframesRuleNamed(html, AnimationNameOfTag(FindTagContaining(html, "id=\"copyFan_copy2\"")));
+  EXPECT_NE(rule0.find("rotate(40deg)"), std::string::npos) << rule0;
+  EXPECT_NE(rule1.find("rotate(20deg)"), std::string::npos) << rule1;
+  // The outer copy takes index 0, so its matrix stays identity and the stop prints `none`.
+  EXPECT_NE(rule2.find("transform: none"), std::string::npos) << rule2;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayerAnchorXSlidesPivot) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="handSlide" x="150" y="100" width="120" height="16" anchor="0,8" rotationZ="20">

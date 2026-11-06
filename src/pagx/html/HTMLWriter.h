@@ -128,6 +128,9 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m);
 // writeRepeater applies per copy: anchor recenter + scale^prog + rotate*prog + position*prog.
 // `i` is the raw loop index; the order (AboveOriginal vs BelowOriginal) and offset are folded in.
 Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i);
+// Same matrix with the repeater rotation replaced, so an animated rotation can recompose a copy
+// without mutating the node.
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation);
 
 float ComputePathLength(const PathData& pathData);
 float ComputePathSignedArea(const PathData& pathData);
@@ -308,6 +311,16 @@ class HTMLWriterContext {
     // RoundCorner node -> the single shape it rounds. The radius animation rebuilds that shape's
     // path per frame, so the emitter needs the geometry the modifier applies to.
     std::unordered_map<const RoundCorner*, const Element*> roundCornerShapes = {};
+
+    // A Repeater paints one DOM copy per repetition, so an animated repeater channel is fanned out
+    // to every copy instead of one tag. Each copy is recorded with the index it was emitted for.
+    struct RepeaterCopy {
+      const Repeater* repeater = nullptr;
+      int index = 0;
+      std::string id = {};
+    };
+    std::unordered_set<const Repeater*> animatedRepeaters = {};
+    std::vector<RepeaterCopy> repeaterCopies = {};
 
     struct Instance {
       const Composition* composition = nullptr;
