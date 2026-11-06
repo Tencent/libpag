@@ -47,7 +47,7 @@
 | 文件 | 职责 |
 |---|---|
 | `include/pagx/VideoExporter.h`（新增） | `VideoExportOptions` + `VideoExporter`，与 SVG/HTML/PPT 导出器同构 |
-| `src/pagx/video/VideoExporter.cpp`（新增） | 逐帧时间轴循环（承载现 `CommandRender.cpp` 的逻辑） |
+| `src/pagx/VideoExporter.cpp`（新增） | 逐帧时间轴循环（承载现 `CommandRender.cpp` 的逻辑）。放根目录而非 `video/` 子目录，因为 `src/pagx/*.cpp` 是非递归 GLOB，子目录需逐条登记 |
 | `src/cli/VideoEncoder.h/.cpp`（新增） | ffmpeg 发现、格式表、命令行构建（纯函数）、子进程封装、帧写入 |
 | `src/cli/CommandExport.cpp`（改） | `--format mp4` 分支、视频相关参数解析 |
 | `src/cli/CommandRender.cpp`（改） | `--frames-dir` 改用 `VideoExporter` |
@@ -93,13 +93,18 @@ struct VideoExportOptions {
  * Constraints:
  * - Make() must run on a thread that owns a GPU context; on wasm that is the main thread.
  * - Callers must not hold the same device's context lock while calling nextFrame().
- * - Layout is applied automatically if PAGXDocument::isLayoutApplied() is false.
+ * - PAGScene::Make() applies layout when the document has not applied it yet, so callers only
+ *   need to register fonts on PAGXDocument::fontConfig() beforehand when it needs external fonts.
+ *
+ * The document is taken by shared_ptr because PAGScene retains it for the exporter's lifetime;
+ * PAGXDocument does not derive from enable_shared_from_this.
  */
 class VideoExporter {
  public:
   using Options = VideoExportOptions;
 
-  static std::shared_ptr<VideoExporter> Make(PAGXDocument& document, const Options& options = {},
+  static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
+                                             const Options& options = {},
                                              std::string* errorMsg = nullptr);
 
   int width() const;
@@ -299,7 +304,7 @@ Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，�
 
 ## 8. 实施顺序
 
-1. `include/pagx/VideoExporter.h` + `src/pagx/video/VideoExporter.cpp`，把 `CommandRender.cpp` 的时间轴循环搬进去。
+1. `include/pagx/VideoExporter.h` + `src/pagx/VideoExporter.cpp`，把 `CommandRender.cpp` 的时间轴循环搬进去。**已完成**
 2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致。
 3. `src/cli/VideoEncoder.*`：格式表 + ffmpeg 发现 + 命令行构建 + 子进程封装。
 4. `CommandExport::exportMp4()`：新增视频参数与 `--format mp4` 分支，先跑 `--dry-run` 验证命令行。
