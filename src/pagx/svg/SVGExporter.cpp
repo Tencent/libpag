@@ -1920,11 +1920,7 @@ bool SVGWriter::isMaskReferenceLayer(const Layer* layer) {
     return false;
   }
   if (!_context->maskReferencesReady) {
-    auto& refs = _context->maskReferenceLayers;
-    CollectMaskReferenceLayers(*_doc, &refs);
-    // Walk every Layer node in the document (top-level plus children/composition subtrees) and
-    // register each Layer::mask reference target, recursing into the mask's own subtree so
-    // nested mask-of-mask references are covered. `visited` guards against cycles.
+    CollectMaskReferenceLayers(*_doc, &_context->maskReferenceLayers);
     _context->maskReferencesReady = true;
   }
   return _context->maskReferenceLayers.count(layer) > 0;

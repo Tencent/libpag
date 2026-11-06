@@ -2948,6 +2948,16 @@ static void TileChannelKeyframes(Channel* channel, Frame period, Frame maxEnd) {
   }
 }
 
+Frame SMILAnimationParser::RepeatPeriodFrames(SVGParserContext& ctx,
+                                              const std::shared_ptr<DOMNode>& element,
+                                              float frameRate) {
+  auto durSeconds = parseSMILClockValue(ctx.getAttribute(element, "dur"));
+  if (!std::isfinite(durSeconds) || durSeconds <= 0.0) {
+    return 0;
+  }
+  return static_cast<Frame>(std::round(durSeconds * frameRate));
+}
+
 Animation* SMILAnimationParser::buildAnimation(
     SVGParserContext& ctx, PAGXDocument* doc,
     const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations,
@@ -3018,15 +3028,11 @@ Animation* SMILAnimationParser::buildAnimation(
         if (endFrame > layerEndFrame) {
           layerEndFrame = endFrame;
         }
-        auto repeatCount = ctx.getAttribute(animEl, "repeatCount");
-        if (repeatCount == "indefinite") {
+        if (IsIndefiniteRepeat(animEl)) {
           hasIndefiniteLoop = true;
           elementIndefinite = true;
           if (indefinitePeriod <= 0) {
-            auto durSeconds = parseSMILClockValue(ctx.getAttribute(animEl, "dur"));
-            if (std::isfinite(durSeconds) && durSeconds > 0.0) {
-              indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
-            }
+            indefinitePeriod = RepeatPeriodFrames(ctx, animEl, frameRate);
           }
         }
       }
@@ -3064,15 +3070,11 @@ Animation* SMILAnimationParser::buildAnimation(
           if (endFrame > layerEndFrame) {
             layerEndFrame = endFrame;
           }
-          auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
-          if (repeatCount == "indefinite") {
+          if (IsIndefiniteRepeat(transformEl)) {
             hasIndefiniteLoop = true;
             elementIndefinite = true;
             if (indefinitePeriod <= 0) {
-              auto durSeconds = parseSMILClockValue(ctx.getAttribute(transformEl, "dur"));
-              if (std::isfinite(durSeconds) && durSeconds > 0.0) {
-                indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
-              }
+              indefinitePeriod = RepeatPeriodFrames(ctx, transformEl, frameRate);
             }
           }
         }
@@ -3088,15 +3090,11 @@ Animation* SMILAnimationParser::buildAnimation(
           if (endFrame > layerEndFrame) {
             layerEndFrame = endFrame;
           }
-          auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
-          if (repeatCount == "indefinite") {
+          if (IsIndefiniteRepeat(motionEl)) {
             hasIndefiniteLoop = true;
             elementIndefinite = true;
             if (indefinitePeriod <= 0) {
-              auto durSeconds = parseSMILClockValue(ctx.getAttribute(motionEl, "dur"));
-              if (std::isfinite(durSeconds) && durSeconds > 0.0) {
-                indefinitePeriod = static_cast<Frame>(std::round(durSeconds * frameRate));
-              }
+              indefinitePeriod = RepeatPeriodFrames(ctx, motionEl, frameRate);
             }
           }
         }
