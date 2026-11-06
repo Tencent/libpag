@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <filter id="f">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4">
+        <animate attributeName="stdDeviation" values="4;8;4" dur="2s" fill="freeze"/>
+      </feGaussianBlur>
+    </filter>
+  </defs>
+  <rect width="80" height="80" rx="5" fill="red" stroke="black" stroke-width="2" filter="url(#f)">
+    <animate attributeName="rx" values="5;20;5" dur="2s" fill="freeze"/>
+    <animate attributeName="stroke-width" values="2;6;2" dur="2s" fill="freeze"/>
+  </rect>
+</svg>

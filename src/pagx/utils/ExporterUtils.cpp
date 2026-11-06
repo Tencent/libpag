@@ -19,6 +19,7 @@
 #include "pagx/utils/ExporterUtils.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
@@ -195,6 +196,43 @@ void DecomposeScale(const Matrix& m, float* sx, float* sy) {
   *sx = std::sqrt(m.a * m.a + m.b * m.b);
   float det = m.a * m.d - m.b * m.c;
   *sy = (*sx > 0) ? std::abs(det) / *sx : 0;
+}
+
+namespace {
+
+void CollectMaskReferences(const Layer* node, std::unordered_set<const Layer*>* layers,
+                           std::unordered_set<const Layer*>* visited) {
+  if (node == nullptr || !visited->insert(node).second) {
+    return;
+  }
+  if (node->mask != nullptr) {
+    layers->insert(node->mask);
+    CollectMaskReferences(node->mask, layers, visited);
+  }
+  for (const auto* child : node->children) {
+    CollectMaskReferences(child, layers, visited);
+  }
+  if (node->composition != nullptr) {
+    for (const auto* compLayer : node->composition->layers) {
+      CollectMaskReferences(compLayer, layers, visited);
+    }
+  }
+}
+
+}  // namespace
+
+void CollectMaskReferenceLayers(const PAGXDocument& document,
+                                std::unordered_set<const Layer*>* layers) {
+  if (layers == nullptr) {
+    return;
+  }
+  std::unordered_set<const Layer*> visited = {};
+  for (const auto& node : document.nodes) {
+    if (node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    CollectMaskReferences(static_cast<const Layer*>(node.get()), layers, &visited);
+  }
 }
 
 }  // namespace pagx

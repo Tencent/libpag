@@ -904,4 +904,9 @@ const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
   return it->second;
 }
 
+void detail::DocumentAccess::RegisterNode(PAGXDocument& document, Node* node,
+                                          const std::string& id) {
+  document.registerNode(node, id);
+}
+
 }  // namespace pagx

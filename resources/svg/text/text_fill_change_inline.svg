@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80" viewBox="0 0 200 80">
+  <text x="10" y="40" font-family="Arial" font-size="20" fill="#FF0000">Hello <tspan
+      fill="#0000FF">world</tspan></text>
+</svg>

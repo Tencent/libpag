@@ -61,6 +61,12 @@ class SVGImporter {
      */
     float targetHeight = NAN;
 
+    /**
+     * Frame rate used when converting SMIL animation time values (begin/dur/keyTimes) to PAGX
+     * frame indices. Defaults to 60 fps, matching PAGX's native animation frame rate.
+     */
+    float animationFrameRate = 60.0f;
+
     Options() {
     }
   };

@@ -547,6 +547,48 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
 }
 
 /**
+ * Test case: matrix interpolation has two spellings and the channel picks one. With
+ * pivotInterpolation the transient translation is spelled from the target pose's fixed point, so a
+ * rotation happens in place (SVG transform animations). Without it the decomposed translation
+ * interpolates linearly, which is what CSS transforms expect.
+ */
+PAGX_TEST(PAGXRuntimeTest, MatrixInterpolationRespectsPivotFlag) {
+  // rotate(90) about (50,50): fixed point is the shape centre.
+  auto rotateAboutCenter = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(90.0f) *
+                           pagx::Matrix::Translate(-50.0f, -50.0f);
+  std::vector<pagx::Keyframe<pagx::Matrix>> centerTrack;
+  centerTrack.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  centerTrack.push_back({60, rotateAboutCenter, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto pivotMid = pagx::EvaluateKeyframeSequence(centerTrack, 30.0, true);
+  EXPECT_NEAR(pivotMid.a, 0.7071f, 1e-2f);
+  EXPECT_NEAR(pivotMid.tx, 50.0f, 0.5f);
+  EXPECT_NEAR(pivotMid.ty, -20.71f, 0.5f);
+
+  auto linearMid = pagx::EvaluateKeyframeSequence(centerTrack, 30.0, false);
+  EXPECT_NEAR(linearMid.a, 0.7071f, 1e-2f);
+  EXPECT_NEAR(linearMid.tx, 50.0f, 0.5f);
+  EXPECT_NEAR(linearMid.ty, 0.0f, 0.5f);
+
+  // none -> translate(50,50) rotate(90): the CSS spelling moves the pose to (25,25) halfway, while
+  // the fixed-point spelling (that pose's fixed point is (0,50)) swings it along an arc.
+  auto cssTarget = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(90.0f);
+  std::vector<pagx::Keyframe<pagx::Matrix>> cssTrack;
+  cssTrack.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  cssTrack.push_back({60, cssTarget, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto cssMid = pagx::EvaluateKeyframeSequence(cssTrack, 30.0, false);
+  EXPECT_NEAR(cssMid.tx, 25.0f, 0.5f);
+  EXPECT_NEAR(cssMid.ty, 25.0f, 0.5f);
+
+  auto pivotCssMid = pagx::EvaluateKeyframeSequence(cssTrack, 30.0, true);
+  EXPECT_NEAR(pivotCssMid.tx, 35.36f, 0.5f);
+  EXPECT_NEAR(pivotCssMid.ty, 14.64f, 0.5f);
+}
+
+/**
  * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid
  * point for each interpolation mode. Hold/None returns the left value, Linear returns exact lerp,
  * and Bezier returns the eased lerp (verified against a known control curve).

@@ -22,9 +22,12 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
@@ -42,6 +45,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/svg/SMILAnimationParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -126,6 +130,35 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  // One positioned line of text collected while walking a <text> element's children.
+  struct TextLine {
+    float startX = 0;
+    float baseline = 0;
+    std::string text = {};
+    // Effective fill of the run; runs with different fills are emitted as separate text nodes
+    // because a PAGX Text node carries a single paint.
+    std::string fill = {};
+  };
+  // State shared across the recursive <text>/<tspan> walk in collectTextRuns.
+  struct TextWalkState {
+    std::vector<TextLine> lines = {};
+    int currentLineIndex = -1;
+    float currentX = 0;
+    float currentY = 0;
+    float fontSize = 12;
+    // Whether currentX came from an explicit x: only then can a fill change start a new run at a
+    // known position.
+    bool positioned = false;
+    // Combined raw content of every descendant text node, used when a <textPath> turns the
+    // run into path-following text (per-line positioning does not apply there).
+    std::string textContent = {};
+    std::shared_ptr<DOMNode> textPathElement = nullptr;
+  };
+  // Recursively walks <text> children and nested <tspan> elements, tracking explicit x/y
+  // (absolute) and dx/dy (relative) pen positioning, and splits content into lines on
+  // baseline jumps larger than half the font size.
+  void collectTextRuns(const std::shared_ptr<DOMNode>& element, TextWalkState* state,
+                       const InheritedStyle& parentStyle);
   TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
@@ -151,7 +184,7 @@ class SVGParserContext {
                             ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
-                     const InheritedStyle& inheritedStyle);
+                     const InheritedStyle& inheritedStyle, bool includeFill = true);
 
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
 
@@ -235,6 +268,44 @@ class SVGParserContext {
   // Parse data-* attributes from element and add to node's customData.
   void parseCustomData(const std::shared_ptr<DOMNode>& element, Node* node);
 
+  // Recursively collect SMIL animation elements (animate/animateTransform/animateMotion/set)
+  // grouped by their parent SVG graphics element. Populates _smilAnimations.
+  void collectSMILAnimations(const std::shared_ptr<DOMNode>& node);
+
+  // Ensure the given element has an id (generating one if missing) and record the mapping from
+  // DOM element to AnimatedNodeInfo so buildAnimation can later resolve targets. Transform
+  // animations are baked onto the Layer matrix channel, so no Group child is created. Returns the
+  // resolved target id (empty when element has no SMIL animations and nothing is recorded).
+  std::string registerAnimatedElement(const std::shared_ptr<DOMNode>& element, Layer* layer);
+
+  // Build the top-level Animation node from _smilAnimations + _animatedNodeMap, append it to
+  // doc->animations, and attach an AnimationTimeline to the root layer. No-op when no SMIL
+  // animations were collected.
+  void buildAnimation(Layer* rootLayer);
+
+  // Registers a PAGX filter node created by convertFilterElement so it can be targeted by SMIL
+  // animations on the fe* primitives that produced it. Assigns an id, registers the filter in the
+  // document's nodeMap, and records each fe* DOM element → filter mapping in _feToFilterMap so
+  // registerAnimatedElement can later resolve <animate> children of feGaussianBlur/feOffset to
+  // this filter node. blurElement/offsetElement may be null when the filter was created without
+  // that primitive (e.g. a solid drop shadow has no feGaussianBlur).
+  void registerFilterAnimationTarget(LayerFilter* filterNode,
+                                     const std::shared_ptr<DOMNode>& blurElement,
+                                     const std::shared_ptr<DOMNode>& offsetElement);
+
+  // Records one fe* primitive → filter mapping and, when the primitive carries SMIL animation
+  // children, the AnimatedNodeInfo buildAnimation needs to emit its channels.
+  void registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement,
+                                 LayerFilter* filterNode);
+
+  // Whether the given SVG element has collected SMIL animation children.
+  bool hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const;
+
+  // The SMIL parser reads the same attribute/style helpers this context exposes to the importer.
+  // Both live in src/pagx/svg, so the friendship stays inside the import implementation instead of
+  // reaching into the public headers.
+  friend class SMILAnimationParser;
+
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
@@ -250,6 +321,9 @@ class SVGParserContext {
   // whether it lives in a root-level <defs>, a nested <defs>, or the rendered subtree.
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _elementsById = {};
   std::vector<Layer*> _maskLayers = {};
+  // Instance counter for mask layers expanded from <use>; kept per parse so ids stay reproducible
+  // across runs and do not race when several documents parse concurrently.
+  int _maskInstanceSeq = 0;
   std::unordered_map<std::string, Image*> _imageSourceToId =
       {};                                             // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
@@ -265,7 +339,36 @@ class SVGParserContext {
   int _nextGeneratedId = 0;
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
+  // viewBox -> document mapping. When it is pre-multiplied onto a single top-level layer, matrix
+  // animations on that layer must compose with it instead of replacing the whole pose.
+  Matrix _contentMatrix = Matrix::Identity();
+  bool _contentMatrixBakedIntoLayer = false;
 
+ public:
+  /** Returns the document viewBox width used for unit conversions (parseLength). */
+  float getViewBoxWidth() const {
+    return _viewBoxWidth;
+  }
+  /** Returns the document viewBox height used for unit conversions (parseLength). */
+  float getViewBoxHeight() const {
+    return _viewBoxHeight;
+  }
+  /** Returns the paint server or effect definition registered under `id`, or null. */
+  std::shared_ptr<DOMNode> findDefinition(const std::string& id) const {
+    auto it = _defs.find(id);
+    return it == _defs.end() ? nullptr : it->second;
+  }
+
+  /** Returns the viewBox mapping pre-multiplied onto a single top-level layer. */
+  const Matrix& getContentMatrix() const {
+    return _contentMatrix;
+  }
+  /** Whether the viewBox mapping was baked into the animated top-level layer itself. */
+  bool isContentMatrixBakedIntoLayer() const {
+    return _contentMatrixBakedIntoLayer;
+  }
+
+ private:
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};
@@ -273,6 +376,29 @@ class SVGParserContext {
   // Cache of parsed style properties per DOMNode to avoid redundant CSS parsing.
   std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
       _stylePropertiesCache = {};
+
+  // SMIL animation elements grouped by their parent SVG graphics element (raw DOMNode pointer
+  // key, valid for the lifetime of the parsed XMLDOM which outlives parseDOM).
+  std::unordered_map<const DOMNode*, SMILAnimationGroup> _smilAnimations = {};
+
+  // Layers whose rotate-about-point animation was hoisted onto a parent pivot layer. Their matrix
+  // keyframes are rewritten to pure rotation (no pivot compensation) during buildAnimation.
+  std::unordered_map<const Layer*, std::pair<float, float>> _pivotNormalizedLayers = {};
+
+  // PAGX node info for each animated SVG element, populated during convertToLayer and consumed
+  // by buildAnimation. Key matches _smilAnimations so the two maps can be walked together.
+  // One entry per converted instance: a <use> reference converts the same DOM subtree again, and
+  // every instance carries its own AnimationObject.
+  std::unordered_map<const DOMNode*, std::vector<AnimatedNodeInfo>> _animatedNodeMap = {};
+
+  // Mapping from feGaussianBlur/feOffset DOM elements to the PAGX filter node they contributed
+  // to (a single DropShadowFilter is built from multiple fe* primitives, so multiple DOM keys
+  // may map to the same filter). Populated by registerFilterAnimationTarget, consumed by
+  // registerAnimatedElement to route <animate> children of fe* elements to the filter node.
+  std::unordered_map<const DOMNode*, LayerFilter*> _feToFilterMap = {};
+
+  // Frame rate used to convert SMIL time values to PAGX Frame indices.
+  float _animationFrameRate = 60.0f;
 };
 
 }  // namespace pagx
