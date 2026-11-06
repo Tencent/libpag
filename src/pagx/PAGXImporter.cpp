@@ -28,7 +28,6 @@
 #include <memory>
 #include <vector>
 #include "base/utils/Log.h"
-#include "pagx/PAGXChannelTable.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -3118,34 +3117,6 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   return doc;
 }
 
-// Copies the channel table's interpolation space onto every animation channel, so evaluation knows
-// what its keyframe values represent. Channels whose target does not resolve keep the value space;
-// an animation over a missing target never applies anyway.
-static void ResolveChannelInterpolationSpaces(PAGXDocument* doc) {
-  for (const auto& node : doc->nodes) {
-    if (node == nullptr || node->nodeType() != NodeType::Animation) {
-      continue;
-    }
-    auto* animation = static_cast<Animation*>(node.get());
-    for (auto* object : animation->objects) {
-      if (object == nullptr) {
-        continue;
-      }
-      auto* targetNode = doc->findNode(object->target);
-      if (targetNode == nullptr) {
-        continue;
-      }
-      for (auto* channel : object->channels) {
-        if (channel == nullptr) {
-          continue;
-        }
-        channel->interpolationSpace =
-            GetChannelInterpolationSpace(targetNode->nodeType(), channel->name);
-      }
-    }
-  }
-}
-
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
@@ -3201,12 +3172,6 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
   }
   gPendingMaskRefs.clear();
-
-  // Fourth pass: derive each animation channel's keyframe interpolation space from the field it
-  // drives. Deferred until every node id resolves, because the space belongs to the target field
-  // (Layer::perspective is a projection distance) rather than to the channel declaration, and a
-  // target may be declared after the animation that drives it.
-  ResolveChannelInterpolationSpaces(doc);
 }
 
 // Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:

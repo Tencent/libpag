@@ -60,20 +60,11 @@ struct ChannelDef {
   const char* channel;
   ChannelFlags flags;
   ChannelAccessor access;
-  // The space an animation of this channel interpolates its keyframe values in. Only channels whose
-  // value reaches the renderer as a projection coefficient (-1/d) opt out of the value space, so
-  // the default covers every other row.
-  KeyframeInterpolationSpace interpolationSpace = KeyframeInterpolationSpace::Value;
 };
 
 // Returns the channel table for the given node type, or an empty table if the type has no
-// reflectable scalar channels. The table is the single source of truth for channel names, their
-// flags and their keyframe interpolation space, backing the public read/write/query API in
-// PAGXNodeChannel.h.
+// reflectable scalar channels. The table is the single source of truth for channel names and their
+// flags, backing the public read/write/query API in PAGXNodeChannel.h.
 const std::vector<ChannelDef>& ChannelsFor(NodeType type);
-
-// Returns the keyframe interpolation space of the given channel on the node type, or
-// KeyframeInterpolationSpace::Value if the channel is unknown for that type.
-KeyframeInterpolationSpace GetChannelInterpolationSpace(NodeType type, const std::string& channel);
 
 }  // namespace pagx

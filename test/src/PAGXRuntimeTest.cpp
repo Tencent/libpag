@@ -33,6 +33,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
+#include "pagx/runtime/MixUtils.h"
 #include "pagx/tgfx.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
@@ -548,51 +549,56 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
 }
 
 /**
- * Test case: a segment interpolated in the reciprocal space blends the projection coefficient
- * -1/d instead of the distance, so a perspective going from 1000 to 200 passes through 333.33 at
- * the midpoint instead of 600. This is how a browser interpolates the perspective() transform
- * function, and the value space stays the default for every other channel.
+ * Test case: a perspective distance mixes its projection coefficient -1/d instead of the distance,
+ * so a distance going from 1000 to 200 passes through 333.33 at the midpoint instead of 600. This is
+ * how a browser interpolates the perspective() transform function, and it is the only channel that
+ * blends this way.
  */
-PAGX_TEST(PAGXRuntimeTest, ReciprocalKeyframesBlendTheProjectionCoefficient) {
+PAGX_TEST(PAGXRuntimeTest, PerspectiveKeyframesBlendTheProjectionCoefficient) {
   std::vector<pagx::Keyframe<float>> keyframes;
   keyframes.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
 
-  EXPECT_NEAR(
-      pagx::EvaluateKeyframeSequence(keyframes, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
-      333.3333f, 0.001f);
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 30.0), 333.3333f, 0.001f);
+  // The same keys read by a channel that does not carry a projection blend the distances.
   EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(keyframes, 30.0), 600.0f);
 
   // Bezier easing shapes the same fraction, so an identity curve reproduces the linear result.
   std::vector<pagx::Keyframe<float>> eased;
   eased.push_back({0, 1000.0f, pagx::KeyframeInterpolationType::Bezier, {0.5f, 0.5f}, {}});
   eased.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {0.5f, 0.5f}});
-  EXPECT_NEAR(
-      pagx::EvaluateKeyframeSequence(eased, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
-      333.3333f, 0.001f);
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(eased, 30.0), 333.3333f, 0.001f);
+
+  // The projection mix is shared with the component writer, so a weighted write agrees with a
+  // keyframe blend at the same fraction.
+  EXPECT_NEAR(pagx::MixPerspectiveDistance(1000.0f, 200.0f, 0.5f), 333.3333f, 0.001f);
+  EXPECT_FLOAT_EQ(pagx::MixPerspectiveDistance(500.0f, 500.0f, 0.25f), 500.0f);
 }
 
 /**
- * Test case: a perspective of 0 is the "no projection" state (coefficient 0, i.e. an infinite
- * distance), so a segment ending there has no reciprocal and keeps the value-space blend instead of
- * dividing by zero.
+ * Test case: perspective 0 means no projection, which is the coefficient 0, i.e. the infinite
+ * distance end of the coefficient space. A segment touching it stays continuous there instead of
+ * snapping to a near camera: blending 0 with 200 halfway yields 400, and one frame in yields a
+ * distance far beyond the endpoint.
  */
-PAGX_TEST(PAGXRuntimeTest, ReciprocalKeyframesFallBackWithoutAProjection) {
+PAGX_TEST(PAGXRuntimeTest, PerspectiveZeroIsTheInfiniteDistanceEnd) {
   std::vector<pagx::Keyframe<float>> keyframes;
   keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
 
-  EXPECT_FLOAT_EQ(
-      pagx::EvaluateKeyframeSequence(keyframes, 30.0, pagx::KeyframeInterpolationSpace::Reciprocal),
-      100.0f);
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 30.0), 400.0f, 0.001f);
+  // Frame 1 of 60 holds a sixtieth of the target coefficient, i.e. d = 12000: still almost no
+  // projection, where a linear distance blend would already sit at d = 3.33.
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(keyframes, 1.0), 12000.0f, 1.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(keyframes, 0.0), 0.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(keyframes, 60.0), 200.0f);
 }
 
 /**
- * Test case: importing a document derives each channel's interpolation space from the field the
- * channel drives, so a Layer perspective animation blends like a CSS perspective() while every
- * other channel of the same object keeps blending its values.
+ * Test case: a channel named "perspective" blends its keyframes through the projection coefficient
+ * end to end, while the other channels of the same object keep blending their values.
  */
-PAGX_TEST(PAGXRuntimeTest, ImportDerivesChannelInterpolationSpace) {
+PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelBlendsThroughEvaluation) {
   std::string xml =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
       "<pagx width=\"320\" height=\"200\">\n"
@@ -630,8 +636,6 @@ PAGX_TEST(PAGXRuntimeTest, ImportDerivesChannelInterpolationSpace) {
   }
   ASSERT_NE(perspective, nullptr);
   ASSERT_NE(alpha, nullptr);
-  EXPECT_EQ(perspective->interpolationSpace, pagx::KeyframeInterpolationSpace::Reciprocal);
-  EXPECT_EQ(alpha->interpolationSpace, pagx::KeyframeInterpolationSpace::Value);
   EXPECT_NEAR(std::get<float>(perspective->evaluateAt(pagx::Frame{30})), 333.3333f, 0.001f);
   EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
 }
