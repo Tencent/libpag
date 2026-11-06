@@ -1339,6 +1339,10 @@ PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
   EXPECT_TRUE(NearlyEqual(layer->anchorZ, 30.0f));
 
   // The stored pose is the raw CSS value: a depth pivot must not leak into the translation column.
+  // Equivalently, PAGX composes `P * T(a) * pose * T(-a)` while CSS composes
+  // `T(a) * P * pose * T(-a)`; with a depth pivot no camera placement reconciles the two, so the
+  // anchor form is the accepted encoding (see spec/html_subset.md §13.7 and the
+  // `49_rotate3d_depth_pivot` corpus case).
   EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(0, 3), 0.0f, 1e-5f));
   EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(1, 3), 0.0f, 1e-5f));
   EXPECT_TRUE(NearlyEqual(layer->matrix3D.getRowColumn(2, 3), 0.0f, 1e-5f));
