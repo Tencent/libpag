@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: An animated anchor.x slides the pivot from the bar's left edge to its right edge while the bar keeps a
+     static 20 degree rotation, so the same pose is re-pivoted every frame.
+     Target: Layer  Channel: anchor.x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="handSlide" x="150" y="100" width="120" height="16" anchor="0,8" rotationZ="20">
+    <Rectangle position="60,8" size="120,16" roundness="8"/>
+    <Fill color="#C2410C"/>
+  </Layer>
+  <Animations>
+    <Animation id="pivotSlide" duration="60" frameRate="60" loop="once">
+      <Object target="handSlide">
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="120"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

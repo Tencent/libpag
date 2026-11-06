@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: ColorStop color shifts the cyan end of the ramp to magenta so the whole card re-tints.
+     Target: ColorStop  Channel: color  Type: color
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="180,150"/>
+    <Fill>
+      <LinearGradient id="stopTintGrad" startPoint="0,0" endPoint="1,0">
+        <ColorStop id="tintStop" offset="0" color="#0891B2"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="stopTint" duration="60" frameRate="60" loop="once">
+      <Object target="tintStop">
+        <Channel name="color" type="color">
+          <Key time="0" value="#0891B2" interpolation="linear"/>
+          <Key time="60" value="#DB2777"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

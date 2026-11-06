@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Two identical bars rotate by the same 30 degrees: the left one pivots around the layer origin (no anchor),
+     the right one around its centre via anchor, so the difference between the two pivots is visible at once.
+     Target: Layer  Channel: rotation.z  Type: float
+     Expect: supported  (rotation.z is exported, the anchor that places the pivot is not)
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="barDefault" x="40" y="70" width="100" height="14">
+    <Rectangle position="50,7" size="100,14" roundness="7"/>
+    <Fill color="#C2410C"/>
+  </Layer>
+  <Layer id="barCentre" x="180" y="70" width="100" height="14" anchor="50,7">
+    <Rectangle position="50,7" size="100,14" roundness="7"/>
+    <Fill color="#C2410C"/>
+  </Layer>
+  <Animations>
+    <Animation id="barSweep" duration="60" frameRate="60" loop="loop">
+      <Object target="barDefault">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="-30" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+      </Object>
+      <Object target="barCentre">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="-30" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

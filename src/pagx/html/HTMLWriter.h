@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -58,6 +59,7 @@ class RadialGradient;
 class ConicGradient;
 class Polystar;
 class Repeater;
+class RoundCorner;
 class Text;
 class TextBox;
 class TextModifier;
@@ -126,6 +128,12 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m);
 // writeRepeater applies per copy: anchor recenter + scale^prog + rotate*prog + position*prog.
 // `i` is the raw loop index; the order (AboveOriginal vs BelowOriginal) and offset are folded in.
 Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i);
+// Same matrix with the repeater rotation replaced, so an animated rotation can recompose a copy
+// without mutating the node.
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation);
+// Core form: `prog` is the progressive index (copy index plus the repeater offset). An animated
+// `copies` moves each copy's index, so the caller resolves prog per frame.
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation);
 
 float ComputePathLength(const PathData& pathData);
 float ComputePathSignedArea(const PathData& pathData);
@@ -279,6 +287,128 @@ class HTMLWriterContext {
   // emission-site tag ("chain:", "dss:", "iss:", "issb:") so different sites never collide.
   std::unordered_map<std::string, std::string> filterDefIds = {};
 
+  // State that only the animation export needs. Keeping it in one place separates keyframe
+  // bookkeeping from the generic writer's own state and lets the session drop it as a unit.
+  struct AnimationState {
+    // Maps an animated non-Layer element (Group, Fill, Stroke, Text or geometry Element) to the DOM
+    // id its tag must carry so the weaving pass can attach `animation` declarations.
+    std::unordered_map<const Node*, std::string> elementIds = {};
+    // Initially hidden Layers need their contents emitted when a visible channel may show them later.
+    std::unordered_set<const Layer*> visibleLayers = {};
+    // Layers whose translation comes from an animated `matrix` channel. The matrix already carries
+    // the position, so the tag must not also emit left/top from the layer's x/y.
+    std::unordered_set<const Layer*> matrixDrivenLayers = {};
+    // Layers whose animated pose carries the authored x/y inside the transform, so the tag must not
+    // also emit them as left/top.
+    std::unordered_set<const Layer*> poseDrivenLayers = {};
+    // Number of tags already emitted for each animated base id.
+    std::unordered_map<std::string, size_t> domIdUseCount = {};
+
+    // Animated Paths inside a mask, and the SVG element ids handed to them. A coverage mask (Alpha /
+    // Luminance) cannot be expressed as a clip polygon, so such a mask is emitted as an inline SVG
+    // <mask> whose geometry is animated by CSS inside the mask.
+    std::unordered_set<const Path*> maskPaths = {};
+    std::unordered_map<const Path*, std::string> maskPathIds = {};
+    // Masked layer -> id of the inline <mask> generated for it.
+    std::unordered_map<const Layer*, std::string> svgMaskIds = {};
+    // RoundCorner node -> the single shape it rounds. The radius animation rebuilds that shape's
+    // path per frame, so the emitter needs the geometry the modifier applies to.
+    std::unordered_map<const RoundCorner*, const Element*> roundCornerShapes = {};
+
+    // A Repeater paints one DOM copy per repetition, so an animated repeater channel is fanned out
+    // to every copy instead of one tag. Each copy is recorded with the index it was emitted for.
+    struct RepeaterCopy {
+      const Repeater* repeater = nullptr;
+      int index = 0;
+      std::string id = {};
+    };
+    std::unordered_set<const Repeater*> animatedRepeaters = {};
+    // Copies to emit for an animated `copies` channel: the largest count the channel reaches, so
+    // every copy that appears during playback already exists in the DOM.
+    std::unordered_map<const Repeater*, int> repeaterMaxCopies = {};
+    std::vector<RepeaterCopy> repeaterCopies = {};
+
+    struct Instance {
+      const Composition* composition = nullptr;
+      const Layer* slot = nullptr;
+      size_t scope = 0;
+      size_t parentScope = 0;
+    };
+    struct Tag {
+      const Node* node = nullptr;
+      size_t scope = 0;
+      std::string id = {};
+    };
+    std::vector<Instance> instances = {};
+    std::vector<Tag> tags = {};
+
+    // Current Composition slot scope: 0 at document level, non-zero inside a slot. Move it through
+    // AnimationScopeGuard so every exit path restores the previous value.
+    size_t scope = 0;
+    size_t nextScope = 1;
+
+    void Reset() {
+      *this = AnimationState{};
+    }
+  };
+  AnimationState animation = {};
+
+  // Makes a fresh Composition slot scope current for its lifetime and restores the previous one.
+  class AnimationScopeGuard {
+   public:
+    AnimationScopeGuard(HTMLWriterContext& ctx, const Composition* composition, const Layer* slot)
+        : _ctx(ctx), _parentScope(ctx.animation.scope) {
+      size_t scope = _ctx.animation.nextScope++;
+      _ctx.animation.instances.push_back({composition, slot, scope, _parentScope});
+      _ctx.animation.scope = scope;
+    }
+    ~AnimationScopeGuard() {
+      _ctx.animation.scope = _parentScope;
+    }
+
+    AnimationScopeGuard(const AnimationScopeGuard&) = delete;
+    AnimationScopeGuard& operator=(const AnimationScopeGuard&) = delete;
+
+   private:
+    HTMLWriterContext& _ctx;
+    size_t _parentScope = 0;
+  };
+
+  /**
+   * Returns the DOM id for the next tag rendering an animated node, or an empty string when none
+   * of the candidates is animated. The candidates are checked in order and the first one found in
+   * animation.elementIds supplies the base id. One node can render into several tags (Repeater
+   * copies, per-geometry SVG shapes, a Fill shared by shapes and text, every Text under one
+   * TextBox), so the first tag gets the base id and later tags get "<base>__1", "<base>__2", and
+   * so on, which keeps ids unique and lets the weaving pass reach every copy.
+   *
+   * Several candidates can be animated for the same tag (a shape, its Fill, its Stroke and its
+   * TrimPath all paint one element). Only one id fits on the tag, so the id chosen above is
+   * recorded for every animated candidate; the weaving pass resolves each animated node through
+   * those records, which keeps the animations of the other candidates instead of dropping them.
+   */
+  std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
+    if (animation.elementIds.empty()) {
+      return {};
+    }
+    std::string id = {};
+    for (auto* node : candidates) {
+      if (node == nullptr) {
+        continue;
+      }
+      auto it = animation.elementIds.find(node);
+      if (it == animation.elementIds.end()) {
+        continue;
+      }
+      if (id.empty()) {
+        size_t index = animation.domIdUseCount[it->second]++;
+        id = index == 0 ? it->second : it->second + "__" + std::to_string(index);
+      }
+      animation.tags.push_back({node, animation.scope, id});
+    }
+    return id;
+  }
+
   std::string nextId(const std::string& prefix) {
     return prefix + std::to_string(_id++);
   }
@@ -390,6 +520,20 @@ class HTMLWriter {
     const Padding* parentPadding = nullptr;
   };
 
+  struct PendingSVGDraw {
+    std::vector<GeoInfo> geos = {};
+    const Fill* fill = nullptr;
+    const Stroke* stroke = nullptr;
+    float alpha = 1.0f;
+    const TrimPath* trim = nullptr;
+  };
+  std::vector<PendingSVGDraw> _pendingSVGDraws = {};
+  bool _coalesceSVGDraws = false;
+  void flushPendingSVGDraws(HTMLBuilder& out);
+  void emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
+                      const Stroke* stroke, float alpha, const TrimPath* trim, float x0, float y0,
+                      float sw, float sh);
+
   struct ElementDispatchState {
     std::vector<GeoInfo> geos = {};
     const Fill* curFill = nullptr;
@@ -490,9 +634,13 @@ class HTMLWriter {
   // `hasUpcomingRepeater` indicates whether a Repeater element follows this Group in its parent,
   // affecting how geos are batched. `curTextBox` propagates the enclosing TextBox context for
   // inline text elements.
+  // `enclosingPainters` are the Fill/Stroke declared after this Group in its parent element list.
+  // An animated pure-geometry child Group is painted by them, so they are forwarded when the child
+  // needs its own DOM wrapper and can no longer propagate its geometry to the parent.
   void flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                     LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                    const TextBox* curTextBox, ElementDispatchState& state);
+                    const TextBox* curTextBox, ElementDispatchState& state,
+                    const std::vector<Element*>* enclosingPainters = nullptr);
   // Appends an SVG <filter> definition that composites the layer's pre-rendered backdrop with its
   // own pixels using feComposite arithmetic (k1=0, k2=1, k3=1, k4=-1), yielding PlusDarker
   // semantics: clamp(Sc + Dc - 1, 0, 1). Called once per plusDarker layer at the point the
@@ -549,7 +697,8 @@ class HTMLWriter {
   // Group's CSS transform stacks on top, since the inner Group's renderPosition is expressed in
   // the outer Group's local space (not the enclosing Layer's).
   void writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
-                  const Matrix& parentMatrix = {});
+                  const Matrix& parentMatrix = {},
+                  const std::vector<Element*>* propagatedPainters = nullptr);
   void writeRepeater(HTMLBuilder& out, const Repeater* rep, const std::vector<GeoInfo>& geos,
                      const Fill* fill, const Stroke* stroke, float alpha,
                      const TrimPath* trim = nullptr, bool applyCopyAlphaDecay = true);
@@ -578,6 +727,12 @@ class HTMLWriter {
   // Mask/clip defs
   std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
+  // Emits an inline SVG <mask> for an Alpha / Luminance mask whose geometry is animated. The mask
+  // content stays a live SVG subtree, so the weaving pass can animate the path data with CSS
+  // instead of freezing a rasterized mask and clipping it with a polygon.
+  std::string writeAnimatedMaskDef(const Layer* mask, MaskType type);
+  // True when the mask subtree contains a Path driven by animation.
+  bool maskHasAnimatedPath(const Layer* mask, int depth = 0) const;
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
   // Two-pass mask geometry walk. writeMaskCSS emits a self-contained SVG whose viewBox must
@@ -624,9 +779,16 @@ class HTMLWriter {
   // element's own render position and size (Rectangle / Ellipse / Path / Polystar). Returns
   // true with outX / outY / outW / outH set when the resulting box has positive area; returns
   // false when no geo contributed usable bounds (callers should skip emission).
+  // How far a stroke paints beyond the geometry it outlines. A centered stroke paints half its
+  // width on each side, an outside stroke paints its full width, and an inside stroke stays inside
+  // the geometry. The layer box and every SVG viewBox use this same value so they stay consistent.
+  static float StrokeExtentPad(const Stroke* stroke);
+
   static bool ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                      bool useModifiedPathData, float& outX, float& outY,
                                      float& outW, float& outH);
+  static void ExpandStrokePaddedExtent(const std::vector<Element*>& elems, const Matrix& parentMat,
+                                       float& maxRight, float& maxBottom);
 };
 
 }  // namespace pagx

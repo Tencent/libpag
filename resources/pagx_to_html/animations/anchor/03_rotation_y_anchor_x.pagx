@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: rotation.y turns the card around a vertical axis that sits on its left edge, so the projection must keep
+     that edge fixed while the right edge foreshortens.
+     Target: Layer  Channel: rotation.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="cardPivotX" x="100" y="60" width="120" height="80" anchor="0,40" perspective="600">
+    <Rectangle position="60,40" size="120,80" roundness="12"/>
+    <Fill color="#C2410C"/>
+    <Group position="24,24">
+      <Rectangle position="36,16" size="72,32" roundness="8"/>
+      <Fill color="#FED7AA"/>
+    </Group>
+  </Layer>
+  <Layer x="143" y="93" width="14" height="14">
+    <Rectangle position="7,7" size="14,14" roundness="7"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <Animations>
+    <Animation id="cardTurnY" duration="60" frameRate="60" loop="loop">
+      <Object target="cardPivotX">
+        <Channel name="rotation.y" type="float">
+          <Key time="0" value="-45" interpolation="linear"/>
+          <Key time="30" value="45" interpolation="linear"/>
+          <Key time="60" value="-45"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

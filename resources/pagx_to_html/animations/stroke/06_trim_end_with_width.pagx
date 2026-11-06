@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TrimPath end and Stroke width animate at the same time on one path. Both channels are
+     written onto the same SVG <path>, so it must carry both keyframe rules; otherwise the trim is
+     lost and the path keeps a static dash pattern with no animation driving it.
+     Target: TrimPath  Channel: end  Type: float
+     Target: Stroke  Channel: width  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="240,160"/>
+    <TrimPath id="trimBoth" start="0" end="1" type="separate"/>
+    <Stroke id="strokeBoth" color="#0E7490" width="4" cap="round"/>
+  </Layer>
+  <Animations>
+    <Animation id="trimAndThicken" duration="60" frameRate="60" loop="once">
+      <Object target="trimBoth">
+        <Channel name="end" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0"/>
+        </Channel>
+      </Object>
+      <Object target="strokeBoth">
+        <Channel name="width" type="float">
+          <Key time="0" value="4" interpolation="linear"/>
+          <Key time="60" value="24"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -963,6 +963,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
+  // The span is the only tag a Text renders into, so font-size / letter-spacing keyframes land here.
+  auto animId = _ctx->claimAnimatedDomId({tb, fill, text});
+  if (!animId.empty()) {
+    out.addAttr("id", animId);
+  }
   out.addAttr("style", style);
   // Inside a TextBox the container uses word-wrap not white-space:pre, so U+000A
   // newlines would be folded by the browser. Convert them to <br> explicitly.
@@ -1935,7 +1940,8 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!trim) {
     return;
   }
-  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset)) {
+  bool animatedEnd = _ctx->animation.elementIds.find(trim) != _ctx->animation.elementIds.end();
+  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset) && !animatedEnd) {
     return;
   }
   builder.addAttr("pathLength", "1");

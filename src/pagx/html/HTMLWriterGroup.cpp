@@ -34,7 +34,8 @@ namespace pagx {
 using pag::FloatNearlyZero;
 
 void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
-                            const Matrix& parentMatrix) {
+                            const Matrix& parentMatrix,
+                            const std::vector<Element*>* propagatedPainters) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
@@ -53,17 +54,31 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
     style += ";opacity:" + CssFloatToString(ea);
   }
   out.openTag("div");
+  auto animId = _ctx->claimAnimatedDomId({group});
+  if (!animId.empty()) {
+    out.addAttr("id", animId);
+  }
   out.addAttr("class", "pagx-group");
   out.addAttr("style", style);
   out.closeTagStart();
   const Padding* groupPadding = group->padding.isZero() ? nullptr : &group->padding;
-  writeElements(out, group->elements, 1.0f, false, LayerPlacement::Background, groupPadding);
+  const auto* elements = &group->elements;
+  std::vector<Element*> paintedElements = {};
+  if (propagatedPainters != nullptr && !propagatedPainters->empty()) {
+    // These shape-only children normally propagate to the parent Fill/Stroke. Keep their authored
+    // coordinates inside the animated wrapper and append only their parent's matching painters.
+    paintedElements = group->elements;
+    paintedElements.insert(paintedElements.end(), propagatedPainters->begin(),
+                           propagatedPainters->end());
+    elements = &paintedElements;
+  }
+  writeElements(out, *elements, 1.0f, false, LayerPlacement::Background, groupPadding);
   // Recurse through nested Group / TextBox containers so a foreground painter inside a child
   // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
   // suppressed by both passes' filters.
-  bool hasForegroundPainter = HasForegroundPainter(group->elements);
+  bool hasForegroundPainter = HasForegroundPainter(*elements);
   if (hasForegroundPainter) {
-    writeElements(out, group->elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
+    writeElements(out, *elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
   }
   out.closeTag();
 }
@@ -85,6 +100,17 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   _ctx->savedChildLayerOffsetY = 0;
   int n = static_cast<int>(std::ceil(rep->copies));
   float frac = rep->copies - std::floor(rep->copies);
+  // An animated repeater channel is fanned out per copy, so every copy needs a tag of its own; the
+  // weaver later attaches one keyframes rule to each of them.
+  const bool animated = _ctx->animation.animatedRepeaters.count(rep) > 0;
+  const int authoredCopies = n;
+  if (animated) {
+    // Emit every copy the channel can reach, so a copy that appears mid-playback already has a tag.
+    auto maxIt = _ctx->animation.repeaterMaxCopies.find(rep);
+    if (maxIt != _ctx->animation.repeaterMaxCopies.end()) {
+      n = std::max(n, maxIt->second);
+    }
+  }
   for (int i = 0; i < n; i++) {
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
     Matrix m = BuildRepeaterCopyMatrix(rep, i);
@@ -103,8 +129,20 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       ca = frac;
     }
     float ea = ca * alpha;
-    if (!m.isIdentity() || ea < 1.0f) {
+    if (animated && i >= authoredCopies) {
+      // Copies past the authored count only exist once the channel reaches them.
+      ea = 0.0f;
+    }
+    std::string copyId = {};
+    if (animated) {
+      copyId = rep->id + "_copy" + std::to_string(i);
+    }
+    if (animated || !m.isIdentity() || ea < 1.0f) {
       out.openTag("div");
+      if (!copyId.empty()) {
+        out.addAttr("id", copyId);
+        _ctx->animation.repeaterCopies.push_back({rep, i, copyId});
+      }
       std::string s = "position:absolute";
       if (!m.isIdentity()) {
         s += ";transform:" + MatrixTransformToCSS(m);
@@ -116,9 +154,13 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       out.addAttr("style", s);
       out.closeTagStart();
       renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
+      // Animation export can defer SVG emission. Flush before closing this copy so its
+      // transform and opacity apply to the SVG, while the child-layer offset is still zero.
+      flushPendingSVGDraws(out);
       out.closeTag();
     } else {
       renderGeo(out, geos, fill, stroke, 1.0f, false, trim, false);
+      flushPendingSVGDraws(out);
     }
   }
   _ctx->savedChildLayerOffsetX = savedOffX;
