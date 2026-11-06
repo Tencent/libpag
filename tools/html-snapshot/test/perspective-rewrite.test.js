@@ -6,6 +6,8 @@ const {
   rewritePerspectiveKeyframes,
   transformOriginDepth,
   perspectiveOriginXY,
+  recordCameraSkip,
+  pagxCameraSkips,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -109,5 +111,22 @@ describe('camera wrapper guards', () => {
     expect(perspectiveOriginXY({ transformOrigin: '0px 80px 30px' })).toBe('0px 80px');
     expect(perspectiveOriginXY({ transformOrigin: '10px 20px' })).toBe('10px 20px');
     expect(perspectiveOriginXY({})).toBe('50% 50%');
+  });
+});
+
+describe('camera skip accounting', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+  });
+
+  test('counts one entry per skipped element and reason', () => {
+    recordCameraSkip('depth-pivot');
+    recordCameraSkip('depth-pivot');
+    recordCameraSkip('not-a-box-div');
+    expect(pagxCameraSkips()).toEqual({ 'depth-pivot': 2, 'not-a-box-div': 1 });
+  });
+
+  test('reports an empty map before anything was skipped', () => {
+    expect(pagxCameraSkips()).toEqual({});
   });
 });

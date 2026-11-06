@@ -96,6 +96,17 @@ async function main() {
       console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
     }
 
+    // Report how many `perspective()` elements kept their function form instead of the exact camera
+    // wrapper, so a page that silently fell back is visible in the eval report.
+    const cameraSkips = result.cameraSkips || {};
+    const skipTotal = Object.values(cameraSkips).reduce((sum, n) => sum + n, 0);
+    if (skipTotal > 0) {
+      const detail = Object.entries(cameraSkips)
+        .map(([reason, count]) => `${reason}:${count}`)
+        .join(' ');
+      console.error(`${LOG_PREFIX}camera-skips: ${skipTotal} (${detail})`);
+    }
+
     // Emit the per-page font manifest so a caller with a shared --font-dir can
     // feed only this page's fonts to pagx. Written unconditionally when
     // requested (even with zero fonts) so the caller can distinguish "no fonts"
