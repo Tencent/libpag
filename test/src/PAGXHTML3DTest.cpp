@@ -687,6 +687,37 @@ PAG_TEST(PAGXHTML3DTest, ReferenceBoxResolutionDoesNotDuplicateDiagnostics) {
 }
 
 /**
+ * Test case: a flow / flex child has no resolved offset from the parent's box, so the parent camera
+ * cannot be projected around the exact vanishing point. That has to be reported once per document
+ * instead of silently shifting the centre of every such child.
+ */
+PAG_TEST(PAGXHTML3DTest, FlowChildrenUnderPerspectiveWarnOnce) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:10px;top:10px;width:180px;height:100px;display:flex;
+           perspective:600px">
+        <div id="a" style="width:60px;height:40px;background-color:#38BDF8;
+             transform:rotateY(20deg)"></div>
+        <div id="b" style="width:60px;height:40px;background-color:#F472B6;
+             transform:rotateY(20deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int warnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("vanishing point") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "a flex container with many children must not repeat the diagnostic";
+  // The projection itself still applies; only the centre is approximate.
+  auto* a = FindLayerById(doc, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_NE(a->matrix3D.getRowColumn(3, 2), 0.0f);
+}
+
+/**
  * Test case: a `perspective` element whose own box has no px size (percentage / auto) cannot resolve
  * the default `perspective-origin` (the box centre). That has to be reported once per declaring
  * element instead of silently projecting about the layer origin.

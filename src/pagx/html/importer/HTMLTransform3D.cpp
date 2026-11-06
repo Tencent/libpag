@@ -222,41 +222,6 @@ float ResolveOriginAxis(const std::string& token, float dimension, HTMLValuePars
   return valueParser.parseAbsoluteLengthPx(token);
 }
 
-bool IsInvertible(const Matrix3D& matrix) {
-  float rows[4][4] = {};
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      rows[row][column] = matrix.getRowColumn(row, column);
-    }
-  }
-  float determinant = 1.0f;
-  for (int column = 0; column < 4; ++column) {
-    int pivot = column;
-    for (int row = column + 1; row < 4; ++row) {
-      if (std::fabs(rows[row][column]) > std::fabs(rows[pivot][column])) {
-        pivot = row;
-      }
-    }
-    if (std::fabs(rows[pivot][column]) < 1e-6f) {
-      return false;
-    }
-    if (pivot != column) {
-      for (int k = 0; k < 4; ++k) {
-        std::swap(rows[column][k], rows[pivot][k]);
-      }
-      determinant = -determinant;
-    }
-    determinant *= rows[column][column];
-    for (int row = column + 1; row < 4; ++row) {
-      const float factor = rows[row][column] / rows[column][column];
-      for (int k = column; k < 4; ++k) {
-        rows[row][k] -= factor * rows[column][k];
-      }
-    }
-  }
-  return std::fabs(determinant) > 1e-6f;
-}
-
 // One arity diagnostic per function family, shared by the "wrong number of arguments" and the
 // "argument failed to parse" exits so both describe the same contract.
 std::string TranslateArityMessage(const std::string& label, const std::string& token) {
@@ -540,6 +505,41 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
 
 }  // namespace
 
+bool IsInvertible(const Matrix3D& matrix) {
+  float rows[4][4] = {};
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      rows[row][column] = matrix.getRowColumn(row, column);
+    }
+  }
+  float determinant = 1.0f;
+  for (int column = 0; column < 4; ++column) {
+    int pivot = column;
+    for (int row = column + 1; row < 4; ++row) {
+      if (std::fabs(rows[row][column]) > std::fabs(rows[pivot][column])) {
+        pivot = row;
+      }
+    }
+    if (std::fabs(rows[pivot][column]) < 1e-6f) {
+      return false;
+    }
+    if (pivot != column) {
+      for (int k = 0; k < 4; ++k) {
+        std::swap(rows[column][k], rows[pivot][k]);
+      }
+      determinant = -determinant;
+    }
+    determinant *= rows[column][column];
+    for (int row = column + 1; row < 4; ++row) {
+      const float factor = rows[row][column] / rows[column][column];
+      for (int k = column; k < 4; ++k) {
+        rows[row][k] -= factor * rows[column][k];
+      }
+    }
+  }
+  return std::fabs(determinant) > 1e-6f;
+}
+
 bool IsSupportedTransformFunction(const std::string& name) {
   static const char* kSupported[] = {
       "translate", "translatex", "translatey", "translatez", "translate3d", "scale",
@@ -665,22 +665,6 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   }
   *out = pose;
   return true;
-}
-
-bool IsInvertiblePose(const Matrix3D& matrix) {
-  return IsInvertible(matrix);
-}
-
-void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX,
-                            float originY) {
-  box.parentPerspectivePx = distancePx;
-  if (!(distancePx > 0.0f) || !std::isfinite(originX) || !std::isfinite(originY)) {
-    return;
-  }
-  const float ownLeft = std::isnan(box.leftPx) ? 0.0f : box.leftPx;
-  const float ownTop = std::isnan(box.topPx) ? 0.0f : box.topPx;
-  box.parentPerspectiveOriginX = originX - ownLeft;
-  box.parentPerspectiveOriginY = originY - ownTop;
 }
 
 Matrix3D PerspectiveMatrix(float distance) {

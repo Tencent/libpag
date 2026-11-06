@@ -599,3 +599,25 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | `subset:animation-delay-replayed` | 无限循环动画带有非零 `animation-delay`；PAGX 重复转换后的整个播放窗口，而非仅在首轮应用延迟 |
 | `subset:animation-timeline-shifted` | 负的 `animation-delay` 将组内时间原点移到 CSS `t=0` 之前；PAGX 默认从负时间段开始播放 |
 | `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |
+### 13.7 透视语义
+
+CSS 有两种声明相机的方式，二者对支点（pivot）的处理不同：
+
+| 写法 | 投影挂在哪 | `transform-origin` 是否共轭它 |
+|------|------------|--------------------------------|
+| 父级 `perspective: <d>` + 子元素 `transform` | 父级（一台相机） | 否 —— 与 PAGX / AE / Lottie 一致 |
+| 元素自身 `transform: perspective(<d>) …` | 元素（自带相机） | 是 —— CSS 会共轭整条函数列表 |
+
+PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`），即第一种写法。
+因此 `tools/html-snapshot` 会把第二种写法改写成第一种：元素外再包一层承载
+`perspective: <d>` 与 `perspective-origin: <元素的 transform-origin>` 的 wrapper，元素自身的
+`transform` 去掉 `perspective()` 项。当支点**位于**图层平面上时，两种写法在代数上严格相等。
+
+改写的限制（按命中频率排序）：
+
+* 支点带深度（`transform-origin: 0 80px 30px`）时无法迁移，因为 `perspective-origin` 没有 z
+  分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），投影顺序与 CSS 相差
+  一个 `origin × projection` 项 —— 在 `d = 600px`、支点深度 30px 时约数像素。
+* `perspective` 父级的 flow / flex 子元素在导入期没有已解析的偏移，相机按父级坐标系投影；
+  会有一条诊断提示。
+* `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，并退化为图层原点而非盒中心。
