@@ -18,6 +18,7 @@
 #include "platform/PlatformHelper.h"
 #include <shlobj.h>
 #include <windows.h>
+#include <QWindow>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -111,6 +112,34 @@ bool IsAEWindowActive() {
   GetClassNameA(foreground, className, sizeof(className));
   std::string name = className;
   return name.find_first_of("AE") == 0;
+}
+
+void AttachWindowToAEMainWindow(QWindow* window) {
+  if (window == nullptr) {
+    return;
+  }
+  auto hwnd = reinterpret_cast<HWND>(window->winId());
+  if (hwnd == nullptr || GetWindow(hwnd, GW_OWNER) != nullptr) {
+    return;
+  }
+  auto suites = GetSuites();
+  if (suites == nullptr) {
+    return;
+  }
+  void* mainHwnd = nullptr;
+  if (suites->UtilitySuite6()->AEGP_GetMainHWND(&mainHwnd) != A_Err_NONE || mainHwnd == nullptr) {
+    return;
+  }
+  // Scan toolbars and floaters are owned by the main window inside After Effects itself. Owned
+  // windows are always displayed above their owner, so the plugin window can no longer be hidden
+  // behind the host window when the user switches back to After Effects from another app. The
+  // z-order is brought to the front by BaseWindow::show() via QWindow::raise(), so no SetWindowPos
+  // is needed here.
+  SetLastError(0);
+  if (SetWindowLongPtr(hwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(mainHwnd)) == 0 &&
+      GetLastError() != 0) {
+    LOGE("AttachWindowToAEMainWindow failed to set the owner window, error=%lu", GetLastError());
+  }
 }
 
 std::string GetPAGViewerPath() {

@@ -26,6 +26,7 @@
 #include <string>
 #include "platform/PAGViewerInstaller.h"
 #include "platform/PlatformHelper.h"
+#include "ui/WindowManager.h"
 
 namespace exporter {
 
@@ -39,14 +40,14 @@ PAGViewerInstallModel::~PAGViewerInstallModel() {
   }
 }
 
-bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
+bool PAGViewerInstallModel::showInstallDialog(QApplication* app, const std::string& pagFilePath) {
   pendingFilePath = pagFilePath;
   dialogResult = false;
 
-  int argc = 0;
-  app = std::make_unique<QApplication>(argc, nullptr);
-  app->setObjectName("PAGViewer-Install");
-  engine = std::make_unique<QQmlApplicationEngine>(app.get());
+  // Reuse the single QApplication owned by WindowManager instead of creating a second one. Two
+  // QApplication instances in one process make QCoreApplication::instance() ambiguous and break
+  // the shared event-loop guard.
+  engine = std::make_unique<QQmlApplicationEngine>(app);
 
   auto context = engine->rootContext();
   context->setContextProperty("installModel", this);
@@ -65,13 +66,12 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  AttachWindowToAEMainWindow(window);
   window->show();
+  window->raise();
+  window->requestActivate();
 
-  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
-    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
-    app->exec();
-    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
-  }
+  WindowManager::GetInstance().runEventLoop();
   return dialogResult;
 }
 
