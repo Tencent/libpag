@@ -667,3 +667,28 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | `subset:animation-delay-replayed` | an infinite animation has a nonzero `animation-delay`; PAGX repeats the converted playback window instead of applying the delay only to initial playback |
 | `subset:animation-timeline-shifted` | a negative `animation-delay` moved the group's origin before CSS `t=0`; PAGX playback starts with the pre-roll |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |
+### 13.7 Perspective semantics
+
+CSS has two ways to declare a camera, and they disagree about the pivot:
+
+| Form | Where the projection lives | Does `transform-origin` conjugate it? |
+|------|----------------------------|----------------------------------------|
+| parent `perspective: <d>` + child `transform` | parent (a camera) | no — same as PAGX / AE / Lottie |
+| `transform: perspective(<d>) …` on the element | element (a camera of its own) | yes — CSS conjugates the whole function list |
+
+PAGX keeps the projection outside `anchor` (`M = P · T(anchor) · L · T(-anchor)`), i.e. the
+first form. `tools/html-snapshot` therefore rewrites the second form into the first: the element
+becomes a child of a wrapper carrying `perspective: <d>` and
+`perspective-origin: <the element's transform-origin>`, and its own transform loses the
+`perspective()` term. The two forms are algebraically equal for a pivot **on** the layer plane.
+
+Limits of that rewrite, in order of how often they are hit:
+
+* A pivot with depth (`transform-origin: 0 80px 30px`) cannot be carried over, because
+  `perspective-origin` has no z component; the rewrite is skipped (counted as `camera-skips:
+  depth-pivot` in `eval-animation`) and the projection order then differs from CSS by the
+  `origin × projection` term — a few pixels at `d = 600px` with a 30px pivot depth.
+* A flow / flex child of a `perspective` parent has no resolved offset at import time, so the
+  camera is projected about the parent's coordinate system as-is; one diagnostic reports it.
+* A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
+  warns once and falls back to the layer origin instead of the box centre.

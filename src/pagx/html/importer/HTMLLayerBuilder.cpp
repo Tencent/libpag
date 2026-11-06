@@ -705,7 +705,7 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // The parser validated the pose before the parent camera was folded in, and PAGX requires a 3D
   // pose to be invertible, so the pushed pose is re-checked (`scale(0)` under a perspective parent
   // would otherwise emit an invalid matrix3D).
-  if (!IsFlatTransform(pose) && !IsInvertiblePose(pose)) {
+  if (!IsFlatTransform(pose) && !IsInvertible(pose)) {
     _diagnostics.warn(
         "html: transform becomes non-invertible under the parent perspective; ignored");
     return;

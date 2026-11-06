@@ -1264,7 +1264,7 @@ bool HTMLAnimationBuilder::buildForElement(
             pureTranslate = false;
           }
           // PAGX requires a 3D pose to be invertible; the parser only validated the pose it saw.
-          if (!flat && !IsInvertiblePose(pushed)) {
+          if (!flat && !IsInvertible(pushed)) {
             if (!warnedTransform) {
               _diagnostics.warn(
                   "html: a @keyframes transform becomes non-invertible under the parent "
