@@ -79,6 +79,13 @@ struct VideoExportOptions {
    * Background color drawn under the content when hasBackground is true. Ignored otherwise.
    */
   Color background = {};
+
+  /**
+   * Whether to round the output width and height up to even numbers. Codecs that subsample chroma
+   * 4:2:0 (H.264 yuv420p and friends) cannot encode an odd dimension, so hosts writing into such a
+   * container must request it. Defaults to false, which keeps `ceil(documentSize * scale)`.
+   */
+  bool alignToEvenSize = false;
 };
 
 /**

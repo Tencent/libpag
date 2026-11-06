@@ -104,6 +104,10 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   }
   int width = static_cast<int>(std::ceil(static_cast<double>(document->width) * scale));
   int height = static_cast<int>(std::ceil(static_cast<double>(document->height) * scale));
+  if (options.alignToEvenSize) {
+    width += width % 2;
+    height += height % 2;
+  }
   if (width <= 0 || height <= 0) {
     SetError(errorMsg, "the output dimensions are zero");
     return nullptr;

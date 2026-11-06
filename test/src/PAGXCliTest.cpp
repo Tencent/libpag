@@ -4214,4 +4214,98 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsEncoderFailureWhenFFmpegIsAvailable) {
   EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
 }
 
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunPrintsTheCommandLineAndWritesNothing) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/export_dry_run.mp4";
+  std::filesystem::remove(outputPath);
+  std::filesystem::remove(outputPath + ".part");
+  std::string output;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", outputPath, "--dry-run"});
+    output = capturedOut.str();
+  }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(output.find("-f rawvideo -pixel_format rgba"), std::string::npos);
+  EXPECT_NE(output.find("-video_size 300x100"), std::string::npos);
+  EXPECT_NE(output.find("-framerate 60"), std::string::npos);
+  EXPECT_NE(output.find(outputPath + ".part"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
+  EXPECT_FALSE(std::filesystem::exists(outputPath + ".part"));
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4RoundsAnOddSizeUpToEven) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/export_odd_size.mp4";
+  std::string output;
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath,
+                                         "--scale", "1.003", "--dry-run"});
+    output = capturedOut.str();
+    errors = capturedErr.str();
+  }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(errors.find("rounded up to 302x102"), std::string::npos);
+  EXPECT_NE(output.find("-video_size 302x102"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_VideoOptionsAreRejectedForVectorFormats) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output",
+                                         TempDir() + "/video_options.svg", "--fps", "30"});
+    errors = capturedErr.str();
+  }
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errors.find("--fps is only supported for video formats"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4RejectsATransparentBackground) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output",
+                   TempDir() + "/transparent_background.mp4", "--background", "#FFFFFF00"});
+    errors = capturedErr.str();
+  }
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errors.find("cannot carry alpha"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4EncodesTheAnimationWhenFFmpegIsAvailable) {
+  if (pagx::cli::FindFFmpeg("").path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/export_animation.mp4";
+  std::filesystem::remove(outputPath);
+  std::filesystem::remove(outputPath + ".part");
+  std::string output;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath,
+                                         "--fps", "20", "--crf", "30"});
+    output = capturedOut.str();
+  }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(output.find("wrote " + outputPath), std::string::npos);
+  EXPECT_NE(output.find("7 frames"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outputPath + ".part"));
+  ASSERT_TRUE(std::filesystem::exists(outputPath));
+  EXPECT_GT(std::filesystem::file_size(outputPath), 1000u);
+}
+
 }  // namespace pag

@@ -116,34 +116,6 @@ static void PrintRenderUsage() {
          "                            specified multiple times)\n";
 }
 
-static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
-                          float* alpha) {
-  std::string color = hex;
-  if (!color.empty() && color[0] == '#') {
-    color = color.substr(1);
-  }
-  if (color.size() != 6 && color.size() != 8) {
-    return false;
-  }
-  char* endPtr = nullptr;
-  unsigned long value = strtoul(color.c_str(), &endPtr, 16);
-  if (endPtr != color.c_str() + color.size()) {
-    return false;
-  }
-  if (color.size() == 8) {
-    *red = static_cast<float>((value >> 24) & 0xFF) / 255.0f;
-    *green = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
-    *blue = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
-    *alpha = static_cast<float>(value & 0xFF) / 255.0f;
-  } else {
-    *red = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
-    *green = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
-    *blue = static_cast<float>(value & 0xFF) / 255.0f;
-    *alpha = 1.0f;
-  }
-  return true;
-}
-
 static bool ParseCrop(const std::string& cropStr, float* x, float* y, float* w, float* h) {
   // Expected format: x,y,w,h
   char* end = nullptr;
@@ -588,8 +560,8 @@ static int RenderFrameSequence(const RenderOptions& options) {
   videoOptions.scale = options.scale;
   videoOptions.hasBackground = options.hasBackground;
   if (options.hasBackground) {
-    videoOptions.background = Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha,
-                                    ColorSpace::SRGB};
+    videoOptions.background =
+        Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
   }
   std::string errorMsg = {};
   auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);

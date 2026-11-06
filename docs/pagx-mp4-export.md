@@ -176,9 +176,11 @@ pagx export --format mp4 --input in.pagx --output out.mp4
 | `--fps <n>` | 文档动画帧率，缺省 60 | 采样帧率 |
 | `--duration <s>` | 最长动画一个周期 | 序列时长 |
 | `--scale <f>` | 1.0 | 缩放（`export` 此前无此参数，需新增） |
-| `--background` | `#FFFFFF` 不透明 | 与 Figma 行为一致；mp4 要求 alpha=255 |
+| `--background` | `#FFFFFF` 不透明 | 与 Figma 行为一致；mp4 要求 alpha=255，传入带 alpha 的颜色直接报错 |
 | `--crf <0-51>` | 20 | 质量 |
+| `--no-crf` | — | 不下发 `-crf`，供 `h264_videotoolbox` 等无 CRF 选项的编码器使用 |
 | `--preset` | `medium` | x264 preset |
+| `--no-preset` | — | 不下发 `-preset`，同上 |
 | `--encoder` | 取格式表默认值 | 内部版可换 `libo264rt`，mac 可换 `h264_videotoolbox` |
 | `--encoder-args` | 空 | 原样追加到命令行 |
 | `--font` / `--fallback` | — | **必须新增**。`export` 现有路径不加载字体（靠文档内嵌 GlyphRun），而 mp4 是真实渲染，缺少时会 fallback 或渲染不出文本 |
@@ -206,6 +208,10 @@ ffmpeg -hide_banner -loglevel error -y \
 4. **临时文件 + rename**：先写 `{out}.part`，`waitpid` 返回 0 后才改名。顺序必须是「关闭 stdin → 等待退出码 → 改名」。
 
 色彩必须双向指定：`-colorspace/-color_primaries` 只写容器元数据，真正决定 swscale 转换矩阵的是 `-vf scale=...in_color_matrix/out_color_matrix`。只写前者会在播放器里出现肤色偏移。
+
+**实测补充（ffmpeg 7.1.1 / libx264）**：`-color_primaries bt709 -color_trc bt709` 实际**不会**写进 H.264 VUI，`ffprobe` 仍报 `color_primaries=unknown / color_transfer=unknown`，只有 `-colorspace` 生效。要写进 VUI 必须用 `-x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709`，但那是 x264 专属、会破坏 `--encoder` 可替换性，因此**不下发**；需要严格元数据的用户用 `--encoder-args` 自行补。像素结果不受影响（矩阵由 `-vf` 决定）。
+
+**尺寸**：`yuv420p` 等 4:2:0 像素格式要求宽高为偶数，CLI 会把 `ceil(size * scale)` 向上取偶（`VideoExportOptions::alignToEvenSize`），并在 stderr 提示实际尺寸。
 
 ### 4.3 格式扩展点
 
@@ -306,9 +312,9 @@ Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，�
 
 1. `include/pagx/VideoExporter.h` + `src/pagx/VideoExporter.cpp`，把 `CommandRender.cpp` 的时间轴循环搬进去。**已完成**
 2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致。
-3. `src/cli/VideoEncoder.*`：格式表 + ffmpeg 发现 + 命令行构建 + 子进程封装。
-4. `CommandExport::exportMp4()`：新增视频参数与 `--format mp4` 分支，先跑 `--dry-run` 验证命令行。
-5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做时长与像素对比。
+3. `src/cli/VideoEncoder.*`：格式表 + ffmpeg 发现 + 命令行构建 + 子进程封装。**已完成**
+4. `CommandExport::exportMp4()`：新增视频参数与 `--format mp4` 分支，先跑 `--dry-run` 验证命令行。**已完成**
+5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做时长与像素对比。样例参考 `~/Desktop/project/PagxToMp4/PAGX文件/a9ad04e7…pagx`（13 条动画，最长 480 帧）
 
 ## 9. 验证命令
 

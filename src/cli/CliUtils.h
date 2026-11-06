@@ -22,6 +22,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,6 +68,38 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
   return SystemFonts::ResolveTypeface(family, style);
+}
+
+/**
+ * Parses a "#RRGGBB" or "#RRGGBBAA" color into normalized float components. The leading '#' is
+ * optional. Returns false when the string is not a valid color, leaving the outputs untouched.
+ */
+inline bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
+                          float* alpha) {
+  std::string color = hex;
+  if (!color.empty() && color[0] == '#') {
+    color = color.substr(1);
+  }
+  if (color.size() != 6 && color.size() != 8) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  unsigned long value = strtoul(color.c_str(), &endPtr, 16);
+  if (endPtr != color.c_str() + color.size()) {
+    return false;
+  }
+  if (color.size() == 8) {
+    *red = static_cast<float>((value >> 24) & 0xFF) / 255.0f;
+    *green = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
+    *blue = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
+    *alpha = static_cast<float>(value & 0xFF) / 255.0f;
+  } else {
+    *red = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
+    *green = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
+    *blue = static_cast<float>(value & 0xFF) / 255.0f;
+    *alpha = 1.0f;
+  }
+  return true;
 }
 
 /**
