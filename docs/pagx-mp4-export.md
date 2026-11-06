@@ -305,7 +305,18 @@ P1 只依赖「一个能跑的 ffmpeg 可执行文件」，来源作为部署问
 
 **已实现的发现顺序**（`FindFFmpeg()`）：`--ffmpeg` > `FFMPEG_BIN` > PATH。显式路径或 `FFMPEG_BIN` 指向非可执行文件时直接报错，不回退 PATH，避免掩盖配置错误；PATH 中的空条目（含义是当前目录）会被跳过。全部失败时报错并给出安装指引与 `pagx render --frames-dir` 降级提示。
 
-**换编码器的实测注意**：`h264_videotoolbox` 不接受 `-preset` / `-crf`，必须配 `--no-preset` / `--no-crf`（默认会下发这两个选项，ffmpeg 会直接报未知选项）。已在 macOS 上用 `--encoder h264_videotoolbox --no-crf --no-preset` 实测出片成功。
+**换编码器 / 硬编的实测注意**：`h264_videotoolbox` 不消费 `-preset` / `-crf`，但 ffmpeg **只打 warning 不报错**（`Codec AVOption preset ... has not been used for any stream`），而 CLI 用 `-loglevel error` 把这个 warning 屏蔽了，所以 `--encoder h264_videotoolbox` **不加** `--no-crf --no-preset` 也能正常出片（macOS 已实测）。这两个开关的作用只是让命令行干净；加上后同样实测通过。
+
+硬编码器下画质不可控（既无 CRF 也无 preset），走的是编码器默认码率（实测 `h264_videotoolbox` 在 1200×738@60 下约 4.8 Mbps），要控制码率目前只能用 `--encoder-args "-b:v 8M"`。
+
+**当前设计对硬编的支持边界**：
+
+| 场景 | 状态 |
+|---|---|
+| macOS `h264_videotoolbox` | 已实测可用 |
+| Windows `h264_mf` / `h264_nvenc` / `h264_qsv` | 原理可用（吃系统内存 yuv420p），未实测 |
+| Linux `h264_vaapi` | **不可用**：需要 `-vf ...,format=nv12,hwupload` 与 `-vaapi_device`，而生成命令里的 `-vf` 是固定的（含 bt709 转换矩阵），用 `--encoder-args` 再加一个 `-vf` 会覆盖前一个、丢掉色彩矩阵 |
+| 自动降级 | 不存在，`--encoder` 指定的编码器不可用时导出直接失败 |
 
 ## 7. 与 Figma 的对标
 
