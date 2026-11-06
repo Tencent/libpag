@@ -687,6 +687,46 @@ PAG_TEST(PAGXHTML3DTest, ReferenceBoxResolutionDoesNotDuplicateDiagnostics) {
 }
 
 /**
+ * Test case: a tiny uniform scale under a perspective parent stays invertible. A fixed determinant
+ * threshold would read `scale(0.001)` as singular (det ~ 1e-6) and drop the whole transform, while
+ * PAGX's own validator accepts it.
+ */
+PAG_TEST(PAGXHTML3DTest, TinyScaleUnderPerspectiveStaysInvertible) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="tiny" style="position:absolute;left:10px;top:10px;width:80px;height:40px;
+             background-color:#38BDF8;transform:scale(0.001)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "non-invertible"));
+  auto* tiny = FindLayerById(doc, "tiny");
+  ASSERT_NE(tiny, nullptr);
+  EXPECT_FALSE(tiny->matrix3D.isIdentity()) << "the transform must survive the sanity check";
+  EXPECT_TRUE(NearlyEqual(tiny->matrix3D.getRowColumn(0, 0), 0.001f, 1e-6f));
+}
+
+/**
+ * Test case: a plain flow child of a `perspective` flex container keeps no diagnostic, because the
+ * camera cannot change a pose that stays on the z = 0 plane; warning there would drown the signal.
+ */
+PAG_TEST(PAGXHTML3DTest, PlainFlowChildUnderPerspectiveDoesNotWarn) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:10px;top:10px;width:180px;height:100px;display:flex;
+           perspective:600px">
+        <div style="width:60px;height:40px;background-color:#38BDF8"></div>
+        <div style="width:60px;height:40px;background-color:#F472B6"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+}
+
+/**
  * Test case: a flow / flex child has no resolved offset from the parent's box, so the parent camera
  * cannot be projected around the exact vanishing point. That has to be reported once per document
  * instead of silently shifting the centre of every such child.

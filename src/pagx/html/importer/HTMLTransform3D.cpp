@@ -24,6 +24,7 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
@@ -506,38 +507,10 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
 }  // namespace
 
 bool IsInvertible(const Matrix3D& matrix) {
-  float rows[4][4] = {};
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      rows[row][column] = matrix.getRowColumn(row, column);
-    }
-  }
-  float determinant = 1.0f;
-  for (int column = 0; column < 4; ++column) {
-    int pivot = column;
-    for (int row = column + 1; row < 4; ++row) {
-      if (std::fabs(rows[row][column]) > std::fabs(rows[pivot][column])) {
-        pivot = row;
-      }
-    }
-    if (std::fabs(rows[pivot][column]) < 1e-6f) {
-      return false;
-    }
-    if (pivot != column) {
-      for (int k = 0; k < 4; ++k) {
-        std::swap(rows[column][k], rows[pivot][k]);
-      }
-      determinant = -determinant;
-    }
-    determinant *= rows[column][column];
-    for (int row = column + 1; row < 4; ++row) {
-      const float factor = rows[row][column] / rows[column][column];
-      for (int k = column; k < 4; ++k) {
-        rows[row][k] -= factor * rows[column][k];
-      }
-    }
-  }
-  return std::fabs(determinant) > 1e-6f;
+  // Reuse the runtime's check: it normalizes the columns and treats a perspective row separately, so
+  // the verdict does not depend on the overall scale. A fixed determinant threshold would reject a
+  // legal pose such as `perspective(600px) scale(0.001)` (det ~ 1e-6) that PAGX itself accepts.
+  return IsInvertibleMatrix3D(matrix);
 }
 
 bool IsSupportedTransformFunction(const std::string& name) {
