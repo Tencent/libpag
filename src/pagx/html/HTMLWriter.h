@@ -131,6 +131,9 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i);
 // Same matrix with the repeater rotation replaced, so an animated rotation can recompose a copy
 // without mutating the node.
 Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation);
+// Core form: `prog` is the progressive index (copy index plus the repeater offset). An animated
+// `copies` moves each copy's index, so the caller resolves prog per frame.
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation);
 
 float ComputePathLength(const PathData& pathData);
 float ComputePathSignedArea(const PathData& pathData);
@@ -320,6 +323,9 @@ class HTMLWriterContext {
       std::string id = {};
     };
     std::unordered_set<const Repeater*> animatedRepeaters = {};
+    // Copies to emit for an animated `copies` channel: the largest count the channel reaches, so
+    // every copy that appears during playback already exists in the DOM.
+    std::unordered_map<const Repeater*, int> repeaterMaxCopies = {};
     std::vector<RepeaterCopy> repeaterCopies = {};
 
     struct Instance {
