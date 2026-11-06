@@ -19,6 +19,8 @@
 | web 编码 | JS WebCodecs `VideoEncoder` + mediabunny |
 | 音频 | P1 不产出（`-an`），接口按 §5 预留 |
 | 其他视频格式 | P1 只支持 mp4，webm/gif 不做占位；扩展点见 §4.3 |
+| 编码器可替换 | `--encoder` 换编码器；无 CRF/preset 选项的编码器（如 `h264_videotoolbox`）配 `--no-crf` / `--no-preset` |
+| 尺寸对齐 | `yuv420p` 等 4:2:0 格式要求偶数宽高，`ceil(size * scale)` 向上取偶 |
 
 形态由三条硬约束决定：
 
@@ -77,6 +79,8 @@ struct VideoExportOptions {
    *  output container, not here: H.264 carries no alpha, VP9 does. */
   bool hasBackground = false;
   Color background = {};
+  /** Round the output width and height up to even numbers; 4:2:0 codecs cannot take an odd one. */
+  bool alignToEvenSize = false;
 };
 
 /**
@@ -134,11 +138,13 @@ class VideoExporter {
 宿主调用形态：
 
 ```cpp
-// native
-auto exporter = VideoExporter::Make(*document, videoOptions);
+// native: the CLI wiring, VideoEncoder lives in src/cli (not in the library)
+auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
+auto encoder = VideoEncoder::Start(ffmpegPath, *FindVideoFormat("mp4"), encodeOptions, &errorMsg);
 while (exporter->nextFrame()) {
-  encoder.writeFrame(exporter->pixels(), exporter->rowBytes(), exporter->height());
+  encoder->writeFrame(exporter->pixels(), exporter->rowBytes(), &errorMsg);
 }
+encoder->finish(&errorMsg);
 ```
 
 ```ts
@@ -161,12 +167,13 @@ while (exporter.nextFrame()) {
 ```
 pagx export --format mp4 --input in.pagx --output out.mp4
             [--fps N] [--duration S] [--scale F] [--background #RRGGBB]
-            [--crf 0-51] [--preset medium] [--encoder libx264] [--encoder-args "<args>"]
+            [--crf 0-51 | --no-crf] [--preset <name> | --no-preset]
+            [--encoder libx264] [--encoder-args "<args>"]
             [--font <path>] [--fallback <path|name>]
             [--ffmpeg <path>] [--dry-run]
 ```
 
-`--format` 也可从 `--output` 扩展名推断（沿用现有机制）。多输入仅 pptx 允许，视频格式强制单输入。
+`--format` 也可从 `--output` 扩展名推断（沿用现有机制）。多输入仅 pptx 允许，视频格式强制单输入。视频专用参数用在 svg/pptx/html 上会直接报错而不是静默忽略；`--font` / `--fallback` 是全局参数，但只有 mp4 分支会消费。
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -244,7 +251,7 @@ static const VideoFormatSpec kVideoFormats[] = {
 
 ## 5. 音频
 
-P1 产出 `-an`。音频**不进入 `VideoExporter`**，由宿主装配后交给编码器；将来走 `pagx export --format mp4 --audio <file>`：
+**P1 未实现**：当前实现固定下发 `-an`，产物没有音轨；`--audio` 参数不存在。以下为后续设计。音频**不进入 `VideoExporter`**，由宿主装配后交给编码器；将来走 `pagx export --format mp4 --audio <file>`：
 
 | 层 | 音频职责 |
 |---|---|
@@ -296,6 +303,10 @@ P1 只依赖「一个能跑的 ffmpeg 可执行文件」，来源作为部署问
 
 内部版 ffmpeg 只需把 `--encoder` 换成 `libo264rt`（Win/Linux）或 `h264_videotoolbox`（mac），CLI 代码不变。
 
+**已实现的发现顺序**（`FindFFmpeg()`）：`--ffmpeg` > `FFMPEG_BIN` > PATH。显式路径或 `FFMPEG_BIN` 指向非可执行文件时直接报错，不回退 PATH，避免掩盖配置错误；PATH 中的空条目（含义是当前目录）会被跳过。全部失败时报错并给出安装指引与 `pagx render --frames-dir` 降级提示。
+
+**换编码器的实测注意**：`h264_videotoolbox` 不接受 `-preset` / `-crf`，必须配 `--no-preset` / `--no-crf`（默认会下发这两个选项，ffmpeg 会直接报未知选项）。已在 macOS 上用 `--encoder h264_videotoolbox --no-crf --no-preset` 实测出片成功。
+
 ## 7. 与 Figma 的对标
 
 Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，作为默认值依据：
@@ -311,31 +322,49 @@ Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，�
 ## 8. 实施顺序
 
 1. `include/pagx/VideoExporter.h` + `src/pagx/VideoExporter.cpp`，把 `CommandRender.cpp` 的时间轴循环搬进去。**已完成**
-2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致。
+2. `--frames-dir` 改用 `VideoExporter`，验证帧序列输出与现状逐字节一致。**已完成**（20 帧样例，全部帧与 `--time` 路径逐字节一致）
 3. `src/cli/VideoEncoder.*`：格式表 + ffmpeg 发现 + 命令行构建 + 子进程封装。**已完成**
 4. `CommandExport::exportMp4()`：新增视频参数与 `--format mp4` 分支，先跑 `--dry-run` 验证命令行。**已完成**
-5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做时长与像素对比。样例参考 `~/Desktop/project/PagxToMp4/PAGX文件/a9ad04e7…pagx`（13 条动画，最长 480 帧）
+5. 端到端：480 帧样例出片，与 `--frames-dir` + 手工 ffmpeg 的结果做时长与像素对比。**已完成**
+
+第 5 步实测（1200×738 / 60fps / 8s / 480 帧，样例 `a9ad04e7…pagx`）：
+
+- `pagx export` 产物与「`--frames-dir` 480 张 PNG + 同参数手工 ffmpeg」产物 **md5 相同**（`6d0b04ab…`），解码后的 RGBA 流逐字节相同
+- 整片 PSNR 相对源帧序列：`y:47.59 u:48.71 v:49.99 average:48.09 dB`
+- 出片耗时 14.3s（≈30ms/帧，含渲染 + 编码）
 
 ## 9. 验证命令
 
 ```bash
-# 构建
+# 构建（新增源文件靠 GLOB 收集，必须重新 configure）
 cmake -G Ninja -DPAG_BUILD_CLI=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target pagx-cli
 
-# 单帧抽查（确认动画被驱动）
-./cmake-build-debug/pagx render --time 0 -o /tmp/t0.png input.pagx
-./cmake-build-debug/pagx render --time 2 -o /tmp/t2.png input.pagx
+# 命令行预演：只打印 ffmpeg 命令行，不启动子进程、不落盘
+./cmake-build-debug/pagx export --input input.pagx --output /tmp/out.mp4 --dry-run
 
-# 帧序列（默认时长 = 最长动画一个周期）
-./cmake-build-debug/pagx render --frames-dir /tmp/frames --fps 60 input.pagx
-
-# 直出 MP4
-./cmake-build-debug/pagx export --format mp4 --input input.pagx --output /tmp/out.mp4 --fps 60 --crf 20
+# 出片
+./cmake-build-debug/pagx export --input input.pagx --output /tmp/out.mp4 --fps 60 --crf 20
 
 # 校验产物
-ffmpeg -hide_banner -i /tmp/out.mp4 2>&1 | grep -E "Stream|Duration"
-ffmpeg -hide_banner -i /tmp/out.mp4 -af silencedetect=n=-50dB:d=0.4 -f null - 2>&1 | grep silence
+ffprobe -hide_banner -v error -show_entries \
+  stream=codec_name,profile,width,height,pix_fmt,r_frame_rate,nb_frames,color_space,color_range \
+  -show_entries format=duration -of default=noprint_wrappers=1 /tmp/out.mp4
+
+# 与帧序列路径比对（两条路径的 mp4 应逐字节相同）
+./cmake-build-debug/pagx render --frames-dir /tmp/frames --fps 60 input.pagx
+ffmpeg -hide_banner -loglevel error -y -framerate 60 -i /tmp/frames/f_%04d.png -an \
+  -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
+  -vf "scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format=yuv420p" \
+  -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
+  -movflags +faststart -f mp4 /tmp/manual.mp4
+cmp /tmp/out.mp4 /tmp/manual.mp4 && echo identical
+
+# 单元测试（ffmpeg 缺失时相关用例自动 SKIP）
+cmake --build cmake-build-debug --target PAGFullTest_OpenGL
+./cmake-build-debug/PAGFullTest_OpenGL --gtest_filter='PAGXCliTest.Video*:PAGXCliTest.Export*'
 ```
+
+帧序列与 mp4 的比对前提是**背景不透明**（默认 `--background #FFFFFF`），此时预乘等于直通，PNG 与 rawvideo 送进编码器的字节完全一致；带透明像素时预乘值会被当作直通值，两条路径都不适用。
 
 一致性对比时时间点必须精确对齐：`--time` 接收秒（float），帧序列内部按 `llround(frame * 1e6 / fps)` 计算微秒，`fps` 取 100/50/25 这类可被十进制精确表达的值，否则会引入几个微秒偏差，导致像素对比出现假阳性。
