@@ -1978,9 +1978,12 @@ function splitProjectiveTransform(transform) {
 // fill it. Returns null when the emitted html is not a plain absolutely-positioned <div>, so the
 // caller can fall back to the old behaviour instead of corrupting the layout.
 function liftBoxOntoCameraWrapper(html, distance, origin) {
-  const match = /^<div style="([^"]*)"/.exec(html);
+  // Any attribute the element already carries (the author `name`, see applyLayerName) stays on the
+  // element's own box; only the box geometry moves out onto the camera layer.
+  const match = /^<div((?:\s+[A-Za-z_:][-\w:.]*="[^"]*")*)\s+style="([^"]*)"/.exec(html);
   if (!match) return null;
-  const style = match[1];
+  const leadingAttributes = match[1];
+  const style = match[2];
   const box = {};
   for (const key of ['left', 'top', 'width', 'height']) {
     const found = new RegExp('(?:^|;\\s*)' + key + ':\\s*([^;]+)').exec(style);
@@ -2003,7 +2006,8 @@ function liftBoxOntoCameraWrapper(html, distance, origin) {
   ].join('; ');
   // `html.slice(...)` starts at the original opening tag's closing quote and already ends with the
   // element's own `</div>`, so only the wrapper's closing tag is appended.
-  return '<div style="' + wrapperStyle + '"><div style="' + inner + '"' + html.slice(match[0].length) + '</div>';
+  return '<div style="' + wrapperStyle + '"><div' + leadingAttributes + ' style="' + inner + '"' +
+         html.slice(match[0].length) + '</div>';
 }
 
 // Distance of the camera a captured animation carries, keyed by animation name. Kept on `window`
@@ -4650,9 +4654,10 @@ function applyLayerName(el, html, opts, precomputed) {
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
   const computed = precomputed || getComputedStyle(el);
-  const html = withPerspectiveCamera(el, renderElementBox(el, parentRect, opts, computed),
-                                     opts, computed);
-  return applyLayerName(el, html, opts, computed);
+  // Name the element's own box before the camera wrapper is added: an author `name` identifies the
+  // layer that carries the content and the animation, not the structural camera layer above it.
+  const named = applyLayerName(el, renderElementBox(el, parentRect, opts, computed), opts, computed);
+  return withPerspectiveCamera(el, named, opts, computed);
 }
 
 // Distance of the camera this element needs, either because its own transform carries a
