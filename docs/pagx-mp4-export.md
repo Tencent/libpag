@@ -4,7 +4,7 @@
 
 - 输入：已带动画轨道的 `pagx::PAGXDocument` 或 `.pagx` 文件
 - 输出：MP4（H.264 + AAC）
-- 落点：`pagx export --format mp4`（native）与 ardot 编辑器（wasm）
+- 落点：`pagx export --format mp4`（native CLI）与 ardot 编辑器（web 版与 CEF 桌面版共用 JS 侧 WebCodecs 编码层，见 §10）
 
 ## 1. 方案概要
 
@@ -368,3 +368,90 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 帧序列与 mp4 的比对前提是**背景不透明**（默认 `--background #FFFFFF`），此时预乘等于直通，PNG 与 rawvideo 送进编码器的字节完全一致；带透明像素时预乘值会被当作直通值，两条路径都不适用。
 
 一致性对比时时间点必须精确对齐：`--time` 接收秒（float），帧序列内部按 `llround(frame * 1e6 / fps)` 计算微秒，`fps` 取 100/50/25 这类可被十进制精确表达的值，否则会引入几个微秒偏差，导致像素对比出现假阳性。
+
+## 10. Web 端（WebCodecs）
+
+### 10.1 已核实的前提
+
+| 事实 | 依据 |
+|---|---|
+| CEF 桌面端基于 **Chromium 144**，WebCodecs 可用 | `third_party/cef/mac-arm64/include/cef_version.h`: `CHROME_VERSION_MAJOR 144` |
+| ardot 桌面端的编辑器渲染核心**跑在 CEF 渲染进程内**，与 JS 同进程 | `packages/frontend/desktop/macos/CMakeLists.txt` 的 renderer helper 链入 `desktop/src/render_process/*`（`EditorCanvas` 自建 tgfx `GLDevice`） |
+| ardot 的 `pagx` 库用非递归 GLOB 收集 `src/pagx/*.cpp`，`VideoExporter` 自动编入 | `packages/common/editor/pagx.cmake:42` |
+| 仓库内 web SDK 的 wasm **不含 pagx** | `PAG_BUILD_PAGX` 默认 OFF（root `CMakeLists.txt:51`），`web/script/cmake.demo.js` 不传该开关 |
+| libpag 仓库与 ardot 目前**都没有** WebCodecs / muxer 代码 | 全量 grep 无命中 |
+
+因此 web 端编码层需要**新增**，且三段宿主（viewer / ardot web / ardot 桌面）共用同一份实现，只在“帧源适配器”上分叉。
+
+### 10.2 宿主 × 后端 × 编码器
+
+| 宿主 | 帧源 | 回读 | 编码 + 封箱 |
+|---|---|---|---|
+| libpag viewer（示例/回归） | wasm `VideoExporter` 或 canvas | 同步（WebGL） | WebCodecs + JS muxer |
+| ardot web 版 | wasm（GL / WebGPU） | 同步 / **异步**（WebGPU 必须） | 同上（同一份代码） |
+| ardot 桌面版（CEF） | native（渲染进程内 GL device） | 同步 | 同上（同一份代码） |
+| pagx CLI / 无 CEF 的批处理 | 库内 `VideoExporter` | 同步 | ffmpeg 子进程（§4） |
+
+同步/异步差异**属于渲染后端**而非宿主：WebGL/Metal/D3D12 可同步读回，WebGPU 必须 `mapAsync`（非 Asyncify 构建下同步 `Surface::readPixels` 不可用）。所以帧源接口一律设计成 async，同步实现用 `async` 包一层。
+
+### 10.3 实测基线（ardot 桌面端，CEF / Chromium 144，1080×1920）
+
+三轮探测，逐轮排除干扰：
+
+| 轮次 | 内容 | 结果 |
+|---|---|---|
+| 1. 支持性 | `isConfigSupported` @1080×1920@60 | `avc1.42E01E`（Baseline **L3.1**）**false**；`avc1.4d0028`（Main L4.0）**true**；`vp09.00.10.08` **true** |
+| 2. 平坦帧吞吐 | 全 0 帧 × 60 | `prefer-hardware` 6.87ms/帧，`prefer-software` 4.44ms/帧 |
+| 3. 真实内容吞吐 | 渐变 + 20 个动矩形 + 文字 × 60 | `prefer-hardware` 11.65ms/帧（85.8fps），`prefer-software` 12.07ms/帧（82.8fps） |
+
+结论：
+
+1. **H.264 可用**（Main profile），说明该 CEF 构建带 proprietary codecs；桌面端可以走 WebCodecs。
+2. **`avc1.42E01E` 失败不是缺编解码器**，是 level 与分辨率不匹配（L3.1 上限 ≈1280×720@30）。codec string 的 level 必须与输出尺寸/帧率匹配。
+3. 第 2 轮数字无参考价值：平坦帧编码成本接近 0，测到的是帧拷贝开销。
+4. 第 3 轮两路径只差 3.6%，远小于硬编/软编应有的 3–5 倍差距，推测**两条路都在软编**；但 `VideoFrame(RGBA)` → I420 的转换成本（1080p 约 4–8ms）会同时压住两条路径，需按 §10.7 进一步确认。
+5. **无论硬编是否生效，编码都不是瓶颈**：12ms/帧 ≈ 83fps，高于 60fps 采集节奏；480 帧约 5.6s 纯编码，与 native 路径（14.3s 含渲染）同量级。因此 `hardwareAcceleration` 保持默认 `'no-preference'`，**不强制硬编**（第 2/3 轮里强制硬编均无收益甚至更慢）。
+
+### 10.4 codec 选择策略
+
+不维护“尺寸 → level”硬编码表，改为**从高到低探测 + 结果缓存**，且必须带真实的 `width/height/framerate`：
+
+```text
+avc1.640034 → avc1.640033 → avc1.4d002A → avc1.4d0028 → avc1.42E01F → vp09.00.10.08
+```
+
+逐个 `VideoEncoder.isConfigSupported()`，取第一个 `supported === true` 的；全部失败才向用户报“该浏览器不支持 H.264/VP9 编码”。其他约定：
+
+- `latencyMode: 'quality'`，关键帧间隔 2s（`8000 * 2` 个微秒）
+- 码率按像素数从 1080p 的 8–12 Mbps 线性缩放
+- 不暴露 `hardwareAcceleration` 给上层（见 §10.3 结论 5）
+
+### 10.5 帧源接口
+
+```ts
+interface VideoFrameSource {
+  width: number; height: number; frameRate: number; frameCount: number;
+  /** 第 index 帧的紧凑 RGBA（已去 stride），timestampUs = round(index * 1e6 / fps) */
+  readFrame(index: number): Promise<{ rgba: Uint8Array; timestampUs: number }>;
+}
+encodeToMp4(source: VideoFrameSource, params: EncodeParams): Promise<Blob>
+```
+
+- `encodeToMp4` 是唯一的共享实现：编码配置 + `VideoFrame` 构造 + 时间戳 + muxer + 进度回调 + 取消。
+- 三个宿主各写一个 adapter：viewer / ardot-web（wasm 堆）、ardot 桌面（native buffer，可零拷贝包成 external ArrayBuffer）。
+- 时间戳必须与 native 侧一致（`llround(index * 1e6 / fps)`），否则无法做跨端产物对比。
+
+### 10.6 已知坑
+
+1. **canvas 抓帧必须同 task**：tgfx 的 WebGL canvas 没有开 `preserveDrawingBuffer`（`WebGLDevice.cpp` 只透传 attrs，pagx/viewer 侧未开启），`VideoFrame(canvas)` 必须紧跟 `_draw()` 在同一个任务里执行，跨 `await` 会拿到清屏后的空帧。
+2. **WebGPU 必须异步**：非 Asyncify 构建下同步 `readPixels` 不可用，帧源 adapter 要 await 每帧回读完成。
+3. **RGBA→I420 转换是主要成本**（1080p 约 4–8ms/帧），两条编码路径都要付。桌面端的优化方向是 native 直接出 I420/NV12（待确认 tgfx 的 `PixelFormat` 是否支持）。
+4. **不能把 wasm/native 内存直接交给 `VideoFrame`**：构造后编码器会异步引用，必须拷贝或转移所有权（external ArrayBuffer + 释放回调）。
+5. **渲染进程崩溃面**：CEF 桌面端编码器在渲染进程内，长序列导出要有内存上限与取消（`encoder.close()` + 丢弃 muxer）。
+6. **产物不能跨端逐字节对齐**：viewer(WebGL) / ardot(WebGPU) / native(ffmpeg) 渲染与编码都不同，跨端只能用 PSNR/SSIM 门禁；逐字节一致只在同宿主同后端内成立。
+
+### 10.7 待验证
+
+- CEF 桌面端到底用的是硬编还是软编：看 `chrome://gpu` 的 **Video Encode** 行，或 `--enable-logging=stderr --v=1` 日志里的编码器实现名（`H264VideoToolboxEncoder` vs `OpenH264`）。
+- tgfx / libpag 是否能直接产出 I420，以省掉 §10.6 第 3 条的转换成本。
+- 真实 480 帧端到端耗时（渲染 + 编码）与 native 的 14.3s 对比，决定是否值得为桌面端引入 I420 直出优化。
