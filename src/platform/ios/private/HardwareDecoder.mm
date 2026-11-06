@@ -240,6 +240,11 @@ bool HardwareDecoder::resetVideoToolBox() {
     }
   }
 
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
+
   // create decompression session
   CFDictionaryRef attrs = NULL;
   // Ask CoreVideo to make the decoded CVPixelBuffer usable directly by whichever GPU backend

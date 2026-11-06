@@ -155,6 +155,11 @@ bool HardwareDecoder::resetVideoToolBox() {
     session = nullptr;
   }
 
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
+
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLCompatibilityKey,
