@@ -233,6 +233,11 @@ class SMILAnimationParser {
                                                      float frameRate, const ResolvedTiming& timing,
                                                      Frame& outEndFrame);
 
+  // Frame length of one iteration of an SMIL element, used to tile indefinitely repeating
+  // animations. Returns 0 when the element carries no usable duration.
+  static Frame RepeatPeriodFrames(SVGParserContext& ctx, const std::shared_ptr<DOMNode>& element,
+                                  float frameRate);
+
   // Parses a single <animateMotion> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Samples the referenced path via PathMeasure with an adaptive
   // density (clamp(totalLength/10, 32, 256)) and bakes Translate(pos) * Rotate(angle) per

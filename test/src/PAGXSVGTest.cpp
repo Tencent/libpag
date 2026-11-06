@@ -6662,6 +6662,24 @@ PAGX_TEST(PAGXSVGTest, SVGImport_NegativeBegin) {
 }
 
 /**
+ * repeat_dur_indefinite.svg: repeatDur="indefinite" is the duration-side spelling of an endless
+ * repeat, so the animation must loop even though repeatCount is absent.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_RepeatDurIndefiniteSetsLoop) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/repeat_dur_indefinite.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(anim->objects[0]->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.0f);
+}
+
+/**
  * Test SVG import: repeatDur="2.5s" with dur="1s" resolves to an equivalent repeatCount of
  * 2.5, expanding like a fractional repeatCount.
  */
