@@ -26,6 +26,7 @@
 #import <UIKit/UIKit.h>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <vector>
 #include "base/utils/Log.h"
@@ -34,6 +35,11 @@
 namespace pag {
 
 namespace {
+// VTDecompressionSessionInvalidate may crash inside VideoToolbox when it runs while
+// VTDecompressionSessionDecodeFrame is still executing on the same session, so an in-flight decode
+// gets this long to return before the session is torn down underneath it.
+static constexpr int MAX_INVALIDATE_WAIT_TIME_MS = 200;
+
 std::mutex& GetActiveDecodersMutex() {
   static std::mutex m;
   return m;
@@ -83,20 +89,20 @@ void RegisterAppLifecycleObserversOnce() {
 }  // namespace
 
 void HardwareDecoder::invalidateSession() {
-  // Retain a reference under the lock so concurrent resetVideoToolBox()/dealloc cannot release
-  // the session pointer between our load and the VT call below. Then drop the lock before
-  // calling into VT to avoid blocking the worker thread that may also touch the session.
-  VTDecompressionSessionRef sessionToInvalidate = nullptr;
+  // VideoToolbox tears down the decoder state that VTDecompressionSessionDecodeFrame is still
+  // executing inside, which crashes inside the decoder plugin. Give a running decode the chance to
+  // return first, and only invalidate underneath it once it is really stuck, because unblocking a
+  // stuck decode is what this method exists for.
+  const bool hasDecodeLocker =
+      decodeLocker.try_lock_for(std::chrono::milliseconds(MAX_INVALIDATE_WAIT_TIME_MS));
   {
     std::lock_guard<std::mutex> lock(sessionLocker);
     if (session) {
-      CFRetain(session);
-      sessionToInvalidate = session;
+      VTDecompressionSessionInvalidate(session);
     }
   }
-  if (sessionToInvalidate) {
-    VTDecompressionSessionInvalidate(sessionToInvalidate);
-    CFRelease(sessionToInvalidate);
+  if (hasDecodeLocker) {
+    decodeLocker.unlock();
   }
 }
 
@@ -370,8 +376,13 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
 
-    status =
-        VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
+    {
+      // Held so invalidateSession() can tell whether a decode is still running before tearing the
+      // session down.
+      std::lock_guard<std::timed_mutex> lock(decodeLocker);
+      status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer,
+                                                 &infoFlags);
+    }
 
     if (status != noErr && !outputPixelBuffer) {
       if (status == kVTInvalidSessionErr) {
