@@ -1226,6 +1226,19 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                                  !(modifier->fillColor.has_value()) && text->glyphData != nullptr &&
                                  !text->glyphData->layoutRuns.empty();
 
+      // Per-glyph SVG <text> is also the only exact layout for a TextModifier: it places every glyph
+      // at the position PAGX's shaper produced (baseline coordinates), while inline-block spans let
+      // the browser re-lay the run out. That costs the shaper's kerning (2-3px per kerned pair) and
+      // shifts the baseline by a half-leading that depends on the font metrics.
+      bool usesSVGTextForModifier =
+          fill && fill->color && fill->color->nodeType() == NodeType::SolidColor &&
+          modifier != nullptr && !(modifier->fillColor.has_value()) && text->glyphData != nullptr &&
+          !text->glyphData->layoutRuns.empty();
+
+      if (usesSVGTextForModifier) {
+        usesSVGTextGradient = true;
+      }
+
       if (usesSVGTextGradient) {
         // --- SVG <text> path for gradient fills ---
         // Use layoutRuns for precise per-glyph positions. Each glyph's (x, y) is in the
@@ -1240,14 +1253,18 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         out.addAttr("style", svgStyle);
         out.closeTagStart();
 
-        // Write gradient definition into an inline <defs> block.
-        std::string gradId = _ctx->nextId("tmgrad");
-        out.openTag("defs");
-        out.closeTagStart();
-        writeSVGGradientDefInto(out, fill->color, gradId);
-        out.closeTag();  // </defs>
-
-        std::string fillRef = "url(#" + gradId + ")";
+        // A solid fill needs no <defs>; only a gradient is defined per text block.
+        std::string fillRef;
+        if (fill->color->nodeType() != NodeType::SolidColor) {
+          std::string gradId = _ctx->nextId("tmgrad");
+          out.openTag("defs");
+          out.closeTagStart();
+          writeSVGGradientDefInto(out, fill->color, gradId);
+          out.closeTag();  // </defs>
+          fillRef = "url(#" + gradId + ")";
+        } else {
+          fillRef = ColorToSVGHex(static_cast<const SolidColor*>(fill->color)->color);
+        }
         float fillAlpha = fill->alpha;
 
         // Build shared font attributes.
