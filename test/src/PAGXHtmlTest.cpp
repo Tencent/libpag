@@ -3886,6 +3886,50 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
 
 // A Repeater paints one copy per repetition, so its rotation channel cannot ride on a single tag:
 // each copy recomposes the per-copy matrix (rotation * copy index) and needs its own rule.
+// `copies` changes how many copies exist, so the export emits every copy the channel can reach and
+// lets each one decide per frame whether it is visible; the index shift at each integer crossing is
+// kept as a step instead of a slide.
+CLI_TEST(PAGXHtmlTest, AnimationRepeaterCopiesGrowsTheRow) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle position="40,100" size="60,60" roundness="10"/>
+      <Fill color="#9333EA"/>
+      <Repeater id="copyCount" copies="1" offset="0" anchor="0,0" position="60,0" scale="1,1"
+                startAlpha="1" endAlpha="1"/>
+    </Layer>
+    <Animations>
+      <Animation id="copyGrow" duration="60" frameRate="60" loop="once">
+        <Object target="copyCount">
+          <Channel name="copies" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="5"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // Every copy the channel reaches is emitted, even though the document starts with one.
+  for (int i = 0; i < 5; ++i) {
+    auto tag = FindTagContaining(html, "id=\"copyCount_copy" + std::to_string(i) + "\"");
+    ASSERT_FALSE(tag.empty()) << i << html;
+    EXPECT_NE(tag.find("animation:"), std::string::npos) << tag;
+  }
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 5u) << html;
+  // The last copy only exists at the end of the timeline.
+  auto lastRule = KeyframesRuleNamed(
+      html, AnimationNameOfTag(FindTagContaining(html, "id=\"copyCount_copy4\"")));
+  ASSERT_FALSE(lastRule.empty()) << html;
+  EXPECT_NE(lastRule.find("0% { opacity: 0;"), std::string::npos) << lastRule;
+  EXPECT_NE(lastRule.find("100% { opacity: 1;"), std::string::npos) << lastRule;
+  // Each integer crossing gets stops on both sides so the row grows in steps, not by sliding.
+  EXPECT_NE(lastRule.find("25%"), std::string::npos) << lastRule;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationRepeaterRotationFansOutToCopies) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">

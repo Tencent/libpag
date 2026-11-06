@@ -103,6 +103,14 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   // An animated repeater channel is fanned out per copy, so every copy needs a tag of its own; the
   // weaver later attaches one keyframes rule to each of them.
   const bool animated = _ctx->animation.animatedRepeaters.count(rep) > 0;
+  const int authoredCopies = n;
+  if (animated) {
+    // Emit every copy the channel can reach, so a copy that appears mid-playback already has a tag.
+    auto maxIt = _ctx->animation.repeaterMaxCopies.find(rep);
+    if (maxIt != _ctx->animation.repeaterMaxCopies.end()) {
+      n = std::max(n, maxIt->second);
+    }
+  }
   for (int i = 0; i < n; i++) {
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
     Matrix m = BuildRepeaterCopyMatrix(rep, i);
@@ -121,6 +129,10 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       ca = frac;
     }
     float ea = ca * alpha;
+    if (animated && i >= authoredCopies) {
+      // Copies past the authored count only exist once the channel reaches them.
+      ea = 0.0f;
+    }
     std::string copyId = {};
     if (animated) {
       copyId = rep->id + "_copy" + std::to_string(i);

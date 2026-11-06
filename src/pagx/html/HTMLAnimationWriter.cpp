@@ -651,6 +651,7 @@ enum class TargetChannelRole {
   TrimStart,
   // A Repeater channel fans out to its copies: each copy recomposes the per-copy matrix per frame.
   RepeaterRotation,
+  RepeaterCopies,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -725,6 +726,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
     {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
+    {NodeType::Repeater, "copies", TargetChannelRole::RepeaterCopies},
     {NodeType::RoundCorner, "radius", TargetChannelRole::RoundCornerRadius},
 
     // Group & TextBox channels
@@ -815,6 +817,7 @@ struct BundleChannelSet {
   const Channel* trimEndCh = nullptr;
   const Channel* trimStartCh = nullptr;
   const Channel* repeaterRotationCh = nullptr;
+  const Channel* repeaterCopiesCh = nullptr;
   const Repeater* repeaterTarget = nullptr;
   int repeaterIndex = -1;
   // RoundCorner rounds the geometry declared before it, so the frame rebuilds that shape's `d`.
@@ -957,6 +960,10 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerSkewY:
       out.layerSkewYCh = ch;
+      return true;
+    case TargetChannelRole::RepeaterCopies:
+      out.repeaterCopiesCh = ch;
+      out.repeaterTarget = static_cast<const Repeater*>(objTarget);
       return true;
     case TargetChannelRole::RepeaterRotation:
       out.repeaterRotationCh = ch;
@@ -1121,6 +1128,35 @@ BundleChannelSet CollectBundleChannels(
   // A Repeater copy bundle drives exactly one copy; the emitter needs its index to recompose the
   // per-copy matrix.
   result.repeaterIndex = bundle.repeaterIndex;
+  if (result.repeaterCopiesCh != nullptr &&
+      result.repeaterCopiesCh->valueType() == ChannelValueType::Float) {
+    // Crossing an integer copy count appends a copy and shifts every other copy's index, which is a
+    // step in the middle of an otherwise linear channel. Stops on both sides of each crossing keep
+    // that step instead of letting CSS interpolate through it.
+    const auto& keys = static_cast<const TypedChannel<float>*>(result.repeaterCopiesCh)->keyframes;
+    // One frame after the crossing: the stop carries the new copy layout.
+    constexpr Frame kCrossingEpsilon = 1;
+    for (size_t k = 0; k + 1 < keys.size(); ++k) {
+      // Only linear segments have a single crossing time; other segments are sampled at their keys.
+      double v0 = keys[k].value;
+      double v1 = keys[k + 1].value;
+      if (v1 == v0) {
+        continue;
+      }
+      // A key that lands exactly on an integer starts a new copy count immediately after it, so the
+      // frame right after the key already shows the shifted layout.
+      result.keyTimes.insert(keys[k].time + kCrossingEpsilon);
+      double lo = std::min(v0, v1);
+      double hi = std::max(v0, v1);
+      for (double boundary = std::floor(lo) + 1.0; boundary < hi; boundary += 1.0) {
+        double ratio = (boundary - v0) / (v1 - v0);
+        Frame crossing =
+            keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
+        result.keyTimes.insert(crossing);
+        result.keyTimes.insert(crossing + kCrossingEpsilon);
+      }
+    }
+  }
   if (result.animatedMaskPath != nullptr) {
     auto maskIt = maskPathToLayer.find(result.animatedMaskPath);
     if (maskIt != maskPathToLayer.end() && maskIt->second != nullptr &&
@@ -1177,6 +1213,36 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
 
 void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                              std::string& decls, bool& needsZeroOrigin) {
+  if (chSet.repeaterCopiesCh != nullptr && chSet.repeaterTarget != nullptr &&
+      chSet.repeaterIndex >= 0) {
+    // `copies` decides how many copies exist, so a copy fades in as it appears and shifts its own
+    // index: both the opacity and the per-copy matrix come from the value at this frame.
+    const Repeater* rep = chSet.repeaterTarget;
+    float copiesValue = std::max(EvalFloatChannel(chSet.repeaterCopiesCh, t, rep->copies), 0.0f);
+    int n = static_cast<int>(std::ceil(copiesValue));
+    float frac = copiesValue - std::floor(copiesValue);
+    int i = chSet.repeaterIndex;
+    int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
+    float alpha = 0.0f;
+    if (i < n) {
+      alpha = 1.0f;
+      if (idx == n - 1 && frac > 0.0f && frac < 1.0f) {
+        // The trailing copy is only partially there.
+        alpha = frac;
+      }
+      float denom = std::max(static_cast<float>(n), 1.0f);
+      float np = std::clamp((static_cast<float>(idx) + rep->offset) / denom, 0.0f, 1.0f);
+      float decay = rep->startAlpha + (rep->endAlpha - rep->startAlpha) * np;
+      alpha *= decay;
+    }
+    AppendCssDecl(decls, "opacity", CssFloatToString(alpha));
+    float rotation = EvalFloatChannel(chSet.repeaterRotationCh, t, rep->rotation);
+    Matrix m = BuildRepeaterCopyMatrixAtProg(rep, static_cast<float>(idx) + rep->offset, rotation);
+    std::string css = MatrixTransformToCSS(m);
+    AppendCssDecl(decls, "transform", css.empty() ? "none" : css);
+    needsZeroOrigin = true;
+    return;
+  }
   if (chSet.repeaterRotationCh != nullptr && chSet.repeaterTarget != nullptr &&
       chSet.repeaterIndex >= 0) {
     // Every copy owns its own matrix: the repeater rotation enters it multiplied by the copy index,
@@ -2180,13 +2246,25 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           if (ch == nullptr) {
             continue;
           }
-          if (LookupChannelRole(nType, ch->name) == TargetChannelRole::RepeaterRotation) {
+          auto repeaterRole = LookupChannelRole(nType, ch->name);
+          if (repeaterRole == TargetChannelRole::RepeaterRotation ||
+              repeaterRole == TargetChannelRole::RepeaterCopies) {
             // The repeater itself renders nothing: its copies do. Record the node so writeRepeater
             // hands every copy an id, and keep the base id stable across mounts.
             _ctx.animation.animatedRepeaters.insert(repeater);
             if (repeater->id.empty()) {
               _restoredNodeIds.emplace_back(repeater, repeater->id);
               repeater->id = _ctx.nextId("animRep");
+            }
+            if (repeaterRole == TargetChannelRole::RepeaterCopies &&
+                ch->valueType() == ChannelValueType::Float) {
+              float maxCopies = repeater->copies;
+              for (const auto& key : static_cast<const TypedChannel<float>*>(ch)->keyframes) {
+                maxCopies = std::max(maxCopies, key.value);
+              }
+              int emitted = static_cast<int>(std::ceil(std::max(maxCopies, 0.0f)));
+              auto& slot = _ctx.animation.repeaterMaxCopies[repeater];
+              slot = std::max(slot, emitted);
             }
           }
         }
