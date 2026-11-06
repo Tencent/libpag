@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -26,6 +29,41 @@
 #include "renderer/FontEmbedder.h"
 
 namespace pagx::cli {
+
+#ifdef _WIN32
+std::wstring UTF8ToWide(const std::string& value) {
+  if (value.empty()) return {};
+  int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
+                                 static_cast<int>(value.size()), nullptr, 0);
+  if (size <= 0) return {};
+  std::wstring wide(static_cast<size_t>(size), L'\0');
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
+                      wide.data(), size);
+  return wide;
+}
+
+std::wstring QuoteWindowsArg(const std::wstring& value) {
+  std::wstring out = L"\"";
+  size_t backslashes = 0;
+  for (wchar_t ch : value) {
+    if (ch == L'\\') {
+      backslashes++;
+      continue;
+    }
+    if (ch == L'\"') {
+      out.append(backslashes * 2 + 1, L'\\');
+      out.push_back(L'\"');
+    } else {
+      out.append(backslashes, L'\\');
+      out.push_back(ch);
+    }
+    backslashes = 0;
+  }
+  out.append(backslashes * 2, L'\\');
+  out.push_back(L'\"');
+  return out;
+}
+#endif
 
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
                                            const std::string& command) {

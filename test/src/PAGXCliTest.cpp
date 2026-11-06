@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -35,6 +36,7 @@
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
+#include "cli/VideoEncoder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -3952,6 +3954,264 @@ CLI_TEST(PAGXCliTest, Embed_Usage_NoInputErrors_HelpPrints) {
   EXPECT_NE(helpOutput.find("Usage: pagx embed"), std::string::npos);
   EXPECT_NE(helpOutput.find("--skip-fonts"), std::string::npos);
   EXPECT_NE(helpOutput.find("--skip-images"), std::string::npos);
+}
+
+//==============================================================================
+// Video encoder tests
+//==============================================================================
+
+static pagx::cli::VideoEncodeOptions DefaultVideoOptions() {
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = 320;
+  options.height = 180;
+  options.frameRate = 60;
+  options.outputFile = "/tmp/out.mp4";
+  return options;
+}
+
+static std::vector<std::string> BuildMp4CommandLine(const pagx::cli::VideoEncodeOptions& options,
+                                                    std::string* errorMsg) {
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  EXPECT_NE(format, nullptr);
+  std::vector<std::string> arguments = {};
+  auto ok = pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, errorMsg);
+  EXPECT_TRUE(ok);
+  return arguments;
+}
+
+static bool HasArgumentSequence(const std::vector<std::string>& arguments,
+                                const std::vector<std::string>& expected) {
+  if (expected.empty() || arguments.size() < expected.size()) {
+    return false;
+  }
+  for (size_t i = 0; i + expected.size() <= arguments.size(); ++i) {
+    if (std::equal(expected.begin(), expected.end(), arguments.begin() + i)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+CLI_TEST(PAGXCliTest, VideoFormat_OnlyMp4IsSupported) {
+  auto* mp4 = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(mp4, nullptr);
+  EXPECT_EQ(mp4->container, "mp4");
+  EXPECT_EQ(mp4->defaultEncoder, "libx264");
+  EXPECT_EQ(mp4->pixelFormat, "yuv420p");
+  EXPECT_TRUE(mp4->requiresOpaque);
+  EXPECT_EQ(pagx::cli::FindVideoFormat("webm"), nullptr);
+  EXPECT_EQ(pagx::cli::FindVideoFormat("gif"), nullptr);
+  EXPECT_EQ(pagx::cli::FindVideoFormat(""), nullptr);
+}
+
+CLI_TEST(PAGXCliTest, VideoCommandLine_BuildsRawvideoPipeline) {
+  std::string errorMsg;
+  auto arguments = BuildMp4CommandLine(DefaultVideoOptions(), &errorMsg);
+  ASSERT_FALSE(arguments.empty());
+  EXPECT_EQ(arguments.front(), "ffmpeg");
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-hide_banner", "-loglevel", "error", "-y"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-f", "rawvideo", "-pixel_format", "rgba"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-video_size", "320x180"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-framerate", "60", "-i", "pipe:0"}));
+  EXPECT_NE(std::find(arguments.begin(), arguments.end(), "-an"), arguments.end());
+  EXPECT_TRUE(
+      HasArgumentSequence(arguments, {"-c:v", "libx264", "-preset", "medium", "-crf", "20"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-pix_fmt", "yuv420p"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-colorspace", "bt709", "-color_primaries", "bt709",
+                                              "-color_trc", "bt709", "-color_range", "tv"}));
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-movflags", "+faststart", "-f", "mp4"}));
+  EXPECT_EQ(arguments[arguments.size() - 2], "mp4");
+  EXPECT_EQ(arguments.back(), "/tmp/out.mp4.part");
+  auto filterPos = std::find(arguments.begin(), arguments.end(), "-vf");
+  ASSERT_NE(filterPos, arguments.end());
+  ASSERT_NE(filterPos + 1, arguments.end());
+  auto filter = *(filterPos + 1);
+  EXPECT_NE(filter.find("in_color_matrix=bt709"), std::string::npos);
+  EXPECT_NE(filter.find("out_range=tv"), std::string::npos);
+  EXPECT_NE(filter.find("format=yuv420p"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsInvalidOptions) {
+  std::vector<std::string> arguments = {};
+  std::string errorMsg;
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+
+  auto options = DefaultVideoOptions();
+  options.height = 181;
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("even"), std::string::npos);
+
+  options = DefaultVideoOptions();
+  options.width = 0;
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("size"), std::string::npos);
+
+  options = DefaultVideoOptions();
+  options.frameRate = 0;
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("frame rate"), std::string::npos);
+
+  options = DefaultVideoOptions();
+  options.crf = 52;
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("crf"), std::string::npos);
+
+  options = DefaultVideoOptions();
+  options.outputFile.clear();
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("output path"), std::string::npos);
+
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("", *format, DefaultVideoOptions(), &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("ffmpeg path"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, VideoCommandLine_HonorsEncoderOverrideAndExtraArgs) {
+  auto options = DefaultVideoOptions();
+  options.encoder = "h264_videotoolbox";
+  options.preset.clear();
+  options.crf = -1;
+  options.extraArgs = {"-b:v", "6M"};
+  std::string errorMsg;
+  auto arguments = BuildMp4CommandLine(options, &errorMsg);
+  ASSERT_FALSE(arguments.empty());
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-c:v", "h264_videotoolbox"}));
+  EXPECT_EQ(std::find(arguments.begin(), arguments.end(), "-preset"), arguments.end());
+  EXPECT_EQ(std::find(arguments.begin(), arguments.end(), "-crf"), arguments.end());
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-b:v", "6M", "-movflags", "+faststart"}));
+}
+
+CLI_TEST(PAGXCliTest, VideoSplitArguments_HonorsDoubleQuotes) {
+  auto arguments = pagx::cli::SplitArguments("-b:v  6M \"-x264-params keyint=30\"");
+  ASSERT_EQ(arguments.size(), 3u);
+  EXPECT_EQ(arguments[0], "-b:v");
+  EXPECT_EQ(arguments[1], "6M");
+  EXPECT_EQ(arguments[2], "-x264-params keyint=30");
+  EXPECT_TRUE(pagx::cli::SplitArguments("   ").empty());
+}
+
+CLI_TEST(PAGXCliTest, VideoFormatCommandLine_QuotesOnlyWhenNeeded) {
+  auto line = pagx::cli::FormatCommandLine(
+      {"ffmpeg", "-i", "pipe:0", "scale=format=yuv420p", "/tmp/a b.mp4"});
+  EXPECT_EQ(line, "ffmpeg -i pipe:0 scale=format=yuv420p \"/tmp/a b.mp4\"");
+}
+
+CLI_TEST(PAGXCliTest, VideoFindFFmpeg_RequiresAnExecutable) {
+  auto missing = TempDir() + "/no-such-ffmpeg";
+  std::filesystem::remove(missing);
+  auto location = pagx::cli::FindFFmpeg(missing);
+  EXPECT_TRUE(location.path.empty());
+  EXPECT_TRUE(location.source.empty());
+  EXPECT_NE(location.error.find("--ffmpeg"), std::string::npos);
+
+  auto fake = TempDir() + "/fake-ffmpeg";
+  {
+    std::ofstream out(fake);
+    out << "#!/bin/sh\n";
+  }
+  std::filesystem::permissions(fake, std::filesystem::perms::owner_all);
+  location = pagx::cli::FindFFmpeg(fake);
+  EXPECT_EQ(location.path, fake);
+  EXPECT_EQ(location.source, "--ffmpeg");
+  EXPECT_TRUE(location.error.empty());
+}
+
+static void FillVideoFrame(std::vector<uint8_t>* frame, size_t stride, int width, int height,
+                           int index) {
+  frame->assign(stride * static_cast<size_t>(height), 0);
+  for (int row = 0; row < height; ++row) {
+    auto* pixels = frame->data() + static_cast<size_t>(row) * stride;
+    for (int column = 0; column < width; ++column) {
+      pixels[column * 4] = static_cast<uint8_t>(index * 20);
+      pixels[column * 4 + 1] = static_cast<uint8_t>(column * 3);
+      pixels[column * 4 + 2] = static_cast<uint8_t>(row * 5);
+      pixels[column * 4 + 3] = 255;
+    }
+  }
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
+  auto location = pagx::cli::FindFFmpeg("");
+  if (location.path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  const int width = 64;
+  const int height = 48;
+  const int frameCount = 10;
+  const size_t stride = static_cast<size_t>(width) * 4 + 64;
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = width;
+  options.height = height;
+  options.frameRate = 10;
+  options.outputFile = TempDir() + "/encoder_padded.mp4";
+  std::filesystem::remove(options.outputFile);
+  std::filesystem::remove(options.outputFile + ".part");
+
+  std::string errorMsg;
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  std::vector<uint8_t> frame = {};
+  for (int index = 0; index < frameCount; ++index) {
+    FillVideoFrame(&frame, stride, width, height, index);
+    errorMsg.clear();
+    ASSERT_TRUE(encoder->writeFrame(frame.data(), stride, &errorMsg)) << errorMsg;
+  }
+  errorMsg.clear();
+  ASSERT_TRUE(encoder->finish(&errorMsg)) << errorMsg;
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
+  ASSERT_TRUE(std::filesystem::exists(options.outputFile));
+  EXPECT_GT(std::filesystem::file_size(options.outputFile), 1000u);
+
+  std::ifstream in(options.outputFile, std::ios::binary);
+  std::vector<char> header(8, 0);
+  in.read(header.data(), 8);
+  EXPECT_EQ(std::string(header.data() + 4, 4), "ftyp");
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_ReportsEncoderFailureWhenFFmpegIsAvailable) {
+  auto location = pagx::cli::FindFFmpeg("");
+  if (location.path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  const int width = 64;
+  const int height = 48;
+  const size_t stride = static_cast<size_t>(width) * 4;
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = width;
+  options.height = height;
+  options.frameRate = 10;
+  options.encoder = "libunknownencoder";
+  options.outputFile = TempDir() + "/encoder_failure.mp4";
+  std::filesystem::remove(options.outputFile);
+  std::filesystem::remove(options.outputFile + ".part");
+
+  std::string errorMsg;
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  std::vector<uint8_t> frame = {};
+  FillVideoFrame(&frame, stride, width, height, 0);
+  std::string writeError;
+  auto wrote = encoder->writeFrame(frame.data(), stride, &writeError);
+  std::string finishError;
+  auto finished = encoder->finish(&finishError);
+  EXPECT_TRUE(!wrote || !finished);
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile));
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
 }
 
 }  // namespace pag

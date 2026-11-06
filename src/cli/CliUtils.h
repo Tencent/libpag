@@ -198,6 +198,17 @@ inline std::string EscapeJson(const std::string& input) {
   return result;
 }
 
+#ifdef _WIN32
+/** Converts a UTF-8 string to UTF-16; returns an empty string when the input is not valid UTF-8. */
+std::wstring UTF8ToWide(const std::string& value);
+
+/**
+ * Quotes one argv item using the CommandLineToArgvW / Microsoft C runtime rules. CreateProcessW
+ * receives the command line directly, so cmd.exe metacharacters never get a chance to execute.
+ */
+std::wstring QuoteWindowsArg(const std::wstring& value);
+#endif
+
 /**
  * Loads a PAGX document from a file. Prints load errors and warnings to stderr using the given
  * command name as prefix. Returns nullptr on failure.
