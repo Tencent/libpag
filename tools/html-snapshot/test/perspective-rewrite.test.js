@@ -58,6 +58,19 @@ describe('liftBoxOntoCameraWrapper', () => {
     expect((wrapped.match(/<\/div>/g) || []).length).toBe(2);
   });
 
+  test('keeps an authored attribute on the element box, not on the camera layer', () => {
+    // `applyLayerName` names the element before the wrapper is added, so the wrapper must not
+    // swallow the name: `Layer.name` has to stay on the layer that carries content and animation.
+    const named = '<div name="card" style="position: absolute; left: 60px; top: 40px; width: 120px; height: 80px; background-color: rgb(56, 189, 248)" id="x">x</div>';
+    const wrapped = liftBoxOntoCameraWrapper(named, 600, '0px 40px');
+    expect(wrapped).not.toBeNull();
+    expect(wrapped.startsWith('<div style="position: absolute; left: 60px; top: 40px;')).toBe(true);
+    expect(wrapped).not.toContain('<div name="card" style="position: absolute; left: 60px');
+    expect(wrapped).toContain('<div name="card" style="position: absolute; left: 0px;');
+    expect((wrapped.match(/<div /g) || []).length).toBe(2);
+    expect((wrapped.match(/<\/div>/g) || []).length).toBe(2);
+  });
+
   test('declines when the element did not render as a positioned div', () => {
     expect(liftBoxOntoCameraWrapper('<span style="left: 0px">x</span>', 600, '50% 50%')).toBeNull();
     expect(liftBoxOntoCameraWrapper('<div style="position: relative">x</div>', 600, '50% 50%')).toBeNull();
