@@ -649,6 +649,8 @@ enum class TargetChannelRole {
   RectangleRoundness,
   TrimEnd,
   TrimStart,
+  // A Repeater channel fans out to its copies: each copy recomposes the per-copy matrix per frame.
+  RepeaterRotation,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -722,6 +724,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
+    {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
     {NodeType::RoundCorner, "radius", TargetChannelRole::RoundCornerRadius},
 
     // Group & TextBox channels
@@ -787,6 +790,8 @@ struct DomTargetBundle {
   std::string domId;
   const Node* primaryHost = nullptr;
   std::vector<const AnimationObject*> objects = {};
+  // Set for a Repeater copy bundle: which copy this tag paints.
+  int repeaterIndex = -1;
 };
 
 struct FilterChannelSlot {
@@ -809,6 +814,9 @@ struct BundleChannelSet {
   const Channel* roundnessCh = nullptr;
   const Channel* trimEndCh = nullptr;
   const Channel* trimStartCh = nullptr;
+  const Channel* repeaterRotationCh = nullptr;
+  const Repeater* repeaterTarget = nullptr;
+  int repeaterIndex = -1;
   // RoundCorner rounds the geometry declared before it, so the frame rebuilds that shape's `d`.
   const Channel* roundCornerCh = nullptr;
   const RoundCorner* roundCornerTarget = nullptr;
@@ -949,6 +957,10 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerSkewY:
       out.layerSkewYCh = ch;
+      return true;
+    case TargetChannelRole::RepeaterRotation:
+      out.repeaterRotationCh = ch;
+      out.repeaterTarget = static_cast<const Repeater*>(objTarget);
       return true;
     case TargetChannelRole::TrimStart: {
       auto* trim = static_cast<const TrimPath*>(objTarget);
@@ -1106,6 +1118,9 @@ BundleChannelSet CollectBundleChannels(
       }
     }
   }
+  // A Repeater copy bundle drives exactly one copy; the emitter needs its index to recompose the
+  // per-copy matrix.
+  result.repeaterIndex = bundle.repeaterIndex;
   if (result.animatedMaskPath != nullptr) {
     auto maskIt = maskPathToLayer.find(result.animatedMaskPath);
     if (maskIt != maskPathToLayer.end() && maskIt->second != nullptr &&
@@ -1162,6 +1177,19 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
 
 void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                              std::string& decls, bool& needsZeroOrigin) {
+  if (chSet.repeaterRotationCh != nullptr && chSet.repeaterTarget != nullptr &&
+      chSet.repeaterIndex >= 0) {
+    // Every copy owns its own matrix: the repeater rotation enters it multiplied by the copy index,
+    // so the frame recomposes that copy instead of animating a shared transform.
+    float rotation = EvalFloatChannel(chSet.repeaterRotationCh, t, chSet.repeaterTarget->rotation);
+    Matrix m = BuildRepeaterCopyMatrix(chSet.repeaterTarget, chSet.repeaterIndex, rotation);
+    std::string css = MatrixTransformToCSS(m);
+    // An identity copy has no matrix to print; `none` keeps the stop valid instead of emitting an
+    // empty declaration the browser would drop.
+    AppendCssDecl(decls, "transform", css.empty() ? "none" : css);
+    needsZeroOrigin = true;
+    return;
+  }
   const Layer* hostLayer = nullptr;
   if (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer) {
     hostLayer = static_cast<const Layer*>(bundle.primaryHost);
@@ -1738,6 +1766,20 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::Repeater) {
+      for (const auto& copy : ctx.animation.repeaterCopies) {
+        if (copy.repeater != targetNode) {
+          continue;
+        }
+        DomTargetBundle copyBundle;
+        copyBundle.domId = copy.id;
+        copyBundle.primaryHost = targetNode;
+        copyBundle.objects.push_back(obj);
+        copyBundle.repeaterIndex = copy.index;
+        bundles.push_back(std::move(copyBundle));
+      }
+      continue;
+    }
     if (nType == NodeType::Layer) {
       domId = targetNode->id;
     } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Text ||
@@ -2130,6 +2172,22 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           if (role == TargetChannelRole::Opacity && !layer->groupOpacity) {
             _restoredGroupOpacity.emplace_back(layer, layer->groupOpacity);
             layer->groupOpacity = true;
+          }
+        }
+      } else if (nType == NodeType::Repeater) {
+        auto* repeater = static_cast<Repeater*>(targetNode);
+        for (auto* ch : obj->channels) {
+          if (ch == nullptr) {
+            continue;
+          }
+          if (LookupChannelRole(nType, ch->name) == TargetChannelRole::RepeaterRotation) {
+            // The repeater itself renders nothing: its copies do. Record the node so writeRepeater
+            // hands every copy an id, and keep the base id stable across mounts.
+            _ctx.animation.animatedRepeaters.insert(repeater);
+            if (repeater->id.empty()) {
+              _restoredNodeIds.emplace_back(repeater, repeater->id);
+              repeater->id = _ctx.nextId("animRep");
+            }
           }
         }
       } else if (nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
