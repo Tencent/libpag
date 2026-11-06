@@ -129,6 +129,8 @@ function signatureOptions(opts: ArchiveImportOptions): unknown {
     downloadImages: opts.downloadImages, pagxImages: opts.pagxImages, svgOptions: opts.svgOptions,
     inlineIconFonts: opts.inlineIconFonts, captureAnimations: opts.captureAnimations, scrollReveal: opts.scrollReveal,
     viewportWidth: opts.viewportWidth, viewportHeight: opts.viewportHeight, waitMs: opts.waitMs, selector: opts.selector,
+    // Credentials can change the rendered page; keep their raw values out of cache records.
+    request: createHash('sha256').update(JSON.stringify({ cookies: opts.cookies || [], headers: opts.headers || [] })).digest('hex'),
     environment: Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(HTML_SNAPSHOT_|PAGX_FONT)/.test(key)).sort()),
   };
 }

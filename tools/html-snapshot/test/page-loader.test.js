@@ -91,6 +91,25 @@ describe('openAndSettlePage — reduced motion', () => {
     expect(page.close).toHaveBeenCalledTimes(1);
   });
 
+  test('awaits website listeners before navigation and closes the page if setup fails', async () => {
+    const order = [];
+    const page = { on: jest.fn(), close: jest.fn().mockResolvedValue(),
+      goto: jest.fn(async () => { order.push('goto'); }), waitForFunction: jest.fn().mockResolvedValue() };
+    browserEngine.newPage.mockResolvedValue(page);
+    const beforeNavigate = jest.fn(async value => {
+      expect(value).toBe(page); await Promise.resolve(); order.push('listeners');
+    });
+    await openAndSettlePage({ browser: {}, engine: 'puppeteer' }, 'http://127.0.0.1/index.html',
+      { beforeNavigate, waitMs: 0, autoScroll: false });
+    expect(order).toEqual(['listeners', 'goto']);
+    page.goto.mockClear();
+    const error = new Error('listener setup failed');
+    beforeNavigate.mockRejectedValueOnce(error);
+    await expect(openAndSettlePage({ browser: {}, engine: 'puppeteer' }, 'http://127.0.0.1/index.html',
+      { beforeNavigate, waitMs: 0, autoScroll: false })).rejects.toBe(error);
+    expect(page.goto).not.toHaveBeenCalled(); expect(page.close).toHaveBeenCalledTimes(1);
+  });
+
   test('does not capture about:blank when a main document never commits', async () => {
     const error = new Error('Navigation timeout');
     const page = { on: jest.fn(), goto: jest.fn().mockRejectedValue(error), url: () => 'about:blank',

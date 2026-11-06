@@ -72,6 +72,8 @@ export async function writeArtifactZip(directory: string, destination: string,
   for (const file of files) zip.addReadStreamLazy(file.name, { size: file.size }, callback => {
     const stream = fs.createReadStream(file.file, { signal: options.signal });
     readers.add(stream); stream.once('close', () => readers.delete(stream));
+    // yazl's lazy stream API does not forward source errors to its output stream.
+    stream.once('error', error => output.destroy(error));
     callback(null, stream);
   });
   zip.end();

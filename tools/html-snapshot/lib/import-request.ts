@@ -68,6 +68,8 @@ export function validateImportRequest(opts: ImportRequest): ImportRequest {
     if (archive && (opts.batchDir || opts.scenario || opts.htmlNoSnapshot || opts.format !== 'html')) {
       invalid('ZIP requires HTML snapshotting and cannot be combined with batch or scenario');
     }
+    for (const value of opts.cookies || []) parseCookie('--html-cookie', value, invalid);
+    for (const value of opts.headers || []) parseHeader('--html-header', value, invalid);
     if (opts.batchDir) {
       if (!fs.statSync(opts.batchDir, { throwIfNoEntry: false })?.isDirectory()) {
         throw new ImportRequestError(`input directory not found: ${opts.batchDir}`, 1);
@@ -88,8 +90,6 @@ export function validateImportRequest(opts: ImportRequest): ImportRequest {
       directoryDestination(opts.outputDir || path.dirname(path.resolve(opts.outputFile!)));
       return opts;
     }
-    for (const value of opts.cookies || []) parseCookie('--html-cookie', value, invalid);
-    for (const value of opts.headers || []) parseHeader('--html-header', value, invalid);
     let names: string[] = [''];
     if (opts.scenario) {
       const scenario = parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8')));

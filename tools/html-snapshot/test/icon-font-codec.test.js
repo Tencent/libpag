@@ -114,6 +114,24 @@ describe('resolveIconFontSvgs — full success path', () => {
     expect(fetchCalls).toBe(1);
   });
 
+  test('website icon fonts use captured bytes and never fetch uncaptured resources from Node', async () => {
+    const parsed = [];
+    const { resolveIconFontSvgs } = loadIconFontWithCodec({ parse: bytes => {
+      parsed.push(Buffer.from(bytes)); return stubFont();
+    } });
+    globalThis.fetch = jest.fn(() => { throw new Error('unexpected request outside the browser'); });
+    const captured = Buffer.from([0, 1, 0, 0]), logs = [];
+    const targets = ['https://site/captured.ttf', 'https://site/blocked.ttf', 'data:font/ttf;base64,AAEAAA==']
+      .map((fontUrl, id) => ({ id: String(id), codepoint: 0xe900, fontUrl, fontFamily: 'X', format: 'ttf' }));
+    const result = await resolveIconFontSvgs(targets, message => logs.push(message), {
+      capturedResourcesOnly: true, capturedFonts: new Map([[targets[0].fontUrl, captured]]),
+    });
+    expect(result.map(item => item.id)).toEqual(['0', '2']);
+    expect(parsed).toEqual([captured, captured]);
+    expect(logs.join('\n')).toContain('Font was not captured by the website browser');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   test('logs and skips a target whose glyph extraction throws, keeping the rest', async () => {
     const { resolveIconFontSvgs } = loadIconFontWithCodec();
     const logs = [];
