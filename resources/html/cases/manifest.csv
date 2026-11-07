@@ -140,9 +140,9 @@ id,category,feature,tier,expected_warnings,notes
 13-transform__translate,transform,"transform: translate()",subset,,
 13-transform__matrix,transform,"transform: matrix()",subset,,
 13-transform__transform-origin-center,transform,"transform-origin: center honoured",subset,,
-13-transform__rotate-chained,transform,"compound transform chain (unsupported)",subset,subset:unsupported-property,
-13-transform__rotate3d,transform,"rotate3d (unsupported)",subset,subset:unsupported-property,
-13-transform__perspective,transform,"perspective (unsupported)",subset,subset:unsupported-property,
+13-transform__rotate-chained,transform,"compound transform chain composed in CSS order",subset,,
+13-transform__rotate3d,transform,"rotate3d with a normalised axis",subset,,
+13-transform__perspective,transform,"perspective() inside the function list",subset,,
 14-overflow-clip__overflow-hidden,overflow-clip,"overflow: hidden -> clipToBounds",subset,,
 14-overflow-clip__clip-path-url,overflow-clip,"clip-path: url(#id) contour mask",subset,,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
 14-overflow-clip__clip-path-polygon,overflow-clip,"clip-path: polygon() (unsupported)",subset,subset:unsupported-property,

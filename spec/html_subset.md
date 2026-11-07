@@ -189,8 +189,8 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
 | `filter: blur(X) drop-shadow(X Y [B] [C])` (no spread or `inset`) | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
-| `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
-| `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
+| `transform: <fn-list>` | composed in CSS order into a 4x4 pose. Every function is supported: `translate[X\|Y\|Z\|3d]`, `scale[X\|Y\|Z\|3d]`, `rotate[X\|Y\|Z\|3d]`, `skewX`/`skewY`/`skew`, `matrix`, `matrix3d`, `perspective`. A pose that stays on the z = 0 plane is written onto `Layer.matrix`; a pose with depth or perspective onto `Layer.matrix3D` (3D poses must be invertible). `transform-style: preserve-3d` maps onto `Layer.preserve3D` |
+| `transform-origin` | resolved against the element box (`px`, `%`, `left`/`center`/`right`/`top`/`bottom`, plus the optional px depth) and written onto `Layer.anchor` / `anchorZ`; the pose itself stays un-pivoted. Only an unresolvable origin (a percentage / keyword with no absolute box size) warns and falls back to the top-left pivot |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
@@ -200,8 +200,8 @@ rebuilt as an inset child layer, which is how CSS paints gradient borders (a pla
 `background-color` still paints the border box). Any other value is dropped with a diagnostic.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
-`outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
-`path`), and compound / non-`matrix3d` 3D `transform` chains.
+`outline`, the `perspective` property (use `transform: perspective()` instead), and geometric
+`clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/`path`).
 
 ### 4.5 Text
 
@@ -387,7 +387,7 @@ Behaviour:
 | DocumentSkeleton | merges duplicate `<head>` / `<body>`, lowercases tags, strips comments / processing instructions, drops `<head>` children other than `<title>` / `<meta>` / `<style>` | `<script>` and other disallowed `<head>` content (`subset:unsupported-tag`); external `<link rel="stylesheet">` (`subset:external-stylesheet`); stray top-level elements between `<html>` and `<body>` (`subset:unsupported-tag`) |
 | StyleSheetCollector | inlines class- and element-selector rules from a single `<style>` block into the per-element cascade and removes the `<style>` element | universal `*`, descendant / pseudo / attribute selectors (`subset:unsupported-selector`); `@media`, `@font-face`, `@keyframes` and any other at-rule (`subset:unsupported-at-rule`) |
 | ComputedStyle | resolves the cascade (inherited → element defaults → element rules → class rules → inline `style`) and writes the merged map back as inline style; coalesces `-webkit-`-prefixed declarations onto their standard name (e.g. `-webkit-background-clip` → `background-clip`) | — |
-| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (single-function / `matrix()` / `matrix3d()` only), `object-fit`, `writing-mode`, `background-image` + `background-size`/`background-repeat`/`background-position` (url backgrounds), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` compound chains & non-`matrix3d` 3D forms, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
+| PropertyFilter | converts `em` → px (resolved against the parent's computed `font-size`), `rem` → px (16-px base), `vw`/`vh` → px (resolved against canvas size), `pt` → px (`subset:unit-coerced`); collapses `flex: <grow> <shrink> <basis>` to `flex: <grow>` (`subset:flex-shorthand-collapsed`); maps `flex: none`→`0`, `auto`/`initial`→`1`; drops `flex-shrink: 0` (PAGX never shrinks); downgrades `display: inline \| inline-block` to `block`, `flex-direction: *-reverse` to `row`/`column`; silently drops `position: relative` (no-op in PAGX, see §4.3); downgrades `position: fixed \| sticky` to `position: absolute`; keeps `margin*` (folded later), `transform`/`transform-origin` (any supported function list), `transform-style`, `object-fit`, `writing-mode`, `background-image` + `background-size`/`background-repeat`/`background-position` (url backgrounds), `mask-*`, `clip-path: url(#id)`, `-webkit-text-stroke*` | `transform` functions outside the supported set, `flex-shrink` (non-zero), geometric `clip-path` forms, `outline`, `float`, `order`, `align-content`, `align-self`, `direction`, `unicode-bidi`, `flex-wrap`, `flex-grow`, `flex-basis`, `min-*`, `max-*`, `aspect-ratio`, `text-transform`, `text-indent`, `word-*`, `overflow-wrap`, `font-variant`, `font-stretch`, `font` shorthand, `grid-*`, per-side `border-*`, per-corner `border-*-radius`, `z-index`, `cursor`, `pointer-events`, `user-select`, `visibility` (`subset:unsupported-property`); `var()`, `calc()`, `min/max/clamp()` (`subset:unsupported-property`); other unknown units (`subset:unsupported-property`) |
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |
@@ -503,16 +503,15 @@ Everything else inside a `@keyframes` stop is warned and dropped
 | `filter: brightness(...)` | `alpha` (clamped to `[0,1]`) | a generated nested `Layer` | float |
 | `clip-path` (geometric `inset`/`circle`/`ellipse`/`polygon`/`path`) | `point{i}.x` / `point{i}.y` | a `Path` inside a contour-mask `Layer` | float |
 
-`transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
-compound chains — `translate[X|Y]` / `scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`). When
-*every* keyframe is a pure translation the animation uses the cheaper `x` / `y` channels (which stack
-on top of the layout-assigned position). As soon as any keyframe carries scale / rotate / skew (or a
-non-translation `matrix(...)`), the *full* affine is routed through a single `matrix` channel,
-pivoted around the element's `transform-origin` exactly like the static `transform` path
-(`T(cx,cy) · M · T(-cx,-cy)`), so static and animated transforms agree. 3D forms
-(`matrix3d` / `rotate3d` / `perspective`) have no 2D affine representation and are dropped with
-`subset:animation-unsupported-property`. Layout-affecting properties (`width`, `height`, `margin`,
-`padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped the same way.
+`transform` is parsed per keyframe into the same 4x4 pose the static path builds (a whitespace
+separated function list composed in CSS order). When *every* keyframe is a pure translation the
+animation uses the cheaper `x` / `y` channels (which stack on top of the layout-assigned position).
+A flat pose routes the whole affine through one `matrix` channel, and a pose with depth or
+perspective through one `matrix3D` channel. Neither channel carries the pivot: `transform-origin`
+stays on the animated layer as `anchor`, which the runtime applies once after interpolation, so the
+pivot cannot drift between keyframes. Layout-affecting properties (`width`, `height`, `margin`,
+`padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped with
+`subset:animation-unsupported-property`.
 
 > Matrix-channel interpolation decomposes each keyframe into translation / scale / rotation / shear
 > and interpolates those components (`pagx/runtime/MatrixDecompose.h`); it cannot recover full turns
@@ -668,3 +667,28 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | `subset:animation-delay-replayed` | an infinite animation has a nonzero `animation-delay`; PAGX repeats the converted playback window instead of applying the delay only to initial playback |
 | `subset:animation-timeline-shifted` | a negative `animation-delay` moved the group's origin before CSS `t=0`; PAGX playback starts with the pre-roll |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |
+### 13.7 Perspective semantics
+
+CSS has two ways to declare a camera, and they disagree about the pivot:
+
+| Form | Where the projection lives | Does `transform-origin` conjugate it? |
+|------|----------------------------|----------------------------------------|
+| parent `perspective: <d>` + child `transform` | parent (a camera) | no — same as PAGX / AE / Lottie |
+| `transform: perspective(<d>) …` on the element | element (a camera of its own) | yes — CSS conjugates the whole function list |
+
+PAGX keeps the projection outside `anchor` (`M = P · T(anchor) · L · T(-anchor)`), i.e. the
+first form. `tools/html-snapshot` therefore rewrites the second form into the first: the element
+becomes a child of a wrapper carrying `perspective: <d>` and
+`perspective-origin: <the element's transform-origin>`, and its own transform loses the
+`perspective()` term. The two forms are algebraically equal for a pivot **on** the layer plane.
+
+Limits of that rewrite, in order of how often they are hit:
+
+* A pivot with depth (`transform-origin: 0 80px 30px`) cannot be carried over, because
+  `perspective-origin` has no z component; the rewrite is skipped (counted as `camera-skips:
+  depth-pivot` in `eval-animation`) and the projection order then differs from CSS by the
+  `origin × projection` term — a few pixels at `d = 600px` with a 30px pivot depth.
+* A flow / flex child of a `perspective` parent has no resolved offset at import time, so the
+  camera is projected about the parent's coordinate system as-is; one diagnostic reports it.
+* A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
+  warns once and falls back to the layer origin instead of the box centre.

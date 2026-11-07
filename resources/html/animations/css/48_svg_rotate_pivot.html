@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Inline SVG Rotate Off-Center Pivot</title>
+    <!--
+      Inline SVG shapes keep the structural pivot path (the pivot lives on the generated group), so
+      this case guards that the Layer anchor work does not pull shapes into the HTML matrix branch.
+      The static dot marks the shared pivot point at (30, 90).
+    -->
+    <style>
+      @keyframes sweep {
+        0%   { transform: rotate(-40deg); }
+        50%  { transform: rotate(40deg); }
+        100% { transform: rotate(-40deg); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <svg width="120" height="120" viewBox="0 0 120 120"
+         style="position: absolute; left: 60px; top: 20px;">
+      <rect x="24" y="84" width="72" height="12" rx="6" fill="#38BDF8"
+            style="transform-origin: 30px 90px; animation: sweep 2s ease-in-out infinite;"/>
+      <circle cx="30" cy="90" r="8" fill="#F472B6"/>
+    </svg>
+  </body>
+</html>

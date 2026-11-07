@@ -24,6 +24,7 @@
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
 
 namespace pagx {
 
@@ -104,6 +105,12 @@ class HTMLStyleCascade {
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
+  /**
+   * Returns the box size `transform-origin` should resolve against, falling back to an `<svg>`'s
+   * `width` / `height` attributes when CSS did not size the element.
+   */
+  HTMLTransformReference getTransformReferenceSize(const std::shared_ptr<DOMNode>& element);
+
   /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
    *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
   const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
@@ -118,8 +125,11 @@ class HTMLStyleCascade {
   void parseBoxPositioning(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxLayout(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap& props);
-  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props);
-  void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props);
+  void parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
+                       const HTMLTransformReference& reference, const std::string& elementName);
+  void parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props,
+                         const std::string& elementName, float referenceWidthPx,
+                         float referenceHeightPx);
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBorder(HTMLBoxAttributes& box, const std::string& border);

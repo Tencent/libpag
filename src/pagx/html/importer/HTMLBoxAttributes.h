@@ -24,7 +24,9 @@
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/types/Matrix3D.h"
 #include "pagx/types/Padding.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 
@@ -69,6 +71,13 @@ static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.5f;
  * whether to inherit further or use their own defaults).
  */
 struct HTMLInheritedStyle {
+  // CSS `perspective` declared on the *parent* element (px), pushed into this element's pose. Not
+  // inherited: `resolveInheritedStyle` resets it, and a parent sets it on the bag it hands to its
+  // direct children only. The origin is the parent's `perspective-origin` in the parent's local
+  // coordinates; the child subtracts its own offset to express it locally.
+  float parentPerspectivePx = 0.0f;
+  float parentPerspectiveOriginX = NAN;
+  float parentPerspectiveOriginY = NAN;
   std::string color = {};
   std::string fontFamily = {};
   std::string fontSize = {};
@@ -130,49 +139,20 @@ struct HTMLInheritedStyle {
 };
 
 /**
- * Resolved CSS `transform` for a single HTML element. Populated when the
- * `transform` declaration uses one of the supported single-function forms
- * (skewX/skewY/rotate/scale[X|Y]/translate[X|Y]), the `matrix(a, b, c, d,
- * tx, ty)` shorthand, or the `matrix3d(...)` 3D form (projected
- * orthographically onto its 2D affine subset). Compound function chains and
- * the remaining 3D variants (`rotate3d`/`perspective`/…) are dropped earlier
- * in the subset transformer.
+ * Resolved CSS `transform` for a single HTML element: the whole function list composed in CSS order
+ * into a 4x4 pose, plus the resolved `transform-origin`. The pivot is never folded into `pose`;
+ * `applyBoxTransform` writes it onto `Layer.anchor` so matrix / matrix3D keyframes stay un-pivoted.
  *
- * The single-function variants populate the discrete fields (skew/rotation/
- * scale/translate) so the existing TextBox path can map them straight onto
- * `TextBox.skew/skewAxis/rotation/scale`. ALL forms — including the
- * compound ones reached only through `matrix(...)` — additionally fill
- * `matrix` with the equivalent affine, so the new generic Layer path can
- * write it onto `Layer.matrix` regardless of the source CSS function used.
- * `valid` is false when no usable transform was set; in that case `matrix`
- * stays at the identity and the discrete fields keep their defaults
- * (skew/rotation/translate = 0; scale = 1).
+ * `valid` is false when the declaration is absent, `none`, or was rejected by the parser (which
+ * reports the reason). `originResolved` is false when a percentage / keyword origin could not be
+ * resolved because the reference box has no absolute size; the caller then pivots at the top-left.
  */
 struct HTMLTransform {
   bool valid = false;
-  float skew = 0.0f;        // pagx skew (deg); CSS skewX(α) -> -α; CSS skewY(α) -> α.
-  float skewAxis = 0.0f;    // pagx skewAxis (deg); 0 for skewX, 90 for skewY.
-  float rotation = 0.0f;    // pagx rotation (deg); from CSS rotate(α).
-  float scaleX = 1.0f;      // pagx scale.x; from CSS scale*().
-  float scaleY = 1.0f;      // pagx scale.y; from CSS scale*().
-  float translateX = 0.0f;  // CSS translate*().x in px; folded into Layer left/top.
-  float translateY = 0.0f;  // CSS translate*().y in px; folded into Layer left/top.
-  // Affine matrix equivalent of the parsed CSS transform. Single-function
-  // forms compose this from their discrete arguments; the `matrix(...)`
-  // form populates this directly. The matrix here is the *raw* CSS value;
-  // `transform-origin` is NOT folded in. Callers that consume the matrix on
-  // a non-text Layer must apply the origin themselves (typically `T(cx,cy)
-  // * matrix * T(-cx,-cy)` for the canonical `50% 50%` origin).
-  Matrix matrix = {};
-  // CSS `transform-origin` resolved to absolute pixels relative to the
-  // element's box. Both default to NaN, meaning "use the box's geometric
-  // centre" (the CSS default of `50% 50%` and the only origin Chromium
-  // emits when no source CSS overrides it). When the source CSS specifies
-  // a different origin, parseBoxTransform writes the resolved px values
-  // here so applyBoxTransform pivots around the requested point instead
-  // of the centre.
-  float originXPx = NAN;
-  float originYPx = NAN;
+  Matrix3D pose = {};
+  Point origin = {};
+  float originZ = 0.0f;
+  bool originResolved = false;
 };
 
 /**
@@ -327,10 +307,25 @@ struct HTMLBoxAttributes {
   // `fill`, which corresponds to PAGX `ScaleMode::Stretch`.
   std::string objectFit = {};
 
-  // Inline `transform` mapped to the TextBox / Group transform fields. Currently the
-  // importer only honours `valid == true` for text leaves (where the resolved fields
-  // get written onto the synthesised TextBox); on non-text elements the transform is
-  // dropped with a diagnostic at apply time because Layer has no skew/rotation fields.
+  // CSS `transform-style: preserve-3d`, forwarded onto `Layer.preserve3D`.
+  bool preserve3D = false;
+
+  // CSS `perspective` declared on the parent (px), folded into this element's pose. Stored on the box
+  // so the transform write and the animation registration read the same value regardless of which
+  // element happens to be converting when they run. `parentPerspectiveOrigin*` is the parent's
+  // `perspective-origin` re-expressed in this element's local coordinates.
+  float parentPerspectivePx = 0.0f;
+  float parentPerspectiveOriginX = NAN;
+  float parentPerspectiveOriginY = NAN;
+
+  // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
+  // projection on the layer that owns the pose, so the parent value is pushed into each child pose
+  // as `P * pose` (see HTMLTransform3D::PerspectiveMatrix). 0 means "no perspective".
+  float perspectivePx = 0.0f;
+  // CSS `perspective-origin` of the camera above, in this box's local pixels (default: the centre).
+  float perspectiveOriginX = NAN;
+  float perspectiveOriginY = NAN;
+
   HTMLTransform transform = {};
 };
 

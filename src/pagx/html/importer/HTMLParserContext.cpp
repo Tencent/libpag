@@ -45,6 +45,36 @@ using namespace pagx::html;
 
 namespace {
 
+// Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
+// re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
+// absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
+// by layout, so its local origin is unknown here and the parent coordinates are used as-is.
+void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY,
+                            const std::string& elementName, HTMLDiagnosticSink& diagnostics,
+                            bool& warnedFlowChild) {
+  box.parentPerspectivePx = distancePx;
+  box.parentPerspectiveOriginX = NAN;
+  box.parentPerspectiveOriginY = NAN;
+  if (!(distancePx > 0.0f) || !std::isfinite(originX) || !std::isfinite(originY)) {
+    // The declaring box had no absolute size; the projection step reports that once.
+    return;
+  }
+  // The camera only changes the result when the child's pose leaves the z = 0 plane (or its pivot
+  // sits in front of it); a plain child of a `perspective` flex container is unaffected.
+  const bool cameraAffectsPose = box.transform.valid && (!IsFlatTransform(box.transform.pose) ||
+                                                         std::fabs(box.transform.originZ) > 0.0f);
+  if (!box.absolute && cameraAffectsPose && !warnedFlowChild) {
+    // One diagnostic per document: a flex container with many children would otherwise repeat it.
+    diagnostics.warn(
+        "html: perspective on the parent of <" + elementName +
+        "> cannot be projected around the exact vanishing point: a flow / flex child "
+        "has no resolved offset, so the perspective centre follows its layout position");
+    warnedFlowChild = true;
+  }
+  box.parentPerspectiveOriginX = originX - (std::isnan(box.leftPx) ? 0.0f : box.leftPx);
+  box.parentPerspectiveOriginY = originY - (std::isnan(box.topPx) ? 0.0f : box.topPx);
+}
+
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
 // All importer-controlled transformer behaviour funnels through here so adding a new shared
 // option only edits one location instead of being mirrored at every parseDOM() call site.
@@ -367,7 +397,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // shapes and ordinary elements can belong to the same timing group. Discarded candidates may
   // affect this origin; finalizeTiming corrects it after the playable objects have been emitted.
   for (auto& entry : _pendingAnimations) {
-    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.first), false);
+    _animationBuilder->prepareTiming(_styleCascade->getResolvedStyle(entry.element), false);
   }
   for (auto& shape : _pendingSvgShapeAnimations) {
     _animationBuilder->prepareTiming(shape.style, true);
@@ -375,8 +405,10 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   // Build PAGX animations for every recorded animated element now that the full layer tree
   // (including background fills consumed by `color` channels) exists. See spec §13.
   for (auto& entry : _pendingAnimations) {
-    const auto& style = _styleCascade->getResolvedStyle(entry.first);
-    _animationBuilder->buildForElement(style, entry.second);
+    const auto& style = _styleCascade->getResolvedStyle(entry.element);
+    _animationBuilder->buildForElement(
+        style, entry.layer, _styleCascade->getTransformReferenceSize(entry.element),
+        entry.parentPerspectivePx, entry.parentPerspectiveOriginX, entry.parentPerspectiveOriginY);
   }
   // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
@@ -593,14 +625,17 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 // ID assignment with animation registration hook.
 //==================================================================================================
 
-void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
+                                        float parentPerspectivePx, float parentPerspectiveOriginX,
+                                        float parentPerspectiveOriginY) {
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
   if (layer != nullptr && element != nullptr) {
     const auto& style = _styleCascade->getResolvedStyle(element);
     if (style.count("animation") > 0 || style.count("animation-name") > 0) {
-      _pendingAnimations.emplace_back(element, layer);
+      _pendingAnimations.push_back({element, layer, parentPerspectivePx, parentPerspectiveOriginX,
+                                    parentPerspectiveOriginY});
     }
   }
 }
@@ -693,8 +728,14 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
+                           _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(
-        _textFragmentBuilder->convertPAGXTextHost(element, inherited), box);
+        _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
+                                                  box.parentPerspectiveOriginX,
+                                                  box.parentPerspectiveOriginY),
+        box);
   }
 
   if (tag == "br") {
@@ -712,16 +753,25 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
+                           _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
+                           _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+  ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                         inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
+                         _flowChildPerspectiveWarned);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
@@ -782,7 +832,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     }
   }
 
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box);
 
   // Must run after applyBackgroundVisuals(): the fold reuses the rounded Rectangle just
   // emitted into `layer->contents` as the image's fill geometry.
@@ -803,10 +853,18 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
+  // CSS `perspective` projects the direct children, so the bag handed down carries it only one level.
+  HTMLInheritedStyle childInherited = inherited;
+  childInherited.parentPerspectivePx = box.perspectivePx;
+  if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
+      std::isfinite(box.perspectiveOriginY)) {
+    childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
+    childInherited.parentPerspectiveOriginY = box.perspectiveOriginY;
+  }
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto* childLayer = convertElement(child, inherited, depth + 1);
+      auto* childLayer = convertElement(child, childInherited, depth + 1);
       if (childLayer) {
         // CSS border-box: position:absolute descendants are positioned relative to the
         // parent's padding box, which sits inside the border. Shift their explicit
@@ -842,7 +900,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
   applyRoundedOverflowClip(layer, box);
-  assignElementId(wrapper, element);
+  assignElementId(wrapper, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
+                  box.parentPerspectiveOriginY);
   return wrapper;
 }
 
@@ -859,7 +918,8 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   // assignment does not enqueue CSS animations for the post-tree animation pass. Without this,
   // animations on <span>/<a>/<p>/<h1>... elements are silently dropped while identical styles on
   // a <div> work, which is especially visible for per-character text animations.
-  assignElementId(layer, element);
+  assignElementId(layer, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
+                  box.parentPerspectiveOriginY);
   return layer;
 }
 
