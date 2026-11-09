@@ -50,8 +50,8 @@ namespace {
 // absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
 // by layout, so its local origin is unknown here and the parent coordinates are used as-is.
 void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY,
-                            const std::string& elementName, HTMLDiagnosticSink& diagnostics,
-                            bool& warnedFlowChild) {
+                            float parentBorderWidthPx, const std::string& elementName,
+                            HTMLDiagnosticSink& diagnostics, bool& warnedFlowChild) {
   box.parentPerspectivePx = distancePx;
   box.parentPerspectiveOriginX = NAN;
   box.parentPerspectiveOriginY = NAN;
@@ -63,16 +63,28 @@ void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float orig
   // sits in front of it); a plain child of a `perspective` flex container is unaffected.
   const bool cameraAffectsPose = box.transform.valid && (!IsFlatTransform(box.transform.pose) ||
                                                          std::fabs(box.transform.originZ) > 0.0f);
-  if (!box.absolute && cameraAffectsPose && !warnedFlowChild) {
+  // An absolute child resolves its offset from the parent's padding box; a flow / flex child is
+  // placed by layout, and a `right` / `bottom` positioned one has no `left` / `top`, so neither has
+  // an offset that can be expressed here.
+  const bool resolvedOffset = box.absolute && std::isfinite(box.leftPx) && std::isfinite(box.topPx);
+  if (!resolvedOffset && cameraAffectsPose && !warnedFlowChild) {
     // One diagnostic per document: a flex container with many children would otherwise repeat it.
     diagnostics.warn(
         "html: perspective on the parent of <" + elementName +
-        "> cannot be projected around the exact vanishing point: a flow / flex child "
-        "has no resolved offset, so the perspective centre follows its layout position");
+        "> cannot be projected around the exact vanishing point: the child has no resolved offset "
+        "(flow / flex placement, or positioned by right / bottom), so the perspective centre "
+        "follows the parent origin");
     warnedFlowChild = true;
   }
-  box.parentPerspectiveOriginX = originX - (std::isnan(box.leftPx) ? 0.0f : box.leftPx);
-  box.parentPerspectiveOriginY = originY - (std::isnan(box.topPx) ? 0.0f : box.topPx);
+  if (!resolvedOffset) {
+    box.parentPerspectiveOriginX = originX;
+    box.parentPerspectiveOriginY = originY;
+    return;
+  }
+  // `perspective-origin` lives in the parent's border box, the child's `left` / `top` in its padding
+  // box, so the border width sits between the two.
+  box.parentPerspectiveOriginX = originX - (parentBorderWidthPx + box.leftPx);
+  box.parentPerspectiveOriginY = originY - (parentBorderWidthPx + box.topPx);
 }
 
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
@@ -681,6 +693,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   // the bag handed down carries the camera one level (see convertContainer).
   HTMLInheritedStyle childInherited = inherited;
   childInherited.parentPerspectivePx = box.perspectivePx;
+  childInherited.parentBorderWidthPx = box.borderWidthPx;
   if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
       std::isfinite(box.perspectiveOriginY)) {
     childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
@@ -739,8 +752,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
     ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
-                           _flowChildPerspectiveWarned);
+                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(
         _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
                                                   box.parentPerspectiveOriginX,
@@ -764,15 +777,15 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
     ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
-                           _flowChildPerspectiveWarned);
+                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
     ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
-                           _flowChildPerspectiveWarned);
+                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
@@ -780,8 +793,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
   ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                         inherited.parentPerspectiveOriginY, element->name, *_diagnostics,
-                         _flowChildPerspectiveWarned);
+                         inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+                         element->name, *_diagnostics, _flowChildPerspectiveWarned);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
@@ -866,6 +879,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // CSS `perspective` projects the direct children, so the bag handed down carries it only one level.
   HTMLInheritedStyle childInherited = inherited;
   childInherited.parentPerspectivePx = box.perspectivePx;
+  childInherited.parentBorderWidthPx = box.borderWidthPx;
   if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
       std::isfinite(box.perspectiveOriginY)) {
     childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
