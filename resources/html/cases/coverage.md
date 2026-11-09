@@ -83,6 +83,7 @@ Legend: [x] covered in this phase (P1) · [ ] reserved for a later phase.
 | `transform-origin` three value | pivot depth kept (`anchorZ`) | `13-transform__transform-origin-three-value` |
 | `transform-origin` with pure translate | pivot is a no-op, no anchor emitted | `13-transform__transform-origin-translate` |
 | `transform` compound chain / `rotate3d` / `perspective()` | supported; 4x4 pose -> `Layer.matrix3D` | `13-transform__rotate-chained`, `...rotate3d`, `...perspective` |
+| `perspective()` on a static box | snapshot rewrites it into a parent camera layer; `perspective-origin` keeps the element `transform-origin`, a pivot with depth keeps the function form | `13-transform__static-perspective-origin` |
 | `overflow: hidden` | clipToBounds | `14-overflow-clip__overflow-hidden` |
 | `clip-path: url(#id)` | contour mask (XFAIL) | `14-overflow-clip__clip-path-url` |
 | `clip-path: polygon()` | dropped | `14-overflow-clip__clip-path-polygon` |
