@@ -282,6 +282,7 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   out.parentPerspectivePx = 0.0f;
   out.parentPerspectiveOriginX = NAN;
   out.parentPerspectiveOriginY = NAN;
+  out.parentBorderWidthPx = 0.0f;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);

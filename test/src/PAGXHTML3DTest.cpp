@@ -1098,6 +1098,69 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveOriginKeywordMatchesTheEquivalentPixels) {
 }
 
 /**
+ * Test case: `perspective-origin` is measured in the parent's border box, the child's `left` / `top`
+ * in the parent's padding box. A 20px border therefore shifts the camera origin by 20px; the same
+ * page written with `perspective-origin: -20px -20px` and no border has to produce the same pose.
+ */
+PAG_TEST(PAGXHTML3DTest, BorderWidthInsetsTheParentCameraOrigin) {
+  auto withBorder = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:160px;height:100px;border:20px solid #888;
+           perspective:600px;perspective-origin:0px 0px">
+        <div id="card" style="position:absolute;left:0;top:0;width:80px;height:60px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  auto noBorder = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:140px;
+           perspective:600px;perspective-origin:-20px -20px">
+        <div id="card" style="position:absolute;left:0;top:0;width:80px;height:60px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(withBorder, nullptr);
+  ASSERT_NE(noBorder, nullptr);
+  auto* bordered = FindLayerById(withBorder, "card");
+  auto* plain = FindLayerById(noBorder, "card");
+  ASSERT_NE(bordered, nullptr);
+  ASSERT_NE(plain, nullptr);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_TRUE(NearlyEqual(bordered->matrix3D.getRowColumn(row, column),
+                              plain->matrix3D.getRowColumn(row, column), 1e-5f))
+          << "row " << row << " column " << column;
+    }
+  }
+}
+
+/**
+ * Test case: an absolutely positioned child placed by `right` / `bottom` has no `left` / `top`, so
+ * the parent camera cannot be expressed in its local coordinates; that has to be reported instead of
+ * silently pinning the vanishing point to the parent origin.
+ */
+PAG_TEST(PAGXHTML3DTest, RightPositionedChildUnderPerspectiveWarns) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div style="position:absolute;right:10px;top:10px;width:80px;height:60px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int warnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("vanishing point") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1);
+}
+
+/**
  * Test case: `perspective` declared on `<body>` projects its direct children, the same way it does on
  * any other container. `convertBody` used to hand the inherited style down unchanged, so a page-level
  * camera was dropped and every 3D transform rendered without perspective.

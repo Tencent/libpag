@@ -78,6 +78,9 @@ struct HTMLInheritedStyle {
   float parentPerspectivePx = 0.0f;
   float parentPerspectiveOriginX = NAN;
   float parentPerspectiveOriginY = NAN;
+  // The parent's border width: `perspective-origin` is measured in the parent's border box, while an
+  // absolutely positioned child's `left` / `top` start at its padding box, so the offset needs this.
+  float parentBorderWidthPx = 0.0f;
   std::string color = {};
   std::string fontFamily = {};
   std::string fontSize = {};
