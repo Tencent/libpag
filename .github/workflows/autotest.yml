@@ -152,6 +152,8 @@ jobs:
 
       - name: Run macOS Metal Autotest
         id: metal_autotest
+        env:
+          NSZombieEnabled: 'YES'
         run: |
           touch "$RUNNER_TEMP/metal-autotest-start"
           mkdir -p third_party/tgfx/out/cache
