@@ -78,7 +78,7 @@ python3 tools/anim_coverage.py --check
 | Text | `fontStyle` | ✘ | `text/09` |
 | Text | `letterSpacing` | ✔ | `text/05` |
 | Text | `text` | ✘ | `text/03` |
-| Text | `x` | ✔ | `text/10` |
+| Text | `x` | ✔ | `combo/05`、`text/10` |
 | Text | `y` | ✔ | `text/11` |
 | TextPath | `alpha` `anchor.x` `anchor.y` `position.x` `position.y` `rotation` `scale.x` `scale.y` `skew` `skewAxis` | ✘ | — |
 | Rectangle | `position.x` | ✘ | `geometry/07` |
@@ -215,6 +215,7 @@ python3 tools/anim_coverage.py --check
 | `Group.rotation` | 3 | `combo/04`、`group/04·07` |
 | `Group.scale.x` | 2 | `combo/04`、`group/05` |
 | `Group.scale.y` | 2 | `combo/04`、`group/06` |
+| `Text.x` | 2 | `combo/05`、`text/10` |
 | `Rectangle.size.width` | 2 | `geometry/01·05` |
 | `Fill.alpha` | 4 | `fill/*`（4） |
 | `Fill.color` | 5 | `fill/01·03`、`geometry/05`、`sharing/02·03` |
@@ -316,6 +317,11 @@ node tools/html-snapshot/eval-animation/run.js \
 同时让 `anim_coverage.py --check` 不再因为“gap 用例却有 `@keyframes`”而报错。当前唯一使用它的是
 `layer/12_perspective`（`css-perspective-interpolation`）：CSS 在两条 `perspective()` 之间按矩阵分解
 （等价于对 `1/d` 线性）插值，而运行时按通道值线性取 `d` 再重算矩阵，中间帧必然分叉，端点一致。
+
+`combo/05_text_x_with_font_size`（`text-reflow-anchor`）：`x` 单独动画时走 SVG `<text>`，基线精确
+（`text/10` 0.98）；叠加 `fontSize` 后基线随字号下移，而 SVG 的 `y` 是固定属性（实测在关键帧里动画 `y`
+无效），只能退回 CSS span 路径，于是又受 span 基线偏低 1~2px 的影响，均值 0.90。要修需要让 SVG 关键帧
+同时补偿基线位移（`transform` 纵向分量实测 0.93，仍不够），尚未实现。
 
 `stroke/05_miter_limit`（`static-miter-join-rendering`）：通道本身已导出，但 `miterLimit > 1` 时**静态**导出的
 尖角几何就与参考差约 1.4%（1/4/10/20 里只有 1 完全一致，其余结果相同），属于既有静态差异，**计划后续修**。

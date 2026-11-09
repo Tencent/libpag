@@ -2705,6 +2705,9 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           if (role == TargetChannelRole::TextAnchorX || role == TargetChannelRole::TextAnchorY) {
             _ctx.animation.svgBaselineTexts.insert(static_cast<const Text*>(targetNode));
           }
+          if (role == TargetChannelRole::FontSize || role == TargetChannelRole::LetterSpacing) {
+            _ctx.animation.reflowingTexts.insert(static_cast<const Text*>(targetNode));
+          }
         }
       }
       if (nType == NodeType::Layer) {
