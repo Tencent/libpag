@@ -660,6 +660,9 @@ enum class TargetChannelRole {
   RepeaterCopies,
   RepeaterStartAlpha,
   RepeaterPositionX,
+  // Text.x / Text.y are layout channels: they move the text anchor, not a transform.
+  TextAnchorX,
+  TextAnchorY,
   // RangeSelector range channels fan out to the glyphs of the TextModifier that owns the selector.
   RangeSelectorStart,
   RangeSelectorEnd,
@@ -759,6 +762,8 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Group, "skewAxis", TargetChannelRole::SkewAxis},
     {NodeType::Text, "fontSize", TargetChannelRole::FontSize},
     {NodeType::Text, "letterSpacing", TargetChannelRole::LetterSpacing},
+    {NodeType::Text, "x", TargetChannelRole::TextAnchorX},
+    {NodeType::Text, "y", TargetChannelRole::TextAnchorY},
     {NodeType::TextBox, "alpha", TargetChannelRole::Opacity},
     {NodeType::TextBox, "position.x", TargetChannelRole::GroupPosX},
     {NodeType::TextBox, "position.y", TargetChannelRole::GroupPosY},
@@ -813,6 +818,10 @@ struct DomTargetBundle {
   int repeaterIndex = -1;
   // Set for a RangeSelector glyph bundle: index into AnimationState::rangeSelectorGlyphs.
   int rangeGlyphIndex = -1;
+  // Set for a Text bundle whose x/y channel is animated: the left/top the tag was placed at.
+  bool hasTextOrigin = false;
+  float textOriginX = 0.0f;
+  float textOriginY = 0.0f;
 };
 
 struct FilterChannelSlot {
@@ -839,6 +848,8 @@ struct BundleChannelSet {
   const Channel* repeaterCopiesCh = nullptr;
   const Channel* repeaterStartAlphaCh = nullptr;
   const Channel* repeaterPositionXCh = nullptr;
+  const Channel* textAnchorXCh = nullptr;
+  const Channel* textAnchorYCh = nullptr;
   const Channel* rangeStartCh = nullptr;
   const Channel* rangeEndCh = nullptr;
   const Channel* rangeOffsetCh = nullptr;
@@ -998,6 +1009,12 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::RepeaterCopies:
       out.repeaterCopiesCh = ch;
       out.repeaterTarget = static_cast<const Repeater*>(objTarget);
+      return true;
+    case TargetChannelRole::TextAnchorX:
+      out.textAnchorXCh = ch;
+      return true;
+    case TargetChannelRole::TextAnchorY:
+      out.textAnchorYCh = ch;
       return true;
     case TargetChannelRole::RepeaterStartAlpha:
       out.repeaterStartAlphaCh = ch;
@@ -1255,6 +1272,18 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
 
 void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                              std::string& decls, bool& needsZeroOrigin) {
+  if ((chSet.textAnchorXCh != nullptr || chSet.textAnchorYCh != nullptr) && bundle.hasTextOrigin &&
+      bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Text) {
+    // Text.x / Text.y feed the layout anchor, so the tag keeps its position:absolute placement and
+    // the frame moves left/top by the channel delta instead of wrapping it in a transform.
+    const Text* text = static_cast<const Text*>(bundle.primaryHost);
+    float x = EvalFloatChannel(chSet.textAnchorXCh, t, text->position.x);
+    float y = EvalFloatChannel(chSet.textAnchorYCh, t, text->position.y);
+    AppendCssDecl(decls, "left",
+                  CssFloatToString(bundle.textOriginX + x - text->position.x) + "px");
+    AppendCssDecl(decls, "top", CssFloatToString(bundle.textOriginY + y - text->position.y) + "px");
+    return;
+  }
   bool hasRepeaterChannel =
       chSet.repeaterCopiesCh != nullptr || chSet.repeaterRotationCh != nullptr ||
       chSet.repeaterStartAlphaCh != nullptr || chSet.repeaterPositionXCh != nullptr;
@@ -1868,6 +1897,20 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::Text) {
+      auto originIt = ctx.animation.textOrigins.find(targetNode);
+      if (originIt != ctx.animation.textOrigins.end()) {
+        DomTargetBundle textBundle;
+        textBundle.domId = targetNode->id;
+        textBundle.primaryHost = targetNode;
+        textBundle.objects.push_back(obj);
+        textBundle.hasTextOrigin = true;
+        textBundle.textOriginX = originIt->second.first;
+        textBundle.textOriginY = originIt->second.second;
+        bundles.push_back(std::move(textBundle));
+        continue;
+      }
+    }
     if (nType == NodeType::RangeSelector) {
       const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
       for (size_t index = 0; index < glyphs.size(); ++index) {

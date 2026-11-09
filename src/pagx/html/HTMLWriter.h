@@ -362,6 +362,9 @@ class HTMLWriterContext {
       float fontSize = 0.0f;
       std::string id = {};
     };
+    // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
+    // shift that anchor per frame instead of re-deriving the layout.
+    std::unordered_map<const Node*, std::pair<float, float>> textOrigins = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 

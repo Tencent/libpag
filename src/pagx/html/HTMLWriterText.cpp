@@ -907,6 +907,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
     }
+    if (!text->id.empty()) {
+      // The frame list shifts this anchor when the x/y channel is animated.
+      _ctx->animation.textOrigins[text] = {posX, ty};
+    }
   }
   if (text->fauxItalic) {
     // Use Chromium's native synthesized italic instead of a CSS transform. `font-style:italic`
