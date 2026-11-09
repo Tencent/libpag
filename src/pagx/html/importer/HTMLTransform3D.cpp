@@ -20,7 +20,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
-#include <utility>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
