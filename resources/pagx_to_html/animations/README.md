@@ -189,9 +189,7 @@ python3 tools/anim_coverage.py --check
 | InnerShadowFilter | `blurX` `blurY` `offsetX` `offsetY` `shadowOnly` | ✘ | — |
 | InnerShadowFilter | `color` | ✔ | `filter/13` |
 | BlendFilter | `color` | ✔ | `filter/09` |
-| NoiseFilter | `color` `firstColor` `secondColor` `seed` `size` | ✘ | — |
-| NoiseFilter | `density` | ✘ | `filter/10` |
-| NoiseFilter | `opacity` | ✘ | `filter/19` |
+| NoiseFilter | `color` `density` `firstColor` `opacity` `secondColor` `seed` `size` | ✘ | — |
 
 ## 2. 同一通道的用例分布（精简性检查）
 
