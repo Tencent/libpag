@@ -76,14 +76,28 @@ cmake -S "$WORKSPACE" -B "$WORKSPACE/build" "${CMAKE_BACKEND_ARGS[@]}" \
 cmake --build "$WORKSPACE/build" --target "PAGFullTest_$TARGET_SUFFIX" -- -j 12
 
 cd "$WORKSPACE/build"
-TEST_RESULT=0
-"./PAGFullTest_$TARGET_SUFFIX" --gtest_output=json:PAGFullTest.json || TEST_RESULT=$?
-cp -a "$WORKSPACE/build/"*.json "$WORKSPACE/result/"
+set +e
+"./PAGFullTest_$TARGET_SUFFIX" --gtest_output=json:PAGFullTest.json 2>&1 | \
+  tee "$WORKSPACE/result/PAGFullTest_$TARGET_SUFFIX.log"
+TEST_STATUS=("${PIPESTATUS[@]}")
+set -e
+TEST_RESULT=${TEST_STATUS[0]}
+COLLECT_RESULT=${TEST_STATUS[1]}
+if [ -f "$WORKSPACE/build/PAGFullTest.json" ]; then
+  cp -a "$WORKSPACE/build/"*.json "$WORKSPACE/result/" || COLLECT_RESULT=$?
+elif [ "$TEST_RESULT" -eq 0 ]; then
+  echo "PAGFullTest_$TARGET_SUFFIX did not produce PAGFullTest.json." >&2
+  COLLECT_RESULT=1
+fi
 if [ -d "$WORKSPACE/test/out" ]; then
-  cp -R "$WORKSPACE/test/out" "$WORKSPACE/result/"
+  cp -R "$WORKSPACE/test/out" "$WORKSPACE/result/" || COLLECT_RESULT=$?
 fi
 if [ "$TEST_RESULT" -ne 0 ]; then
-  echo "PAGFullTest_$TARGET_SUFFIX ($BACKEND_NAME) failed." >&2
+  echo "PAGFullTest_$TARGET_SUFFIX ($BACKEND_NAME) failed with exit code $TEST_RESULT." >&2
   exit "$TEST_RESULT"
+fi
+if [ "$COLLECT_RESULT" -ne 0 ]; then
+  echo "Collecting PAGFullTest_$TARGET_SUFFIX results failed." >&2
+  exit "$COLLECT_RESULT"
 fi
 echo "PAGFullTest_$TARGET_SUFFIX ($BACKEND_NAME) passed."

@@ -151,10 +151,52 @@ jobs:
         shell: bash
 
       - name: Run macOS Metal Autotest
+        id: metal_autotest
         run: |
+          touch "$RUNNER_TEMP/metal-autotest-start"
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
           ./autotest.sh USE_METAL --skip-images
+        shell: bash
+
+      - name: Collect Metal Crash Diagnostics
+        if: ${{ failure() && steps.metal_autotest.outcome == 'failure' }}
+        timeout-minutes: 5
+        run: |
+          CRASH_DIR="$GITHUB_WORKSPACE/result/crash"
+          mkdir -p "$CRASH_DIR"
+          git rev-parse HEAD > "$CRASH_DIR/commit.txt"
+          shopt -s nullglob
+          for ((WAITED=0; WAITED<30; WAITED+=5)); do
+            sleep 5
+            for REPORT_DIR in "$HOME/Library/Logs/DiagnosticReports" "/Library/Logs/DiagnosticReports"; do
+              if [ -d "$REPORT_DIR" ] && [ -f "$RUNNER_TEMP/metal-autotest-start" ]; then
+                find "$REPORT_DIR" -type f -newer "$RUNNER_TEMP/metal-autotest-start" \
+                  \( -name 'PAGFullTest_Metal*.ips' -o -name 'PAGFullTest_Metal*.crash' \) \
+                  -exec cp -p {} "$CRASH_DIR/" \; || \
+                  echo "::warning::Could not collect all Metal crash reports from $REPORT_DIR."
+              fi
+            done
+            REPORTS=("$CRASH_DIR/"*.ips "$CRASH_DIR/"*.crash)
+            if [ "${#REPORTS[@]}" -ne 0 ]; then
+              break
+            fi
+          done
+          if [ "${#REPORTS[@]}" -eq 0 ]; then
+            echo "::warning::No PAGFullTest_Metal crash report was found within 30 seconds."
+          fi
+          BINARY="$GITHUB_WORKSPACE/build/PAGFullTest_Metal"
+          if [ -f "$BINARY" ]; then
+            cp -p "$BINARY" "$CRASH_DIR/" || \
+              echo "::warning::Could not copy the Metal test executable."
+            xcrun dwarfdump --uuid "$BINARY" > "$CRASH_DIR/binary-uuid.txt" 2>&1 || \
+              echo "::warning::Could not read the Metal test executable UUID."
+            xcrun dsymutil "$BINARY" -o "$CRASH_DIR/PAGFullTest_Metal.dSYM" \
+              > "$CRASH_DIR/dsymutil.log" 2>&1 || \
+              echo "::warning::Could not generate Metal test debug symbols. See dsymutil.log."
+          else
+            echo "::warning::The Metal test executable is unavailable."
+          fi
         shell: bash
 
       - name: Save Third-Party Cache
