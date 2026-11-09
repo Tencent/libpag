@@ -8,6 +8,8 @@ const {
   perspectiveOriginXY,
   recordCameraSkip,
   pagxCameraSkips,
+  staticCameraFor,
+  withPerspectiveCamera,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -155,5 +157,41 @@ describe('camera skip accounting', () => {
 
   test('reports an empty map before anything was skipped', () => {
     expect(pagxCameraSkips()).toEqual({});
+  });
+});
+
+describe('static camera placement', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+  });
+
+  const named = '<div name="card" style="position: absolute; left: 20px; top: 20px; width: 120px; height: 80px">x</div>';
+
+  test('reads the camera from the pre-strip computed transform', () => {
+    // `computed.transform` is the matrix3d the browser reports for `perspective(600px) rotateY(20deg)`.
+    const projected = {
+      transform:
+        'matrix3d(0.939693, 0, -0.34202, 0.00057, 0, 1, 0, 0, 0.34202, 0, 0.939693, -0.001566, 0, 0, 0, 1)',
+      transformOrigin: '0px 40px',
+    };
+    // The fixture is a 6-decimal matrix, so the recovered distance is 600.06 rather than exactly 600.
+    expect(staticCameraFor(projected).distance).toBeCloseTo(600, 0);
+    // A flat matrix3d carries no projection, so nothing to wrap.
+    expect(
+      staticCameraFor({ transform: 'matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1)' }),
+    ).toBeNull();
+    expect(staticCameraFor({ transform: 'matrix(1, 0, 0, 1, 5, 5)' })).toBeNull();
+  });
+
+  test('the stripped re-entry never adds a second camera layer', () => {
+    // `renderElementBox` re-renders the same element with its transform cleared; wrapping there would
+    // put the camera above the author `name` (it is applied by the outermost call).
+    const style = { transform: 'none', transformOrigin: '0px 40px' };
+    const html = '<div style="position: absolute; left: 0px; top: 0px; width: 120px; height: 80px">x</div>';
+    expect(withPerspectiveCamera(html, { _strippedTransform: true }, style, { distance: 600 })).toBe(html);
+    // The outermost call does wrap, after naming.
+    const wrapped = withPerspectiveCamera(named, {}, style, { distance: 600 });
+    expect(wrapped).toContain('perspective: 600px');
+    expect(wrapped).toContain('<div name="card" style="position: absolute; left: 0px;');
   });
 });
