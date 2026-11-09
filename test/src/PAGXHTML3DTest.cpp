@@ -1133,6 +1133,47 @@ PAG_TEST(PAGXHTML3DTest, Matrix3DFillHoldsKeepTheStatic2DTransform) {
 }
 
 /**
+ * Test case: `skewX` / `skew` carry the CSS sign. `skewX(a)` is `matrix(1, 0, tan a, 1)`, so a
+ * positive angle leans the bottom edge to the right; the importer used to negate it, which mirrored
+ * the shear on the HTML -> PAGX -> HTML round trip.
+ */
+PAG_TEST(PAGXHTML3DTest, SkewKeepsTheCssSign) {
+  auto skewX = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:60px;height:40px;background-color:#000;transform:skewX(30deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(skewX, nullptr);
+  auto* skewXBox = FindLayerById(skewX, "box");
+  ASSERT_NE(skewXBox, nullptr);
+  EXPECT_TRUE(NearlyEqual(skewXBox->matrix.c, 0.577350f, 0.001f)) << "c = +tan(30deg)";
+  EXPECT_TRUE(NearlyEqual(skewXBox->matrix.b, 0.0f, 0.001f));
+
+  auto skewY = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:60px;height:40px;background-color:#000;transform:skewY(30deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(skewY, nullptr);
+  auto* skewYBox = FindLayerById(skewY, "box");
+  ASSERT_NE(skewYBox, nullptr);
+  EXPECT_TRUE(NearlyEqual(skewYBox->matrix.b, 0.577350f, 0.001f)) << "b = +tan(30deg)";
+  EXPECT_TRUE(NearlyEqual(skewYBox->matrix.c, 0.0f, 0.001f));
+
+  auto skewBoth = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:60px;height:40px;background-color:#000;
+           transform:skew(20deg, 10deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(skewBoth, nullptr);
+  auto* skewBothBox = FindLayerById(skewBoth, "box");
+  ASSERT_NE(skewBothBox, nullptr);
+  EXPECT_TRUE(NearlyEqual(skewBothBox->matrix.c, 0.363970f, 0.001f)) << "c = +tan(20deg)";
+  EXPECT_TRUE(NearlyEqual(skewBothBox->matrix.b, 0.176327f, 0.001f)) << "b = +tan(10deg)";
+}
+
+/**
  * Test case: `<transform-list>` needs no separator between functions, so minified CSS
  * (`rotate(45deg)scale(2)`) composes exactly like the spaced form.
  */
