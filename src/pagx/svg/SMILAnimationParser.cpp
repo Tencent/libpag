@@ -3200,8 +3200,7 @@ Animation* SMILAnimationParser::buildAnimation(
           if (targetNode != nullptr && targetNode->nodeType() == NodeType::Layer) {
             const auto& staticPose = static_cast<Layer*>(targetNode)->matrix;
             for (auto* channel : obj->channels) {
-              if (channel->name != "matrix" ||
-                  channel->valueType() != ChannelValueType::Matrix) {
+              if (channel->name != "matrix" || channel->valueType() != ChannelValueType::Matrix) {
                 continue;
               }
               auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
