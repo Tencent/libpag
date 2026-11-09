@@ -550,6 +550,13 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
     shifted.push_back(shiftedKey);
   }
   std::stable_sort(shifted.begin(), shifted.end(), KeyframeTimeLess<T>);
+  // wrap-around can map the first and last key onto the same phase; keep the times strictly
+  // increasing so a track keyed by timestamp does not drop one of them.
+  for (size_t i = 1; i < shifted.size(); ++i) {
+    if (shifted[i].time <= shifted[i - 1].time) {
+      shifted[i].time = shifted[i - 1].time + 1;
+    }
+  }
   channel->keyframes = std::move(shifted);
 }
 
@@ -1588,8 +1595,11 @@ static bool IsIndefiniteRepeat(const std::shared_ptr<DOMNode>& element) {
 }
 
 static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, KeyValue baseValue,
-                                  Frame beginFrames, Frame endFrame, bool fillFreeze) {
-  if (beginFrames > 0) {
+                                  Frame beginFrames, Frame endFrame, bool fillFreeze,
+                                  bool additive = false) {
+  // An additive channel has no meaningful pre-begin value of its own: its frame-0 base key would
+  // become part of the additive segment and shift the merge window back to 0.
+  if (beginFrames > 0 && !additive) {
     AppendKeyframe(channel, valueType, 0, baseValue, KeyframeInterpolationType::Hold, {}, {});
   }
   if (!fillFreeze && endFrame > 0) {
@@ -2310,7 +2320,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   KeyValue baseValue = ReadBaseValue(target);
   for (auto* ch : channels) {
-    AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze);
+    AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze,
+                          ctx.getAttribute(animElement, "additive") == "sum");
   }
 
   // SVG rects are anchored at the top-left corner while a PAGX Rectangle is anchored at its
@@ -2404,7 +2415,8 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
 
   // Add base-value keyframes for begin-offset and fill="remove" semantics.
   KeyValue baseValue = ReadBaseValue(target);
-  AddBaseValueKeyframes(channel, target.valueType, baseValue, beginFrames, endFrame, fillFreeze);
+  AddBaseValueKeyframes(channel, target.valueType, baseValue, beginFrames, endFrame, fillFreeze,
+                        ctx.getAttribute(setElement, "additive") == "sum");
 
   channels.push_back(channel);
   return channels;
@@ -2640,7 +2652,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
-                        fillFreeze);
+                        fillFreeze, additive);
   return channels;
 }
 
@@ -2849,6 +2861,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     }
     if (additive) {
       m = staticMatrix * m;
+    } else if (ctx.contentMatrixLayer() == nodeInfo.targetLayer) {
+      // Same rule as transform animations: the viewBox mapping only belongs to the layer that
+      // actually carries it, otherwise a hoisted pivot parent would apply it twice.
+      m = ctx.getContentMatrix() * m;
     }
     double sampleTime = motionKeyTimes.empty() ? normalizedTime : motionKeyTimes[i];
     Frame time = beginFrames + static_cast<Frame>(std::round(sampleTime * durFrames));
@@ -2909,7 +2925,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
-                        fillFreeze);
+                        fillFreeze, additive);
   return channels;
 }
 
@@ -2980,6 +2996,24 @@ Frame SMILAnimationParser::RepeatPeriodFrames(SVGParserContext& ctx,
   return static_cast<Frame>(std::round(durSeconds * frameRate));
 }
 
+// Orders the per-element animation entries by their first target id so the emitted
+// AnimationObject list does not depend on unordered_map iteration order.
+struct AnimatedEntryLess {
+  using Entry = std::pair<const DOMNode* const, std::vector<AnimatedNodeInfo>>;
+
+  bool operator()(const Entry* a, const Entry* b) const {
+    const std::string& left = a->second.empty() ? EmptyId() : a->second.front().targetId;
+    const std::string& right = b->second.empty() ? EmptyId() : b->second.front().targetId;
+    return left < right;
+  }
+
+ private:
+  static const std::string& EmptyId() {
+    static const std::string empty = {};
+    return empty;
+  }
+};
+
 Animation* SMILAnimationParser::buildAnimation(
     SVGParserContext& ctx, PAGXDocument* doc,
     const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations,
@@ -3015,7 +3049,17 @@ Animation* SMILAnimationParser::buildAnimation(
     }
   }
 
-  for (const auto& pair : animatedNodeMap) {
+  // The map is unordered, so walk it in target-id order: the AnimationObject list has to be
+  // reproducible, and per-target ordering alone does not pin the cross-element order.
+  std::vector<const AnimatedEntryLess::Entry*> nodeEntries = {};
+  nodeEntries.reserve(animatedNodeMap.size());
+  for (const auto& entry : animatedNodeMap) {
+    nodeEntries.push_back(&entry);
+  }
+  std::sort(nodeEntries.begin(), nodeEntries.end(), AnimatedEntryLess{});
+
+  for (const auto* nodeEntry : nodeEntries) {
+    const auto& pair = *nodeEntry;
     auto smilIt = smilAnimations.find(pair.first);
     if (smilIt == smilAnimations.end()) {
       continue;
