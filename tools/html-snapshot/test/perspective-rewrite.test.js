@@ -10,6 +10,9 @@ const {
   pagxCameraSkips,
   staticCameraFor,
   withPerspectiveCamera,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
+  pagxAnimCameraClones,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -104,9 +107,13 @@ describe('rewritePerspectiveKeyframes', () => {
       '@keyframes pagxAnim0 { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } ' +
       '100% { transform: matrix3d(0.5, 0, -0.866025, 0.001443, 0, 1, 0, 0, 0.866025, 0, 0.5, -0.000833, 0, 0, 0, 1); } }';
     const rewritten = rewritePerspectiveKeyframes(css);
-    expect(rewritten).not.toContain('-0.00117851');
-    expect(rewritten).not.toContain('-0.000833');
-    expect(rewritten).toContain('@keyframes pagxAnim0');
+    // The stripped copy is what a wrapped element plays; a `__pagxCam` clone keeps the projection for
+    // elements whose wrapper is declined at render time.
+    const stripped = rewritten.slice(0, rewritten.indexOf('__pagxCam'));
+    expect(stripped).not.toContain('-0.00117851');
+    expect(stripped).not.toContain('-0.000833');
+    expect(stripped).toContain('@keyframes pagxAnim0');
+    expect(rewritten).toContain('@keyframes pagxAnim0__pagxCam {');
     expect(globalThis.__pagxAnimCameras['pagxAnim0']).toBeCloseTo(600, 2);
   });
 
@@ -193,5 +200,53 @@ describe('static camera placement', () => {
     const wrapped = withPerspectiveCamera(named, {}, style, { distance: 600 });
     expect(wrapped).toContain('perspective: 600px');
     expect(wrapped).toContain('<div name="card" style="position: absolute; left: 0px;');
+  });
+});
+
+describe('declined cameras keep their perspective', () => {
+  const projected =
+    'matrix3d(1, 0, 0, 0, 0, 0.707107, -0.707107, 0.00117851, 0, 0.707107, 0.707107, -0.00117851, 0, 0, 0, 1)';
+  const affine =
+    'matrix3d(1, 0, 0, 0, 0, 0.707107, -0.707107, 0, 0, 0.707107, 0.707107, 0, 0, 0, 0, 1)';
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+  });
+
+  test('the stripped transform is put back when no wrapper can be emitted', () => {
+    const html =
+      '<div style="position: absolute; left: 0px; transform: ' + affine + '" id="card">x</div>';
+    const restored = restoreProjectedTransform(html, { distance: 600, original: projected, affine });
+    expect(restored).toContain(projected);
+    expect(restored).not.toContain('transform: ' + affine);
+    // A pure 2D element has no camera to restore.
+    expect(restoreProjectedTransform(html, null)).toBe(html);
+  });
+
+  test('a declined element is pointed at the un-stripped keyframes', () => {
+    rewritePerspectiveKeyframes(
+      '@keyframes spin { 0% { transform: ' + projected + '; } 100% { transform: ' + projected + '; } }',
+    );
+    const html = '<div style="animation-name: spin; animation-duration: 2s">x</div>';
+    expect(useProjectedKeyframes(html, { animationName: 'spin' })).toContain(
+      'animation-name: spin__pagxCam',
+    );
+    // Elements whose camera was emitted keep the stripped name.
+    expect(useProjectedKeyframes(html, { animationName: 'other' })).toBe(html);
+  });
+
+  test('a depth pivot keeps the projection in the element itself', () => {
+    const wrapped = withPerspectiveCamera(
+      '<div style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px; transform: ' +
+        affine +
+        '">x</div>',
+      {},
+      { transformOrigin: '0px 80px 30px' },
+      { distance: 600, original: projected, affine },
+    );
+    expect(wrapped).toContain(projected);
+    expect(pagxCameraSkips()['depth-pivot']).toBe(1);
   });
 });
