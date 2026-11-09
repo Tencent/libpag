@@ -1157,13 +1157,82 @@ PAG_TEST(PAGXHTML3DTest, CompoundTransformWithoutSpacesIsAccepted) {
   auto* compactBox = FindLayerById(compactDoc, "box");
   ASSERT_NE(spacedBox, nullptr);
   ASSERT_NE(compactBox, nullptr);
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      EXPECT_TRUE(NearlyEqual(spacedBox->matrix3D.getRowColumn(row, column),
-                              compactBox->matrix3D.getRowColumn(row, column), 1e-5f))
-          << "row " << row << " column " << column;
-    }
+  EXPECT_TRUE(NearlyEqual(spacedBox->matrix.a, compactBox->matrix.a, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(spacedBox->matrix.b, compactBox->matrix.b, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(spacedBox->matrix.c, compactBox->matrix.c, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(spacedBox->matrix.d, compactBox->matrix.d, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(spacedBox->matrix.a, 1.41421356f, 1e-4f));
+}
+
+/**
+ * Test case: angle arguments accept the CSS units (`deg` / `grad` / `rad` / `turn`) case
+ * insensitively. `100grad` is a right angle, `0.5TURN` is a half turn, and `1rad` is ~57.3deg.
+ */
+PAG_TEST(PAGXHTML3DTest, AngleUnitsAreConvertedCaseInsensitively) {
+  struct AngleCase {
+    const char* transform;
+    float m00;
+    float m10;
+    float m01;
+  };
+  const AngleCase cases[] = {
+      {"rotate(100grad)", 0.0f, 1.0f, -1.0f},
+      {"rotate(0.5turn)", -1.0f, 0.0f, 0.0f},
+      {"rotate(0.5TURN)", -1.0f, 0.0f, 0.0f},
+      {"rotate(1rad)", 0.540302f, 0.841471f, -0.841471f},
+      {"rotate3d(0, 0, 1, 0.25turn)", 0.0f, 1.0f, -1.0f},
+  };
+  for (const auto& item : cases) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:120px">
+        <div id="box" style="width:80px;height:40px;background-color:#000;transform:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, item.transform);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << item.transform;
+    EXPECT_FALSE(HasDiagnosticContaining(doc, "angle")) << item.transform;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << item.transform;
+    EXPECT_TRUE(NearlyEqual(box->matrix.a, item.m00, 0.002f))
+        << item.transform << " a=" << box->matrix.a;
+    EXPECT_TRUE(NearlyEqual(box->matrix.b, item.m10, 0.002f))
+        << item.transform << " b=" << box->matrix.b;
+    EXPECT_TRUE(NearlyEqual(box->matrix.c, item.m01, 0.002f))
+        << item.transform << " c=" << box->matrix.c;
   }
+}
+
+/**
+ * Test case: an angle with an unknown or missing unit invalidates the declaration, the way CSS does
+ * (`rotate(45px)` and `rotate(45)` are both invalid; a bare `0` is allowed).
+ */
+PAG_TEST(PAGXHTML3DTest, InvalidAngleUnitsDropTheTransform) {
+  const char* invalid[] = {"rotate(45px)", "rotate(45)", "skewX(1foo)", "rotate3d(0, 0, 1, 30px)"};
+  for (const char* value : invalid) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:120px">
+        <div id="box" style="width:80px;height:40px;background-color:#000;transform:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, value);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << value;
+    EXPECT_TRUE(HasDiagnosticContaining(doc, "angle")) << value;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << value;
+    EXPECT_TRUE(box->matrix.isIdentity()) << value << " must not be applied";
+    EXPECT_TRUE(box->matrix3D.isIdentity()) << value << " must not be applied";
+  }
+
+  // A bare zero is a legal `<angle>`.
+  auto zeroDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:80px;height:40px;background-color:#000;transform:rotate(0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(zeroDoc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(zeroDoc, "angle"));
 }
 
 /**
