@@ -786,7 +786,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       if (text->baseline != TextBaseline::Alphabetic && text->textAnchor == TextAnchor::Start &&
           text->text.find('\n') == std::string::npos && text->glyphData != nullptr &&
           _ctx->animation.svgBaselineTexts.count(text) > 0 &&
-          !text->glyphData->layoutRuns.empty() &&
+          _ctx->animation.reflowingTexts.count(text) == 0 && !text->glyphData->layoutRuns.empty() &&
           !text->glyphData->layoutRuns.front().positions.empty()) {
         const auto& firstPosition = text->glyphData->layoutRuns.front().positions.front();
         baselineY = renderPos.y + firstPosition.y;

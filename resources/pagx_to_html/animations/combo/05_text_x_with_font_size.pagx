@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Text whose x and font-size animate together: the word slides right while growing, so the
+     frame has to move the anchor and reflow the line at the same time.
+     Target: Text  Channel: x, fontSize  Type: float
+     Expect: gap
+     Known-gap: text-reflow-anchor
+     Note: x 单独动画时走 SVG <text>（基线精确，0.98）；一旦叠加 fontSize，基线随字号下移，而 SVG 的
+           y 是固定值，改用 CSS span 路径（行盒随字号重排）。span 的基线比 PAGX 低 1-2px，实测均值
+           0.90。修法是让 SVG 关键帧同时补偿基线位移，或改用能重排的矢量文本，尚未实现。
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="word" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="24"
+          letterSpacing="0" position="40,60"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="word">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="160"/>
+        </Channel>
+        <Channel name="fontSize" type="float">
+          <Key time="0" value="24" interpolation="linear"/>
+          <Key time="60" value="72"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

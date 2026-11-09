@@ -373,6 +373,9 @@ class HTMLWriterContext {
     // <text> (y is the baseline) so the per-frame position is exact. Everything else keeps the span
     // path, whose line box is what reflows correctly under a font-size animation.
     std::unordered_set<const Node*> svgBaselineTexts = {};
+    // Texts that reflow when their animated channels change (font-size, letter-spacing): an SVG
+    // <text> keeps a fixed baseline y, so these stay on the span path.
+    std::unordered_set<const Node*> reflowingTexts = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 
