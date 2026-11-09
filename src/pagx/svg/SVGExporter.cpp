@@ -66,6 +66,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/svg/SVGAnimationPlan.h"
+#include "pagx/svg/SVGAnimationWriter.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -90,6 +92,13 @@ using pag::FloatNearlyZero;
 using SVGBuilder = XMLBuilder;
 
 // SVGBuilder is provided by pagx/xml/XMLBuilder.h (aliased above as SVGBuilder = XMLBuilder)
+
+// Shared empty path for the animated-Group chain, used as the default so callers that never enter a
+// Group do not have to build one.
+static const std::vector<SVGGroupTransformStep>& EmptyGroupPath() {
+  static const std::vector<SVGGroupTransformStep> empty = {};
+  return empty;
+}
 
 //==============================================================================
 // Utility types and static helpers
@@ -368,11 +377,12 @@ class SVGWriter {
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
-            bool resolveModifiers = true, std::vector<std::string>* warnings = nullptr)
+            bool resolveModifiers = true, std::vector<std::string>* warnings = nullptr,
+            const SVGAnimationPlan* animation = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
         _rasterScale(rasterScale), _resolveModifiers(resolveModifiers), _warnings(warnings),
-        _layoutContext(layoutContext), _resolver(doc), _doc(doc) {
+        _layoutContext(layoutContext), _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -389,11 +399,19 @@ class SVGWriter {
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
   PAGXDocument* _doc = nullptr;
+  SVGAnimationWriter _animWriter;
   GPUContext _gpu;
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
 
   Rect _gradientUserSpaceBounds = {};
+
+  // Animated Group chain for the geometry element currently being emitted, set by
+  // emitGeometryWithFs around the dispatch. Animated Group transforms are pushed down to the
+  // element because the deferred painter scope cannot host a wrapper <g>.
+  const std::vector<SVGGroupTransformStep>* _pendingGroupSteps = nullptr;
+  Matrix _pendingStaticTransform = {};
+  const Element* _pendingGeometry = nullptr;
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -420,6 +438,7 @@ class SVGWriter {
     const Element* element = nullptr;
     Matrix transform = {};
     const TextBox* textBox = nullptr;
+    std::vector<SVGGroupTransformStep> animatedGroups = {};
   };
 
   // Layer / element writing
@@ -430,13 +449,21 @@ class SVGWriter {
   void writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
                      const Matrix& transform, float alpha, const TextBox* parentTextBox = nullptr,
                      LayerPlacement targetPlacement = LayerPlacement::Background,
-                     bool acceptAnyPlacement = false);
+                     bool acceptAnyPlacement = false,
+                     const std::vector<SVGGroupTransformStep>& groupPath = EmptyGroupPath());
   void processVectorScope(SVGBuilder& out, const std::vector<Element*>& elements,
                           const Matrix& transform, float alpha, const TextBox* parentTextBox,
                           std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
-                          LayerPlacement targetPlacement, bool acceptAnyPlacement);
+                          LayerPlacement targetPlacement, bool acceptAnyPlacement,
+                          const std::vector<SVGGroupTransformStep>& groupPath = EmptyGroupPath());
   void emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& entry,
                           const FillStrokeInfo& fs, float alpha);
+
+  // Closes a shape element, emitting the painter SMIL children first when the Fill / Stroke carry
+  // an animation. The self-closing form is kept otherwise so static output stays byte-identical.
+  void finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, float alpha);
+  void finishTextElement(SVGBuilder& out, const FillStrokeInfo& fs, float alpha,
+                         const std::string& content);
 
   // Shape writing
   void writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
@@ -2006,6 +2033,74 @@ void SVGWriter::applyPainters(SVGBuilder& out, const FillStrokeInfo& fs, const R
 // SVGWriter – shape elements
 //==============================================================================
 
+void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, float alpha) {
+  // The pending chain is only populated for Groups that actually own an animation channel, so it is
+  // a reliable "this element will host SMIL children" test before the start tag closes.
+  const Element* geometry = _pendingGeometry;
+  bool hasGroupAnimation = _pendingGroupSteps != nullptr;
+  bool hasGeometryAnimation = geometry != nullptr && _animWriter.HasShapeGeometryAnimates(geometry);
+  bool hasGroupOpacity =
+      hasGroupAnimation && !_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
+      _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(), _pendingGroupSteps->size());
+  if (!hasGroupAnimation && !hasGeometryAnimation &&
+      !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
+    out.closeElementSelfClosing();
+    return;
+  }
+  out.closeElementStart();
+  if (hasGroupAnimation) {
+    _animWriter.WriteElementTransformAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), _pendingStaticTransform);
+  }
+  if (hasGeometryAnimation) {
+    _animWriter.WriteShapeGeometryAnimates(out, geometry, fs.stroke);
+  }
+  if (hasGroupOpacity) {
+    if (fs.fill != nullptr) {
+      _animWriter.WriteElementOpacityAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), alpha, "fill-opacity");
+    }
+    if (fs.stroke != nullptr) {
+      _animWriter.WriteElementOpacityAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), alpha, "stroke-opacity");
+    }
+  }
+  _animWriter.WritePainterAnimates(out, fs.fill, fs.stroke, alpha);
+  out.closeElement();
+}
+
+void SVGWriter::finishTextElement(SVGBuilder& out, const FillStrokeInfo& fs, float alpha,
+                                  const std::string& content) {
+  bool hasGroupAnimation = _pendingGroupSteps != nullptr;
+  bool hasGroupOpacity =
+      hasGroupAnimation && !_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
+      _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(), _pendingGroupSteps->size());
+  if (!hasGroupAnimation && !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
+    out.closeElementWithText(content);
+    return;
+  }
+  // The SMIL children go in before the character data so the emitted text node stays free of the
+  // indentation newlines a nested layout would introduce.
+  out.closeElementStart();
+  if (hasGroupAnimation) {
+    _animWriter.WriteElementTransformAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), _pendingStaticTransform);
+  }
+  if (hasGroupOpacity) {
+    if (fs.fill != nullptr) {
+      _animWriter.WriteElementOpacityAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), alpha, "fill-opacity");
+    }
+    if (fs.stroke != nullptr) {
+      _animWriter.WriteElementOpacityAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), alpha, "stroke-opacity");
+    }
+  }
+  _animWriter.WritePainterAnimates(out, fs.fill, fs.stroke, alpha);
+  out.addTextContent(content);
+  out.closeElement();
+}
+
 void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
                                const Matrix& m, float alpha) {
   auto renderPos = rect->renderPosition();
@@ -2037,7 +2132,7 @@ void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const Fil
   }
   Rect bounds = Rect::MakeXYWH(x, y, w, h);
   applyPainters(out, fs, bounds, alpha);
-  out.closeElementSelfClosing();
+  finishShapeElement(out, fs, alpha);
 }
 
 void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
@@ -2077,7 +2172,7 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
   }
   Rect bounds = Rect::MakeXYWH(x, y, w, h);
   applyPainters(out, fs, bounds, alpha);
-  out.closeElementSelfClosing();
+  finishShapeElement(out, fs, alpha);
 }
 
 void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInfo& fs,
@@ -2125,7 +2220,7 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   // ImagePattern shapeBounds. No additional translate / scale arithmetic needed.
   Rect bounds = needsBaking ? baked.getBounds() : path->data->getBounds();
   applyPainters(out, fs, bounds, alpha);
-  out.closeElementSelfClosing();
+  finishShapeElement(out, fs, alpha);
 }
 
 // ── writeTextAsPath ─────────────────────────────────────────────────────────
@@ -2200,6 +2295,23 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   // bitmap glyph branch and any nested writers fall back to the default mode.
   _gradientUserSpaceBounds = {};
   out.closeElementStart();
+  if (_pendingGroupSteps != nullptr) {
+    _animWriter.WriteElementTransformAnimates(out, _pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size(), _pendingStaticTransform);
+    if (!_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
+        _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(),
+                                              _pendingGroupSteps->size())) {
+      if (fs.fill != nullptr) {
+        _animWriter.WriteElementOpacityAnimates(out, _pendingGroupSteps->data(),
+                                                _pendingGroupSteps->size(), alpha, "fill-opacity");
+      }
+      if (fs.stroke != nullptr) {
+        _animWriter.WriteElementOpacityAnimates(
+            out, _pendingGroupSteps->data(), _pendingGroupSteps->size(), alpha, "stroke-opacity");
+      }
+    }
+  }
+  _animWriter.WritePainterAnimates(out, fs.fill, fs.stroke, alpha);
 
   if (fitGradientToRun) {
     for (const auto& d : bakedPaths) {
@@ -2383,7 +2495,7 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
   // Fill / stroke painting via the shared helper. Solid colors only — the gradient fallback above
   // sent the run to writeTextAsPath. shapeBounds is empty because gradients are excluded.
   applyPainters(out, fs, {}, alpha);
-  out.closeElementWithText(puaText);
+  finishTextElement(out, fs, alpha, puaText);
   return true;
 }
 
@@ -2719,7 +2831,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
         out.addAttribute("textLength", FloatToString(innerHeight));
         out.addAttribute("lengthAdjust", "spacing");
       }
-      out.closeElementWithText(columnText);
+      finishTextElement(out, fs, alpha, columnText);
     }
     return;
   }
@@ -2741,7 +2853,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     out.addRequiredAttribute("x", anchoring.anchorX);
     out.addRequiredAttribute(
         "y", isVertical ? anchoring.offsetY : anchoring.offsetY + text->renderFontSize());
-    out.closeElementWithText(text->text);
+    finishTextElement(out, fs, alpha, text->text);
     return;
   }
 
@@ -2775,7 +2887,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
         out.addAttribute("word-spacing", FloatToString(wordSpacing));
       }
     }
-    out.closeElementWithText(lineText);
+    finishTextElement(out, fs, alpha, lineText);
   }
 }
 
@@ -2943,7 +3055,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       runFs.fill = effectiveFill;
       runFs.stroke = effectiveStroke;
       applyPainters(out, runFs, {}, alpha);
-      out.closeElementWithText(lineText);
+      finishTextElement(out, runFs, alpha, lineText);
       ++i;
     }
     out.closeElement();
@@ -2985,7 +3097,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   auto renderPos = text->renderPosition();
   out.addAttributeIfNonZero("x", renderPos.x);
   out.addAttributeIfNonZero("y", renderPos.y);
-  out.closeElementWithText(text->text);
+  finishTextElement(out, fs, alpha, text->text);
 }
 
 //==============================================================================
@@ -3063,6 +3175,12 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
   if (localFs.textBox == nullptr) {
     localFs.textBox = entry.textBox;
   }
+  // Animated Group transforms are folded into each descendant element, so the element writers pick
+  // them up from this pending slot when they close the element. Scoped to the dispatch so a nested
+  // write cannot inherit it.
+  _pendingGroupSteps = entry.animatedGroups.empty() ? nullptr : &entry.animatedGroups;
+  _pendingStaticTransform = entry.transform;
+  _pendingGeometry = entry.element;
   switch (entry.element->nodeType()) {
     case NodeType::Rectangle:
       writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
@@ -3118,6 +3236,8 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
     default:
       break;
   }
+  _pendingGroupSteps = nullptr;
+  _pendingGeometry = nullptr;
 }
 
 // Walk a single scope's element list, growing `accumulator` with new geometry
@@ -3131,7 +3251,8 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
                                    const Matrix& transform, float alpha,
                                    const TextBox* parentTextBox,
                                    std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
-                                   LayerPlacement targetPlacement, bool acceptAnyPlacement) {
+                                   LayerPlacement targetPlacement, bool acceptAnyPlacement,
+                                   const std::vector<SVGGroupTransformStep>& groupPath) {
   const TextBox* localTextBox = FindModifierTextBox(elements);
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
@@ -3182,6 +3303,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         entry.element = element;
         entry.transform = transform;
         entry.textBox = localTextBox;
+        entry.animatedGroups = groupPath;
         accumulator.push_back(entry);
         break;
       }
@@ -3193,6 +3315,10 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         }
         Matrix tbMatrix = transform * BuildGroupMatrix(tb);
         float tbAlpha = alpha * tb->alpha;
+        std::vector<SVGGroupTransformStep> tbPath = groupPath;
+        if (_animWriter.HasGroupAnimates(tb)) {
+          tbPath.push_back({tb, transform});
+        }
         if (_convertTextToPath) {
           // Container TextBox under glyph-path mode: process as its own scope so
           // child Text is added to the accumulator with the box's transform /
@@ -3200,7 +3326,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // path modifiers nested inside the box before walking.
           const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
           processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
-                             accumulator.size(), targetPlacement, acceptAnyPlacement);
+                             accumulator.size(), targetPlacement, acceptAnyPlacement, tbPath);
         } else {
           // Native text-box rendering: container TextBox owns its own paragraph
           // shaping and fill/stroke pairing. Don't add its child Text into the
@@ -3213,9 +3339,13 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         auto* group = static_cast<const Group*>(element);
         Matrix groupMatrix = transform * BuildGroupMatrix(group);
         float groupAlpha = alpha * group->alpha;
+        std::vector<SVGGroupTransformStep> innerPath = groupPath;
+        if (_animWriter.HasGroupAnimates(group)) {
+          innerPath.push_back({group, transform});
+        }
         const std::vector<Element*> innerWalked = resolveIfEnabled(group->elements);
         processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
-                           accumulator.size(), targetPlacement, acceptAnyPlacement);
+                           accumulator.size(), targetPlacement, acceptAnyPlacement, innerPath);
         break;
       }
       case NodeType::Repeater:
@@ -3233,7 +3363,8 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
 
 void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elements,
                               const Matrix& transform, float alpha, const TextBox* parentTextBox,
-                              LayerPlacement targetPlacement, bool acceptAnyPlacement) {
+                              LayerPlacement targetPlacement, bool acceptAnyPlacement,
+                              const std::vector<SVGGroupTransformStep>& groupPath) {
   // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
   // TrimPath / RoundCorner / MergePath -> editable Path). Painters, Group,
   // Text, and TextBox pass through unchanged so the accumulator walk below
@@ -3243,7 +3374,7 @@ void SVGWriter::writeElements(SVGBuilder& out, const std::vector<Element*>& elem
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
   processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator, /*scopeStart=*/0,
-                     targetPlacement, acceptAnyPlacement);
+                     targetPlacement, acceptAnyPlacement, groupPath);
 }
 
 void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Matrix& transform,
@@ -3254,7 +3385,10 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
-  if (!layer->visible && layer->mask == nullptr) {
+  // An animated visibility channel turns the layer into a lasting SMIL host, so the static invisible
+  // state must not elide the element that carries the animation.
+  bool animated = _animWriter.HasLayerAnimates(layer);
+  if (!layer->visible && layer->mask == nullptr && !animated) {
     return;
   }
 
@@ -3267,7 +3401,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // BackgroundBlurStyle and GlassStyle, which SVG has no portable primitive for) are handled
   // separately by the explicit skip in writeStyleList / writeFilterAndStyleDefs.
   auto features = ProbeLayerFeaturesForSVG(layer);
-  if (_bakeUnsupported) {
+  // Rasterizing an animated layer would freeze it into a single frame, so animated layers always
+  // stay on the vector path and report the degradation instead.
+  if (_bakeUnsupported && !animated) {
     if (features.needsRasterization()) {
       if (rasterizeLayerAsImage(out, layer)) {
         return;
@@ -3276,22 +3412,25 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   } else {
     if (features.needsRasterization()) {
       addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-                 "' uses SVG-unsupported features (TextPath / TextModifier / diamond or conic "
-                 "gradient / non-affine perspective) and bakeUnsupported is false; emitting as "
-                 "best-effort vector with those features dropped or downgraded.");
+                 (animated ? "' is animated and uses SVG-unsupported features (TextPath / "
+                             "TextModifier / diamond or conic gradient); the layer is kept as "
+                             "best-effort vector with those features dropped or downgraded."
+                           : "' uses SVG-unsupported features (TextPath / TextModifier / diamond "
+                             "or conic gradient) and bakeUnsupported is false; emitting as "
+                             "best-effort vector with those features dropped or downgraded to "
+                             "radial."));
     }
   }
 
   bool needsGroup = !BuildLayerMatrix(layer).isIdentity() || layer->alpha < 1.0f ||
                     !layer->id.empty() || !layer->filters.empty() || !layer->styles.empty() ||
                     layer->mask != nullptr || !layer->customData.empty() ||
-                    layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
+                    layer->blendMode != BlendMode::Normal || layer->hasScrollRect || animated;
 
-  // When groupOpacity is false, the layer's alpha is distributed to each child
-  // element individually rather than applied to the composited group. Compute
-  // the per-child alpha multiplier here so both the bare-through path and the
-  // needs-group path can forward it to writeLayerBody.
-  float perChildAlpha = (!layer->groupOpacity && layer->alpha < 1.0f) ? layer->alpha : 1.0f;
+  // An animated alpha forces the group form: distributing it to every descendant would multiply the
+  // same curve into each child element.
+  float perChildAlpha =
+      (!layer->groupOpacity && layer->alpha < 1.0f && !animated) ? layer->alpha : 1.0f;
 
   if (!needsGroup) {
     writeLayerBody(out, layer, perChildAlpha);
@@ -3324,20 +3463,40 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   }
 
   if (!hasContent) {
+    if (animated) {
+      out.closeElementStart();
+      _animWriter.WriteLayerOuterAnimates(out, layer);
+      _animWriter.WriteLayerTransformAnimates(out, layer);
+      out.closeElement();
+      return;
+    }
     out.closeElementSelfClosing();
     return;
   }
 
   out.closeElementStart();
 
+  if (animated) {
+    _animWriter.WriteLayerOuterAnimates(out, layer);
+  }
+
+  bool transformAnimated =
+      _animWriter.plan() != nullptr && _animWriter.plan()->HasTransformAnimation(layer);
+
   // Inner <g> carrying the layer's own transform + scrollRect clip. Only
   // emitted when the outer <g> took the mask attribute; otherwise everything
   // already lives on the outer <g>.
-  bool needsInnerWrapper = hasMask && (!BuildLayerTransform(layer).empty() || layer->hasScrollRect);
+  bool needsInnerWrapper =
+      hasMask && (!BuildLayerTransform(layer).empty() || layer->hasScrollRect || transformAnimated);
   if (needsInnerWrapper) {
     out.openElement("g");
     writeLayerInnerAttributes(out, layer);
     out.closeElementStart();
+    if (transformAnimated) {
+      _animWriter.WriteLayerTransformAnimates(out, layer);
+    }
+  } else if (transformAnimated) {
+    _animWriter.WriteLayerTransformAnimates(out, layer);
   }
 
   // When scrollRect is active, wrap all content in an inner <g> that shifts
@@ -3424,6 +3583,15 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
 
   if (layer->alpha < 1.0f && layer->groupOpacity) {
     out.addAttribute("opacity", FloatToString(layer->alpha));
+  } else if (_animWriter.plan() != nullptr && _animWriter.plan()->HasAlphaAnimation(layer)) {
+    // Animated alpha always takes the group form, so the static value becomes the SMIL baseline.
+    out.addAttribute("opacity", FloatToString(layer->alpha));
+  }
+
+  if (!layer->visible && _animWriter.plan() != nullptr &&
+      _animWriter.plan()->HasVisibilityAnimation(layer)) {
+    // Only reachable when writeLayer kept the layer because it drives a visibility animation.
+    out.addAttribute("visibility", "hidden");
   }
 
   if (layer->blendMode != BlendMode::Normal) {
@@ -3454,7 +3622,13 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeLayerInnerAttributes(SVGBuilder& out, const Layer* layer) {
-  std::string transform = BuildLayerTransform(layer);
+  // An animated transform is emitted as additive <animateTransform> children, so the static
+  // attribute becomes the frame-0 baseline that applies before the timeline starts.
+  bool transformAnimated =
+      _animWriter.plan() != nullptr && _animWriter.plan()->HasTransformAnimation(layer);
+  std::string transform = transformAnimated
+                              ? MatrixToSVGTransform(_animWriter.LayerTransformBaseMatrix(layer))
+                              : BuildLayerTransform(layer);
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
@@ -3515,6 +3689,14 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   SVGWriterContext context;
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
 
+  // Pre-pass: resolve every active AnimationTimeline into per-node channel bindings. The writer
+  // consults the plan at each emission point to inject SMIL children, so a document without
+  // animations produces exactly the same output as before.
+  std::unique_ptr<SVGAnimationPlan> animationPlan = nullptr;
+  if (options.exportAnimation) {
+    animationPlan = SVGAnimationPlan::Build(&doc, warnings);
+  }
+
   // Pre-pass: build WOFF2 fonts for embedded vector fonts. Only Font resources whose first glyph
   // carries vector outline data (Glyph.path, no Glyph.image) participate — bitmap CBDT fonts
   // remain on the per-glyph <image> rendering path because per-glyph scales/skews cannot be
@@ -3558,7 +3740,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
                    &doc, options.bakeUnsupported, safeRasterScale, options.resolveModifiers,
-                   warnings);
+                   warnings, animationPlan.get());
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

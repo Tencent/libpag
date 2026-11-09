@@ -107,6 +107,15 @@ struct SVGExportOptions {
    * value is true.
    */
   bool embedFontsAsWoff2 = true;
+
+  /**
+   * Whether to export PAGX animations as SVG SMIL elements. A document without animations produces
+   * byte-identical output either way, because the exporter only changes structure for elements that
+   * actually carry an exportable channel. Channels without a native SMIL equivalent (text content,
+   * blend modes, path data) are reported through the warnings sink and dropped.
+   * The default value is true.
+   */
+  bool exportAnimation = true;
 };
 
 /**

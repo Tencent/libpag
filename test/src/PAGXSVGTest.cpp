@@ -29,6 +29,9 @@
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -4476,6 +4479,389 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
   // leave the SVG without `<mask id=...>` and the owner without its `mask=` attribute.
   EXPECT_NE(svg.find("id=\"crossParentMask_a\""), std::string::npos);
   EXPECT_NE(svg.find("mask=\"url(#crossParentMask_a)\""), std::string::npos);
+}
+
+//==============================================================================
+// PAGX animation -> SVG SMIL export
+//==============================================================================
+
+static pagx::Animation* MakeAnimation(pagx::PAGXDocument* doc, pagx::Frame duration,
+                                      pagx::LoopMode loop, float frameRate = 60.0f) {
+  auto* animation = doc->makeNode<pagx::Animation>("anim");
+  animation->duration = duration;
+  animation->frameRate = frameRate;
+  animation->loop = loop;
+  doc->animations.push_back(animation);
+  return animation;
+}
+
+static pagx::AnimationObject* MakeAnimationObject(pagx::PAGXDocument* doc,
+                                                  pagx::Animation* animation,
+                                                  const std::string& targetId) {
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = targetId;
+  animation->objects.push_back(object);
+  return object;
+}
+
+template <typename T>
+static pagx::TypedChannel<T>* MakeChannel(pagx::PAGXDocument* doc, pagx::AnimationObject* object,
+                                          const std::string& name) {
+  auto* channel = doc->makeNode<pagx::TypedChannel<T>>();
+  channel->name = name;
+  object->channels.push_back(channel);
+  return channel;
+}
+
+static void AttachTimeline(pagx::Layer* layer, const std::string& animationId,
+                           int64_t evaluationOffset = 0, bool playing = true) {
+  auto timeline = std::make_unique<pagx::AnimationTimeline>();
+  timeline->animationId = animationId;
+  timeline->evaluationOffset = evaluationOffset;
+  timeline->playing = playing;
+  layer->timelines.push_back(std::move(timeline));
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeRectDocument(pagx::Rectangle** outRect = nullptr,
+                                                            pagx::Fill** outFill = nullptr,
+                                                            pagx::Stroke** outStroke = nullptr) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {160, 120};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* strokeSolid = doc->makeNode<pagx::SolidColor>();
+  strokeSolid->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  stroke->color = strokeSolid;
+  stroke->width = 4.0f;
+  layer->contents = {rect, fill, stroke};
+  doc->layers.push_back(layer);
+  if (outRect != nullptr) {
+    *outRect = rect;
+  }
+  if (outFill != nullptr) {
+    *outFill = fill;
+  }
+  if (outStroke != nullptr) {
+    *outStroke = stroke;
+  }
+  return doc;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_NoAnimationOutputUnchanged) {
+  auto doc = MakeRectDocument();
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  EXPECT_EQ(svg.find("<set"), std::string::npos);
+  auto rectPos = svg.find("<rect");
+  ASSERT_NE(rectPos, std::string::npos);
+  EXPECT_NE(svg.find("/>", rectPos), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacity) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"freeze\""), std::string::npos);
+  EXPECT_EQ(svg.find("repeatCount"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacityLoop) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 120, pagx::LoopMode::Loop);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({120, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("repeatCount=\"indefinite\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacityPingPong) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;1;0\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;0.5;1\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_NE(svg.find("repeatCount=\"indefinite\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimEvaluationOffsetAndPaused) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim", 30);
+  auto delayed = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(delayed.find("begin=\"0.5s\""), std::string::npos);
+
+  doc->layers[0]->timelines.clear();
+  AttachTimeline(doc->layers[0], "anim", -30);
+  auto ahead = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(ahead.find("begin=\"-0.5s\""), std::string::npos);
+
+  doc->layers[0]->timelines.clear();
+  AttachTimeline(doc->layers[0], "anim", 0, false);
+  auto paused = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(paused.find("begin=\"indefinite\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerVisibility) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Loop);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<bool>(doc.get(), object, "visible");
+  channel->keyframes.push_back({0, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({30, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"visibility\""), std::string::npos);
+  EXPECT_NE(svg.find("calcMode=\"discrete\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"visible;hidden;hidden\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimFillColor) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "fill");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#0000FF\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimStrokeWidthAndDashOffset) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stroke");
+  auto* width = MakeChannel<float>(doc.get(), object, "width");
+  width->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  width->keyframes.push_back({60, 9.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* dashOffset = MakeChannel<float>(doc.get(), object, "dashOffset");
+  dashOffset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  dashOffset->keyframes.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"stroke-width\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stroke-dashoffset\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBezierKeySplines) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, {0.25f, 0.1f}, {}});
+  channel->keyframes.push_back(
+      {60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {0.75f, 0.9f}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("calcMode=\"spline\""), std::string::npos);
+  EXPECT_NE(svg.find("keySplines=\"0.25 0.1 0.75 0.9\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimHoldSegmentProducesStep) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 100, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({50, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({100, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;0;1;0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerMatrixChannel) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<animateTransform"), std::string::npos);
+  EXPECT_NE(svg.find("additive=\"replace\""), std::string::npos);
+  EXPECT_NE(svg.find("type=\"scale\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"1 1;2 2\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimUnsupportedLayerChannelWarns) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  // This exporter's transform model has no rotation component, so the channel cannot be expressed.
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  ASSERT_FALSE(warnings.empty());
+  EXPECT_NE(warnings[0].find("rotation.z"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto rectPos = svg.find("<rect");
+  ASSERT_NE(rectPos, std::string::npos);
+  auto rectEnd = svg.find("</rect>", rectPos);
+  ASSERT_NE(rectEnd, std::string::npos);
+  auto rectContent = svg.substr(rectPos, rectEnd - rectPos);
+  EXPECT_NE(rectContent.find("<animateTransform"), std::string::npos);
+  EXPECT_NE(rectContent.find("type=\"rotate\""), std::string::npos);
+  EXPECT_NE(rectContent.find("values=\"0;90\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill-opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"1;0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRectWidth) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("attributeName=\"width\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"160;200\""), std::string::npos);
+  EXPECT_TRUE(warnings.empty()) << (warnings.empty() ? "" : warnings[0]);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRectRoundness) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "roundness");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"rx\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"ry\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;20\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimCircleRadius) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* ellipse = doc->makeNode<pagx::Ellipse>("circle");
+  ellipse->position = {100, 100};
+  ellipse->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {ellipse, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "circle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* heightChannel = MakeChannel<float>(doc.get(), object, "size.height");
+  heightChannel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  heightChannel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<circle"), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"r\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"40;60\""), std::string::npos);
 }
 
 }  // namespace pag

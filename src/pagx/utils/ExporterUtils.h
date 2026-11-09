@@ -37,6 +37,30 @@ struct FillStrokeInfo {
   const TextBox* textBox = nullptr;
 };
 
+/**
+ * Optional per-channel overrides used to evaluate a Group transform at one animation frame. Every
+ * pointer is optional; a null pointer falls back to the Group's own field.
+ */
+struct GroupChannelOverride {
+  const Point* position = nullptr;
+  const Point* anchor = nullptr;
+  const float* rotation = nullptr;
+  const float* scaleX = nullptr;
+  const float* scaleY = nullptr;
+  const float* skew = nullptr;
+  const float* skewAxis = nullptr;
+};
+
+/**
+ * Optional per-channel override used to evaluate a Layer transform at one animation frame. Only the
+ * authored `matrix` participates: this exporter's transform model has no rotation / scale / skew /
+ * anchor components, so those channels are reported as unsupported by SVGAnimationPlan instead of
+ * being silently ignored here.
+ */
+struct LayerChannelOverride {
+  const Matrix* matrix = nullptr;
+};
+
 FillStrokeInfo CollectFillStroke(const std::vector<Element*>& contents);
 
 /**
@@ -75,10 +99,12 @@ std::string EscapeCssFontFamily(const std::string& family);
  */
 std::string EscapeCssFontFamily(const std::string& family);
 
-// Returns the Layer's transform projected to 2D, including the layout position.
-Matrix BuildLayerMatrix(const Layer* layer);
+// Returns the Layer's transform projected to 2D, including the layout position. `override` lets the
+// animation exporter evaluate the same transform with the keyframe's matrix substituted; passing
+// nullptr reproduces the static transform exactly.
+Matrix BuildLayerMatrix(const Layer* layer, const LayerChannelOverride* override = nullptr);
 
-Matrix BuildGroupMatrix(const Group* group);
+Matrix BuildGroupMatrix(const Group* group, const GroupChannelOverride* override = nullptr);
 
 FillRule DetectMaskFillRule(const Layer* maskLayer);
 
