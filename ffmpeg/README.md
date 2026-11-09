@@ -26,16 +26,26 @@ or FFmpeg shared libraries, but it may still use normal operating-system librari
 
 ## Prerequisites
 
-All platforms require Git, a native compiler, Make, pkg-config, Node.js, and depsync.
+All platforms require Git, a C compiler, Make, pkg-config, Node.js, and depsync.
 Install depsync with:
 
 ```bash
 npm install -g depsync
 ```
 
-x64 builds also require NASM. Only native compilation is supported; cross-compilation
-is deliberately rejected so that the requested target cannot silently disagree with
-the produced executable.
+x86 and x64 targets also require NASM. Cross-compilation is supported between
+architectures on the same host OS, but not between operating systems. The supported
+target matrix is:
+
+| Host | Targets | Toolchain |
+| --- | --- | --- |
+| macOS x64 or ARM64 | macOS x64, macOS ARM64 | Xcode Clang with `-arch` |
+| Linux x64 or ARM64 | Linux x64, Linux ARM64 | Native GCC or the matching GNU cross toolchain |
+| Windows | Windows x86, x64, ARM64 | MSYS2 MINGW32, MINGW64/UCRT64, CLANGARM64 |
+
+Set `CC`, `AR`, `RANLIB`, and `STRIP` when using a custom cross toolchain. `CC` must
+name the compiler executable without additional arguments; use `CFLAGS` and `LDFLAGS`
+for extra flags.
 
 ### macOS
 
@@ -52,7 +62,11 @@ On Debian or Ubuntu:
 sudo apt-get install build-essential git nasm pkg-config nodejs npm
 ```
 
-Other distributions need the equivalent development tools.
+Other distributions need the equivalent development tools. For an ARM64 target on an
+x64 Ubuntu host, also install `gcc-aarch64-linux-gnu` and `binutils-aarch64-linux-gnu`.
+For an x64 target on an ARM64 Ubuntu host, install `gcc-x86-64-linux-gnu` and
+`binutils-x86-64-linux-gnu`. The script selects the corresponding GNU cross-prefix
+automatically when the host and target architectures differ.
 
 ### Windows
 
@@ -63,6 +77,13 @@ pacman -S --needed base-devel git make nasm pkgconf nodejs npm \
   mingw-w64-x86_64-toolchain
 ```
 
+For Windows x86, install the 32-bit MinGW toolchain:
+
+```bash
+pacman -S --needed base-devel git make nasm pkgconf nodejs npm \
+  mingw-w64-i686-toolchain
+```
+
 For Windows ARM64, install the LLVM-MinGW toolchain instead:
 
 ```bash
@@ -70,8 +91,8 @@ pacman -S --needed base-devel git make pkgconf nodejs npm \
   mingw-w64-clang-aarch64-toolchain
 ```
 
-`build.ps1` selects `MINGW64` for x64 and `CLANGARM64` for ARM64. Set `MSYS2_ROOT`
-if MSYS2 is not installed at `C:\msys64`.
+`build.ps1` selects `MINGW32` for x86, `MINGW64` for x64, and `CLANGARM64` for ARM64.
+Set `MSYS2_ROOT` if MSYS2 is not installed at `C:\msys64`.
 
 ## Build
 
@@ -80,13 +101,16 @@ macOS and Linux:
 ```bash
 ./build.sh                         # Detect the host platform and architecture
 ./build.sh --platform mac --arch arm64 --jobs 8
+./build.sh --platform mac --arch x64   # Cross-compile on an ARM64 Mac
 ./build.sh --platform linux --arch x64
+./build.sh --platform linux --arch arm64
 ```
 
 Windows PowerShell:
 
 ```powershell
 ./build.ps1 -Arch x64 -Jobs 8
+./build.ps1 -Arch x86
 ./build.ps1 -Arch arm64
 ```
 
@@ -103,10 +127,12 @@ out/<platform>-<arch>/
 └── share/licenses/
 ```
 
-`build-info.json` records the actual source commits, configure arguments, target, and
-SHA-256 digest of the executable. Every build verifies the required FFmpeg components
-and encodes three generated RGBA frames into a real MP4 through stdin. A build that
-cannot perform this encoding is treated as failed.
+`build-info.json` records the actual source commits, configure arguments, host, target,
+toolchain, validation level, and SHA-256 digest of the executable. Every build checks
+the generated FFmpeg configuration for all required components. A native build also
+checks component availability at runtime and encodes three generated RGBA frames into
+a real MP4 through stdin. A cross-compiled build is marked `configuration-only` because
+the target executable is not run on the host; run it on the target OS before release.
 
 To remove one target's intermediate files and output:
 
