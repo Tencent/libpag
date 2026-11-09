@@ -145,19 +145,6 @@ Matrix3D MakePerspective(float distance) {
   return m;
 }
 
-bool ParseStrictFloat(const std::string& token, float& out) {
-  std::string trimmed = Trim(token);
-  if (trimmed.empty()) {
-    return false;
-  }
-  char* end = nullptr;
-  const float value = std::strtof(trimmed.c_str(), &end);
-  if (end == trimmed.c_str() || !Trim(end).empty() || !std::isfinite(value)) {
-    return false;
-  }
-  out = value;
-  return true;
-}
 
 // `ParseAngle` maps unparsable input to 0 and unknown units to plain degrees, which would silently
 // turn `rotate(45px)` into a 45 degree rotation, so the unit is validated here instead. CSS accepts
@@ -194,35 +181,7 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
   return std::isfinite(out);
 }
 
-std::vector<std::string> SplitCommaArgs(const std::string& args) {
-  std::vector<std::string> out = {};
-  size_t start = 0;
-  for (size_t i = 0; i <= args.size(); ++i) {
-    if (i == args.size() || args[i] == ',') {
-      out.push_back(Trim(args.substr(start, i - start)));
-      start = i + 1;
-    }
-  }
-  return out;
-}
 
-std::vector<std::string> SplitWhitespaceTokens(const std::string& value) {
-  std::vector<std::string> out = {};
-  size_t index = 0;
-  while (index < value.size()) {
-    while (index < value.size() && std::isspace(static_cast<unsigned char>(value[index]))) {
-      ++index;
-    }
-    size_t start = index;
-    while (index < value.size() && !std::isspace(static_cast<unsigned char>(value[index]))) {
-      ++index;
-    }
-    if (index > start) {
-      out.push_back(value.substr(start, index - start));
-    }
-  }
-  return out;
-}
 
 // Resolves one `transform-origin` axis token to layer-local pixels. `dimension` is NaN when the
 // reference box size is unknown, which leaves percentage / keyword forms unresolvable.
@@ -302,7 +261,7 @@ bool EvaluateCalcFactor(const std::string& text, size_t& index, float referenceP
     return false;
   }
   float number = 0.0f;
-  if (!ParseStrictFloat(text.substr(start, index - start), number)) {
+  if (!ParseScalarFloat(text.substr(start, index - start), number)) {
     return false;
   }
   std::string unit;
@@ -439,7 +398,7 @@ struct TransformArgs {
   }
 
   bool NumberAt(size_t index, float& value) const {
-    return index < parts.size() && ParseStrictFloat(parts[index], value);
+    return index < parts.size() && ParseScalarFloat(parts[index], value);
   }
 
   bool AngleAt(size_t index, float& value) const {
@@ -474,7 +433,7 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   // Diagnostics keep the authored spelling (`translateX`, `skewX`, ...) so the message points at
   // exactly the token the author wrote.
   const std::string label = Trim(token.substr(0, token.find('(')));
-  const auto parts = SplitCommaArgs(args);
+  const auto parts = SplitTopLevelCommas(args);
 
   const TransformArgs transformArgs = {parts, valueParser, referenceWidthPx, referenceHeightPx};
 
@@ -780,7 +739,7 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
   if (text.empty()) {
     text = "50% 50%";
   }
-  const auto tokens = SplitWhitespaceTokens(text);
+  const auto tokens = SplitTopLevelWhitespace(text);
   if (tokens.empty() || tokens.size() > 3) {
     return origin;
   }

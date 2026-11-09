@@ -67,16 +67,6 @@ std::string LookupEffectiveBackgroundImage(
 // `ParseCssFunctionCall`: the FIRST `)` must coincide with the LAST `)` and trail only
 // whitespace, otherwise the value is a compound chain and is rejected.
 
-bool ParseScalarFloat(const std::string& token, float& out) {
-  std::string trimmed = Trim(token);
-  if (trimmed.empty()) return false;
-  char* end = nullptr;
-  float v = std::strtof(trimmed.c_str(), &end);
-  if (end == trimmed.c_str()) return false;
-  if (!Trim(end).empty()) return false;
-  out = v;
-  return true;
-}
 
 // CSS edge-overlap scaling: when the sum of two border radii exceeds the box edge they
 // share, every radius shrinks by the smallest factor that keeps every edge within bounds.
