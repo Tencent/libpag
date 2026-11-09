@@ -90,8 +90,12 @@ inline std::string GetFileExtension(const std::string& path) {
  * the new extension.
  */
 inline std::string ReplaceExtension(const std::string& path, const std::string& newExt) {
+  auto slash = FindLastPathSeparator(path);
   auto dot = path.rfind('.');
-  if (dot != std::string::npos) {
+  // Only a dot inside the file name separates the extension; the dots of "./" or "../" belong to
+  // the directory component, and a dot right after the separator starts a dot file, not an
+  // extension.
+  if (dot != std::string::npos && (slash == std::string::npos || dot > slash + 1)) {
     return path.substr(0, dot + 1) + newExt;
   }
   return path + "." + newExt;

@@ -3512,7 +3512,11 @@ CLI_TEST(PAGXCliTest, Verify_WritesScreenshot) {
   auto layoutPath = TempDir() + "/import_node_none.layout.xml";
   std::filesystem::remove(pngPath);
   std::filesystem::remove(layoutPath);
-  auto tempPagx = CopyToTemp("import_node_none.pagx", "import_node_none.pagx");
+  // The verify run happens from the temp directory, so the input path must be absolute before the
+  // working directory moves away from the one TempDir() is relative to.
+  auto tempPagx =
+      std::filesystem::absolute(CopyToTemp("import_node_none.pagx", "import_node_none.pagx"))
+          .string();
 
   auto oldCwd = std::filesystem::current_path();
   std::filesystem::current_path(TempDir());
