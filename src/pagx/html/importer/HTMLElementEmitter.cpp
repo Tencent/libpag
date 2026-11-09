@@ -694,8 +694,8 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
 
   // Use assignElementId (not a bare _idAllocator->assign) so an `animation` style on the folded
   // element is still recorded for later PAGX animation emission.
-  assignElementId(layer, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
-                  box.parentPerspectiveOriginY);
+  assignElementId(layer, element, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                  box.localPerspectiveOriginY);
   return true;
 }
 
@@ -745,8 +745,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     }
     importHost->importDirective.format = "svg";
     auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
-    assignElementId(wrapper, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
-                    box.parentPerspectiveOriginY);
+    assignElementId(wrapper, element, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                    box.localPerspectiveOriginY);
     return wrapper;
   }
 
@@ -775,8 +775,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   _layerBuilder->applyBackgroundVisuals(layer, box, fill);
   _layerBuilder->applyBoxTransform(layer, box);
   auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
-  assignElementId(wrapper, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
-                  box.parentPerspectiveOriginY);
+  assignElementId(wrapper, element, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                  box.localPerspectiveOriginY);
   return wrapper;
 }
 
@@ -849,8 +849,8 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   importHost->importDirective.content = _svgEmitter->serialize(element);
   importHost->importDirective.format = "svg";
   auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
-  assignElementId(wrapper, element, box.parentPerspectivePx, box.parentPerspectiveOriginX,
-                  box.parentPerspectiveOriginY);
+  assignElementId(wrapper, element, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                  box.localPerspectiveOriginY);
   return wrapper;
 }
 

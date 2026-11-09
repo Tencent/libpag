@@ -315,11 +315,11 @@ struct HTMLBoxAttributes {
 
   // CSS `perspective` declared on the parent (px), folded into this element's pose. Stored on the box
   // so the transform write and the animation registration read the same value regardless of which
-  // element happens to be converting when they run. `parentPerspectiveOrigin*` is the parent's
+  // element happens to be converting when they run. `localPerspectiveOrigin*` is the parent's
   // `perspective-origin` re-expressed in this element's local coordinates.
   float parentPerspectivePx = 0.0f;
-  float parentPerspectiveOriginX = NAN;
-  float parentPerspectiveOriginY = NAN;
+  float localPerspectiveOriginX = NAN;
+  float localPerspectiveOriginY = NAN;
 
   // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
   // projection on the layer that owns the pose, so the parent value is pushed into each child pose

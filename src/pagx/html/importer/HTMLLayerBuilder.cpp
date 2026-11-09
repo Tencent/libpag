@@ -701,8 +701,8 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
   // classifies the result the same way the keyframe path does.
   const PosePlacement placement =
-      PlacePose(box.transform.pose, box.parentPerspectivePx, box.parentPerspectiveOriginX,
-                box.parentPerspectiveOriginY);
+      PlacePose(box.transform.pose, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                box.localPerspectiveOriginY);
   if (!placement.valid) {
     _diagnostics.warn(
         "html: transform becomes non-invertible under the parent perspective; ignored");

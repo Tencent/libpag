@@ -224,8 +224,8 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // The values already arrive in this element's local coordinates (the caller resolved them), so
   // they are assigned verbatim instead of being offset again.
   containerBox.parentPerspectivePx = parentPerspectivePx;
-  containerBox.parentPerspectiveOriginX = parentPerspectiveOriginX;
-  containerBox.parentPerspectiveOriginY = parentPerspectiveOriginY;
+  containerBox.localPerspectiveOriginX = parentPerspectiveOriginX;
+  containerBox.localPerspectiveOriginY = parentPerspectiveOriginY;
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
     HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
