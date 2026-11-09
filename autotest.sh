@@ -66,9 +66,7 @@ case "$BACKEND_ARG" in
 esac
 
 ./install_tools.sh
-if ! ./update_baseline.sh "$@"; then
-  echo "WARNING: the baseline cache refresh failed; continuing with the full test suite." >&2
-fi
+./update_baseline.sh "$@"
 rm -rf "$WORKSPACE/result" "$WORKSPACE/build"
 mkdir -p "$WORKSPACE/result" "$WORKSPACE/build"
 cp -R "$WORKSPACE/test/baseline" "$WORKSPACE/result/"
