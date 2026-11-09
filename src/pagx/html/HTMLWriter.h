@@ -160,6 +160,10 @@ float ApplySelectorShape(SelectorShape shape, float t);
 float CombineSelectorValues(SelectorMode mode, float a, float b);
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs);
+// Same factor with the range values supplied by the caller, so an animated start / end / offset can
+// be evaluated without mutating the node.
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset);
 
 struct ArcLengthLUT {
   std::vector<float> arcLengths = {};
@@ -327,6 +331,22 @@ class HTMLWriterContext {
     // every copy that appears during playback already exists in the DOM.
     std::unordered_map<const Repeater*, int> repeaterMaxCopies = {};
     std::vector<RepeaterCopy> repeaterCopies = {};
+
+    // A RangeSelector channel moves which glyphs its TextModifier reaches, so it is fanned out to
+    // one rule per glyph. Each glyph records what the emitter needs to rebuild its modifier pose.
+    struct RangeSelectorGlyph {
+      const RangeSelector* selector = nullptr;
+      const TextModifier* modifier = nullptr;
+      size_t glyphIndex = 0;
+      size_t totalGlyphs = 0;
+      float glyphX = 0.0f;
+      float glyphY = 0.0f;
+      float pivotX = 0.0f;
+      float fontSize = 0.0f;
+      std::string id = {};
+    };
+    std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
+    std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 
     struct Instance {
       const Composition* composition = nullptr;

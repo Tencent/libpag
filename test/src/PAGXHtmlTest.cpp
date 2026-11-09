@@ -3889,6 +3889,63 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
 // `copies` changes how many copies exist, so the export emits every copy the channel can reach and
 // lets each one decide per frame whether it is visible; the index shift at each integer crossing is
 // kept as a step instead of a slide.
+// A RangeSelector `start` channel moves which glyphs the TextModifier reaches, so every glyph gets
+// its own rule. With linear keys the rampUp factor of a glyph is a rational function of time, so
+// each monotonic piece is one stop pair with a fitted cubic-bezier instead of per-frame stops.
+CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56" position="70,120"
+            letterSpacing="0"/>
+      <TextModifier id="waveModifier" position="0,-18">
+        <RangeSelector id="waveSelector" start="0" end="1" offset="0" unit="percentage"
+                       shape="rampUp"/>
+      </TextModifier>
+      <Fill color="#BE123C"/>
+    </Layer>
+    <Animations>
+      <Animation id="waveSpread" duration="60" frameRate="60" loop="once">
+        <Object target="waveSelector">
+          <Channel name="start" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 4u) << html;
+  // Glyphs are drawn at the shaper's positions; outline rasterization keeps them on PAGX's pixels.
+  EXPECT_NE(html.find("text-rendering:geometricPrecision"), std::string::npos) << html;
+  for (int i = 0; i < 4; ++i) {
+    auto tag = FindTagContaining(html, "id=\"waveSelector_g" + std::to_string(i) + "\"");
+    ASSERT_FALSE(tag.empty()) << i << html;
+    EXPECT_EQ(tag.rfind("<text", 0), static_cast<size_t>(0)) << tag;
+    // The <text> has no style of its own, so weaving adds a new attribute after the last one; it
+    // must not land inside the transform attribute's quotes.
+    EXPECT_NE(tag.find("\" style=\"animation:"), std::string::npos) << tag;
+  }
+  // E (center 0.875) starts at the full modifier offset times its factor and reaches the baseline
+  // when start passes its center, at 87.5% of the timeline.
+  auto rule = KeyframesRuleNamed(
+      html, AnimationNameOfTag(FindTagContaining(html, "id=\"waveSelector_g3\"")));
+  ASSERT_FALSE(rule.empty()) << html;
+  EXPECT_NE(rule.find("0% { transform: translate(123.4023px, 50px) translate(0px, -15.75px)"),
+            std::string::npos)
+      << rule;
+  EXPECT_NE(rule.find("cubic-bezier("), std::string::npos) << rule;
+  EXPECT_NE(rule.find("87.5% { transform: translate(123.4023px, 50px) translate(0px, 0px)"),
+            std::string::npos)
+      << rule;
+  // Far fewer stops than frames: the curve is encoded by the easing, not sampled.
+  EXPECT_LE(CountOccurrences(rule, "transform:"), 5u) << rule;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationRepeaterCopiesGrowsTheRow) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">

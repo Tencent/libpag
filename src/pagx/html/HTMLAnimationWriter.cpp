@@ -36,12 +36,14 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
@@ -555,7 +557,8 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
 }
 
 // Builds the opening tag text with the animation declarations added to its style attribute. A tag
-// without a style attribute (a bare SVG <path/>) gets one inserted before its closing bracket.
+// without a style attribute gets one after its last attribute. `tagStr` is the opening tag without
+// its closing '>', so the new attribute goes at the end, or before the '/' of a self-closing tag.
 std::string BuildWovenTag(const std::string& tagStr, const std::string& animDecl,
                           bool needsZeroTransformOrigin) {
   std::string woven = tagStr;
@@ -584,7 +587,10 @@ std::string BuildWovenTag(const std::string& tagStr, const std::string& animDecl
     newStyle += "transform-origin:0 0;";
   }
   newStyle += "animation:" + animDecl + "\"";
-  size_t insertPos = woven.size() - 1;
+  size_t insertPos = woven.size();
+  if (insertPos > 0 && woven[insertPos - 1] == '>') {
+    insertPos -= 1;
+  }
   if (insertPos > 0 && woven[insertPos - 1] == '/') {
     insertPos -= 1;
   }
@@ -652,6 +658,10 @@ enum class TargetChannelRole {
   // A Repeater channel fans out to its copies: each copy recomposes the per-copy matrix per frame.
   RepeaterRotation,
   RepeaterCopies,
+  // RangeSelector range channels fan out to the glyphs of the TextModifier that owns the selector.
+  RangeSelectorStart,
+  RangeSelectorEnd,
+  RangeSelectorOffset,
   GroupPosX,
   GroupPosY,
   Rotation,
@@ -727,6 +737,9 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
     {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
     {NodeType::Repeater, "copies", TargetChannelRole::RepeaterCopies},
+    {NodeType::RangeSelector, "start", TargetChannelRole::RangeSelectorStart},
+    {NodeType::RangeSelector, "end", TargetChannelRole::RangeSelectorEnd},
+    {NodeType::RangeSelector, "offset", TargetChannelRole::RangeSelectorOffset},
     {NodeType::RoundCorner, "radius", TargetChannelRole::RoundCornerRadius},
 
     // Group & TextBox channels
@@ -794,6 +807,8 @@ struct DomTargetBundle {
   std::vector<const AnimationObject*> objects = {};
   // Set for a Repeater copy bundle: which copy this tag paints.
   int repeaterIndex = -1;
+  // Set for a RangeSelector glyph bundle: index into AnimationState::rangeSelectorGlyphs.
+  int rangeGlyphIndex = -1;
 };
 
 struct FilterChannelSlot {
@@ -818,6 +833,10 @@ struct BundleChannelSet {
   const Channel* trimStartCh = nullptr;
   const Channel* repeaterRotationCh = nullptr;
   const Channel* repeaterCopiesCh = nullptr;
+  const Channel* rangeStartCh = nullptr;
+  const Channel* rangeEndCh = nullptr;
+  const Channel* rangeOffsetCh = nullptr;
+  const HTMLWriterContext::AnimationState::RangeSelectorGlyph* rangeGlyph = nullptr;
   const Repeater* repeaterTarget = nullptr;
   int repeaterIndex = -1;
   // RoundCorner rounds the geometry declared before it, so the frame rebuilds that shape's `d`.
@@ -960,6 +979,15 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerSkewY:
       out.layerSkewYCh = ch;
+      return true;
+    case TargetChannelRole::RangeSelectorStart:
+      out.rangeStartCh = ch;
+      return true;
+    case TargetChannelRole::RangeSelectorEnd:
+      out.rangeEndCh = ch;
+      return true;
+    case TargetChannelRole::RangeSelectorOffset:
+      out.rangeOffsetCh = ch;
       return true;
     case TargetChannelRole::RepeaterCopies:
       out.repeaterCopiesCh = ch;
@@ -1832,6 +1860,21 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::RangeSelector) {
+      const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
+      for (size_t index = 0; index < glyphs.size(); ++index) {
+        if (glyphs[index].selector != targetNode) {
+          continue;
+        }
+        DomTargetBundle glyphBundle;
+        glyphBundle.domId = glyphs[index].id;
+        glyphBundle.primaryHost = targetNode;
+        glyphBundle.objects.push_back(obj);
+        glyphBundle.rangeGlyphIndex = static_cast<int>(index);
+        bundles.push_back(std::move(glyphBundle));
+      }
+      continue;
+    }
     if (nType == NodeType::Repeater) {
       for (const auto& copy : ctx.animation.repeaterCopies) {
         if (copy.repeater != targetNode) {
@@ -1907,9 +1950,400 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
   return bundles;
 }
 
+// True when every key of a float channel interpolates linearly or holds. Between two keys such a
+// channel is then linear in time, which keeps a RangeSelector factor rational in time.
+bool IsLinearOrHoldFloatChannel(const Channel* ch) {
+  if (ch == nullptr || ch->valueType() != ChannelValueType::Float) {
+    return false;
+  }
+  for (const auto& key : static_cast<const TypedChannel<float>*>(ch)->keyframes) {
+    if (key.interpolation == KeyframeInterpolationType::Bezier) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Value of a linear / hold float channel at a fractional frame. A glyph's factor crosses the
+// selector edges between keys, so its stops do not land on whole frames.
+double EvalLinearFloatAt(const Channel* ch, double t, double fallback) {
+  if (ch == nullptr || ch->valueType() != ChannelValueType::Float) {
+    return fallback;
+  }
+  const auto& keys = static_cast<const TypedChannel<float>*>(ch)->keyframes;
+  if (keys.empty()) {
+    return fallback;
+  }
+  if (t <= static_cast<double>(keys.front().time)) {
+    return keys.front().value;
+  }
+  for (size_t k = 0; k + 1 < keys.size(); ++k) {
+    double t1 = static_cast<double>(keys[k + 1].time);
+    if (t >= t1) {
+      continue;
+    }
+    if (keys[k].interpolation != KeyframeInterpolationType::Linear) {
+      return keys[k].value;
+    }
+    double t0 = static_cast<double>(keys[k].time);
+    double u = t1 > t0 ? (t - t0) / (t1 - t0) : 1.0;
+    return keys[k].value + (keys[k + 1].value - keys[k].value) * u;
+  }
+  return keys.back().value;
+}
+
+using RangeSelectorGlyph = HTMLWriterContext::AnimationState::RangeSelectorGlyph;
+
+struct RangeValues {
+  double start = 0.0;
+  double end = 0.0;
+  double offset = 0.0;
+};
+
+RangeValues RangeValuesAt(const BundleChannelSet& chSet, double t) {
+  const RangeSelector* selector = chSet.rangeGlyph->selector;
+  return {EvalLinearFloatAt(chSet.rangeStartCh, t, selector->start),
+          EvalLinearFloatAt(chSet.rangeEndCh, t, selector->end),
+          EvalLinearFloatAt(chSet.rangeOffsetCh, t, selector->offset)};
+}
+
+// The glyph's combined factor at time t, clamped exactly like the static export.
+double RangeGlyphFactorAt(const BundleChannelSet& chSet, double t) {
+  const RangeSelectorGlyph* glyph = chSet.rangeGlyph;
+  RangeValues values = RangeValuesAt(chSet, t);
+  float factor = ComputeRangeSelectorFactor(
+      glyph->selector, glyph->glyphIndex, glyph->totalGlyphs, static_cast<float>(values.start),
+      static_cast<float>(values.end), static_cast<float>(values.offset));
+  return std::clamp(static_cast<double>(factor), -1.0, 1.0);
+}
+
+constexpr int kRangeGlyphEdgeCount = 7;
+
+// The selector range edges against the glyph's own edges, as signed distances in text fractions.
+// The factor only changes formula where one of them changes sign, and between keys each of them is
+// linear in time, so their zeros are the only interior breakpoints.
+void RangeGlyphEdgeDistances(const BundleChannelSet& chSet, double t,
+                             double out[kRangeGlyphEdgeCount]) {
+  const RangeSelectorGlyph* glyph = chSet.rangeGlyph;
+  RangeValues values = RangeValuesAt(chSet, t);
+  double count = static_cast<double>(glyph->totalGlyphs);
+  double scale = glyph->selector->unit == SelectorUnit::Index ? 1.0 / count : 1.0;
+  double rangeStart = (values.start + values.offset) * scale;
+  double rangeEnd = (values.end + values.offset) * scale;
+  double glyphStart = static_cast<double>(glyph->glyphIndex) / count;
+  double glyphEnd = static_cast<double>(glyph->glyphIndex + 1) / count;
+  double glyphCenter = (glyphStart + glyphEnd) * 0.5;
+  out[0] = rangeStart - glyphStart;
+  out[1] = rangeStart - glyphCenter;
+  out[2] = rangeStart - glyphEnd;
+  out[3] = rangeEnd - glyphStart;
+  out[4] = rangeEnd - glyphCenter;
+  out[5] = rangeEnd - glyphEnd;
+  out[6] = rangeStart - rangeEnd;
+}
+
+// Which edge distances change the factor formula for a shape. A ramp is (center - start) /
+// (end - start) clamped to [0, 1], so it only switches where a range edge passes the glyph center;
+// Square measures the overlap of the glyph span, so it switches at the glyph's start and end.
+bool RangeGlyphEdgeMatters(SelectorShape shape, int edge) {
+  if (edge == 6) {
+    return true;
+  }
+  if (shape == SelectorShape::Square) {
+    return edge == 0 || edge == 2 || edge == 3 || edge == 5;
+  }
+  return edge == 1 || edge == 4;
+}
+
+// y of a CSS cubic-bezier(x1, y1, x2, y2) at progress x. x(s) is monotonic for x1, x2 in [0, 1],
+// so Newton steps are kept inside a shrinking bisection bracket.
+double CubicBezierEase(double x1, double y1, double x2, double y2, double x) {
+  double lo = 0.0;
+  double hi = 1.0;
+  double s = x;
+  for (int i = 0; i < 32; ++i) {
+    double ms = 1.0 - s;
+    double xs = 3.0 * ms * ms * s * x1 + 3.0 * ms * s * s * x2 + s * s * s - x;
+    if (std::abs(xs) < 1e-10) {
+      break;
+    }
+    if (xs > 0.0) {
+      hi = s;
+    } else {
+      lo = s;
+    }
+    double dx = 3.0 * ms * ms * x1 + 6.0 * ms * s * (x2 - x1) + 3.0 * s * s * (1.0 - x2);
+    double next = std::abs(dx) > 1e-9 ? s - xs / dx : (lo + hi) * 0.5;
+    s = (next <= lo || next >= hi) ? (lo + hi) * 0.5 : next;
+  }
+  double ms = 1.0 - s;
+  return 3.0 * ms * ms * s * y1 + 3.0 * ms * s * s * y2 + s * s * s;
+}
+
+struct CubicBezierCurve {
+  double x1 = 0.0;
+  double y1 = 0.0;
+  double x2 = 1.0;
+  double y2 = 1.0;
+};
+
+constexpr int kEaseSamples = 31;
+
+// A monotonic rational piece normalized to [0, 1] on both axes is u / (u + r * (1 - u)): its slope
+// is 1 / r at the start and r at the end. The easing keeps those two slopes and only searches the
+// two handle lengths, a small deterministic 2D search.
+double RationalEaseError(double r, double a, double b) {
+  double worst = 0.0;
+  for (int i = 1; i <= kEaseSamples; ++i) {
+    double u = static_cast<double>(i) / (kEaseSamples + 1);
+    double target = u / (u + r * (1.0 - u));
+    worst = std::max(worst, std::abs(CubicBezierEase(a, a / r, 1.0 - b, 1.0 - b * r, u) - target));
+  }
+  return worst;
+}
+
+CubicBezierCurve FitRationalEase(double r) {
+  double bestA = 1.0 / 3.0;
+  double bestB = 1.0 / 3.0;
+  double bestError = RationalEaseError(r, bestA, bestB);
+  for (int i = 1; i <= 20; ++i) {
+    for (int j = 1; j <= 20; ++j) {
+      double a = i / 20.0;
+      double b = j / 20.0;
+      double error = RationalEaseError(r, a, b);
+      if (error < bestError) {
+        bestError = error;
+        bestA = a;
+        bestB = b;
+      }
+    }
+  }
+  const double moves[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+  for (double step = 0.025; step > 1e-4; step *= 0.5) {
+    bool improved = true;
+    while (improved) {
+      improved = false;
+      for (const auto& move : moves) {
+        double a = bestA + move[0] * step;
+        double b = bestB + move[1] * step;
+        if (a <= 0.0 || a > 1.0 || b <= 0.0 || b > 1.0) {
+          continue;
+        }
+        double error = RationalEaseError(r, a, b);
+        if (error < bestError) {
+          bestError = error;
+          bestA = a;
+          bestB = b;
+          improved = true;
+        }
+      }
+    }
+  }
+  return {bestA, bestA / r, 1.0 - bestB, 1.0 - bestB * r};
+}
+
+struct RangeGlyphStop {
+  double time = 0.0;
+  double factor = 0.0;
+  std::string easing = {};
+};
+
+// Turns a pixel (and opacity) tolerance into a factor tolerance from the largest change any emitted
+// value makes per unit of factor.
+double RangeGlyphFactorTolerance(const RangeSelectorGlyph& glyph) {
+  constexpr double kPixelTolerance = 0.03;
+  constexpr double kAlphaTolerance = 0.004;
+  constexpr double kDegreesToRadians = 3.14159265358979323846 / 180.0;
+  const TextModifier* modifier = glyph.modifier;
+  double pixels = std::max({std::abs(modifier->position.x), std::abs(modifier->position.y),
+                            std::abs(modifier->anchor.x), std::abs(modifier->anchor.y)});
+  pixels += std::abs(modifier->rotation) * kDegreesToRadians * glyph.fontSize;
+  pixels += std::max(std::abs(modifier->scale.x - 1.0f), std::abs(modifier->scale.y - 1.0f)) *
+            glyph.fontSize;
+  pixels += std::abs(modifier->skew) * kDegreesToRadians * glyph.fontSize;
+  double tolerance = pixels > 0.0 ? kPixelTolerance / pixels : 1.0;
+  if (modifier->alpha < 1.0f) {
+    tolerance = std::min(tolerance, kAlphaTolerance / (1.0 - modifier->alpha));
+  }
+  return tolerance;
+}
+
+std::string FormatCubicBezier(const CubicBezierCurve& curve) {
+  return "cubic-bezier(" + CssFloatToString(static_cast<float>(curve.x1)) + ", " +
+         CssFloatToString(static_cast<float>(curve.y1)) + ", " +
+         CssFloatToString(static_cast<float>(curve.x2)) + ", " +
+         CssFloatToString(static_cast<float>(curve.y2)) + ")";
+}
+
+// Appends the stops covering [t0, t1]. A monotonic rational piece is one stop eased by a fitted
+// cubic-bezier; a piece the fit cannot reach within the tolerance is split in half.
+void AppendRangeGlyphPiece(const BundleChannelSet& chSet, double t0, double t1, double tolerance,
+                           int depth, std::vector<RangeGlyphStop>& stops) {
+  constexpr int kMaxDepth = 6;
+  double span = t1 - t0;
+  double f0 = RangeGlyphFactorAt(chSet, t0);
+  // A hold key jumps at t1: the value just before it is what this piece shows.
+  double f1 = RangeGlyphFactorAt(chSet, t1 - span * 1e-6);
+  if (std::abs(f1 - f0) < 1e-9) {
+    double after = RangeGlyphFactorAt(chSet, t1);
+    stops.push_back({t0, f0, std::abs(after - f1) > 1e-9 ? "steps(1, end)" : "linear"});
+    return;
+  }
+  double h = (RangeGlyphFactorAt(chSet, t0 + span * 0.5) - f0) / (f1 - f0);
+  if (h > 1e-6 && h < 1.0 - 1e-6) {
+    double r = 1.0 / h - 1.0;
+    bool linear = std::abs(r - 1.0) < 1e-6;
+    CubicBezierCurve curve = {1.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0};
+    if (!linear) {
+      curve = FitRationalEase(r);
+    }
+    double worst = 0.0;
+    for (int i = 1; i <= 16; ++i) {
+      double u = i / 17.0;
+      double eased = CubicBezierEase(curve.x1, curve.y1, curve.x2, curve.y2, u);
+      double actual = RangeGlyphFactorAt(chSet, t0 + span * u);
+      worst = std::max(worst, std::abs(f0 + (f1 - f0) * eased - actual));
+    }
+    if (worst <= tolerance || depth >= kMaxDepth) {
+      stops.push_back({t0, f0, linear ? "linear" : FormatCubicBezier(curve)});
+      return;
+    }
+  }
+  if (depth >= kMaxDepth) {
+    stops.push_back({t0, f0, "linear"});
+    return;
+  }
+  double split = t0 + span * 0.5;
+  AppendRangeGlyphPiece(chSet, t0, split, tolerance, depth + 1, stops);
+  AppendRangeGlyphPiece(chSet, split, t1, tolerance, depth + 1, stops);
+}
+
+// The glyph's style for one factor value. The function list depends only on which modifier
+// properties are set, never on the factor, and every argument is linear in the factor, so CSS
+// interpolates exactly what the runtime does and the easing is the only curve to reproduce.
+std::string RangeGlyphDecls(const RangeSelectorGlyph& glyph, double factor) {
+  const TextModifier* modifier = glyph.modifier;
+  float f = static_cast<float>(factor);
+  std::string transform = "translate(" + CssFloatToString(glyph.glyphX) + "px, " +
+                          CssFloatToString(glyph.glyphY) + "px)";
+  if (!FloatNearlyZero(modifier->position.x) || !FloatNearlyZero(modifier->position.y)) {
+    transform += " translate(" + CssFloatToString(modifier->position.x * f) + "px, " +
+                 CssFloatToString(modifier->position.y * f) + "px)";
+  }
+  bool hasRotation = !FloatNearlyZero(modifier->rotation);
+  bool hasScale =
+      !FloatNearlyZero(modifier->scale.x - 1.0f) || !FloatNearlyZero(modifier->scale.y - 1.0f);
+  bool hasSkew = !FloatNearlyZero(modifier->skew);
+  if (hasRotation || hasScale || hasSkew) {
+    float pivotX = glyph.pivotX + modifier->anchor.x * f;
+    float pivotY = modifier->anchor.y * f;
+    transform +=
+        " translate(" + CssFloatToString(pivotX) + "px, " + CssFloatToString(pivotY) + "px)";
+    if (hasRotation) {
+      transform += " rotate(" + CssFloatToString(modifier->rotation * f) + "deg)";
+    }
+    if (hasScale) {
+      transform += " scale(" + CssFloatToString(1.0f + (modifier->scale.x - 1.0f) * f) + ", " +
+                   CssFloatToString(1.0f + (modifier->scale.y - 1.0f) * f) + ")";
+    }
+    if (hasSkew) {
+      bool hasAxis = !FloatNearlyZero(modifier->skewAxis);
+      if (hasAxis) {
+        transform += " rotate(" + CssFloatToString(modifier->skewAxis) + "deg)";
+      }
+      transform += " skewX(" + CssFloatToString(-modifier->skew * f) + "deg)";
+      if (hasAxis) {
+        transform += " rotate(" + CssFloatToString(-modifier->skewAxis) + "deg)";
+      }
+    }
+    transform +=
+        " translate(" + CssFloatToString(-pivotX) + "px, " + CssFloatToString(-pivotY) + "px)";
+  }
+  std::string decls = {};
+  AppendCssDecl(decls, "transform", transform);
+  if (modifier->alpha < 1.0f) {
+    AppendCssDecl(decls, "opacity", CssFloatToString(1.0f + (modifier->alpha - 1.0f) * f));
+  }
+  return decls;
+}
+
+// Stops for one glyph of an animated RangeSelector. The timeline is cut at every key and wherever a
+// range edge crosses a glyph edge; inside each cut the factor is one rational function of time, so
+// it is a stop pair eased by a fitted cubic-bezier rather than a per-frame sample.
+std::string EmitRangeSelectorGlyphStops(const BundleChannelSet& chSet,
+                                        const BundleTimingInfo& timing) {
+  if (timing.effectiveDuration <= 0) {
+    return {};
+  }
+  const double windowStart = static_cast<double>(timing.bundleShiftFrames);
+  const double windowEnd = windowStart + static_cast<double>(timing.effectiveDuration);
+  std::set<double> cuts = {windowStart, windowEnd};
+  for (Frame key : chSet.keyTimes) {
+    double t = static_cast<double>(key);
+    if (t > windowStart && t < windowEnd) {
+      cuts.insert(t);
+    }
+  }
+  const std::vector<double> keyCuts(cuts.begin(), cuts.end());
+  for (size_t k = 0; k + 1 < keyCuts.size(); ++k) {
+    double t0 = keyCuts[k];
+    double t1 = keyCuts[k + 1];
+    double d0[kRangeGlyphEdgeCount];
+    double d1[kRangeGlyphEdgeCount];
+    RangeGlyphEdgeDistances(chSet, t0, d0);
+    RangeGlyphEdgeDistances(chSet, t1 - (t1 - t0) * 1e-9, d1);
+    for (int e = 0; e < kRangeGlyphEdgeCount; ++e) {
+      if (!RangeGlyphEdgeMatters(chSet.rangeGlyph->selector->shape, e)) {
+        continue;
+      }
+      if ((d0[e] < 0.0 && d1[e] > 0.0) || (d0[e] > 0.0 && d1[e] < 0.0)) {
+        cuts.insert(t0 + (t1 - t0) * d0[e] / (d0[e] - d1[e]));
+      }
+    }
+  }
+  const std::vector<double> times(cuts.begin(), cuts.end());
+  const double tolerance = RangeGlyphFactorTolerance(*chSet.rangeGlyph);
+  std::vector<RangeGlyphStop> pieces = {};
+  for (size_t k = 0; k + 1 < times.size(); ++k) {
+    if (times[k + 1] - times[k] < 1e-6) {
+      continue;
+    }
+    AppendRangeGlyphPiece(chSet, times[k], times[k + 1], tolerance, 0, pieces);
+  }
+  pieces.push_back({windowEnd, RangeGlyphFactorAt(chSet, windowEnd), {}});
+  // A stop whose value equals both neighbours only repeats a flat stretch.
+  std::vector<RangeGlyphStop> kept = {};
+  for (size_t k = 0; k < pieces.size(); ++k) {
+    bool flatInterior = k > 0 && k + 1 < pieces.size() &&
+                        std::abs(pieces[k].factor - kept.back().factor) < 1e-9 &&
+                        std::abs(pieces[k].factor - pieces[k + 1].factor) < 1e-9;
+    if (flatInterior) {
+      kept.back().easing = "linear";
+      continue;
+    }
+    kept.push_back(pieces[k]);
+  }
+  pieces = std::move(kept);
+
+  std::string stops = {};
+  const double duration = static_cast<double>(timing.effectiveDuration);
+  for (const auto& piece : pieces) {
+    double percent = std::clamp((piece.time - windowStart) * 100.0 / duration, 0.0, 100.0);
+    std::string decls = RangeGlyphDecls(*chSet.rangeGlyph, piece.factor);
+    if (!piece.easing.empty()) {
+      AppendCssDecl(decls, "animation-timing-function", piece.easing);
+    }
+    stops += "  " + CssFloatToString(static_cast<float>(percent)) + "% { " + decls + "; }\n";
+  }
+  return stops;
+}
+
 std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
                                     const BundleTimingInfo& timing, const std::string& tagName,
                                     bool& outNeedsZeroOrigin) {
+  if (chSet.rangeGlyph != nullptr) {
+    return EmitRangeSelectorGlyphStops(chSet, timing);
+  }
   std::string stops = {};
   // PAGX holds the first/last key value outside the key range, whereas CSS synthesizes missing
   // 0%/100% stops from the element's static style. Always emit both boundary stops so the browser
@@ -2240,6 +2674,31 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             layer->groupOpacity = true;
           }
         }
+      } else if (nType == NodeType::RangeSelector) {
+        auto* selector = static_cast<RangeSelector*>(targetNode);
+        bool bound = false;
+        bool exact = true;
+        for (auto* ch : obj->channels) {
+          if (ch == nullptr) {
+            continue;
+          }
+          auto role = LookupChannelRole(nType, ch->name);
+          if (role == TargetChannelRole::RangeSelectorStart ||
+              role == TargetChannelRole::RangeSelectorEnd ||
+              role == TargetChannelRole::RangeSelectorOffset) {
+            bound = true;
+            exact = exact && IsLinearOrHoldFloatChannel(ch);
+          }
+        }
+        // Eased keys would compose the bezier with the rational factor curve, which one fitted
+        // easing per piece cannot reproduce; such a selector keeps its static pose.
+        if (bound && exact) {
+          _ctx.animation.animatedRangeSelectors.insert(selector);
+          if (selector->id.empty()) {
+            _restoredNodeIds.emplace_back(selector, selector->id);
+            selector->id = _ctx.nextId("animRS");
+          }
+        }
       } else if (nType == NodeType::Repeater) {
         auto* repeater = static_cast<Repeater*>(targetNode);
         for (auto* ch : obj->channels) {
@@ -2456,6 +2915,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       BundleChannelSet chSet =
           CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer);
+      if (bundle.rangeGlyphIndex >= 0) {
+        chSet.rangeGlyph = &_ctx.animation.rangeSelectorGlyphs[bundle.rangeGlyphIndex];
+      }
       if (chSet.roundCornerTarget != nullptr) {
         auto shapeIt = _ctx.animation.roundCornerShapes.find(chSet.roundCornerTarget);
         if (shapeIt != _ctx.animation.roundCornerShapes.end()) {

@@ -86,20 +86,22 @@ python3 tools/anim_coverage.py --check
 | Stroke | `alpha` | ✔ | `stroke/02` |
 | Stroke | `color` | ✔ | `stroke/01` |
 | Stroke | `dashOffset` | ✔ | `stroke/04` |
-| Stroke | `miterLimit` | ✘ | `stroke/05` |
+| Stroke | `miterLimit` | ✔ | `stroke/05` |
 | Stroke | `width` | ✔ | `stroke/03·06` |
 | TrimPath | `end` | ✔ | `geometry/04`、`stroke/06` |
 | TrimPath | `offset` | ✘ | — |
 | TrimPath | `start` | ✔ | `modifier/02` |
 | RoundCorner | `radius` | ✔ | `modifier/01` |
 | Repeater | `anchor.x` `anchor.y` `endAlpha` `offset` `position.x` `position.y` `scale.x` `scale.y` `startAlpha` | ✘ | — |
-| Repeater | `copies` | ✘ | `modifier/03` |
-| Repeater | `rotation` | ✘ | `modifier/04` |
+| Repeater | `copies` | ✔ | `modifier/03` |
+| Repeater | `rotation` | ✔ | `modifier/04` |
 | TextModifier | `alpha` | ✘ | `text/02` |
 | TextModifier | `anchor.x` `anchor.y` `position.x` `position.y` `rotation` `scale.x` `scale.y` `skew` `skewAxis` `strokeColor` `strokeWidth` | ✘ | — |
 | TextModifier | `fillColor` | ✘ | `text/01` |
-| RangeSelector | `easeIn` `easeOut` `end` `offset` `weight` | ✘ | — |
-| RangeSelector | `start` | ✘ | `modifier/05` |
+| RangeSelector | `easeIn` `easeOut` `weight` | ✘ | — |
+| RangeSelector | `end` | ✔ | `modifier/06` |
+| RangeSelector | `offset` | ✔ | `modifier/07` |
+| RangeSelector | `start` | ✔ | `modifier/05` |
 | SolidColor | `color` | ✔ | `sharing/01`、`solid_color/01`、`timing/04·06` |
 | LinearGradient | `endPoint.x` | ✘ | `gradient/01` |
 | LinearGradient | `endPoint.y` `startPoint.x` `startPoint.y` | ✘ | — |
@@ -272,8 +274,10 @@ node tools/html-snapshot/eval-animation/run.js \
 
 > 背景：浏览器按 CSS 行盒定位文本（`top` 是盒子顶边，基线由字体 ascent 推导），PAGX 的文本锚点是基线。
 > 二者相差一个“半行距 + ascent 取整”的量（56px 字号约 1.5~2px），且随字号不按比例变化。
-> 导出侧的修法是输出 SVG `<text>`（`y` 即基线），而不是给 CSS 加补偿像素；该改动尚未落地，
-> 在它完成前，文本类用例的分数上限约为 0.95（`modifier/05` 因额外叠加逐字动画，上限约 0.94）。
+> 导出侧的修法是输出 SVG `<text>`（`y` 即基线），而不是给 CSS 加补偿像素。带 `TextModifier` 的文本已走这条
+> 路径；`RangeSelector` 的 `start` / `end` / `offset` 动画在其上逐字形输出关键帧：每段因子曲线是时间的分式
+> 线性函数，用一对 stop 加一条拟合的 `cubic-bezier` 表达（误差 ≤0.03px），不做逐帧采样。`modifier/05`–`07`
+> 逐帧 SSIM 约 0.990，剩余差异是字形边缘抗锯齿。
 
 ## 7. 范围与已知限制
 

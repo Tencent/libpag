@@ -286,8 +286,33 @@ static float CalculateTriangleFactorBezier(float textCenter, float rangeStart, f
                             t * t * t * y4);
 }
 
+// True when a per-glyph keyframes rule can reproduce an animated selector exactly: a single
+// RangeSelector whose shape is piecewise rational in its range values (so every monotonic piece is
+// one fitted cubic-bezier), and a modifier whose glyph style is linear in the factor.
+static bool RangeSelectorGlyphsAnimatable(const TextModifier* modifier) {
+  if (modifier == nullptr || modifier->selectors.size() != 1 || modifier->selectors[0] == nullptr ||
+      modifier->selectors[0]->nodeType() != NodeType::RangeSelector) {
+    return false;
+  }
+  auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+  bool rationalShape = selector->shape == SelectorShape::RampUp ||
+                       selector->shape == SelectorShape::RampDown ||
+                       selector->shape == SelectorShape::Square;
+  // Color and stroke-width blends are not emitted per frame; weight below zero flips the factor
+  // sign, which the static path folds through |f| and a linear easing cannot.
+  return rationalShape && !selector->randomOrder && selector->weight >= 0.0f &&
+         !modifier->fillColor.has_value() && !modifier->strokeColor.has_value() &&
+         !modifier->strokeWidth.has_value();
+}
+
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs) {
+  return ComputeRangeSelectorFactor(selector, glyphIndex, totalGlyphs, selector->start,
+                                    selector->end, selector->offset);
+}
+
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset) {
   if (totalGlyphs == 0) {
     return 0.0f;
   }
@@ -296,13 +321,12 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   auto textEnd = static_cast<float>(glyphIndex + 1) / textCount;
   auto textCenter = (textStart + textEnd) * 0.5f;
 
-  float rangeStart = selector->start;
-  float rangeEnd = selector->end;
+  float rangeStart = start;
+  float rangeEnd = end;
   if (selector->unit == SelectorUnit::Index) {
     rangeStart = rangeStart / textCount;
     rangeEnd = rangeEnd / textCount;
   }
-  float offset = selector->offset;
   if (selector->unit == SelectorUnit::Index) {
     offset = offset / textCount;
   }
@@ -1244,8 +1268,22 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         // Use layoutRuns for precise per-glyph positions. Each glyph's (x, y) is in the
         // text's layout coordinate system; the SVG viewport is positioned at renderPos so
         // glyph coordinates are relative to that origin.
+        const RangeSelector* animatedSelector = nullptr;
+        if (RangeSelectorGlyphsAnimatable(modifier)) {
+          auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+          if (_ctx->animation.animatedRangeSelectors.count(selector) > 0 && !selector->id.empty()) {
+            animatedSelector = selector;
+          }
+        }
         std::string svgStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
                                "px;top:" + CssFloatToString(ty) + "px;overflow:visible";
+        if (animatedSelector != nullptr) {
+          // Per-glyph keyframes move each glyph by fractions of a pixel. Unhinted outline
+          // rasterisation keeps those glyphs on the pixels PAGX draws (measured: hinting lands them
+          // one pixel taller). It is not applied to static text: there the effect depends on the
+          // content, and stroked glyphs measured worse with it.
+          svgStyle += ";text-rendering:geometricPrecision";
+        }
         if (alpha < 1.0f) {
           svgStyle += ";opacity:" + CssFloatToString(alpha);
         }
@@ -1349,6 +1387,15 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                           CssFloatToString(-modAnchorY) + ") ";
 
           out.openTag("text");
+          if (animatedSelector != nullptr) {
+            // The keyframes rebuild this glyph's modifier pose per frame; the static transform
+            // below stays as the pre-animation fallback.
+            std::string glyphId = animatedSelector->id + "_g" + std::to_string(charIdx);
+            out.addAttr("id", glyphId);
+            _ctx->animation.rangeSelectorGlyphs.push_back({animatedSelector, modifier, charIdx,
+                                                           factors.size(), glyphX, glyphY, pivotX,
+                                                           renderFont, glyphId});
+          }
           if (!fontFamily.empty()) {
             out.addAttr("font-family", fontFamily);
           }
