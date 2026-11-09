@@ -323,7 +323,8 @@ struct HTMLBoxAttributes {
 
   // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
   // projection on the layer that owns the pose, so the parent value is pushed into each child pose
-  // as `P * pose` (see HTMLTransform3D::PerspectiveMatrix). 0 means "no perspective".
+  // as `P * pose`, where `P` is the identity with bottom row `(0, 0, -1/d, 1)`. 0 means "no
+  // perspective".
   float perspectivePx = 0.0f;
   // CSS `perspective-origin` of the camera above, in this box's local pixels (default: the centre).
   float perspectiveOriginX = NAN;
