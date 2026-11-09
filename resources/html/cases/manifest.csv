@@ -144,6 +144,10 @@ id,category,feature,tier,expected_warnings,notes
 13-transform__rotate3d,transform,"rotate3d with a normalised axis",subset,,
 13-transform__perspective,transform,"perspective() inside the function list",subset,,
 13-transform__static-perspective-origin,transform,"perspective() on a static box: the camera moves to a wrapper and perspective-origin keeps the element transform-origin",subset,,
+13-transform__transform-origin-percent-px,transform,"percent and px origins both land on Layer.anchor",subset,,
+13-transform__transform-origin-keywords,transform,"keyword order is resolved by axis (bottom left / top 20px)",subset,,
+13-transform__transform-origin-three-value,transform,"third value is the pivot depth (anchorZ)",subset,,
+13-transform__transform-origin-translate,transform,"a pure translation ignores the pivot, no anchor emitted",subset,,
 14-overflow-clip__overflow-hidden,overflow-clip,"overflow: hidden -> clipToBounds",subset,,
 14-overflow-clip__clip-path-url,overflow-clip,"clip-path: url(#id) contour mask",subset,,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
 14-overflow-clip__clip-path-polygon,overflow-clip,"clip-path: polygon() (unsupported)",subset,subset:unsupported-property,
