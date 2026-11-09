@@ -677,10 +677,20 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
+  // CSS `perspective` on `<body>` projects its direct children just like on any other container, so
+  // the bag handed down carries the camera one level (see convertContainer).
+  HTMLInheritedStyle childInherited = inherited;
+  childInherited.parentPerspectivePx = box.perspectivePx;
+  if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
+      std::isfinite(box.perspectiveOriginY)) {
+    childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
+    childInherited.parentPerspectiveOriginY = box.perspectiveOriginY;
+  }
+
   auto child = body->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
-      auto* childLayer = convertElement(child, inherited, 1);
+      auto* childLayer = convertElement(child, childInherited, 1);
       if (childLayer) {
         contentHost->children.push_back(childLayer);
       }
@@ -692,7 +702,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
         warn("html: stray text inside <body>; emitted as anonymous text leaf");
         HTMLBoxAttributes leafBox = HTMLBoxAttributes{};
         auto anon = MakeStrayTextSpan(trimmed);
-        Layer* leaf = convertTextLeaf(anon, leafBox, inherited);
+        Layer* leaf = convertTextLeaf(anon, leafBox, childInherited);
         if (leaf) {
           contentHost->children.push_back(leaf);
         }

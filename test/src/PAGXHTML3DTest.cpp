@@ -1098,6 +1098,41 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveOriginKeywordMatchesTheEquivalentPixels) {
 }
 
 /**
+ * Test case: `perspective` declared on `<body>` projects its direct children, the same way it does on
+ * any other container. `convertBody` used to hand the inherited style down unchanged, so a page-level
+ * camera was dropped and every 3D transform rendered without perspective.
+ */
+PAG_TEST(PAGXHTML3DTest, BodyPerspectiveReachesItsChildren) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>body { perspective: 600px; }</style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:rotateY(30deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  const float projection =
+      std::fabs(card->matrix3D.getRowColumn(3, 0)) + std::fabs(card->matrix3D.getRowColumn(3, 2));
+  EXPECT_GT(projection, 1e-5f) << "the body camera must reach the child pose";
+
+  // Without the camera the same pose stays a plain rotation.
+  auto plain = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:rotateY(30deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(plain, nullptr);
+  auto* plainCard = FindLayerById(plain, "card");
+  ASSERT_NE(plainCard, nullptr);
+  EXPECT_TRUE(NearlyEqual(plainCard->matrix3D.getRowColumn(3, 0), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(plainCard->matrix3D.getRowColumn(3, 2), 0.0f, 1e-6f));
+}
+
+/**
  * Test case: a flat stop that is singular (`scale(0)`) cannot be lifted onto the `matrix3D` channel
  * when another stop of the same animation is 3D. PAGX requires every `matrix3D` keyframe to be
  * invertible, so the stop is dropped with one diagnostic instead of being written out invalid.
