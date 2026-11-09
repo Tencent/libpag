@@ -698,14 +698,12 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   if (!box.transform.valid) {
     return;
   }
-  // A `perspective` declared on the parent projects this element's pose. PAGX keeps the projection
-  // on the layer that owns the pose, so it is folded in here rather than read from the parent.
-  const Matrix3D pose = PushPerspective(box.transform.pose, box.parentPerspectivePx,
-                                        box.parentPerspectiveOriginX, box.parentPerspectiveOriginY);
-  // The parser validated the pose before the parent camera was folded in, and PAGX requires a 3D
-  // pose to be invertible, so the pushed pose is re-checked (`scale(0)` under a perspective parent
-  // would otherwise emit an invalid matrix3D).
-  if (!IsFlatTransform(pose) && !IsInvertible(pose)) {
+  // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
+  // classifies the result the same way the keyframe path does.
+  const PosePlacement placement =
+      PlacePose(box.transform.pose, box.parentPerspectivePx, box.parentPerspectiveOriginX,
+                box.parentPerspectiveOriginY);
+  if (!placement.valid) {
     _diagnostics.warn(
         "html: transform becomes non-invertible under the parent perspective; ignored");
     return;
@@ -714,9 +712,9 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
   // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or
   // pure projection) is unaffected by the pivot, so it keeps the legacy matrix-only form.
-  const bool needsAnchor = box.transform.originResolved && !IsLinearIdentity(pose);
-  if (IsFlatTransform(pose)) {
-    const Matrix affine = ToAffine2D(pose);
+  const bool needsAnchor = box.transform.originResolved && !placement.linearIsIdentity;
+  if (placement.flat) {
+    const Matrix affine = ToAffine2D(placement.pose);
     if (affine.isIdentity()) {
       return;
     }
@@ -731,7 +729,7 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
     layer->anchor = box.transform.origin;
     layer->anchorZ = box.transform.originZ;
   }
-  layer->matrix3D = pose;
+  layer->matrix3D = placement.pose;
 }
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,

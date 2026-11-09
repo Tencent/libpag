@@ -894,6 +894,19 @@ Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, fl
   return Multiply(Multiply(toOrigin, projection), Multiply(fromOrigin, pose));
 }
 
+PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
+                        float parentPerspectiveOriginX, float parentPerspectiveOriginY) {
+  PosePlacement placement = {};
+  placement.pose = PushPerspective(pose, parentPerspectivePx, parentPerspectiveOriginX,
+                                   parentPerspectiveOriginY);
+  placement.flat = IsFlatTransform(placement.pose);
+  // PAGX requires a 3D pose to be invertible; a flat pose has no such constraint, because a zero
+  // scale is a valid (if empty) 2D transform.
+  placement.valid = placement.flat || IsInvertible(placement.pose);
+  placement.linearIsIdentity = IsLinearIdentity(placement.pose);
+  return placement;
+}
+
 bool IsFlatTransform(const Matrix3D& matrix) {
   // Composing rotations leaves values like 0.99999994 on the Z axis, so the plane test needs a
   // tolerance instead of exact comparisons.
