@@ -34,6 +34,13 @@ NODE_ORDER = [
 ]
 
 
+# Channels that are animatable in the registry but provably cannot change a rendered pixel, so a
+# case could only ever compare two static images. Each entry states why; keep this list short.
+CHANNEL_EXEMPTIONS = {
+    ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
+}
+
+
 def load_registry():
     src = open(CHANNEL_SRC).read()
     anim = {}
@@ -218,28 +225,27 @@ def render_families(cases):
 def check(anim, exported, index, cases):
     """Returns (failures, warnings).
 
-    A channel is covered either by a case that drives it or by a case on the same node type: the
-    exporter decides per node type and channel family, so one representative case per node type
-    records the same gap. Dead mapping entries are warnings, not failures: they are exporter bugs
-    that the document lists, not corpus holes.
+    Every animatable channel in the PAGX registry needs a case that drives it, whether the exporter
+    supports it (`Expect: supported`) or not yet (`Expect: gap`). The corpus is the inventory of
+    PAGX animation features, not of the exporter's progress, so an unexported channel still needs
+    its gap case: that is what turns "not implemented" into a visible, measurable item. Dead
+    mapping entries are warnings, not failures: they are exporter bugs that the document lists,
+    not corpus holes.
     """
     failures = []
     warnings = []
 
-    covered_nodes = set()
-    for case in cases:
-        covered_nodes.update(case["targets"])
     # the two anchor cases animate rotation.z, which is mapped, while the pivot is not: the header
     # keeps `gap` and says so, so the emits check must not treat them as stale
     partial = {"anchor/01_rotation_z_offcenter", "anchor/08_anchor_center_vs_default"}
 
-    # TextPath only carries the shared transform channels and needs a path-bound text layout the
-    # corpus has no other use for; the text modifier family (text/01~text/05) records that gap.
-    exceptions = {"TextPath": "共享变换通道，由 text/ 族代表"}
-
     for node in NODE_ORDER:
-        if anim.get(node) and node not in covered_nodes and node not in exceptions:
-            failures.append("node type without any case: " + node)
+        for channel in sorted(anim.get(node, ())):
+            if (node, channel) in index:
+                continue
+            if (node, channel) in CHANNEL_EXEMPTIONS:
+                continue
+            failures.append("animatable channel without a case: %s.%s" % (node, channel))
 
     for node, channels in exported.items():
         for channel in channels:
