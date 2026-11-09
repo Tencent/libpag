@@ -158,19 +158,38 @@ bool ParseStrictFloat(const std::string& token, float& out) {
   return true;
 }
 
-// `ParseAngle` maps unparsable input to 0, which would silently turn `rotate(abc)` into a no-op, so
-// the numeric prefix is validated first.
+// `ParseAngle` maps unparsable input to 0 and unknown units to plain degrees, which would silently
+// turn `rotate(45px)` into a 45 degree rotation, so the unit is validated here instead. CSS accepts
+// `deg` / `grad` / `rad` / `turn` case insensitively; a unitless value is only valid as `0`.
 bool ParseRotationDegrees(const std::string& token, float& out) {
-  std::string trimmed = Trim(token);
+  const std::string trimmed = ToLower(Trim(token));
   if (trimmed.empty()) {
     return false;
   }
   char* end = nullptr;
-  std::strtof(trimmed.c_str(), &end);
-  if (end == trimmed.c_str()) {
+  const float value = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str() || !std::isfinite(value)) {
     return false;
   }
-  out = ParseAngle(trimmed);
+  const std::string suffix = Trim(std::string(end));
+  if (suffix.empty()) {
+    if (value != 0.0f) {
+      return false;
+    }
+    out = 0.0f;
+    return true;
+  }
+  if (suffix == "deg") {
+    out = value;
+  } else if (suffix == "grad") {
+    out = value * 0.9f;
+  } else if (suffix == "rad") {
+    out = value * 180.0f / 3.14159265358979323846f;
+  } else if (suffix == "turn") {
+    out = value * 360.0f;
+  } else {
+    return false;
+  }
   return std::isfinite(out);
 }
 
@@ -540,8 +559,13 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
 
   if (name == "rotate" || name == "rotatex" || name == "rotatey" || name == "rotatez") {
     float degrees = 0.0f;
-    if (parts.size() != 1 || !transformArgs.AngleAt(0, degrees)) {
+    if (parts.size() != 1) {
       diagnostics.warn("html: " + label + " expects 1 argument; got '" + token + "'");
+      return false;
+    }
+    if (!transformArgs.AngleAt(0, degrees)) {
+      diagnostics.warn("html: " + label + " angle '" + parts[0] +
+                       "' is not a valid angle (deg / grad / rad / turn); ignored");
       return false;
     }
     if (name == "rotatex") {
@@ -575,8 +599,13 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
 
   if (name == "skewx") {
     float degrees = 0.0f;
-    if (parts.size() != 1 || !transformArgs.AngleAt(0, degrees)) {
+    if (parts.size() != 1) {
       diagnostics.warn("html: skewX expects 1 argument; got '" + token + "'");
+      return false;
+    }
+    if (!transformArgs.AngleAt(0, degrees)) {
+      diagnostics.warn("html: skewX angle '" + parts[0] +
+                       "' is not a valid angle (deg / grad / rad / turn); ignored");
       return false;
     }
     *out = MakeShear(-degrees, 0.0f);
@@ -584,8 +613,13 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   }
   if (name == "skewy") {
     float degrees = 0.0f;
-    if (parts.size() != 1 || !transformArgs.AngleAt(0, degrees)) {
+    if (parts.size() != 1) {
       diagnostics.warn("html: skewY expects 1 argument; got '" + token + "'");
+      return false;
+    }
+    if (!transformArgs.AngleAt(0, degrees)) {
+      diagnostics.warn("html: skewY angle '" + parts[0] +
+                       "' is not a valid angle (deg / grad / rad / turn); ignored");
       return false;
     }
     *out = MakeShear(0.0f, degrees);
