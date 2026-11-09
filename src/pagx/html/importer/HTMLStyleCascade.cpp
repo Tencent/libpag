@@ -848,8 +848,12 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   parsed.origin = origin.point;
   parsed.originZ = origin.z;
   parsed.originResolved = origin.resolved;
-  if (!origin.resolved) {
-    _diagnostics.warn("html: transform-origin '" + originValue + "' on <" + elementName +
+  // The pivot only matters for a pose with a non-identity linear part: a pure translation or a pure
+  // projection is unchanged by it, so an unresolved origin is not worth a diagnostic there.
+  if (!origin.resolved && !IsLinearIdentity(pose)) {
+    const std::string authored =
+        originValue.empty() ? std::string("50% 50% (default)") : originValue;
+    _diagnostics.warn("html: transform-origin '" + authored + "' on <" + elementName +
                       "> cannot be resolved against the box size; pivoting at the top-left "
                       "corner");
   }
