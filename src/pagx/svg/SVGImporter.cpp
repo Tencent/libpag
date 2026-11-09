@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include "pagx/DocumentAccess.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
@@ -274,6 +275,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
       singleLayer->matrix = contentMatrix * singleLayer->matrix;
       _contentMatrix = contentMatrix;
       _contentMatrixBakedIntoLayer = true;
+      _contentMatrixLayer = singleLayer;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
@@ -1126,6 +1128,12 @@ static std::string FirstFontFamily(const std::string& value) {
   return first;
 }
 
+// A Text run owns exactly one solid paint. Gradients, patterns and "none" need the element-level
+// path (addFillStroke), so runs using them stay merged with the line.
+static bool IsSolidTextPaint(const std::string& paint) {
+  return !paint.empty() && paint != "none" && paint.rfind("url(", 0) != 0;
+}
+
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                      const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
@@ -1175,13 +1183,17 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     for (const auto& line : state.lines) {
       auto normalized = NormalizeTextWhitespace(line.text);
       if (!normalized.empty()) {
-        emittedRuns.push_back(TextLine{line.startX, line.baseline, normalized, line.fill});
+        emittedRuns.push_back(
+            TextLine{line.startX, line.baseline, normalized, line.fill, line.fillOpacity});
       }
     }
   }
 
   bool uniformFill = true;
+  bool allRunsNone = false;
   std::string groupFill = {};
+  // Alpha of the group-level Fill, taken from the first run when every run agrees.
+  float groupFillOpacity = 1.0f;
   if (!emittedRuns.empty()) {
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
@@ -1233,14 +1245,18 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     }
     // A Text node carries a single paint, so runs with different fills need their own Fill.
     std::string firstFill = {};
+    float firstFillOpacity = 1.0f;
+    allRunsNone = !emittedRuns.empty();
     for (const auto& run : emittedRuns) {
       auto fill = run.fill.empty() ? elementFill : run.fill;
       if (fill == "none") {
         continue;
       }
+      allRunsNone = false;
       if (firstFill.empty()) {
         firstFill = fill;
-      } else if (fill != firstFill) {
+        firstFillOpacity = run.fillOpacity;
+      } else if (fill != firstFill || run.fillOpacity != firstFillOpacity) {
         uniformFill = false;
         break;
       }
@@ -1269,6 +1285,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         auto solidColor = _document->makeNode<SolidColor>();
         solidColor->color = parseColor(fill);
         fillNode->color = solidColor;
+        fillNode->alpha = run.fillOpacity;
         runGroup->elements.push_back(fillNode);
         group->elements.push_back(runGroup);
       } else {
@@ -1296,8 +1313,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       if (elementFill.empty()) {
         elementFill = "#000000";
       }
-      if (elementFill != firstFill) {
+      if (elementFill != firstFill && IsSolidTextPaint(firstFill)) {
         groupFill = firstFill;
+        groupFillOpacity = firstFillOpacity;
       }
     }
   }
@@ -1307,14 +1325,21 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     auto solidColor = _document->makeNode<SolidColor>();
     solidColor->color = parseColor(groupFill);
     fillNode->color = solidColor;
+    fillNode->alpha = groupFillOpacity;
     group->elements.push_back(fillNode);
   }
-  addFillStroke(element, group->elements, inheritedStyle, uniformFill && groupFill.empty());
+  // Every run asking for "none" must stay unpainted; the element default would otherwise fill them.
+  bool includeFill = uniformFill && groupFill.empty() && !allRunsNone;
+  addFillStroke(element, group->elements, inheritedStyle, includeFill);
   return group;
 }
 
 void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
                                        TextWalkState* state, const InheritedStyle& parentStyle) {
+  // Only an explicit x on THIS element anchors the text that follows: a tspan without x continues
+  // the previous run's advance, which the importer cannot measure, so a fill split there would
+  // start the new run at a stale pen position and overlap the previous one.
+  const bool anchored = !getAttribute(element, "x").empty();
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
@@ -1328,13 +1353,23 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
                        fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
                            state->fontSize * 0.5f;
       // A fill change inside one visual line also opens a run, so each Text keeps one paint.
-      // A fill change needs a known start position: without an explicit x the new run would have
-      // to continue the previous run's advance, which the importer cannot measure, and the two runs
-      // would overlap. In that case the line keeps the first run's paint.
+      // fill-opacity lives on the element that owns the run (the <text> or <tspan>), not on the
+      // text node being visited.
+      std::string fillOpacityAttr = getAttribute(element, "fill-opacity");
+      if (fillOpacityAttr.empty()) {
+        fillOpacityAttr = parentStyle.fillOpacity;
+      }
+      float fillOpacity = 1.0f;
+      if (!fillOpacityAttr.empty()) {
+        fillOpacity = std::strtof(fillOpacityAttr.c_str(), nullptr);
+      }
       auto* currentLine = opensLine ? nullptr : &state->lines[state->currentLineIndex];
-      bool fillChanged = currentLine != nullptr && currentLine->fill != fill && state->positioned;
-      if (opensLine || fillChanged) {
-        state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill});
+      bool fillChanged = currentLine != nullptr && currentLine->fill != fill && anchored &&
+                         IsSolidTextPaint(fill) && IsSolidTextPaint(currentLine->fill);
+      bool opacityChanged = currentLine != nullptr && currentLine->fillOpacity != fillOpacity &&
+                            anchored && IsSolidTextPaint(fill);
+      if (opensLine || fillChanged || opacityChanged) {
+        state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill, fillOpacity});
         state->currentLineIndex = static_cast<int>(state->lines.size()) - 1;
         currentLine = &state->lines.back();
       }
@@ -1349,7 +1384,6 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
       auto yAttribute = getAttribute(child, "y");
       if (!xAttribute.empty()) {
         state->currentX = parseLength(xAttribute, _viewBoxWidth);
-        state->positioned = true;
       } else {
         state->currentX += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, state->fontSize);
       }
@@ -1619,6 +1653,10 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
       }
     }
   }
+
+  // The referenced container may carry its own animate / animateTransform children; the copy above
+  // only converts the subtree, so register the container itself against the instantiated group.
+  registerAnimatedElement(refElement, group);
 
   return group;
 }

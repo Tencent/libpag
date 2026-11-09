@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/DocumentAccess.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"

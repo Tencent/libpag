@@ -136,8 +136,10 @@ class SVGParserContext {
     float baseline = 0;
     std::string text = {};
     // Effective fill of the run; runs with different fills are emitted as separate text nodes
-    // because a PAGX Text node carries a single paint.
+    // because a PAGX Text node carries a single paint. Opacity rides along: a PAGX Fill applies one
+    // alpha to the whole run.
     std::string fill = {};
+    float fillOpacity = 1.0f;
   };
   // State shared across the recursive <text>/<tspan> walk in collectTextRuns.
   struct TextWalkState {
@@ -146,9 +148,6 @@ class SVGParserContext {
     float currentX = 0;
     float currentY = 0;
     float fontSize = 12;
-    // Whether currentX came from an explicit x: only then can a fill change start a new run at a
-    // known position.
-    bool positioned = false;
     // Combined raw content of every descendant text node, used when a <textPath> turns the
     // run into path-following text (per-line positioning does not apply there).
     std::string textContent = {};
@@ -343,6 +342,7 @@ class SVGParserContext {
   // animations on that layer must compose with it instead of replacing the whole pose.
   Matrix _contentMatrix = Matrix::Identity();
   bool _contentMatrixBakedIntoLayer = false;
+  const Layer* _contentMatrixLayer = nullptr;
 
  public:
   /** Returns the document viewBox width used for unit conversions (parseLength). */
@@ -366,6 +366,14 @@ class SVGParserContext {
   /** Whether the viewBox mapping was baked into the animated top-level layer itself. */
   bool isContentMatrixBakedIntoLayer() const {
     return _contentMatrixBakedIntoLayer;
+  }
+  /**
+   * The layer that actually received the baked viewBox mapping, or null when it was not baked.
+   * Animations targeting a different layer (a hoisted pivot child, for example) must not apply the
+   * mapping again: the parent already does, so multiplying twice squares the scale and offset.
+   */
+  const Layer* contentMatrixLayer() const {
+    return _contentMatrixLayer;
   }
 
  private:

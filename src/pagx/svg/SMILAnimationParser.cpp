@@ -25,6 +25,7 @@
 #include <cstring>
 #include <set>
 #include <unordered_set>
+#include "pagx/DocumentAccess.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
@@ -45,6 +46,9 @@ namespace pagx {
 static constexpr double kMaxDurationSeconds = 86400.0;
 static constexpr double kMaxRepeatCount = 1000.0;
 static constexpr int kMaxRotationSteps = 10000;
+// Tiling an indefinite loop up to a far begin time would otherwise expand into millions of
+// keyframes; stop well before that and let the tail hold the last value.
+static constexpr size_t kMaxTiledKeyframes = 200000;
 
 // Two keyframes on the same frame describe an instantaneous jump (opacity 1 -> 0 -> 1 within one
 // frame). Marking the earlier key as Hold is not enough: tracks keyed by frame deduplicate by
@@ -621,6 +625,21 @@ static double SyncEventTime(const TimingInfo& target, const SyncBaseRef& ref) {
 // references to fixed-point (chains like a.end -> b.end -> c resolve in dependency order;
 // cycles fall back to 0). Interactive offsets resolve to their clock component or 0. Returns
 // per-element resolved timing consumed by the parse functions.
+// Clamps a clock value read from an untrusted attribute. inf/NaN would make round() undefined, and
+// an unbounded time would expand into an unbounded number of keyframes.
+static double SanitizeClockValue(double seconds) {
+  if (!std::isfinite(seconds)) {
+    return 0.0;
+  }
+  if (seconds > kMaxDurationSeconds) {
+    return kMaxDurationSeconds;
+  }
+  if (seconds < -kMaxDurationSeconds) {
+    return -kMaxDurationSeconds;
+  }
+  return seconds;
+}
+
 std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveAllTimings(
     SVGParserContext& ctx,
     const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations) {
@@ -640,7 +659,7 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
         TimingInfo info = {};
         info.element = el.get();
         info.id = ctx.getAttribute(el, "id");
-        info.durSeconds = parseSMILClockValue(ctx.getAttribute(el, "dur"));
+        info.durSeconds = SanitizeClockValue(parseSMILClockValue(ctx.getAttribute(el, "dur")));
         info.repeatCount = ResolveRepeatCount(ctx.getAttribute(el, "repeatCount"),
                                               ctx.getAttribute(el, "repeatDur"), info.durSeconds);
 
@@ -655,7 +674,7 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
             continue;
           }
           if (IsClockToken(token)) {
-            double t = parseSMILClockValue(token);
+            double t = SanitizeClockValue(parseSMILClockValue(token));
             if (!info.hasClockBegin || t < info.clockBegin) {
               info.clockBegin = t;
               info.hasClockBegin = true;
@@ -671,7 +690,7 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
             info.endSync = sync;
             info.hasEndSync = true;
           } else if (IsClockToken(endTokens.front())) {
-            info.clockEnd = parseSMILClockValue(endTokens.front());
+            info.clockEnd = SanitizeClockValue(parseSMILClockValue(endTokens.front()));
             info.hasClockEnd = true;
           }
         }
@@ -2565,11 +2584,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
   const auto& staticMatrix = nodeInfo.targetLayer->matrix;
   auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
-  // Motion samples are baked around the layer origin; keep the same fixed-point spelling as
-  // transform animations so the path is followed without sliding.
-  ch->pivotInterpolation = true;
   // SVG transform animations rotate and scale about the element's anchor, so the transient
-  // translation must keep that fixed point. CSS-style matrix animations keep the linear spelling.
+  // translation must keep that fixed point. CSS-style matrix animations keep the linear spelling;
+  // motion samples interpolate linearly between path samples and do not opt in.
   ch->pivotInterpolation = true;
   for (size_t i = 0; i < paramSets.size(); ++i) {
     Matrix m = TransformParamsToMatrix(type, paramSets[i]);
@@ -2577,9 +2594,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       // SMIL additive="sum": the animated transform post-multiplies the base value, so each
       // keyframe composes as static * animated.
       m = staticMatrix * m;
-    } else if (ctx.isContentMatrixBakedIntoLayer()) {
-      // The viewBox mapping was pre-multiplied onto this layer. A replaced pose must keep it,
-      // otherwise the animation drops the viewBox scale/offset as soon as it starts.
+    } else if (ctx.contentMatrixLayer() == nodeInfo.targetLayer) {
+      // The viewBox mapping was pre-multiplied onto this very layer. A replaced pose must keep it,
+      // otherwise the animation drops the viewBox scale/offset as soon as it starts. When the
+      // animated layer was hoisted under a pivot parent, the mapping lives on that parent and
+      // applying it here would square it.
       m = ctx.getContentMatrix() * m;
     }
     Point bo = {}, bi = {};
@@ -2911,6 +2930,9 @@ static void TileTypedChannel(TypedChannel<T>* channel, Frame period, Frame maxEn
   }
   const auto base = channel->keyframes;
   for (Frame offset = period; offset < maxEnd; offset += period) {
+    if (channel->keyframes.size() >= kMaxTiledKeyframes) {
+      break;
+    }
     for (const auto& source : base) {
       Frame time = source.time + offset;
       if (time > maxEnd) {
