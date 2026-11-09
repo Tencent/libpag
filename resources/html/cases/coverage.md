@@ -79,7 +79,7 @@ Legend: [x] covered in this phase (P1) · [ ] reserved for a later phase.
 | `opacity`, `mix-blend-mode` | supported | `12-opacity-blend__opacity`, `...mix-blend-mode-*` |
 | `background-blend-mode` | dropped | `12-opacity-blend__background-blend-mode` |
 | `transform` functions + origin | supported; `transform-origin` lands on `Layer.anchor` | `13-transform__rotate/scale/scale-xy/skew-x/translate/matrix/transform-origin-center` |
-| `transform-origin` px / % / keyword | honoured as the pivot (`Layer.anchor`) | `13-transform__transform-origin-px-noncenter`, `...percent`, `...keywords`, `...skew-corner` |
+| `transform-origin` px / % / keyword | honoured as the pivot (`Layer.anchor`); keyword order is resolved by axis | `13-transform__transform-origin-percent-px`, `...keywords` |
 | `transform-origin` three value | pivot depth kept (`anchorZ`) | `13-transform__transform-origin-three-value` |
 | `transform-origin` with pure translate | pivot is a no-op, no anchor emitted | `13-transform__transform-origin-translate` |
 | `transform` compound chain / `rotate3d` / `perspective()` | supported; 4x4 pose -> `Layer.matrix3D` | `13-transform__rotate-chained`, `...rotate3d`, `...perspective` |
