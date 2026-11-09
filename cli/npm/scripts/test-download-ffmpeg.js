@@ -15,6 +15,7 @@ const {
   findFFmpegOnPath,
   formatDownloadError,
   hasExplicitFFmpeg,
+  isMP4Export,
   parseChecksums,
   resolveTarget,
 } = require('./download-ffmpeg.js');
@@ -54,6 +55,16 @@ test('maps every pagx platform and architecture', () => {
   assert.strictEqual(resolveTarget('win32', 'x64').assetName, 'ffmpeg-win-x64.zip');
   assert.strictEqual(resolveTarget('win32', 'x64').executableName, 'ffmpeg.exe');
   assert.throws(() => resolveTarget('darwin', 'ia32'), /not available/);
+});
+
+test('detects MP4 exports that require the ffmpeg installation prompt', () => {
+  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--input', 'a.pagx']), true);
+  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx', '--output', 'a.MP4']), true);
+  assert.strictEqual(isMP4Export(['export', '--output', 'a.mp4', '--format', 'svg']), false);
+  assert.strictEqual(isMP4Export(['export', '--format=mp4']), true);
+  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--help']), false);
+  assert.strictEqual(isMP4Export(['render', '--format', 'mp4']), false);
+  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx']), false);
 });
 
 test('recognizes explicit paths and existing PATH executables', () => {

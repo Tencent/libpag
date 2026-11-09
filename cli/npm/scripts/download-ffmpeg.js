@@ -73,6 +73,19 @@ function hasExplicitFFmpeg(args, env = process.env) {
   return Boolean(env.FFMPEG_BIN) || args.some((arg) => arg === '--ffmpeg' || arg.startsWith('--ffmpeg='));
 }
 
+function isMP4Export(args) {
+  if (args[0] !== 'export' || args.includes('--help') || args.includes('-h')) return false;
+  let format = null;
+  let output = null;
+  for (let i = 1; i < args.length; ++i) {
+    if (args[i] === '--format') format = args[++i];
+    else if (args[i].startsWith('--format=')) format = args[i].slice('--format='.length);
+    else if (args[i] === '--output') output = args[++i];
+    else if (args[i].startsWith('--output=')) output = args[i].slice('--output='.length);
+  }
+  return format ? format === 'mp4' : Boolean(output) && path.extname(output).toLowerCase() === '.mp4';
+}
+
 function findCachedFFmpeg(options = {}) {
   try {
     const target = resolveTarget(options.platform, options.arch);
@@ -295,6 +308,7 @@ module.exports = {
   formatDownloadError,
   hasExplicitFFmpeg,
   isExecutable,
+  isMP4Export,
   parseChecksums,
   resolveTarget,
 };

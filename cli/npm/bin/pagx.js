@@ -6,6 +6,7 @@ const {
   findCachedFFmpeg,
   findFFmpegOnPath,
   hasExplicitFFmpeg,
+  isMP4Export,
 } = require("../scripts/download-ffmpeg.js");
 
 const SUPPORTED = ["darwin", "linux", "win32"];
@@ -121,7 +122,14 @@ const args = process.argv.slice(2);
 // network, so a missing or failed download cannot delay or break unrelated pagx commands.
 if (!hasExplicitFFmpeg(args) && !findFFmpegOnPath()) {
   const cachedFFmpeg = findCachedFFmpeg();
-  if (cachedFFmpeg) process.env.FFMPEG_BIN = cachedFFmpeg;
+  if (cachedFFmpeg) {
+    process.env.FFMPEG_BIN = cachedFFmpeg;
+  } else if (isMP4Export(args)) {
+    console.error("pagx: ffmpeg is required for MP4 export but was not found.");
+    console.error("pagx: reinstall the npm package to retry the ffmpeg download:");
+    console.error("  npm install -g @libpag/pagx");
+    process.exit(1);
+  }
 }
 try {
   execFileSync(binPath, args, { stdio: "inherit" });
