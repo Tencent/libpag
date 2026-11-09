@@ -989,17 +989,25 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
 }
 
 void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
+  GeoToPathData(element, type, pathData, nullptr);
+}
+
+void GeoToPathData(const Element* element, NodeType type, PathData& pathData,
+                   const GeometryOverrides* overrides) {
   pathData = PathDataFromSVGString("");
   switch (type) {
     case NodeType::Rectangle: {
       auto r = static_cast<const Rectangle*>(element);
-      auto pos = r->renderPosition();
-      auto size = r->renderSize();
-      float x = pos.x - size.width / 2;
-      float y = pos.y - size.height / 2;
-      float w = size.width;
-      float h = size.height;
-      if (r->roundness <= 0) {
+      auto pos = overrides != nullptr && overrides->hasPosition ? overrides->position
+                                                                : r->renderPosition();
+      auto staticSize = r->renderSize();
+      float w = overrides != nullptr && overrides->hasSize ? overrides->width : staticSize.width;
+      float h = overrides != nullptr && overrides->hasSize ? overrides->height : staticSize.height;
+      float roundness =
+          overrides != nullptr && overrides->hasRoundness ? overrides->roundness : r->roundness;
+      float x = pos.x - w / 2;
+      float y = pos.y - h / 2;
+      if (roundness <= 0) {
         // Match native (tgfx) start point: top-right corner, CW direction.
         pathData.moveTo(x + w, y);
         if (r->reversed) {
@@ -1013,7 +1021,7 @@ void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
         }
         pathData.close();
       } else {
-        float rn = std::min(r->roundness, std::min(w / 2, h / 2));
+        float rn = std::min(roundness, std::min(w / 2, h / 2));
         // Match native (tgfx) RRect startIndex=2: start at right edge top-rn, CW direction.
         pathData.moveTo(x + w, y + rn);
         if (r->reversed) {

@@ -48,7 +48,7 @@ python3 tools/anim_coverage.py --check
 | Layer | `skew.x` | ✔ | `layer/15` |
 | Layer | `skew.y` | ✔ | `layer/16` |
 | Layer | `visible` | ✔ | `layer/06` |
-| Layer | `x` | ✔ | `boundary/03`、`combo/*`（3）、`layer/02·05` |
+| Layer | `x` | ✔ | `boundary/03`、`combo/*`（4）、`layer/02·05` |
 | Layer | `y` | ✔ | `combo/01`、`layer/03` |
 | Layer | `z` | ✔ | `layer/14` |
 | Group | `alpha` | ✔ | `group/01` |
@@ -85,7 +85,7 @@ python3 tools/anim_coverage.py --check
 | Rectangle | `position.y` | ✘ | `geometry/08` |
 | Rectangle | `roundness` | ✔ | `geometry/02` |
 | Rectangle | `size.height` | ✘ | `geometry/09` |
-| Rectangle | `size.width` | ✔ | `geometry/01·05` |
+| Rectangle | `size.width` | ✔ | `combo/07`、`geometry/01·05` |
 | Ellipse | `position.x` | ✘ | `geometry/10` |
 | Ellipse | `position.y` | ✘ | `geometry/11` |
 | Ellipse | `size.height` | ✘ | `geometry/12` |
@@ -210,12 +210,12 @@ python3 tools/anim_coverage.py --check
 | `Layer.rotation.x` | 3 | `anchor/04·07`、`layer/17` |
 | `Layer.rotation.y` | 3 | `anchor/03·06`、`layer/11` |
 | `Layer.rotation.z` | 3 | `anchor/01·08`、`layer/10` |
-| `Layer.x` | 6 | `boundary/03`、`combo/*`（3）、`layer/02·05` |
+| `Layer.x` | 7 | `boundary/03`、`combo/*`（4）、`layer/02·05` |
 | `Layer.y` | 2 | `combo/01`、`layer/03` |
 | `Group.rotation` | 3 | `combo/04`、`group/04·07` |
 | `Group.scale.x` | 2 | `combo/04`、`group/05` |
 | `Group.scale.y` | 2 | `combo/04`、`group/06` |
-| `Rectangle.size.width` | 2 | `geometry/01·05` |
+| `Rectangle.size.width` | 3 | `combo/07`、`geometry/01·05` |
 | `Fill.alpha` | 4 | `fill/*`（4） |
 | `Fill.color` | 5 | `fill/01·03`、`geometry/05`、`sharing/02·03` |
 | `Stroke.width` | 2 | `stroke/03·06` |
