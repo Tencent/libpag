@@ -65,6 +65,16 @@ std::vector<std::string> SplitTopLevelCommas(const std::string& s) {
   return out;
 }
 
+bool ParseScalarFloat(const std::string& token, float& out) {
+  const std::string trimmed = Trim(token);
+  if (trimmed.empty()) return false;
+  char* end = nullptr;
+  const float value = std::strtof(trimmed.c_str(), &end);
+  if (end == trimmed.c_str() || !Trim(end).empty()) return false;
+  out = value;
+  return true;
+}
+
 std::vector<std::string> SplitTopLevelWhitespace(const std::string& s) {
   std::vector<std::string> out;
   int depth = 0;

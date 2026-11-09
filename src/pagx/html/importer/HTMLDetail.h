@@ -72,6 +72,13 @@ inline bool IsBlankText(const std::string& text) {
 // Split a CSS value list on top-level commas (commas inside parentheses are not split).
 std::vector<std::string> SplitTopLevelCommas(const std::string& s);
 
+/**
+ * Parses a bare number (integer or decimal) and rejects trailing units, so `1.5` succeeds while
+ * `1.5px` and `abc` fail. Shared by the transform parser and the style cascade so "is this a plain
+ * number?" has a single answer.
+ */
+bool ParseScalarFloat(const std::string& token, float& out);
+
 // Split a CSS value on whitespace runs while respecting parenthesised groups (so
 // "0 2px 6px rgba(0,0,0,0.2)" yields four tokens).
 std::vector<std::string> SplitTopLevelWhitespace(const std::string& s);
