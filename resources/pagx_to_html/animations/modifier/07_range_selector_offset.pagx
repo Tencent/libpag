@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RangeSelector offset slides a half-word rampDown window across the text, so the lift sweeps
+     from the left glyphs to the right ones.
+     Target: RangeSelector  Channel: offset  Type: float
+     Expect: supported
+     Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
+     Ref: PAGXHtmlTest.AnimationRangeSelectorStartFansOutToGlyphs -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56" position="70,120" letterSpacing="0"/>
+    <TextModifier id="sweepModifier" position="0,-18">
+      <RangeSelector id="sweepSelector" start="0" end="0.5" offset="-0.5" unit="percentage" shape="rampDown"/>
+    </TextModifier>
+    <Fill color="#7C3AED"/>
+  </Layer>
+  <Animations>
+    <Animation id="sweepRange" duration="60" frameRate="60" loop="once">
+      <Object target="sweepSelector">
+        <Channel name="offset" type="float">
+          <Key time="0" value="-0.5" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
