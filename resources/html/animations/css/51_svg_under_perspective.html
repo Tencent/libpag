@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><head>
+    <!--
+      An inline-SVG shape rotating under a `perspective: 600px` parent. The shape animation ignores
+      the parent camera, and nothing is lost by that: shape poses are restricted to the z = 0 plane
+      (a 3D shape pose is rejected with a diagnostic), so the projection is the identity on them and
+      folding the camera in would not change a pixel. This case keeps that reasoning honest — if
+      shapes ever gain 3D poses, the score here drops and the note in spec §13.7 has to change.
+    -->
+    <style>
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+body { background-color: #0f172a; }
+</style></head>
+<body style="width:240px;height:160px">
+  <div style="position:absolute;left:20px;top:20px;width:200px;height:120px;perspective:600px">
+    <svg width="200" height="120" style="overflow:visible">
+      <rect x="40" y="30" width="80" height="50" fill="#38bdf8"
+            style="transform-origin:80px 55px;transform-box:fill-box;animation:spin 2s linear infinite"/>
+    </svg>
+  </div>
+</body></html>

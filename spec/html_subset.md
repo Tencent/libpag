@@ -694,3 +694,6 @@ Limits of that rewrite, in order of how often they are hit:
   camera is projected about the parent's coordinate system as-is; one diagnostic reports it.
 * A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
   warns once and falls back to the layer origin instead of the box centre.
+* An inline-SVG shape animation ignores the parent camera. That is not a loss: shape transforms are
+  restricted to the z = 0 plane (a 3D shape pose is rejected with a diagnostic), and a flat pose
+  projects to itself (`w = 1`), so folding the camera in would not change a pixel.
