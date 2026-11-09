@@ -4727,14 +4727,22 @@ function staticCameraFor(computed) {
   return split ? { distance: split.distance, original: transform, affine: split.affine } : null;
 }
 
+// Animation names the element plays, trimmed and without the `none` keyword. An empty list means the
+// element has no CSS animation, which lets the callers below return before touching any registry.
+function animationNamesFor(computed) {
+  const raw = String((computed && computed.animationName) || '');
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name && name.toLowerCase() !== 'none');
+}
+
 // Distance of the camera this element needs, either because its own transform carries a
 // `perspective()` (already split out by `renderElementBox`) or because its animation does.
 function cameraDistanceForElement(computed) {
-  const names = String((computed && computed.animationName) || '')
-    .split(',')
-    .map((name) => name.trim());
   const cameras = pagxAnimCameras();
-  for (const name of names) {
+  for (const name of animationNamesFor(computed)) {
     const distance = cameras[name];
     if (distance) return distance;
   }
@@ -4780,12 +4788,8 @@ function restoreProjectedTransform(html, camera) {
 // projection survives inside the pose instead of disappearing with the wrapper.
 function useProjectedKeyframes(html, computed) {
   const clones = pagxAnimCameraClones();
-  const names = String((computed && computed.animationName) || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean);
   let out = html;
-  for (const name of names) {
+  for (const name of animationNamesFor(computed)) {
     if (!clones[name]) continue;
     out = out.replace(
       new RegExp('(animation-name:\\s*' + name + ')(\\s*[;\"])'),
@@ -4813,11 +4817,7 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   // The same element can play several animations; a wrapper would add a second projection on top of
   // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
   const projected = pagxAnimProjectedNames();
-  const names = String((computed && computed.animationName) || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean);
-  if (names.some((name) => projected[name])) {
+  if (animationNamesFor(computed).some((name) => projected[name])) {
     return declined('keyframes-mixed');
   }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
@@ -5539,6 +5539,7 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // payload.
 const HELPER_FNS = [
   recordCameraSkip,
+  animationNamesFor,
   pagxCameraSkips,
   pagxAnimProjectedNames,
   pagxAnimCameraClones,
@@ -5551,6 +5552,7 @@ const HELPER_FNS = [
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
   cameraDistanceForElement,
+  animationNamesFor,
   staticCameraFor,
   transformOriginDepth,
   perspectiveOriginXY,

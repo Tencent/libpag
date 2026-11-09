@@ -91,7 +91,12 @@ class HTMLValueParser {
   void bindDocument(PAGXDocument* document);
 
   Color parseColor(const std::string& valueRaw);
-  float parseAbsoluteLengthPx(const std::string& valueRaw);
+  /**
+   * Absolute length in px. `warn` lets a caller that reports the failure itself (the transform
+   * resolver names the offending function argument) suppress the generic unit diagnostic, so one bad
+   * value yields one message instead of two.
+   */
+  float parseAbsoluteLengthPx(const std::string& valueRaw, bool warn = true);
   float resolveLineHeightPx(const std::string& valueRaw, float fontSizePx);
 
   /** Parses box-shadow entries; non-zero spread is diagnosed and omitted by HTML import. */

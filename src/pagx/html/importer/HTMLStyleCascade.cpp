@@ -67,7 +67,6 @@ std::string LookupEffectiveBackgroundImage(
 // `ParseCssFunctionCall`: the FIRST `)` must coincide with the LAST `)` and trail only
 // whitespace, otherwise the value is a compound chain and is rejected.
 
-
 // CSS edge-overlap scaling: when the sum of two border radii exceeds the box edge they
 // share, every radius shrinks by the smallest factor that keeps every edge within bounds.
 // `scale` carries the running minimum across all four edges.
@@ -441,7 +440,7 @@ HTMLTransformReference HTMLStyleCascade::getTransformReferenceSize(
   float heightPct = NAN;
   ParseSizingDimension(LookupProperty(props, "width"), reference.widthPx, widthPct);
   ParseSizingDimension(LookupProperty(props, "height"), reference.heightPx, heightPct);
-  if (element == nullptr || element->name != "svg") {
+  if (element->name != "svg") {
     return reference;
   }
   if (std::isnan(reference.widthPx) && std::isnan(widthPct)) {
@@ -462,7 +461,7 @@ HTMLTransformReference HTMLStyleCascade::getTransformReferenceSize(
 HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<DOMNode>& element) {
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
-  const std::string elementName = element != nullptr ? element->name : std::string();
+  const std::string elementName = element->name;
   parseBoxSizing(box, props);
   // Resolve the pivot / camera reference box once, before the intrinsic-width marker clears the
   // measured size, so `transform-origin` and `perspective-origin` share one reference box.
