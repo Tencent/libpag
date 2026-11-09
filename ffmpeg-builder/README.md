@@ -1,6 +1,6 @@
-# pagx-ffmpeg
+# ffmpeg-builder
 
-`pagx-ffmpeg` builds a real, minimal FFmpeg executable with static x264 support for
+`ffmpeg-builder` builds a real, minimal FFmpeg executable with static x264 support for
 `pagx export --format mp4`. It is self-contained and can be used as a standalone
 repository without depending on the parent libpag repository.
 
