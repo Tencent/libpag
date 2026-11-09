@@ -129,8 +129,9 @@ Matrix3D MakeRotationAxis(float x, float y, float z, float degrees) {
   return m;
 }
 
-// `shearX` fills the y -> x coefficient and `shearY` the x -> y one, matching the affine this
-// importer has always produced for skewX / skewY.
+// `shearX` fills the y -> x coefficient (`c`) and `shearY` the x -> y one (`b`), i.e. the CSS
+// convention: `skewX(a)` is `matrix(1, 0, tan a, 1)`. `skewX` used to negate its angle, which made
+// HTML -> PAGX -> HTML mirror the shear (the snapshot path hid it by baking the computed matrix).
 Matrix3D MakeShear(float shearX, float shearY) {
   Matrix3D m = {};
   m.setRowColumn(0, 1, std::tan(shearX * kDegToRad));
@@ -608,7 +609,7 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
                        "' is not a valid angle (deg / grad / rad / turn); ignored");
       return false;
     }
-    *out = MakeShear(-degrees, 0.0f);
+    *out = MakeShear(degrees, 0.0f);
     return true;
   }
   if (name == "skewy") {
@@ -633,7 +634,7 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       diagnostics.warn("html: skew expects 1 or 2 angles; got '" + token + "'");
       return false;
     }
-    *out = MakeShear(-x, y);
+    *out = MakeShear(x, y);
     return true;
   }
 
