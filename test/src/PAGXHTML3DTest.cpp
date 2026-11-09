@@ -1098,6 +1098,35 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveOriginKeywordMatchesTheEquivalentPixels) {
 }
 
 /**
+ * Test case: a flat stop that is singular (`scale(0)`) cannot be lifted onto the `matrix3D` channel
+ * when another stop of the same animation is 3D. PAGX requires every `matrix3D` keyframe to be
+ * invertible, so the stop is dropped with one diagnostic instead of being written out invalid.
+ */
+PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsNotLiftedIntoMatrix3D) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k { 0% { transform: scale(0); } 100% { transform: rotateY(45deg); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;animation:k 1s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not invertible"));
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_FALSE(channel->keyframes.empty());
+  for (const auto& key : channel->keyframes) {
+    // The dropped stop would lift to an all-zero linear block.
+    EXPECT_GT(std::fabs(key.value.getRowColumn(0, 0)), 1e-6f) << "time " << key.time;
+    EXPECT_GT(std::fabs(key.value.getRowColumn(1, 1)), 1e-6f) << "time " << key.time;
+  }
+}
+
+/**
  * Test case: a 3D keyframe track on an element whose static pose is 2D. The fill-mode holds (before
  * a `delay` and after a `Once` run) must restore that static pose instead of the identity, which
  * would hide the element's authored `transform` outside the active window.

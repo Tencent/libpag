@@ -1391,14 +1391,24 @@ bool HTMLAnimationBuilder::buildForElement(
         matrixKeys.push_back({ts.first, ToAffine2D(ts.second), interp, {}, {}});
       }
     } else {
+      bool warnedSingularStop = false;
       for (const auto& ts : transformStops) {
-        matrix3DKeys.push_back({ts.first,
-                                IsFlatTransform(ts.second)
-                                    ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
-                                    : ts.second,
-                                interp,
-                                {},
-                                {}});
+        const Matrix3D pose = IsFlatTransform(ts.second)
+                                  ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
+                                  : ts.second;
+        // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
+        // (e.g. `scale(0)`) becomes one as soon as it is lifted, so it is dropped instead of written
+        // as an invalid key that a re-import would reject.
+        if (!IsInvertible(pose)) {
+          if (!warnedSingularStop) {
+            _diagnostics.warn(
+                "html: a @keyframes stop is not invertible once lifted to matrix3D; dropped "
+                "[subset:animation-unsupported-property]");
+            warnedSingularStop = true;
+          }
+          continue;
+        }
+        matrix3DKeys.push_back({ts.first, pose, interp, {}, {}});
       }
     }
   }
