@@ -1655,9 +1655,9 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   // Layer-targeted `matrix` channel for scale / rotate / skew (and any non-translation transform).
-  // General affine transforms target the original Layer with transform-origin baked into each
-  // matrix. Pure rotations target the structural pivot wrapper created above, whose keyframes have
-  // zero translation so interpolation cannot move the centre.
+  // The keyframes carry the un-pivoted pose; `transform-origin` stays on the layer as `anchor`, which
+  // the runtime applies once after interpolation. Baking it in would make the interpolator treat the
+  // pivot translation as an independent value and drift between keyframes.
   if (!matrixKeys.empty()) {
     auto* object = _document->makeNode<AnimationObject>();
     object->target = matrixTarget->id;
