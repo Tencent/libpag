@@ -190,6 +190,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `filter: blur(X) drop-shadow(X Y [B] [C])` (no spread or `inset`) | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | composed in CSS order into a 4x4 pose. Every function is supported: `translate[X\|Y\|Z\|3d]`, `scale[X\|Y\|Z\|3d]`, `rotate[X\|Y\|Z\|3d]`, `skewX`/`skewY`/`skew`, `matrix`, `matrix3d`, `perspective`. Functions need no separator (`rotate(45deg)scale(2)` is legal), and a length argument may be `px`, a percentage of the element box (width on X, height on Y) or a `calc()` over both. Angle arguments accept `deg` / `grad` / `rad` / `turn` case insensitively; a unitless angle is only valid as `0`, and any other unit invalidates the declaration. A pose that stays on the z = 0 plane is written onto `Layer.matrix`; a pose with depth or perspective onto `Layer.matrix3D` (3D poses must be invertible). `transform-style: preserve-3d` maps onto `Layer.preserve3D` |
+| `perspective` / `perspective-origin` | the declaring element acts as a camera for its **direct children**: the distance must be a positive length, and `perspective-origin` (the box centre by default) is conjugated into each child pose, since PAGX has no origin parameter. See §13.7 |
 | `transform-origin` | resolved against the element box (`px`, `%`, `left`/`center`/`right`/`top`/`bottom`, plus the optional px depth) and written onto `Layer.anchor` / `anchorZ`; the pose itself stays un-pivoted. Only an unresolvable origin (a percentage / keyword with no absolute box size) warns and falls back to the top-left pivot |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
@@ -200,8 +201,7 @@ rebuilt as an inset child layer, which is how CSS paints gradient borders (a pla
 `background-color` still paints the border box). Any other value is dropped with a diagnostic.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
-`outline`, the `perspective` property (use `transform: perspective()` instead), and geometric
-`clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/`path`).
+`outline`, and geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/`path`).
 
 ### 4.5 Text
 
