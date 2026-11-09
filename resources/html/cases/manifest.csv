@@ -143,6 +143,7 @@ id,category,feature,tier,expected_warnings,notes
 13-transform__rotate-chained,transform,"compound transform chain composed in CSS order",subset,,
 13-transform__rotate3d,transform,"rotate3d with a normalised axis",subset,,
 13-transform__perspective,transform,"perspective() inside the function list",subset,,
+13-transform__static-perspective-origin,transform,"perspective() on a static box: the camera moves to a wrapper and perspective-origin keeps the element transform-origin",subset,,
 14-overflow-clip__overflow-hidden,overflow-clip,"overflow: hidden -> clipToBounds",subset,,
 14-overflow-clip__clip-path-url,overflow-clip,"clip-path: url(#id) contour mask",subset,,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
 14-overflow-clip__clip-path-polygon,overflow-clip,"clip-path: polygon() (unsupported)",subset,subset:unsupported-property,
