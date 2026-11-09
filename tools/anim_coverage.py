@@ -39,6 +39,15 @@ NODE_ORDER = [
 CHANNEL_EXEMPTIONS = {
     ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
 }
+# TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
+# applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()
+# does, via setAccessor), so `pagx render --time` draws the same frame at every time and a case would
+# compare two static images. Measured: rotation / position.x / scale.x / alpha animations all render
+# identical first and last frames. Remove these entries and add cases once the renderer writes them.
+TEXT_PATH_RENDERER_GAP = "渲染器 convertTextPath() 未注册通道写入，参考帧不会动，待渲染器支持后补用例"
+for _channel in ("alpha", "anchor.x", "anchor.y", "position.x", "position.y", "rotation", "scale.x",
+                 "scale.y", "skew", "skewAxis"):
+    CHANNEL_EXEMPTIONS[("TextPath", _channel)] = TEXT_PATH_RENDERER_GAP
 
 
 def load_registry():
@@ -235,10 +244,6 @@ def check(anim, exported, index, cases):
     failures = []
     warnings = []
 
-    # the two anchor cases animate rotation.z, which is mapped, while the pivot is not: the header
-    # keeps `gap` and says so, so the emits check must not treat them as stale
-    partial = {"anchor/01_rotation_z_offcenter", "anchor/08_anchor_center_vs_default"}
-
     for node in NODE_ORDER:
         for channel in sorted(anim.get(node, ())):
             if (node, channel) in index:
@@ -257,8 +262,6 @@ def check(anim, exported, index, cases):
                 failures.append("exported channel without a case: %s.%s" % (node, channel))
 
     for case in cases:
-        if case["short"] in partial:
-            continue
         if os.path.exists(PAGX_BIN):
             out = os.path.join("/tmp/anim_coverage", case["short"].replace("/", "_") + ".html")
             os.makedirs("/tmp/anim_coverage", exist_ok=True)

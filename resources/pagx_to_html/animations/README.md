@@ -21,7 +21,8 @@ python3 tools/anim_coverage.py --check
 ```
 
 它会同时校验：① 导出映射表中的每个通道都有用例；② 注册表中的**每个可动画通道**都有直接驱动它的用例
-（唯一例外见脚本中的 `CHANNEL_EXEMPTIONS`，目前只有数学上不可见的 `Layer.scale.z`）；
+（例外见脚本中的 `CHANNEL_EXEMPTIONS`：数学上不可见的 `Layer.scale.z`，以及渲染器尚未写入的
+`TextPath` 全部通道）；
 ③ 每个用例头部 `Expect` 与实际导出结果一致；④ 语料中不存在"仅 id 不同"的重复文档。
 
 ## 1. 主表：可动画通道 → 导出 → 用例
@@ -248,18 +249,17 @@ python3 tools/anim_coverage.py --check
 
 ## 4. 缺口与已知问题
 
-**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 109 条 `Expect: gap` 用例，逐通道覆盖 Layer
+**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
 
-**唯一未覆盖的通道族：`TextPath`（10 个通道）**。这些通道在 `PAGXNodeChannel.cpp` 里标为可动画，但
+**豁免的通道族：`TextPath`（10 个通道）**。这些通道在 `PAGXNodeChannel.cpp` 里标为可动画，但
 `src/renderer/LayerBuilder.cpp` 的 `convertTextPath()` 没有注册任何通道 writer（对比
 `convertTextModifier()` 有 `setAccessor`），实测 `rotation` / `position.x` / `scale.x` / `alpha` 动画在
-`pagx render --time` 下的首尾帧差值都是 0，写不出"参考确实在动"的用例。需要先补渲染器 writer，或由
-维护者决定是否加入 `CHANNEL_EXEMPTIONS`。
+`pagx render --time` 下的首尾帧差值都是 0，写不出"参考确实在动"的用例。它们已列入
+`tools/anim_coverage.py` 的 `CHANNEL_EXEMPTIONS`；渲染器补上 writer 后，删除豁免并补用例。
 
 **已知映射问题**：`{SolidColor, "alpha"}` 与 `{DropShadowFilter, "alpha"}` 指向不存在的通道，`--check`
-报 WARN；`anchor/01`、`anchor/08` 同时动画已映射的 `rotation.z` 与未映射的静态 `anchor`，导出会产出
-keyframes 但忽略支点，头部保留 `gap` 并在注释中说明。
+报 WARN。
 
 ## 5. 用例族与 fixture
 
