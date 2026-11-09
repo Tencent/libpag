@@ -241,8 +241,12 @@ bool HardwareDecoder::resetVideoToolBox() {
                                  : kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
+  // The attribute containers are handed to CoreVideo and VideoToolbox, which rely on standard CF
+  // ownership: whatever they insert stays alive because the container retains it. Non-retaining
+  // callbacks let those inserted objects dangle once the inserter releases its own reference.
   CFDictionaryRef ioSurfaceParam =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
+      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
 
   // The compatibility keys expect a CFBoolean, not a CFNumber: passing a CFNumber makes
   // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set on newer
@@ -250,7 +254,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   // constant and must not be released.
   const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, ioSurfaceParam};
 
-  attrs = CFDictionaryCreate(NULL, keys, values, 3, NULL, NULL);
+  attrs = CFDictionaryCreate(NULL, keys, values, 3, &kCFTypeDictionaryKeyCallBacks,
+                             &kCFTypeDictionaryValueCallBacks);
 
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;

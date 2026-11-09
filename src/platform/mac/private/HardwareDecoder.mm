@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include <cstdlib>
 
 namespace pag {
 class HardwareDecoderFactory : public VideoDecoderFactory {
@@ -158,13 +159,19 @@ bool HardwareDecoder::resetVideoToolBox() {
   // kCFBooleanTrue is the fix (correcting the earlier assumption in PR #3631 that the OpenGL key
   // was no longer recognized). The Metal compatibility key is added because tgfx renders through
   // Metal (CVMetalTextureCache) on macOS.
+
+  // The attribute containers are handed to CoreVideo and VideoToolbox, which rely on standard CF
+  // ownership: whatever they insert stays alive because the container retains it. Non-retaining
+  // callbacks let those inserted objects dangle once the inserter releases its own reference.
   CFDictionaryRef ioSurfaceParam =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
+      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
 
   const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, kCFBooleanTrue, ioSurfaceParam};
-  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, NULL, NULL);
+  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, &kCFTypeDictionaryKeyCallBacks,
+                               &kCFTypeDictionaryValueCallBacks);
   const void* combineDics[] = {inAttrs};
-  CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
+  CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, &kCFTypeArrayCallBacks);
   CFDictionaryRef outAttrs = NULL;
   CVReturn resolvedResult =
       CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
@@ -180,8 +187,11 @@ bool HardwareDecoder::resetVideoToolBox() {
   callBackRecord.decompressionOutputCallback = DidDecompress;
   callBackRecord.decompressionOutputRefCon = NULL;
 
+  // Diagnostic: dropping the attributes tells whether the IOSurface properties we pass in are
+  // required for the paravirtual crash.
+  auto sessionAttrs = std::getenv("PAG_DROP_PIXEL_BUFFER_ATTRS") != nullptr ? nullptr : outAttrs;
   OSStatus status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL,
-                                                 outAttrs, &callBackRecord, &session);
+                                                 sessionAttrs, &callBackRecord, &session);
 
   if (outAttrs != NULL) {
     CFRelease(outAttrs);
