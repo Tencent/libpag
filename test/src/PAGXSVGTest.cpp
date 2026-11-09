@@ -5519,6 +5519,112 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxTransformAnimation) {
 }
 
 /**
+ * use_container_animation.svg: <use> references a <g> that carries its own animateTransform. The
+ * copy converts the subtree, so the container itself has to be registered too or its animation is
+ * silently dropped.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_UseContainerAnimation) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/use_container_animation.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  ASSERT_EQ(anim->objects[0]->channels.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 40.0f, 0.01f);
+}
+
+/**
+ * text_tspan_mixed_x.svg: only an explicit x on the element that owns the text anchors a run. The
+ * green tspan has no x, so it must continue the blue run instead of starting a third Text on top of
+ * it.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextMixedPositioning) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/text/text_tspan_mixed_x.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 2u);
+  auto* first = static_cast<pagx::Text*>(texts[0]);
+  auto* second = static_cast<pagx::Text*>(texts[1]);
+  EXPECT_EQ(first->text, "A");
+  EXPECT_NEAR(first->position.x, 10.0f, 0.01f);
+  EXPECT_EQ(second->text, "BC");
+  EXPECT_NEAR(second->position.x, 30.0f, 0.01f);
+}
+
+/**
+ * text_tspan_fill_opacity.svg: the run-level paint carries fill-opacity, otherwise a translucent
+ * tspan would render opaque.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextFillOpacity) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/text/text_tspan_fill_opacity.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("#FF0000"), std::string::npos) << xml;
+  EXPECT_NE(xml.find("alpha=\"0.5\""), std::string::npos) << xml;
+}
+
+/**
+ * begin_overflow.svg: begin="1e999s" parses to infinity. Rounding that is undefined, so the value
+ * is clamped and the track stays on a finite frame range.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_BeginOverflowClamped) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/begin_overflow.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(anim->objects[0]->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_LE(ch->keyframes.back().time, 60);
+}
+
+/**
+ * viewbox_scaled_rotate_center.svg: a scaled viewBox plus a rotate-about-point animation on a <g>.
+ * The viewBox mapping is baked onto the hoisted pivot parent, so the animated child must NOT apply
+ * it again: doing so squares the 2x scale in every keyframe.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaledRotateCenter) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/viewbox_scaled_rotate_center.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* pivotLayer = doc->layers[0];
+  // 2x viewBox scale composed with the hoisted pivot translate (50,50).
+  EXPECT_NEAR(pivotLayer->matrix.a, 2.0f, 1e-3f);
+  EXPECT_NEAR(pivotLayer->matrix.d, 2.0f, 1e-3f);
+  EXPECT_NEAR(pivotLayer->matrix.tx, 100.0f, 1e-3f);
+  EXPECT_NEAR(pivotLayer->matrix.ty, 100.0f, 1e-3f);
+
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // The child only owns the rotation: identity at t=0 and a pure 90 degree rotation at the end.
+  const auto& start = ch->keyframes.front().value;
+  EXPECT_NEAR(start.a, 1.0f, 1e-3f);
+  EXPECT_NEAR(start.tx, 0.0f, 1e-3f);
+  const auto& end = ch->keyframes.back().value;
+  EXPECT_NEAR(end.a, 0.0f, 1e-3f);
+  EXPECT_NEAR(end.b, 1.0f, 1e-3f);
+  EXPECT_NEAR(end.c, -1.0f, 1e-3f);
+  EXPECT_NEAR(end.d, 0.0f, 1e-3f);
+  EXPECT_NEAR(end.tx, 0.0f, 1e-3f);
+  EXPECT_NEAR(end.ty, 0.0f, 1e-3f);
+}
+
+/**
  * rotate_about_center.svg: SVG transform animations rotate about their anchor, so the matrix channel
  * opts into fixed-point interpolation. The flag must survive a PAGX round-trip, otherwise saving
  * and reloading silently reverts the animation to the linear (CSS) spelling.

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100">
+  <g>
+    <rect x="25" y="25" width="50" height="50" fill="#FF0000"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="90 50 50"
+                      dur="1s" fill="freeze"/>
+  </g>
+</svg>

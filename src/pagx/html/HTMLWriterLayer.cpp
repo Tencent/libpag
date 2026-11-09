@@ -2894,7 +2894,7 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
     // child would paint the mask's own fill (e.g. a solid rounded rect) on top of the masked
     // content as an opaque patch. The node stays in `children` because the clip-def writer
     // (writeClipContent) and the tgfx bake path both still need it.
-    if (child == layer->mask) {
+    if (child == layer->mask || maskReferenceLayers.count(child) != 0) {
       continue;
     }
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;

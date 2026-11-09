@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -710,6 +711,9 @@ class PPTWriter {
 
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
+  // Layers referenced through Layer::mask. Nested siblings of their owner are mask definitions too,
+  // so the child walk has to consult this set, not just `child == layer->mask`.
+  std::unordered_set<const Layer*> _maskReferenceLayers = {};
   bool _convertTextToPath = false;
   bool _ignoreGlyphRuns = false;
   bool _bridgeContours = false;

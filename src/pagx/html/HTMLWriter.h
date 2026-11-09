@@ -372,6 +372,10 @@ class HTMLWriter {
                   bool distributeAlpha = false, bool isFlexItem = false,
                   LayoutMode parentLayout = LayoutMode::None);
 
+  // Layers referenced through Layer::mask, collected once per document. Nested siblings of their
+  // owner are mask definitions too, so writeLayer consults this set as well.
+  std::unordered_set<const Layer*> maskReferenceLayers = {};
+
  private:
   friend struct ElementDispatchStateGuard;
   HTMLBuilder* _defs = nullptr;
