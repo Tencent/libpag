@@ -21,6 +21,7 @@
 #include <CoreMedia/CoreMedia.h>
 #include <VideoToolbox/VideoToolbox.h>
 #include <list>
+#include <mutex>
 #include <unordered_map>
 #include "rendering/video/VideoDecoder.h"
 
@@ -41,9 +42,16 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
+  /**
+   * Aborts in-progress synchronous decompression by invalidating the underlying session. This
+   * method can be called from any thread to release the rendering device lock before backgrounding.
+   */
+  void invalidateSession();
+
  private:
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
+  std::mutex sessionLocker = {};
   CMFormatDescriptionRef videoFormatDescription = nullptr;
   tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;

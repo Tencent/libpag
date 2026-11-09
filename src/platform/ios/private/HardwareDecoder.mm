@@ -17,24 +17,102 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#import <UIKit/UIKit.h>
+#include <algorithm>
+#include <atomic>
+#include <mutex>
+#include <vector>
 #include "base/utils/Log.h"
 #include "base/utils/USE.h"
 
 namespace pag {
+
+namespace {
+std::mutex& GetActiveDecodersMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::vector<HardwareDecoder*>& GetActiveDecoders() {
+  static std::vector<HardwareDecoder*> list;
+  return list;
+}
+
+// iOS may suspend the hardware decoder as the app becomes inactive. Reject new decode attempts
+// before the main thread reaches EAGLDevice::finish(), which waits for the rendering device lock.
+std::atomic<bool> AppInactive{false};
+
+// Handle lifecycle events on a dedicated serial queue so session invalidation does not depend on
+// the rendering thread or the main thread that subsequently waits for the device lock.
+void RegisterAppLifecycleObserversOnce() {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSOperationQueue* queue = [[NSOperationQueue alloc] init];
+    queue.maxConcurrentOperationCount = 1;
+    queue.name = @"libpag.HardwareDecoder.lifecycle";
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationWillResignActiveNotification
+                    object:nil
+                     queue:queue
+                usingBlock:^(NSNotification*) {
+                  AppInactive.store(true, std::memory_order_release);
+                  std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+                  for (auto* decoder : GetActiveDecoders()) {
+                    decoder->invalidateSession();
+                  }
+                }];
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationDidBecomeActiveNotification
+                    object:nil
+                     queue:queue
+                usingBlock:^(NSNotification*) {
+                  AppInactive.store(false, std::memory_order_release);
+                }];
+  });
+}
+}  // namespace
+
+void HardwareDecoder::invalidateSession() {
+  // Retain under the lock to protect against concurrent session replacement, then release the lock
+  // before entering VideoToolbox so the decoding thread can finish without waiting for this lock.
+  VTDecompressionSessionRef sessionToInvalidate = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(sessionLocker);
+    if (session) {
+      CFRetain(session);
+      sessionToInvalidate = session;
+    }
+  }
+  if (sessionToInvalidate) {
+    VTDecompressionSessionInvalidate(sessionToInvalidate);
+    CFRelease(sessionToInvalidate);
+  }
+}
 
 HardwareDecoder::HardwareDecoder(const VideoFormat& format)
     : sourceColorSpace(format.colorSpace),
       destinationColorSpace(format.colorSpace),
       maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
+  RegisterAppLifecycleObserversOnce();
+  std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+  GetActiveDecoders().push_back(this);
 }
 
 HardwareDecoder::~HardwareDecoder() {
-  if (session) {
-    VTDecompressionSessionFinishDelayedFrames(session);
-    VTDecompressionSessionInvalidate(session);
-    CFRelease(session);
-    session = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+    auto& list = GetActiveDecoders();
+    list.erase(std::remove(list.begin(), list.end(), this), list.end());
+  }
+  {
+    std::lock_guard<std::mutex> lock(sessionLocker);
+    if (session) {
+      VTDecompressionSessionFinishDelayedFrames(session);
+      VTDecompressionSessionInvalidate(session);
+      CFRelease(session);
+      session = nullptr;
+    }
   }
 
   if (videoFormatDescription) {
@@ -122,11 +200,17 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
 }
 
 bool HardwareDecoder::resetVideoToolBox() {
-  if (session) {
-    VTDecompressionSessionFinishDelayedFrames(session);
-    VTDecompressionSessionInvalidate(session);
-    CFRelease(session);
-    session = nullptr;
+  // Keep session replacement synchronized with lifecycle invalidation. Publish the new session
+  // only after creation succeeds so an observer never retains a partially initialized session.
+  {
+    std::lock_guard<std::mutex> lock(sessionLocker);
+    if (session) {
+      auto old = session;
+      session = nullptr;
+      VTDecompressionSessionFinishDelayedFrames(old);
+      VTDecompressionSessionInvalidate(old);
+      CFRelease(old);
+    }
   }
 
   // create decompression session
@@ -153,9 +237,10 @@ bool HardwareDecoder::resetVideoToolBox() {
   callBackRecord.decompressionOutputCallback = DidDecompress;
   callBackRecord.decompressionOutputRefCon = NULL;
 
+  VTDecompressionSessionRef newSession = nullptr;
   OSStatus status;
   status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL, attrs,
-                                        &callBackRecord, &session);
+                                        &callBackRecord, &newSession);
 
   CFRelease(attrs);
   CFRelease(pixelFormatTypeValue);
@@ -163,8 +248,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {
-    if (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
-        sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL) {
+    if (newSession != nullptr && (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
+                                  sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL)) {
       CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
           kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
       CFStringRef destinationTransferFunction = CFStringCreateWithCString(
@@ -182,7 +267,7 @@ bool HardwareDecoder::resetVideoToolBox() {
                            kCVImageBufferTransferFunction_ITU_R_709_2);
       CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix,
                            kCVImageBufferYCbCrMatrix_ITU_R_709_2);
-      VTSessionSetProperty(session, pixelTransferProperties, pixelTransferPropertiesParam);
+      VTSessionSetProperty(newSession, pixelTransferProperties, pixelTransferPropertiesParam);
 
       CFRelease(destinationColorPrimaries);
       CFRelease(destinationTransferFunction);
@@ -196,11 +281,15 @@ bool HardwareDecoder::resetVideoToolBox() {
     }
   }
 
-  if (status != noErr || !session) {
+  if (status != noErr || !newSession) {
     LOGE("HardwareDecoder:decoder session create failed status = %d", status);
     return false;
   }
 
+  {
+    std::lock_guard<std::mutex> lock(sessionLocker);
+    session = newSession;
+  }
   return true;
 }
 
@@ -246,6 +335,10 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
     outputFrame = nullptr;
+  }
+
+  if (AppInactive.load(std::memory_order_acquire)) {
+    return DecodingResult::Error;
   }
 
   CVPixelBufferRef outputPixelBuffer = nullptr;
