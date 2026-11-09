@@ -1137,6 +1137,44 @@ PAG_TEST(PAGXHTML3DTest, BorderWidthInsetsTheParentCameraOrigin) {
 }
 
 /**
+ * Test case: a flow child that only reaches 3D through `@keyframes` still gets the parent camera
+ * folded into every keyframe, so it has to be reported the same way a static 3D pose is. A child
+ * animating only `opacity` keeps quiet.
+ */
+PAG_TEST(PAGXHTML3DTest, AnimatedFlowChildUnderPerspectiveWarns) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes spin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(40deg); } }
+      @keyframes fade { 0% { opacity: 0.2; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;display:flex;
+           perspective:600px">
+        <div id="a" style="width:80px;height:60px;background-color:#38BDF8;
+             animation:spin 2s linear infinite"></div>
+        <div id="b" style="width:80px;height:60px;background-color:#F472B6;
+             animation:fade 2s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int warnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("vanishing point") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "the transform animation must be reported, the opacity one must not";
+  // The warning is not theoretical: the keyframes really do carry the projection.
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_FALSE(channel->keyframes.empty());
+  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(3, 2)), 1e-6f);
+}
+
+/**
  * Test case: an absolutely positioned child placed by `right` / `bottom` has no `left` / `top`, so
  * the parent camera cannot be expressed in its local coordinates; that has to be reported instead of
  * silently pinning the vanishing point to the parent origin.
