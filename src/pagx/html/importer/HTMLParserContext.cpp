@@ -49,9 +49,55 @@ namespace {
 // re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
 // absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
 // by layout, so its local origin is unknown here and the parent coordinates are used as-is.
+// True when one of the element's own `@keyframes` animates `transform`: such a child only gets its
+// 3D pose from the animation, so the static pose cannot be used to decide whether the camera matters.
+bool AnimatesTransform(const std::unordered_map<std::string, html::CssKeyframesRule>& rules,
+                       const HTMLStyleCascade::PropertyMap& style) {
+  std::vector<std::string> names = {};
+  for (const char* property : {"animation-name", "animation"}) {
+    const std::string value = LookupProperty(style, property);
+    size_t start = 0;
+    for (size_t i = 0; i <= value.size(); ++i) {
+      if (i == value.size() || value[i] == ',' ||
+          std::isspace(static_cast<unsigned char>(value[i]))) {
+        if (i > start) {
+          names.push_back(Trim(value.substr(start, i - start)));
+        }
+        start = i + 1;
+      }
+    }
+  }
+  for (const auto& name : names) {
+    const auto rule = rules.find(name);
+    if (rule == rules.end()) {
+      continue;
+    }
+    for (const auto& stop : rule->second.stops) {
+      // Only a `transform` declaration counts; `transform-origin` alone does not move the pose.
+      size_t at = 0;
+      while ((at = stop.declarations.find("transform", at)) != std::string::npos) {
+        constexpr size_t kTransformLength = 9;  // strlen("transform")
+        const size_t after = at + kTransformLength;
+        const size_t before = stop.declarations.rfind(';', at);
+        const bool startsDeclaration =
+            before == std::string::npos
+                ? Trim(stop.declarations.substr(0, at)).empty()
+                : Trim(stop.declarations.substr(before + 1, at - before - 1)).empty();
+        if (startsDeclaration && after < stop.declarations.size() &&
+            Trim(stop.declarations.substr(after, 1)) == ":") {
+          return true;
+        }
+        at = after;
+      }
+    }
+  }
+  return false;
+}
+
 void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY,
-                            float parentBorderWidthPx, const std::string& elementName,
-                            HTMLDiagnosticSink& diagnostics, bool& warnedFlowChild) {
+                            float parentBorderWidthPx, bool animatesTransform,
+                            const std::string& elementName, HTMLDiagnosticSink& diagnostics,
+                            bool& warnedFlowChild) {
   box.parentPerspectivePx = distancePx;
   box.parentPerspectiveOriginX = NAN;
   box.parentPerspectiveOriginY = NAN;
@@ -61,8 +107,10 @@ void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float orig
   }
   // The camera only changes the result when the child's pose leaves the z = 0 plane (or its pivot
   // sits in front of it); a plain child of a `perspective` flex container is unaffected.
-  const bool cameraAffectsPose = box.transform.valid && (!IsFlatTransform(box.transform.pose) ||
-                                                         std::fabs(box.transform.originZ) > 0.0f);
+  const bool cameraAffectsPose =
+      (box.transform.valid &&
+       (!IsFlatTransform(box.transform.pose) || std::fabs(box.transform.originZ) > 0.0f)) ||
+      animatesTransform;
   // An absolute child resolves its offset from the parent's padding box; a flow / flex child is
   // placed by layout, and a `right` / `bottom` positioned one has no `left` / `top`, so neither has
   // an offset that can be expressed here.
@@ -751,9 +799,11 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
+    ApplyParentPerspective(
+        box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+        inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+        AnimatesTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+        element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(
         _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
                                                   box.parentPerspectiveOriginX,
@@ -776,25 +826,31 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
+    ApplyParentPerspective(
+        box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+        inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+        AnimatesTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+        element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
+    ApplyParentPerspective(
+        box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+        inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+        AnimatesTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+        element->name, *_diagnostics, _flowChildPerspectiveWarned);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-  ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                         inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-                         element->name, *_diagnostics, _flowChildPerspectiveWarned);
+  ApplyParentPerspective(
+      box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+      inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+      AnimatesTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+      element->name, *_diagnostics, _flowChildPerspectiveWarned);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
