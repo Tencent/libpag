@@ -135,6 +135,23 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation);
 // `copies` moves each copy's index, so the caller resolves prog per frame.
 Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation);
 
+// The repeater values a frame can drive. Every entry falls back to the authored value, so the static
+// path and the animated path share one matrix builder.
+struct RepeaterValues {
+  float anchorX = 0.0f;
+  float anchorY = 0.0f;
+  float positionX = 0.0f;
+  float positionY = 0.0f;
+  float scaleX = 1.0f;
+  float scaleY = 1.0f;
+  float rotation = 0.0f;
+  float startAlpha = 1.0f;
+  float endAlpha = 1.0f;
+};
+
+RepeaterValues RepeaterValuesFrom(const Repeater* rep);
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, const RepeaterValues& values);
+
 float ComputePathLength(const PathData& pathData);
 float ComputePathSignedArea(const PathData& pathData);
 bool IsPathClockwise(const PathData& pathData);

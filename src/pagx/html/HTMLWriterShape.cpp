@@ -927,32 +927,53 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
   return PathDataToSVGString(result);
 }
 
+RepeaterValues RepeaterValuesFrom(const Repeater* rep) {
+  RepeaterValues values = {};
+  values.anchorX = rep->anchor.x;
+  values.anchorY = rep->anchor.y;
+  values.positionX = rep->position.x;
+  values.positionY = rep->position.y;
+  values.scaleX = rep->scale.x;
+  values.scaleY = rep->scale.y;
+  values.rotation = rep->rotation;
+  values.startAlpha = rep->startAlpha;
+  values.endAlpha = rep->endAlpha;
+  return values;
+}
+
 Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation) {
+  RepeaterValues values = RepeaterValuesFrom(rep);
+  values.rotation = rotation;
+  return BuildRepeaterCopyMatrixAtProg(rep, prog, values);
+}
+
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* /*rep*/, float prog,
+                                     const RepeaterValues& values) {
   // Mirror the per-copy transform formula writeRepeater applies in HTMLWriterText.cpp. The
   // factoring is deliberate: anchor-out → scale → rotate → translate → anchor-in, composed
   // right-to-left so the anchor (0,0) by default) stays fixed while each copy moves by a
   // progressive delta. Using a shared helper keeps path-level geometry expansion (used when
   // a Repeater lives inside a Group) in lockstep with DOM-level copy emission (outer path).
   Matrix m = {};
-  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
-    m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
+  if (!FloatNearlyZero(values.anchorX) || !FloatNearlyZero(values.anchorY)) {
+    m = Matrix::Translate(-values.anchorX, -values.anchorY);
   }
-  float sx = std::pow(rep->scale.x, prog);
-  float sy = std::pow(rep->scale.y, prog);
+  float sx = std::pow(values.scaleX, prog);
+  float sy = std::pow(values.scaleY, prog);
   if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
     m = Matrix::Scale(sx, sy) * m;
   }
-  float rot = rotation * prog;
+  float rot = values.rotation * prog;
   if (!FloatNearlyZero(rot)) {
     m = Matrix::Rotate(rot) * m;
   }
-  float px = rep->position.x * prog;
-  float py = rep->position.y * prog;
+  float px = values.positionX * prog;
+  float py = values.positionY * prog;
   if (!FloatNearlyZero(px) || !FloatNearlyZero(py)) {
     m = Matrix::Translate(px, py) * m;
   }
-  if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
-    m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
+  if (!FloatNearlyZero(values.anchorX) || !FloatNearlyZero(values.anchorY)) {
+    m = Matrix::Translate(values.anchorX, values.anchorY) * m;
   }
   return m;
 }

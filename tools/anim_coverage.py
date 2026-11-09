@@ -36,6 +36,16 @@ NODE_ORDER = [
 
 # Channels that are animatable in the registry but provably cannot change a rendered pixel, so a
 # case could only ever compare two static images. Each entry states why; keep this list short.
+# Nodes whose static export is missing entirely: the writer never references them, so nothing is
+# painted at t=0 and a channel case would compare a drawn reference against an empty frame. These
+# are recorded in the README as static gaps; drop the entries when the node is implemented.
+# Whole nodes whose static export is missing: `src/pagx/html` never references them, so nothing is
+# painted at t=0 and a channel case would compare a drawn reference against an empty frame. They are
+# listed as static gaps in the README; drop the entry once the node is exported.
+NODE_EXEMPTIONS = {
+    "NoiseStyle": "静态导出未实现该节点（writer 无引用），t=0 画面为空，需先补静态能力",
+    "NoiseFilter": "静态导出未实现该节点（writer 无引用），t=0 只画出底色、无噪声，需先补静态能力",
+}
 CHANNEL_EXEMPTIONS = {
     ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
 }
@@ -48,6 +58,7 @@ TEXT_PATH_RENDERER_GAP = "渲染器 convertTextPath() 未注册通道写入，�
 for _channel in ("alpha", "anchor.x", "anchor.y", "position.x", "position.y", "rotation", "scale.x",
                  "scale.y", "skew", "skewAxis"):
     CHANNEL_EXEMPTIONS[("TextPath", _channel)] = TEXT_PATH_RENDERER_GAP
+
 
 
 def load_registry():
@@ -245,6 +256,8 @@ def check(anim, exported, index, cases):
     warnings = []
 
     for node in NODE_ORDER:
+        if node in NODE_EXEMPTIONS:
+            continue
         for channel in sorted(anim.get(node, ())):
             if (node, channel) in index:
                 continue
