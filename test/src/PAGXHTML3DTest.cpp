@@ -1137,6 +1137,40 @@ PAG_TEST(PAGXHTML3DTest, BorderWidthInsetsTheParentCameraOrigin) {
 }
 
 /**
+ * Test case: an unresolvable `transform-origin` only matters for a pose with a non-identity linear
+ * part. A pure translation (or pure projection) pivots identically at any origin, so it must not
+ * warn — and the message names the default origin instead of an empty string.
+ */
+PAG_TEST(PAGXHTML3DTest, UnresolvedOriginOnlyWarnsWhenThePivotMatters) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="slide" style="position:absolute;left:0;top:0;width:100%;
+           transform:translateX(10px)"></div>
+      <div id="spin" style="position:absolute;left:0;top:60px;width:100%;
+           transform:rotate(15deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int warnings = 0;
+  bool namedDefault = false;
+  for (const auto& message : doc->errors) {
+    if (message.find("transform-origin") == std::string::npos) {
+      continue;
+    }
+    warnings++;
+    if (message.find("(default)") != std::string::npos) {
+      namedDefault = true;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "only the rotation needs a pivot";
+  EXPECT_TRUE(namedDefault) << "the message must name the default origin, not an empty string";
+  // The translation still applies; only the diagnostic is skipped.
+  auto* slide = FindLayerById(doc, "slide");
+  ASSERT_NE(slide, nullptr);
+  EXPECT_TRUE(NearlyEqual(slide->matrix.tx, 10.0f, 0.01f));
+}
+
+/**
  * Test case: a flow child that only reaches 3D through `@keyframes` still gets the parent camera
  * folded into every keyframe, so it has to be reported the same way a static 3D pose is. A child
  * animating only `opacity` keeps quiet.
