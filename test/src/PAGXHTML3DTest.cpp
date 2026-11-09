@@ -1135,6 +1135,29 @@ PAG_TEST(PAGXHTML3DTest, BorderWidthInsetsTheParentCameraOrigin) {
 }
 
 /**
+ * Test case: one bad length argument yields one diagnostic. `parseAbsoluteLengthPx` reports the unit
+ * itself, and the transform resolver names the offending argument, so the two used to double-report
+ * `translate(10foo)`.
+ */
+PAG_TEST(PAGXHTML3DTest, BadLengthUnitReportsOnce) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="position:absolute;left:0;top:0;width:60px;height:40px;
+           background-color:#000;transform:translate(10foo, 0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int unitWarnings = 0;
+  int argumentWarnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("length unit") != std::string::npos) unitWarnings++;
+    if (message.find("not a px length") != std::string::npos) argumentWarnings++;
+  }
+  EXPECT_EQ(unitWarnings, 0) << "the resolver names the argument, the unit warning is redundant";
+  EXPECT_EQ(argumentWarnings, 1);
+}
+
+/**
  * Test case: an unresolvable `transform-origin` only matters for a pose with a non-identity linear
  * part. A pure translation (or pure projection) pivots identically at any origin, so it must not
  * warn — and the message names the default origin instead of an empty string.

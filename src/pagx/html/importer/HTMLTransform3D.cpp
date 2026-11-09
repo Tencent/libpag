@@ -143,7 +143,6 @@ Matrix3D MakePerspective(float distance) {
   return m;
 }
 
-
 // `ParseAngle` maps unparsable input to 0 and unknown units to plain degrees, which would silently
 // turn `rotate(45px)` into a 45 degree rotation, so the unit is validated here instead. CSS accepts
 // `deg` / `grad` / `rad` / `turn` case insensitively; a unitless value is only valid as `0`.
@@ -178,8 +177,6 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
   }
   return std::isfinite(out);
 }
-
-
 
 // Resolves one `transform-origin` axis token to layer-local pixels. `dimension` is NaN when the
 // reference box size is unknown, which leaves percentage / keyword forms unresolvable.
@@ -375,7 +372,9 @@ bool ResolveLengthToken(const std::string& token, float referencePx, HTMLValuePa
     out = referencePx * fraction;
     return true;
   }
-  out = valueParser.parseAbsoluteLengthPx(trimmed);
+  // The callers name the offending argument themselves, so the generic unit warning is suppressed
+  // here: `translate(10foo)` reports once, not twice.
+  out = valueParser.parseAbsoluteLengthPx(trimmed, /*warn=*/false);
   return std::isfinite(out);
 }
 
@@ -871,6 +870,12 @@ PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
 bool IsFlatTransform(const Matrix3D& matrix) {
   // Composing rotations leaves values like 0.99999994 on the Z axis, so the plane test needs a
   // tolerance instead of exact comparisons.
+  //
+  // This is a *geometric* test, so it deliberately differs from `HasPerspective` in
+  // `LayerTransformUtils.h`, which asks whether the matrix carries a projection row at all (an exact
+  // `!= 0`). A camera beyond `kPoseEpsilon` distance (`perspective(1000000px)`) therefore reads as
+  // flat here while `HasPerspective` still sees a projection: on the z = 0 plane the two disagree by
+  // less than a pixel, and the exact test is what export needs to keep the row it was given.
   return NearlyZero(matrix.getRowColumn(2, 0)) && NearlyZero(matrix.getRowColumn(2, 1)) &&
          NearlyOne(matrix.getRowColumn(2, 2)) && NearlyZero(matrix.getRowColumn(2, 3)) &&
          NearlyZero(matrix.getRowColumn(3, 0)) && NearlyZero(matrix.getRowColumn(3, 1)) &&
