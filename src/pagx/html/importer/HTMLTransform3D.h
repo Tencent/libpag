@@ -101,6 +101,31 @@ bool IsInvertible(const Matrix3D& matrix);
 Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY);
 
 /**
+ * Where a pose goes once its parent camera has been folded in. Both the static box path and the
+ * animation keyframe path ask this question, and answering it in two places is how they drifted
+ * apart, so the classification lives here:
+ *
+ *  - `valid`   — false when the pushed pose is 3D and not invertible (PAGX rejects such a pose). The
+ *                callers decide the consequence: the static path drops the whole transform, the
+ *                keyframe path drops that one stop.
+ *  - `flat`    — the pushed pose stays on the z = 0 plane, so it can travel on the 2D `matrix`
+ *                channel; a pose that only became 3D through the parent camera must not.
+ *  - `linearIsIdentity` — the pivot has no effect (pure translation or pure projection), so no
+ *                `anchor` is needed.
+ *  - `pose`    — the pushed pose itself. It never carries the pivot: `anchor` is applied by the
+ *                runtime after interpolation.
+ */
+struct PosePlacement {
+  bool valid = false;
+  bool flat = true;
+  bool linearIsIdentity = true;
+  Matrix3D pose = {};
+};
+
+PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
+                        float parentPerspectiveOriginX, float parentPerspectiveOriginY);
+
+/**
  * Returns true when the pose only acts on the z = 0 plane: no depth translation, no z-dependent
  * linear terms and no projection row. Such a pose is written as a 2D affine, which keeps documents
  * whose 4x4 is only pedantically 3D on the cheap path.
