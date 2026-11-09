@@ -83,7 +83,11 @@ void SearchLayers(const std::vector<Layer*>& layers, TargetSearch* search) {
   }
 }
 
-bool HasDynamicContent(const PAGXDocument* document) {
+bool HasDynamicContent(const PAGXDocument* document,
+                       std::unordered_set<const PAGXDocument*>& visited) {
+  if (!visited.insert(document).second) {
+    return false;
+  }
   if (!document->animations.empty() || !document->dataBinds.empty()) {
     return true;
   }
@@ -99,6 +103,12 @@ bool HasDynamicContent(const PAGXDocument* document) {
     if (type == NodeType::Composition &&
         !static_cast<const Composition*>(node.get())->animations.empty()) {
       return true;
+    }
+    if (type == NodeType::Layer) {
+      const auto& externalDoc = static_cast<const Layer*>(node.get())->externalDoc;
+      if (externalDoc != nullptr && HasDynamicContent(externalDoc.get(), visited)) {
+        return true;
+      }
     }
   }
   return false;
@@ -187,7 +197,8 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
         "Invalid 'outputBounds': all components must be finite and width/height must "
         "be greater than zero.");
   }
-  if (HasDynamicContent(document)) {
+  std::unordered_set<const PAGXDocument*> visitedDocuments;
+  if (HasDynamicContent(document, visitedDocuments)) {
     return report(
         "Target view documents with animations, state machines or data binds are not "
         "supported.");

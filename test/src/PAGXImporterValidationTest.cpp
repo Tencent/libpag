@@ -22,6 +22,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/utils/OutputView.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -342,6 +343,69 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsDynamicContent) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_TRUE(HasError(doc, "animations"));
+}
+
+/**
+ * Test case: the static output contract includes loaded external documents at every depth.
+ * A static two-level composition stays valid, while an animation in its inner document is rejected.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewValidatesNestedExternalDocuments) {
+  for (bool hasAnimation : {false, true}) {
+    SCOPED_TRACE(hasAnimation);
+    auto doc = pagx::PAGXImporter::FromXML(
+        "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">"
+        "<Layer id=\"target\" composition=\"outer.pagx\"/></pagx>");
+    ASSERT_NE(doc, nullptr);
+    std::string outerXML =
+        "<pagx width=\"100\" height=\"100\"><Layer id=\"innerSlot\" composition=\"inner.pagx\">";
+    if (hasAnimation) {
+      outerXML += "<Timelines><Animation ref=\"@fade\" playing=\"true\"/></Timelines>";
+    }
+    outerXML += "</Layer></pagx>";
+    ASSERT_TRUE(doc->loadFileData("outer.pagx",
+                                  pagx::Data::MakeWithCopy(outerXML.data(), outerXML.size())));
+    std::string innerXML =
+        "<pagx width=\"100\" height=\"100\"><Layer id=\"content\">"
+        "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/></Layer>";
+    if (hasAnimation) {
+      innerXML +=
+          "<Animations><Animation id=\"fade\" duration=\"60\" frameRate=\"60\">"
+          "<Object target=\"content\"><Channel name=\"alpha\" type=\"float\">"
+          "<Key time=\"0\" value=\"0\"/><Key time=\"60\" value=\"1\"/>"
+          "</Channel></Object></Animation></Animations>";
+    }
+    innerXML += "</pagx>";
+    ASSERT_TRUE(doc->loadFileData("inner.pagx",
+                                  pagx::Data::MakeWithCopy(innerXML.data(), innerXML.size())));
+    EXPECT_TRUE(doc->errors.empty());
+    EXPECT_TRUE(doc->animations.empty());
+    EXPECT_TRUE(doc->getExternalFilePaths().empty());
+    auto* target = doc->findNode<pagx::Layer>("target");
+    ASSERT_NE(target, nullptr);
+    ASSERT_NE(target->externalDoc, nullptr);
+    EXPECT_TRUE(target->externalDoc->animations.empty());
+    auto* innerSlot = target->externalDoc->findNode<pagx::Layer>("innerSlot");
+    ASSERT_NE(innerSlot, nullptr);
+    ASSERT_NE(innerSlot->externalDoc, nullptr);
+    EXPECT_EQ(innerSlot->externalDoc->animations.size(), hasAnimation ? 1u : 0u);
+
+    const pagx::Layer* resolved = nullptr;
+    std::string error;
+    auto status = pagx::ResolveOutputView(doc.get(), &resolved, &error);
+    if (hasAnimation) {
+      EXPECT_EQ(status, pagx::OutputViewStatus::Invalid);
+      EXPECT_EQ(resolved, nullptr);
+      EXPECT_EQ(error,
+                "Target view documents with animations, state machines or data binds are not "
+                "supported.");
+      EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+    } else {
+      EXPECT_EQ(status, pagx::OutputViewStatus::Valid);
+      EXPECT_EQ(resolved, target);
+      EXPECT_TRUE(error.empty());
+      EXPECT_NE(pagx::PAGScene::Make(doc), nullptr);
+    }
+  }
 }
 
 /**
