@@ -695,6 +695,15 @@ enum class TargetChannelRole {
   FilterAlpha,
   // Colour of the <feFlood> inside an SVG filter pipeline (inner shadow, blend).
   FilterFloodColor,
+  // Polystar outline channels: every one of them changes the path, so the frame rebuilds it.
+  PolystarPointCount,
+  PolystarOuterRadius,
+  PolystarInnerRadius,
+  PolystarOuterRoundness,
+  PolystarInnerRoundness,
+  PolystarRotation,
+  PolystarPositionX,
+  PolystarPositionY,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
@@ -739,6 +748,14 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "scale.y", TargetChannelRole::ScaleY},
 
     // Shape geometry channels
+    {NodeType::Polystar, "pointCount", TargetChannelRole::PolystarPointCount},
+    {NodeType::Polystar, "outerRadius", TargetChannelRole::PolystarOuterRadius},
+    {NodeType::Polystar, "innerRadius", TargetChannelRole::PolystarInnerRadius},
+    {NodeType::Polystar, "outerRoundness", TargetChannelRole::PolystarOuterRoundness},
+    {NodeType::Polystar, "innerRoundness", TargetChannelRole::PolystarInnerRoundness},
+    {NodeType::Polystar, "rotation", TargetChannelRole::PolystarRotation},
+    {NodeType::Polystar, "position.x", TargetChannelRole::PolystarPositionX},
+    {NodeType::Polystar, "position.y", TargetChannelRole::PolystarPositionY},
     {NodeType::Rectangle, "size.width", TargetChannelRole::GeometryWidth},
     {NodeType::Rectangle, "roundness", TargetChannelRole::RectangleRoundness},
     {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
@@ -852,6 +869,16 @@ struct BundleChannelSet {
   const Channel* trimStartCh = nullptr;
   const Channel* repeaterRotationCh = nullptr;
   const Channel* floodColorCh = nullptr;
+  // Polystar: every channel rewrites the outline, so one struct keeps them together.
+  bool hasPolystarGeometry = false;
+  const Channel* starPointCountCh = nullptr;
+  const Channel* starOuterRadiusCh = nullptr;
+  const Channel* starInnerRadiusCh = nullptr;
+  const Channel* starOuterRoundnessCh = nullptr;
+  const Channel* starInnerRoundnessCh = nullptr;
+  const Channel* starRotationCh = nullptr;
+  const Channel* starPosXCh = nullptr;
+  const Channel* starPosYCh = nullptr;
   // Static colour of the flooding filter, used when the channel is absent from a stop.
   Color floodBaseColor = {};
   const Channel* repeaterCopiesCh = nullptr;
@@ -1144,6 +1171,38 @@ bool BindChannelToBundleSet(
       }
       return false;
     }
+    case TargetChannelRole::PolystarPointCount:
+      out.starPointCountCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarOuterRadius:
+      out.starOuterRadiusCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarInnerRadius:
+      out.starInnerRadiusCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarOuterRoundness:
+      out.starOuterRoundnessCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarInnerRoundness:
+      out.starInnerRoundnessCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarRotation:
+      out.starRotationCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarPositionX:
+      out.starPosXCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
+    case TargetChannelRole::PolystarPositionY:
+      out.starPosYCh = ch;
+      out.hasPolystarGeometry = true;
+      return true;
     case TargetChannelRole::FilterFloodColor:
       // Colour of the <feFlood> inside a pipeline filter: the only filter property CSS can animate.
       out.floodColorCh = ch;
@@ -1203,6 +1262,18 @@ BundleChannelSet CollectBundleChannels(
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings);
       }
+    }
+  }
+  if (result.hasPolystarGeometry && !result.keyTimes.empty()) {
+    // A polystar outline is rebuilt per frame, and CSS interpolates the two path() strings it gets
+    // by walking the points, which is not how a rotation or a point-count step moves them. Sampling
+    // the channel every few frames keeps each interpolated segment short enough to stay under a
+    // pixel instead of baking every frame.
+    constexpr Frame kPolystarStep = 3;
+    Frame first = *result.keyTimes.begin();
+    Frame last = *result.keyTimes.rbegin();
+    for (Frame t = first; t <= last; t += kPolystarStep) {
+      result.keyTimes.insert(t);
     }
   }
   // A Repeater copy bundle drives exactly one copy; the emitter needs its index to recompose the
@@ -1801,6 +1872,32 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
     return;
   }
   auto type = bundle.primaryHost->nodeType();
+  if (type == NodeType::Polystar) {
+    if (chSet.hasPolystarGeometry) {
+      auto* star = static_cast<const Polystar*>(bundle.primaryHost);
+      PolystarValues values = PolystarValuesFrom(star);
+      // The runtime floors pointCount (5.1 and 5.9 draw the same polygon), so the frame floors it
+      // too instead of building a partial vertex the reference never shows.
+      values.pointCount =
+          std::floor(EvalFloatChannel(chSet.starPointCountCh, t, values.pointCount));
+      values.outerRadius = EvalFloatChannel(chSet.starOuterRadiusCh, t, values.outerRadius);
+      values.innerRadius = EvalFloatChannel(chSet.starInnerRadiusCh, t, values.innerRadius);
+      values.outerRoundness =
+          EvalFloatChannel(chSet.starOuterRoundnessCh, t, values.outerRoundness);
+      values.innerRoundness =
+          EvalFloatChannel(chSet.starInnerRoundnessCh, t, values.innerRoundness);
+      values.rotation = EvalFloatChannel(chSet.starRotationCh, t, values.rotation);
+      // The position channel is authored in the element's own space, while the outline is built
+      // from renderPosition() (which folds in the layout slot), so the frame applies the delta.
+      values.centerX += EvalFloatChannel(chSet.starPosXCh, t, star->position.x) - star->position.x;
+      values.centerY += EvalFloatChannel(chSet.starPosYCh, t, star->position.y) - star->position.y;
+      std::string d = BuildPolystarPath(star, values);
+      if (!d.empty()) {
+        AppendCssDecl(decls, "d", "path(\"" + d + "\")");
+      }
+    }
+    return;
+  }
   if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
     return;
   }
@@ -2061,7 +2158,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
       domId = targetNode->id;
     } else if (nType == NodeType::Group || nType == NodeType::TextBox || nType == NodeType::Text ||
                nType == NodeType::Fill || nType == NodeType::Stroke ||
-               nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
+               nType == NodeType::Rectangle || nType == NodeType::Ellipse ||
+               nType == NodeType::Polystar) {
       auto it = ctx.animation.elementIds.find(targetNode);
       if (it != ctx.animation.elementIds.end()) {
         domId = it->second;
@@ -2909,7 +3007,8 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             }
           }
         }
-      } else if (nType == NodeType::Rectangle || nType == NodeType::Ellipse) {
+      } else if (nType == NodeType::Rectangle || nType == NodeType::Ellipse ||
+                 nType == NodeType::Polystar) {
         bool hasGeometryChannel = false;
         for (auto* channel : obj->channels) {
           if (channel != nullptr &&
@@ -3191,7 +3290,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
       // Stroke width and shape width can expand SVG paint beyond its static viewBox. Other paint
       // channels (color, opacity, dash offset) do not change the viewport-sized extent.
-      if (chSet.strokeWidthCh != nullptr || chSet.geometryWidthCh != nullptr) {
+      if (chSet.strokeWidthCh != nullptr || chSet.geometryWidthCh != nullptr ||
+          chSet.hasPolystarGeometry) {
         for (const auto& element : elements) {
           edits.liftsSvgClip[element.id] = true;
         }

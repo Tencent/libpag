@@ -90,14 +90,14 @@ python3 tools/anim_coverage.py --check
 | Ellipse | `position.y` | ✘ | `geometry/11` |
 | Ellipse | `size.height` | ✘ | `geometry/12` |
 | Ellipse | `size.width` | ✔ | `geometry/03` |
-| Polystar | `innerRadius` | ✘ | `geometry/13` |
-| Polystar | `innerRoundness` | ✘ | `geometry/15` |
-| Polystar | `outerRadius` | ✘ | `geometry/14` |
-| Polystar | `outerRoundness` | ✘ | `geometry/16` |
-| Polystar | `pointCount` | ✘ | `geometry/06` |
-| Polystar | `position.x` | ✘ | `geometry/17` |
-| Polystar | `position.y` | ✘ | `geometry/18` |
-| Polystar | `rotation` | ✘ | `geometry/19` |
+| Polystar | `innerRadius` | ✔ | `geometry/13` |
+| Polystar | `innerRoundness` | ✔ | `geometry/15` |
+| Polystar | `outerRadius` | ✔ | `geometry/14` |
+| Polystar | `outerRoundness` | ✔ | `geometry/16` |
+| Polystar | `pointCount` | ✔ | `geometry/06` |
+| Polystar | `position.x` | ✔ | `geometry/17` |
+| Polystar | `position.y` | ✔ | `geometry/18` |
+| Polystar | `rotation` | ✔ | `geometry/19` |
 | Fill | `alpha` | ✔ | `fill/*`（4） |
 | Fill | `color` | ✔ | `fill/01·03`、`geometry/05`、`sharing/02·03` |
 | Stroke | `alpha` | ✔ | `stroke/02` |
@@ -236,6 +236,11 @@ python3 tools/anim_coverage.py --check
 
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
+
+**几何类通道（`Polystar` 全部 8 个）**：`pointCount` / 内外半径 / 内外圆角 / 位置 / 旋转都会改变轮廓，因此每帧
+按求值后的参数重建 `d`。两点实现细节：`pointCount` 在运行时被**取整**（实测 5.1 与 5.9 画面完全相同，
+5.9 与 6.1 才不同），导出侧同样取整；另外 CSS 的 `path()` 插值是逐点走直线，不等于旋转或点数跳变，所以这类
+bundle 每 3 帧加一个采样点，把每段插值压到 1px 以内（不做逐帧烘焙）。
 
 **CSS 无法表达的滤镜通道**：管线滤镜（内阴影、混合）的几何参数是 SVG 滤镜原语的属性（`feOffset dx/dy`、
 `feGaussianBlur stdDeviation`），不是 CSS 属性。实测给它们写关键帧后首末帧**零像素差**，而同一个滤镜里的

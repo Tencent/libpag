@@ -131,6 +131,22 @@ struct GeometryOverrides {
   float roundness = 0.0f;
 };
 
+// Per-frame values of a Polystar, so its outline can be rebuilt from animated channels.
+struct PolystarValues {
+  float centerX = 0.0f;
+  float centerY = 0.0f;
+  float pointCount = 0.0f;
+  float outerRadius = 0.0f;
+  float innerRadius = 0.0f;
+  float outerRoundness = 0.0f;
+  float innerRoundness = 0.0f;
+  float rotation = 0.0f;
+};
+
+PolystarValues PolystarValuesFrom(const Polystar* ps);
+std::string BuildPolystarPath(const Polystar* ps);
+std::string BuildPolystarPath(const Polystar* ps, const PolystarValues& values);
+
 void GeoToPathData(const Element* element, NodeType type, PathData& output);
 void GeoToPathData(const Element* element, NodeType type, PathData& output,
                    const GeometryOverrides* overrides);

@@ -188,23 +188,40 @@ static void AppendPolystarCurve(std::string& d, float centerX, float centerY, fl
        CssFloatToString(dy2 + centerY);
 }
 
+PolystarValues PolystarValuesFrom(const Polystar* ps) {
+  PolystarValues values = {};
+  auto center = ps->renderPosition();
+  values.centerX = center.x;
+  values.centerY = center.y;
+  values.pointCount = ps->pointCount;
+  values.outerRadius = ps->renderOuterRadius();
+  values.innerRadius = ps->renderInnerRadius();
+  values.outerRoundness = ps->outerRoundness;
+  values.innerRoundness = ps->innerRoundness;
+  values.rotation = ps->rotation;
+  return values;
+}
+
 std::string BuildPolystarPath(const Polystar* ps) {
-  if (!(ps->pointCount > 0.0f) || !std::isfinite(ps->pointCount)) {
+  return BuildPolystarPath(ps, PolystarValuesFrom(ps));
+}
+
+std::string BuildPolystarPath(const Polystar* ps, const PolystarValues& values) {
+  if (!(values.pointCount > 0.0f) || !std::isfinite(values.pointCount)) {
     return {};
   }
-  auto psCenter = ps->renderPosition();
-  float centerX = psCenter.x;
-  float centerY = psCenter.y;
-  float outerR = ps->renderOuterRadius();
-  float innerR = ps->renderInnerRadius();
+  float centerX = values.centerX;
+  float centerY = values.centerY;
+  float outerR = values.outerRadius;
+  float innerR = values.innerRadius;
   bool isStar = ps->type == PolystarType::Star;
 
   if (isStar) {
     float direction = ps->reversed ? -1.0f : 1.0f;
-    float angleStep = static_cast<float>(M_PI) / ps->pointCount;
-    float currentAngle = (ps->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-    int numPoints = static_cast<int>(std::ceil(ps->pointCount)) * 2;
-    float decimalPart = ps->pointCount - std::floor(ps->pointCount);
+    float angleStep = static_cast<float>(M_PI) / values.pointCount;
+    float currentAngle = (values.rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+    int numPoints = static_cast<int>(std::ceil(values.pointCount)) * 2;
+    float decimalPart = values.pointCount - std::floor(values.pointCount);
     int decimalIndex = -2;
     if (decimalPart != 0.0f) {
       decimalIndex = direction > 0 ? 1 : numPoints - 3;
@@ -238,9 +255,9 @@ std::string BuildPolystarPath(const Polystar* ps) {
         dx = radius * std::cos(currentAngle);
         dy = radius * std::sin(currentAngle);
       }
-      if (ps->innerRoundness != 0.0f || ps->outerRoundness != 0.0f) {
-        float lastRoundness = outerFlag ? ps->innerRoundness : ps->outerRoundness;
-        float roundness = outerFlag ? ps->outerRoundness : ps->innerRoundness;
+      if (values.innerRoundness != 0.0f || values.outerRoundness != 0.0f) {
+        float lastRoundness = outerFlag ? values.innerRoundness : values.outerRoundness;
+        float roundness = outerFlag ? values.outerRoundness : values.innerRoundness;
         AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
                             dx, dy, roundness);
         lastDx = dx;
@@ -255,13 +272,13 @@ std::string BuildPolystarPath(const Polystar* ps) {
   }
 
   // Polygon
-  int numPoints = static_cast<int>(std::floor(ps->pointCount));
+  int numPoints = static_cast<int>(std::floor(values.pointCount));
   if (numPoints < 1) {
     return {};
   }
   float direction = ps->reversed ? -1.0f : 1.0f;
   float angleStep = static_cast<float>(M_PI) * 2.0f / static_cast<float>(numPoints);
-  float currentAngle = (ps->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+  float currentAngle = (values.rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
 
   float firstDx = outerR * std::cos(currentAngle);
   float firstDy = outerR * std::sin(currentAngle);
@@ -277,18 +294,18 @@ std::string BuildPolystarPath(const Polystar* ps) {
     currentAngle += angleDelta;
     float dx = outerR * std::cos(currentAngle);
     float dy = outerR * std::sin(currentAngle);
-    if (ps->outerRoundness != 0.0f) {
+    if (values.outerRoundness != 0.0f) {
       AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
-                          ps->outerRoundness, dx, dy, ps->outerRoundness);
+                          values.outerRoundness, dx, dy, values.outerRoundness);
     } else {
       d += "L" + CssFloatToString(dx + centerX) + "," + CssFloatToString(dy + centerY);
     }
     lastDx = dx;
     lastDy = dy;
   }
-  if (ps->outerRoundness != 0.0f) {
-    AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, ps->outerRoundness,
-                        firstDx, firstDy, ps->outerRoundness);
+  if (values.outerRoundness != 0.0f) {
+    AppendPolystarCurve(d, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy,
+                        values.outerRoundness, firstDx, firstDy, values.outerRoundness);
   }
   d += "Z";
   return d;

@@ -3949,6 +3949,53 @@ CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
 // A Layer position channel and a pose channel share one transform list: the frame folds the authored
 // x/y into the chain and drops left/top, so emitting only the position delta would lose both the base
 // position and the rotation.
+// A Polystar's channels all rewrite the outline, and the runtime floors pointCount (5.1 and 5.9 draw
+// the same polygon). The frame rebuilds `d` from the evaluated values instead of animating a
+// transform, and the bundle is sampled every few frames because CSS walks the two path() strings
+// point by point rather than rotating them.
+CLI_TEST(PAGXHtmlTest, AnimationPolystarRebuildsOutlinePerFrame) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Polystar id="star" position="160,100" type="polygon" pointCount="5" outerRadius="80"
+                rotation="-90"/>
+      <Fill color="#B45309"/>
+    </Layer>
+    <Animations>
+      <Animation id="grow" duration="60" frameRate="60" loop="once">
+        <Object target="star">
+          <Channel name="pointCount" type="float">
+            <Key time="0" value="5" interpolation="linear"/>
+            <Key time="60" value="9"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"star\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // The outline moves, so it has to be an inline <path> the keyframes can rewrite.
+  EXPECT_EQ(tag.rfind("<path", 0), static_cast<size_t>(0)) << tag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  auto first = KeyframeStopOf(html, "id=\"star\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"star\"", "100%");
+  ASSERT_FALSE(first.empty()) << rule;
+  ASSERT_FALSE(last.empty()) << rule;
+  EXPECT_NE(first.find("d: path("), std::string::npos) << first;
+  EXPECT_NE(last.find("d: path("), std::string::npos) << last;
+  // Nine points instead of five: the command list itself grows.
+  size_t firstSegments =
+      std::count(first.begin(), first.end(), 'L') + std::count(first.begin(), first.end(), 'C');
+  size_t lastSegments =
+      std::count(last.begin(), last.end(), 'L') + std::count(last.begin(), last.end(), 'C');
+  EXPECT_LT(firstSegments, lastSegments) << first << last;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLayerPositionAndPoseShareOneTransform) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="bar" x="120" y="80" width="90" height="40" anchor="45,20">
