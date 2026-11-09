@@ -13,6 +13,7 @@ const {
   restoreProjectedTransform,
   useProjectedKeyframes,
   pagxAnimCameraClones,
+  pagxAnimProjectedNames,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -248,5 +249,34 @@ describe('declined cameras keep their perspective', () => {
     );
     expect(wrapped).toContain(projected);
     expect(pagxCameraSkips()['depth-pivot']).toBe(1);
+  });
+});
+
+describe('one element never mixes two camera modes', () => {
+  const flat = 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)';
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  test('a keyframe set that keeps its projection blocks the camera wrapper', () => {
+    // Stops disagree on the distance, so the block stays as authored and still projects.
+    // One stop projects, the other does not, so the block cannot be moved onto a single wrapper and
+    // keeps its authored (projected) form.
+    rewritePerspectiveKeyframes(
+      '@keyframes mixed { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        flat + '; } }',
+    );
+    expect(pagxAnimProjectedNames().mixed).toBe(true);
+
+    const html =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 80px; height: 40px">x</div>';
+    // Without the guard this element would get a wrapper on top of the projection it already carries.
+    const result = withPerspectiveCamera(html, {}, { animationName: 'mixed' }, null);
+    expect(result).toBe(html);
+    expect(pagxCameraSkips()['keyframes-mixed']).toBeGreaterThanOrEqual(1);
   });
 });

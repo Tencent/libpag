@@ -2039,6 +2039,20 @@ function pagxCameraSkips() {
   return scope && scope.__pagxCameraSkips ? scope.__pagxCameraSkips : {};
 }
 
+// Animation names whose keyframes still carry their own `perspective()` because the stops disagreed
+// on the distance. An element playing one of them must not also get a camera wrapper: the pose would
+// be projected twice.
+function pagxAnimProjectedNames() {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) {
+    return {};
+  }
+  if (!scope.__pagxAnimProjected) {
+    scope.__pagxAnimProjected = {};
+  }
+  return scope.__pagxAnimProjected;
+}
+
 // Animation names whose keyframes were also emitted un-stripped (suffix `__pagxCam`), for elements
 // whose camera wrapper is declined at render time.
 function pagxAnimCameraClones() {
@@ -2074,6 +2088,10 @@ function rewritePerspectiveKeyframes(cssText) {
   const clones = pagxAnimCameraClones();
   for (const name of Object.keys(clones)) {
     delete clones[name];
+  }
+  const projected = pagxAnimProjectedNames();
+  for (const name of Object.keys(projected)) {
+    delete projected[name];
   }
   if (!cssText) return cssText;
   let out = '';
@@ -2132,6 +2150,7 @@ function rewritePerspectiveKeyframes(cssText) {
     } else {
       if (distance > 0) {
         recordCameraSkip('keyframes-mixed');
+        if (name) projected[name] = true;
       }
       out += cssText.slice(index, close + 1);
     }
@@ -4791,6 +4810,16 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
     return declined('depth-pivot');
   }
+  // The same element can play several animations; a wrapper would add a second projection on top of
+  // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
+  const projected = pagxAnimProjectedNames();
+  const names = String((computed && computed.animationName) || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (names.some((name) => projected[name])) {
+    return declined('keyframes-mixed');
+  }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
   if (!wrapped) {
     return declined('not-a-sized-div');
@@ -5511,6 +5540,7 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 const HELPER_FNS = [
   recordCameraSkip,
   pagxCameraSkips,
+  pagxAnimProjectedNames,
   pagxAnimCameraClones,
   restoreProjectedTransform,
   useProjectedKeyframes,
@@ -6798,6 +6828,7 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  pagxAnimProjectedNames,
   pagxAnimCameraClones,
   restoreProjectedTransform,
   useProjectedKeyframes,
