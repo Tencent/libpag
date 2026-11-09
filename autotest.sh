@@ -66,7 +66,11 @@ case "$BACKEND_ARG" in
 esac
 
 ./install_tools.sh
-./update_baseline.sh "$@"
+if ! ./update_baseline.sh "$@"; then
+  # A crashed refresh leaves the previous cache in place; the tests still run so the failure does
+  # not hide every suite behind the baseline step.
+  echo "WARNING: the baseline cache refresh failed; running the tests against the existing cache." >&2
+fi
 rm -rf "$WORKSPACE/result" "$WORKSPACE/build"
 mkdir -p "$WORKSPACE/result" "$WORKSPACE/build"
 cp -R "$WORKSPACE/test/baseline" "$WORKSPACE/result/"
