@@ -66,22 +66,9 @@ case "$BACKEND_ARG" in
 esac
 
 ./install_tools.sh
-CACHE_DIR="$WORKSPACE/test/baseline/.cache/$BACKEND_NAME"
-CACHE_BACKUP=$(mktemp -d)
-if [ -d "$CACHE_DIR" ]; then
-  cp -R "$CACHE_DIR" "$CACHE_BACKUP/"
-fi
 if ! ./update_baseline.sh "$@"; then
-  # The refresh builds origin/main, which still crashes in the video decoder. Restore the cache
-  # that was present before the refresh and let the branch tests run; remove this once the decoder
-  # fix reaches main.
-  echo "WARNING: the baseline cache refresh failed; restoring the previous cache and continuing." >&2
-  rm -rf "$CACHE_DIR"
-  if [ -d "$CACHE_BACKUP/$BACKEND_NAME" ]; then
-    cp -R "$CACHE_BACKUP/$BACKEND_NAME" "$CACHE_DIR"
-  fi
+  echo "WARNING: the baseline cache refresh failed; continuing with the full test suite." >&2
 fi
-rm -rf "$CACHE_BACKUP"
 rm -rf "$WORKSPACE/result" "$WORKSPACE/build"
 mkdir -p "$WORKSPACE/result" "$WORKSPACE/build"
 cp -R "$WORKSPACE/test/baseline" "$WORKSPACE/result/"
