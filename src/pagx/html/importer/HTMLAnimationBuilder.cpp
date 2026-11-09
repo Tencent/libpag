@@ -46,6 +46,7 @@
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
@@ -1399,7 +1400,7 @@ bool HTMLAnimationBuilder::buildForElement(
         // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
         // (e.g. `scale(0)`) becomes one as soon as it is lifted, so it is dropped instead of written
         // as an invalid key that a re-import would reject.
-        if (!IsInvertible(pose)) {
+        if (!IsInvertibleMatrix3D(pose)) {
           if (!warnedSingularStop) {
             _diagnostics.warn(
                 "html: a @keyframes stop is not invertible once lifted to matrix3D; dropped "

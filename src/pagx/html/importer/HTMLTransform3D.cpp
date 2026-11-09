@@ -667,13 +667,6 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
 
 }  // namespace
 
-bool IsInvertible(const Matrix3D& matrix) {
-  // Reuse the runtime's check: it normalizes the columns and treats a perspective row separately, so
-  // the verdict does not depend on the overall scale. A fixed determinant threshold would reject a
-  // legal pose such as `perspective(600px) scale(0.001)` (det ~ 1e-6) that PAGX itself accepts.
-  return IsInvertibleMatrix3D(matrix);
-}
-
 bool IsSupportedTransformFunction(const std::string& name) {
   static const char* kSupported[] = {
       "translate", "translatex", "translatey", "translatez", "translate3d", "scale",
@@ -830,7 +823,7 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   }
   // PAGX requires a 3D pose to be invertible; a singular flat pose stays legal because a 2D
   // matrix has no such constraint (a zero scale is a valid, if empty, 2D transform).
-  if (!IsFlatTransform(pose) && !IsInvertible(pose)) {
+  if (!IsFlatTransform(pose) && !IsInvertibleMatrix3D(pose)) {
     diagnostics.warn("html: transform '" + trimmed + "' is not invertible; ignored");
     return false;
   }
@@ -838,7 +831,10 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   return true;
 }
 
-Matrix3D PerspectiveMatrix(float distance) {
+// Internal: the identity with its bottom row set to `(0, 0, -1/distance, 1)`. `Layer.perspective`
+// builds the same matrix, but a CSS `perspective` declaration lives on the parent and has to be
+// pushed into the child pose instead.
+static Matrix3D PerspectiveMatrix(float distance) {
   if (!(distance > 0.0f) || !std::isfinite(distance)) {
     return {};
   }
@@ -868,7 +864,7 @@ PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
   placement.flat = IsFlatTransform(placement.pose);
   // PAGX requires a 3D pose to be invertible; a flat pose has no such constraint, because a zero
   // scale is a valid (if empty) 2D transform.
-  placement.valid = placement.flat || IsInvertible(placement.pose);
+  placement.valid = placement.flat || IsInvertibleMatrix3D(placement.pose);
   placement.linearIsIdentity = IsLinearIdentity(placement.pose);
   return placement;
 }
