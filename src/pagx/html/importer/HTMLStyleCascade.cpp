@@ -791,7 +791,9 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
   // CSS `perspective` on this element projects its children; the value rides on the box so the
-  // parser context can push `P` into each child pose. `perspective-origin` has no PAGX equivalent.
+  // parser context can push `P` into each child pose. `perspective-origin` is resolved against the
+  // same reference box and travels with the camera: PAGX has no origin parameter, so the parser
+  // conjugates it into the pose instead.
   const std::string perspective = LookupLowerTrimmed(props, "perspective");
   if (!perspective.empty() && perspective != "none") {
     const float distance = _valueParser.parseAbsoluteLengthPx(perspective);

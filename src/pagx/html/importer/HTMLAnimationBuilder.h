@@ -43,7 +43,9 @@ struct CssKeyframesRule;
  * emits an `Animation` -> `AnimationObject` -> `Channel` -> `Keyframe` graph into
  * `PAGXDocument::animations`, restricted to the channels the runtime can play back
  * (`alpha` / `x` / `y` on the element's Layer for opacity and pure translation; the full affine
- * `matrix` channel for scale / rotate / skew transforms; and `color` on the Layer's solid Fill).
+ * `matrix` channel for scale / rotate / skew transforms; the `matrix3D` channel for poses with depth
+ * or perspective; and `color` on the Layer's solid Fill). None of the transform channels carries the
+ * pivot: `transform-origin` stays on the layer as `anchor`.
  *
  * The builder borrows the importer's diagnostic sink, value parser and id allocator; the document
  * handle and the `@keyframes` registry are bound after the document and cascade exist.

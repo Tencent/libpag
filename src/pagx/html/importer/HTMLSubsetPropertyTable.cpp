@@ -341,10 +341,8 @@ std::string TransformTransform(const std::string& value, const PropertyContext&,
   return trimmed;
 }
 
-// `transform-origin` is forwarded verbatim. The downstream resolver only
-// understands the default "50% 50%" form (the typical inline output) and
-// warns when it sees something else, so the table-level transform is a
-// straight pass-through.
+// `transform-origin` is forwarded verbatim: the importer resolves the full CSS form (px, percentage,
+// keywords, plus the optional depth), so the table only trims the value.
 std::string TransformTransformOrigin(const std::string& value, const PropertyContext&,
                                      HTMLTransformContext&) {
   return Trim(value);
@@ -442,9 +440,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"-webkit-text-stroke", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-width", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-color", PropAction::Keep, nullptr, nullptr},
-    // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the
-    // function back onto the TextBox / Group transform fields. The handler enforces the
-    // supported single-function subset; compound chains and matrix(...) forms are dropped.
+    // `transform` and `transform-origin` are forwarded. The handler composes the whole function list
+    // in CSS order and maps the pivot onto `Layer.anchor`; an unsupported function or unit is reported
+    // by the resolver, not dropped here.
     {"transform", PropAction::Transform, &TransformTransform, nullptr},
     {"transform-origin", PropAction::Transform, &TransformTransformOrigin, nullptr},
     // `transform-style: preserve-3d` maps onto `Layer.preserve3D`; the flat default is a no-op.
@@ -474,13 +472,13 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-right", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-bottom", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
-    // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     // `perspective` is forwarded so the importer can push it onto the children: PAGX keeps the
     // projection on the layer that owns the pose, CSS keeps it on the parent.
     {"perspective", PropAction::Keep, nullptr, nullptr},
     // `perspective-origin` is the vanishing point of that camera; the importer folds it into the
     // child pose, so the authored value has to survive the subset pass.
     {"perspective-origin", PropAction::Keep, nullptr, nullptr},
+    // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
