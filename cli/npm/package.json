@@ -31,6 +31,8 @@
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
     "check:binaries": "node scripts/check-binaries.js",
     "check:preview": "node scripts/check-preview.js",
+    "download:ffmpeg": "node scripts/download-ffmpeg.js",
+    "test:ffmpeg": "node scripts/test-download-ffmpeg.js",
     "prepack": "node scripts/build-html-snapshot.js",
     "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
@@ -52,6 +54,7 @@
     "bin/",
     "html-snapshot/",
     "preview/",
+    "scripts/download-ffmpeg.js",
     "README.md"
   ]
 }

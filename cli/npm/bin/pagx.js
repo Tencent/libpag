@@ -2,6 +2,14 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const {
+  ensureFFmpeg,
+  findFFmpegOnPath,
+  formatDownloadError,
+  hasExplicitFFmpeg,
+  isMP4Export,
+  resolveTarget,
+} = require("../scripts/download-ffmpeg.js");
 
 const SUPPORTED = ["darwin", "linux", "win32"];
 
@@ -111,8 +119,27 @@ if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.l
   process.exit(result.status || 0);
 }
 
-try {
-  execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
-} catch (e) {
-  process.exit(e.status != null ? e.status : 1);
+async function runNative() {
+  const args = process.argv.slice(2);
+  if (isMP4Export(args) && !hasExplicitFFmpeg(args) && !findFFmpegOnPath()) {
+    try {
+      const target = resolveTarget();
+      console.error(`pagx: ffmpeg not found; preparing ffmpeg for ${target.name}...`);
+      process.env.FFMPEG_BIN = await ensureFFmpeg();
+    } catch (error) {
+      console.error(formatDownloadError(error));
+      process.exitCode = 1;
+      return;
+    }
+  }
+  try {
+    execFileSync(binPath, args, { stdio: "inherit" });
+  } catch (e) {
+    process.exit(e.status != null ? e.status : 1);
+  }
 }
+
+runNative().catch((error) => {
+  console.error(`pagx: ${error.message}`);
+  process.exitCode = 1;
+});
