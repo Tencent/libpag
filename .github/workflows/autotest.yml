@@ -8,9 +8,10 @@ on:
 
 jobs:
   mac:
-    # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
+    # macos-14 no longer resolves to a usable runner configuration for this org, so the mac lanes
+    # follow tgfx and pin the macOS 15 image.
     name: mac (opengl-swiftshader)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -108,7 +109,7 @@ jobs:
   mac_metal:
     name: mac(metal)
     # Run the full native Metal suite against its own baseline cache, including screenshot tests.
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4

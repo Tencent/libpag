@@ -18,10 +18,11 @@
 
 #include "WindowManager.h"
 #include <QApplication>
-#include <QEventLoop>
 #include <QFile>
+#include <QGuiApplication>
 #include <QQuickStyle>
 #include <QTranslator>
+#include <QWindow>
 #include <QtGui/QFont>
 #include <QtQuick/QQuickWindow>
 #include <memory>
@@ -53,7 +54,7 @@ void WindowManager::showExportPanelWindow() {
     exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
   }
   exportPanelWindow->show();
-  app->exec();
+  runEventLoop();
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -62,7 +63,7 @@ void WindowManager::showPAGConfigWindow() {
     configWindow = std::make_unique<ConfigWindow>(app.get());
   }
   configWindow->show();
-  app->exec();
+  runEventLoop();
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -72,7 +73,7 @@ void WindowManager::showExportPreviewWindow() {
     previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
   }
   previewWindow->show();
-  app->exec();
+  runEventLoop();
 }
 
 void WindowManager::showExportWindow() {
@@ -81,7 +82,7 @@ void WindowManager::showExportWindow() {
     exportWindow = std::make_unique<ExportWindow>(app.get());
   }
   exportWindow->show();
-  app->exec();
+  runEventLoop();
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
@@ -113,7 +114,7 @@ bool WindowManager::showSimpleError(const QString& errorMessage) {
 
 bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
   PAGViewerInstallModel installModel;
-  return installModel.showInstallDialog(pagFilePath);
+  return installModel.showInstallDialog(app.get(), pagFilePath);
 }
 
 void WindowManager::initializeQtEnvironment() {
@@ -167,6 +168,33 @@ void WindowManager::init() {
 
   AlertInfoManager::GetInstance().warningList.clear();
   AlertInfoManager::GetInstance().saveWarnings.clear();
+}
+
+void WindowManager::runEventLoop() {
+  // Re-entered menu clicks while a plugin window is already open must not stack nested exec()
+  // loops, because closing the last window only quits the innermost loop and the leaked layers
+  // would keep the After Effects main thread inside the plugin forever. Returning early keeps a
+  // single loop pumping events for every open window.
+  if (BaseWindow::isEventLoopRunning()) {
+    return;
+  }
+  // Guard against a loop that can never exit: when the user cancels the save dialog opened by
+  // ExportWindow::init(), show() creates no window, so entering app->exec() here would wait
+  // forever and strand the After Effects main thread inside the plugin. Only run the loop when at
+  // least one top-level window is visible to quit it on close.
+  bool hasVisibleWindow = false;
+  const auto windows = QGuiApplication::topLevelWindows();
+  for (auto* topLevelWindow : windows) {
+    if (topLevelWindow != nullptr && topLevelWindow->isVisible()) {
+      hasVisibleWindow = true;
+      break;
+    }
+  }
+  if (!hasVisibleWindow) {
+    return;
+  }
+  BaseWindow::EventLoopScope scope;
+  app->exec();
 }
 
 }  // namespace exporter

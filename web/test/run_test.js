@@ -2,8 +2,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { ArtifactNames, Backends, Modes, SnapshotBuild, HashText, ReplaceDirectory, ValidateBuildInfo,
-  ValidateCache, ValidateResult } = require('./artifacts');
+const { ArtifactNames, Backends, Modes, ResolveRepositoryPath, SnapshotBuild, HashText, ReplaceDirectory,
+  ValidateBuildInfo, ValidateCache, ValidateResult } = require('./artifacts');
 const { SourceMetadata, ValidateProvenance, CheckUpdateSource } = require('./cache-source');
 
 const ProjectRoot = path.resolve(__dirname, '../..');
@@ -48,17 +48,19 @@ function ReadExpectedCache(directory, backend) {
 }
 
 function StartServer(directory) {
-  const allowed = new Set([...ArtifactNames, 'build-info.json']);
-  function handleRequest(request, response) {
-    const name = request.url?.slice(1);
-    if (!['GET', 'HEAD'].includes(request.method) || !allowed.has(name)) {
-      response.writeHead(404).end();
-      return;
+  const allowed = [...ArtifactNames, 'build-info.json'];
+  // The request URL only ever participates in an equality test: the returned path is built from
+  // an element of the constant list above, so no request string can reach the file system.
+  function ResolveArtifact(url) {
+    const name = url?.slice(1);
+    for (const candidate of allowed) {
+      if (candidate === name) return path.join(directory, candidate);
     }
-    const file = path.join(directory, name);
-    // The allowlist above already rejects traversal sequences; keep this containment check
-    // explicit so the request URL can never reach the file system unsanitized.
-    if (path.dirname(file) !== directory) {
+    return null;
+  }
+  function handleRequest(request, response) {
+    const file = ResolveArtifact(request.url);
+    if (!['GET', 'HEAD'].includes(request.method) || !file) {
       response.writeHead(404).end();
       return;
     }
@@ -176,11 +178,18 @@ function OutputPath(directory, file, backend, mode) {
   const allowed = file === '/test/report.json' || file.startsWith('/test/out/') ||
     file.startsWith('/test/baseline-out/') ||
     (mode === 'update' && file.startsWith(`/test/baseline/.cache/${backend}/`));
-  if (!allowed || file.includes('\\') || file.includes('\0') || file.split('/').includes('..')) {
+  if (!allowed || file.includes('\\') || file.includes('\0')) {
     throw new Error(`Invalid output path: ${file}`);
   }
-  const destination = path.resolve(directory, file.slice('/test/'.length));
-  if (!destination.startsWith(path.resolve(directory) + path.sep)) throw new Error('Output path escapes run');
+  // The manifest comes from the browser side, so resolve it against the run directory and reject
+  // anything that normalizes to the parent directory before it is joined back into a real path.
+  const root = path.resolve(directory);
+  const relative = path.normalize(file.slice('/test/'.length));
+  if (path.isAbsolute(relative) || relative === '..' || relative.startsWith(`..${path.sep}`)) {
+    throw new Error(`Invalid output path: ${file}`);
+  }
+  const destination = path.join(root, relative);
+  if (!destination.startsWith(root + path.sep)) throw new Error('Output path escapes run');
   return destination;
 }
 
@@ -238,11 +247,9 @@ function CommitCache(source, destination, baselineVersion, runInfo) {
 }
 
 function PrepareOutput(options) {
-  const output = options.output ? path.resolve(options.output) :
-    path.join(__dirname, 'results', `${options.backend}-${options.mode}-${crypto.randomUUID()}`);
-  if (!output.startsWith(ProjectRoot + path.sep) || fs.existsSync(output)) {
-    throw new Error('Output must be a new directory inside the repository');
-  }
+  const output = ResolveRepositoryPath(options.output ||
+    path.join(__dirname, 'results', `${options.backend}-${options.mode}-${crypto.randomUUID()}`));
+  if (fs.existsSync(output)) throw new Error('Output must be a new directory inside the repository');
   fs.mkdirSync(output, { recursive: true });
   return output;
 }
