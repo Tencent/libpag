@@ -541,9 +541,18 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
           // Registration normally happens after the content branch; the early return below skips
           // it, so the animated layer must be registered here.
           registerAnimatedElement(element, layer);
+          // The compensation has to sit on a wrapper instead of the child's own matrix: a child
+          // with a replace transform animation overwrites its matrix channel, which would drop the
+          // T(-pivot) and shift the child to the pivot's origin.
+          std::vector<Layer*> compensatedChildren = {};
+          compensatedChildren.reserve(layer->children.size());
           for (auto* childLayer : layer->children) {
-            childLayer->matrix = Matrix::Translate(-pivotX, -pivotY) * childLayer->matrix;
+            auto* compensation = _document->makeNode<Layer>();
+            compensation->matrix = Matrix::Translate(-pivotX, -pivotY);
+            compensation->children.push_back(childLayer);
+            compensatedChildren.push_back(compensation);
           }
+          layer->children = std::move(compensatedChildren);
           auto* pivotLayer = _document->makeNode<Layer>();
           pivotLayer->matrix = Matrix::Translate(pivotX, pivotY);
           pivotLayer->children.push_back(layer);
@@ -1586,6 +1595,11 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
 
   auto group = _document->makeNode<Layer>();
   group->matrix = contentMatrix;
+  // The instance positioning and the referenced element's own transform animation must stay on
+  // separate layers: a replace animation on the container writes the whole matrix channel, which
+  // would otherwise erase the use's x/y and the symbol viewport mapping.
+  auto content = _document->makeNode<Layer>();
+  group->children.push_back(content);
 
   InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
   _useStack.insert(refId);
@@ -1593,13 +1607,13 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   while (child) {
     auto childLayer = convertToLayer(child, refStyle, depth + 1);
     if (childLayer) {
-      group->children.push_back(childLayer);
+      content->children.push_back(childLayer);
     }
     child = child->getNextSibling();
   }
   _useStack.erase(refId);
 
-  if (group->children.empty()) {
+  if (content->children.empty()) {
     return nullptr;
   }
 
@@ -1656,7 +1670,7 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
 
   // The referenced container may carry its own animate / animateTransform children; the copy above
   // only converts the subtree, so register the container itself against the instantiated group.
-  registerAnimatedElement(refElement, group);
+  registerAnimatedElement(refElement, content);
 
   return group;
 }
@@ -1993,18 +2007,19 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         auto group = _document->makeNode<Group>();
         convertChildren(child, group->elements, inheritedStyle);
         if (!group->elements.empty()) {
+          // Every mask shape goes through a child layer, animated or not. The runtime draws the
+          // layer's own contents before its children, so mixing the two paths for one mask reverses
+          // the SVG paint order (a later black rect would cover an earlier white circle).
+          auto subLayer = _document->makeNode<Layer>();
           if (_smilAnimations.count(child.get()) > 0) {
-            // An animated shape needs its own layer to host the animation. Path/Stroke are put
-            // directly into that layer: an intermediate Group prevents stroke channels from
-            // resolving their host element.
-            auto subLayer = _document->makeNode<Layer>();
-            subLayer->contents.clear();
+            // Path/Stroke are put directly into the layer: an intermediate Group prevents stroke
+            // channels from resolving their host element.
             convertChildren(child, subLayer->contents, inheritedStyle);
-            maskLayer->children.push_back(subLayer);
             registerAnimatedElement(child, subLayer);
           } else {
-            maskLayer->contents.push_back(group);
+            subLayer->contents.push_back(group);
           }
+          maskLayer->children.push_back(subLayer);
         }
       }
     } else if (child->name == "g") {

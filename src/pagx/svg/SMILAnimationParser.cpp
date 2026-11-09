@@ -2603,9 +2603,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   for (size_t i = 0; i < paramSets.size(); ++i) {
     Matrix m = TransformParamsToMatrix(type, paramSets[i]);
     if (additive) {
-      // SMIL additive="sum": the animated transform post-multiplies the base value, so each
-      // keyframe composes as static * animated.
-      m = staticMatrix * m;
+      // SMIL additive="sum": the animated transform post-multiplies the base value. The static pose
+      // is applied once after all sum tracks are merged; baking it per track would multiply it in
+      // repeatedly (S*A*S*B) and the merge cannot divide it back out for singular matrices.
     } else if (ctx.contentMatrixLayer() == nodeInfo.targetLayer) {
       // The viewBox mapping was pre-multiplied onto this very layer. A replaced pose must keep it,
       // otherwise the animation drops the viewBox scale/offset as soon as it starts. When the
@@ -2860,7 +2860,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
       m = m * Matrix::Rotate(fixedRotation);
     }
     if (additive) {
-      m = staticMatrix * m;
+      // See parseAnimateTransform: the static pose is applied once after merging.
     } else if (ctx.contentMatrixLayer() == nodeInfo.targetLayer) {
       // Same rule as transform animations: the viewBox mapping only belongs to the layer that
       // actually carries it, otherwise a hoisted pivot parent would apply it twice.
@@ -3183,7 +3183,34 @@ Animation* SMILAnimationParser::buildAnimation(
         auto& channels = groupedByTarget[targetId];
         auto* obj = doc->makeNode<AnimationObject>();
         obj->target = targetId;
+        // A sum chain composes as static * A1 * A2...; the tracks carry deltas only, so the static
+        // pose is folded in exactly once here. A replace base track already defines the whole
+        // pose and must not receive it.
+        bool matrixBaseIsAdditive = false;
+        for (const auto& entry : channels) {
+          if (entry.channel->name == "matrix" &&
+              entry.channel->valueType() == ChannelValueType::Matrix) {
+            matrixBaseIsAdditive = entry.additive;
+            break;
+          }
+        }
         obj->channels = MergeAdditiveChannels(&channels);
+        if (matrixBaseIsAdditive) {
+          auto* targetNode = doc->findNode(targetId);
+          if (targetNode != nullptr && targetNode->nodeType() == NodeType::Layer) {
+            const auto& staticPose = static_cast<Layer*>(targetNode)->matrix;
+            for (auto* channel : obj->channels) {
+              if (channel->name != "matrix" ||
+                  channel->valueType() != ChannelValueType::Matrix) {
+                continue;
+              }
+              auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
+              for (auto& keyframe : matrixChannel->keyframes) {
+                keyframe.value = staticPose * keyframe.value;
+              }
+            }
+          }
+        }
         if (!obj->channels.empty()) {
           animation->objects.push_back(obj);
           if (elementIndefinite && layerEndFrame > 0) {
