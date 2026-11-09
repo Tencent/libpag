@@ -1,7 +1,7 @@
-# FFmpeg for pagx MP4 export
+# pagx-ffmpeg
 
-This directory builds a real, minimal FFmpeg executable with static x264 support for
-`pagx export --format mp4`. It is self-contained and can be moved to a standalone
+`pagx-ffmpeg` builds a real, minimal FFmpeg executable with static x264 support for
+`pagx export --format mp4`. It is self-contained and can be used as a standalone
 repository without depending on the parent libpag repository.
 
 The build is intentionally limited to the components used by pagx:
