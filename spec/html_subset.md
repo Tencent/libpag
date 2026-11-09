@@ -685,9 +685,11 @@ becomes a child of a wrapper carrying `perspective: <d>` and
 Limits of that rewrite, in order of how often they are hit:
 
 * A pivot with depth (`transform-origin: 0 80px 30px`) cannot be carried over, because
-  `perspective-origin` has no z component; the rewrite is skipped (counted as `camera-skips:
-  depth-pivot` in `eval-animation`) and the projection order then differs from CSS by the
-  `origin × projection` term — a few pixels at `d = 600px` with a 30px pivot depth.
+  `perspective-origin` has no z component. The rewrite is skipped (counted as `camera-skips:
+  depth-pivot` in `eval-animation`) and the element keeps the function form: its pose still carries
+  the projection, but PAGX composes `P · T(a) · L · T(-a)` where CSS composes `T(a) · P · L · T(-a)`,
+  so the projected size differs by that ordering term (a few percent at `d = 600px` with a 30px
+  pivot depth). Skipping the rewrite must never drop the projection itself.
 * A flow / flex child of a `perspective` parent has no resolved offset at import time, so the
   camera is projected about the parent's coordinate system as-is; one diagnostic reports it.
 * A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
