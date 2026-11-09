@@ -188,6 +188,34 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRoundTrip) {
 }
 
 /**
+ * Test case: tiny positive output dimensions and origins round-trip exactly instead of being
+ * rounded to zero, which would make a valid output view fail validation on reload.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewTinyBoundsRoundTrip) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\"-1e-20,2e-20,1e-10,3e-30\"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, -1e-20f);
+  EXPECT_EQ(doc->outputBounds->y, 2e-20f);
+  EXPECT_EQ(doc->outputBounds->width, 1e-10f);
+  EXPECT_EQ(doc->outputBounds->height, 3e-30f);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  EXPECT_TRUE(reloaded->outputViewError.empty());
+  EXPECT_EQ(reloaded->targetLayerId, "target");
+  ASSERT_TRUE(reloaded->outputBounds.has_value());
+  EXPECT_EQ(reloaded->outputBounds->x, -1e-20f);
+  EXPECT_EQ(reloaded->outputBounds->y, 2e-20f);
+  EXPECT_EQ(reloaded->outputBounds->width, 1e-10f);
+  EXPECT_EQ(reloaded->outputBounds->height, 3e-30f);
+}
+
+/**
  * Test case: a single target view attribute is rejected instead of guessing a default window.
  */
 PAGX_TEST(PAGXImporterValidationTest, OutputViewRequiresPairedAttributes) {

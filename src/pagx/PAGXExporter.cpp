@@ -110,6 +110,15 @@ static std::string RectToString(const Rect& r) {
          FloatToString(r.height);
 }
 
+// Output bounds accept scientific notation and require positive dimensions. Keep nine significant
+// digits so even tiny positive floats survive export without rounding to an invalid zero dimension.
+static std::string OutputBoundsToString(const Rect& bounds) {
+  char buffer[128] = {};
+  snprintf(buffer, sizeof(buffer), "%.9g,%.9g,%.9g,%.9g", bounds.x, bounds.y, bounds.width,
+           bounds.height);
+  return buffer;
+}
+
 static std::string FloatListToString(const float* values, size_t count) {
   std::string result;
   result.reserve(count * 8);
@@ -1920,7 +1929,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
     xml.addRequiredAttribute("targetLayer", *doc.declaredTargetLayer);
   }
   if (doc.outputBounds.has_value()) {
-    xml.addAttribute("outputBounds", RectToString(*doc.outputBounds));
+    xml.addAttribute("outputBounds", OutputBoundsToString(*doc.outputBounds));
   } else if (doc.declaredOutputBounds.has_value()) {
     xml.addRequiredAttribute("outputBounds", *doc.declaredOutputBounds);
   }
