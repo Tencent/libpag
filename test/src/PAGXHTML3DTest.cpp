@@ -1133,6 +1133,44 @@ PAG_TEST(PAGXHTML3DTest, Matrix3DFillHoldsKeepTheStatic2DTransform) {
 }
 
 /**
+ * Test case: a huge `rotate3d` axis still normalizes. Squaring `1e20` overflows a float and used to
+ * slip past the zero-vector check, which collapsed the rotation to `cos * I` and wrote it out as a
+ * valid 3D pose; the axis is now normalized in double precision.
+ */
+PAG_TEST(PAGXHTML3DTest, HugeRotate3DAxisStillNormalizes) {
+  const std::string templateHtml = R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:60px;height:40px;background-color:#000;
+           transform:rotate3d(AXIS, 0, 0, 45deg)"></div>
+    </body></html>
+  )HTML";
+  auto huge = templateHtml;
+  huge.replace(huge.find("AXIS"), 4, "1e20");
+  auto unit = templateHtml;
+  unit.replace(unit.find("AXIS"), 4, "1");
+
+  auto hugeDoc = ParseHtml(huge);
+  auto unitDoc = ParseHtml(unit);
+  ASSERT_NE(hugeDoc, nullptr);
+  ASSERT_NE(unitDoc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(hugeDoc, "axis"));
+  auto* hugeBox = FindLayerById(hugeDoc, "box");
+  auto* unitBox = FindLayerById(unitDoc, "box");
+  ASSERT_NE(hugeBox, nullptr);
+  ASSERT_NE(unitBox, nullptr);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_TRUE(NearlyEqual(hugeBox->matrix3D.getRowColumn(row, column),
+                              unitBox->matrix3D.getRowColumn(row, column), 1e-4f))
+          << "row " << row << " column " << column;
+    }
+  }
+  // `cos * I` would put cos(45) on the diagonal instead of 1.
+  EXPECT_TRUE(NearlyEqual(hugeBox->matrix3D.getRowColumn(0, 0), 1.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(hugeBox->matrix3D.getRowColumn(1, 1), 0.707107f, 1e-4f));
+}
+
+/**
  * Test case: `skewX` / `skew` carry the CSS sign. `skewX(a)` is `matrix(1, 0, tan a, 1)`, so a
  * positive angle leans the bottom edge to the right; the importer used to negate it, which mirrored
  * the shear on the HTML -> PAGX -> HTML round trip.

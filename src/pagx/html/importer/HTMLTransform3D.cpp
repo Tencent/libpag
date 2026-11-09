@@ -589,12 +589,19 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       diagnostics.warn("html: rotate3d expects 3 axis numbers and 1 angle; ignored");
       return false;
     }
-    const float length = std::sqrt(x * x + y * y + z * z);
-    if (!(length > 1e-6f)) {
-      diagnostics.warn("html: rotate3d axis is a zero vector; ignored");
+    // The axis is normalized in double precision: `rotate3d(1e20, 0, 0, 45deg)` squares to infinity
+    // in float, which slips past the zero-vector check and collapses the rotation to `cos * I`. A
+    // length that is still infinite in double (or NaN) is a degenerate axis and is rejected.
+    const double axisX = static_cast<double>(x);
+    const double axisY = static_cast<double>(y);
+    const double axisZ = static_cast<double>(z);
+    const double length = std::sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
+    if (!std::isfinite(length) || !(length > 1e-6)) {
+      diagnostics.warn("html: rotate3d axis is a zero or non-finite vector; ignored");
       return false;
     }
-    *out = MakeRotationAxis(x / length, y / length, z / length, degrees);
+    *out = MakeRotationAxis(static_cast<float>(axisX / length), static_cast<float>(axisY / length),
+                            static_cast<float>(axisZ / length), degrees);
     return true;
   }
 
