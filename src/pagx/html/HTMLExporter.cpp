@@ -279,6 +279,25 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   }
   std::string bodyStr = body.release();
 
+  // The SVG defs go in front of the content, as they always have. They are part of the woven string
+  // because a filter primitive inside them can carry keyframes (the colour of a <feFlood>), and the
+  // weaver resolves its tags from the body it is given.
+  {
+    std::string defsStr = defs.release();
+    if (!defsStr.empty()) {
+      HTMLBuilder defsBlock(1, 4096);
+      defsBlock.openTag("svg");
+      defsBlock.addAttr("style", "position:absolute;width:0;height:0;overflow:hidden");
+      defsBlock.closeTagStart();
+      defsBlock.openTag("defs");
+      defsBlock.closeTagStart();
+      defsBlock.addRawContent(defsStr);
+      defsBlock.closeTag();  // </defs>
+      defsBlock.closeTag();  // </svg>
+      bodyStr = defsBlock.release() + bodyStr;
+    }
+  }
+
   // Animation CSS is independent of the font rules: keep it in its own buffer and emit it in its
   // own <style> so that changing how fonts are written can never drop the keyframes.
   std::string animationCss;
@@ -299,19 +318,6 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     html.closeTagStart();
     html.addRawContent(animationCss);
     html.closeTag();  // </style>
-  }
-
-  // Insert SVG defs if any
-  std::string defsStr = defs.release();
-  if (!defsStr.empty()) {
-    html.openTag("svg");
-    html.addAttr("style", "position:absolute;width:0;height:0;overflow:hidden");
-    html.closeTagStart();
-    html.openTag("defs");
-    html.closeTagStart();
-    html.addRawContent(defsStr);
-    html.closeTag();  // </defs>
-    html.closeTag();  // </svg>
   }
 
   html.addRawContent(bodyStr);

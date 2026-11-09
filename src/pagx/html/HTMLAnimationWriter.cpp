@@ -27,6 +27,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
@@ -34,6 +35,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/RangeSelector.h"
@@ -691,6 +693,8 @@ enum class TargetChannelRole {
   FilterOffsetY,
   FilterColor,
   FilterAlpha,
+  // Colour of the <feFlood> inside an SVG filter pipeline (inner shadow, blend).
+  FilterFloodColor,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
@@ -795,6 +799,8 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::DropShadowFilter, "offsetY", TargetChannelRole::FilterOffsetY},
     {NodeType::DropShadowFilter, "color", TargetChannelRole::FilterColor},
     {NodeType::DropShadowFilter, "alpha", TargetChannelRole::FilterAlpha},
+    {NodeType::InnerShadowFilter, "color", TargetChannelRole::FilterFloodColor},
+    {NodeType::BlendFilter, "color", TargetChannelRole::FilterFloodColor},
 };
 
 TargetChannelRole LookupChannelRole(NodeType nodeType, const std::string& channelName) {
@@ -845,6 +851,9 @@ struct BundleChannelSet {
   const Channel* trimEndCh = nullptr;
   const Channel* trimStartCh = nullptr;
   const Channel* repeaterRotationCh = nullptr;
+  const Channel* floodColorCh = nullptr;
+  // Static colour of the flooding filter, used when the channel is absent from a stop.
+  Color floodBaseColor = {};
   const Channel* repeaterCopiesCh = nullptr;
   const Channel* repeaterStartAlphaCh = nullptr;
   const Channel* repeaterPositionXCh = nullptr;
@@ -1135,6 +1144,15 @@ bool BindChannelToBundleSet(
       }
       return false;
     }
+    case TargetChannelRole::FilterFloodColor:
+      // Colour of the <feFlood> inside a pipeline filter: the only filter property CSS can animate.
+      out.floodColorCh = ch;
+      if (objTarget != nullptr && objTarget->nodeType() == NodeType::InnerShadowFilter) {
+        out.floodBaseColor = static_cast<const InnerShadowFilter*>(objTarget)->color;
+      } else if (objTarget != nullptr && objTarget->nodeType() == NodeType::BlendFilter) {
+        out.floodBaseColor = static_cast<const BlendFilter*>(objTarget)->color;
+      }
+      return true;
     case TargetChannelRole::FilterBlurX:
     case TargetChannelRole::FilterBlurY:
     case TargetChannelRole::FilterOffsetX:
@@ -1692,6 +1710,21 @@ void EmitTextCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& c
   }
 }
 
+// `flood-color` is a CSS property on <feFlood>, so a filter colour can ride on that element even
+// though the pipeline's geometry attributes (dx, dy, stdDeviation) are not animatable.
+void EmitFloodColorCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
+                              std::string& decls) {
+  // The tag index lower-cases element names.
+  if (chSet.floodColorCh == nullptr || (tagName != "feFlood" && tagName != "feflood")) {
+    return;
+  }
+  Color color = EvalColorChannel(chSet.floodColorCh, t, chSet.floodBaseColor);
+  AppendCssDecl(decls, "flood-color", ColorToSVGHex(color));
+  if (color.alpha < 1.0f) {
+    AppendCssDecl(decls, "flood-opacity", CssFloatToString(color.alpha));
+  }
+}
+
 void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
                           std::string& decls) {
   if (!chSet.hasFilterAnim || bundle.primaryHost == nullptr ||
@@ -1863,6 +1896,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   EmitPaintCssAtFrame(chSet, tagName, t, decls);
   EmitTextCssAtFrame(bundle, chSet, t, decls);
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
+  EmitFloodColorCssAtFrame(chSet, tagName, t, decls);
 
   if (chSet.animatedMaskPath != nullptr) {
     std::string dStr = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
@@ -1969,6 +2003,17 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter) {
+      auto idIt = ctx.animation.elementIds.find(targetNode);
+      if (idIt != ctx.animation.elementIds.end()) {
+        DomTargetBundle floodBundle;
+        floodBundle.domId = idIt->second;
+        floodBundle.primaryHost = targetNode;
+        floodBundle.objects.push_back(obj);
+        bundles.push_back(std::move(floodBundle));
+        continue;
+      }
+    }
     if (nType == NodeType::Text) {
       auto originIt = ctx.animation.textOrigins.find(targetNode);
       if (originIt != ctx.animation.textOrigins.end()) {
@@ -2758,6 +2803,18 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         continue;
       }
       auto nType = targetNode->nodeType();
+      if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter) {
+        for (auto* ch : obj->channels) {
+          if (ch != nullptr &&
+              LookupChannelRole(nType, ch->name) == TargetChannelRole::FilterFloodColor) {
+            // The filter def is written while the body is emitted, so decide the id here, before it;
+            // the def emitter picks it up from this map.
+            std::string floodId = _ctx.nextId("flood");
+            _ctx.animation.filterFloodIds[targetNode] = floodId;
+            _ctx.animation.elementIds[targetNode] = floodId;
+          }
+        }
+      }
       if (nType == NodeType::Layer) {
         auto* layer = static_cast<Layer*>(targetNode);
         if (layer->id.empty()) {

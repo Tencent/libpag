@@ -321,6 +321,14 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           blurredResult = "iOff" + i;
         }
         _defs->openTag("feFlood");
+        {
+          // A colour channel animates `flood-color` on this element, which CSS can do; the pipeline's
+          // geometry attributes cannot be animated at all.
+          auto floodIt = _ctx->animation.filterFloodIds.find(f);
+          if (floodIt != _ctx->animation.filterFloodIds.end()) {
+            _defs->addAttr("id", floodIt->second);
+          }
+        }
         _defs->addAttr("flood-color", ColorToSVGHex(s->color));
         if (s->color.alpha < 1.0f) {
           _defs->addAttr("flood-opacity", CssFloatToString(s->color.alpha));
@@ -389,6 +397,14 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         std::string i = std::to_string(si++);
         std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feFlood");
+        {
+          // A colour channel animates `flood-color` on this element, which CSS can do; the pipeline's
+          // geometry attributes cannot be animated at all.
+          auto floodIt = _ctx->animation.filterFloodIds.find(f);
+          if (floodIt != _ctx->animation.filterFloodIds.end()) {
+            _defs->addAttr("id", floodIt->second);
+          }
+        }
         _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
           _defs->addAttr("flood-opacity", CssFloatToString(bf->color.alpha));

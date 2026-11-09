@@ -185,14 +185,10 @@ python3 tools/anim_coverage.py --check
 | DropShadowFilter | `color` | ✔ | `filter/06` |
 | DropShadowFilter | `offsetX` | ✔ | `filter/03` |
 | DropShadowFilter | `offsetY` | ✔ | `filter/04` |
-| DropShadowFilter | `shadowOnly` | ✘ | `filter/07` |
-| InnerShadowFilter | `blurX` | ✘ | `filter/11` |
-| InnerShadowFilter | `blurY` | ✘ | `filter/12` |
-| InnerShadowFilter | `color` | ✘ | `filter/13` |
-| InnerShadowFilter | `offsetX` | ✘ | `filter/08` |
-| InnerShadowFilter | `offsetY` | ✘ | `filter/14` |
-| InnerShadowFilter | `shadowOnly` | ✘ | `filter/15` |
-| BlendFilter | `color` | ✘ | `filter/09` |
+| DropShadowFilter | `shadowOnly` | ✘ | — |
+| InnerShadowFilter | `blurX` `blurY` `offsetX` `offsetY` `shadowOnly` | ✘ | — |
+| InnerShadowFilter | `color` | ✔ | `filter/13` |
+| BlendFilter | `color` | ✔ | `filter/09` |
 | NoiseFilter | `color` `firstColor` `secondColor` `seed` `size` | ✘ | — |
 | NoiseFilter | `density` | ✘ | `filter/10` |
 | NoiseFilter | `opacity` | ✘ | `filter/19` |
@@ -242,6 +238,12 @@ python3 tools/anim_coverage.py --check
 
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
+
+**CSS 无法表达的滤镜通道**：管线滤镜（内阴影、混合）的几何参数是 SVG 滤镜原语的属性（`feOffset dx/dy`、
+`feGaussianBlur stdDeviation`），不是 CSS 属性。实测给它们写关键帧后首末帧**零像素差**，而同一个滤镜里的
+`flood-color` 可以动画（`filter/13` 从 0.913 提到 0.998）。因此 `InnerShadowFilter` 的 `blurX/blurY/
+offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EXEMPTIONS`，标注为
+「需 JS 侧逐帧重写滤镜」，不属于 CSS 这一期。
 
 **豁免的判定标准（只看三种情况，别扩大）**：一个通道只有在"用例永远不可能有意义"时才进
 `CHANNEL_EXEMPTIONS` / `NODE_EXEMPTIONS`——① 数值无法改变画面（`Layer.scale.z`）；② 渲染器不应用它，

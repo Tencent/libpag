@@ -53,6 +53,16 @@ NODE_EXEMPTIONS = {
     "NoiseFilter": "静态导出未实现该节点（writer 无引用），t=0 只画出底色、无噪声，需先补静态能力",
 }
 
+# A pipeline filter's geometry (dx / dy / stdDeviation) and its shadowOnly switch are attributes on
+# the SVG filter primitives, not CSS properties: measured, keyframes that set dx / stdDeviation are
+# ignored (zero pixels change between the first and last frame), while flood-color does animate. So
+# these channels need a JS-side export that rewrites the filter per frame and stay out of the CSS
+# milestone. `filter/07,08,11,12,14,15` documents the gap.
+FILTER_CSS_UNSUPPORTED = "SVG 滤镜原语的几何属性不是 CSS 属性，关键帧无效，需 JS 侧逐帧重写滤镜"
+for _channel in ("blurX", "blurY", "offsetX", "offsetY", "shadowOnly"):
+    CHANNEL_EXEMPTIONS[("InnerShadowFilter", _channel)] = FILTER_CSS_UNSUPPORTED
+CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = FILTER_CSS_UNSUPPORTED
+
 # TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
 # applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()
 # does, via setAccessor), so `pagx render --time` draws the same frame at every time and a case would
