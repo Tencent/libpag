@@ -32,7 +32,6 @@ using namespace pagx::html;
 
 namespace {
 
-constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
 constexpr float kPoseEpsilon = 1e-6f;
 
 bool NearlyZero(float value) {
@@ -74,7 +73,7 @@ Matrix3D MakeScale(float x, float y, float z) {
 }
 
 Matrix3D MakeRotationX(float degrees) {
-  const float radians = degrees * kDegToRad;
+  const float radians = static_cast<float>(degrees * DEGREES_TO_RADIANS);
   const float c = std::cos(radians);
   const float s = std::sin(radians);
   Matrix3D m = {};
@@ -86,7 +85,7 @@ Matrix3D MakeRotationX(float degrees) {
 }
 
 Matrix3D MakeRotationY(float degrees) {
-  const float radians = degrees * kDegToRad;
+  const float radians = static_cast<float>(degrees * DEGREES_TO_RADIANS);
   const float c = std::cos(radians);
   const float s = std::sin(radians);
   Matrix3D m = {};
@@ -98,7 +97,7 @@ Matrix3D MakeRotationY(float degrees) {
 }
 
 Matrix3D MakeRotationZ(float degrees) {
-  const float radians = degrees * kDegToRad;
+  const float radians = static_cast<float>(degrees * DEGREES_TO_RADIANS);
   const float c = std::cos(radians);
   const float s = std::sin(radians);
   Matrix3D m = {};
@@ -111,7 +110,7 @@ Matrix3D MakeRotationZ(float degrees) {
 
 // Rodrigues rotation around a unit axis.
 Matrix3D MakeRotationAxis(float x, float y, float z, float degrees) {
-  const float radians = degrees * kDegToRad;
+  const float radians = static_cast<float>(degrees * DEGREES_TO_RADIANS);
   const float c = std::cos(radians);
   const float s = std::sin(radians);
   const float t = 1.0f - c;
@@ -133,8 +132,8 @@ Matrix3D MakeRotationAxis(float x, float y, float z, float degrees) {
 // HTML -> PAGX -> HTML mirror the shear (the snapshot path hid it by baking the computed matrix).
 Matrix3D MakeShear(float shearX, float shearY) {
   Matrix3D m = {};
-  m.setRowColumn(0, 1, std::tan(shearX * kDegToRad));
-  m.setRowColumn(1, 0, std::tan(shearY * kDegToRad));
+  m.setRowColumn(0, 1, static_cast<float>(std::tan(shearX * DEGREES_TO_RADIANS)));
+  m.setRowColumn(1, 0, static_cast<float>(std::tan(shearY * DEGREES_TO_RADIANS)));
   return m;
 }
 
