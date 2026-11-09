@@ -3946,6 +3946,95 @@ CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
   EXPECT_LE(CountOccurrences(rule, "transform:"), 5u) << rule;
 }
 
+// A Layer position channel and a pose channel share one transform list: the frame folds the authored
+// x/y into the chain and drops left/top, so emitting only the position delta would lose both the base
+// position and the rotation.
+CLI_TEST(PAGXHtmlTest, AnimationLayerPositionAndPoseShareOneTransform) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="bar" x="120" y="80" width="90" height="40" anchor="45,20">
+      <Rectangle position="45,20" size="90,40"/>
+      <Fill color="#0E7490"/>
+    </Layer>
+    <Animations>
+      <Animation id="a" duration="60" frameRate="60" loop="once">
+        <Object target="bar">
+          <Channel name="x" type="float">
+            <Key time="0" value="120" interpolation="linear"/>
+            <Key time="60" value="200"/>
+          </Channel>
+          <Channel name="rotation.z" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="40"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"bar\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // left/top would double-count the translation once the chain carries it.
+  EXPECT_EQ(tag.find("left:"), std::string::npos) << tag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  auto first = KeyframeStopOf(html, "id=\"bar\"", "0%");
+  auto last = KeyframeStopOf(html, "id=\"bar\"", "100%");
+  ASSERT_FALSE(first.empty()) << rule;
+  ASSERT_FALSE(last.empty()) << rule;
+  // Absolute position from the channel, not a delta.
+  EXPECT_NE(first.find("translate(120px, 80px)"), std::string::npos) << first;
+  EXPECT_NE(last.find("translate(200px, 80px)"), std::string::npos) << last;
+  EXPECT_NE(last.find("rotate(40deg)"), std::string::npos) << last;
+}
+
+// A Rectangle's geometry channel and a RoundCorner radius land on the same div: the radius is CSS
+// border-radius, so neither channel has to take the tag over from the other.
+CLI_TEST(PAGXHtmlTest, AnimationShapeGeometryAndRoundCornerShareOneTag) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle id="card" position="160,100" size="120,80" roundness="0"/>
+      <RoundCorner id="corner" radius="0"/>
+      <Fill color="#9333EA"/>
+    </Layer>
+    <Animations>
+      <Animation id="a" duration="60" frameRate="60" loop="once">
+        <Object target="card">
+          <Channel name="size.width" type="float">
+            <Key time="0" value="120" interpolation="linear"/>
+            <Key time="60" value="200"/>
+          </Channel>
+        </Object>
+        <Object target="corner">
+          <Channel name="radius" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="24"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"corner\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // A div with border-radius, not an inline <path> the width channel cannot join.
+  EXPECT_EQ(tag.rfind("<path", 0), std::string::npos) << tag;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  auto last = KeyframeStopOf(html, "id=\"corner\"", "100%");
+  ASSERT_FALSE(last.empty()) << rule;
+  // Both channels appear in the end stop: the width grew and the corner rounded.
+  EXPECT_NE(last.find("width: 200px"), std::string::npos) << last;
+  EXPECT_NE(last.find("border-radius: 24px"), std::string::npos) << last;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationRepeaterCopiesGrowsTheRow) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">

@@ -119,7 +119,21 @@ std::string GetPathSVGString(const Path* path);
 std::string ReversePathDataToSVGString(const PathData& pathData);
 std::string RectToPathData(const Rectangle* r);
 std::string EllipseToPathData(const Ellipse* e);
+// Per-frame geometry values, so a path can be rebuilt from animated channels instead of the
+// authored ones. Anything left unset falls back to the node's own value.
+struct GeometryOverrides {
+  bool hasPosition = false;
+  Point position = {};
+  bool hasSize = false;
+  float width = 0.0f;
+  float height = 0.0f;
+  bool hasRoundness = false;
+  float roundness = 0.0f;
+};
+
 void GeoToPathData(const Element* element, NodeType type, PathData& output);
+void GeoToPathData(const Element* element, NodeType type, PathData& output,
+                   const GeometryOverrides* overrides);
 void ReversePathData(const PathData& pathData, PathData& output);
 void ApplyRoundCorner(const PathData& pathData, float radius, PathData& output);
 std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m);

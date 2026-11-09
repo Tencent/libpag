@@ -854,6 +854,9 @@ struct BundleChannelSet {
   const Channel* rangeEndCh = nullptr;
   const Channel* rangeOffsetCh = nullptr;
   const HTMLWriterContext::AnimationState::RangeSelectorGlyph* rangeGlyph = nullptr;
+  // A RoundCorner on a Rectangle is exactly CSS border-radius, so it stays on the div and can share
+  // the element with the shape's own geometry channels instead of taking over its `d`.
+  bool roundCornerAsCss = false;
   const Repeater* repeaterTarget = nullptr;
   int repeaterIndex = -1;
   // RoundCorner rounds the geometry declared before it, so the frame rebuilds that shape's `d`.
@@ -1400,7 +1403,16 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     needsZeroOrigin = true;
     return;
   }
-  if (chSet.matrixCh != nullptr || chSet.xCh != nullptr || chSet.yCh != nullptr) {
+  // A pose channel (rotation / scale / skew / anchor) folds the authored x/y into the transform, so
+  // the tag drops its left/top; the translation branch below assumes left/top still carries the
+  // base position and would silently lose both the base and the pose when the two are combined.
+  bool hasPoseChannel =
+      chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
+      chSet.posXCh != nullptr || chSet.posYCh != nullptr || chSet.anchorXCh != nullptr ||
+      chSet.anchorYCh != nullptr || chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr ||
+      chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr;
+  if (!hasPoseChannel &&
+      (chSet.matrixCh != nullptr || chSet.xCh != nullptr || chSet.yCh != nullptr)) {
     // The runtime composes the layer transform as Translate(x, y) * matrix (see
     // LayerRuntimeTarget::recompose). A keyframe `transform` replaces the element's inline transform
     // instead of stacking on it, so every frame re-emits the full chain: the animated translation
@@ -1445,13 +1457,7 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     AppendCssDecl(decls, "transform", tf);
     return;
   }
-  // A Layer's anchor is the pivot of its own pose (T * T(a) * L * T(-a)), so it participates in the
-  // 2D list as a translate pair, exactly like the 3D one.
-  bool anchorApplies = chSet.anchorXCh != nullptr || chSet.anchorYCh != nullptr;
-  if (chSet.rotCh != nullptr || chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr ||
-      chSet.posXCh != nullptr || chSet.posYCh != nullptr || anchorApplies ||
-      chSet.skewCh != nullptr || chSet.skewAxisCh != nullptr || chSet.layerSkewXCh != nullptr ||
-      chSet.layerSkewYCh != nullptr) {
+  if (hasPoseChannel || chSet.xCh != nullptr || chSet.yCh != nullptr) {
     float basePosX = 0.0f;
     float basePosY = 0.0f;
     float baseRot = 0.0f;
@@ -1518,11 +1524,14 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     };
     if (isLayerHost) {
       // The pose list owns the position for a Layer, so the authored x/y is folded in here instead
-      // of being emitted as left/top.
+      // of being emitted as left/top. An x/y channel supplies the value per frame.
       auto* layer = static_cast<const Layer*>(bundle.primaryHost);
-      if (!FloatNearlyZero(layer->x) || !FloatNearlyZero(layer->y)) {
-        appendFunction("translate(" + CssFloatToString(layer->x) + "px, " +
-                       CssFloatToString(layer->y) + "px)");
+      float layerX = EvalFloatChannel(chSet.xCh, t, layer->x);
+      float layerY = EvalFloatChannel(chSet.yCh, t, layer->y);
+      if (chSet.xCh != nullptr || chSet.yCh != nullptr || !FloatNearlyZero(layerX) ||
+          !FloatNearlyZero(layerY)) {
+        appendFunction("translate(" + CssFloatToString(layerX) + "px, " + CssFloatToString(layerY) +
+                       "px)");
       }
     }
     if (!FloatNearlyZero(px) || !FloatNearlyZero(py) || chSet.posXCh != nullptr ||
@@ -1733,8 +1742,25 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
   if (chSet.roundCornerCh != nullptr && chSet.roundCornerTarget != nullptr &&
       chSet.roundCornerShape != nullptr) {
     // The radius reshapes the outline, so every stop rewrites the path with that frame's radius.
+    // Geometry channels on the same shape feed the same rewrite: dropping them here would leave the
+    // outline at its authored size while the reference grows.
+    GeometryOverrides overrides = {};
+    NodeType shapeType = chSet.roundCornerShape->nodeType();
+    if (shapeType == NodeType::Rectangle) {
+      auto* rect = static_cast<const Rectangle*>(chSet.roundCornerShape);
+      auto size = rect->renderSize();
+      if (chSet.geometryWidthCh != nullptr) {
+        overrides.hasSize = true;
+        overrides.width = EvalFloatChannel(chSet.geometryWidthCh, t, size.width);
+        overrides.height = size.height;
+      }
+      if (chSet.roundnessCh != nullptr) {
+        overrides.hasRoundness = true;
+        overrides.roundness = EvalFloatChannel(chSet.roundnessCh, t, rect->roundness);
+      }
+    }
     PathData raw = PathDataFromSVGString("");
-    GeoToPathData(chSet.roundCornerShape, chSet.roundCornerShape->nodeType(), raw);
+    GeoToPathData(chSet.roundCornerShape, shapeType, raw, &overrides);
     float radius = EvalFloatChannel(chSet.roundCornerCh, t, chSet.roundCornerTarget->radius);
     PathData rounded = PathDataFromSVGString("");
     ApplyRoundCorner(raw, radius, rounded);
@@ -1743,6 +1769,29 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
   }
   auto type = bundle.primaryHost->nodeType();
   if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
+    return;
+  }
+  if (chSet.roundCornerAsCss && type == NodeType::Rectangle && chSet.roundCornerTarget != nullptr) {
+    auto* rect = static_cast<const Rectangle*>(bundle.primaryHost);
+    auto size = rect->renderSize();
+    float width = EvalFloatChannel(chSet.geometryWidthCh, t, size.width);
+    // size.height has no channel binding yet; the clamp only needs the value used for layout.
+    float height = size.height;
+    float radius = EvalFloatChannel(chSet.roundCornerCh, t, chSet.roundCornerTarget->radius);
+    float roundness = EvalFloatChannel(chSet.roundnessCh, t, rect->roundness);
+    // PAGX rounds the corners by `radius` on top of the shape's own roundness, clamped to half the
+    // shorter side; CSS border-radius takes the two as a single length.
+    float corner = std::min(roundness + radius, std::min(width, height) * 0.5f);
+    AppendCssDecl(decls, tagName == "rect" ? "rx" : "border-radius",
+                  CssFloatToString(corner) + "px");
+    if (tagName == "rect") {
+      AppendCssDecl(decls, "ry", CssFloatToString(corner) + "px");
+    }
+    if (chSet.geometryWidthCh != nullptr) {
+      AppendCssDecl(decls, tagName == "rect" ? "x" : "left",
+                    CssFloatToString(rect->renderPosition().x - width * 0.5f) + "px");
+      AppendCssDecl(decls, "width", CssFloatToString(width) + "px");
+    }
     return;
   }
   Point center = {};
@@ -1876,6 +1925,29 @@ std::string BuildAnimationShorthand(const Animation* anim, const std::string& kf
     shorthand += " 1 both";
   }
   return shorthand;
+}
+
+// Two targets can share one DOM tag: a RoundCorner points its animation at the shape it rounds, so
+// the shape's own geometry channels arrive as a second bundle with the same id. Merging them keeps
+// one channel set per tag, which is what lets the geometry emitter rebuild `d` from both the shape
+// channels and the modifier.
+void MergeBundlesByDomId(std::vector<DomTargetBundle>& bundles) {
+  std::vector<DomTargetBundle> merged = {};
+  for (auto& bundle : bundles) {
+    auto same = std::find_if(merged.begin(), merged.end(), [&bundle](const DomTargetBundle& other) {
+      return !other.domId.empty() && other.domId == bundle.domId;
+    });
+    if (same == merged.end()) {
+      merged.push_back(std::move(bundle));
+      continue;
+    }
+    same->objects.insert(same->objects.end(), bundle.objects.begin(), bundle.objects.end());
+    if (same->primaryHost == nullptr || same->primaryHost->nodeType() == NodeType::RoundCorner) {
+      // The geometry node is the one whose tag is being rewritten.
+      same->primaryHost = bundle.primaryHost;
+    }
+  }
+  bundles = std::move(merged);
 }
 
 std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
@@ -2960,6 +3032,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
+    MergeBundlesByDomId(bundles);
     for (const auto& bundle : bundles) {
       auto elements =
           FindBundleElementsForNode(tagIndex.nameById, tagIndexByNode, bundle, mount.scope);
@@ -2974,7 +3047,13 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       if (chSet.roundCornerTarget != nullptr) {
         auto shapeIt = _ctx.animation.roundCornerShapes.find(chSet.roundCornerTarget);
         if (shapeIt != _ctx.animation.roundCornerShapes.end()) {
-          chSet.roundCornerShape = shapeIt->second;
+          if (shapeIt->second->nodeType() == NodeType::Rectangle) {
+            // border-radius runs on the same div as left/width, so a geometry channel can animate
+            // next to it; the path rewrite below cannot interpolate when the command list changes.
+            chSet.roundCornerAsCss = true;
+          } else {
+            chSet.roundCornerShape = shapeIt->second;
+          }
         }
       }
       if (chSet.keyTimes.empty()) {
