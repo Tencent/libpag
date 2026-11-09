@@ -1499,9 +1499,11 @@ bool HTMLAnimationBuilder::buildForElement(
   float baselineXY = 0.0f;
   Matrix baselineMatrix = layer->matrix;
   // The static pose is already un-pivoted (the pivot lives in `anchor`), so the keyframe baseline
-  // is exactly `layer->matrix` / `layer->matrix3D`.
+  // is the composed local transform. The matrix3D channel carries the whole pose, so its baseline
+  // cannot be `layer->matrix3D` alone: a static 2D `matrix` (or components) would be read as the
+  // identity and the fill-mode holds would hide it before the animation starts and after it ends.
   const Matrix matrixChannelBaseline = baselineMatrix;
-  const Matrix3D matrix3DChannelBaseline = layer->matrix3D;
+  const Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
   if (!colorKeys.empty()) {
