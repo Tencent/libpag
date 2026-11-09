@@ -1064,6 +1064,10 @@ PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent)
   imageNode->filePath = "target.png";
   auto* pattern = doc->makeNode<pagx::ImagePattern>();
   pattern->image = imageNode;
+  // A magnified 1x1 image with linear Decal sampling blends with transparent border texels.
+  // Clamp keeps this solid-color fixture opaque so the assertions isolate resource replacement.
+  pattern->tileModeX = pagx::TileMode::Clamp;
+  pattern->tileModeY = pagx::TileMode::Clamp;
   auto* fill = static_cast<pagx::Fill*>(target->contents.back());
   fill->color = pattern;
   const uint8_t red[] = {255, 0, 0, 255};
@@ -1085,16 +1089,19 @@ PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent)
   EXPECT_FALSE(scene->hasContentChanged());
   std::vector<uint8_t> pixels = {};
   ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
-  EXPECT_EQ(pixels[0], 255u);
-  EXPECT_EQ(pixels[2], 0u);
+  auto sampleOffset = (5 * surface->width() + 5) * 4;
+  EXPECT_EQ(pixels[sampleOffset], 255u);
+  EXPECT_EQ(pixels[sampleOffset + 2], 0u);
+  EXPECT_EQ(pixels[sampleOffset + 3], 255u);
 
   ASSERT_TRUE(doc->loadFileData("target.png", blueImage));
   EXPECT_TRUE(scene->hasContentChanged());
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
   ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
-  EXPECT_EQ(pixels[0], 0u);
-  EXPECT_EQ(pixels[2], 255u);
+  EXPECT_EQ(pixels[sampleOffset], 0u);
+  EXPECT_EQ(pixels[sampleOffset + 2], 255u);
+  EXPECT_EQ(pixels[sampleOffset + 3], 255u);
 }
 
 /**
