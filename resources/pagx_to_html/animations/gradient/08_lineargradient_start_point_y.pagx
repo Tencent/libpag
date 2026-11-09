@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: LinearGradient startPoint.y tilts the ramp, so the colour bands rotate around the card.
+     Target: LinearGradient  Channel: startPoint.y  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="220,150" roundness="18"/>
+    <Fill>
+      <LinearGradient id="grad" startPoint="0,0" endPoint="1,0">
+        <ColorStop offset="0" color="#0891B2"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="gradAnim" duration="60" frameRate="60" loop="once">
+      <Object target="grad">
+        <Channel name="startPoint.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

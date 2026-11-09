@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A fontFamily channel swaps Arial for the serif Times New Roman, so every glyph changes shape at the
+     switch instead of interpolating.
+     Target: Text  Channel: fontFamily  Type: string
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="word" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="80"
+          letterSpacing="0" position="60,130"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="textAnim" duration="60" frameRate="60" loop="once">
+      <Object target="word">
+        <Channel name="fontFamily" type="string">
+          <Key time="0" value="Arial" interpolation="hold"/>
+          <Key time="30" value="Times New Roman" interpolation="hold"/>
+          <Key time="60" value="Times New Roman"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

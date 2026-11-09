@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: NoiseStyle seed reshuffles the grain pattern, so the whole texture changes at the switch.
+     Target: NoiseStyle  Channel: seed  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="170,120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <NoiseStyle id="styleNode" mode="mono" size="6" density="0.85" seed="1" color="#1E1B4B"/>
+  </Layer>
+  <Animations>
+    <Animation id="styleAnim" duration="60" frameRate="60" loop="once">
+      <Object target="styleNode">
+        <Channel name="seed" type="float">
+          <Key time="0" value="1" interpolation="hold"/>
+          <Key time="30" value="9" interpolation="hold"/>
+          <Key time="60" value="9"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
