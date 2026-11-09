@@ -379,6 +379,9 @@ class HTMLWriterContext {
     // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
     // shift that anchor per frame instead of re-deriving the layout.
     std::unordered_map<const Node*, std::pair<float, float>> textOrigins = {};
+    // LayerFilter -> id of the <feFlood> its colour lands on. Colour is a CSS property on that
+    // element, while the filter's geometry attributes (dx, dy, stdDeviation) are not animatable.
+    std::unordered_map<const Node*, std::string> filterFloodIds = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 
