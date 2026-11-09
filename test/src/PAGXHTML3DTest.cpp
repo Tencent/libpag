@@ -1058,6 +1058,82 @@ PAG_TEST(PAGXHTML3DTest, AnimatedKeywordOriginResolvesAnchor) {
 }
 
 /**
+ * Test case: a two- or three-value `transform-origin` puts each token on the axis its keyword
+ * belongs to. The keyword may come first (`bottom left` is x=left, y=bottom), a bare length takes
+ * the X axis, and the optional third value is the pivot depth.
+ */
+/**
+ * Test case: `perspective-origin` goes through the same resolver, so a keyword pair has to land on
+ * the same vanishing point as the equivalent px pair.
+ */
+PAG_TEST(PAGXHTML3DTest, PerspectiveOriginKeywordMatchesTheEquivalentPixels) {
+  const std::string templateHtml = R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:60px;perspective:600px;perspective-origin:ORIGIN">
+        <div id="card" style="width:100px;height:60px;background-color:#000;
+             transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML";
+  auto keywords = templateHtml;
+  keywords.replace(keywords.find("ORIGIN"), 6, "bottom left");
+  auto pixels = templateHtml;
+  pixels.replace(pixels.find("ORIGIN"), 6, "0px 60px");
+
+  auto keywordDoc = ParseHtml(keywords);
+  auto pixelDoc = ParseHtml(pixels);
+  ASSERT_NE(keywordDoc, nullptr);
+  ASSERT_NE(pixelDoc, nullptr);
+  auto* keywordCard = FindLayerById(keywordDoc, "card");
+  auto* pixelCard = FindLayerById(pixelDoc, "card");
+  ASSERT_NE(keywordCard, nullptr);
+  ASSERT_NE(pixelCard, nullptr);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_TRUE(NearlyEqual(keywordCard->matrix3D.getRowColumn(row, column),
+                              pixelCard->matrix3D.getRowColumn(row, column), 1e-4f))
+          << "row " << row << " column " << column;
+    }
+  }
+}
+
+PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
+  struct OriginCase {
+    const char* value;
+    float x;
+    float y;
+    float z;
+  };
+  // Box is 100x60, so left=0 / right=100 and top=0 / bottom=60.
+  const OriginCase cases[] = {
+      {"bottom left", 0.0f, 60.0f, 0.0f},    {"top center", 50.0f, 0.0f, 0.0f},
+      {"center bottom", 50.0f, 60.0f, 0.0f}, {"center left", 0.0f, 30.0f, 0.0f},
+      {"right bottom", 100.0f, 60.0f, 0.0f}, {"top 20px", 20.0f, 0.0f, 0.0f},
+      {"20px bottom", 20.0f, 60.0f, 0.0f},   {"bottom right 20px", 100.0f, 60.0f, 20.0f},
+      {"left top 10px", 0.0f, 0.0f, 10.0f},
+  };
+  for (const auto& item : cases) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:200px">
+        <div id="box" style="width:100px;height:60px;background-color:#000;
+             transform:rotate(10deg);transform-origin:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, item.value);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << item.value;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << item.value;
+    EXPECT_TRUE(NearlyEqual(box->anchor.x, item.x))
+        << "transform-origin: " << item.value << " x=" << box->anchor.x;
+    EXPECT_TRUE(NearlyEqual(box->anchor.y, item.y))
+        << "transform-origin: " << item.value << " y=" << box->anchor.y;
+    EXPECT_TRUE(NearlyEqual(box->anchorZ, item.z))
+        << "transform-origin: " << item.value << " z=" << box->anchorZ;
+  }
+}
+
+/**
  * Test case: a single vertical keyword is the Y component (`transform-origin: top` == `center top`),
  * matching CSS rather than being read as an X value.
  */
