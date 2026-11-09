@@ -34,21 +34,25 @@ NODE_ORDER = [
 ]
 
 
-# Channels that are animatable in the registry but provably cannot change a rendered pixel, so a
-# case could only ever compare two static images. Each entry states why; keep this list short.
-# Nodes whose static export is missing entirely: the writer never references them, so nothing is
-# painted at t=0 and a channel case would compare a drawn reference against an empty frame. These
-# are recorded in the README as static gaps; drop the entries when the node is implemented.
-# Whole nodes whose static export is missing: `src/pagx/html` never references them, so nothing is
-# painted at t=0 and a channel case would compare a drawn reference against an empty frame. They are
-# listed as static gaps in the README; drop the entry once the node is exported.
+# Exemptions are only for channels that can never have a meaningful case, in one of three ways:
+#   1. the value cannot change a rendered pixel (`Layer.scale.z`);
+#   2. the renderer never applies it, so no reference frame moves (`TextPath`);
+#   3. the node has no static export at all, so the reference frame is empty (the noise nodes).
+# A channel that is merely not implemented yet does NOT belong here: its `Expect: gap` case is the
+# roadmap entry, and it turns into `supported` when the channel lands. Exempting it would hide the
+# work item and drop it from the coverage table.
+CHANNEL_EXEMPTIONS = {
+    ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
+}
+
+# Whole nodes with no static export: `src/pagx/html` never references them, so nothing is painted at
+# t=0 and a channel case would compare a drawn reference against an empty frame. Listed as static
+# gaps in the README; drop the entry once the node is exported.
 NODE_EXEMPTIONS = {
     "NoiseStyle": "静态导出未实现该节点（writer 无引用），t=0 画面为空，需先补静态能力",
     "NoiseFilter": "静态导出未实现该节点（writer 无引用），t=0 只画出底色、无噪声，需先补静态能力",
 }
-CHANNEL_EXEMPTIONS = {
-    ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
-}
+
 # TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
 # applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()
 # does, via setAccessor), so `pagx render --time` draws the same frame at every time and a case would
