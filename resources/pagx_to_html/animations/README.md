@@ -243,6 +243,15 @@ python3 tools/anim_coverage.py --check
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
 
+**豁免的判定标准（只看三种情况，别扩大）**：一个通道只有在"用例永远不可能有意义"时才进
+`CHANNEL_EXEMPTIONS` / `NODE_EXEMPTIONS`——① 数值无法改变画面（`Layer.scale.z`）；② 渲染器不应用它，
+参考帧根本不动（`TextPath`）；③ 节点没有静态导出，参考帧是空的（`NoiseStyle`、`NoiseFilter`）。
+
+**仅仅是"导出侧还没实现"的通道不进豁免**：那种通道保留 `Expect: gap` 用例，它就是待办清单——实现后把
+`Expect` 改成 `supported` 即可。比如 `Rectangle.position.x`、`Rectangle.size.height` 目前仍未实现，
+它们仍是 gap 用例而不是豁免项；这类通道和已实现通道组成的复合动画（如 `position.x + size.height`）
+现在只会因为"那个通道没实现"而分数低，不会再有结构冲突——`combo/06`、`combo/07` 就是用来锁住这一点的。
+
 **静态导出缺失的节点（整节点豁免）**：
 
 | 节点 | 状态 | 依据 |
