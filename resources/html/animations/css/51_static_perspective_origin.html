@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Static Perspective Origin</title>
+    <!--
+      Static (non-animated) function-form `perspective()` with an off-centre `transform-origin`.
+      `tools/html-snapshot` rewrites this into a parent camera layer, and the camera has to be read
+      from the *pre-strip* computed style: `transform-origin` must survive into
+      `perspective-origin`, and the element keeps its own size and its `name`. Reading it after the
+      transform is stripped silently falls back to the box centre, which moves the projection by
+      ~6px at `d = 600px` — visible here because the two cards sit at different origins.
+
+      This case is deliberately static: the animated function-form path is covered by 45/46 and the
+      animated property-form path by 50. It exercises the `_strippedTransform` re-entry, which is the
+      only path that used to wrap twice (camera above the author `name`).
+    -->
+    <style>
+      body { background-color: #0f172a; }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px;">
+    <div name="corner" style="position: absolute; left: 20px; top: 20px;
+         width: 100px; height: 70px; border-radius: 10px; background-color: #38bdf8;
+         transform: perspective(600px) rotateY(-32deg); transform-origin: 0px 70px;">
+    </div>
+    <div name="centre" style="position: absolute; left: 130px; top: 20px;
+         width: 100px; height: 70px; border-radius: 10px; background-color: #f472b6;
+         transform: perspective(600px) rotateY(32deg); transform-origin: 100px 0px;">
+    </div>
+  </body>
+</html>
