@@ -405,34 +405,21 @@ constexpr float kPi = 3.14159265358979323846f;
 // validate matrix/scale arguments before they are folded into a transform matrix — without this
 // guard, `strtof`'s 0-on-failure behavior would silently produce degenerate matrices for malformed
 // transforms.
-// Parses a CSS `transform` value into the 4x4 pose a keyframe carries. `pureTranslate` marks the
-// pose as a translation only (the cheap, layout-preserving x/y channels) and `flat` marks it as
-// staying on the z = 0 plane (the 2D `matrix` channel instead of `matrix3D`). `transform-origin` is
-// NOT folded in: the pivot stays on the layer as `anchor`, so keyframes never carry a per-frame
-// pivot translation that the runtime would interpolate independently.
+// Parses a CSS `transform` value into the 4x4 pose a keyframe carries. How that pose is routed
+// (x/y, 2D `matrix` or `matrix3D`) is decided by `PlacePose`, once the parent camera has been folded
+// in, so classification does not happen here as well. `transform-origin` is NOT folded in: the pivot
+// stays on the layer as `anchor`, so keyframes never carry a per-frame pivot translation that the
+// runtime would interpolate independently.
 bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
-                        HTMLDiagnosticSink& diagnostics, Matrix3D& outPose, bool& pureTranslate,
-                        bool& flat, const HTMLTransformReference& reference) {
+                        HTMLDiagnosticSink& diagnostics, Matrix3D& outPose,
+                        const HTMLTransformReference& reference) {
   outPose = {};
-  pureTranslate = true;
-  flat = true;
   const std::string trimmed = Trim(value);
   if (trimmed.empty() || ToLower(trimmed) == "none") {
     return true;  // identity == translate(0, 0)
   }
-  if (!ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
-                             reference.heightPx)) {
-    return false;
-  }
-  flat = IsFlatTransform(outPose);
-  if (!flat) {
-    pureTranslate = false;
-    return true;
-  }
-  // Reuse the pose epsilon so "the linear part is the identity" has a single definition shared
-  // with IsLinearIdentity(); two thresholds would route the same pose to different channels.
-  pureTranslate = IsLinearIdentity(outPose);
-  return true;
+  return ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
+                               reference.heightPx);
 }
 
 // Resolves the pivot the animation keeps on the layer: the element's `transform-origin` in
@@ -520,14 +507,13 @@ bool ParseFlatTransformMatrix(const std::string& value, HTMLValueParser& parser,
                               HTMLDiagnosticSink& diagnostics, Matrix& outMatrix,
                               bool& pureTranslate) {
   Matrix3D pose = {};
-  bool flat = true;
   // SVG shapes have no box reference for percentage / `calc()` lengths, so the empty reference
   // keeps that path on plain px.
-  if (!ParseTransformPose(value, parser, diagnostics, pose, pureTranslate, flat,
-                          HTMLTransformReference{}) ||
-      !flat) {
+  if (!ParseTransformPose(value, parser, diagnostics, pose, HTMLTransformReference{}) ||
+      !IsFlatTransform(pose)) {
     return false;
   }
+  pureTranslate = IsLinearIdentity(pose);
   outMatrix = ToAffine2D(pose);
   return true;
 }
@@ -1256,21 +1242,12 @@ bool HTMLAnimationBuilder::buildForElement(
         alphaKeys.push_back({time, v, interp, {}, {}});
       } else if (prop == "transform") {
         Matrix3D pose = {};
-        bool pureTranslate = false;
-        bool flat = true;
-        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, pureTranslate, flat,
-                               reference)) {
-          const Matrix3D pushed = PushPerspective(
-              pose, parentPerspectivePx, parentPerspectiveOriginX, parentPerspectiveOriginY);
+        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference)) {
           // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
-          // depth here: refresh the classification instead of routing the keyframe to the 2D
-          // `matrix` channel, which would silently drop the projection.
-          if (!IsFlatTransform(pushed)) {
-            flat = false;
-            pureTranslate = false;
-          }
-          // PAGX requires a 3D pose to be invertible; the parser only validated the pose it saw.
-          if (!flat && !IsInvertible(pushed)) {
+          // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop.
+          const PosePlacement placement = PlacePose(
+              pose, parentPerspectivePx, parentPerspectiveOriginX, parentPerspectiveOriginY);
+          if (!placement.valid) {
             if (!warnedTransform) {
               _diagnostics.warn(
                   "html: a @keyframes transform becomes non-invertible under the parent "
@@ -1278,9 +1255,9 @@ bool HTMLAnimationBuilder::buildForElement(
               warnedTransform = true;
             }
           } else {
-            transformStops.push_back({time, pushed});
-            if (!pureTranslate) transformAllPureTranslate = false;
-            if (!flat) transformAllFlat = false;
+            transformStops.push_back({time, placement.pose});
+            if (!(placement.flat && placement.linearIsIdentity)) transformAllPureTranslate = false;
+            if (!placement.flat) transformAllFlat = false;
           }
         } else if (!warnedTransform) {
           _diagnostics.warn("html: unsupported 'transform' value '" + Trim(val) +
