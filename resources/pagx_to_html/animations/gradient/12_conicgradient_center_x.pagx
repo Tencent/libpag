@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: ConicGradient center.x moves the wheel's hub sideways, so the wedges skew across the card.
+     Target: ConicGradient  Channel: center.x  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="220,150" roundness="18"/>
+    <Fill>
+      <ConicGradient id="grad" center="0.5,0.5" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#0891B2"/>
+        <ColorStop offset="0.5" color="#FDE047"/>
+        <ColorStop offset="1" color="#0891B2"/>
+      </ConicGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="gradAnim" duration="60" frameRate="60" loop="once">
+      <Object target="grad">
+        <Channel name="center.x" type="float">
+          <Key time="0" value="0.5" interpolation="linear"/>
+          <Key time="60" value="0.15"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -3,7 +3,7 @@
 本目录是**动画导出**的回归语料：一个 `.pagx` 只验证一个语义点，参考实现是 `pagx render --time`
 （PAGX 运行时求值后渲染），被测实现是 `pagx export --format html` 产出的 CSS `@keyframes`。
 
-**194 个可动画通道 / 32 种节点类型 / 126 个用例。** 下面两张表分别回答"是否全面"和"是否精简"，
+**194 个可动画通道 / 32 种节点类型 / 216 个用例。** 下面两张表分别回答"是否全面"和"是否精简"，
 表格由 `tools/anim_coverage.py` 从源码与语料生成，可当场复核。
 
 ## 0. 判定标准与复核
@@ -26,8 +26,8 @@ python3 tools/anim_coverage.py --check
 
 ## 1. 主表：可动画通道 → 导出 → 用例
 
-`导出` 以 `src/pagx/html/HTMLAnimationWriter.cpp` 的通道映射表为准；`用例` 为 `—` 表示该通道缺用例，
-`--check` 会报错（`Layer.scale.z` 除外）。用例列里 `family/*（n）` 表示该族贡献了 n 条。
+`导出` 以 `src/pagx/html/HTMLAnimationWriter.cpp` 的通道映射表为准；`用例` 只在这里没有单独用例时留空。
+用例列里 `family/*（n）` 表示该族贡献了 n 条。
 
 | 节点 | 可动画通道 | 导出 | 用例 |
 |------|------------|------|------|
@@ -70,18 +70,33 @@ python3 tools/anim_coverage.py --check
 | TextBox | `scale.y` | ✔ | `textbox/06` |
 | TextBox | `skew` | ✔ | `textbox/08` |
 | TextBox | `skewAxis` | ✔ | `textbox/10` |
-| Text | `fauxBold` `fauxItalic` `fontFamily` `fontStyle` `x` `y` | ✘ | — |
+| Text | `fauxBold` | ✘ | `text/06` |
+| Text | `fauxItalic` | ✘ | `text/07` |
+| Text | `fontFamily` | ✘ | `text/08` |
 | Text | `fontSize` | ✔ | `text/04` |
+| Text | `fontStyle` | ✘ | `text/09` |
 | Text | `letterSpacing` | ✔ | `text/05` |
 | Text | `text` | ✘ | `text/03` |
+| Text | `x` | ✘ | `text/10` |
+| Text | `y` | ✘ | `text/11` |
 | TextPath | `alpha` `anchor.x` `anchor.y` `position.x` `position.y` `rotation` `scale.x` `scale.y` `skew` `skewAxis` | ✘ | — |
-| Rectangle | `position.x` `position.y` `size.height` | ✘ | — |
+| Rectangle | `position.x` | ✘ | `geometry/07` |
+| Rectangle | `position.y` | ✘ | `geometry/08` |
 | Rectangle | `roundness` | ✔ | `geometry/02` |
+| Rectangle | `size.height` | ✘ | `geometry/09` |
 | Rectangle | `size.width` | ✔ | `geometry/01·05` |
-| Ellipse | `position.x` `position.y` `size.height` | ✘ | — |
+| Ellipse | `position.x` | ✘ | `geometry/10` |
+| Ellipse | `position.y` | ✘ | `geometry/11` |
+| Ellipse | `size.height` | ✘ | `geometry/12` |
 | Ellipse | `size.width` | ✔ | `geometry/03` |
-| Polystar | `innerRadius` `innerRoundness` `outerRadius` `outerRoundness` `position.x` `position.y` `rotation` | ✘ | — |
+| Polystar | `innerRadius` | ✘ | `geometry/13` |
+| Polystar | `innerRoundness` | ✘ | `geometry/15` |
+| Polystar | `outerRadius` | ✘ | `geometry/14` |
+| Polystar | `outerRoundness` | ✘ | `geometry/16` |
 | Polystar | `pointCount` | ✘ | `geometry/06` |
+| Polystar | `position.x` | ✘ | `geometry/17` |
+| Polystar | `position.y` | ✘ | `geometry/18` |
+| Polystar | `rotation` | ✘ | `geometry/19` |
 | Fill | `alpha` | ✔ | `fill/*`（4） |
 | Fill | `color` | ✔ | `fill/01·03`、`geometry/05`、`sharing/02·03` |
 | Stroke | `alpha` | ✔ | `stroke/02` |
@@ -90,40 +105,84 @@ python3 tools/anim_coverage.py --check
 | Stroke | `miterLimit` | ✔ | `stroke/05` |
 | Stroke | `width` | ✔ | `stroke/03·06` |
 | TrimPath | `end` | ✔ | `geometry/04`、`stroke/06` |
-| TrimPath | `offset` | ✘ | — |
+| TrimPath | `offset` | ✘ | `geometry/20` |
 | TrimPath | `start` | ✔ | `modifier/02` |
 | RoundCorner | `radius` | ✔ | `modifier/01` |
-| Repeater | `anchor.x` `anchor.y` `endAlpha` `offset` `position.x` `position.y` `scale.x` `scale.y` `startAlpha` | ✘ | — |
+| Repeater | `anchor.x` | ✘ | `modifier/08` |
+| Repeater | `anchor.y` | ✘ | `modifier/09` |
 | Repeater | `copies` | ✔ | `modifier/03` |
+| Repeater | `endAlpha` | ✘ | `modifier/11` |
+| Repeater | `offset` | ✘ | `modifier/12` |
+| Repeater | `position.x` | ✘ | `modifier/13` |
+| Repeater | `position.y` | ✘ | `modifier/14` |
 | Repeater | `rotation` | ✔ | `modifier/04` |
+| Repeater | `scale.x` | ✘ | `modifier/15` |
+| Repeater | `scale.y` | ✘ | `modifier/16` |
+| Repeater | `startAlpha` | ✘ | `modifier/10` |
 | TextModifier | `alpha` | ✘ | `text/02` |
-| TextModifier | `anchor.x` `anchor.y` `position.x` `position.y` `rotation` `scale.x` `scale.y` `skew` `skewAxis` `strokeColor` `strokeWidth` | ✘ | — |
+| TextModifier | `anchor.x` | ✘ | `text/12` |
+| TextModifier | `anchor.y` | ✘ | `text/13` |
 | TextModifier | `fillColor` | ✘ | `text/01` |
-| RangeSelector | `easeIn` `easeOut` `weight` | ✘ | — |
+| TextModifier | `position.x` | ✘ | `text/14` |
+| TextModifier | `position.y` | ✘ | `text/15` |
+| TextModifier | `rotation` | ✘ | `text/16` |
+| TextModifier | `scale.x` | ✘ | `text/17` |
+| TextModifier | `scale.y` | ✘ | `text/18` |
+| TextModifier | `skew` | ✘ | `text/19` |
+| TextModifier | `skewAxis` | ✘ | `text/20` |
+| TextModifier | `strokeColor` | ✘ | `text/21` |
+| TextModifier | `strokeWidth` | ✘ | `text/22` |
+| RangeSelector | `easeIn` | ✘ | `modifier/17` |
+| RangeSelector | `easeOut` | ✘ | `modifier/18` |
 | RangeSelector | `end` | ✔ | `modifier/06` |
 | RangeSelector | `offset` | ✔ | `modifier/07` |
 | RangeSelector | `start` | ✔ | `modifier/05` |
+| RangeSelector | `weight` | ✘ | `modifier/19` |
 | SolidColor | `color` | ✔ | `sharing/01`、`solid_color/01`、`timing/04·06` |
 | LinearGradient | `endPoint.x` | ✘ | `gradient/01` |
-| LinearGradient | `endPoint.y` `startPoint.x` `startPoint.y` | ✘ | — |
-| RadialGradient | `center.x` `center.y` | ✘ | — |
+| LinearGradient | `endPoint.y` | ✘ | `gradient/09` |
+| LinearGradient | `startPoint.x` | ✘ | `gradient/07` |
+| LinearGradient | `startPoint.y` | ✘ | `gradient/08` |
+| RadialGradient | `center.x` | ✘ | `gradient/10` |
+| RadialGradient | `center.y` | ✘ | `gradient/11` |
 | RadialGradient | `radius` | ✘ | `gradient/02` |
-| ConicGradient | `center.x` `center.y` `endAngle` | ✘ | — |
+| ConicGradient | `center.x` | ✘ | `gradient/12` |
+| ConicGradient | `center.y` | ✘ | `gradient/13` |
+| ConicGradient | `endAngle` | ✘ | `gradient/14` |
 | ConicGradient | `startAngle` | ✘ | `gradient/03` |
-| DiamondGradient | `center.x` `center.y` | ✘ | — |
+| DiamondGradient | `center.x` | ✘ | `gradient/15` |
+| DiamondGradient | `center.y` | ✘ | `gradient/16` |
 | DiamondGradient | `radius` | ✘ | `gradient/04` |
 | ColorStop | `color` | ✘ | `gradient/06` |
 | ColorStop | `offset` | ✘ | `gradient/05` |
-| DropShadowStyle | `blurX` `blurY` `color` `offsetY` `showBehindLayer` `spread` | ✘ | — |
+| DropShadowStyle | `blurX` | ✘ | `style/06` |
+| DropShadowStyle | `blurY` | ✘ | `style/07` |
+| DropShadowStyle | `color` | ✘ | `style/08` |
 | DropShadowStyle | `offsetX` | ✘ | `style/01` |
+| DropShadowStyle | `offsetY` | ✘ | `style/09` |
+| DropShadowStyle | `showBehindLayer` | ✘ | `style/10` |
+| DropShadowStyle | `spread` | ✘ | `style/11` |
 | InnerShadowStyle | `blurX` `blurY` | ✘ | `style/02` |
-| InnerShadowStyle | `color` `offsetX` `offsetY` `spread` | ✘ | — |
+| InnerShadowStyle | `color` | ✘ | `style/12` |
+| InnerShadowStyle | `offsetX` | ✘ | `style/13` |
+| InnerShadowStyle | `offsetY` | ✘ | `style/14` |
+| InnerShadowStyle | `spread` | ✘ | `style/15` |
 | BackgroundBlurStyle | `blurX` | ✘ | `style/03` |
-| BackgroundBlurStyle | `blurY` | ✘ | — |
-| GlassStyle | `depth` `dispersion` `frost` `lightAngle` `lightIntensity` `splay` | ✘ | — |
+| BackgroundBlurStyle | `blurY` | ✘ | `style/16` |
+| GlassStyle | `depth` | ✘ | `style/17` |
+| GlassStyle | `dispersion` | ✘ | `style/18` |
+| GlassStyle | `frost` | ✘ | `style/19` |
+| GlassStyle | `lightAngle` | ✘ | `style/20` |
+| GlassStyle | `lightIntensity` | ✘ | `style/21` |
 | GlassStyle | `refraction` | ✘ | `style/04` |
-| NoiseStyle | `color` `firstColor` `opacity` `secondColor` `seed` `size` | ✘ | — |
+| GlassStyle | `splay` | ✘ | `style/22` |
+| NoiseStyle | `color` | ✘ | `style/23` |
 | NoiseStyle | `density` | ✘ | `style/05` |
+| NoiseStyle | `firstColor` | ✘ | `style/24` |
+| NoiseStyle | `opacity` | ✘ | `style/26` |
+| NoiseStyle | `secondColor` | ✘ | `style/25` |
+| NoiseStyle | `seed` | ✘ | `style/27` |
+| NoiseStyle | `size` | ✘ | `style/28` |
 | BlurFilter | `blurX` | ✔ | `filter/01` |
 | BlurFilter | `blurY` | ✔ | `filter/02` |
 | DropShadowFilter | `blurX` `blurY` | ✔ | `filter/05` |
@@ -131,15 +190,25 @@ python3 tools/anim_coverage.py --check
 | DropShadowFilter | `offsetX` | ✔ | `filter/03` |
 | DropShadowFilter | `offsetY` | ✔ | `filter/04` |
 | DropShadowFilter | `shadowOnly` | ✘ | `filter/07` |
-| InnerShadowFilter | `blurX` `blurY` `color` `offsetY` `shadowOnly` | ✘ | — |
+| InnerShadowFilter | `blurX` | ✘ | `filter/11` |
+| InnerShadowFilter | `blurY` | ✘ | `filter/12` |
+| InnerShadowFilter | `color` | ✘ | `filter/13` |
 | InnerShadowFilter | `offsetX` | ✘ | `filter/08` |
+| InnerShadowFilter | `offsetY` | ✘ | `filter/14` |
+| InnerShadowFilter | `shadowOnly` | ✘ | `filter/15` |
 | BlendFilter | `color` | ✘ | `filter/09` |
-| NoiseFilter | `color` `firstColor` `opacity` `secondColor` `seed` `size` | ✘ | — |
+| NoiseFilter | `color` | ✘ | `filter/16` |
 | NoiseFilter | `density` | ✘ | `filter/10` |
+| NoiseFilter | `firstColor` | ✘ | `filter/17` |
+| NoiseFilter | `opacity` | ✘ | `filter/19` |
+| NoiseFilter | `secondColor` | ✘ | `filter/18` |
+| NoiseFilter | `seed` | ✘ | `filter/20` |
+| NoiseFilter | `size` | ✘ | `filter/21` |
 
 ## 2. 同一通道的用例分布（精简性检查）
 
-被多个用例驱动的通道都在这里。每一行的用例分属不同族，说明它们变化的是不同维度而不是重复同一条断言：
+被多个用例驱动的通道都在这里。**判据：同一通道的多条用例必须分属不同族**（各变一个维度），
+族内不得重复驱动同一通道：
 
 | 通道 | 用例数 | 用例（按族） |
 |------|--------|--------------|
@@ -179,20 +248,18 @@ python3 tools/anim_coverage.py --check
 
 ## 4. 缺口与已知问题
 
-**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 38 条 `Expect: gap` 用例，覆盖 Layer 3D/支点、
-渐变色源、RoundCorner、TrimPath.start 之外的修改器、TextModifier/Text 文本属性、图层样式、滤镜参数。
+**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 109 条 `Expect: gap` 用例，逐通道覆盖 Layer
+3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
 
-**未实现且由同族代表**（表 1 中"导出 ✘ 且用例为 —"的行）：同一节点类型下的兄弟通道，导出侧是同一段
-未实现分支，例如 `Layer.anchor.y`、`Layer.scale.z` 与 `Layer.z`，`Polystar` 的其余通道与
-`geometry/06`，`NoiseStyle` 的其余通道与 `style/05`。
+**唯一未覆盖的通道族：`TextPath`（10 个通道）**。这些通道在 `PAGXNodeChannel.cpp` 里标为可动画，但
+`src/renderer/LayerBuilder.cpp` 的 `convertTextPath()` 没有注册任何通道 writer（对比
+`convertTextModifier()` 有 `setAccessor`），实测 `rotation` / `position.x` / `scale.x` / `alpha` 动画在
+`pagx render --time` 下的首尾帧差值都是 0，写不出"参考确实在动"的用例。需要先补渲染器 writer，或由
+维护者决定是否加入 `CHANNEL_EXEMPTIONS`。
 
-**已知例外**：
-
-| 项 | 说明 |
-|----|------|
-| `TextPath` | 只承载共享变换通道，且需要"文本沿路径排版"的夹具；其缺口由 `text/` 族代表 |
-| 3 条无效映射 | `{Layer, "rotation"}`、`{SolidColor, "alpha"}`、`{DropShadowFilter, "alpha"}` 指向不存在的通道，`--check` 报 WARN |
-| `anchor/01`、`anchor/08` | 同时动画 `rotation.z`（已映射）与静态 `anchor`（未映射），导出会产出 keyframes 但忽略支点，头部保留 `gap` 并在注释中说明 |
+**已知映射问题**：`{SolidColor, "alpha"}` 与 `{DropShadowFilter, "alpha"}` 指向不存在的通道，`--check`
+报 WARN；`anchor/01`、`anchor/08` 同时动画已映射的 `rotation.z` 与未映射的静态 `anchor`，导出会产出
+keyframes 但忽略支点，头部保留 `gap` 并在注释中说明。
 
 ## 5. 用例族与 fixture
 
@@ -203,8 +270,8 @@ python3 tools/anim_coverage.py --check
 | `textbox` | 10 | `#7C3AED` | 文本 "AB" | TextBox 布局与变换通道 |
 | `fill` | 6 | `#DB2777` | 胶囊 / 文本 / 渐变三角 | 绘制器颜色与透明度承载 |
 | `stroke` | 6 | `#0E7490` | 椭圆描边环 / 五角星 | 描边参数 |
-| `filter` | 10 | `#15803D` | 六边形 + 深色阴影 | 滤镜参数 |
-| `geometry` | 6 | `#B45309` | 矩形 / 椭圆 / 五角星 | 几何尺寸与圆角 |
+| `filter` | 21 | `#15803D` | 六边形 + 深色阴影 | 滤镜参数 |
+| `geometry` | 20 | `#B45309` | 矩形 / 椭圆 / 五角星 | 几何尺寸与圆角 |
 | `mask` | 4 | `#B91C1C` | 被遮罩内容 | 遮罩路径逐点变形 |
 | `timing` | 8 | `#0284C7` | 圆形 | 循环、帧率、`evaluationOffset`、挂载 |
 | `boundary` | 6 | `#0F766E` | 五角星 | 关键帧边界 |
@@ -212,11 +279,11 @@ python3 tools/anim_coverage.py --check
 | `combo` | 4 | `#475569` | 八边形 | 多通道共享 keyframe |
 | `sharing` | 3 | `#9A3412` | 圆形 / 圆形与文本 | 资源与绘制器共享 |
 | `solid_color` | 1 | `#65A30D` | 圆形 | 颜色源 |
-| `anchor` | 8 | `#C2410C` | 长条 + 支点圆点 / 卡片 | 局部变换支点（含 `anchor.z` 深度）与 3D 耦合 |
-| `gradient` | 6 | `#0891B2` | 椭圆 | 渐变色源参数 |
-| `modifier` | 5 | `#9333EA` | 五边形 / 五角星描边 / 方块阵列 | 修改器参数 |
-| `text` | 5 | `#BE123C` | 72px 粗体文本 | 文本与文本修改器参数 |
-| `style` | 5 | `#4338CA` | 白色卡片（模糊类带背板） | 图层样式参数 |
+| `anchor` | 9 | `#C2410C` | 长条 + 支点圆点 / 卡片 | 局部变换支点（含 `anchor.z` 深度）与 3D 耦合 |
+| `gradient` | 16 | `#0891B2` | 椭圆 | 渐变色源参数 |
+| `modifier` | 19 | `#9333EA` | 五边形 / 五角星描边 / 方块阵列 | 修改器参数 |
+| `text` | 22 | `#BE123C` | 72px 粗体文本 | 文本与文本修改器参数 |
+| `style` | 28 | `#4338CA` | 白色卡片（模糊类带背板） | 图层样式参数 |
 
 约束：320×200、`#F8FAFC` 背景（`boundary/03` 为 400×160）；每族一个剪影，跨族不重复；旋转类形状不得有
 旋转对称（4 点多边形每 90° 重复，会掩盖错路径样本）；`matrix`/`matrix3D` 通道会替换 `x`/`y` 平移，
