@@ -820,6 +820,8 @@ struct DomTargetBundle {
   int rangeGlyphIndex = -1;
   // Set for a Text bundle whose x/y channel is animated: the left/top the tag was placed at.
   bool hasTextOrigin = false;
+  // True when the tag is an SVG <text>: it has no left/top, so x/y moves by transform.
+  bool textUsesSvg = false;
   float textOriginX = 0.0f;
   float textOriginY = 0.0f;
 };
@@ -1274,14 +1276,21 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
                              std::string& decls, bool& needsZeroOrigin) {
   if ((chSet.textAnchorXCh != nullptr || chSet.textAnchorYCh != nullptr) && bundle.hasTextOrigin &&
       bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Text) {
-    // Text.x / Text.y feed the layout anchor, so the tag keeps its position:absolute placement and
-    // the frame moves left/top by the channel delta instead of wrapping it in a transform.
+    // Text.x / Text.y feed the layout anchor, so the tag keeps its placement and the frame moves it
+    // by the channel delta: left/top for a span, transform for an SVG <text> whose x/y are
+    // attributes.
     const Text* text = static_cast<const Text*>(bundle.primaryHost);
     float x = EvalFloatChannel(chSet.textAnchorXCh, t, text->position.x);
     float y = EvalFloatChannel(chSet.textAnchorYCh, t, text->position.y);
-    AppendCssDecl(decls, "left",
-                  CssFloatToString(bundle.textOriginX + x - text->position.x) + "px");
-    AppendCssDecl(decls, "top", CssFloatToString(bundle.textOriginY + y - text->position.y) + "px");
+    float dx = bundle.textOriginX + x - text->position.x;
+    float dy = bundle.textOriginY + y - text->position.y;
+    if (bundle.textUsesSvg) {
+      AppendCssDecl(decls, "transform",
+                    "translate(" + CssFloatToString(dx) + "px, " + CssFloatToString(dy) + "px)");
+    } else {
+      AppendCssDecl(decls, "left", CssFloatToString(dx) + "px");
+      AppendCssDecl(decls, "top", CssFloatToString(dy) + "px");
+    }
     return;
   }
   bool hasRepeaterChannel =
@@ -1905,6 +1914,7 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         textBundle.primaryHost = targetNode;
         textBundle.objects.push_back(obj);
         textBundle.hasTextOrigin = true;
+        textBundle.textUsesSvg = ctx.animation.svgTextNodes.count(targetNode) > 0;
         textBundle.textOriginX = originIt->second.first;
         textBundle.textOriginY = originIt->second.second;
         bundles.push_back(std::move(textBundle));
@@ -2686,6 +2696,17 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         continue;
       }
       auto nType = targetNode->nodeType();
+      if (nType == NodeType::Text) {
+        for (auto* ch : obj->channels) {
+          if (ch == nullptr) {
+            continue;
+          }
+          auto role = LookupChannelRole(nType, ch->name);
+          if (role == TargetChannelRole::TextAnchorX || role == TargetChannelRole::TextAnchorY) {
+            _ctx.animation.svgBaselineTexts.insert(static_cast<const Text*>(targetNode));
+          }
+        }
+      }
       if (nType == NodeType::Layer) {
         auto* layer = static_cast<Layer*>(targetNode);
         if (layer->id.empty()) {

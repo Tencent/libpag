@@ -776,11 +776,26 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     } else {
       auto renderPos = text->renderPosition();
       posX = renderPos.x;
-      if (text->baseline == TextBaseline::Alphabetic) {
-        // SVG <text> natively positions its y attribute at the alphabetic baseline,
-        // matching the PAGX semantic without needing font ascent metrics.
-        float x = renderPos.x;
-        float y = text->position.y;
+      // SVG <text> natively positions its y attribute at the alphabetic baseline, while a CSS span
+      // derives its baseline from the browser's own line box: at an 80px font the whole block lands
+      // 2px lower than PAGX. The shaper already recorded where the baseline sits inside the text
+      // origin, so a single-line run can be emitted as SVG and pinned to that baseline instead.
+      bool baselineFromLayout = false;
+      float baselineY = 0.0f;
+      float glyphOriginX = renderPos.x;
+      if (text->baseline != TextBaseline::Alphabetic && text->textAnchor == TextAnchor::Start &&
+          text->text.find('\n') == std::string::npos && text->glyphData != nullptr &&
+          _ctx->animation.svgBaselineTexts.count(text) > 0 &&
+          !text->glyphData->layoutRuns.empty() &&
+          !text->glyphData->layoutRuns.front().positions.empty()) {
+        const auto& firstPosition = text->glyphData->layoutRuns.front().positions.front();
+        baselineY = renderPos.y + firstPosition.y;
+        glyphOriginX = renderPos.x + firstPosition.x;
+        baselineFromLayout = true;
+      }
+      if (text->baseline == TextBaseline::Alphabetic || baselineFromLayout) {
+        float x = text->baseline == TextBaseline::Alphabetic ? renderPos.x : glyphOriginX;
+        float y = text->baseline == TextBaseline::Alphabetic ? text->position.y : baselineY;
 
         HTMLBuilder localDefs;
         std::string svgFillAttr;
@@ -815,6 +830,15 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
         }
 
         out.openTag("text");
+        // The <text> element is the tag this Text renders into, so animations land on it. It carries
+        // the position as x/y, which keyframes cannot move, so an animated x/y is emitted as a
+        // transform instead (see AnimationState::svgTextNodes).
+        auto svgAnimId = _ctx->claimAnimatedDomId({text});
+        if (!svgAnimId.empty()) {
+          out.addAttr("id", svgAnimId);
+          _ctx->animation.textOrigins[text] = {0.0f, 0.0f};
+          _ctx->animation.svgTextNodes.insert(text);
+        }
         out.addAttr("x", CssFloatToString(x));
         out.addAttr("y", CssFloatToString(y));
         if (!text->fontFamily.empty()) {

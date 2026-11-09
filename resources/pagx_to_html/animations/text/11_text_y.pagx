@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A Text y channel lifts the layout anchor towards the top edge.
      Target: Text  Channel: y  Type: float
-     Expect: gap
-     Known-gap: static-text-baseline
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
