@@ -44,8 +44,6 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
-#include "pagx/types/Point.h"
-#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
