@@ -317,10 +317,6 @@ node tools/html-snapshot/eval-animation/run.js \
 `layer/12_perspective`（`css-perspective-interpolation`）：CSS 在两条 `perspective()` 之间按矩阵分解
 （等价于对 `1/d` 线性）插值，而运行时按通道值线性取 `d` 再重算矩阵，中间帧必然分叉，端点一致。
 
-`text/10_text_x`、`text/11_text_y`（`static-text-baseline`）：通道已导出，逐帧位置也对（x 差 1px 内），
-但整块文字在浏览器里比 PAGX 低 2px（80px 字号），是纯平移——整体上移 2px 后 SSIM 从 0.878 升到 0.986。
-原因与文本族其它用例一致：CSS 行盒基线由浏览器字体度量推导，PAGX 按自身度量定位，字号越大偏移越大。
-
 `stroke/05_miter_limit`（`static-miter-join-rendering`）：通道本身已导出，但 `miterLimit > 1` 时**静态**导出的
 尖角几何就与参考差约 1.4%（1/4/10/20 里只有 1 完全一致，其余结果相同），属于既有静态差异，**计划后续修**。
 
