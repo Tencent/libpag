@@ -574,16 +574,43 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
     return origin;
   }
 
-  std::string tokenX = tokens[0];
-  // A single vertical keyword positions the Y axis and leaves X at `center` (`transform-origin:
-  // top` == `center top`); every other single value is the X component with Y defaulting to
-  // `center`.
+  // CSS orders the two components by which axis each token belongs to, not by position: `bottom
+  // left` is x=left, y=bottom, and `top 20px` is x=20px, y=top. `center` and bare lengths belong to
+  // neither axis on their own, so they fill whichever axis the keyword did not take (and, when both
+  // are neutral, the first is X as usual).
+  enum class AxisHint { X, Y, Neutral };
+  const auto hintOf = [](const std::string& token) {
+    if (token == "left" || token == "right") {
+      return AxisHint::X;
+    }
+    if (token == "top" || token == "bottom") {
+      return AxisHint::Y;
+    }
+    return AxisHint::Neutral;
+  };
+
+  std::string tokenX = "center";
   std::string tokenY = "center";
-  if (tokens.size() > 1) {
-    tokenY = tokens[1];
-  } else if (tokenX == "top" || tokenX == "bottom") {
-    tokenY = tokenX;
-    tokenX = "center";
+  if (tokens.size() == 1) {
+    if (hintOf(tokens[0]) == AxisHint::Y) {
+      tokenY = tokens[0];
+    } else {
+      tokenX = tokens[0];
+    }
+  } else {
+    const AxisHint first = hintOf(tokens[0]);
+    const AxisHint second = hintOf(tokens[1]);
+    if (first == second && first != AxisHint::Neutral) {
+      // `left right` / `top bottom` name the same axis twice, which is not a valid origin.
+      return origin;
+    }
+    if (first == AxisHint::Y || second == AxisHint::X) {
+      tokenX = tokens[1];
+      tokenY = tokens[0];
+    } else {
+      tokenX = tokens[0];
+      tokenY = tokens[1];
+    }
   }
   const float x = ResolveOriginAxis(tokenX, width, valueParser);
   const float y = ResolveOriginAxis(tokenY, height, valueParser);
