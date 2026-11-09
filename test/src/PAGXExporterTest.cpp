@@ -327,6 +327,30 @@ PAGX_TEST(PAGXExporterTest, ToDataAvoidsPathsKeptByUnpackedImages) {
   EXPECT_NE(xml.find("source=\"images/img_1_2.png\""), std::string::npos);
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataAvoidsDirectoriesRequiredByKeptImages) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto packedData = MakeImageData(0xD1);
+  AddImage(doc.get(), "foo", "", packedData);
+  // This kept reference needs images/foo.png to stay a directory after extraction, so the packed
+  // image with id "foo" must not claim that name as a file. The kept path is also upper-cased to
+  // cover the case-insensitive comparison.
+  auto* kept = AddImage(doc.get(), "", "images/Foo.png/photo.png");
+  AddPatternLayer(doc.get(), kept);
+
+  auto zip = pagx::PAGXExporter::ToData(*doc);
+  ASSERT_NE(zip, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 2u);
+  EXPECT_EQ(entries.find("images/foo.png"), entries.end());
+  ASSERT_NE(entries.find("images/foo_2.png"), entries.end());
+  EXPECT_EQ(entries["images/foo_2.png"], BytesOf(packedData));
+
+  const auto& xml = entries["document.pagx"];
+  EXPECT_NE(xml.find("image=\"images/Foo.png/photo.png\""), std::string::npos);
+  EXPECT_NE(xml.find("source=\"images/foo_2.png\""), std::string::npos);
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataLimitsEntryNameLength) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   std::string longId(300, 'a');

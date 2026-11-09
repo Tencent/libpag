@@ -232,6 +232,21 @@ static std::string NormalizeRelativePath(const std::string& path) {
   return normalized;
 }
 
+static constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen("images/")
+
+// Reserves a kept external reference and every directory above it below images/. A reference such
+// as "images/foo.png/photo.png" needs "images/foo.png" to exist as a directory after extraction,
+// so a packed entry must not take that name as a file: a file/directory clash makes the archive
+// fail to extract. The images/ root itself stays available for packed entries.
+static void ReserveKeptPath(const std::string& key, PAGXPackContext* pack) {
+  pack->usedPaths.insert(key);
+  for (auto slash = key.find_last_of('/');
+       slash != std::string::npos && slash >= IMAGES_PREFIX_LENGTH;
+       slash = key.find_last_of('/', slash - 1)) {
+    pack->usedPaths.insert(key.substr(0, slash));
+  }
+}
+
 // Reserves the paths that unresolved images keep referring to, so a packed entry can never be
 // written at a path an unpacked image already points to. Reservation must happen before any entry
 // is allocated, otherwise the entry's data would silently replace that external reference inside
@@ -247,7 +262,7 @@ static void ReserveKeptImagePaths(const PAGXDocument& doc, PAGXPackContext* pack
     }
     auto key = ToLowerAscii(NormalizeRelativePath(image->filePath));
     if (key.rfind("images/", 0) == 0) {
-      pack->usedPaths.insert(std::move(key));
+      ReserveKeptPath(key, pack);
     }
   }
 }
