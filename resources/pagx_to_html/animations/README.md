@@ -114,12 +114,12 @@ python3 tools/anim_coverage.py --check
 | Repeater | `copies` | ✔ | `modifier/03` |
 | Repeater | `endAlpha` | ✘ | `modifier/11` |
 | Repeater | `offset` | ✘ | `modifier/12` |
-| Repeater | `position.x` | ✘ | `modifier/13` |
+| Repeater | `position.x` | ✔ | `modifier/13` |
 | Repeater | `position.y` | ✘ | `modifier/14` |
 | Repeater | `rotation` | ✔ | `modifier/04` |
 | Repeater | `scale.x` | ✘ | `modifier/15` |
 | Repeater | `scale.y` | ✘ | `modifier/16` |
-| Repeater | `startAlpha` | ✘ | `modifier/10` |
+| Repeater | `startAlpha` | ✔ | `modifier/10` |
 | TextModifier | `alpha` | ✘ | `text/02` |
 | TextModifier | `anchor.x` | ✘ | `text/12` |
 | TextModifier | `anchor.y` | ✘ | `text/13` |
@@ -177,13 +177,8 @@ python3 tools/anim_coverage.py --check
 | GlassStyle | `lightIntensity` | ✘ | `style/21` |
 | GlassStyle | `refraction` | ✘ | `style/04` |
 | GlassStyle | `splay` | ✘ | `style/22` |
-| NoiseStyle | `color` | ✘ | `style/23` |
-| NoiseStyle | `density` | ✘ | `style/05` |
-| NoiseStyle | `firstColor` | ✘ | `style/24` |
+| NoiseStyle | `color` `density` `firstColor` `secondColor` `seed` `size` | ✘ | — |
 | NoiseStyle | `opacity` | ✘ | `style/26` |
-| NoiseStyle | `secondColor` | ✘ | `style/25` |
-| NoiseStyle | `seed` | ✘ | `style/27` |
-| NoiseStyle | `size` | ✘ | `style/28` |
 | BlurFilter | `blurX` | ✔ | `filter/01` |
 | BlurFilter | `blurY` | ✔ | `filter/02` |
 | DropShadowFilter | `blurX` `blurY` | ✔ | `filter/05` |
@@ -198,13 +193,9 @@ python3 tools/anim_coverage.py --check
 | InnerShadowFilter | `offsetY` | ✘ | `filter/14` |
 | InnerShadowFilter | `shadowOnly` | ✘ | `filter/15` |
 | BlendFilter | `color` | ✘ | `filter/09` |
-| NoiseFilter | `color` | ✘ | `filter/16` |
+| NoiseFilter | `color` `firstColor` `secondColor` `seed` `size` | ✘ | — |
 | NoiseFilter | `density` | ✘ | `filter/10` |
-| NoiseFilter | `firstColor` | ✘ | `filter/17` |
 | NoiseFilter | `opacity` | ✘ | `filter/19` |
-| NoiseFilter | `secondColor` | ✘ | `filter/18` |
-| NoiseFilter | `seed` | ✘ | `filter/20` |
-| NoiseFilter | `size` | ✘ | `filter/21` |
 
 ## 2. 同一通道的用例分布（精简性检查）
 
@@ -251,6 +242,15 @@ python3 tools/anim_coverage.py --check
 
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
+
+**静态导出缺失的节点（整节点豁免）**：
+
+| 节点 | 状态 | 依据 |
+|------|------|------|
+| `NoiseStyle` | 静态不渲染：`src/pagx/html` 中**零引用**，导出的 t=0 画面为空 | 已从语料中移除对应用例，节点整体列入 `tools/anim_coverage.py` 的 `NODE_EXEMPTIONS` |
+| `NoiseFilter` | 静态不渲染噪声：导出只有底色（5582px），参考有噪点（12613px） | 同上 |
+
+这两个节点需要先补静态能力（把噪点画出来），动画通道才有意义。补齐后删除 `NODE_EXEMPTIONS` 里的条目并补用例。
 
 **豁免的通道族：`TextPath`（10 个通道）**。这些通道在 `PAGXNodeChannel.cpp` 里标为可动画，但
 `src/renderer/LayerBuilder.cpp` 的 `convertTextPath()` 没有注册任何通道 writer（对比

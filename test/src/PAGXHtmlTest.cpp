@@ -5478,8 +5478,6 @@ CLI_TEST(PAGXHtmlTest, AnimationSharedDivKeepsGeometryAndFill) {
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
   const char* cases[] = {
       "layer/07_blend_mode.pagx",
-      // NoiseStyle has no CSS mapping at all, so its channels stay unexported.
-      "style/05_noise_style_density.pagx",
   };
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
@@ -5490,6 +5488,31 @@ CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
     EXPECT_EQ(html.find("@keyframes"), std::string::npos) << name;
     EXPECT_EQ(html.find("animation:"), std::string::npos) << name;
     EXPECT_EQ(html.find("{ ; }"), std::string::npos) << name;
+  }
+  // NoiseStyle has no static export at all (the writer never references it), so its channels have no
+  // CSS mapping and stay unexported. Built inline so the test does not depend on a corpus case.
+  const char* noiseXml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#F8FAFC"/>
+      <NoiseStyle id="grain" density="0.5" size="2" seed="7"/>
+    </Layer>
+    <Animations>
+      <Animation id="grainShift" duration="60" frameRate="60" loop="once">
+        <Object target="grain">
+          <Channel name="density" type="float">
+            <Key time="0" value="0.2" interpolation="linear"/>
+            <Key time="60" value="0.8"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  auto noiseHtml = LoadXMLAndConvert(noiseXml, opts);
+  ASSERT_FALSE(noiseHtml.empty());
+  for (const auto& html : {std::string(noiseHtml)}) {
+    EXPECT_EQ(html.find("@keyframes"), std::string::npos) << html;
+    EXPECT_EQ(html.find("animation:"), std::string::npos) << html;
   }
 }
 
