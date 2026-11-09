@@ -5,15 +5,16 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const { spawnSync } = require('child_process');
 const os = require('os');
 const path = require('path');
 const {
   downloadFile,
   ensureFFmpeg,
+  findCachedFFmpeg,
   findFFmpegOnPath,
   formatDownloadError,
   hasExplicitFFmpeg,
-  isMP4Export,
   parseChecksums,
   resolveTarget,
 } = require('./download-ffmpeg.js');
@@ -53,16 +54,6 @@ test('maps every pagx platform and architecture', () => {
   assert.strictEqual(resolveTarget('win32', 'x64').assetName, 'ffmpeg-win-x64.zip');
   assert.strictEqual(resolveTarget('win32', 'x64').executableName, 'ffmpeg.exe');
   assert.throws(() => resolveTarget('darwin', 'ia32'), /not available/);
-});
-
-test('detects only real MP4 exports', () => {
-  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--input', 'a.pagx']), true);
-  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx', '--output', 'a.MP4']), true);
-  assert.strictEqual(isMP4Export(['export', '--output', 'a.mp4', '--format', 'svg']), false);
-  assert.strictEqual(isMP4Export(['export', '--format=mp4']), true);
-  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--help']), false);
-  assert.strictEqual(isMP4Export(['render', '--format', 'mp4']), false);
-  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx']), false);
 });
 
 test('recognizes explicit paths and existing PATH executables', () => {
@@ -133,6 +124,7 @@ test('installs atomically and reuses the cache', async () => {
     assert.strictEqual(executable, path.join(root, 'v1.0.0', 'darwin-arm64', 'bin', 'ffmpeg'));
     assert.strictEqual(downloads.length, 2);
     assert.strictEqual(await ensureFFmpeg(options), executable);
+    assert.strictEqual(findCachedFFmpeg(options), executable);
     assert.strictEqual(downloads.length, 2);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -204,6 +196,27 @@ test('shares one installation between concurrent callers', async () => {
     const results = await Promise.all([ensureFFmpeg(options), ensureFFmpeg(options)]);
     assert.strictEqual(results[0], results[1]);
     assert.strictEqual(downloads.length, 2);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('postinstall logs download failures without failing installation', () => {
+  const root = tempDirectory();
+  try {
+    const result = spawnSync(process.execPath, [path.join(__dirname, 'download-ffmpeg.js'), '--postinstall'], {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        PAGX_FFMPEG_BASE_URL: 'http://127.0.0.1:1',
+        PAGX_FFMPEG_CACHE_DIR: root,
+        PAGX_SKIP_FFMPEG_DOWNLOAD: '0',
+      },
+    });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stderr, /optional ffmpeg download failed/);
+    assert.match(result.stderr, /installation will continue/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

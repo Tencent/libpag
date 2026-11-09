@@ -113,10 +113,11 @@ Render a PAGX file to an image.
 
 ### `pagx export --format mp4 --input <file.pagx> --output <file.mp4>`
 
-Export an animated PAGX file to H.264 MP4 through an external ffmpeg process. The launcher first uses
-`--ffmpeg`, `FFMPEG_BIN`, or an executable found in `PATH`. If none is available, it downloads the
-matching pinned build from `libpag/ffmpeg-builder`, verifies its SHA-256 checksum, and caches it for
-later exports. Non-MP4 commands never trigger this download.
+Export an animated PAGX file to H.264 MP4 through an external ffmpeg process. During `npm install`,
+the package's `postinstall` hook downloads the matching pinned build from `libpag/ffmpeg-builder`,
+verifies its SHA-256 checksum, and caches it. This optional download is logged on failure but never
+fails the pagx installation. Runtime commands only use the existing cache, `PATH`, `FFMPEG_BIN`, or
+`--ffmpeg`; they never wait for a network download.
 
 ```bash
 pagx export --input motion.pagx --output motion.mp4
@@ -133,9 +134,10 @@ npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"
 
 The cache location defaults to the platform user cache. `PAGX_FFMPEG_CACHE_DIR` overrides it,
 `PAGX_FFMPEG_RELEASE` selects a specific builder release, and `PAGX_FFMPEG_BASE_URL` can point to a
-mirror directory containing the release assets. Downloads include the upstream license files. If a
-download fails, configure a proxy or mirror, retry, or use an existing ffmpeg through
-`FFMPEG_BIN`/`--ffmpeg`.
+mirror directory containing the release assets. Set `PAGX_SKIP_FFMPEG_DOWNLOAD=1` before
+installation to skip the optional postinstall download. Downloads include the upstream license
+files. If a download fails, configure a proxy or mirror, retry the download script, or use an
+existing ffmpeg through `FFMPEG_BIN`/`--ffmpeg`.
 
 ### `pagx optimize [options] <file.pagx>`
 

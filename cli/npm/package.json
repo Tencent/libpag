@@ -33,6 +33,7 @@
     "check:preview": "node scripts/check-preview.js",
     "download:ffmpeg": "node scripts/download-ffmpeg.js",
     "test:ffmpeg": "node scripts/test-download-ffmpeg.js",
+    "postinstall": "node scripts/download-ffmpeg.js --postinstall",
     "prepack": "node scripts/build-html-snapshot.js",
     "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },

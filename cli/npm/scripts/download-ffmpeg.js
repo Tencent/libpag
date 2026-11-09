@@ -73,17 +73,17 @@ function hasExplicitFFmpeg(args, env = process.env) {
   return Boolean(env.FFMPEG_BIN) || args.some((arg) => arg === '--ffmpeg' || arg.startsWith('--ffmpeg='));
 }
 
-function isMP4Export(args) {
-  if (args[0] !== 'export' || args.includes('--help') || args.includes('-h')) return false;
-  let format = null;
-  let output = null;
-  for (let i = 1; i < args.length; ++i) {
-    if (args[i] === '--format') format = args[++i];
-    else if (args[i].startsWith('--format=')) format = args[i].slice('--format='.length);
-    else if (args[i] === '--output') output = args[++i];
-    else if (args[i].startsWith('--output=')) output = args[i].slice('--output='.length);
+function findCachedFFmpeg(options = {}) {
+  try {
+    const target = resolveTarget(options.platform, options.arch);
+    const env = options.env || process.env;
+    const release = env.PAGX_FFMPEG_RELEASE || DEFAULT_RELEASE;
+    const cacheRoot = options.cacheRoot || defaultCacheRoot(env);
+    const executable = path.join(cacheRoot, release, target.name, 'bin', target.executableName);
+    return isExecutable(executable, target.platform) ? executable : null;
+  } catch {
+    return null;
   }
-  return format ? format === 'mp4' : Boolean(output) && path.extname(output).toLowerCase() === '.mp4';
 }
 
 function releaseBaseURL(env = process.env) {
@@ -290,20 +290,31 @@ module.exports = {
   DEFAULT_RELEASE,
   downloadFile,
   ensureFFmpeg,
+  findCachedFFmpeg,
   findFFmpegOnPath,
   formatDownloadError,
   hasExplicitFFmpeg,
   isExecutable,
-  isMP4Export,
   parseChecksums,
   resolveTarget,
 };
 
 if (require.main === module) {
-  ensureFFmpeg()
-    .then((executablePath) => console.log(executablePath))
-    .catch((error) => {
-      console.error(formatDownloadError(error));
-      process.exitCode = 1;
-    });
+  const postinstall = process.argv.includes('--postinstall');
+  if (postinstall && process.env.PAGX_SKIP_FFMPEG_DOWNLOAD === '1') {
+    console.log('pagx: skipping the optional ffmpeg download (PAGX_SKIP_FFMPEG_DOWNLOAD=1)');
+  } else {
+    ensureFFmpeg()
+      .then((executablePath) => {
+        console.log(postinstall ? `pagx: ffmpeg is ready at ${executablePath}` : executablePath);
+      })
+      .catch((error) => {
+        if (postinstall) {
+          console.warn('pagx: optional ffmpeg download failed; the pagx installation will continue.');
+          console.warn('pagx: MP4 export can still use PATH, FFMPEG_BIN, or --ffmpeg.');
+        }
+        console.error(formatDownloadError(error));
+        if (!postinstall) process.exitCode = 1;
+      });
+  }
 }
