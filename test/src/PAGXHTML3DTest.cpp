@@ -1097,6 +1097,41 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveOriginKeywordMatchesTheEquivalentPixels) {
   }
 }
 
+/**
+ * Test case: a 3D keyframe track on an element whose static pose is 2D. The fill-mode holds (before
+ * a `delay` and after a `Once` run) must restore that static pose instead of the identity, which
+ * would hide the element's authored `transform` outside the active window.
+ */
+PAG_TEST(PAGXHTML3DTest, Matrix3DFillHoldsKeepTheStatic2DTransform) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:rotate(20deg);
+           animation:k 1s linear 0.5s 1"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 4u) << "delay + once needs a hold on both sides";
+  // `rotate(20deg)` in the layer's matrix form: m00 = cos, m10 = sin.
+  const float cos20 = 0.939693f;
+  const float sin20 = 0.342020f;
+  const auto& leading = channel->keyframes.front();
+  const auto& trailing = channel->keyframes.back();
+  EXPECT_TRUE(NearlyEqual(leading.value.getRowColumn(0, 0), cos20, 0.001f))
+      << "during the delay the static transform must show, not the identity";
+  EXPECT_TRUE(NearlyEqual(leading.value.getRowColumn(1, 0), sin20, 0.001f));
+  EXPECT_TRUE(NearlyEqual(trailing.value.getRowColumn(0, 0), cos20, 0.001f))
+      << "after a Once run with fill-mode none the static transform comes back";
+  EXPECT_TRUE(NearlyEqual(trailing.value.getRowColumn(1, 0), sin20, 0.001f));
+}
+
 PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
   struct OriginCase {
     const char* value;
