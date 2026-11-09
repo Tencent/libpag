@@ -3,11 +3,10 @@
      frame has to move the anchor and reflow the line at the same time.
      Target: Text  Channel: x, fontSize  Type: float
      Expect: gap
-     Known-gap: text-reflow-anchor
-     Note: x 单独动画时走 SVG <text>（基线精确，0.98）；一旦叠加 fontSize，基线随字号下移，而 SVG 的
-           y 是固定值，改用 CSS span 路径（行盒随字号重排）。span 的基线比 PAGX 低 1-2px，实测均值
-           0.90。修法是让 SVG 关键帧同时补偿基线位移，或改用能重排的矢量文本，尚未实现。
-     Ref: - -->
+     Known-gap: static-text-baseline
+     Note: 文本统一走 CSS span（单一路径，避免 x/y 与字号两类动画走不同模式而互相冲突）。span 的
+           行盒基线由浏览器度量推导，比 PAGX 低 1~2px，因此本用例与 text/10、text/11 一样停在 0.90。
+          Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
