@@ -627,11 +627,19 @@ std::string ExtractParenArgs(const std::string& value) {
 bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs) {
   size_t openParen = trimmed.find('(');
   if (openParen == std::string::npos || openParen == 0) return false;
-  size_t closeParen = trimmed.find_last_of(')');
-  if (closeParen == std::string::npos || closeParen <= openParen) return false;
-  // Reject nested or compound calls: there must be exactly one `)` (the closing one) and
-  // no non-whitespace content after it.
-  if (trimmed.find(')') != closeParen) return false;
+  // The argument may carry parentheses of its own (`calc(100% - 10px)`, `var(--x)`), so the closing
+  // paren is the one that balances the opening paren, not the first or last one in the string.
+  int depth = 0;
+  size_t closeParen = trimmed.size();
+  for (size_t i = openParen; i < trimmed.size(); ++i) {
+    if (trimmed[i] == '(') {
+      ++depth;
+    } else if (trimmed[i] == ')' && --depth == 0) {
+      closeParen = i;
+      break;
+    }
+  }
+  if (closeParen >= trimmed.size()) return false;
   if (!Trim(trimmed.substr(closeParen + 1)).empty()) return false;
   std::string name = ToLower(Trim(trimmed.substr(0, openParen)));
   if (name.empty()) return false;

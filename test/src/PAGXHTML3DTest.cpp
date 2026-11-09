@@ -1132,6 +1132,91 @@ PAG_TEST(PAGXHTML3DTest, Matrix3DFillHoldsKeepTheStatic2DTransform) {
   EXPECT_TRUE(NearlyEqual(trailing.value.getRowColumn(1, 0), sin20, 0.001f));
 }
 
+/**
+ * Test case: `<transform-list>` needs no separator between functions, so minified CSS
+ * (`rotate(45deg)scale(2)`) composes exactly like the spaced form.
+ */
+PAG_TEST(PAGXHTML3DTest, CompoundTransformWithoutSpacesIsAccepted) {
+  const std::string templateHtml = R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:80px;height:40px;background-color:#000;
+           transform:SPACED"></div>
+    </body></html>
+  )HTML";
+  auto spaced = templateHtml;
+  spaced.replace(spaced.find("SPACED"), 6, "rotate(45deg) scale(2)");
+  auto compact = templateHtml;
+  compact.replace(compact.find("SPACED"), 6, "rotate(45deg)scale(2)");
+
+  auto spacedDoc = ParseHtml(spaced);
+  auto compactDoc = ParseHtml(compact);
+  ASSERT_NE(spacedDoc, nullptr);
+  ASSERT_NE(compactDoc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(compactDoc, "malformed"));
+  auto* spacedBox = FindLayerById(spacedDoc, "box");
+  auto* compactBox = FindLayerById(compactDoc, "box");
+  ASSERT_NE(spacedBox, nullptr);
+  ASSERT_NE(compactBox, nullptr);
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      EXPECT_TRUE(NearlyEqual(spacedBox->matrix3D.getRowColumn(row, column),
+                              compactBox->matrix3D.getRowColumn(row, column), 1e-5f))
+          << "row " << row << " column " << column;
+    }
+  }
+}
+
+/**
+ * Test case: a `calc()` length argument resolves against the element box, including percentages and
+ * nested parentheses. The X axis is relative to the width, the Y axis to the height.
+ */
+PAG_TEST(PAGXHTML3DTest, CalcLengthArgumentsResolveAgainstTheElementBox) {
+  struct CalcCase {
+    const char* transform;
+    float tx;
+    float ty;
+  };
+  // Box is 80x40.
+  const CalcCase cases[] = {
+      {"translateX(calc(100% - 10px))", 70.0f, 0.0f},
+      {"translateY(calc(50% + 4px))", 0.0f, 24.0f},
+      {"translate(calc((100% - 40px) / 2), calc(25% * 2))", 20.0f, 20.0f},
+      {"translateX(calc(10px + 5px))", 15.0f, 0.0f},
+  };
+  for (const auto& item : cases) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:120px">
+        <div id="box" style="width:80px;height:40px;background-color:#000;transform:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, item.transform);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << item.transform;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << item.transform;
+    EXPECT_TRUE(NearlyEqual(box->matrix.tx, item.tx, 0.01f))
+        << item.transform << " tx=" << box->matrix.tx;
+    EXPECT_TRUE(NearlyEqual(box->matrix.ty, item.ty, 0.01f))
+        << item.transform << " ty=" << box->matrix.ty;
+  }
+}
+
+/**
+ * Test case: an argument the subset cannot evaluate is reported as such (not as a malformed list),
+ * so the diagnostic points at the function that owns it.
+ */
+PAG_TEST(PAGXHTML3DTest, UnsupportedLengthArgumentIsNotReportedAsMalformed) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:80px;height:40px;background-color:#000;
+           transform:translateX(var(--dx))"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "is malformed"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX argument"));
+}
+
 PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
   struct OriginCase {
     const char* value;

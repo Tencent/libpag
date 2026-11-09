@@ -247,16 +247,175 @@ std::string ScaleArityMessage(const std::string& label, const std::string& token
 
 // Argument accessors for one transform function. A small struct keeps the parser flat and avoids
 // the capturing lambdas the project style discourages.
+// Minimal `calc()` solver for transform lengths: sums / differences of px and percentage terms, each
+// optionally multiplied or divided by a plain number, with parentheses. A percentage resolves against
+// the element box (width on the X axis, height on Y); a `calc()` with no such reference, or with any
+// other unit / function, fails so the caller can report the argument.
+void SkipCalcSpaces(const std::string& text, size_t& index) {
+  while (index < text.size() && std::isspace(static_cast<unsigned char>(text[index]))) {
+    ++index;
+  }
+}
+
+bool EvaluateCalcSum(const std::string& text, size_t& index, float referencePx, float& out);
+
+bool EvaluateCalcFactor(const std::string& text, size_t& index, float referencePx, float& out) {
+  SkipCalcSpaces(text, index);
+  if (index < text.size() && text[index] == '(') {
+    ++index;
+    if (!EvaluateCalcSum(text, index, referencePx, out)) {
+      return false;
+    }
+    SkipCalcSpaces(text, index);
+    if (index >= text.size() || text[index] != ')') {
+      return false;
+    }
+    ++index;
+    return true;
+  }
+  const size_t start = index;
+  while (index < text.size() &&
+         (std::isdigit(static_cast<unsigned char>(text[index])) || text[index] == '.')) {
+    ++index;
+  }
+  if (index == start) {
+    return false;
+  }
+  float number = 0.0f;
+  if (!ParseStrictFloat(text.substr(start, index - start), number)) {
+    return false;
+  }
+  std::string unit;
+  if (index < text.size() && text[index] == '%') {
+    ++index;
+    unit = "%";
+  } else {
+    const size_t unitStart = index;
+    while (index < text.size() && std::isalpha(static_cast<unsigned char>(text[index]))) {
+      ++index;
+    }
+    unit = ToLower(text.substr(unitStart, index - unitStart));
+  }
+  if (unit.empty() || unit == "px") {
+    out = number;
+    return true;
+  }
+  if (unit == "%") {
+    if (!std::isfinite(referencePx)) {
+      return false;
+    }
+    out = number * 0.01f * referencePx;
+    return true;
+  }
+  return false;
+}
+
+bool EvaluateCalcProduct(const std::string& text, size_t& index, float referencePx, float& out) {
+  if (!EvaluateCalcFactor(text, index, referencePx, out)) {
+    return false;
+  }
+  for (;;) {
+    SkipCalcSpaces(text, index);
+    if (index >= text.size() || (text[index] != '*' && text[index] != '/')) {
+      return true;
+    }
+    const char op = text[index++];
+    float rhs = 0.0f;
+    if (!EvaluateCalcFactor(text, index, referencePx, rhs)) {
+      return false;
+    }
+    if (op == '*') {
+      out *= rhs;
+    } else {
+      if (rhs == 0.0f) {
+        return false;
+      }
+      out /= rhs;
+    }
+  }
+}
+
+bool EvaluateCalcSum(const std::string& text, size_t& index, float referencePx, float& out) {
+  SkipCalcSpaces(text, index);
+  float sign = 1.0f;
+  if (index < text.size() && (text[index] == '+' || text[index] == '-')) {
+    if (text[index] == '-') {
+      sign = -1.0f;
+    }
+    ++index;
+  }
+  if (!EvaluateCalcProduct(text, index, referencePx, out)) {
+    return false;
+  }
+  out *= sign;
+  for (;;) {
+    SkipCalcSpaces(text, index);
+    if (index >= text.size() || (text[index] != '+' && text[index] != '-')) {
+      return true;
+    }
+    const char op = text[index++];
+    float rhs = 0.0f;
+    if (!EvaluateCalcProduct(text, index, referencePx, rhs)) {
+      return false;
+    }
+    out = op == '+' ? out + rhs : out - rhs;
+  }
+}
+
+bool EvaluateCalcLength(const std::string& value, float referencePx, float& out) {
+  const std::string trimmed = Trim(value);
+  if (trimmed.size() < 7 || trimmed.back() != ')') {
+    return false;
+  }
+  const std::string inner = trimmed.substr(5, trimmed.size() - 6);
+  size_t index = 0;
+  float result = 0.0f;
+  if (!EvaluateCalcSum(inner, index, referencePx, result)) {
+    return false;
+  }
+  SkipCalcSpaces(inner, index);
+  if (index != inner.size()) {
+    return false;
+  }
+  out = result;
+  return true;
+}
+
+// Resolves one length argument: a plain px value, a percentage of `referencePx`, or a `calc()` over
+// both. `referencePx` is NaN when the axis has no percentage basis (the Z axis) or the box size is
+// unknown, in which case those forms are reported as unsupported.
+bool ResolveLengthToken(const std::string& token, float referencePx, HTMLValueParser& valueParser,
+                        float& out) {
+  const std::string trimmed = Trim(token);
+  if (ToLower(trimmed).rfind("calc(", 0) == 0) {
+    return EvaluateCalcLength(trimmed, referencePx, out);
+  }
+  if (!trimmed.empty() && trimmed.back() == '%') {
+    float fraction = 0.0f;
+    if (!ParseCssPercentage(trimmed, fraction) || !std::isfinite(referencePx)) {
+      return false;
+    }
+    out = referencePx * fraction;
+    return true;
+  }
+  out = valueParser.parseAbsoluteLengthPx(trimmed);
+  return std::isfinite(out);
+}
+
 struct TransformArgs {
   const std::vector<std::string>& parts;
   HTMLValueParser& valueParser;
+  // Percentage / `calc()` lengths resolve against the element box: width for X, height for Y.
+  float referenceWidthPx = NAN;
+  float referenceHeightPx = NAN;
 
-  bool LengthAt(size_t index, float& value) const {
+  // `axis`: 0 = x (percent of width), 1 = y (percent of height), 2 = z (no percentage basis).
+  bool LengthAt(size_t index, float& value, int axis = 0) const {
     if (index >= parts.size()) {
       return false;
     }
-    value = valueParser.parseAbsoluteLengthPx(parts[index]);
-    return std::isfinite(value);
+    const float reference = axis == 0 ? referenceWidthPx : (axis == 1 ? referenceHeightPx : NAN);
+    return ResolveLengthToken(parts[index], reference, valueParser, value);
   }
 
   bool NumberAt(size_t index, float& value) const {
@@ -279,7 +438,8 @@ bool IsFinite(const Matrix3D& matrix) {
 
 // Parses one `fn(args)` token. Returns false after emitting a diagnostic.
 bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
-                   HTMLDiagnosticSink& diagnostics, Matrix3D* out) {
+                   HTMLDiagnosticSink& diagnostics, Matrix3D* out, float referenceWidthPx,
+                   float referenceHeightPx) {
   std::string name;
   std::string args;
   if (!ParseCssFunctionCall(token, name, args)) {
@@ -296,7 +456,7 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   const std::string label = Trim(token.substr(0, token.find('(')));
   const auto parts = SplitCommaArgs(args);
 
-  const TransformArgs transformArgs = {parts, valueParser};
+  const TransformArgs transformArgs = {parts, valueParser, referenceWidthPx, referenceHeightPx};
 
   if (name == "translate" || name == "translate3d" || name == "translatex" ||
       name == "translatey" || name == "translatez") {
@@ -312,24 +472,25 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
     float z = 0.0f;
     if (name == "translate" || name == "translate3d") {
       // `translate` stops at two lengths, so only `translate3d` reaches the depth axis.
-      if (!transformArgs.LengthAt(0, x)) {
+      if (!transformArgs.LengthAt(0, x, 0)) {
         diagnostics.warn("html: translate first argument '" + parts[0] +
                          "' is not a px length; ignored");
         return false;
       }
-      if (parts.size() > 1 && !transformArgs.LengthAt(1, y)) {
+      if (parts.size() > 1 && !transformArgs.LengthAt(1, y, 1)) {
         diagnostics.warn("html: translate second argument '" + parts[1] +
                          "' is not a px length; ignored");
         return false;
       }
-      if (parts.size() > 2 && !transformArgs.LengthAt(2, z)) {
+      if (parts.size() > 2 && !transformArgs.LengthAt(2, z, 2)) {
         diagnostics.warn("html: translate third argument '" + parts[2] +
                          "' is not a px length; ignored");
         return false;
       }
     } else {
       float& only = name == "translatex" ? x : (name == "translatey" ? y : z);
-      if (!transformArgs.LengthAt(0, only)) {
+      const int onlyAxis = name == "translatex" ? 0 : (name == "translatey" ? 1 : 2);
+      if (!transformArgs.LengthAt(0, only, onlyAxis)) {
         diagnostics.warn("html: " + label + " argument '" + parts[0] +
                          "' is not a px length; ignored");
         return false;
@@ -491,7 +652,7 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       return true;
     }
     float distance = 0.0f;
-    if (!transformArgs.LengthAt(0, distance) || !(distance > 0.0f)) {
+    if (!transformArgs.LengthAt(0, distance, 2) || !(distance > 0.0f)) {
       diagnostics.warn("html: perspective distance must be a positive length; got '" + token +
                        "'; ignored");
       return false;
@@ -549,15 +710,23 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
     if (index >= size || value[index] != '(') {
       return false;
     }
-    const size_t closeParen = value.find(')', index);
-    if (closeParen == std::string::npos) {
+    // `<transform-list>` is `<transform-function>+`, so `rotate(45deg)scale(2)` is legal and needs no
+    // separator. The closing paren is matched by depth, so an argument may carry parentheses of its
+    // own (`translateX(calc(100% - 10px))`).
+    int depth = 0;
+    size_t closeParen = index;
+    for (; closeParen < size; ++closeParen) {
+      if (value[closeParen] == '(') {
+        ++depth;
+      } else if (value[closeParen] == ')' && --depth == 0) {
+        break;
+      }
+    }
+    if (closeParen >= size) {
       return false;
     }
     out->push_back(Trim(value.substr(nameStart, closeParen - nameStart + 1)));
     index = closeParen + 1;
-    if (index < size && !std::isspace(static_cast<unsigned char>(value[index]))) {
-      return false;
-    }
   }
   return !out->empty();
 }
@@ -631,7 +800,8 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
 }
 
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
-                           HTMLDiagnosticSink& diagnostics, Matrix3D* out) {
+                           HTMLDiagnosticSink& diagnostics, Matrix3D* out, float referenceWidthPx,
+                           float referenceHeightPx) {
   if (out == nullptr) {
     return false;
   }
@@ -648,7 +818,8 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   Matrix3D pose = {};
   for (const auto& token : tokens) {
     Matrix3D step = {};
-    if (!ParseFunction(token, valueParser, diagnostics, &step)) {
+    if (!ParseFunction(token, valueParser, diagnostics, &step, referenceWidthPx,
+                       referenceHeightPx)) {
       return false;
     }
     pose = Multiply(pose, step);

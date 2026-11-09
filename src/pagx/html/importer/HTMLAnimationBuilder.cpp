@@ -412,7 +412,7 @@ constexpr float kPi = 3.14159265358979323846f;
 // pivot translation that the runtime would interpolate independently.
 bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
                         HTMLDiagnosticSink& diagnostics, Matrix3D& outPose, bool& pureTranslate,
-                        bool& flat) {
+                        bool& flat, const HTMLTransformReference& reference) {
   outPose = {};
   pureTranslate = true;
   flat = true;
@@ -420,7 +420,8 @@ bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
   if (trimmed.empty() || ToLower(trimmed) == "none") {
     return true;  // identity == translate(0, 0)
   }
-  if (!ParseCssTransformList(trimmed, parser, diagnostics, &outPose)) {
+  if (!ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
+                             reference.heightPx)) {
     return false;
   }
   flat = IsFlatTransform(outPose);
@@ -520,7 +521,11 @@ bool ParseFlatTransformMatrix(const std::string& value, HTMLValueParser& parser,
                               bool& pureTranslate) {
   Matrix3D pose = {};
   bool flat = true;
-  if (!ParseTransformPose(value, parser, diagnostics, pose, pureTranslate, flat) || !flat) {
+  // SVG shapes have no box reference for percentage / `calc()` lengths, so the empty reference
+  // keeps that path on plain px.
+  if (!ParseTransformPose(value, parser, diagnostics, pose, pureTranslate, flat,
+                          HTMLTransformReference{}) ||
+      !flat) {
     return false;
   }
   outMatrix = ToAffine2D(pose);
@@ -1253,7 +1258,8 @@ bool HTMLAnimationBuilder::buildForElement(
         Matrix3D pose = {};
         bool pureTranslate = false;
         bool flat = true;
-        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, pureTranslate, flat)) {
+        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, pureTranslate, flat,
+                               reference)) {
           const Matrix3D pushed = PushPerspective(
               pose, parentPerspectivePx, parentPerspectiveOriginX, parentPerspectiveOriginY);
           // The parent camera is folded in after parsing, so a pose that parsed as flat can gain

@@ -77,7 +77,8 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
  * not finite, or a 3D result is not invertible (PAGX rejects such poses).
  */
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
-                           HTMLDiagnosticSink& diagnostics, Matrix3D* out);
+                           HTMLDiagnosticSink& diagnostics, Matrix3D* out,
+                           float referenceWidthPx = NAN, float referenceHeightPx = NAN);
 
 /**
  * Returns the projection matrix `P` for the CSS perspective distance `distance`: the identity with

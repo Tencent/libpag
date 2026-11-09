@@ -834,7 +834,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   box.preserve3D = ToLower(Trim(LookupProperty(props, "transform-style"))) == "preserve-3d";
   const std::string transform = Trim(LookupProperty(props, "transform"));
   Matrix3D pose = {};
-  if (!ParseCssTransformList(transform, _valueParser, _diagnostics, &pose)) {
+  if (!ParseCssTransformList(transform, _valueParser, _diagnostics, &pose, referenceWidthPx,
+                             referenceHeightPx)) {
     return;
   }
   const std::string originValue = Trim(LookupProperty(props, "transform-origin"));
