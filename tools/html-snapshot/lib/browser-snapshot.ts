@@ -4661,17 +4661,31 @@ function applyLayerName(el, html, opts, precomputed) {
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
   const computed = precomputed || getComputedStyle(el);
+  // The camera is read before `renderElementBox` strips the inline transform: stripping also clears
+  // `transform-origin`, which would reset `perspective-origin` to the box centre and hide a pivot
+  // depth. Only the outermost call wraps — the `_strippedTransform` re-entry renders the pose itself
+  // and must not add a second camera layer above the author `name`.
+  const camera = opts && opts._strippedTransform ? null : staticCameraFor(computed);
   // Name the element's own box before the camera wrapper is added: an author `name` identifies the
   // layer that carries the content and the animation, not the structural camera layer above it.
   const named = applyLayerName(el, renderElementBox(el, parentRect, opts, computed), opts, computed);
-  return withPerspectiveCamera(el, named, opts, computed);
+  return withPerspectiveCamera(named, opts, computed, camera);
+}
+
+// Camera carried by the element's own static transform (`transform: perspective(<d>) ...`), read
+// from the pre-strip computed style. Returns null when the transform carries no projection.
+function staticCameraFor(computed) {
+  const transform = String((computed && computed.transform) || '').trim();
+  if (!/^matrix3d\(/i.test(transform)) {
+    return null;
+  }
+  const split = splitProjectiveTransform(transform);
+  return split ? { distance: split.distance } : null;
 }
 
 // Distance of the camera this element needs, either because its own transform carries a
 // `perspective()` (already split out by `renderElementBox`) or because its animation does.
-function cameraDistanceForElement(opts, computed) {
-  const forwarded = opts && opts._cameraDistance;
-  if (forwarded) return forwarded;
+function cameraDistanceForElement(computed) {
   const names = String((computed && computed.animationName) || '')
     .split(',')
     .map((name) => name.trim());
@@ -4711,9 +4725,11 @@ function perspectiveOriginXY(computed) {
   return parts.length === 2 ? parts[0] + ' ' + parts[1] : '50% 50%';
 }
 
-function withPerspectiveCamera(el, html, opts, computed) {
+function withPerspectiveCamera(html, opts, computed, staticCamera) {
   if (!html) return html;
-  const distance = cameraDistanceForElement(opts, computed);
+  if (opts && opts._strippedTransform) return html;
+  const distance =
+    (staticCamera && staticCamera.distance) || cameraDistanceForElement(computed);
   if (!distance) return html;
   if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
     recordCameraSkip('depth-pivot');
@@ -4772,9 +4788,8 @@ function renderElementBox(el, parentRect, opts, precomputed) {
       const forwarded = split
         ? { transform: split.affine, transformOrigin: boxTransform.transformOrigin }
         : boxTransform;
-      const camera = split ? split.distance : 0;
       return withStrippedTransform(el, () => render(el, parentRect, {
-        ...opts, _strippedTransform: true, transform: forwarded, _cameraDistance: camera,
+        ...opts, _strippedTransform: true, transform: forwarded,
       }, getComputedStyle(el)));
     }
   }
@@ -5448,6 +5463,7 @@ const HELPER_FNS = [
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
   cameraDistanceForElement,
+  staticCameraFor,
   transformOriginDepth,
   perspectiveOriginXY,
   withPerspectiveCamera,
@@ -6724,6 +6740,8 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  staticCameraFor,
+  withPerspectiveCamera,
   recordCameraSkip,
   pagxCameraSkips,
   transformOriginDepth,
