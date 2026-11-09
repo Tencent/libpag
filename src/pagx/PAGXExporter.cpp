@@ -174,6 +174,17 @@ static std::string ToLowerAscii(std::string value) {
   return value;
 }
 
+// Windows resolves these names as devices before looking at the extension, so an entry such as
+// "con.png" or "COM1.png" cannot be created or opened there even though the archive is valid.
+static bool IsWindowsDeviceName(const std::string& stem) {
+  auto lower = ToLowerAscii(stem);
+  if (lower == "con" || lower == "prn" || lower == "aux" || lower == "nul") {
+    return true;
+  }
+  return lower.size() == 4 && lower[3] >= '1' && lower[3] <= '9' &&
+         (lower.rfind("com", 0) == 0 || lower.rfind("lpt", 0) == 0);
+}
+
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
 // extension and for the "_<n>" suffix that resolves name collisions.
 static constexpr size_t MAX_ENTRY_STEM_LENGTH = 128;
@@ -186,6 +197,9 @@ static std::string AllocateEntryPath(PAGXPackContext* pack, const std::string& b
   std::string stem = baseName.empty() ? "img_" + std::to_string(pack->nextImageIndex++) : baseName;
   if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
     stem.resize(MAX_ENTRY_STEM_LENGTH);
+  }
+  if (IsWindowsDeviceName(stem)) {
+    stem = "img_" + stem;
   }
   std::string prefix = "images/" + stem;
   std::string path = prefix + "." + extension;

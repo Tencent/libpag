@@ -351,6 +351,32 @@ PAGX_TEST(PAGXExporterTest, ToDataAvoidsDirectoriesRequiredByKeptImages) {
   EXPECT_NE(xml.find("source=\"images/foo_2.png\""), std::string::npos);
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataAvoidsWindowsDeviceEntryNames) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  AddImage(doc.get(), "CON", "", MakeImageData(0xE1));
+  AddImage(doc.get(), "nul", "", MakeImageData(0xE2));
+  AddImage(doc.get(), "COM1", "", MakeImageData(0xE3));
+  AddImage(doc.get(), "lpt9", "", MakeImageData(0xE4));
+  // Only COM1-COM9 and LPT1-LPT9 are device names, not names that merely start with them.
+  AddImage(doc.get(), "CON2", "", MakeImageData(0xE5));
+
+  auto zip = pagx::PAGXExporter::ToData(*doc);
+  ASSERT_NE(zip, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 6u);
+
+  EXPECT_EQ(entries.find("images/CON.png"), entries.end());
+  EXPECT_EQ(entries.find("images/nul.png"), entries.end());
+  EXPECT_EQ(entries.find("images/COM1.png"), entries.end());
+  EXPECT_EQ(entries.find("images/lpt9.png"), entries.end());
+  EXPECT_EQ(entries["images/img_CON.png"], BytesOf(MakeImageData(0xE1)));
+  EXPECT_EQ(entries["images/img_nul.png"], BytesOf(MakeImageData(0xE2)));
+  EXPECT_EQ(entries["images/img_COM1.png"], BytesOf(MakeImageData(0xE3)));
+  EXPECT_EQ(entries["images/img_lpt9.png"], BytesOf(MakeImageData(0xE4)));
+  EXPECT_EQ(entries["images/CON2.png"], BytesOf(MakeImageData(0xE5)));
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataLimitsEntryNameLength) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   std::string longId(300, 'a');
