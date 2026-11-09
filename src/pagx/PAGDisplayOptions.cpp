@@ -74,7 +74,11 @@ float PAGDisplayOptions::getZoomScale() const {
 void PAGDisplayOptions::setZoomScale(float zoomScale) {
   auto displayList = getDisplayList();
   if (displayList != nullptr) {
+    auto previous = displayList->zoomScale();
     displayList->setZoomScale(zoomScale);
+    if (previous != displayList->zoomScale()) {
+      scene->outputViewDirty = true;
+    }
   }
 }
 
@@ -86,7 +90,11 @@ int PAGDisplayOptions::getZoomScalePrecision() const {
 void PAGDisplayOptions::setZoomScalePrecision(int precision) {
   auto displayList = getDisplayList();
   if (displayList != nullptr) {
+    auto previous = displayList->zoomScale();
     displayList->setZoomScalePrecision(precision);
+    if (previous != displayList->zoomScale()) {
+      scene->outputViewDirty = true;
+    }
   }
 }
 
@@ -102,7 +110,11 @@ Point PAGDisplayOptions::getContentOffset() const {
 void PAGDisplayOptions::setContentOffset(float offsetX, float offsetY) {
   auto displayList = getDisplayList();
   if (displayList != nullptr) {
+    auto previous = displayList->contentOffset();
     displayList->setContentOffset(offsetX, offsetY);
+    if (previous != displayList->contentOffset()) {
+      scene->outputViewDirty = true;
+    }
   }
 }
 
@@ -176,7 +188,11 @@ Color PAGDisplayOptions::getBackgroundColor() const {
 void PAGDisplayOptions::setBackgroundColor(const Color& color) {
   auto displayList = getDisplayList();
   if (displayList != nullptr) {
+    auto previous = displayList->backgroundColor();
     displayList->setBackgroundColor(ToTGFX(color));
+    if (previous != displayList->backgroundColor()) {
+      scene->outputViewDirty = true;
+    }
   }
 }
 

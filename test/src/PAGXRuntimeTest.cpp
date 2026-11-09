@@ -26,6 +26,8 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -34,6 +36,7 @@
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/tgfx.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
@@ -942,7 +945,9 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   ASSERT_TRUE(surface != nullptr);
 
   std::vector<uint8_t> firstFrame = {};
+  EXPECT_TRUE(scene->hasContentChanged());
   ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
   ASSERT_TRUE(ReadSurfacePixels(surface, &firstFrame));
   EXPECT_EQ(firstFrame[3], 255u);
 
@@ -950,6 +955,146 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   ASSERT_TRUE(scene->draw(surface));
   ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
   EXPECT_EQ(secondFrame, firstFrame);
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewEditsInvalidateRenderedContent) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  target->alpha = 0;
+  doc->notifyChange({target}, false);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[3], 0u);
+
+  doc->outputBounds = pagx::Rect::MakeXYWH(10, 10, 20, 20);
+  doc->notifyChange({doc.get()}, false);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewDisplayChangesInvalidateRenderedContent) {
+  auto scene = pagx::PAGScene::Make(MakeTargetViewDocument());
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto* options = scene->getDisplayOptions();
+
+  options->setZoomScale(2);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScale(2);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setContentOffset(5, 10);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setContentOffset(5, 10);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setBackgroundColor({0, 0, 1, 1});
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setBackgroundColor({0, 0, 1, 1});
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setZoomScale(1.5f);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScalePrecision(1);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScalePrecision(1);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setZoomScale(0);
+  EXPECT_TRUE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->draw(surface));
+  EXPECT_TRUE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewRecordConsumesContentChanges) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto device = Devices::MakeDefault();
+  ASSERT_NE(device, nullptr);
+  DeviceLockScope scope(device);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto surface = tgfx::Surface::Make(scope.context(), 20, 20);
+  ASSERT_NE(surface, nullptr);
+  auto wrapped = pagx::MakeFrom(device, surface);
+  ASSERT_NE(wrapped, nullptr);
+
+  EXPECT_TRUE(scene->hasContentChanged());
+  auto recording = pagx::Record(scope.context(), scene, wrapped);
+  ASSERT_NE(recording, nullptr);
+  scope.context()->submit(std::move(recording));
+  EXPECT_FALSE(scene->hasContentChanged());
+  scene->getDisplayOptions()->setContentOffset(5, 5);
+  EXPECT_TRUE(scene->hasContentChanged());
+  recording = pagx::Record(scope.context(), scene, wrapped);
+  ASSERT_NE(recording, nullptr);
+  scope.context()->submit(std::move(recording));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent) {
+  auto doc = MakeTargetViewDocument();
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  auto* imageNode = doc->makeNode<pagx::Image>();
+  imageNode->filePath = "target.png";
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = imageNode;
+  auto* fill = static_cast<pagx::Fill*>(target->contents.back());
+  fill->color = pattern;
+  const uint8_t red[] = {255, 0, 0, 255};
+  const uint8_t blue[] = {0, 0, 255, 255};
+  auto info =
+      tgfx::ImageInfo::Make(1, 1, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+  auto redImage =
+      pagx::MakeFrom(tgfx::Image::MakeFrom(info, tgfx::Data::MakeWithCopy(red, sizeof(red))));
+  auto blueImage =
+      pagx::MakeFrom(tgfx::Image::MakeFrom(info, tgfx::Data::MakeWithCopy(blue, sizeof(blue))));
+  ASSERT_NE(redImage, nullptr);
+  ASSERT_NE(blueImage, nullptr);
+  ASSERT_TRUE(doc->loadFileData("target.png", redImage));
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[0], 255u);
+  EXPECT_EQ(pixels[2], 0u);
+
+  ASSERT_TRUE(doc->loadFileData("target.png", blueImage));
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[0], 0u);
+  EXPECT_EQ(pixels[2], 255u);
 }
 
 /**
@@ -967,11 +1112,14 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
 
   doc->targetLayerId.clear();
   doc->notifyChange({doc.get()}, true);
+  EXPECT_TRUE(scene->hasContentChanged());
   EXPECT_FALSE(scene->draw(surface));
+  EXPECT_TRUE(scene->hasContentChanged());
 
   doc->targetLayerId = "target";
   doc->notifyChange({doc.get()}, true);
   EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
 }
 
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is

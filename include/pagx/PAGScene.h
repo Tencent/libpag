@@ -174,7 +174,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * produce different pixels. Hosts driving their own render loop can consult this to skip
    * redundant full renders on idle frames. Returns true when either the underlying display list
    * has changed or a pending TextHolder reshape (driven by a ViewModel data bind or animation
-   * text-shaping channel) has not yet been flushed — flush runs inside Record().
+   * text-shaping channel) has not yet been flushed — flush runs inside Record(). Static output
+   * views track document/resource notifications and effective display transform/background changes
+   * independently of the temporary layer-tree changes used while drawing the target.
    */
   bool hasContentChanged() const;
 
@@ -279,6 +281,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // reject that state instead of falling back to a whole-canvas render.
   enum class OutputViewState { None, Valid, Invalid };
   OutputViewState outputViewState = OutputViewState::None;
+
+  // Target drawing temporarily reparents layers, which leaves the display list dirty even when
+  // no authored content changed. Consume this separate flag only after a successful target draw.
+  bool outputViewDirty = true;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 

@@ -155,6 +155,7 @@ void PAGScene::buildRuntimeTree() {
 }
 
 void PAGScene::resolveOutputTarget() {
+  outputViewDirty = true;
   outputTargetNode = nullptr;
   const Layer* resolved = nullptr;
   std::string error;
@@ -606,6 +607,7 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     canvas->translate(-bounds.x, -bounds.y);
     DrawOutputTarget(canvas, _rootComposition->runtimeLayer, target);
     clearAllViewModelsDirty();
+    outputViewDirty = false;
     return true;
   }
   displayList->render(tgfxSurface.get(), autoClear);
@@ -723,6 +725,7 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   if (changedImages.empty() || _rootComposition == nullptr) {
     return;
   }
+  outputViewDirty = true;
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
@@ -903,6 +906,9 @@ bool PAGScene::hasContentChanged() const {
     if (holder != nullptr && holder->isDirty()) {
       return true;
     }
+  }
+  if (outputViewState != OutputViewState::None) {
+    return outputViewDirty;
   }
   return displayList->hasContentChanged();
 }
