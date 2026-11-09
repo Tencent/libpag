@@ -616,8 +616,9 @@ PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`�
 改写的限制（按命中频率排序）：
 
 * 支点带深度（`transform-origin: 0 80px 30px`）时无法迁移，因为 `perspective-origin` 没有 z
-  分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），投影顺序与 CSS 相差
-  一个 `origin × projection` 项 —— 在 `d = 600px`、支点深度 30px 时约数像素。
+  分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），元素保留函数写法：
+  姿态里仍然带着投影，但 PAGX 按 `P · T(a) · L · T(-a)` 合成、CSS 按 `T(a) · P · L · T(-a)`，
+  两者相差这个次序项（`d = 600px`、支点深度 30px 时约百分之几）。跳过改写绝不能把投影本身丢掉。
 * `perspective` 父级的 flow / flex 子元素在导入期没有已解析的偏移，相机按父级坐标系投影；
   会有一条诊断提示。
 * `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，并退化为图层原点而非盒中心。

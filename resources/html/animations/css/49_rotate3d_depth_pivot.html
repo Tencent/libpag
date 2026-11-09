@@ -13,9 +13,10 @@
       projection with `transform-origin` too, i.e. T(a) * P * L * T(-a), while PAGX / AE /
       Lottie keep it outside the pivot, i.e. P * T(a) * L * T(-a). `perspective-origin`
       carries only x / y, so no camera placement reproduces a pivot that sits off the layer
-      plane. Expect this case to stay near SSIM 0.93 / 2.2%: the canvas is 240x160, the card
-      is 120x80, and a `d = 600px` camera with a 30px pivot depth is enough for the 3-7px
-      offset to show. The eval report marks it as `camSkip=depth-pivot`.
+      plane. The rewrite is skipped and the element keeps the function form, i.e. its pose still
+      carries the projection: the residual is the ordering term above, not a dropped camera.
+      Expect this case to stay near SSIM 0.91 / 2.9% (canvas 240x160, card 120x80, `d = 600px`,
+      30px pivot depth). The eval report marks it as `camSkip=depth-pivot`.
     -->
     <style>
       @keyframes tilt3d {

@@ -2039,6 +2039,19 @@ function pagxCameraSkips() {
   return scope && scope.__pagxCameraSkips ? scope.__pagxCameraSkips : {};
 }
 
+// Animation names whose keyframes were also emitted un-stripped (suffix `__pagxCam`), for elements
+// whose camera wrapper is declined at render time.
+function pagxAnimCameraClones() {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) {
+    return {};
+  }
+  if (!scope.__pagxAnimCameraClones) {
+    scope.__pagxAnimCameraClones = {};
+  }
+  return scope.__pagxAnimCameraClones;
+}
+
 function pagxAnimCameras() {
   const scope = typeof globalThis === 'undefined' ? null : globalThis;
   if (!scope) {
@@ -2057,6 +2070,10 @@ function rewritePerspectiveKeyframes(cssText) {
   const cameras = pagxAnimCameras();
   for (const name of Object.keys(cameras)) {
     delete cameras[name];
+  }
+  const clones = pagxAnimCameraClones();
+  for (const name of Object.keys(clones)) {
+    delete clones[name];
   }
   if (!cssText) return cssText;
   let out = '';
@@ -2104,8 +2121,14 @@ function rewritePerspectiveKeyframes(cssText) {
       consistent = false;
     }
     if (distance > 0 && consistent) {
-      if (name) cameras[name] = distance;
       out += cssText.slice(index, open + 1) + rewritten + '}';
+      if (name) {
+        cameras[name] = distance;
+        // An element whose camera cannot be emitted keeps the function form, so it needs a copy of
+        // the block that still carries the projection.
+        clones[name] = true;
+        out += '@keyframes ' + name + '__pagxCam ' + cssText.slice(open, close + 1);
+      }
     } else {
       if (distance > 0) {
         recordCameraSkip('keyframes-mixed');
@@ -4680,7 +4703,9 @@ function staticCameraFor(computed) {
     return null;
   }
   const split = splitProjectiveTransform(transform);
-  return split ? { distance: split.distance } : null;
+  // `original` keeps the projection so a declined wrap can put it back; `affine` is what the element
+  // carries once the camera has moved onto a wrapper.
+  return split ? { distance: split.distance, original: transform, affine: split.affine } : null;
 }
 
 // Distance of the camera this element needs, either because its own transform carries a
@@ -4725,20 +4750,50 @@ function perspectiveOriginXY(computed) {
   return parts.length === 2 ? parts[0] + ' ' + parts[1] : '50% 50%';
 }
 
+// Puts the projected transform back on an element whose camera could not be emitted: without this
+// the element keeps the affine remainder only, i.e. silently loses its perspective.
+function restoreProjectedTransform(html, camera) {
+  if (!camera || !camera.original || !camera.affine) return html;
+  return html.replace('transform: ' + camera.affine, 'transform: ' + camera.original);
+}
+
+// Points an element whose camera was declined at the un-stripped copy of its keyframes, so the
+// projection survives inside the pose instead of disappearing with the wrapper.
+function useProjectedKeyframes(html, computed) {
+  const clones = pagxAnimCameraClones();
+  const names = String((computed && computed.animationName) || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  let out = html;
+  for (const name of names) {
+    if (!clones[name]) continue;
+    out = out.replace(
+      new RegExp('(animation-name:\\s*' + name + ')(\\s*[;\"])'),
+      '$1__pagxCam$2',
+    );
+  }
+  return out;
+}
+
 function withPerspectiveCamera(html, opts, computed, staticCamera) {
   if (!html) return html;
   if (opts && opts._strippedTransform) return html;
   const distance =
     (staticCamera && staticCamera.distance) || cameraDistanceForElement(computed);
   if (!distance) return html;
+  // The wrapper is the only encoding that keeps the projection exact, so an element that cannot get
+  // one must keep the projection inside its own pose instead of silently turning orthographic.
+  const declined = (reason) => {
+    recordCameraSkip(reason);
+    return useProjectedKeyframes(restoreProjectedTransform(html, staticCamera), computed);
+  };
   if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
-    recordCameraSkip('depth-pivot');
-    return html;
+    return declined('depth-pivot');
   }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
   if (!wrapped) {
-    recordCameraSkip('not-a-sized-div');
-    return html;
+    return declined('not-a-sized-div');
   }
   return wrapped;
 }
@@ -5456,6 +5511,9 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 const HELPER_FNS = [
   recordCameraSkip,
   pagxCameraSkips,
+  pagxAnimCameraClones,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
   pagxAnimCameras,
   parseMatrix3DValues,
   invert3x3,
@@ -6740,6 +6798,9 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  pagxAnimCameraClones,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
   staticCameraFor,
   withPerspectiveCamera,
   recordCameraSkip,
