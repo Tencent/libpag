@@ -318,10 +318,11 @@ node tools/html-snapshot/eval-animation/run.js \
 `layer/12_perspective`（`css-perspective-interpolation`）：CSS 在两条 `perspective()` 之间按矩阵分解
 （等价于对 `1/d` 线性）插值，而运行时按通道值线性取 `d` 再重算矩阵，中间帧必然分叉，端点一致。
 
-`combo/05_text_x_with_font_size`（`text-reflow-anchor`）：`x` 单独动画时走 SVG `<text>`，基线精确
-（`text/10` 0.98）；叠加 `fontSize` 后基线随字号下移，而 SVG 的 `y` 是固定属性（实测在关键帧里动画 `y`
-无效），只能退回 CSS span 路径，于是又受 span 基线偏低 1~2px 的影响，均值 0.90。要修需要让 SVG 关键帧
-同时补偿基线位移（`transform` 纵向分量实测 0.93，仍不够），尚未实现。
+`combo/05_text_x_with_font_size`、`text/10_text_x`、`text/11_text_y`（`static-text-baseline`）：文本一律导出为
+CSS `span`，行盒基线由浏览器字体度量推导，比 PAGX 低 1~2px（40px 字号约 1px、80px 约 2px），因此这几条停在
+0.88~0.90。曾经试过让 x/y 动画的文本改用 SVG `<text>`（`y` 就是基线，可到 0.98），但那样 `x` 动画走 SVG、
+`fontSize` 动画走 span，两套模式在复合动画上会互相冲突（`x + fontSize` 实测掉到 0.26），因此放弃：
+**统一走 span，接受 1~2px 基线差**。要消除它需要在 span 路径上对齐行盒基线，属于 text 族的独立课题。
 
 `stroke/05_miter_limit`（`static-miter-join-rendering`）：通道本身已导出，但 `miterLimit > 1` 时**静态**导出的
 尖角几何就与参考差约 1.4%（1/4/10/20 里只有 1 完全一致，其余结果相同），属于既有静态差异，**计划后续修**。

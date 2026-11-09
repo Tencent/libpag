@@ -365,17 +365,6 @@ class HTMLWriterContext {
     // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
     // shift that anchor per frame instead of re-deriving the layout.
     std::unordered_map<const Node*, std::pair<float, float>> textOrigins = {};
-    // Texts emitted as SVG <text>: their tag has no left/top, so an animated x/y becomes a transform
-    // instead of a position change.
-    std::unordered_set<const Node*> svgTextNodes = {};
-    // Texts whose x/y channel is animated. A CSS span derives its baseline from the browser line
-    // box, which at large sizes lands the whole block 1-2px below PAGX; these are emitted as SVG
-    // <text> (y is the baseline) so the per-frame position is exact. Everything else keeps the span
-    // path, whose line box is what reflows correctly under a font-size animation.
-    std::unordered_set<const Node*> svgBaselineTexts = {};
-    // Texts that reflow when their animated channels change (font-size, letter-spacing): an SVG
-    // <text> keeps a fixed baseline y, so these stay on the span path.
-    std::unordered_set<const Node*> reflowingTexts = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 
