@@ -1428,6 +1428,18 @@ PAG_TEST(PAGXHTML3DTest, Animated3DKeyframesKeepAnchorOutsideProjection) {
  * Test case: a pivot with depth. `transform-origin: 20px 10px 30px` puts the rotation centre off
  * the layer plane, so rotating about X also slides the plane along Z by `anchorZ - L_z * anchorZ`
  * while the stored pose stays un-pivoted.
+ *
+ * Known gap, deliberately not worked around here: CSS composes `T(a) * P * L * T(-a)` (the pivot
+ * conjugates the projection too) while PAGX / AE / Lottie compose `P * T(a) * L * T(-a)` (the
+ * camera is fixed, `anchor` only moves the object). The two agree only when the pivot has no depth,
+ * because then the camera can be moved onto the pivot in the layer plane.
+ *
+ * A double wrapper (`perspective` + the 3D conjugation on a parent element) reproduces the CSS order
+ * exactly and is what the PAGX -> HTML direction does; it cannot be used here because PAGX does not
+ * compose a parent layer's *projection* into its children (an affine parent `matrix3D` does compose,
+ * a projective one is dropped), so the wrapper would only add a layer without changing the render.
+ * If the renderer ever composes it, the wrapper becomes viable and this case can move from 0.915 to
+ * ~0.999 without touching the animation encoding.
  */
 PAG_TEST(PAGXHTML3DTest, DepthPivotOffsetsThePlaneInZ) {
   const std::string templateHtml = R"HTML(
