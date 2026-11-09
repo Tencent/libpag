@@ -81,19 +81,6 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
                            float referenceWidthPx = NAN, float referenceHeightPx = NAN);
 
 /**
- * Returns the projection matrix `P` for the CSS perspective distance `distance`: the identity with
- * its bottom row set to `(0, 0, -1/distance, 1)`. `Layer.perspective` builds the same matrix, but a
- * CSS `perspective` declaration lives on the parent and must be pushed into the child pose instead.
- */
-Matrix3D PerspectiveMatrix(float distance);
-
-/**
- * Returns true when the pose is invertible. PAGX requires a 3D pose to be invertible, so a pose that
- * gains a projection after parsing (see PushPerspective) has to be re-checked.
- */
-bool IsInvertible(const Matrix3D& matrix);
-
-/**
  * Returns `P * pose` for a CSS `perspective` declared on the pose's parent. The projection is pushed
  * into the child pose because PAGX keeps it on the layer that owns the pose; `Layer.perspective`
  * cannot be used for that, as it would only project the declaring layer itself.
