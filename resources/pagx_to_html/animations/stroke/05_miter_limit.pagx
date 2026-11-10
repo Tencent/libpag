@@ -2,8 +2,7 @@
 <!-- Tests: Stroke miterLimit raises the join limit on a sharp star, turning bevel joins into long
      miter spikes.
      Target: Stroke  Channel: miterLimit  Type: float
-     Expect: gap
-     Known-gap: static-miter-join-rendering
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
