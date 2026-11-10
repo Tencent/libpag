@@ -150,27 +150,15 @@ python3 tools/anim_coverage.py --check
 | DiamondGradient | `center.x` `center.y` `radius` | ✘ | — |
 | ColorStop | `color` | ✔ | `gradient/06` |
 | ColorStop | `offset` | ✘ | — |
-| DropShadowStyle | `blurX` | ✘ | `style/06` |
-| DropShadowStyle | `blurY` | ✘ | `style/07` |
+| DropShadowStyle | `blurX` `blurY` `showBehindLayer` | ✘ | — |
 | DropShadowStyle | `color` | ✔ | `style/08` |
 | DropShadowStyle | `offsetX` | ✔ | `style/01` |
 | DropShadowStyle | `offsetY` | ✔ | `style/09` |
-| DropShadowStyle | `showBehindLayer` | ✘ | `style/10` |
 | DropShadowStyle | `spread` | ✔ | `style/11` |
-| InnerShadowStyle | `blurX` `blurY` | ✘ | `style/02` |
+| InnerShadowStyle | `blurX` `blurY` `offsetX` `offsetY` `spread` | ✘ | — |
 | InnerShadowStyle | `color` | ✔ | `style/12` |
-| InnerShadowStyle | `offsetX` | ✘ | `style/13` |
-| InnerShadowStyle | `offsetY` | ✘ | `style/14` |
-| InnerShadowStyle | `spread` | ✘ | `style/15` |
-| BackgroundBlurStyle | `blurX` | ✘ | `style/03` |
-| BackgroundBlurStyle | `blurY` | ✘ | `style/16` |
-| GlassStyle | `depth` | ✘ | `style/17` |
-| GlassStyle | `dispersion` | ✘ | `style/18` |
-| GlassStyle | `frost` | ✘ | `style/19` |
-| GlassStyle | `lightAngle` | ✘ | `style/20` |
-| GlassStyle | `lightIntensity` | ✘ | `style/21` |
-| GlassStyle | `refraction` | ✘ | `style/04` |
-| GlassStyle | `splay` | ✘ | `style/22` |
+| BackgroundBlurStyle | `blurX` `blurY` | ✘ | — |
+| GlassStyle | `depth` `dispersion` `frost` `lightAngle` `lightIntensity` `refraction` `splay` | ✘ | — |
 | NoiseStyle | `color` `density` `firstColor` `opacity` `secondColor` `seed` `size` | ✘ | — |
 | BlurFilter | `blurX` | ✔ | `filter/01` |
 | BlurFilter | `blurY` | ✔ | `filter/02` |
@@ -288,6 +276,25 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 | `DropShadowStyle.color` | `background-color` | 0.9961 |
 | `DropShadowStyle.spread` | 阴影 div 的 `left/top/width/height/border-radius` | 0.9985 |
 | `InnerShadowStyle.color` | `<feFlood>` 的 `flood-color` | 0.9964 |
+
+其余 16 条样式用例已删除（豁免通道的用例永远无法转绿，只会长期占着 gap 名额）。删除前的实测分数留在这里，
+作为下一期 JS 工作的起点：
+
+| 用例 | 通道 | 删除前 SSIM | 标签 |
+|------|------|------:|------|
+| `style/02_inner_shadow_style_blur` | `blurX/blurY` | 0.744 | `js-pending` |
+| `style/03_background_blur_style_blur_x` | `blurX` | 0.968 | `js-pending` |
+| `style/04_glass_style_refraction` | `refraction` | 0.988 | `js-after-static` |
+| `style/06_dropshadowstyle_blur_x` | `blurX` | 0.972 | `js-pending` |
+| `style/07_dropshadowstyle_blur_y` | `blurY` | 0.962 | `js-pending` |
+| `style/10_dropshadowstyle_show_behind_layer` | `showBehindLayer` | 0.880 | `js-pending` |
+| `style/13_innershadowstyle_offset_x` | `offsetX` | 0.835 | `js-pending` |
+| `style/14_innershadowstyle_offset_y` | `offsetY` | 0.758 | `js-pending` |
+| `style/15_innershadowstyle_spread` | `spread` | 0.740 | `js-pending` |
+| `style/16_backgroundblurstyle_blur_y` | `blurY` | 0.972 | `js-pending` |
+| `style/17_glassstyle_depth` ~ `22_glassstyle_splay` | 6 个玻璃参数 | 0.97 | `js-after-static` |
+
+恢复方式：从提交历史取回 fixture，并删掉脚本里对应的豁免条目即可。
 
 其余样式通道已列入 `CHANNEL_EXEMPTIONS`：`DropShadowStyle` / `InnerShadowStyle` /
 `BackgroundBlurStyle` 的模糊与几何参数标 `js-pending`（CSS 模糊各向同性，实测只能到 0.96；内阴影几何在滤镜原语上），
