@@ -646,6 +646,9 @@ Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* m
   // The implicit copy shares the owning glyph cache pointer, which would be freed twice; the clone
   // rebuilds that cache from the modified runs instead.
   clone->glyphData = nullptr;
+  // Keeping the source id would leave two nodes with the same id in the document, which breaks
+  // id-keyed lookups and makes repeated exports pile up duplicates.
+  clone->id.clear();
   clone->glyphRuns.clear();
   TextSelectorEvaluator evaluator(modifier->selectors, GlyphCount(text));
   bool touchesRotation = modifier->rotation != 0.0f;

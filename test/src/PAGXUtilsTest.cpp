@@ -3081,4 +3081,18 @@ PAGX_TEST(PAGXUtilsTest, ModifierResolver_KeepsTextModifierForNestedText) {
   EXPECT_FALSE(resolver.CanBakeTextModifiers(elements));
 }
 
+// With seed 0 AE always makes the first slot pick the table index for the character count; for four
+// characters that is index 2, so a range covering only index 2 weights slot 0.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_RandomOrderKeepsFirstSlotStable) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 2.0f;
+  selector->end = 3.0f;
+  selector->randomOrder = true;
+  selector->randomSeed = 0;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 1.0f);
+}
+
 }  // namespace pag

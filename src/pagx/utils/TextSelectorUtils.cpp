@@ -192,6 +192,24 @@ float OverlayFactor(float current, float factor, SelectorMode mode) {
   }
 }
 
+// AE only randomizes the order of the first character deterministically: for a given character
+// count the first slot always maps to a fixed index. The table below reproduces that mapping, which
+// the legacy PAG renderer also relies on to keep the first baseline stable.
+static const struct {
+  int end;
+  int index;
+} kFirstRandomRanges[] = {{2, 0},   {4, 2},    {5, 4},     {20, 5},
+                          {69, 20}, {127, 69}, {206, 127}, {10000, 205}};
+
+static int FirstRandomIndex(size_t count) {
+  for (const auto& range : kFirstRandomRanges) {
+    if (static_cast<int>(count) <= range.end) {
+      return range.index;
+    }
+  }
+  return 0;
+}
+
 uint32_t NextRandom(uint32_t* state) {
   *state = *state * 1664525u + 1013904223u;
   return *state >> 8;
@@ -227,6 +245,15 @@ TextSelectorEvaluator::TextSelectorEvaluator(const std::vector<TextSelector*>& s
       for (size_t i = count; i > 1; --i) {
         auto j = static_cast<size_t>(NextRandom(&seed) % i);
         std::swap(state.order[i - 1], state.order[j]);
+      }
+      if (range->randomSeed == 0 && count > 1) {
+        auto target = static_cast<size_t>(FirstRandomIndex(count));
+        for (size_t i = 0; i < count; ++i) {
+          if (state.order[i] == target) {
+            std::swap(state.order[0], state.order[i]);
+            break;
+          }
+        }
       }
     }
     _ranges.push_back(std::move(state));
