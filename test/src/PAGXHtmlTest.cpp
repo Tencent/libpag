@@ -5337,6 +5337,10 @@ CLI_TEST(PAGXHtmlTest, AnimationSvgHostingAnimatedShapeDoesNotClip) {
       <Rectangle position="80,100" size="100,100"/>
       <Stroke id="tintStroke" color="#16A34A" width="4"/>
     </Layer>
+    <Layer x="480" width="160" height="200">
+      <Polystar type="polygon" pointCount="5" outerRadius="40" position="80,100"/>
+      <Fill color="#FDE68A"/>
+    </Layer>
     <Animations>
       <Animation id="strokeGrow" duration="60" frameRate="60" loop="once">
         <Object target="growStroke">
@@ -5364,21 +5368,21 @@ CLI_TEST(PAGXHtmlTest, AnimationSvgHostingAnimatedShapeDoesNotClip) {
   ASSERT_FALSE(widthSvg.empty());
   EXPECT_NE(widthSvg.find("overflow:visible"), std::string::npos) << widthSvg;
 
+  // A stroked shape needs the clip lifted even without animation: the viewport is the geometry bbox
+  // padded by half the stroke width, and a miter join reaches past that at a sharp corner.
   auto colorSvg = EnclosingSvgTag(html, "id=\"tintStroke\"");
   ASSERT_FALSE(colorSvg.empty());
-  EXPECT_EQ(colorSvg.find("overflow:visible"), std::string::npos) << colorSvg;
+  EXPECT_NE(colorSvg.find("overflow:visible"), std::string::npos) << colorSvg;
 
   // The static stroke carries no animated id, so locate its <svg> through its stroke color.
   auto staticSvg = EnclosingSvgTag(html, "stroke=\"#F97316\"");
   ASSERT_FALSE(staticSvg.empty());
-  EXPECT_EQ(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
+  EXPECT_NE(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
 
-  pagx::HTMLExportOptions offOpts;
-  offOpts.extractStyleSheet = false;
-  offOpts.exportAnimations = false;
-  auto staticHtml = LoadXMLAndConvert(xml, offOpts);
-  ASSERT_FALSE(staticHtml.empty());
-  EXPECT_EQ(staticHtml.find("overflow:visible"), std::string::npos);
+  // A fill-only shape paints inside its bbox, so its clip stays as it is.
+  auto fillSvg = EnclosingSvgTag(html, "fill=\"#FDE68A\"");
+  ASSERT_FALSE(fillSvg.empty());
+  EXPECT_EQ(fillSvg.find("overflow:visible"), std::string::npos) << fillSvg;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {

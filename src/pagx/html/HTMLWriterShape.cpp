@@ -2023,6 +2023,12 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (alpha < 1.0f) {
     svgStyle += ";opacity:" + CssFloatToString(alpha);
   }
+  if (stroke != nullptr) {
+    // The viewport is the geometry bbox padded by half the stroke width, but a miter join reaches
+    // past that at sharp corners (a 5-point star tip overshoots by ~8px), so the painted extent has
+    // to be allowed to leave the box.
+    svgStyle += ";overflow:visible";
+  }
 
   out.openTag("svg");
   out.addAttr("width", CssFloatToString(sw));
