@@ -30,7 +30,7 @@ jobs:
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
-          tools: ninja yasm gcovr
+          tools: ninja yasm gcovr ffmpeg
 
       - name: Run depsync
         run: |
@@ -128,7 +128,7 @@ jobs:
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
-          tools: ninja yasm
+          tools: ninja yasm ffmpeg
 
       - name: Run depsync
         run: |
