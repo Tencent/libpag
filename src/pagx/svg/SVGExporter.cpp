@@ -3114,6 +3114,10 @@ struct SVGRichTextRun {
 
 struct SVGLineEntry {
   size_t runIndex = 0;
+  // The run's own x origin within the TextBox, taken from the layout's alignment-adjusted startX.
+  // Each run is a separate Text, so this is the per-run advance anchor that a run rendered as
+  // glyphs (instead of <tspan> characters) has to be placed at.
+  float startX = 0;
   float baselineY = 0;
   float lineWidth = 0;
   uint32_t byteStart = 0;
@@ -3172,7 +3176,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         if (li.byteStart >= li.byteEnd) {
           continue;
         }
-        lineEntries.push_back({i, li.baselineY, li.lineWidth, li.byteStart, li.byteEnd});
+        lineEntries.push_back({i, li.startX, li.baselineY, li.lineWidth, li.byteStart, li.byteEnd});
       }
     }
     if (useLineLayout && lineEntries.empty()) {
