@@ -17,6 +17,7 @@ const {
   hasExplicitFFmpeg,
   isMP4Export,
   parseChecksums,
+  resolveFFmpegForCLI,
   resolveTarget,
 } = require('./download-ffmpeg.js');
 
@@ -78,6 +79,36 @@ test('recognizes explicit paths and existing PATH executables', () => {
     if (process.platform !== 'win32') fs.chmodSync(executable, 0o755);
     assert.strictEqual(findFFmpegOnPath({ PATH: root }), executable);
     assert.strictEqual(findFFmpegOnPath({ PATH: path.join(root, 'missing') }), null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('prefers the downloaded ffmpeg over PATH and honors explicit overrides', () => {
+  const root = tempDirectory();
+  try {
+    const target = resolveTarget();
+    const pathDir = path.join(root, 'path');
+    fs.mkdirSync(pathDir, { recursive: true });
+    const pathFFmpeg = path.join(pathDir, target.executableName);
+    fs.writeFileSync(pathFFmpeg, 'PATH ffmpeg');
+
+    const cacheRoot = path.join(root, 'cache');
+    const cachedFFmpeg = path.join(cacheRoot, 'v1.0.0', target.name, 'bin', target.executableName);
+    fs.mkdirSync(path.dirname(cachedFFmpeg), { recursive: true });
+    fs.writeFileSync(cachedFFmpeg, 'cached ffmpeg');
+    if (target.platform !== 'win32') {
+      fs.chmodSync(pathFFmpeg, 0o755);
+      fs.chmodSync(cachedFFmpeg, 0o755);
+    }
+
+    const options = { cacheRoot, env: { PATH: pathDir } };
+    assert.strictEqual(resolveFFmpegForCLI([], options), cachedFFmpeg);
+    assert.strictEqual(resolveFFmpegForCLI(['--ffmpeg', '/custom/ffmpeg'], options), null);
+    assert.strictEqual(resolveFFmpegForCLI([], { ...options, env: { FFMPEG_BIN: '/custom/ffmpeg' } }), null);
+
+    options.cacheRoot = path.join(root, 'empty-cache');
+    assert.strictEqual(resolveFFmpegForCLI([], options), pathFFmpeg);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

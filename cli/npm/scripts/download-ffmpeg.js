@@ -86,6 +86,12 @@ function isMP4Export(args) {
   return format ? format === 'mp4' : Boolean(output) && path.extname(output).toLowerCase() === '.mp4';
 }
 
+function resolveFFmpegForCLI(args, options = {}) {
+  const env = options.env || process.env;
+  if (hasExplicitFFmpeg(args, env)) return null;
+  return findCachedFFmpeg(options) || findFFmpegOnPath(env, options.platform || process.platform);
+}
+
 function findCachedFFmpeg(options = {}) {
   try {
     const target = resolveTarget(options.platform, options.arch);
@@ -310,6 +316,7 @@ module.exports = {
   isExecutable,
   isMP4Export,
   parseChecksums,
+  resolveFFmpegForCLI,
   resolveTarget,
 };
 

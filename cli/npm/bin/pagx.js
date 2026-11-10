@@ -3,10 +3,9 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const {
-  findCachedFFmpeg,
-  findFFmpegOnPath,
   hasExplicitFFmpeg,
   isMP4Export,
+  resolveFFmpegForCLI,
 } = require("../scripts/download-ffmpeg.js");
 
 const SUPPORTED = ["darwin", "linux", "win32"];
@@ -118,12 +117,12 @@ if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.l
 }
 
 const args = process.argv.slice(2);
-// postinstall downloads ffmpeg. Runtime only discovers the existing cache and never accesses the
-// network, so a missing or failed download cannot delay or break unrelated pagx commands.
-if (!hasExplicitFFmpeg(args) && !findFFmpegOnPath()) {
-  const cachedFFmpeg = findCachedFFmpeg();
-  if (cachedFFmpeg) {
-    process.env.FFMPEG_BIN = cachedFFmpeg;
+// postinstall downloads ffmpeg. Runtime prefers that pinned cache over PATH, while explicit
+// --ffmpeg/FFMPEG_BIN still win. Runtime never accesses the network.
+if (!hasExplicitFFmpeg(args)) {
+  const ffmpeg = resolveFFmpegForCLI(args);
+  if (ffmpeg) {
+    process.env.FFMPEG_BIN = ffmpeg;
   } else if (isMP4Export(args)) {
     console.error("pagx: ffmpeg is required for MP4 export but was not found.");
     console.error("pagx: reinstall the npm package to retry the ffmpeg download:");
