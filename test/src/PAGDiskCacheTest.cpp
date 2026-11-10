@@ -662,6 +662,7 @@ PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     EXPECT_TRUE(diskCache->readConfig());
   }
+  DiskIOWorker::GetInstance()->waitAll();
   EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
   EXPECT_TRUE(std::filesystem::exists(folder + "/" + std::to_string(cacheFileID) + ".bin"));
   EXPECT_TRUE(std::filesystem::exists(foreignFile));
