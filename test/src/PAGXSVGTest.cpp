@@ -5358,4 +5358,23 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FilterRegionScalesWithBounds) {
   EXPECT_NE(svg.find("width=\"400%\""), std::string::npos);
 }
 
+// ST40: a blend mode without an feBlend equivalent must be reported instead of silently rendering
+// as the default mode.
+PAGX_TEST(PAGXSVGTest, SVGExport_BlendFilterNonFeBlendModeWarns) {
+  auto doc = MakeRectDocument();
+  auto* blend = doc->makeNode<pagx::BlendFilter>("blend");
+  blend->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  blend->blendMode = pagx::BlendMode::PlusLighter;
+  doc->layers[0]->filters.push_back(blend);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<feBlend"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("no feBlend equivalent") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 }  // namespace pag

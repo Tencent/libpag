@@ -501,6 +501,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST35（2026-11-10） | `updateScrollRect` 记录「由 layout 生成」，重新布局时刷新尺寸；作者显式 scrollRect 仍优先且不被覆盖；`PAGXSVGTest` 182 / 182、`PAGX*:PPT*:HTML*` 2436 / 2437（唯一失败是既有的 `PAGXTest.SVGToPAGXAll` 基线差异，与本次改动无关） | S1 遗留：Contour stroke 环、passThroughBackground 的完整离屏隔离；S2 未开始 |
 | 本轮 ST6 部分（2026-11-10） | 滤镜区域把像素边距按 owner 的实际 bounds 换算成百分比，小元素大模糊不再被裁；`DropShadowStyle` 也改用通道最大值；`PAGXSVGTest` 183 / 183 | ST6 剩余：shadow 链不推进 source、filter 与 style 的顺序；ST7 spread / Glass / backdrop；ST40 BlendFilter 的额外 alpha clip |
 | 本轮 ST7 部分（2026-11-10） | 阴影 `spread` 用 `feMorphology`（正 dilate / 负 erode）实现，不再丢弃并告警；区域边距把 spread 计入；`PAGXSVGTest` 183 / 183 | Glass / backdrop 仍是 B 类；ST40 BlendFilter 的额外 alpha clip 未动 |
+| 本轮 ST40 部分（2026-11-10） | 没有 feBlend 对应物的 blend mode（plus-lighter / plus-darker）改为显式告警，不再静默按 normal 渲染；`PAGXSVGTest` 184 / 184 | BlendFilter 的 source/dest alpha 组合与透明洞仍未逐 mode 验证；Glass / backdrop 仍是 B 类 |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 

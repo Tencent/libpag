@@ -1211,6 +1211,10 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   auto modeStr = BlendModeToFEBlendString(blend->blendMode);
   if (modeStr) {
     _defs->addAttribute("mode", modeStr);
+  } else {
+    // plus-lighter / plus-darker have no feBlend equivalent; falling back to the default mode must
+    // not look like a successful export.
+    addWarning("BlendFilter blend mode has no feBlend equivalent and was emitted as normal.");
   }
   _defs->addAttribute("result", blendResult);
   _defs->closeElementSelfClosing();
