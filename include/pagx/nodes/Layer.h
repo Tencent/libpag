@@ -401,6 +401,11 @@ class Layer : public Node, public LayoutNode {
   void performContainerLayout(LayoutContext* context);
   void updateScrollRect();
 
+  // True when scrollRect was produced by clipToBounds during layout rather than authored. A
+  // generated rect must follow the resolved size across re-layouts; an authored one always wins and
+  // is never overwritten.
+  bool scrollRectFromLayout = false;
+
   void updateSize(LayoutContext* context) override;
   void onMeasure(LayoutContext* context) override;
   void setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) override;
