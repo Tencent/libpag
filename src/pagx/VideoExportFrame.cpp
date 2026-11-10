@@ -21,7 +21,6 @@
 #include "pagx/runtime/Drawable.h"
 #include "rendering/utils/AsyncReadback.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/GPUBuffer.h"
 
 namespace pagx {
 
@@ -129,45 +128,21 @@ bool VideoExportFrameImpl::readGPUPixels(void* dstPixels, size_t dstRowBytes) {
   if (context == nullptr) {
     return false;
   }
-  auto buffer = readback->getGPUBuffer(context);
-  if (buffer == nullptr || !buffer->isReady()) {
-    device->unlock();
-    return false;
-  }
-  // Ready means the transfer and mapping have completed. lockPixels() would unnecessarily wait for
-  // the whole GPU queue again, so map the ready buffer directly.
-  auto pixels = buffer->map();
-  if (pixels == nullptr) {
-    device->unlock();
-    return false;
-  }
-  tgfx::Pixmap source(readback->info(), pixels);
-  auto copyTo = [&source, this](const tgfx::ImageInfo& destination, void* destinationPixels) {
-    if (destination.isEmpty()) {
-      return false;
-    }
-    if (!flipY) {
-      return source.readPixels(destination, destinationPixels);
-    }
-    for (int row = 0; row < source.height(); ++row) {
-      auto rowInfo =
-          tgfx::ImageInfo::Make(source.width(), 1, destination.colorType(), destination.alphaType(),
-                                destination.rowBytes(), destination.colorSpace());
-      auto* rowPixels = static_cast<uint8_t*>(destinationPixels) + row * destination.rowBytes();
-      if (!source.readPixels(rowInfo, rowPixels, 0, source.height() - row - 1)) {
-        return false;
+  auto success = false;
+  if (readback->isReady(context)) {
+    auto pixels = readback->lockPixels(context, flipY);
+    if (pixels != nullptr) {
+      tgfx::Pixmap source(readback->info(), pixels);
+      auto destination =
+          tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
+                                tgfx::AlphaType::Premultiplied, dstRowBytes);
+      success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
+      if (success && staticCache != nullptr) {
+        success = source.readPixels(staticCache->info(), staticCache->writablePixels());
       }
+      readback->unlockPixels(context);
     }
-    return true;
-  };
-  auto destination =
-      tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
-                            tgfx::AlphaType::Premultiplied, dstRowBytes);
-  auto success = copyTo(destination, dstPixels);
-  if (success && staticCache != nullptr) {
-    success = copyTo(staticCache->info(), staticCache->writablePixels());
   }
-  buffer->unmap();
   device->unlock();
   return success;
 }
