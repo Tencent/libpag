@@ -343,6 +343,24 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
+
+static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenceFile,
+                                    const tgfx::ImageInfo& info, int frameCount) {
+  ASSERT_EQ(sequenceFile->info(), info);
+  ASSERT_EQ(sequenceFile->numFrames(), static_cast<uint32_t>(frameCount));
+  EXPECT_EQ(sequenceFile->cachedFrames, frameCount);
+  std::vector<uint8_t> decodedPixels(info.byteSize());
+  auto decodedBuffer = BitmapBuffer::Wrap(info, decodedPixels.data());
+  ASSERT_TRUE(decodedBuffer != nullptr);
+  std::vector<uint8_t> expectedPixels(info.byteSize());
+  for (int i = 0; i < frameCount; i++) {
+    SCOPED_TRACE(i);
+    std::fill(expectedPixels.begin(), expectedPixels.end(), i + 1);
+    std::fill(decodedPixels.begin(), decodedPixels.end(), 0);
+    ASSERT_TRUE(sequenceFile->readFrame(i, decodedBuffer));
+    EXPECT_EQ(memcmp(decodedPixels.data(), expectedPixels.data(), expectedPixels.size()), 0);
+  }
+}
 }  // namespace
 
 /**
@@ -376,13 +394,13 @@ PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
   tgfx::Bitmap bitmap = {};
   ASSERT_TRUE(bitmap.allocPixels(Size, Size, false, false));
   tgfx::Pixmap pixmap(bitmap);
-  memset(pixmap.writablePixels(), 0, pixmap.rowBytes() * Size);
   auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
 
   auto diskCache = DiskCache::GetInstance();
   auto sequenceFile = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
   ASSERT_TRUE(sequenceFile != nullptr);
   for (int i = 0; i < FrameCount; i++) {
+    memset(pixmap.writablePixels(), i + 1, pixmap.rowBytes() * Size);
     ASSERT_TRUE(sequenceFile->writeFrame(i, buffer));
   }
   EXPECT_EQ(sequenceFile->cachedFrames, FrameCount);
@@ -399,18 +417,21 @@ PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
   auto reopened = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
   ASSERT_TRUE(reopened != nullptr);
   EXPECT_EQ(reopened->fileID, fileID);
-  EXPECT_EQ(reopened->cachedFrames, FrameCount);
-  EXPECT_TRUE(reopened->readFrame(0, buffer));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "Immediately after reopening";
 
   workerBlock.release();
   {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     EXPECT_EQ(diskCache->openedFiles.count(reopened->fileID), 1u);
   }
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After the pending close task";
   PAGDiskCache::RemoveAll();
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_TRUE(std::filesystem::exists(filePath));
-  EXPECT_TRUE(reopened->readFrame(0, buffer));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After removing the disk cache";
   reopened = nullptr;
 }
 
