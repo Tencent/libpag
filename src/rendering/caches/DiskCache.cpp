@@ -84,12 +84,16 @@ std::string DiskCache::getCacheDir() {
 
 void DiskCache::setCacheDir(const std::string& dir) {
   std::lock_guard<std::mutex> autoLock(locker);
-  customCacheDir = dir;
-  // Update cache paths
   auto cacheDir = dir.empty() ? Platform::Current()->getCacheDir() : dir;
+  customCacheDir = dir;
   if (!cacheDir.empty()) {
-    configPath = Directory::JoinPath(cacheDir, "cache.cfg");
-    cacheFolder = Directory::JoinPath(cacheDir, "files");
+    auto newConfigPath = Directory::JoinPath(cacheDir, "cache.cfg");
+    auto newCacheFolder = Directory::JoinPath(cacheDir, "files");
+    if (configPath == newConfigPath && cacheFolder == newCacheFolder) {
+      return;
+    }
+    configPath = newConfigPath;
+    cacheFolder = newCacheFolder;
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
                             [](const std::string& path, size_t) { RemoveFileAsync(path); });
@@ -323,6 +327,10 @@ void DiskCache::moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo) {
 }
 
 bool DiskCache::readConfig() {
+  cachedFileIDs.clear();
+  cachedFileInfos.clear();
+  cachedFiles.clear();
+  totalDiskSize = 0;
   auto file = fopen(configPath.c_str(), "rb");
   if (file == nullptr) {
     return false;

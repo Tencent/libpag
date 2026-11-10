@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -114,6 +115,89 @@ class ScopedDiskCacheCleanup {
     PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
     ClearDiskCacheAndWait();
   }
+};
+
+static void CheckNoOpenDiskCacheFiles() {
+  auto diskCache = DiskCache::GetInstance();
+  DiskIOWorker::GetInstance()->waitAll();
+  std::lock_guard<std::mutex> lock(diskCache->locker);
+  ASSERT_TRUE(diskCache->openedFiles.empty());
+}
+
+/**
+ * Isolates the singleton's bookkeeping in an exclusively created temporary directory. Restores
+ * the original state without scanning or modifying its files, including on fatal assertion returns.
+ */
+class ScopedDiskCacheDirectory {
+ public:
+  std::string directory;
+
+  ScopedDiskCacheDirectory() {
+    std::error_code error = {};
+    auto root = std::filesystem::temp_directory_path(error);
+    if (error) {
+      return;
+    }
+    auto path = (root / "PAGDiskCacheTest_XXXXXX").string();
+#ifdef _WIN32
+    if (_mktemp_s(path.data(), path.size() + 1) != 0 ||
+        !std::filesystem::create_directory(path, error) || error) {
+      return;
+    }
+#else
+    if (mkdtemp(path.data()) == nullptr) {
+      return;
+    }
+#endif
+    directory = path;
+    auto diskCache = DiskCache::GetInstance();
+    DiskIOWorker::GetInstance()->waitAll();
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    originalCacheDir = diskCache->customCacheDir;
+    originalConfigPath = diskCache->configPath;
+    originalCacheFolder = diskCache->cacheFolder;
+    originalMaxDiskSize = diskCache->maxDiskSize;
+    originalTotalDiskSize = diskCache->totalDiskSize;
+    originalCachedFileIDs.swap(diskCache->cachedFileIDs);
+    originalCachedFileInfos.swap(diskCache->cachedFileInfos);
+    originalCachedFiles.swap(diskCache->cachedFiles);
+    diskCache->totalDiskSize = 0;
+  }
+
+  ScopedDiskCacheDirectory(const ScopedDiskCacheDirectory&) = delete;
+  ScopedDiskCacheDirectory& operator=(const ScopedDiskCacheDirectory&) = delete;
+
+  ~ScopedDiskCacheDirectory() {
+    if (directory.empty()) {
+      return;
+    }
+    auto diskCache = DiskCache::GetInstance();
+    DiskIOWorker::GetInstance()->waitAll();
+    {
+      std::lock_guard<std::mutex> lock(diskCache->locker);
+      originalCachedFileIDs.swap(diskCache->cachedFileIDs);
+      originalCachedFileInfos.swap(diskCache->cachedFileInfos);
+      originalCachedFiles.swap(diskCache->cachedFiles);
+      diskCache->customCacheDir = originalCacheDir;
+      diskCache->configPath = originalConfigPath;
+      diskCache->cacheFolder = originalCacheFolder;
+      diskCache->maxDiskSize = originalMaxDiskSize;
+      diskCache->totalDiskSize = originalTotalDiskSize;
+    }
+    std::error_code error = {};
+    std::filesystem::remove_all(directory, error);
+    EXPECT_FALSE(error);
+  }
+
+ private:
+  std::string originalCacheDir;
+  std::string originalConfigPath;
+  std::string originalCacheFolder;
+  size_t originalMaxDiskSize = 0;
+  size_t originalTotalDiskSize = 0;
+  decltype(DiskCache::cachedFileIDs) originalCachedFileIDs;
+  decltype(DiskCache::cachedFileInfos) originalCachedFileInfos;
+  decltype(DiskCache::cachedFiles) originalCachedFiles;
 };
 
 static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSize,
@@ -620,11 +704,147 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
   pag::PAGDiskCache::RemoveAll();
 }
 
+PAG_TEST(PAGDiskCacheTest, RepeatedCacheDirectorySetup) {
+  ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());
+  auto diskCache = DiskCache::GetInstance();
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto data = ReadFile("resources/apitest/polygon.pag");
+  ASSERT_TRUE(data != nullptr);
+  PAGDiskCache::SetCacheDir(cleanup.directory);
+  PAGDiskCache::SetMaxDiskSize(data->size());
+  const std::string cacheKey = "RepeatedCacheDirectorySetup";
+  ASSERT_TRUE(DiskCache::WriteFile(cacheKey, data));
+  DiskIOWorker::GetInstance()->waitAll();
+  std::shared_ptr<FileInfo> cachedFileInfo = nullptr;
+  std::string cacheFilePath;
+  uint32_t nextFileID = 0;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFiles.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileInfos.size(), 1u);
+    EXPECT_EQ(diskCache->totalDiskSize, data->size());
+    cachedFileInfo = diskCache->cachedFiles.front();
+    cacheFilePath = diskCache->fileIDToPath(diskCache->cachedFileIDs.at(cacheKey));
+    nextFileID = diskCache->fileIDCount;
+  }
+  for (int i = 0; i < 3; i++) {
+    PAGDiskCache::SetCacheDir(cleanup.directory);
+  }
+  auto cacheDir = Directory::JoinPath(cleanup.directory, "");
+  PAGDiskCache::SetCacheDir(cacheDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFiles.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileInfos.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFiles.front(), cachedFileInfo);
+    EXPECT_EQ(diskCache->totalDiskSize, data->size());
+    EXPECT_EQ(diskCache->fileIDCount, nextFileID);
+    EXPECT_EQ(diskCache->customCacheDir, cacheDir);
+  }
+  PAGDiskCache::SetMaxDiskSize(0);
+  DiskIOWorker::GetInstance()->waitAll();
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->cachedFiles.empty());
+    EXPECT_TRUE(diskCache->cachedFileInfos.empty());
+    EXPECT_EQ(diskCache->totalDiskSize, 0u);
+  }
+  EXPECT_FALSE(std::filesystem::exists(cacheFilePath));
+}
+
+PAG_TEST(PAGDiskCacheTest, CacheDirectorySwitchReloadsConfiguration) {
+  ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());
+  auto diskCache = DiskCache::GetInstance();
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto data = ReadFile("resources/apitest/polygon.pag");
+  ASSERT_TRUE(data != nullptr);
+  auto firstDir = Directory::JoinPath(cleanup.directory, "first");
+  auto secondDir = Directory::JoinPath(cleanup.directory, "second");
+  const std::string firstKey = "FirstCacheDirectory";
+  const std::string secondKey = "SecondCacheDirectory";
+  PAGDiskCache::SetCacheDir(firstDir);
+  PAGDiskCache::SetMaxDiskSize(data->size());
+  ASSERT_TRUE(DiskCache::WriteFile(firstKey, data));
+  DiskIOWorker::GetInstance()->waitAll();
+  uint32_t firstFileID = 0;
+  uint32_t nextFileID = 0;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    firstFileID = diskCache->cachedFileIDs.at(firstKey);
+    nextFileID = diskCache->fileIDCount;
+  }
+  ASSERT_FALSE(std::filesystem::exists(Directory::JoinPath(secondDir, "cache.cfg")));
+  PAGDiskCache::SetCacheDir(secondDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->cachedFiles.empty());
+    EXPECT_TRUE(diskCache->cachedFileIDs.empty());
+    EXPECT_TRUE(diskCache->cachedFileInfos.empty());
+    EXPECT_EQ(diskCache->totalDiskSize, 0u);
+    EXPECT_EQ(diskCache->fileIDCount, nextFileID);
+  }
+  ASSERT_TRUE(DiskCache::WriteFile(secondKey, data));
+  DiskIOWorker::GetInstance()->waitAll();
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    EXPECT_GT(diskCache->cachedFileIDs.at(secondKey), firstFileID);
+    nextFileID = diskCache->fileIDCount;
+  }
+  PAGDiskCache::SetCacheDir(firstDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->cachedFiles.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
+    ASSERT_EQ(diskCache->cachedFileIDs.count(firstKey), 1u);
+    EXPECT_EQ(diskCache->cachedFileIDs.at(firstKey), firstFileID);
+    EXPECT_EQ(diskCache->cachedFileIDs.count(secondKey), 0u);
+    EXPECT_EQ(diskCache->totalDiskSize, data->size());
+    EXPECT_EQ(diskCache->fileIDCount, nextFileID);
+  }
+  auto cacheData = DiskCache::ReadFile(firstKey);
+  ASSERT_TRUE(cacheData != nullptr);
+  ASSERT_EQ(cacheData->size(), data->size());
+  EXPECT_EQ(memcmp(cacheData->bytes(), data->bytes(), data->size()), 0);
+  PAGDiskCache::SetCacheDir(secondDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->cachedFiles.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileIDs.count(firstKey), 0u);
+    EXPECT_EQ(diskCache->cachedFileIDs.count(secondKey), 1u);
+    EXPECT_EQ(diskCache->totalDiskSize, data->size());
+    EXPECT_EQ(diskCache->fileIDCount, nextFileID);
+  }
+  auto emptyDir = Directory::JoinPath(cleanup.directory, "empty");
+  ASSERT_TRUE(std::filesystem::create_directory(emptyDir));
+  std::ofstream stream(Directory::JoinPath(emptyDir, "cache.cfg"));
+  ASSERT_TRUE(stream.is_open());
+  stream.close();
+  PAGDiskCache::SetCacheDir(emptyDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->cachedFiles.empty());
+    EXPECT_TRUE(diskCache->cachedFileIDs.empty());
+    EXPECT_TRUE(diskCache->cachedFileInfos.empty());
+    EXPECT_EQ(diskCache->totalDiskSize, 0u);
+    EXPECT_EQ(diskCache->fileIDCount, nextFileID);
+  }
+}
+
 /**
  * Regression test for issue #3827: other SDKs sharing the same cache directory may drop their own
  * files and sub-directories into the SDK-owned folder. Scanning such entries used to throw an
  * uncaught std::invalid_argument from std::stoull and abort the whole process. They must be
- * skipped and left untouched instead.
+ * skipped and left untouched instead. Reloading the configuration must replace the existing
+ * bookkeeping rather than duplicate its entries and disk size.
  */
 PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
   auto cacheDir = Platform::Current()->getCacheDir();
@@ -661,9 +881,12 @@ PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
   {
     std::lock_guard<std::mutex> lock(diskCache->locker);
     EXPECT_TRUE(diskCache->readConfig());
+    EXPECT_EQ(diskCache->cachedFiles.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileIDs.size(), 1u);
+    EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
+    EXPECT_EQ(diskCache->totalDiskSize, data->size());
   }
   DiskIOWorker::GetInstance()->waitAll();
-  EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
   EXPECT_TRUE(std::filesystem::exists(folder + "/" + std::to_string(cacheFileID) + ".bin"));
   EXPECT_TRUE(std::filesystem::exists(foreignFile));
   EXPECT_TRUE(std::filesystem::exists(folder + "/subdir"));
