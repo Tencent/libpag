@@ -466,6 +466,10 @@ class SVGWriter {
   // written. Set by writeMaskOrClipDef so the content writers do not have to recompute it.
   Matrix _maskContentTransform = {};
 
+  // True while emitting a <clipPath> body. Inside <clipPath> the inside/outside test is driven by
+  // clip-rule, not fill-rule, so the even-odd flag has to be written under a different name.
+  bool _clipPathContent = false;
+
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
   }
@@ -1911,6 +1915,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* o
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
                          _doc);
   nestedWriter._maskContentTransform = maskRelativeMatrix(maskLayer, owner);
+  nestedWriter._clipPathContent = isClipPath;
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -2070,7 +2075,8 @@ void SVGWriter::applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rec
   applyPaintColor(out, "fill", fill->color, fill->alpha, fill->blendMode, shapeBounds,
                   alphaMultiplier, p3Style);
   if (fill->fillRule == FillRule::EvenOdd) {
-    out.addAttribute("fill-rule", "evenodd");
+    // <clipPath> children are tested with clip-rule; fill-rule has no effect there.
+    out.addAttribute(_clipPathContent ? "clip-rule" : "fill-rule", "evenodd");
   }
 }
 

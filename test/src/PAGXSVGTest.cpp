@@ -5280,4 +5280,38 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CompositionInstancesGetUniqueIds) {
   EXPECT_EQ(CountOccurrences(svg, "id=\"inner_1\""), 1u);
 }
 
+// ST4: a contour mask becomes <clipPath>, where the inside/outside test is driven by clip-rule.
+// An even-odd mask fill must therefore emit clip-rule instead of fill-rule.
+PAGX_TEST(PAGXSVGTest, SVGExport_ContourMaskUsesClipRule) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* mask = doc->makeNode<pagx::Layer>("contourMask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* white = doc->makeNode<pagx::SolidColor>();
+  white->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = white;
+  maskFill->fillRule = pagx::FillRule::EvenOdd;
+  mask->contents = {maskRect, maskFill};
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->mask = mask;
+  owner->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  owner->contents = {rect, fill};
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-rule=\"evenodd\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill-rule=\"evenodd\""), std::string::npos);
+}
+
 }  // namespace pag

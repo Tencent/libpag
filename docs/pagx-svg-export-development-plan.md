@@ -496,6 +496,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S1 前两项（2026-11-10） | ST33 隐藏层不再因持有 Mask 而漏画；ST34 composition 优先、不再与 contents 双画；各带一个回归用例；`PAGXSVGTest` 178 / 178 | S1 其余项（唯一 ID / 跨父 Mask 矩阵 / Contour clip-rule / scrollRect 失效 / 离屏 alpha） |
 | 本轮 ST1（2026-11-10） | 生成 def id 避让作者 id（预扫描 `doc.nodes` 的 id 作保留集）；Composition 多实例的内联 id 自动加 `_1` 后缀；`PAGXSVGTest` 180 / 180 | ST2 跨父 Mask 矩阵、ST4 Contour clip-rule、ST5 离屏 alpha/blend、ST35 scrollRect |
 | 本轮 ST2（2026-11-10） | 跨父 Mask / ClipPath 改为按 `inverse(W(owner.parent)) * W(mask)` 计算相对矩阵，def 缓存 key 加入 owner 父级；原来的跨父告警被真实矩阵取代；`PAGXSVGTest` 180 / 180 | ST4 Contour clip-rule、ST5 离屏 alpha/blend、ST35 scrollRect、S1 其余项 |
+| 本轮 ST4 部分（2026-11-10） | `<clipPath>` 内容改用 `clip-rule` 承载 even-odd，不再写对 clipPath 无效的 `fill-rule`；`PAGXSVGTest` 181 / 181 | Contour 的 stroke 环（需要把描边展开成轮廓）未做；ST5 离屏 alpha/blend、ST35 scrollRect |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
