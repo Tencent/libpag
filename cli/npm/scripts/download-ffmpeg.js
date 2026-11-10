@@ -323,12 +323,8 @@ if (require.main === module) {
         console.log(postinstall ? `pagx: ffmpeg is ready at ${executablePath}` : executablePath);
       })
       .catch((error) => {
-        if (postinstall) {
-          console.warn('pagx: optional ffmpeg download failed; the pagx installation will continue.');
-          console.warn('pagx: MP4 export can still use PATH, FFMPEG_BIN, or --ffmpeg.');
-        }
         console.error(formatDownloadError(error));
-        if (!postinstall) process.exitCode = 1;
+        process.exitCode = 1;
       });
   }
 }

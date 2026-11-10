@@ -115,8 +115,8 @@ Render a PAGX file to an image.
 
 Export an animated PAGX file to H.264 MP4 through an external ffmpeg process. During `npm install`,
 the package's `postinstall` hook downloads the matching pinned build from `libpag/ffmpeg-builder`,
-verifies its SHA-256 checksum, and caches it. This optional download is logged on failure but never
-fails the pagx installation. Runtime commands only use the existing cache, `PATH`, `FFMPEG_BIN`, or
+verifies its SHA-256 checksum, and caches it. A download failure reports its cause and fails the npm
+installation. Runtime commands only use the existing cache, `PATH`, `FFMPEG_BIN`, or
 `--ffmpeg`; they never wait for a network download. If MP4 export finds none of these, it exits with
 instructions to run `npm install -g @libpag/pagx` again and retry the download.
 

@@ -212,7 +212,7 @@ test('shares one installation between concurrent callers', async () => {
   }
 });
 
-test('postinstall logs download failures without failing installation', () => {
+test('postinstall reports download failures and fails installation', () => {
   const root = tempDirectory();
   try {
     const result = spawnSync(process.execPath, [path.join(__dirname, 'download-ffmpeg.js'), '--postinstall'], {
@@ -225,9 +225,9 @@ test('postinstall logs download failures without failing installation', () => {
         PAGX_SKIP_FFMPEG_DOWNLOAD: '0',
       },
     });
-    assert.strictEqual(result.status, 0, result.stderr);
-    assert.match(result.stderr, /optional ffmpeg download failed/);
-    assert.match(result.stderr, /installation will continue/);
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /failed to install ffmpeg/);
+    assert.match(result.stderr, /Check your network or proxy settings/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
