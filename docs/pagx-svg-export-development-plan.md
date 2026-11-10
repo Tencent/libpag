@@ -494,6 +494,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 P1 增量（2026-11-10） | `BlurFilter` blurX/blurY、`DropShadowFilter` / `InnerShadowFilter` 的 offset + blur、`BlendFilter.color` 已可动画；滤镜区域改为按通道最大绝对值扩大；`PAGXSVGTest` 173 / 173 | 阴影 `color`（烘焙在 feColorMatrix 常量列）、Noise 参数、像素门禁 |
 | 本轮 S0 部分（2026-11-10） | 通道账本（30 类 / 175 条）与双向门禁；退化动画改为显式告警；`ToFile` 改为同目录临时文件 + 原子替换；D1—D8 按推荐值采纳并记录；`PAGXSVGTest` 176 / 176 | S0 剩余项（D6 门禁、预算入口）、S1—S6、M0—M6 |
 | 本轮 S1 前两项（2026-11-10） | ST33 隐藏层不再因持有 Mask 而漏画；ST34 composition 优先、不再与 contents 双画；各带一个回归用例；`PAGXSVGTest` 178 / 178 | S1 其余项（唯一 ID / 跨父 Mask 矩阵 / Contour clip-rule / scrollRect 失效 / 离屏 alpha） |
+| 本轮 ST1（2026-11-10） | 生成 def id 避让作者 id（预扫描 `doc.nodes` 的 id 作保留集）；Composition 多实例的内联 id 自动加 `_1` 后缀；`PAGXSVGTest` 180 / 180 | ST2 跨父 Mask 矩阵、ST4 Contour clip-rule、ST5 离屏 alpha/blend、ST35 scrollRect |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 

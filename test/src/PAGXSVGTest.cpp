@@ -5227,4 +5227,63 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CompositionWinsOverContents) {
   EXPECT_EQ(svg.find("#FF0000"), std::string::npos);
 }
 
+static size_t CountOccurrences(const std::string& text, const std::string& needle) {
+  size_t count = 0;
+  for (size_t pos = 0; (pos = text.find(needle, pos)) != std::string::npos; pos += needle.size()) {
+    ++count;
+  }
+  return count;
+}
+
+// ST1: a generated def id must never shadow a name the document already uses.
+PAGX_TEST(PAGXSVGTest, SVGExport_GeneratedIdsAvoidAuthorIds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("grad0");
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("authorGradient");
+  gradient->startPoint = {60, 100};
+  gradient->endPoint = {140, 100};
+  auto* stop = doc->makeNode<pagx::ColorStop>();
+  stop->offset = 0.0f;
+  stop->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  gradient->colorStops.push_back(stop);
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The author's layer keeps grad0; the generated gradient has to pick another name.
+  EXPECT_EQ(CountOccurrences(svg, "id=\"grad0\""), 1u);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"grad1\""), 1u);
+}
+
+// ST1: the same composition inlined twice repeats the layer ids; the second instance must be
+// uniquified instead of producing a duplicate DOM id.
+PAGX_TEST(PAGXSVGTest, SVGExport_CompositionInstancesGetUniqueIds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* composition = doc->makeNode<pagx::Composition>("comp");
+  auto* inner = doc->makeNode<pagx::Layer>("inner");
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  inner->contents = {rect, fill};
+  composition->layers.push_back(inner);
+
+  auto* first = doc->makeNode<pagx::Layer>("slotA");
+  first->composition = composition;
+  auto* second = doc->makeNode<pagx::Layer>("slotB");
+  second->composition = composition;
+  doc->layers = {first, second};
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"inner\""), 1u);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"inner_1\""), 1u);
+}
+
 }  // namespace pag

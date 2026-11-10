@@ -317,9 +317,36 @@ static std::string BuildLayerTransform(const Layer* layer) {
 
 class SVGWriterContext {
  public:
+  // A generated id must never shadow an id the document itself uses, otherwise a later reference
+  // (an author `grad0`, a mask suffix, a repeated composition instance) resolves to the wrong node.
   std::string generateId(const std::string& prefix) {
-    return prefix + std::to_string(nextDefId++);
+    for (;;) {
+      auto candidate = prefix + std::to_string(nextDefId++);
+      if (reservedIds.count(candidate) == 0 && usedIds.insert(candidate).second) {
+        return candidate;
+      }
+    }
   }
+
+  // Returns an id derived from `desired`, suffixing it when the name is already taken. The first
+  // occurrence of an author id keeps its name; a second instance of the same composition, which
+  // inlines the same layer id again, gets `id_1`, `id_2` and so on.
+  std::string uniqueId(const std::string& desired) {
+    if (usedIds.insert(desired).second) {
+      return desired;
+    }
+    for (int suffix = 1;; ++suffix) {
+      auto candidate = desired + "_" + std::to_string(suffix);
+      if (reservedIds.count(candidate) == 0 && usedIds.insert(candidate).second) {
+        return candidate;
+      }
+    }
+  }
+
+  // Ids the document already claims, collected once before any output is written.
+  std::unordered_set<std::string> reservedIds = {};
+  // Ids already emitted in this document.
+  std::unordered_set<std::string> usedIds = {};
 
   // Font* → Woff2FontResult mapping. Populated by SVGExporter::ToSVG's pre-processing pass for
   // every embedded vector Font resource. emitGeometryWithFs checks this mapping to decide whether
@@ -1801,18 +1828,19 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   if (maskLayer->id.empty()) {
     defId = generateId(idPrefix);
   } else {
-    defId = maskLayer->id;
+    std::string desired = maskLayer->id;
     switch (maskType) {
       case MaskType::Alpha:
-        defId += "_a";
+        desired += "_a";
         break;
       case MaskType::Luminance:
-        defId += "_l";
+        desired += "_l";
         break;
       case MaskType::Contour:
-        defId += "_c";
+        desired += "_c";
         break;
     }
+    defId = _context->uniqueId(desired);
   }
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
@@ -3613,7 +3641,9 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
 
 void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   if (!layer->id.empty()) {
-    out.addAttribute("id", layer->id);
+    // A composition inlined twice repeats the same layer id; uniquify so the DOM stays valid and a
+    // mask / filter reference cannot bind to the wrong instance.
+    out.addAttribute("id", _context->uniqueId(layer->id));
   }
 
   for (const auto& [key, value] : layer->customData) {
@@ -3726,6 +3756,13 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   SVGBuilder svg(true, options.indent);
   SVGBuilder defs(true, options.indent, 2);
   SVGWriterContext context;
+  // Reserve every authored id before anything is emitted, so a generated def id (grad0, mask0...)
+  // can never shadow a name the document already uses.
+  for (const auto& node : doc.nodes) {
+    if (node != nullptr && !node->id.empty()) {
+      context.reservedIds.insert(node->id);
+    }
+  }
   auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
 
   // Pre-pass: resolve every active AnimationTimeline into per-node channel bindings. The writer
