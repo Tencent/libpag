@@ -585,6 +585,28 @@ static size_t GlyphCount(const Text* text) {
   return count;
 }
 
+// True when any element in the list (recursively) is a Text. An outer TextModifier cannot reach
+// such glyphs through the element list alone, so a scope containing one is never fully bakeable.
+static bool ContainsText(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::Text) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::Group &&
+        ContainsText(static_cast<const Group*>(element)->elements)) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::TextBox &&
+        !static_cast<const TextBox*>(element)->elements.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static bool HasPaintChannels(const TextModifier* modifier) {
   return modifier->fillColor.has_value() || modifier->strokeColor.has_value() ||
          modifier->strokeWidth.has_value() || modifier->alpha < 1.0f;
@@ -702,17 +724,15 @@ bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& element
         break;
       }
       case NodeType::Group:
-        if (!CanBakeTextModifiers(static_cast<const Group*>(element)->elements)) {
+        if (ContainsText(static_cast<const Group*>(element)->elements)) {
           return false;
         }
         break;
-      case NodeType::TextBox: {
-        auto* box = static_cast<const TextBox*>(element);
-        if (!box->elements.empty() && !CanBakeTextModifiers(box->elements)) {
+      case NodeType::TextBox:
+        if (!static_cast<const TextBox*>(element)->elements.empty()) {
           return false;
         }
         break;
-      }
       default:
         break;
     }
@@ -888,6 +908,18 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // so the authored document stays untouched; a target that cannot be expressed through
         // GlyphRun channels keeps the modifier in the output for the caller's bake path.
         bool bakedAll = true;
+        // A Text nested in an earlier Group / TextBox also accumulates glyphs, but it lives in its
+        // own scope and cannot be reached from here; keeping the modifier lets the bake path cover
+        // it instead of silently losing the effect.
+        for (const auto* prior : output) {
+          if ((prior->nodeType() == NodeType::Group &&
+               ContainsText(static_cast<const Group*>(prior)->elements)) ||
+              (prior->nodeType() == NodeType::TextBox &&
+               !static_cast<const TextBox*>(prior)->elements.empty())) {
+            bakedAll = false;
+            break;
+          }
+        }
         for (auto*& slot : output) {
           if (slot->nodeType() != NodeType::Text) {
             continue;

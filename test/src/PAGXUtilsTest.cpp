@@ -3049,4 +3049,36 @@ PAGX_TEST(PAGXUtilsTest, ModifierResolver_BakesTextModifier) {
   EXPECT_FLOAT_EQ(baked->glyphRuns[0]->positions[1].y, 0.0f);
 }
 
+// A TextModifier after a Group cannot reach the glyphs nested inside it, so the resolver keeps the
+// modifier for the bake path instead of dropping it and losing the effect.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_KeepsTextModifierForNestedText) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1};
+  run->positions = {{0.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+  auto* group = doc->makeNode<pagx::Group>();
+  group->elements = {text};
+
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->position = {0.0f, -100.0f};
+
+  std::vector<pagx::Element*> elements = {group, modifier};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 2u);
+  EXPECT_EQ(resolved[0]->nodeType(), pagx::NodeType::Group);
+  EXPECT_EQ(resolved[1]->nodeType(), pagx::NodeType::TextModifier);
+  EXPECT_FALSE(resolver.CanBakeTextModifiers(elements));
+}
+
 }  // namespace pag
