@@ -1585,6 +1585,12 @@ PAG_TEST(PAGXHTML3DTest, UnsupportedLengthArgumentIsNotReportedAsMalformed) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "translateX argument"));
 }
 
+/**
+ * Test case: a two- or three-value `transform-origin` puts each token on the axis its keyword
+ * belongs to. Keyword pairs are order-independent (`bottom left` is x=left, y=bottom), a length may
+ * only take a slot whose keyword class allows it (`20px top`, `left 20px`), and the forms Chromium
+ * rejects (`top 20px`, `20px left`, `left right`) fall back to the initial `50% 50%`.
+ */
 PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
   struct OriginCase {
     const char* value;
@@ -1593,14 +1599,15 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
     float z;
   };
   // Box is 100x60, so left=0 / right=100 and top=0 / bottom=60.
-  const OriginCase cases[] = {
+  const OriginCase valid[] = {
       {"bottom left", 0.0f, 60.0f, 0.0f},    {"top center", 50.0f, 0.0f, 0.0f},
       {"center bottom", 50.0f, 60.0f, 0.0f}, {"center left", 0.0f, 30.0f, 0.0f},
-      {"right bottom", 100.0f, 60.0f, 0.0f}, {"top 20px", 20.0f, 0.0f, 0.0f},
-      {"20px bottom", 20.0f, 60.0f, 0.0f},   {"bottom right 20px", 100.0f, 60.0f, 20.0f},
+      {"right bottom", 100.0f, 60.0f, 0.0f}, {"20px top", 20.0f, 0.0f, 0.0f},
+      {"left 20px", 0.0f, 20.0f, 0.0f},      {"20px center", 20.0f, 30.0f, 0.0f},
+      {"20px 40px", 20.0f, 40.0f, 0.0f},     {"bottom right 20px", 100.0f, 60.0f, 20.0f},
       {"left top 10px", 0.0f, 0.0f, 10.0f},
   };
-  for (const auto& item : cases) {
+  for (const auto& item : valid) {
     std::string html = R"HTML(
       <html><body style="width:200px;height:200px">
         <div id="box" style="width:100px;height:60px;background-color:#000;
@@ -1610,6 +1617,7 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
     html.replace(html.find("VALUE"), 5, item.value);
     auto doc = ParseHtml(html);
     ASSERT_NE(doc, nullptr) << item.value;
+    EXPECT_FALSE(HasDiagnosticContaining(doc, "not a valid CSS position")) << item.value;
     auto* box = FindLayerById(doc, "box");
     ASSERT_NE(box, nullptr) << item.value;
     EXPECT_TRUE(NearlyEqual(box->anchor.x, item.x))
@@ -1618,6 +1626,25 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
         << "transform-origin: " << item.value << " y=" << box->anchor.y;
     EXPECT_TRUE(NearlyEqual(box->anchorZ, item.z))
         << "transform-origin: " << item.value << " z=" << box->anchorZ;
+  }
+
+  // Chromium drops these declarations, so the initial `50% 50%` (the box centre) applies.
+  const char* invalid[] = {"top 20px", "bottom 20px", "20px left", "left right", "top bottom"};
+  for (const char* value : invalid) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:200px">
+        <div id="box" style="width:100px;height:60px;background-color:#000;
+             transform:rotate(10deg);transform-origin:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, value);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << value;
+    EXPECT_TRUE(HasDiagnosticContaining(doc, "not a valid CSS position")) << value;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << value;
+    EXPECT_TRUE(NearlyEqual(box->anchor.x, 50.0f)) << value << " x=" << box->anchor.x;
+    EXPECT_TRUE(NearlyEqual(box->anchor.y, 30.0f)) << value << " y=" << box->anchor.y;
   }
 }
 
