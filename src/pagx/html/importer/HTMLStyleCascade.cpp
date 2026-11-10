@@ -60,13 +60,6 @@ std::string LookupEffectiveBackgroundImage(
   return bgImage;
 }
 
-// Pulls the function name and the argument-list slice from "fn(args)" form. The CSS subset
-// transformer in HTMLSubsetPropertyTable already rejects compound chains and `matrix(...)`
-// before we see the value, but the resolver runs even when subset transformation is bypassed
-// (e.g. `HTMLImporter::Options::autoNormalize == false`), so we re-check the shape here via
-// `ParseCssFunctionCall`: the FIRST `)` must coincide with the LAST `)` and trail only
-// whitespace, otherwise the value is a compound chain and is rejected.
-
 // CSS edge-overlap scaling: when the sum of two border radii exceeds the box edge they
 // share, every radius shrinks by the smallest factor that keeps every edge within bounds.
 // `scale` carries the running minimum across all four edges.
