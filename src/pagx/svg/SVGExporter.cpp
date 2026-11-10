@@ -1689,6 +1689,11 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
         agg.needSourceGraphic = true;
         break;
       }
+      case NodeType::BackgroundBlurStyle:
+        // The backdrop blur needs pixels painted before this layer; SVG filters only see the
+        // element they are attached to. Reported by writeFilterAndStyleDefs, which runs even when
+        // every style is dropped.
+        break;
       case NodeType::GlassStyle:
         // GlassStyle (frost / refraction / chromatic dispersion / edge lighting) samples and
         // optically distorts the backdrop via GPU shaders; SVG has no portable equivalent.
@@ -1779,11 +1784,19 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   // invisible.
   bool hasEffectiveStyle = false;
   for (const auto* style : styles) {
-    if (style->nodeType() != NodeType::BackgroundBlurStyle &&
-        style->nodeType() != NodeType::GlassStyle) {
-      hasEffectiveStyle = true;
-      break;
+    if (style->nodeType() == NodeType::BackgroundBlurStyle) {
+      addWarning("BackgroundBlurStyle '" + style->id +
+                 "' samples the backdrop; SVG has no equivalent, so the blur is dropped and the "
+                 "layer's base content is kept.");
+      continue;
     }
+    if (style->nodeType() == NodeType::GlassStyle) {
+      addWarning("GlassStyle '" + style->id +
+                 "' samples the backdrop; SVG has no equivalent, so the glass effect is dropped "
+                 "and the layer's base content is kept.");
+      continue;
+    }
+    hasEffectiveStyle = true;
   }
   if (filters.empty() && !hasEffectiveStyle) {
     return {};

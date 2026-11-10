@@ -33,6 +33,7 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -5472,6 +5473,28 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StrokeOnlyContourMaskWarns) {
     warned = warned || warning.find("stroke-only") != std::string::npos;
   }
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST7 remainder: backdrop effects have no SVG equivalent under D8=off. They must be reported as
+// dropped rather than silently skipped while the base content still renders.
+PAGX_TEST(PAGXSVGTest, SVGExport_BackdropStylesAreReported) {
+  auto doc = MakeRectDocument();
+  auto* glass = doc->makeNode<pagx::GlassStyle>("glass");
+  doc->layers[0]->styles.push_back(glass);
+  auto* backdrop = doc->makeNode<pagx::BackgroundBlurStyle>("backdrop");
+  doc->layers[0]->styles.push_back(backdrop);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_FALSE(svg.empty());
+  size_t reported = 0;
+  for (const auto& warning : warnings) {
+    if (warning.find("GlassStyle") != std::string::npos ||
+        warning.find("BackgroundBlurStyle") != std::string::npos) {
+      ++reported;
+    }
+  }
+  EXPECT_EQ(reported, 2u);
 }
 
 }  // namespace pag
