@@ -2608,6 +2608,26 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
     if (!run->scales.empty() || !run->skews.empty()) {
       return false;
     }
+    // A per-glyph rotation pivots around mid-advance plus the glyph anchor, while SVG's rotate
+    // attribute pivots around each character's own (x, y). Without anchors the two disagree, so
+    // rotated runs go through the outline path where the pivot is applied exactly.
+    for (size_t i = 0; i < run->rotations.size(); ++i) {
+      if (!FloatNearlyZero(run->rotations[i])) {
+        return false;
+      }
+    }
+  }
+  // One <text> carries one font-family, so all runs must reference the same embedded font.
+  const Font* font = nullptr;
+  for (auto* run : text->glyphRuns) {
+    if (run->font == nullptr) {
+      continue;
+    }
+    if (font == nullptr) {
+      font = run->font;
+    } else if (font != run->font) {
+      return false;
+    }
   }
   // Mixed font sizes across runs cannot be expressed in a single <text> element either: the
   // glyph positions on the run are pre-shaped at each run's own size, but <text font-size>
@@ -2638,46 +2658,56 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
     renderPos.y += fs.textBox->padding.top;
   }
 
-  // Walk every visible glyph and collect its absolute x/y/rotation. Skipping GID 0 (the .notdef
+  // Walk every visible glyph and collect its absolute x/y. Skipping GID 0 (the .notdef
   // sentinel) matches writeTextAsPath / HTMLWriter::writeEmbeddedShapeGlyphsAsFont so a missing
-  // glyph never paints a blank box.
+  // glyph never paints a blank box. Glyphs without a positions / xOffsets entry advance by their
+  // own width, mirroring the pen WalkGlyphs uses for the outline path.
   std::string puaText;
   std::string xList;
   std::string yList;
-  std::string rotateList;
-  bool hasRotation = false;
   // All runs share `referenceSize` (validated above); fall back to a sane default for the empty
   // / zero-fontSize edge case so the <text font-size> attribute is always populated.
   float fontSize = referenceSize > 0.0f ? referenceSize : 12.0f;
   for (auto* run : text->glyphRuns) {
+    float scale = 1.0f;
+    if (run->font != nullptr && run->font->unitsPerEm > 0) {
+      scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+    }
+    float currentX = run->x;
     for (size_t i = 0; i < run->glyphs.size(); ++i) {
       uint16_t gid = run->glyphs[i];
       if (gid == 0) {
         continue;
       }
+      const Glyph* glyph = nullptr;
+      auto glyphIndex = static_cast<size_t>(gid) - 1;
+      if (run->font != nullptr && glyphIndex < run->font->glyphs.size()) {
+        glyph = run->font->glyphs[glyphIndex];
+      }
       float gx = run->x;
       float gy = run->y;
-      if (i < run->xOffsets.size()) {
-        gx += run->xOffsets[i];
-      }
       if (i < run->positions.size()) {
         gx += run->positions[i].x;
         gy += run->positions[i].y;
+        if (i < run->xOffsets.size()) {
+          gx += run->xOffsets[i];
+        }
+      } else if (i < run->xOffsets.size()) {
+        gx += run->xOffsets[i];
+      } else {
+        gx = currentX;
+      }
+      if (glyph != nullptr) {
+        currentX += glyph->advance * scale;
       }
       gx += renderPos.x;
       gy += renderPos.y;
       if (!puaText.empty()) {
         xList += ' ';
         yList += ' ';
-        rotateList += ' ';
       }
       xList += FloatToString(gx);
       yList += FloatToString(gy);
-      float rotation = (i < run->rotations.size()) ? run->rotations[i] : 0.0f;
-      rotateList += FloatToString(rotation);
-      if (!FloatNearlyZero(rotation)) {
-        hasRotation = true;
-      }
       AppendUTF8Codepoint(puaText, 0xE000u + (gid - 1u));
     }
   }
@@ -2708,11 +2738,6 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
   }
   out.addAttribute("x", xList);
   out.addAttribute("y", yList);
-  if (hasRotation) {
-    // SVG rotate="..." applies one degree value per character around that character's (x, y);
-    // omit when no glyph rotates so simple runs stay terse.
-    out.addAttribute("rotate", rotateList);
-  }
   // Fill / stroke painting via the shared helper. Solid colors only — the gradient fallback above
   // sent the run to writeTextAsPath. shapeBounds is empty because gradients are excluded.
   applyPainters(out, fs, {}, alpha);

@@ -5564,4 +5564,98 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunEmitsOutlines) {
   }
 }
 
+// ST9: a glyph with no positions / xOffsets entry advances by its own width, so the <text> x
+// list must walk the pen instead of collapsing every glyph onto the run origin.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathAdvancesGlyphsWithoutPositions) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto* font = doc->makeNode<pagx::Font>("advanceFont");
+  font->unitsPerEm = 1000;
+  for (float advance : {700.0f, 500.0f}) {
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 100,0 L 100,-100 L 0,-100 Z");
+    glyph->advance = advance;
+    font->glyphs.push_back(glyph);
+  }
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 1000;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 2};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("x=\"0 700\""), std::string::npos);
+}
+
+// ST9: one <text> can only name one family, so runs built from different Fonts must fall back to
+// per-glyph outlines instead of rendering the second font with the first font's family.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathRequiresSingleFont) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto buildFont = [&]() {
+    auto* font = doc->makeNode<pagx::Font>();
+    font->unitsPerEm = 1000;
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+    glyph->advance = 700;
+    font->glyphs.push_back(glyph);
+    return font;
+  };
+  auto* fontA = buildFont();
+  auto* fontB = buildFont();
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  for (auto* font : {fontA, fontB}) {
+    auto* run = doc->makeNode<pagx::GlyphRun>();
+    run->font = font;
+    run->fontSize = 50;
+    run->glyphs = {1};
+    text->glyphRuns.push_back(run);
+  }
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+// ST9: SVG rotates each character around its own (x, y) while PAGX pivots around mid-advance plus
+// the glyph anchor, so a rotated run cannot use <text>.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathRejectsGlyphRotation) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto* font = doc->makeNode<pagx::Font>("rotatedFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  run->rotations = {30};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
 }  // namespace pag
