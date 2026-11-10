@@ -763,6 +763,20 @@ enum class TargetChannelRole {
   GradientStartAngle,
   // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
   StopColor,
+  // TextModifier channels: every glyph the modifier reaches gets its own rule, like a selector.
+  ModifierPosX,
+  ModifierPosY,
+  ModifierRotation,
+  ModifierScaleX,
+  ModifierScaleY,
+  ModifierSkew,
+  ModifierSkewAxis,
+  ModifierAnchorX,
+  ModifierAnchorY,
+  ModifierAlpha,
+  ModifierFillColor,
+  ModifierStrokeColor,
+  ModifierStrokeWidth,
   // DropShadowStyle on a box shape: the shadow is its own blurred div, so these are plain CSS.
   ShadowOffsetX,
   ShadowOffsetY,
@@ -867,6 +881,19 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::RadialGradient, "center.y", TargetChannelRole::GradientCenterY},
     {NodeType::RadialGradient, "radius", TargetChannelRole::GradientRadius},
     {NodeType::ColorStop, "color", TargetChannelRole::StopColor},
+    {NodeType::TextModifier, "position.x", TargetChannelRole::ModifierPosX},
+    {NodeType::TextModifier, "position.y", TargetChannelRole::ModifierPosY},
+    {NodeType::TextModifier, "rotation", TargetChannelRole::ModifierRotation},
+    {NodeType::TextModifier, "scale.x", TargetChannelRole::ModifierScaleX},
+    {NodeType::TextModifier, "scale.y", TargetChannelRole::ModifierScaleY},
+    {NodeType::TextModifier, "skew", TargetChannelRole::ModifierSkew},
+    {NodeType::TextModifier, "skewAxis", TargetChannelRole::ModifierSkewAxis},
+    {NodeType::TextModifier, "anchor.x", TargetChannelRole::ModifierAnchorX},
+    {NodeType::TextModifier, "anchor.y", TargetChannelRole::ModifierAnchorY},
+    {NodeType::TextModifier, "alpha", TargetChannelRole::ModifierAlpha},
+    {NodeType::TextModifier, "fillColor", TargetChannelRole::ModifierFillColor},
+    {NodeType::TextModifier, "strokeColor", TargetChannelRole::ModifierStrokeColor},
+    {NodeType::TextModifier, "strokeWidth", TargetChannelRole::ModifierStrokeWidth},
     {NodeType::DropShadowStyle, "offsetX", TargetChannelRole::ShadowOffsetX},
     {NodeType::DropShadowStyle, "offsetY", TargetChannelRole::ShadowOffsetY},
     {NodeType::DropShadowStyle, "color", TargetChannelRole::ShadowColor},
@@ -1014,6 +1041,21 @@ struct BundleChannelSet {
   const Channel* shadowOffsetYCh = nullptr;
   const Channel* shadowColorCh = nullptr;
   const Channel* shadowSpreadCh = nullptr;
+  // TextModifier channels; `modifierTarget` is the modifier they belong to.
+  const Node* modifierTarget = nullptr;
+  const Channel* modPosXCh = nullptr;
+  const Channel* modPosYCh = nullptr;
+  const Channel* modRotationCh = nullptr;
+  const Channel* modScaleXCh = nullptr;
+  const Channel* modScaleYCh = nullptr;
+  const Channel* modSkewCh = nullptr;
+  const Channel* modSkewAxisCh = nullptr;
+  const Channel* modAnchorXCh = nullptr;
+  const Channel* modAnchorYCh = nullptr;
+  const Channel* modAlphaCh = nullptr;
+  const Channel* modFillColorCh = nullptr;
+  const Channel* modStrokeColorCh = nullptr;
+  const Channel* modStrokeWidthCh = nullptr;
   const Channel* blendModeCh = nullptr;
   Color stopBaseColor = {};
   // Polystar: every channel rewrites the outline, so one struct keeps them together.
@@ -1287,6 +1329,58 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerBlendMode:
       out.blendModeCh = ch;
+      return true;
+    case TargetChannelRole::ModifierPosX:
+      out.modPosXCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierPosY:
+      out.modPosYCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierRotation:
+      out.modRotationCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierScaleX:
+      out.modScaleXCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierScaleY:
+      out.modScaleYCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierSkew:
+      out.modSkewCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierSkewAxis:
+      out.modSkewAxisCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierAnchorX:
+      out.modAnchorXCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierAnchorY:
+      out.modAnchorYCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierAlpha:
+      out.modAlphaCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierFillColor:
+      out.modFillColorCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierStrokeColor:
+      out.modStrokeColorCh = ch;
+      out.modifierTarget = objTarget;
+      return true;
+    case TargetChannelRole::ModifierStrokeWidth:
+      out.modStrokeWidthCh = ch;
+      out.modifierTarget = objTarget;
       return true;
     case TargetChannelRole::ShadowOffsetX:
       out.shadowOffsetXCh = ch;
@@ -2692,6 +2786,21 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         continue;
       }
     }
+    if (nType == NodeType::TextModifier) {
+      const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
+      for (size_t index = 0; index < glyphs.size(); ++index) {
+        if (glyphs[index].modifier != targetNode || !glyphs[index].fromModifier) {
+          continue;
+        }
+        DomTargetBundle glyphBundle;
+        glyphBundle.domId = glyphs[index].id;
+        glyphBundle.primaryHost = targetNode;
+        glyphBundle.objects.push_back(obj);
+        glyphBundle.rangeGlyphIndex = static_cast<int>(index);
+        bundles.push_back(std::move(glyphBundle));
+      }
+      continue;
+    }
     if (nType == NodeType::RangeSelector) {
       const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
       for (size_t index = 0; index < glyphs.size(); ++index) {
@@ -3202,6 +3311,123 @@ std::string RangeGlyphDecls(const RangeSelectorGlyph& glyph, double factor) {
   return decls;
 }
 
+// Rebuilds one glyph's pose from the modifier's channel values at `t`. The static exporter bakes
+// `modifier value * factor` per glyph, so the frame does the same with the value taken at `t`.
+std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChannelSet& chSet,
+                               Frame t) {
+  const TextModifier* modifier = glyph.modifier;
+  float f = glyph.factor;
+  float absF = std::abs(f);
+  float posX = EvalFloatChannel(chSet.modPosXCh, t, modifier->position.x);
+  float posY = EvalFloatChannel(chSet.modPosYCh, t, modifier->position.y);
+  float rotation = EvalFloatChannel(chSet.modRotationCh, t, modifier->rotation);
+  float scaleX = EvalFloatChannel(chSet.modScaleXCh, t, modifier->scale.x);
+  float scaleY = EvalFloatChannel(chSet.modScaleYCh, t, modifier->scale.y);
+  float skew = EvalFloatChannel(chSet.modSkewCh, t, modifier->skew);
+  float skewAxis = EvalFloatChannel(chSet.modSkewAxisCh, t, modifier->skewAxis);
+  float anchorX = EvalFloatChannel(chSet.modAnchorXCh, t, modifier->anchor.x);
+  float anchorY = EvalFloatChannel(chSet.modAnchorYCh, t, modifier->anchor.y);
+  float alpha = EvalFloatChannel(chSet.modAlphaCh, t, modifier->alpha);
+
+  std::string transform = "translate(" + CssFloatToString(glyph.glyphX) + "px, " +
+                          CssFloatToString(glyph.glyphY) + "px)";
+  if (!FloatNearlyZero(posX * f) || !FloatNearlyZero(posY * f)) {
+    transform +=
+        " translate(" + CssFloatToString(posX * f) + "px, " + CssFloatToString(posY * f) + "px)";
+  }
+  bool hasRotation = !FloatNearlyZero(rotation);
+  bool hasScale = !FloatNearlyZero(scaleX - 1.0f) || !FloatNearlyZero(scaleY - 1.0f);
+  bool hasSkew = !FloatNearlyZero(skew);
+  if (hasRotation || hasScale || hasSkew) {
+    float pivotX = glyph.pivotX + anchorX * absF;
+    float pivotY = anchorY * absF;
+    transform +=
+        " translate(" + CssFloatToString(pivotX) + "px, " + CssFloatToString(pivotY) + "px)";
+    if (hasRotation) {
+      transform += " rotate(" + CssFloatToString(rotation * f) + "deg)";
+    }
+    if (hasScale) {
+      transform += " scale(" + CssFloatToString(1.0f + (scaleX - 1.0f) * absF) + ", " +
+                   CssFloatToString(1.0f + (scaleY - 1.0f) * absF) + ")";
+    }
+    if (hasSkew) {
+      bool hasAxis = !FloatNearlyZero(skewAxis);
+      if (hasAxis) {
+        transform += " rotate(" + CssFloatToString(skewAxis) + "deg)";
+      }
+      transform += " skewX(" + CssFloatToString(-skew * absF) + "deg)";
+      if (hasAxis) {
+        transform += " rotate(" + CssFloatToString(-skewAxis) + "deg)";
+      }
+    }
+    transform +=
+        " translate(" + CssFloatToString(-pivotX) + "px, " + CssFloatToString(-pivotY) + "px)";
+  }
+  std::string decls = {};
+  AppendCssDecl(decls, "transform", transform);
+  if (chSet.modFillColorCh != nullptr) {
+    AppendCssDecl(decls, "fill",
+                  ColorToSVGHex(EvalColorChannel(chSet.modFillColorCh, t,
+                                                 modifier->fillColor.value_or(Color()))));
+  }
+  if (chSet.modStrokeColorCh != nullptr) {
+    AppendCssDecl(decls, "stroke",
+                  ColorToSVGHex(EvalColorChannel(chSet.modStrokeColorCh, t,
+                                                 modifier->strokeColor.value_or(Color()))));
+  }
+  if (chSet.modStrokeWidthCh != nullptr) {
+    AppendCssDecl(decls, "stroke-width",
+                  CssFloatToString(EvalFloatChannel(chSet.modStrokeWidthCh, t,
+                                                    modifier->strokeWidth.value_or(0.0f))) +
+                      "px");
+  }
+  if (alpha < 1.0f) {
+    AppendCssDecl(decls, "opacity", CssFloatToString(1.0f + (alpha - 1.0f) * f));
+  }
+  return decls;
+}
+
+// Stops for one glyph whose TextModifier channel animates. The pose is linear in every modifier
+// channel, so the keys alone describe it; a bundle whose channels disagree on easing falls back to
+// evenly spaced linear stops.
+std::string EmitModifierGlyphStops(const BundleChannelSet& chSet, const BundleTimingInfo& timing) {
+  if (timing.effectiveDuration <= 0 || chSet.rangeGlyph == nullptr) {
+    return {};
+  }
+  const RangeSelectorGlyph& glyph = *chSet.rangeGlyph;
+  const Frame windowStart = timing.bundleShiftFrames;
+  const Frame windowEnd = windowStart + timing.effectiveDuration;
+  std::set<Frame> times = {};
+  for (Frame t : chSet.keyTimes) {
+    if (t >= windowStart && t <= windowEnd) {
+      times.insert(t);
+    }
+  }
+  times.insert(windowStart);
+  times.insert(windowEnd);
+  bool mixed = !chSet.mixedEasingTimes.empty();
+  if (mixed) {
+    constexpr Frame kStep = 3;
+    for (Frame t = windowStart; t <= windowEnd; t += kStep) {
+      times.insert(t);
+    }
+  }
+  std::string stops = {};
+  for (Frame t : times) {
+    std::string decls = ModifierGlyphDecls(glyph, chSet, t);
+    if (!mixed) {
+      auto easeIt = chSet.stopEasings.find(t);
+      if (easeIt != chSet.stopEasings.end() &&
+          (easeIt->second.type != KeyframeInterpolationType::Linear || !timing.uniformEasing)) {
+        AppendCssDecl(decls, "animation-timing-function", easeIt->second.toCss());
+      }
+    }
+    Frame relTime = (t >= windowStart) ? (t - windowStart) : 0;
+    stops += "  " + FormatPercent(relTime, timing.effectiveDuration) + " { " + decls + "; }\n";
+  }
+  return stops;
+}
+
 // Stops for one glyph of an animated RangeSelector. The timeline is cut at every key and wherever a
 // range edge crosses a glyph edge; inside each cut the factor is one rational function of time, so
 // it is a stop pair eased by a fitted cubic-bezier rather than a per-frame sample.
@@ -3278,6 +3504,9 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
                                     const BundleTimingInfo& timing, const std::string& tagName,
                                     bool& outNeedsZeroOrigin) {
   if (chSet.rangeGlyph != nullptr) {
+    if (chSet.rangeGlyph->fromModifier) {
+      return EmitModifierGlyphStops(chSet, timing);
+    }
     return EmitRangeSelectorGlyphStops(chSet, timing);
   }
   std::string stops = {};
@@ -3714,6 +3943,17 @@ void HTMLAnimationSession::ResolveAnimationTargets(
               auto& slot = _ctx.animation.repeaterMaxCopies[repeater];
               slot = std::max(slot, emitted);
             }
+          }
+        }
+      } else if (nType == NodeType::TextModifier) {
+        for (auto* channel : obj->channels) {
+          if (channel != nullptr &&
+              LookupChannelRole(nType, channel->name) != TargetChannelRole::Unknown) {
+            auto* modifier = static_cast<TextModifier*>(targetNode);
+            if (!modifier->id.empty()) {
+              _ctx.animation.animatedModifiers.insert(modifier);
+            }
+            break;
           }
         }
       } else if (nType == NodeType::InnerShadowStyle) {

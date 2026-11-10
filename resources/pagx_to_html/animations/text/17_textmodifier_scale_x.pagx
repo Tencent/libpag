@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A TextModifier scale.x stretches each glyph horizontally.
      Target: TextModifier  Channel: scale.x  Type: float
-     Expect: gap
+     Expect: supported
+     modifier-scale-calibration：0.934，与文本质感差异叠加，待标定
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

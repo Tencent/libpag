@@ -397,6 +397,12 @@ class HTMLWriterContext {
       float glyphY = 0.0f;
       float pivotX = 0.0f;
       float fontSize = 0.0f;
+      // The static selector factor of this glyph, so a modifier channel scales its own value by the
+      // same amount the shaper baked into the static pose.
+      float factor = 0.0f;
+      // True when the glyph was registered because a TextModifier channel animates rather than a
+      // RangeSelector channel: the frame then rebuilds the modifier pose from its own values.
+      bool fromModifier = false;
       std::string id = {};
     };
     // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
@@ -425,6 +431,8 @@ class HTMLWriterContext {
     // ColorStop -> id of the <stop> element it writes, so a colour channel can animate stop-color.
     std::unordered_map<const Node*, std::string> colorStopIds = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
+    // TextModifiers with an animated channel: every glyph the modifier reaches needs its own rule.
+    std::unordered_set<const TextModifier*> animatedModifiers = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 
     struct Instance {

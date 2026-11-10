@@ -76,6 +76,10 @@ for _channel in ("blurX", "blurY", "offsetX", "offsetY", "shadowOnly"):
     CHANNEL_EXEMPTIONS[("InnerShadowFilter", _channel)] = JS_PENDING + "（重写 <filter> 原语）"
 CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = JS_PENDING + "（重写 <filter> 原语）"
 
+# Text content is not an animatable property: changing the string re-shapes and re-lays out the
+# line, which only a JS export can do (CSS can replace content of a pseudo element, not the run).
+CHANNEL_EXEMPTIONS[("Text", "text")] = JS_PENDING + "（重新 shaping 与排版）"
+
 # A colour stop's position is the `offset` attribute of <stop>, not a CSS property.
 CHANNEL_EXEMPTIONS[("ColorStop", "offset")] = JS_PENDING + "（逐帧重建 <stop> 的 offset）"
 

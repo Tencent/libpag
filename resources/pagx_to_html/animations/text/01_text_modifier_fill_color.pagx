@@ -2,6 +2,7 @@
 <!-- Tests: TextModifier fillColor overrides the shared fill so the glyphs re-tint without touching the layer fill.
      Target: TextModifier  Channel: fillColor  Type: color
      Expect: gap
+     span-path-paint：文本走 span 路径时 modifier 的绘制通道尚未接到元素上
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
