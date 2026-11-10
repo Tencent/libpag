@@ -1,840 +1,468 @@
-# PAGX → SVG 开发方案与代码评审
+# PAGX → SVG 开发方案与覆盖核查
 
-> - 初稿日期：2026-11-09；静态补充评审日期：2026-11-10。
-> - 评审分支：`feature/lifengdy_svg_export`。
-> - 本次完整模型台账源码基点：`ec095ba15`；当前历史中的动画主体提交：`02a0a528d`。
-> - 状态：静态与动画的完整方案均待评审，尚未开始源码实现。
-> - 仓库根目录：`/Users/lifengdy/Desktop/project/libpag`。源码定位均相对于该目录；关键位置已按本次源码核对。
-> - 第 3 节的运行结果为此前已有二进制的历史记录，不代表本次静态补充评审重新构建或重跑了测试。
+> 初稿：2026-11-09；本轮重组与语义核查：2026-11-10。评审分支：`feature/lifengdy_svg_export`。
+> 源码基点：`847116b92`。源码定位相对于 `/Users/lifengdy/Desktop/project/libpag`，均使用 `file:line`。
+> 本轮仅修改本文档，没有源码实现、构建、测试或像素验证；所有推荐决策仍待确认。
 
-## 1. 阅读结论
+## 1. 总览、范围与待确认决策
 
-**现有静态 PAGX → SVG 也没有覆盖全部 PAGX 绘制语义，不能据此承诺“覆盖所有 SVG 情况”。保留已有导出能力与 Plan / Writer 分工，先修正静态和动画共用的实例、绘制、文字、资源与合成边界，再扩展动画。**
+### 1.1 结论与阅读顺序
 
-静态已有矩形、椭圆、路径、文字、图片、渐变、滤镜、遮罩和部分栅格化实现，但内外描边、跨父遮罩、TextBox / 字形、混合轴图案、滤镜顺序、背景依赖和资源身份仍有实际缺口。SMIL 同时存在顶层入口、实例时序和组合插值问题。两条链路共用的错误应从源头修复，不把静态视为无需检查的正确基线。
+**先完成静态，再编译动效；共用实例、绘制、资源、状态和诊断契约，不另造第二套解释器。**
 
-总体顺序为：
+静态声明已登记全集：55 个 NodeType / 334 个自有字段、31 个基类或附属结构 / 111 个字段、40 类 enum / 155 个值。完整声明、逐字段运行语义、组合和证据保留在附录 A—F。动效反射的 30 类 / 175 个通道全部分类，另登记反射表外动态路径和图片 payload；**全集已分类不等于全部已支持，更不等于修复或像素已通过。**
 
-1. S0 / M0 共用验证基础：建立显式静态导出和动画求值的 XML、属性及浏览器对照；策略、诊断和预算契约前置。
-2. S1 / S2 优先处理高风险的实例坐标、Mask、透明度、滤镜和背景合成；其中实例与绘制上下文和 M1 / M2 共用，不重复建设。
-3. S3 / S4 / S5 补齐文字字形、描边 / 修饰器、渐变 / 图案与资源解析，使对应静态路径达到承诺的能力标准。
-4. 在正确的共用基础上完成 M1—M3 的时钟、变换和组合轨道，再推进 M4 / M5 的动态颜色源与动态几何。
-5. S6 / M6 收口接口、CLI、失败行为和全量回归。不是到最后才加入预算或错误处理，各阶段均须使用它们。
+正文阅读顺序：第 2 节静态契约与 S0—S6 → 第 3 节动效分类与 M0—M6 → 第 4 节共用工程与验收。附录 E 是唯一 ST 清单，附录 F 是唯一 F 清单；阶段只引用编号，不重复展开缺陷。
 
-S0—S6详见第9.1节，动画M0—M6详见第9.2节；**第13章是自底向上的55种PAGX节点、完整字段、枚举和组合台账，是覆盖完整性的权威清单，不以ST缺陷数量代替。** 浏览器验证从第一阶段开始；静态不以“有对应标签”，动画不以“出现animate”作为完成标准。视觉保真、原生可编辑性、源SVG结构还原和所选状态来源分别验收，不能相互替代。
+### 1.2 目标与责任边界
 
-本次保留目录中已有的 `docs/pagx-svg-export-plan.md` 原稿，不覆盖其内容。本文件是基于本次源码评审的独立方案；不沿用原稿中“动画基线已完成”或“先扩滤镜再处理实例”的判断。
+- 合法文件、PAGX 绘制外观、可编辑矢量、可读原文、源 SVG 结构还原分别验收，不能互相代替。
+- 本计划覆盖当前 PAGX 已建模的静态输入，以及有效运行时动画的原生、有界展开、显式有限场景烘焙或拒绝分类；保留 `SVGExporter::ToSVG / ToFile`、Plan / Writer 分工及已有能力。
+- 未保存的源 SVG DOM / CSS / 脚本、响应式行为、foreignObject、链接和独立渐变参数不能由 Exporter 凭空恢复；任意 SVG 往返需另确认导入与模型范围。
+- StateMachine / VM 的开放宿主输入和历史、任意时刻已有 scene 快照、平台绑定不被当作当前已移植能力；有限事件脚本仅在 D8 明确同意后进入 MB。
 
-## 2. 目标、交付边界与待确认决策
-
-### 2.1 核心目标
-
-- 对承诺支持的动画，SVG 与 PAGX 运行时在相同时刻具有一致的属性、绘制顺序和合成语义。
-- 优先保留矢量、文字、资源引用和原生 SMIL，不默认用整段位图动画替代。
-- 无法等价表达的组合属性可以进入受控采样，但必须满足明确的误差和资源预算。
-- 所有无法支持、近似、冻结和资源失败都能定位到实例、节点和属性，不静默丢弃。
-- 静态常规能力不因动画改造回归；已确认的静态错误按本方案修正，不为保持旧输出而保留错误语义。需要保留原结构与需要有意修正的输出分别验收。
-- 不把修改模板文档后重新布局当作运行时动画求值，不破坏多场景共享模板的边界。
-
-### 2.2 本次完整计划包含的能力
-
-- 静态 PAGX 模型可表达内容的覆盖盘点与补齐：实例 ID、坐标空间、Mask / Contour、合成、字形、描边、修饰器、渐变、图案、资源和滤镜。
-- 静态原生输出优先；无法等价原生表达的已建模效果，以完整上下文栅格化保留外观，或按显式策略拒绝 / 降级。
-- 顶层 Animation 选择与导出。
-- 已挂载 Composition 时间轴，包括多实例、不同 offset / playing 和已解析外部文档。
-- 当前白名单通道的语义修正，以及 Layer x / y、共享颜色源、线性 / 径向渐变和色标动画。
-- 动态修饰器和路径结果的来源追踪、能力判断与可表达路径的动画输出。
-- 库接口、CLI 选项、错误行为和浏览器验证。
-
-### 2.3 后续独立确认的能力
-
-- StateMachine 输入、交互事件、DataBind / ViewModel 宿主行为的完整移植。
-- 某个时刻的运行态矢量快照接口。
-- Android / iOS / Web 等平台导出绑定。
-- 动画位图序列、无法等价投影的 3D / 透视动画，以及随时间变化的背景模糊和玻璃效果；这些效果的静态保外观输出纳入 S2，不再笼统推迟。
-- 需要动态重排版的文字内容、字体与复杂逐字形效果；已给定 GlyphRun 的静态字形和静态 TextModifier 纳入 S3。
-- 任意源 SVG 的 DOM / CSS / 脚本、响应式行为、foreignObject 和未被 PAGX 模型保留的参数还原。若目标扩展到此范围，需先设计导入与模型保留，不仅修改 Exporter。
-
-这些内容不是被当作已支持，而是有独立的输入和输出契约。当前模式遇到它们时仍必须明确诊断，不能默认为可保真导出。
-
-### 2.4 编码前需要确认
-
-| 编号 | 决策 | 推荐方案 | 为什么需要确认 |
-|---|---|---|---|
-| D1 | 多个顶层动画如何选择 | 默认按 `PAGScene::getDefaultTimeline()` 选择首个；另提供指定动画和显式全部并播 | 运行时默认选择首个，而当前 render CLI 会应用全部顶层 Animation。替代动画不应被无意叠加 |
-| D2 | 是否接受受控采样 | 接受原生表达之外的有界近似；几何误差目标 0.25 文档像素，alpha / 颜色误差目标 1/255 | 若要求完全解析等价，则部分组合属性只能明确拒绝 |
-| D3 | 动画不支持时默认行为 | 动画默认 Strict；显式 BestEffort 才允许告警后冻结或降级 | 成功写出文件不能等同于完整保留动画；动画与静态策略相互独立但共同约束最终输出 |
-| D4 | 静态表示与保真策略 | 默认 PreserveAppearance：原生优先，必要时完整上下文栅格化，失败则拒绝；另提供 VectorOnly 与显式 BestEffort | VectorOnly 禁止新增效果 PNG 补丁但允许原始图片 / 位图字形；若要求文件完全不含位图，这是更严格的独立要求 |
-| D5 | 静态文字优先级 | 默认 Fidelity：以已布局字形为准，可用 WOFF2 / 轮廓；Native 文字作为显式选择并诊断排版差异 | 视觉保真与可读原文、复制搜索不是同一能力；PUA 字符不能承诺原文搜索和复制 |
-| D6 | 静态保真的目标环境 | 先固定画布、色彩、缩放及 Chromium 主门禁，再确认其他目标浏览器和导出缩放范围 | 不能承诺任意浏览器、字体环境和任意缩放都像素相等；PNG 补丁的保真与采样分辨率相关 |
-| D7 | 静态的状态来源 | TemplateStatic：模板字段与明确供应资源布局后的结果，不执行动画 / 状态机 / 默认DataBind；有效绑定明确登记未初始化宿主 | 无动画播放不代表首次PAGScene绘制只用模板；DefaultHostInitialization和ExistingSceneSnapshot须独立设计，见第13.7节 |
-
-上述推荐均未视为用户已经确认。D1 首项如果是 StateMachine，Strict 应报告不支持，不偷偷跳到下一条 Animation。顶层选择作用于根动画；Composition 是否激活仍由其挂载的 driver 决定。`exportAnimation=false` 则关闭全部动画导出，包括嵌套实例。
-
-## 3. 已核实的代码与验证证据
-
-### 3.1 此前评审已执行的验证
-
-此前评审使用当时工作区已有 Debug 二进制，未重新编译。结果证明的是这些二进制在当时的测试状态，不是本次静态评审的新结果，也不是对全部源码路径的重新构建认证。
-
-| 验证 | 结果 | 能说明什么 |
+| 层 | 责任与数据流 | 边界 / 依据 |
 |---|---|---|
-| `PAGFullTest --gtest_filter='PAGXSVGTest.*'` | 163 / 163 通过 | 现有 SVG 测试未失败，不代表组合动画已保真 |
-| 当前动画结构测试与两项 Composition 运行时测试 | 19 / 19 通过，其中 SVG 17 项、运行时 2 项 | SVG 17 项包括 16 个 `SVGExport_Anim*` 和 1 个静态结构测试 |
-| `spec/samples/animation.pagx` 实际导出并解析 SVG | 动画元素数为 0，stderr 为空 | 合法顶层 Animation 没进入当前导出计划，而且没有丢弃诊断 |
-| 工作区状态检查 | 未改动受版本控制的源码 | 本轮评审没有执行修复、格式化或基准接受 |
+| 模板 / 布局 | 节点、资源、结构定义 → 有效资源与布局产物 | 不保存实例实时播放状态；`include/pagx/PAGXDocument.h:69` |
+| runtime | 实例 binding → 初始化 / 时间 / ordered apply → 实际绘制 | 不靠修改共享模板模拟播放；`src/pagx/PAGAnimation.cpp:44` |
+| SVG | 共用上下文 → DrawRecord / 资源 → 静态表示或 compiled tracks → XML | Writer 不补运行语义；`src/pagx/svg/SVGExporter.cpp:3673` |
 
-此前完整 SVG 测试的 stderr 有三次 PNG 解码错误，测试仍通过；当时未定位原因，本次也未重跑或定位，不将“断言通过”扩写为“日志没有异常”。
+引用安全检查先于可能递归的布局、Mask、Composition 和资源遍历；祖先路径检测允许合法兄弟复用。修正共享源头时同步 runtime / SVG / PPT / HTML，不保留错误输出兼容层。
 
-未执行：重新构建、全仓测试、浏览器逐帧像素对比、HTML / PPT 全量回归、跨浏览器兼容验证。其余缺陷为源码路径与运行时规则对照确认，实施时必须先加入对应复现测试。
+### 1.3 待确认 D 决策（保留原 ID，静态先列）
 
-### 3.2 现有测试的主要盲区
+| ID | 决策 | 推荐契约与确认原因 |
+|---|---|---|
+| D4 | 静态表示策略 | 默认 PreserveAppearance：原生优先，必要时完整上下文 bake，失败拒绝；VectorOnly 禁止新增效果 PNG，但允许原 bitmap；BestEffort 显式报告损失 |
+| D5 | 文字模式 | 默认 Fidelity 使用实际已布局字形 / WOFF2 / 轮廓；Native 保留原文但可能重新塑形；PUA 不承诺原文复制搜索 |
+| D6 | 保真目标环境 | 固定画布、背景、色彩、Chromium 版本、缩放 / 分辨率与容差；PNG 不承诺任意缩放无损；再确认其他浏览器 |
+| D7 | 静态状态来源 | 默认 TemplateStatic：模板 + 明确供应资源 + 布局，不执行动画 / SM / 默认 DataBind；DefaultHostInitialization、ExistingSceneSnapshot 独立定义 |
+| D1 | 根动画选择 | Default取getDefaultTimeline首项，Named只选指定顶层Animation，All按声明顺序选全部顶层Animation（不含顶层StateMachine）；Default首项为StateMachine时Strict拒绝，不偷偷跳过。根先apply，再实际挂载nested driver；两者均不自行激活未挂载定义 |
+| D2 | 动效有界近似 | 建议几何 0.25 文档像素、alpha / 颜色 1/255；N/G 必须证明连续时刻误差，不能证明或预算不足则 Strict 拒绝 |
+| D3 | 动效失败策略 | 默认 Strict；显式 BestEffort 才允许指定时刻冻结 / 降级且逐项诊断；不以静态 PNG 冒充保留动画 |
+| D8 | 可选 MB 输出模式 | 是否允许显式有限场景烘焙：时间窗、初态、事件、资源、分辨率、采样与尾帧 / repeat 必须确定；未同意前 B 类 Strict 拒绝，不是已保真；开放宿主历史仍为 U |
 
-本次静态补充评审仅核对源码，没有重新构建或重跑测试。当前 `PAGXSVGTest.cpp` 声明 166 个 SVG 用例，其中 16 个 `SVGExport_Anim*`；源码没有显式 `exportAnimation=false` 的测试设置。此数字是用例声明数，不能写成“166 项通过”。第 3.1 节的 163 项通过属于此前二进制结果。
+D1—D8 均未擅自确认。推荐数值不是已通过门禁；MB 不是默认开启、已实现或原生矢量能力。
 
-静态测试也存在盲区：`test/src/PAGXSVGTest.cpp:4433` 的跨父 Mask 用例只验证告警和 defs，父变换仍为恒等；`test/src/PAGXSVGTest.cpp:3183` 和 `test/src/PAGXSVGTest.cpp:3211` 用伪 JPEG / WebP 头只验证 MIME；`test/src/PAGXSVGTest.cpp:3506` 的位图字体 fallback 没有真实位图数据。这些不能证明坐标、图案适配和字形 alpha 正确。
+## 2. 静态导出：契约、补齐与阶段
 
-`test/src/PAGXSVGTest.cpp:4556` 起的动画相关测试主要检查字符串，不检测区间中间值、初始姿态、实例独立性和合成结果。
+### 2.1 范围与能力摘要
 
-- `SVGExport_NoAnimationOutputUnchanged` 没有真正比较开关前后的 SVG 字节。
-- 大部分动画样例把 timeline 挂在普通 Layer 上，不能作为 Composition 驱动作用域正确性的证据。
-- 已有 PingPong 测试覆盖 Layer alpha，但没有覆盖 transform、color、visibility 的所有输出路径。
-- 暂停和 offset 测试仅检查 `begin` 字符串，没有检查对应显示状态。
+静态指无动画文档，或 `exportAnimation=false` 的 TemplateStatic；它既不是动画 t=0，也不是 scene 首次 draw。line / polyline / polygon 可用等价 Path，use / symbol / marker 可已展开为 Layer；依据 `src/pagx/svg/SVGImporter.cpp:446`、`src/pagx/svg/SVGImporter.cpp:490`。RadialGradient 没有独立 focus，Gradient 没有 spreadMethod，不能还原未保留参数（`include/pagx/nodes/RadialGradient.h:31`、`include/pagx/nodes/Gradient.h:33`）。
 
-## 4. 职责边界与数据流
+“已有”仅表示代码路径存在。完整字段见附录 A/B，以下只汇总能力，不再次逐节点列成员。
 
-### 4.1 模板、运行时、导出三层
+| 范畴 | 现状 / 补齐边界 | 阶段 |
+|---|---|---|
+| 根画布、约束与容器布局 | 已有固定 viewBox、约束、flow、renderScale；补布局失效、NaN unset、真实字体与有效尺寸 | S0 / S1 / S3 |
+| Layer / Group / Composition | 已有包装、几何累积、Painter 分次发射与内联；补实例 ID、外部归属、有效内容优先级与捕获矩阵 | S1 |
+| Mask / Contour / scroll | 已有简单覆盖；补跨父相对矩阵、根 alpha / effects / composition、stroke 覆盖、隐藏根特殊语义及一次裁剪 | S1 / S2 / S4 |
+| alpha / blend / 背景隔离 | 已有 opacity / mix-blend-mode；必须按实际离屏条件保留整体或逐项合成，不能只套 `<g>` | S1 / S2 |
+| primitive / Path / Stroke / modifier | 常规几何和解析已有；补方向起点、退化微轮廓、内外描边、adaptive dash、Append、Merge 清 Painter、Repeater 顺序 / 幂 | S4 |
+| Text / TextBox / GlyphRun | Native / WOFF2 / 路径 / bitmap 已有；补 layoutRuns、多 Font、短数组、faux、最终字形样式、有效空布局和绘制次序 | S3 |
+| TextPath / Selector / TextModifier | 现有 bake 不能代替完整语义；优先展开实际最终 glyph 与 base / overlay paint | S3 |
+| 渐变 / 色彩 | linear / radial 与 stops 已有；补空 / 单 / 退化规则、P3 / alpha / 空间插值和 shape / glyph 各自 fit bounds | S5 |
+| Image / ImagePattern | 已有图片与部分 repeat / bake；补消费方资源链、真实多格式、16 tile 组合、4 fit、6 sampling 与完整变换 | S5 |
+| styles / filters / backdrop | primitive 与部分 bake 已有；补有序输入、Below / Above bucket、spread / tile / noise / Glass 和背景消费边界 | S2 |
+| 2D / 3D / antiAlias | 当前 Layer 已有组件与 anchor，仿射 / 常量 w 可原生；一般透视与有效 preserve3D 已有 bake，补 flatten / Mask / AA | S1 / S2 |
+| 资源、元数据与生命周期 | 补统一诊断、有效依赖、局部产物、不污染共享数据、合法缓存测试和文件失败行为 | S0 / S6 |
 
-| 层 | 责任 | 不应承担的责任 | 主要定位 |
-|---|---|---|---|
-| PAGX 模板与布局 | 保存节点、资源、动画定义，解析静态布局 | 保存某个播放实例的实时状态 | `include/pagx/PAGXDocument.h:69` |
-| PAGScene / PAGAnimation | 每实例绑定、时间推进、通道求值、写入运行对象 | 通过修改共享模板实现播放 | `src/pagx/PAGAnimation.cpp:63`、`:202` |
-| SVG 导出 | 把选定场景行为编译为 SVG 结构与轨道 | 另造一套与运行时不同的插值和透明度规则 | `src/pagx/svg/SVGExporter.cpp:3673` |
+### 2.2 唯一共用导出上下文与 DrawRecord
 
-当前静态流向：
-
-```text
-PAGXDocument
-  → applyLayout
-  → ModifierResolver / geometry and painter traversal
-  → SVG elements / defs
-  → optional static raster patches
-```
-
-目标动画流向：
-
-```text
-PAGXDocument + confirmed export options
-  → reference validation and instance enumeration
-  → static layout and resource resolution
-  → SVGAnimationPlan: selected drivers and instance-scoped bindings
-  → draw records: geometry / painter / reference dependencies
-  → attribute track compilation: exact native or controlled sampling
-  → SVGAnimationWriter: XML serialization
-  → diagnostics and export result
-```
-
-引用安全检查必须在可能递归的布局和导出遍历之前生效。只给动画收集增加循环检测，而其他入口仍先递归，不构成完整修复。
-
-### 4.2 继续保留的设计
-
-- 保留SVGExporter::ToSVG/ToFile入口和已有静态能力；选项按第8.6节收口，避免表示策略与旧布尔开关冲突。
-- 保留 `SVGAnimationPlan` 与 `SVGAnimationWriter`，不重写成熟的静态主体。
-- 复用 `Channel::evaluateAt(microseconds, frameRate)`，不复制 float / color / Matrix 插值。
-- 复用矩阵分解、颜色空间转换、描边几何和修饰器解析能力。
-- 继续遵守 PAGX 几何累积与 Painter 作用域，不把所有 Group 一一映射为全局 `<g>`。
-
-## 5. 必须修复的问题清单
-
-编号用于后续任务和测试对应。除 F1 官方样例外，本轮未通过新增用例或浏览器实测演示缺陷，不能把下表描述当作已完成修复。
-
-| 编号 | 根因与源码定位 | 复现场景及预期 | 计划归属 |
-|---|---|---|---|
-| F1 | `src/pagx/svg/SVGAnimationPlan.cpp:124` 提前返回且只扫描 Layer timelines | 顶层 Animation 无 Layer driver 仍应按选择策略导出；仅 Composition 定义动画、slot 正常挂载也不能被根列表为空拦截 | M1 |
-| F2 | `src/pagx/svg/SVGAnimationPlan.cpp:131` 按 Animation 指针去重；`src/pagx/svg/SVGAnimationPlan.cpp:153` 在根文档解析目标，绑定按 Node 指针存储 | 同模板两个 slot、不同 offset / playing 应独立；外部文档中的同名 ID 不得误绑定根文档 | M1 |
-| F3 | `src/pagx/svg/SVGAnimationWriter.cpp:599` 多条 transform 共用会被重复翻倍的 duration；`src/pagx/svg/SVGAnimationWriter.cpp:1283` color 路径同理；`src/pagx/svg/SVGAnimationWriter.cpp:1212` visibility 未镜像 | D 时长的 PingPong 统一为 2D；transform 当前生成 16D、color 生成 4D，visibility 必须往返 | M1 |
-| F4 | `src/pagx/svg/SVGAnimationWriter.cpp:253` 只把 offset / paused 映射为 begin | 延迟前和暂停状态应显示初始求值结果；Loop 正 offset 在原点按运行时模回绕，而不是等待首次开始 | M1 |
-| F5 | `src/pagx/utils/ExporterUtils.cpp:160` 的恒等判断未考虑 position override | 默认 Group 单独 `position.x: 0→100` 时中点必须平移 50，不能提前返回恒等矩阵 | M2 |
-| F6 | `src/pagx/svg/SVGAnimationWriter.cpp:537` 对合成矩阵重新分解，没有保留标量圈数和展开最短弧 | 标量 `0→360°` 保留整圈；Matrix `170→190°` 中点应为 180°而非 0° | M2 |
-| F7 | `src/pagx/svg/SVGAnimationWriter.cpp:432` 不接受 Hold；`src/pagx/svg/SVGAnimationWriter.cpp:940` 的派生属性轨道仍连续输出且端点不统一 | 宽度 100 Hold→200 的中点保持 100；15/45 帧关键点、60 帧时长需补齐首尾；多个 easing 不能靠关键点求值保证中间状态 | M2 / M3 |
-| F8 | `src/pagx/svg/SVGAnimationWriter.cpp:772` 与 `src/pagx/svg/SVGAnimationWriter.cpp:816` 零 alpha 直接退出，`src/pagx/svg/SVGAnimationWriter.cpp:834` 使用静态比率；`src/pagx/svg/SVGExporter.cpp:2060` 未传 Painter / color 因子 | 零起点淡入正确；Group=0.5、Fill=0.5、colorAlpha=0.5 时结果为 0.125；各因子同时动画应组合而非覆盖 | M2 / M3 |
-| F9 | `src/pagx/svg/SVGExporter.cpp:3432` 因任意 Layer 动画改变 perChildAlpha；`src/pagx/svg/SVGExporter.cpp:3584` 的组透明度承载不等价 | `groupOpacity=false`、静态 alpha=0.5、仅 matrix 动画仍保留逐项透明度；重叠内容不得改成整体合成 | M2 |
-| F10 | `src/pagx/svg/SVGExporter.cpp:1794` mask nestedWriter 未传 Plan；`src/pagx/svg/SVGExporter.cpp:3334` native TextBox 未传完整路径 | mask 内形状动画、TextBox 自身和相关祖先动画完整到达实际输出节点 | M2 |
-| F11 | `src/pagx/svg/SVGExporter.cpp:3406` 只保护 Layer 自身绑定；ModifierResolver 生成节点后缺少动画来源 | Layer 内 Group / Rectangle / Fill 动画不得被一张 PNG 冻结；被 modifier 替换的几何仍保留动态依赖 | M2 / M5 |
-| F12 | `src/cli/CommandExport.cpp:184` 不收集 SVG warnings | 不支持或丢弃的动画在 stderr 可见；Strict 失败返回非零，不能仍打印正常成功结果 | M6 |
-
-补充依据：
-
-- 运行时目标范围检查：`src/pagx/PAGAnimation.cpp:76`。
-- 每 Composition 独立 binding 与驱动：`src/pagx/runtime/PAGComposition.cpp:105`、`:130`。
-- offset 求值规则：`src/pagx/PAGAnimation.cpp:221`。
-- Matrix 最短弧：`src/pagx/runtime/MatrixDecompose.h:98`，测试 `test/src/PAGXTest.cpp:11107`。
-- 顶层默认选择：`src/pagx/PAGScene.cpp:444`；CLI 全部顶层求值：`src/cli/CommandRender.cpp:284`。
-
-## 6. 关键内部设计
-
-### 6.1 实例键与驱动键
-
-以下是设计模型，不是已经新增的接口：
+不新增通用场景框架；扩展现有 `AccumulatedGeometry` 与 exporter-owned 局部产物，供第 3 节复用。
 
 ```text
+ExportContext:
+  selectedStateSource, effectiveOptions, effectiveFontConfig
+  instanceMap, globalIdAllocator, resourceResults, diagnostics, budgets
+  ancestorReferenceStack, localGeometryAndGlyphProducts
 InstanceKey = (ownerDocument, stableInstancePath, sourceNode)
-DriverKey   = (instancePath, timelineOrdinal)
-Binding     = (targetInstance, channel, animation, driver, applicationOrder)
-```
-
-- sourceNode 表示模板身份，instancePath 表示本次引用实例身份，两者不可互相替代。
-- 同一个 Animation 在不同实例中可以有不同驱动，不能全局去重。
-- 进入外部 Composition 时使用该实例的 externalDoc 做查找。
-- 文档内 findNode 之后，再校验目标是否属于当前实例作用域，禁止跨 Composition 边界写入。
-- 同属性多个已选择驱动按确认后的运行时顺序应用，不把“保留最后一个模板通道”当作任意混合语义的替代品。
-- 未选择的顶层动画和未挂载的定义不自动激活；嵌套激活规则以实际运行时和最终 D1 契约为准。
-- SVG ID 按稳定遍历与实例路径生成；定义缓存同时包含实例和影响其结果的依赖上下文。
-- 循环保护使用当前祖先路径集合，允许合法兄弟复用。布局、mask、composition 和资源遍历保持一致的保护边界。
-
-### 6.2 绘制记录：变换链与透明度链分离
-
-扩展现有 `AccumulatedGeometry`，只增加导出必需的数据，不引入独立通用场景框架。
-
-```text
 DrawRecord:
-  instance
-  sourceGeometry
-  geometryTransformChain
-  capturedGeometryIdentities
-  capturedInnerMatrices
-  finalGeometryMatrices
-  painterScope
-  painterOpacityChain
-  painter
-  painterLifetimeAfterModifiers
-  perGlyphStyle
-  copyDrawOrder
-  modifierProvenance
-  referencedResources
+  instanceKey, sourceGeometry, capturedGeometryIdentities
+  capturedInnerMatrices, finalGeometryMatrices, geometryTransformChain
+  geometryToPainter, painterToLayer, painterScope, painterOpacityChain
+  painter, painterLifetimeAfterModifiers, paintBounds
+  placement, drawOrder, copyDrawOrder, perGlyphStyle
+  compositionBoundary, modifierProvenance, dependencies, referencedResources
+BakeConsumption:
+  consumedDrawRange, replacementRegion, samplingHalo, coordinateSpace
+  appliedAlphaMaskScrollEffects, remainingForeground
 ```
 
-原因：外部 Painter 可以绘制 Group 内累积几何，但该绘制不一定继承几何来源 Group 的 alpha。因此不能从 geometryTransformChain 推导 painterOpacityChain。
+- sourceNode 是模板身份，instancePath 是引用实例；ID 与 defs 缓存必须包含影响输出的实例、空间与依赖，不能全局按 Node 指针复用。
+- geometry transform 与 Painter opacity 分离：外部 Painter 可消费 Group 上行几何而不继承该 Group alpha；保存捕获 innerMatrix 与最终矩阵，不能靠最终 inverse 恢复。
+- `paintAlpha(t)=painterScopeAlpha(t)*painterAlpha(t)*colorAlpha(t)`；静态使用同一表达式。多个因子不得丢失、相互覆盖或除以静态零 alpha。
+- Painter 捕获引用后仍受 modifier 生命周期影响；Merge 清旧几何及 Painter，Repeater 复制并重绑定，Text 可转 Shape。不能先 resolve 全部 modifier 后遇 Painter 立即输出就宣称等价。
+- bounds 分四类：layout、paint-fit、ink / coverage、bake 采样裁剪。shape fit 使用包含全部控制点的 Path.getBounds，glyph fit 使用 textBlob tight bounds，不推广一种规则到全部消费者。
+- MatrixShape 奇异矩阵返回 null，不等于零尺寸 primitive 的微轮廓；Painter 捕获前 / 后零缩放分别验证，恢复不强行求 inverse（`third_party/tgfx/src/core/shapes/MatrixShape.cpp:30`）。
 
-每个 SVG 属性由完整依赖表达式产生：
+数据流依据：`third_party/tgfx/src/layers/VectorLayer.cpp:69`、`third_party/tgfx/src/layers/vectors/Painter.cpp:25`、`third_party/tgfx/src/layers/vectors/VectorGroup.cpp:162`、`third_party/tgfx/src/layers/vectors/MergePath.cpp:70`、`third_party/tgfx/src/layers/vectors/Repeater.cpp:139`。fit 依据保留在附录 B.2。
+
+### 2.3 静态 policy、文字模式与 API 收口
+
+| 拟议类型 / 值 | 权威契约 |
+|---|---|
+| SVGStaticExportPolicy.VectorOnly | 禁止为效果新增 PNG；原 Image / bitmap glyph 可保留；无法原生或最终几何等价表达则拒绝，非“绝对无位图” |
+| SVGStaticExportPolicy.PreserveAppearance | 原生优先；已建模但不等价内容仅在满足固定 D6、完整状态 / 资源 / 预算时 bake；失败拒绝 |
+| SVGStaticExportPolicy.BestEffort | 近似 / 丢弃必须显式诊断；无效输入、执行失败或无界消耗不能当作正常损失 |
+| SVGTextExportMode.Fidelity | 实际布局字形权威；使用 WOFF2 / outline / 原 bitmap；layoutRuns 与 authored glyphRuns 都覆盖 |
+| SVGTextExportMode.Native | 保留可读字符串，目标字体可能重新塑形；超容差不得绕过 policy，可正确回退或拒绝 |
+
+保留 `ToSVG / ToFile` 与 `exportAnimation`，公开接口、CLI 和统一预算只在第 4.1 节定义。以下收口同步全部调用方，不留兼容层：
+
+- 用 staticPolicy 替换 `bakeUnsupported`，用 textMode 替换 `convertTextToPath`；其他格式 text-to-path 含义另按自身契约处理，不生硬替换。
+- **移除 `resolveModifiers` 作为“关闭就丢效果”的开关**；静态与动效默认解析所有必要 modifier。若保留编辑偏好，只能选择表示，不能绕过所选 policy、静默丢 Polystar / TextPath / modifier。
+- `embedFontsAsWoff2` 可保留为字形编码偏好，不允许 TextBox 绕过权威字形，不承诺 PUA 原文搜索或复制。
+- staticPolicy 与 animationPolicy 正交：静态 bake 不授权动画冻结，动画 BestEffort 也不授权 VectorOnly 新增效果 PNG。
+
+### 2.4 状态、资源与缓存生命周期
+
+| 状态来源 | 本方案含义 |
+|---|---|
+| TemplateStatic（D7 推荐） | 模板字段 + 供应的资源 + 布局；不执行动画、SM、VM 默认绑定；有效绑定登记未初始化宿主 |
+| DefaultHostInitialization | 新scene先构造全部VM/DataContext/referenceInstance链接，再bind和首次flush；父slot与Composition复用同一VM实例，open slot回填；随后apply/advance/draw顺序独立确认，不是直接ToSVG原模板 |
+| ExistingSceneSnapshot | 业务值、播放位置、trigger / Once 历史与实际资源；独立快照入口，不能从模板逆推 |
+
+PAGScene.draw先flushDataBinds/flushTextHolders（`src/pagx/PAGScene.cpp:514`）；TemplateStatic参考不初始化行为，原生与bake同源。若选择默认宿主或有限场景，必须复用全部VM链接→统一bind→首次flush的两阶段流程（`src/pagx/PAGScene.cpp:300`、`src/pagx/PAGScene.cpp:349`），以及父slot与Composition的共享VM身份；提前bind可永久漏跨层source，逐实例新建VM也可能改变共享值。静态绘制modifier始终有效，不因名字而被当宿主行为排除。
+
+资源消费链不能因共用工具而统一改语义：
+
+- ImagePattern：runtimeImage → data → dataURI → filePath（`include/pagx/PAGXDocument.h:208`）。
+- 默认 VM 图片：data → dataURI → filePath，不读 runtimeImage（`src/pagx/PAGScene.cpp:53`）。
+- bitmap Glyph：codec data → dataURI → filePath，不读 runtimeImage（`src/renderer/GlyphRunRenderer.cpp:157`）。
+- WOFF2 bitmap 编码内部只读 Image.data；当前 SVG 不启用 bitmap Font 的 WOFF2 预构建，走逐 glyph image（`src/pagx/utils/Woff2FontGenerator.cpp:1263`）。
+
+每个消费者原生与 bake 同源；真实解码 / 尺寸 / GPU readback 与 MIME 分开验收。本计划不自动下载未供应网络资源；源链若需改变，先确认源头行为变化。
+
+Font.glyphs 首次 render 后修改为 undefined（`include/pagx/nodes/Font.h:103`）。`built` 即使 typeface 构建失败也置位并缓存失败（`src/renderer/GlyphRunRenderer.cpp:109`）；不能承诺热 Font 修改 glyphs 自动重建。cold / warm 仅用合法同输入、新对象或既定清理流程比较。
+
+共享文档布局、Font/PathData/索引缓存与外部调用须串行化；局部树不等于整个API线程安全。解析/采样产物不得持续追加document.nodes，不修改源Fill/glyph/PathData；合法失效与notifyChange归属保持既有契约。导出内部可能获取GPU设备锁，调用方不得已持有同一设备context锁（`include/pagx/SVGExporter.h:124`）；原生与bake分支均按该调用前置条件验证，不能绕锁或并发缓存读写。
+
+### 2.5 完整背景合成与 bake 消费契约
+
+现有 probe 已把 TextPath / TextModifier、conic / diamond、一般透视与有效 preserve3D 送入 bake（`src/pagx/svg/SVGFeatureProbe.cpp:86`）；已有实现不是完整保真证明。普通 Layer bake 与带背景能力分别见 `src/pagx/utils/RasterUtils.cpp:130`、`src/pagx/utils/RasterUtils.cpp:351`。
+
+1. 先判原生等价，再选最小但**完整可隔离合成边界**；所有 Mask / 引用路径都经过能力判断，不能只检查普通 Layer。
+2. 使用实际目标之前的 draw 前缀与背景；sampling halo 与 replacementRegion 分开，不能用透明背景上的目标 PNG 冒充 backdrop。
+3. 背景 PNG 已含背景 + 目标，必须消费对应 draw 前缀，或裁掉旧前缀在 replacementRegion 内的输出；不能叠回原背景造成二次 alpha。记录 consumedDrawRange 和剩余 foreground。
+4. alpha、Mask、scroll、clip、effect、3D flatten 各只作用一次；后续 sibling / 祖先 foreground 不得提前消费，深度交叉保留完整上下文。
+5. 无法证明局部替换安全就扩大到完整边界；不能悄悄丢背景。affine / 常量 w 可证等价时保持矢量，不把所有 3D 一律转图。
+6. shader / sampling / antiAlias / colorSpace 不等价、资源 / GPU / 编码 / 预算失败按 policy 处理；PreserveAppearance 仅在固定 D6 下成功，不声称 PNG 任意缩放矢量无损。
+7. 有效动态依赖不得默认单 PNG 冻结；静态缺陷能修就从源头修，不用截图长期掩盖。可选动效 bake 只按第 3.7 节 MB 契约执行。
+
+### 2.6 静态实施 S0—S6
+
+阶段中的文件均是未来实现范围，不代表本轮改动；共用工程前置，S6 只收口。
+
+#### S0：声明、状态与验证入口
+
+- 文件：`test/src/PAGXSVGTest.cpp`、`test/src/PAGXCliTest.cpp`、`tools/html-snapshot`、`CMakeLists.txt`、`include/pagx/SVGExporter.h`。
+- 任务：附录 A—C 声明集合、D.1 组合、E 的 ST1—ST46 建门禁；确认 D4—D7；no-op / inactive / 有效空 / 未初始化宿主分类；共用 XML、同源静态一帧与预算 / 失败入口。
+- 验收：显式 `exportAnimation=false` 无 SMIL；可见控制样例非空；声明漏项阻断；历史通过数不冒充本轮结果，不用墙钟碰巧采帧。
+
+#### S1：实例、坐标、Mask 与合成
+
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/ExporterUtils.{h,cpp}`、`src/pagx/utils/LayerTransformUtils.{h,cpp}`、`src/pagx/nodes/Layer.cpp`、`src/pagx/PAGXDocument.cpp`、`test/src/PAGXSVGTest.cpp`。
+- 任务：唯一 ID / 引用 / defs；共用 DrawRecord；跨父 Mask 相对矩阵与完整像素 Mask；Contour stroke / clip-rule；owner / Mask 根可见性；composition 与 contents 实际优先级；生成 scrollRect 重布局失效；真实离屏 alpha / blend / 背景隔离。
+- 验收：ST1—ST5、ST17、ST33—ST35、ST44—ST45 与 C01—C07；零 / 负 / 奇异矩阵、捕获前后 scale、父空间和状态各只作用一次，布局源头变化同步 runtime。
+
+#### S2：effects、背景、3D 与采样回退
+
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGFeatureProbe.{h,cpp}`、`src/pagx/utils/RasterUtils.{h,cpp}`、`test/src/PAGXSVGTest.cpp`。
+- 任务：11 种 effect 全字段；style Below / Above 顺序与输入 bucket、excludeChildEffects；逐步 filter output、user-space region / halo；spread / tile / noise / antiAlias 能力判断；Glass own geometry / SDF-UDF；背景消费前缀；透视 / preserve3D 与 flatten 完整上下文。
+- 验收：ST6—ST7、ST17、ST38—ST40、C07—C11 / C22；小 bbox 大 blur 不裁、shadowOnly 链有序、背景不二次叠加、不提前画 foreground；GPU / 编码失败正确拒绝。
+
+#### S3：文字、最终 glyph 与布局
+
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/TextUtils.{h,cpp}`、`src/pagx/TextLayout.{h,cpp}`、`src/pagx/TextLayoutParams.h`、`src/renderer/GlyphRunRenderer.{h,cpp}`、`src/pagx/utils/Woff2FontGenerator.{h,cpp}`、`test/src/PAGXSVGTest.cpp`。
+- 任务：TextBox 两模式共用 Painter；layoutRuns / glyphRuns、多 Font / size、7 数组、offset / advance / anchor / faux、bitmap alpha 和 run 顺序；resolved box / valid empty；TextPath 八字段、Selector 全分支、TextModifier base / overlay；有效 fontConfig、Font 不可变与串行缓存。
+- 验收：ST8—ST10、ST18、ST20—ST22、ST28—ST31、ST36 / ST44、C12—C15 / C19；RTL / 竖排 / rich text、Native 损失与 PUA 原文边界独立验证，共用 PPT / HTML 字形路径不回归。
+
+#### S4：几何、Stroke 与 modifier
+
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGPathParser.cpp`、`src/pagx/PathData.cpp`、`src/pagx/utils/StrokeGeometryUtils.{h,cpp}`、`src/pagx/utils/ModifierResolver.{h,cpp}`、`src/pagx/ppt/PPTExporter.cpp` 及实际 PPT 输出模块、`test/src/PAGXSVGTest.cpp`。
+- 任务：原轮廓 / 方向 / 起点 / 微轮廓 / 数值精度；内外 Stroke 倍宽 clip 或等价展开、adaptive dash / cap / join；完整 VectorContext；Text→Shape、Merge 清 Painter、Append 非 Union；Repeater 次序、整数幂、fractional alpha；局部产物与来源；移除丢效果开关。
+- 验收：ST11—ST12、ST16、ST23—ST24、ST27、ST42—ST45、C05—C06 / C16 / C21；负底数分数幂按真实边界处理，不自造 SignedPow；PPT 补偿只留 PPT 端，模板 Fill / nodes 不污染。
+
+#### S5：paint、资源与消费者 fit
+
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/ImageFormatUtils.{h,cpp}`、`src/pagx/utils/RasterUtils.{h,cpp}`、`src/renderer/LayerBuilder.{h,cpp}`、`test/src/PAGXSVGTest.cpp`。
+- 任务：渐变空 / 单 / 重复 stop、退化 / 无效与空间插值；实际 shape / glyph fit 与独立 coverage；资源链闭合、external Font / fontConfig、真实 PNG / JPEG / WebP / GIF；16 tile × 4 fit × 6 sampling、旋转 / skew / 负 scale 同源 bake。
+- 验收：ST13—ST15、ST19、ST25—ST26、ST36—ST37 / ST42、C17—C19；MIME 不替代解码，runtimeImage 红蓝优先链、data URI、P3 / alpha 与高频缩放直接验证，失败不静默改 Repeat / scaleMode。
+
+#### S6：API、文件与静态交付
+
+- 文件：`include/pagx/SVGExporter.h`、`src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGFeatureProbe.{h,cpp}`、`src/cli/CommandExport.cpp`、所有 SVGExporter 调用方、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXCliTest.cpp`、共用评测入口、`CMakeLists.txt`。
+- 任务：落实已确认静态决策与替代选项；全集分类 / 漏项阻断；SDK / CLI 前置一致、诊断不依赖 Plan 或 warnings sink；数量 / 像素 / 字节预算、合法缓存串行化、文件事务；共享工具全量回归。
+- 验收：ST32、ST37、ST41、ST43—ST46、C20—C24 与全部有效静态路径；分别记录原生 / 展开 / 完整 bake / 拒绝 / 损失，所有写失败保旧文件承诺按第 4.1 节验收，不声称 crash durability。
+
+### 2.7 静态验收索引
+
+附录 D.1 的 C01—C24 覆盖不可替代的交互，附录 E 的 ST1—ST46 保留缺陷与补核查依据；闭合 enum 逐值、bool 双值、optional unset / 0 / 非 0、数组空 / 短 / 完整 / 超预算。无动画文档开关字节相等只证明无动态不回归，不证明静态像素正确。
+
+原生 / bake 比较同一 D6 / D7 输入，固定资源后采一帧；关键区域、轮廓和字形位置直接检测，SSIM 辅助。源 SVG→PAGX 与 PAGX→SVG 两段分别判损失，不让双方同错的 round-trip 抵消缺陷。
+
+## 3. 动效导出：全通道分类与编译
+
+### 3.1 范围与分类规则
+
+复用第 2 节全部静态契约；根选择、实际 Composition 挂载、Clock、typed apply、最终 DrawRecord 依赖是动画准入边界，不把模板修改后重布局当运行时求值。
+
+| 类别 | 定义 / 准入 |
+|---|---|
+| N | 原生等价属性 / SMIL，包括合法离散属性；插值、操作链、颜色与宿主结构可证等价 |
+| G | 有界属性表达式、几何或 glyph 展开；连续时刻误差可证明，拓扑切换显式离散且满足预算 |
+| B | 需要明确 finite-scene 合成 / 位图计划，只能按 D8 + MB；未授权或不满足契约则 Strict 拒绝 |
+| U | 无有效 runtime payload / writer、未知 / 非法目标、开放宿主历史或无法界定状态 / 时间 / 资源；明确拒绝 |
+
+下表是**计划准入分类，不是当前支持表**。每通道有 primary 或明确组合条件；N/G 只在等价 / 误差证明、资源和目标状态均成立时准入，复杂效果 / text / geometry fallback 转 B；无法闭合则 U。已证明 inactive、no-op 或 priority-masked 记录为无有效贡献，不伪造动画，也不能漏报其他有效依赖。
+
+### 3.2 全部 175 个反射 Animatable 通道（30 类）
+
+通道名逐项展开；Group / TextBox 分两行，各 10 项。计数范围只含反射 Animatable，不混入资源引用或无 writer 字段。依据均为 `src/pagx/PAGXNodeChannel.cpp` 的对应注册位置。
+
+| NodeType | 数 | 完整 channel 名 | primary / 组合条件与阶段 | 源码依据 |
+|---|---:|---|---|---|
+| Layer | 20 | `visible, alpha, blendMode, x, y, z, rotation.x, rotation.y, rotation.z, scale.x, scale.y, scale.z, skew.x, skew.y, perspective, matrix, matrix3D, anchor.x, anchor.y, anchor.z` | N/G：visible、alpha、x/y、rotation.z、scale.x/y、skew.x/y、matrix、anchor.x/y；B：z、rotation.x/y、scale.z、perspective、matrix3D、anchor.z，一旦可证整体 affine 可降 N/G；blendMode 在 int payload 匹配且离散合成等价时 N/G，否则合成 B，string / mismatch 为 U，不能强转掩盖；M1—M3 | `src/pagx/PAGXNodeChannel.cpp:486` |
+| Group | 10 | `anchor.x, anchor.y, position.x, position.y, rotation, scale.x, scale.y, skew, skewAxis, alpha` | N 操作链；多 easing / alpha / 捕获矩阵组合 G；复杂合成 B；M2/M3 | `src/pagx/PAGXNodeChannel.cpp:684` |
+| TextBox | 10 | `anchor.x, anchor.y, position.x, position.y, rotation, scale.x, scale.y, skew, skewAxis, alpha` | 同 Group 的 N/G 条件，但两布局 / 发射模式均须有效；复杂动态文本 B；M2/M3/M5 | `src/pagx/PAGXNodeChannel.cpp:713` |
+| Rectangle | 5 | `position.x, position.y, size.width, size.height, roundness` | N 参数；原轮廓 / align / dash / modifier 组合 G，拓扑无法闭合 B；M2/M3/M5 | `src/pagx/PAGXNodeChannel.cpp:530` |
+| Ellipse | 4 | `position.x, position.y, size.width, size.height` | N 参数，不按静态正圆锁元素；退化 / 描边组合 G，否则 B；M2/M3/M5 | `src/pagx/PAGXNodeChannel.cpp:543` |
+| Polystar | 8 | `position.x, position.y, pointCount, outerRadius, innerRadius, rotation, outerRoundness, innerRoundness` | G 最终 geometry；pointCount 拓扑切换按离散与预算，不能闭合 B；M5 | `src/pagx/PAGXNodeChannel.cpp:555` |
+| Text | 9 | `text, x, y, fontFamily, fontStyle, fontSize, letterSpacing, fauxBold, fauxItalic` | G TextHolder + flush / reshape 后最终 glyph；x/y 可证单纯位移时 N；string/bool 离散，尺寸等连续需区间证明；复杂布局 / 字体切换 B，未供应资源 U；M5 | `src/pagx/PAGXNodeChannel.cpp:582` |
+| Fill | 2 | `color, alpha` | N 单属性；scope / color alpha 乘积、P3 / 多 paint G，否则 B；M2—M4 | `src/pagx/PAGXNodeChannel.cpp:604` |
+| Stroke | 5 | `color, width, alpha, miterLimit, dashOffset` | N 属性；align / dash / fit / glyph overlay 组合 G，不能等价 B；M2—M5 | `src/pagx/PAGXNodeChannel.cpp:614` |
+| TrimPath | 3 | `start, end, offset` | G 实际 Separate / Continuous geometry，跳变 / topology 显式预算，否则 B；M5 | `src/pagx/PAGXNodeChannel.cpp:630` |
+| RoundCorner | 1 | `radius` | G 最终 corner geometry，含 Text→Shape / no-op；无法闭合 B；M5 | `src/pagx/PAGXNodeChannel.cpp:639` |
+| Repeater | 11 | `copies, offset, anchor.x, anchor.y, position.x, position.y, rotation, scale.x, scale.y, startAlpha, endAlpha` | G 有界副本 / transform / fractional alpha；copies 变化显式离散拓扑；无效幂 U、复杂合成 B；M5 | `src/pagx/PAGXNodeChannel.cpp:726` |
+| TextModifier | 13 | `anchor.x, anchor.y, position.x, position.y, rotation, scale.x, scale.y, skew, skewAxis, alpha, fillColor, strokeColor, strokeWidth` | G 最终 glyph 矩阵 / signed factor / base+overlay，复杂 paint / effect B；M5 | `src/pagx/PAGXNodeChannel.cpp:651` |
+| RangeSelector | 6 | `start, end, offset, easeIn, easeOut, weight` | G 实际 glyph factor 与活跃 shape / mode，inactive 登记无贡献；无法闭合 B；M5 | `src/pagx/PAGXNodeChannel.cpp:743` |
+| SolidColor | 1 | `color` | N 颜色映射；P3 / alpha / 共享引用表达式 G，否则 B；M4 | `src/pagx/PAGXNodeChannel.cpp:759` |
+| LinearGradient | 4 | `startPoint.x, startPoint.y, endPoint.x, endPoint.y` | N 端点；matrix / fit / 动态 bounds 与退化规则 G，否则 B；M4 | `src/pagx/PAGXNodeChannel.cpp:765` |
+| RadialGradient | 3 | `center.x, center.y, radius` | N 参数；fit / 退化 / bounds G，负 radius 无效 U；不能闭合 B；M4 | `src/pagx/PAGXNodeChannel.cpp:775` |
+| ConicGradient | 4 | `center.x, center.y, startAngle, endAngle` | B sweep 合成；全区间可证退化常量才 N/G；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:784` |
+| DiamondGradient | 3 | `center.x, center.y, radius` | B diamond 合成；全区间退化常量 N/G，负 radius U；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:794` |
+| ColorStop | 2 | `offset, color` | N stop；重排 / 退化 / mixed space / alpha G，否则 B；M4 | `src/pagx/PAGXNodeChannel.cpp:803` |
+| DropShadowStyle | 7 | `offsetX, offsetY, blurX, blurY, spread, color, showBehindLayer` | N/G 原生等价 Below 链、离散 behind 与有界 contour / spread；完整输入不能等价 B；M4 | `src/pagx/PAGXNodeChannel.cpp:820` |
+| InnerShadowStyle | 6 | `offsetX, offsetY, blurX, blurY, spread, color` | N/G Above 链与有界 spread / contour；复杂来源 B；M4 | `src/pagx/PAGXNodeChannel.cpp:834` |
+| BackgroundBlurStyle | 2 | `blurX, blurY` | B 动态 backdrop / draw 前缀；全区间双零 no-op 登记；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:847` |
+| GlassStyle | 7 | `refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity` | B 背景、own geometry、SDF/UDF 与光照完整合成；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:857` |
+| NoiseStyle | 7 | `size, density, seed, color, firstColor, secondColor, opacity` | B 活跃 noise 算法 / mode / blend；Mono color、Duo 两色、Multi opacity 之外为无 writer 的 U/无贡献；零 density no-op；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:876` |
+| BlurFilter | 2 | `blurX, blurY` | N/G 双轴 / tile / region 可证等价；不同采样或复杂链 B；M4 | `src/pagx/PAGXNodeChannel.cpp:891` |
+| DropShadowFilter | 6 | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | N/G 上一步完整输入与离散 Only；非等价链 / 色彩 B；M4 | `src/pagx/PAGXNodeChannel.cpp:899` |
+| InnerShadowFilter | 6 | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | N/G 内侧遮罩、完整 output 与离散 Only；复杂合成 B；M4 | `src/pagx/PAGXNodeChannel.cpp:910` |
+| BlendFilter | 1 | `color` | N/G 真正 ColorFilter source/dest/alpha 与固定 blendMode；Plus / 非等价合成 B；M4 | `src/pagx/PAGXNodeChannel.cpp:921` |
+| NoiseFilter | 7 | `size, density, seed, color, firstColor, secondColor, opacity` | B 活跃三 mode / input offset / phase；inactive U/无贡献与 density0 input no-op 分开；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:934` |
+
+合计 175；其中 styles / filters 完整 51 项。当前 `IsSupportedChannel` 只接受 7 类 / 39 项（Layer、Group、TextBox、Rectangle、Ellipse、Fill、Stroke），不是 175 项支持证明，也不额外计 ColorSource（`src/pagx/svg/SVGAnimationPlan.cpp:67`）。
+
+### 3.3 表外通道、类型与目标准入
+
+| 表外 / 特殊路径 | 实际事实 | 处理与直接验证 |
+|---|---|---|
+| Path `point{N}.x / point{N}.y` | PathRuntimeTarget 动态 writer，unscaled 点 + renderScale；nonnull data 才安装 | G 原始点求值 → layout / fit / modifier 后 geometry；校验 N<size、数字溢出、verb/data 长度；`src/renderer/LayerBuilder.cpp:505`、`src/renderer/LayerBuilder.cpp:1728` |
+| ImagePattern.image | writer 要 `shared_ptr<PAGImage>`，XML key 是 TypedChannel<ImageRef>，apply 直传不 resolve | 当前 U，不能列为已支持换图；有限 host 换图须确认 payload / 资源 / 时序并从源头闭合，才可 G 离散 image 或 B；`src/renderer/LayerBuilder.cpp:1939`、`src/pagx/PAGXImporter.cpp:1933`、`src/pagx/PAGAnimation.cpp:44` |
+| 无 writer / 非 Anim 字段 | Path.position 只有 Layout；Text anchor/baseline、gradient matrix、tile / mode、20 项 ColorMatrix 等是静态语义，不因存在字段就可动画 | 保留附录静态语义；effective channel 无 writer 为 U，已证 inactive/no-op 单独记录；`src/pagx/PAGXNodeChannel.cpp:572`、`src/pagx/PAGXNodeChannel.cpp:582` |
+| Layer.blendMode / 数字类型 | runtime writer get_if<int>；反射 FIELD_ENUM 是 string，parser enum 可为 int；未定类型 integer XML 优先 int，期望 float 的 writer 不写 | XML→evaluate→实际 apply 三段准入；源头 typed schema 修复或拒绝，不靠强转 / 默认值掩盖；`src/renderer/LayerBuilder.cpp:1239`、`src/pagx/PAGXNodeChannel.cpp:402`、`src/pagx/PAGXImporter.cpp:1906`、`src/pagx/PAGXImporter.cpp:1925` |
+
+TypedChannel 实际有 float / bool / int / string / ImageRef / Color / Matrix / Matrix3D；KeyValue 另含 PAGImage 宿主值，二者不可混称。未知 channel / target、跨 binding 作用域、非法非有限 payload 按 U 拒绝；不把运行时无写入后的模板静止画面标为动画成功。
+
+查找必须使用实例所属 contextDoc，再校验 binding.contains（`src/pagx/PAGAnimation.cpp:101`、`src/pagx/PAGAnimation.cpp:108`）。普通 Layer 没有 Composition 不 spawn timeline；兄弟实例独立，externalDoc 归属见 `src/pagx/runtime/PAGComposition.cpp:113`、`src/pagx/runtime/PAGComposition.cpp:130`。
+
+### 3.4 Clock、Layer 三层 priority 与 ordered apply
 
 ```text
-paintAlpha(t) = painterScopeAlpha(t) * painterAlpha(t) * colorAlpha(t)
+DriverKey = (instancePath, timelineOrdinal)
+PausedScopeKey = (compositionInstance, animationId)
+Binding = (targetInstance, typedChannel, driver, applicationOrder, mix)
+Clock = (durationUs, frameRate, loopMode, evaluationOffsetUs, initialElapsedUs)
+EvaluateAtExportTime:
+  initialize resources and the confirmed state source
+  if host initialization is selected, link all VM instances before binding
+  apply selected root animations in declaration order
+  advance and apply mounted nested drivers with the runtime pause scope
+  map content time with PAGAnimation.apply and preserve typed mix / shared pose
+  flush effective bindings and text only when the state contract requires it
+  draw through the shared context
 ```
 
-Layer `groupOpacity=true` 时，透明度作用在合成后的组；false 时保持逐项作用。Mask / filter / transform 的包装顺序继续保留现有坐标空间边界，不为动画把它们随意合并。
+- DriverKey 区分 driver，不代表 playing 独立：同 Composition 以 animationId 共享 pausedTimelineIds，任一同 ID driver 初始 paused 会暂停同 slot 的全部同 ID advance；apply 仍全部执行。兄弟 slot 独立（`src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:69`、`src/pagx/runtime/PAGComposition.cpp:78`、`src/pagx/runtime/PAGComposition.cpp:130`）。
+- content 求值与 playbackPosition 报告分离：Loop 在 t=D 内容回 0，但 progress 可报告 D；Once clamp，PingPong 唯一周期 2D。offset 使用实际 apply 的 fold / subtract 顺序，不能把 progress 或 begin 当内容时间（`src/pagx/PAGAnimation.cpp:182`、`src/pagx/PAGAnimation.cpp:199`、`src/pagx/PAGAnimation.cpp:274`）。
+- 暂停只禁 advance，不禁 apply；初始值包含 offset / paused / delay 前的真实求值，不能用永不开始的 SMIL 或模板值代替。
+- 无效 duration / frameRate、period 乘法 / offset 溢出、非有限时间须在边界判定；概念伪代码不冒充数值安全实现。
 
-多个透明度因子落到同一属性时先统一求值，再编译一条正确轨道。不得跳过 Group alpha、忽略 color alpha，或者通过除以静态 alpha 恢复动态值。
+| Layer priority 层 | 真实规则与依据 |
+|---|---|
+| 静态初 pose | 非恒等 matrix3D 覆 matrix / components；非恒等 matrix 覆 x/y 与组件，但保留 z；anchor 在选择后作用，layout 位移在外部；`src/pagx/utils/LayerTransformUtils.cpp:93` |
+| 同一 Animation | 先 merge 同 target 全部 Object 的 channels，再按“通道存在”过滤：matrix3D 屏 matrix、x/y/z 与 components；matrix 屏 x/y 与 components，不屏 anchor 或 z；`src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111` |
+| 跨 Animation / writer | 静态 masked 状态与共享 Layer pose，后续 component write 可能重新 decompose 当前 animated matrix；保留 writer / mix / apply 顺序，不只 last-wins 清 channel；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267` |
 
-### 6.3 统一时钟与初始求值
+未选择根定义和未挂载动画不激活。根集合以D1为准：Default首timeline、Named指定顶层Animation、All仅顶层Animation声明序；根先apply，再nested递归advance/apply，最后按已选宿主状态flush绑定/文字。当前render CLI已遍历顶层Animation并驱动nested（`src/cli/CommandRender.cpp:286`、`src/cli/CommandRender.cpp:297`）；它不是Default/Named或有限事件重放的直接参考。getDefaultTimeline见 `src/pagx/PAGScene.cpp:444`，Plan入口/去重问题仍需修复。
 
-将运行时的纯时间映射提取为内部共享能力，保持现有行为与整数溢出保护；SVG 不复制一份略有区别的规则。
-
-```text
-Clock:
-  durationUs
-  frameRate
-  loopMode
-  evaluationOffsetUs
-  playing
-
-EvaluateBinding(binding, exportTimeUs):
-  elapsed = binding.playing ? exportTimeUs : 0
-  contentTime = MapEvaluationTime(elapsed, binding.clock)
-  return binding.channel.evaluateAt(contentTime, binding.frameRate)
-```
-
-实际实现需对齐运行时 Once / Loop / PingPong 的完整规则，不用上面的概念伪代码代替数值安全处理。
-
-- 帧到微秒使用项目现有转换约定，支持不同 frameRate。
-- 初始 SVG 属性由同一求值入口生成，包括延迟前、负 offset、暂停和单关键帧。
-- PingPong 先构建唯一的完整周期，再给属性序列共享；镜像序列不能修改共享周期。
-- 一次播放完成后保持终态，循环边界按运行时求值约定处理。
-- paused 不需要依靠一条从未开始的动画表达固定状态。
-
-### 6.4 轨道编译，不在 XML 写出时补语义
-
-建议在现有模块内部建立统一的 compiled-track 数据结构。仅在编译职责继续挤占 Writer 时才拆独立编译文件，不先创建空抽象。
+### 3.5 原生、组合采样与关键帧边界
 
 ```text
 CompiledTrack:
-  attribute / transformOperation
-  initialValue
-  sharedClock
-  segments
-  interpolationMode
-  approximationStatus
+  attributeOrTransformOperation, initialValue, sharedClock
+  orderedSegments, interpolationMode, approximationStatus
+Compile:
+  evaluate the full dependency expression
+  choose exact native, bounded G, explicit B, or reject U
+  validate serialized reconstruction and budgets
+  let Writer serialize only validated tracks
 ```
 
-Plan 负责绑定、来源和能力诊断；轨道编译负责求值、插值映射和误差检查；Writer 只写出经过验证的轨道和宿主结构。
+1. 单属性插值与 SVG 等价才 N；Group 尽量保持操作链、anchor、skewAxis 与标量 rotation，不先合成矩阵丢圈数。标量 0→360 / 720 保 full turns，Matrix 170→190 复用分解 shortestArc，逐段保持角度连续。
+2. 多 easing、alpha 乘积、动态 fit / bounds、非线性 effect 参数求完整表达式，不把端点值线性连接。复用 Channel.evaluateAt、Matrix 分解、颜色空间与 modifier，不复制求值器。
+3. G 种子含首尾、全部依赖 key、跳变两侧、相位边界；比较序列化后轨道重建，包含数值格式化误差。连续区间需区间 / 导数误差界等证明；**单中点或有限探点不证明全区间**。无法证明或超预算则 Strict 拒绝。
+4. Hold / None 的真实离散行为直接复现；No Hold epsilon 假渐变。连续与离散段明确拆开，端点 / 镜像 / 单 key 共用编译入口。
+5. 独立属性保持独立 Clock；跨 Clock 表达式优先结构分解，公周期必须有界。无有界公周期的完整合成只在明确 finite window 的 B / MB 下计划，不无界 LCM 展开。
+6. 首尾截取必须真求值：keys `[-10,0]`、`[10,100]` 在 t=0 为 50，不能先 clamp keytime 成 0 改值；现 Writer 问题见 `src/pagx/svg/SVGAnimationWriter.cpp:129`。
+7. 空 Channel.evaluate 得 T{} 与“无 channel、保模板”不同；空 / 单 key、1-frame、duration=1、duration=0、跨 duration key、duplicate ordered key、非有限值全部直接验证（`src/pagx/runtime/KeyframeEvaluatorImpl.h:106`）。
+8. Bezier 可 overshoot：float 不 clamp easing factor，Color 按分量 clamp；不能统一 clamp 得到看似安全但不同结果（`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`）。
 
-#### 原生等价路径
+### 3.6 几何、文字、拓扑与 fallback
 
-在属性映射与插值等价时使用原生 SMIL：
+- dependency closure 覆盖 geometry、Group、Painter、color source、modifier、Mask、Composition、effect 与引用资源；没有动态依赖的复杂效果才继续静态 bake。
+- ModifierResolver 产物保留源 geometry、作用顺序、Painter lifetime、copy 序号和依赖；静态 Trim / Round 作用动态 Path 后仍是动态，局部采样不增长共享 nodes。
+- `d` 命令类型 / 数量稳定只是必要条件；还需连续形状与误差证明。Trim 断点、pointCount、copies、glyph 数 / 字体切换显式离散拓扑与预算，不一律声称“不可能”，也不偷偷连续 morph。
+- Text 使用实际 TextHolder payload、flush / reshape、Selector glyph index 与最终 base / overlay paint；动态 path points 使用未缩放坐标再走 renderScale。复杂重排版 / effect / 拓扑无 G 证明则 B，未供应字体、无有效 payload 或开放历史 U。
+- N/G 需包含整个 effect 链的输入 / outputOffset / region / 全时段 bounds；spread 不默认等于 morphology，非线性倒数不能只换端点。M4 实际扩可原生 effect 参数，不用“后续支持滤镜”代替 51 项分类。
+- Strict 不靠单 PNG freeze；BestEffort 冻结必须说明实例、依赖范围、原点真实求值时刻和动画损失，且仍满足 staticPolicy。类型 / 状态 / 预算未满足不允许静默降级。
 
-- float 直接属性、离散 visibility、可表达的颜色和几何参数。
-- Group 标量变换尽量保留操作链、锚点、skewAxis 和原始 rotation，不先合成矩阵丢掉圈数。
-- 可在每次 Painter 发射的局部包装结构中保留变换链；不把源 Group 错误提升为包含所有绘制的全局 `<g>`。
-- Matrix 通道使用运行时的分解与最短弧约定，逐段处理角度连续性。
-- 单关键帧可以产生固定初态，不要求伪造两个不同值。
-- 首尾补齐、Hold / None、混合离散和连续段都走同一编译入口。
+### 3.7 可选 MB：显式 finite-scene bake（M5 后、M6 前）
 
-#### 受控采样路径
+B 只提供可审查的编译计划，不默认运行；D8 未同意时 Strict 拒绝。它是有限分辨率 / 时间的位图输出模式，不是原生 vector，不是当前已实现保真。
 
-多通道 easing、透明度乘积、复杂派生几何无法直接映射时，采样实际表达式，而不是只把关键帧结果再线性连接。
-
-采样种子包含首尾、所有依赖关键点、跳变两侧、时钟相位边界；在平滑区间继续细分。每次细分比较的是运行时求值与最终序列化轨道的重建结果，包含数值格式化带来的误差。
-
-- 默认建议：1×文档坐标几何误差目标 0.25px；alpha / 颜色分量误差目标 1/255，均待 D2 确认。
-- 仅测中点或有限检查点不能证明整个区间达标。能给出区间或导数误差界的表达式使用该界；不能证明时必须如实标记，并按 D2 / Strict 契约处理。
-- Hold 是跳变，不使用短渐变来伪造保持段；连续段和离散段明确分开。
-- 限制每轨道采样点、递归深度和整体输出预算。达到预算仍不满足要求时返回明确诊断，不无限细分。
-- 不同周期的独立属性保持独立时钟。表达式跨多个时钟时，优先用等价结构分解；确需共同周期时进行有界计算，不能无界求最小公倍数并展开。
-- 负缩放、奇异矩阵、零缩放恢复不依赖不可逆的静态矩阵求逆；不能等价表达时进入受控采样或明确失败。
-
-### 6.5 动态依赖与修饰器来源
-
-将当前 Layer 自身动画判断扩展为绘制单元的依赖闭包：几何、Group、Painter、颜色源、修饰器、Mask、Composition 和引用资源。
-
-- 没有动态依赖的复杂效果，继续允许现有静态栅格化。
-- 有动态依赖时禁止默认用单张 PNG 把动画冻结。
-- BestEffort 选择冻结必须明确指出范围、时刻与丢失的动画，不能仅写“某效果不支持”。
-- ModifierResolver 输出附带源几何、modifier 顺序、Repeater 副本序号和依赖来源，不只返回失去身份的 Path。
-- 动态几何经过静态 TrimPath / RoundCorner 后，结果仍然动态。
-- 按时刻求值使用导出局部状态与临时产物，不持续把每次采样结果追加到共享 document.nodes。
-- 路径命令类型和数量稳定是 `d` 插值的必要条件，不是充分条件；还需验证区间形状和误差。
-- 固定数量 Repeater 可按副本编译；副本数量变化、路径拓扑变化需单独做能力判断，不能统一声明“SVG 绝对不能表达”。
-- 不依赖其他分支存在的 helper 或导入能力；如需引入，先核实当前接口和全局影响，再确认范围。
-
-## 7. API、诊断与 CLI 草案
-
-### 7.1 保留入口，补充明确策略
-
-保留当前 `SVGExportOptions::exportAnimation` 与 `SVGExporter::ToSVG / ToFile` 入口。静态表示与文字选项按第 8.6 节收口，现有静态能力不删减；下面动画字段是待确认的拟议接口，不代表已经存在：
-
-```cpp
-enum class SVGAnimationSelection {
-  Default,
-  All,
-  Named,
-};
-
-enum class SVGAnimationPolicy {
-  Strict,
-  BestEffort,
-};
-
-struct SVGAnimationOptions {
-  SVGAnimationSelection selection = SVGAnimationSelection::Default;
-  std::string animationId = {};
-  SVGAnimationPolicy policy = SVGAnimationPolicy::Strict;
-  float maxPositionError = 0.25f;
-  float maxAlphaError = 1.0f / 255.0f;
-  size_t maxSamplesPerTrack = 4096;
-};
-```
-
-建议作为现有 options 的动画子选项。颜色误差、总输出上限和递归限制先由内部编译预算统一管理，不为尚未确认的需求扩张公开接口；确有调用方需要时再暴露。
-
-入口行为：
-
-- `exportAnimation=false`：模板静态导出，不等于 t=0 的动画初态，更不等于任意时刻快照。
-- Default / All / Named 的解释完全对齐 D1；Named ID 不存在时失败，不回退为默认。
-- Strict：选定动画存在不可表达的有效依赖时失败。`ToSVG` 返回空结果，`ToFile` 返回 false，生成成功之前不打开目标文件。
-- BestEffort：允许约定的初始态冻结或视觉降级，但输出诊断。冻结值来自该驱动在导出原点的求值，不任意取模板值或最后关键帧。
-- 未传 warnings 只影响诊断收集，不影响 Strict 成败。
-- 保留当前 warnings 字符串入口，内部使用含原因码的诊断记录，不为文档方案直接改变现有公开返回类型。
-- 类型、数值有限性和预算在公开输入边界校验；合法内部运行对象继续复用项目保证。
-
-### 7.2 诊断内容
-
-每项至少包含：
-
-```text
-reasonCode
-instancePath
-nodeId
-channel / affectedOutput
-reason
-action: exact / approximated / frozen / dropped / rejected
-```
-
-要区分：未实现映射、输入无效、目标越界、资源失败、预算耗尽、近似误差不达标、输出能力不足。不要把“实现尚未接线”写成“SVG 无法表达”。
-
-未被选择的定义不自动作为导出失败；实际选定的 StateMachine / DataBind 行为则必须显式诊断。
-
-### 7.3 CLI 拟议选项
-
-```text
---svg-no-animation
---svg-animation <id>
---svg-all-animations
---svg-animation-policy strict|best-effort
-```
-
-- 指定 ID 与 all 互斥；关闭动画与选择动画互斥，冲突输入报错。
-- 所有导出 warnings 输出到 stderr；成功信息不掩盖降级信息。
-- Strict 失败返回非零，不创建、截断或覆盖输出文件。
-- 静态策略与文字模式按第 8.6 节补齐；不在这一轮顺带增加快照、平台接口或其他无关 CLI 配置。
-
-## 8. 静态与动画能力矩阵及补齐设计
-
-### 8.1 静态范围：不承诺任意源 SVG 可逆还原
-
-这里的“静态导出”指无动画文档，或显式 `exportAnimation=false`，导出 PAGX 模板布局后的绘制结果；不采样正在播放的某个时刻。
-
-必须区分三种要求：
-
-1. **合法 SVG 文件：** XML、ID、引用和资源有效，目标浏览器能够打开。
-2. **PAGX 静态语义保真：** 在确认的画布、色彩、缩放和环境下，外观、裁剪、绘制顺序、合成与 PAGX renderer 一致。这是本方案的完整性目标。
-3. **还原所有源 SVG 结构和功能：** 保留原来的标签、CSS、DOM、响应式 viewBox、脚本、foreignObject、链接及所有 SVG 参数。这不是现有 PAGX 模型和 Exporter 的能力，不能由“补齐静态标签”完成。
-
-例如 line / polyline / polygon 可以输出为等价 Path；use / symbol 与 marker 在导入时可能被展开为 Layer，导出不必重建原标签才能保留外观。已有导入展开依据为 `src/pagx/svg/SVGImporter.cpp:446` 与 `src/pagx/svg/SVGImporter.cpp:490`。反之，模型没保存的独立径向焦点和 spreadMethod 无法从 center / radius / colorStops 凭空恢复，见 `include/pagx/nodes/RadialGradient.h:31` 与 `include/pagx/nodes/Gradient.h:33`。
-
-因此目标不是“发射 SVG 全部元素”，而是“覆盖 PAGX 已建模的全部有效绘制路径，每处无法原生表达都有保外观或拒绝策略”。如果以后要求任意 SVG 往返，先增加必要的导入、模型与资源语义，再设计导出，另行确认范围。
-
-### 8.2 当前静态能力矩阵
-
-表中“已有”表示存在实现，不表示所有边界与组合已验证；“缺口”包含可修复错误和明确的近似，不能统称 SVG 不支持。
-
-| 范畴 | 当前输出与实际边界 | 补齐目标 / 阶段 |
-|---|---|---|
-| 根画布与布局 | 输出 width / height / `viewBox=0 0 W H`；已有 applyLayout、约束、Path renderScale；不保留原 SVG 响应式结构 | 验证布局与绘制空间，不误承诺还原源结构；S0 / S1 |
-| Layer / Group / Composition | Layer 包装、Group 几何累积与 Painter 分次输出、Composition 内联已有；实例 ID 和父空间不能只按模板指针 | 实例身份、唯一 ID、作用域和稳定引用；S1 |
-| Rectangle / Ellipse / Path | 常规几何已有；反向轮廓、起点、退化轴、解析后的 conic 近似仍有缺口 | 保留原生轮廓语义和受控几何转换；S4 |
-| Fill / Stroke | 多 Painter、fill-rule、普通 cap / join / width 已有 | 每次绘制的坐标、透明度和先后顺序正确；S1 / S4 |
-| 内外描边 | Rectangle / Ellipse 用 inset 近似；Path / Text 未统一处理；非圆椭圆与虚线会偏离 | 原轮廓上倍宽描边加裁剪或等价展开，保持原始 paint bounds；S4 |
-| 虚线 / reversed | 写 dasharray / dashoffset，但不消费完整 adaptive、轮廓方向和原生起点规则 | 原生 dash 简化与自适应；必要时输出解析后的虚线几何；S4 |
-| Polystar / TrimPath / RoundCorner / MergePath / Repeater | 常规静态解析已有；外层 modifier 作用于 Group / Repeater、Append、幂和共享 Fill 状态不完整 | 共用解析语义，不把 PPT 特定补偿施加给 SVG；S4 |
-| 线性 / 径向渐变 | 普通 stops、matrix、fit 模式已有；空 stops、退化 bounds、外部 Painter 空间不一致 | 复用原生 fit 与默认 stop；区分几何空间和 Painter 空间；S5 |
-| 色彩 / alpha | sRGB、P3 CSS 和 stop alpha 有输出；色域、插值空间、量化及浏览器差异没有完整门禁 | 同一色彩约定下验证；非等价时保外观或明确诊断；S5 / S6 |
-| Image / ImagePattern | 内嵌图片、双轴 Repeat 和部分 Decal fit 已有 | 所有实际供应的图片、编码尺寸、独立 X/Y tile、采样与 scaleMode 一致；S5 |
-| Mirror / Clamp 图案 | 已尝试局部 PNG 烘焙；fit、资源顺序和失败 fallback 不等价；并非完全没实现 | 使用完整 shader / fit / tile 状态渲染；禁止静默改变轴模式；S5 |
-| Text / TextBox | 原生 text、行分割、竖排、富文本有路径；默认 TextBox 可绕过 GlyphRun 和内层 Painter 状态 | 布局与实际字形统一；非文字内容和前景顺序不丢；S3 |
-| GlyphRun / WOFF2 / 轮廓 | 已有 WOFF2 与逐字形路径；同 Text 多 Font、缺省 advance、anchor、offset、变换和 faux 样式存在差异 | 复用 renderer 字形放置与合成样式，按 Font 分段，正确 fallback；S3 |
-| fauxBold / fauxItalic | Native 文字已有 CSS 属性；WOFF2 / 轮廓路径未完整应用 renderer 的合成加粗 / 倾斜 | 各字形模式与 bounds 一致，不以 CSS 声明替代保真证明；S3 |
-| 位图字形 | 已有逐字形 image 输出；字形 alpha、资源失败与数据来源未完整接通 | 真实位图、scope / painter alpha、编码与位移验证；S3 / S5 |
-| TextPath / TextModifier / RangeSelector | 正常可见 Layer 默认触发整层烘焙；关掉或失败时丢效果；Mask 旁路 probe | 静态结果可优先展开为最终字形，无法表达则完整栅格化；S3 |
-| Alpha / Luminance Mask | 简单同父路径有输出；跨父仅告警，自身 alpha / effects / composition / scroll 不完整 | 实例相对矩阵、完整像素合成与绘制顺序；S1 |
-| Contour clipPath | 已有基本形状输出；clip-rule、描边轮廓、隐藏后代和有效覆盖判定不完整 | 按 renderer 提取裁剪覆盖，描边先展开，正确排除不可见内容；S1 / S4 |
-| scrollRect / clipToBounds | 常规 clipPath 与滚动位移已有；与跨父 Mask、effects、3D 组合仍需验证 | 区分视口空间与内容空间，一次裁剪和位移；S1 / S2 |
-| groupOpacity / blend / passThroughBackground | alpha 与 mix-blend-mode 有输出；对子树的 alpha 包装不等于原生离屏规则；背景隔离未完整映射 | 根据真实离屏条件决定整体 / 逐项合成，不能仅套 `<g>`；S1 |
-| Blur / Shadow / ColorMatrix / Blend / Noise | 许多 filter primitive 已有，但链路顺序、区域单位、spread、tileMode、noise 算法有差异 | 原生等价链路与 user-space 区域，非等价效果显式栅格化；S2 |
-| BackgroundBlur / Glass | 当前即使 bake 开启也跳过背景效果；普通目标 Layer PNG 不包含所需背景 | 完整背景上下文烘焙与绘制替换，或明确拒绝；S2 |
-| 静态 2D / 3D 变换 | 当前已使用 LayerTransformUtils，含 anchor、组件变换和常量 w 归一化；不能沿用“Layer 无这些字段”旧结论 | 仿射保持矢量；一般透视与有效 preserve3D 已有 bake，补旁路和组合；S1 / S2 |
-| antiAlias 与栅格采样 | renderer 消费 Layer.antiAlias；原生 SVG 未对齐逐层边缘抗锯齿状态，不能默认认为浏览器一致 | 在目标缩放下验证，原生提示不能等价时按策略 bake / 拒绝；S1 / S2 |
-| 资源与失败诊断 | 部分警告已有；空 bitmap、字体 fallback、probe 旁路和 CLI 不收集导致损失不完整可见 | 所有有效依赖有结果或诊断；fail 不截断文件；S6 |
-
-### 8.3 静态缺口、证据与复现场景
-
-下表为本次源码核实的开发输入，不是已完成修复，也不是本轮浏览器实测结果。前次“SVG 测试全通过”不消除这些未覆盖的路径。
-
-| 编号 | 源码依据与根因 | 必须加入的复现场景 | 阶段 |
-|---|---|---|---|
-| ST1 | `src/pagx/svg/SVGExporter.cpp:319` 生成 ID 不检查作者 ID；`src/pagx/svg/SVGExporter.cpp:3537` 重复内联；Mask cache 按模板节点和类型 | Layer 叫 grad0 再生成渐变；两实例包含相同内部 Layer ID；Mask 后缀撞作者 ID；外部同名资源 | S1 |
-| ST2 | `src/pagx/svg/SVGExporter.cpp:1858` 跨父 Mask 只有告警，`src/pagx/svg/SVGExporter.cpp:1814` 只用 Mask 自身矩阵 | Mask 与 owner 不同父级，祖先平移 / 旋转 / scroll；owner 子 Mask；同模板多个实例 | S1 |
-| ST3 | `src/pagx/svg/SVGExporter.cpp:1828` Mask 固定 alpha=1，直接 contents / children，绕过自身 effects / composition / scroll 和完整 probe | 根 Mask alpha=0 或 0.5、仅 Composition 内容、带 filters / scrollRect / TextPath；Luminance 的前景白和背景黑跨 children 合成 | S1 / S2 |
-| ST4 | `src/pagx/svg/SVGExporter.cpp:1842` Contour 使用普通 paint 输出，未按可见性与描边覆盖提取；`src/pagx/svg/SVGExporter.cpp:3557` 只跳 owner 的直接 Mask 子项 | 只有 Stroke 的环形裁剪、evenodd 洞、隐藏子层；放在其他父级的舞台可见 Mask 不应额外上屏 | S1 / S4 |
-| ST5 | `src/pagx/svg/SVGExporter.cpp:3432` 与 `src/pagx/svg/SVGExporter.cpp:3539` 用单层 alpha 或子树 `<g opacity>` 代替离屏条件 | 嵌套 groupOpacity=false 的半透明重叠，叠加 filter / blend / Alpha Mask，passThroughBackground=false | S1 |
-| ST6 | `src/pagx/svg/SVGExporter.cpp:1711` 把像素 margin 直接写百分比；`src/pagx/svg/SVGExporter.cpp:1453` shadow 不推进 currentSource；`src/pagx/svg/SVGExporter.cpp:1729` 先 filter 后 style | 很小 bbox 加大 blur / offset；连续 Blur / Shadow / ColorMatrix；style 后 filter；Mask 加缩放后的滤镜尺度 | S2 |
-| ST7 | `src/pagx/svg/SVGExporter.cpp:1521` spread 只告警忽略；`src/pagx/svg/SVGExporter.cpp:1576` 和 `src/pagx/svg/SVGExporter.cpp:1652` 跳 Glass / backdrop；普通 Raster 只画目标 | 正负 spread、不同 blur tile、noise 保真；背景渐变上的半透明玻璃、混合与祖先前景，不能把孤立 Layer bake 当兜底 | S2 |
-| ST8 | `src/pagx/svg/SVGExporter.cpp:3334` 默认 TextBox 另走富文本收集；`src/pagx/utils/TextUtils.h:74` 只收 text 非空且不保存内层 Group transform / alpha | glyph-only TextBox、TextBox 中 Rectangle、多个 Painter、内层变换与 alpha、foreground 两次遍历 | S3 |
-| ST9 | `src/pagx/svg/SVGExporter.cpp:2388` WOFF2 选择与位置不覆盖多 Font / 缺省 advance / glyph anchor；`src/pagx/utils/TextUtils.cpp:84` 矩阵不同；`src/pagx/utils/TextUtils.cpp:192` 轮廓漏 glyph.offset | 同 Text 两 Font、无 positions / xOffsets、非零位置和 anchor 加旋转 / 缩放 / skew、非零 vector offset | S3 |
-| ST10 | `src/pagx/svg/SVGExporter.cpp:2293` 把透明度写 fill-opacity，`src/pagx/svg/SVGExporter.cpp:2334` 的 image 不应用对应因子 | 带真实 PNG / WebP 数据的位图字形，Group / Painter 半透明，资源不存在时必须诊断 | S3 / S5 |
-| ST11 | `src/pagx/svg/SVGExporter.cpp:2118` 用 inset 改原轮廓；`src/pagx/svg/SVGExporter.cpp:1990` 直接输出 dash 属性；`src/pagx/svg/SVGExporter.cpp:2217` 未消费 Path reversed | 厚描边非圆椭圆、闭合 / 开放 Path 和 Text 内外描边、虚线 round cap、自适应与反向路径、渐变描边原始 bounds | S4 |
-| ST12 | `src/pagx/utils/ModifierResolver.cpp:499` 为 PPT 把 Append 改 Union；`src/pagx/utils/ModifierResolver.cpp:596` Group 不进 shapeSlots；`src/pagx/utils/ModifierResolver.cpp:720` Repeater 后清槽 | Append 重叠轮廓的描边、外部 Trim / Merge 作用 Group 和 Repeater；`SignedPow(-1,0)` 的首副本应正确；不同源 fill-rule 不得互相修改 | S4 |
-| ST13 | `src/pagx/svg/SVGExporter.cpp:665` 空渐变不写 stop；`src/pagx/svg/SVGExporter.cpp:639` 退化 fit 不同；`src/pagx/svg/SVGExporter.cpp:3293` 几何 transform 未携带 Painter 空间 | 空 stops 应按 renderer 默认黑白；零轴路径渐变；Group 平移 / 缩放几何由外部 user-space 渐变和 Stroke 绘制 | S5 |
-| ST14 | `src/pagx/svg/SVGExporter.cpp:872` 只取 PNG 尺寸；`src/pagx/svg/SVGExporter.cpp:816` 任一 Repeat 进入双轴路径；`src/pagx/svg/SVGExporter.cpp:915` 旋转 fallback 丢 scaleMode | 真实 JPEG / WebP / GIF 适配、Repeat/Decal 混合轴、Mirror+LetterBox、旋转或负缩放图片+Stretch/Zoom | S5 |
-| ST15 | `src/pagx/utils/ImageFormatUtils.cpp:270` 只 data / 文件；`src/pagx/utils/RasterUtils.cpp:393` 同样解析；renderer 在 `src/renderer/LayerBuilder.cpp:2295` 优先 runtimeImage | data URI 与宿主已供应 runtimeImage、字节和 runtimeImage 同时存在时一致；未供应资源严格失败而非泄漏本机路径 | S5 / S6 |
-| ST16 | `src/pagx/utils/ModifierResolver.cpp:736` 修改共享 Fill；解析通过 document.makeNode 持有临时节点；公开数值与烘焙预算需统一检查 | 重复导出后模板不被改、nodes 不无界增长；SVG→PPT→SVG 不串状态；非有限数值、深引用、乘性复制和烘焙预算耗尽 | S4 / S6 |
-| ST17 | `src/renderer/LayerBuilder.cpp:2756` 消费 Layer.antiAlias，原生 `src/pagx/svg/SVGExporter.cpp:3575` 等 Layer 发射没有相应状态 | 关闭边缘抗锯齿的斜边、旋转矩形与裁剪，比较固定缩放下覆盖；不能用 shape-rendering 提示未经验证地视为等价 | S1 / S2 |
-| ST18 | `src/renderer/GlyphRunRenderer.cpp:200` 设置 fauxBold / fauxItalic；WOFF2 的 `src/pagx/svg/SVGExporter.cpp:2480` 与轮廓工具未消费完整合成样式 | 同 GlyphRun 使用真实 Bold / Italic 与额外 faux 组合，检查轮廓、advance、bounds、Mask 覆盖；Native、WOFF2、path 和位图模式分别验证 | S3 |
-
-渲染依据与复用位置：
-
-- 原生内外描边使用倍宽加 alignment clip：`third_party/tgfx/src/layers/contents/ShapeContent.cpp:129`；虚线简化和 adaptive：`third_party/tgfx/src/layers/DashEffect.cpp:24`。
-- Contour 包含有效描边覆盖：`third_party/tgfx/src/layers/contents/DrawContent.cpp:70`。Mask 根舞台 `visible=false` 不等于关闭 Mask，其语义必须沿用 renderer，不能一律过滤所有隐藏根。
-- 离屏条件包含 blend、背景隔离、groupOpacity、filter 和像素 Mask：`third_party/tgfx/src/layers/Layer.cpp:1185`；完整相对 Mask 矩阵：`third_party/tgfx/src/layers/Layer.cpp:1277`。
-- 字形 offset、advance 与 anchor 变换：`src/renderer/GlyphRunRenderer.cpp:137`、`src/renderer/GlyphRunRenderer.cpp:218`。
-- 空 stops 默认黑白：`src/renderer/LayerBuilder.cpp:2097`；退化渐变 fit：`third_party/tgfx/src/layers/vectors/Gradient.cpp:93`；图片适配矩阵：`third_party/tgfx/src/layers/vectors/ImagePattern.cpp:95`。
-- 普通目标 bake：`src/pagx/utils/RasterUtils.cpp:130`；已有带背景合成能力：`src/pagx/utils/RasterUtils.cpp:351`。后者不是自动可替换的 SVG 补丁，仍需绘制消费范围契约。
-
-### 8.4 静态正确性的共用模型
-
-不另造一套静态场景树。扩展第 6 节的导出局部实例和 DrawRecord，让动画计划使用同一基础：
-
-```text
-DrawRecord:
-  instancePath
-  sourceGeometry
-  geometryToPainter
-  painterToLayer
-  paintBounds
-  alphaChain
-  placement / drawOrder
-  compositionBoundary
-  dependencies / provenance
-```
-
-- **几何与画笔空间：** 先明确 geometryToPainter，再决定把几何烘焙到 Painter 空间还是保留局部包装；不能同时把外部 gradient / stroke 错误变成随几何 Group 变换。
-- **Mask：** 按实例计算到 owner 输出空间的相对变换，包含共同祖先和滚动；Alpha / Luminance 使用完整层像素合成，Contour 使用有效几何提取。不同空间或实例不能误用缓存。
-- **合成：** 以 renderer 离屏条件选择整体 alpha 或逐项 alpha；filter、clip、mask、blend 的包装顺序保证各自所在空间与效果尺度。
-- **字形：** TextBox 不另走丢 Painter 状态的简化分支。已布局 GlyphRun 优先，统一字形 offset / advance / anchor / transform，WOFF2 按实际 Font 分段，位图字形显式承载 alpha。
-- **修饰器：** 共用算法保留 Append 与布尔运算的真实差别，PPT 特定补偿放在 PPT 输出端。返回结果包含填充规则与来源，不能更改原 Fill。
-- **资源：** 复用 renderer 的实际资源优先级和通用解码 / 尺寸获取；宿主供应状态是输入的一部分。不存在的网络资源不会被本方案擅自下载，必须有明确前置条件或失败诊断。
-- **生命周期：** 静态解析和采样产物由导出局部上下文持有；不在共享模板节点池长期追加，不污染后续 renderer / PPT / HTML 导出。
-
-### 8.5 完整上下文栅格化，不把截图当成万能兜底
-
-已确认正常 Layer 的 probe 会把 TextPath / TextModifier、conic / diamond、一般透视和有效 preserve3D 路径送入 bake，见 `src/pagx/svg/SVGFeatureProbe.cpp:86`。这不是“完全未支持”，而是以编辑性换取特定分辨率下外观的路径；Mask 旁路、背景效果和失败 fallback 仍不完整。
-
-方案：
-
-1. 对每个有效输出单元先判断原生等价能力，再选最小的**完整合成边界**，不是简单取含有不支持节点的 Layer。
-2. 复用 exporter-owned renderer 树及 RasterUtils；Alpha、Mask、scrollRect、3D 和 effect 状态在 bake 中只应用一次。
-3. 背景效果使用实际在目标之前绘制的内容，采样需要的 halo 与输出覆盖区域分开；不能把透明背景上孤立绘制的目标图当成背景模糊结果。
-4. 带背景 PNG 已包含“背景+目标”。必须替换对应绘制前缀或裁去原前缀在补丁区域的输出，不能直接叠在原背景上造成半透明二次合成。后续 foreground / sibling 继续按原次序输出。
-5. 记录 bake 已消费的 DrawRecord 范围、坐标空间、有效覆盖与已应用状态。不能证明局部替换安全时扩大到完整可隔离合成边界，不静默丢掉背景或只保留目标。
-6. 一般投影与深度交叉必须保留完整 3D 上下文；可精确降为 affine 或常量 w 的场景继续原生输出。效果 / Mask 造成的扁平化规则与 renderer 一致。
-7. GPU、资源、像素预算或编码失败时，PreserveAppearance 失败；只有显式 BestEffort 才允许诊断后降级。原生路径存在可修复错误时，应修复，不永久用截图掩盖。
-8. 视觉保真按 D6 的固定缩放和色彩容差验收，不声称 PNG 任意缩放仍矢量无损。带有效动态依赖的单元继续受动画策略约束，Strict 动画不允许单帧冻结。
-
-### 8.6 静态策略、文字模式与选项收口
-
-以下为拟议接口，需 D4—D6 确认后实施：
-
-```cpp
-enum class SVGStaticExportPolicy {
-  VectorOnly,
-  PreserveAppearance,
-  BestEffort,
-};
-
-enum class SVGTextExportMode {
-  Fidelity,
-  Native,
-};
-```
-
-| 模式 | 输出契约 | 失败行为 |
-|---|---|---|
-| VectorOnly | 仅原生 / 最终几何表达，不为效果新增 PNG；已有 Image、位图 glyph 可以作为原资源保留 | 不能等价表达就拒绝，不自动删效果 |
-| PreserveAppearance（推荐默认） | 原生优先；不能等价表达的已建模内容以完整上下文 bake 保外观 | 无法满足确认的容差、资源或预算失败即拒绝，不退成“成功但不同” |
-| BestEffort | 允许明确近似或丢弃，逐项报告原因、范围与动作 | 仍拒绝无效输入与无界资源消耗，不把执行错误当正常近似 |
-| Fidelity 文字（推荐默认） | 使用实际已布局字形；可用 WOFF2、轮廓或原位图，不重新猜字体排版 | 字形数据或外观无法满足要求时按静态策略处理 |
-| Native 文字 | 保留可读字符串，允许目标字体重新塑形 | 比较布局和形状差异；超过容差时不得绕过 PreserveAppearance 假装保真，可按策略回退或拒绝 |
-
-收口原则：
-
-- 用明确静态策略替代语义重叠的 bakeUnsupported，用文字模式替代 convertTextToPath 的简单布尔二分；同步所有公开调用方、CLI 和测试，不保留冲突的旧选项兼容层。
-- embedFontsAsWoff2 作为字形编码偏好保留，不使默认 TextBox 绕过权威字形，也不承诺 PUA 对应原文可搜索 / 复制。
-- 静态策略与第 7 节的动画 Strict / BestEffort 正交：静态允许 bake 不代表允许冻结动画，动画非严格也不能突破 VectorOnly 的表示约束。
-- 导出成功只在所有有效依赖满足对应契约后成立，不依赖 warnings 指针是否为空。静态诊断复用第 7.2 节的原因码、实例路径和动作。
-- CLI 在原计划基础上增加 `--svg-static-policy vector-only|preserve-appearance|best-effort` 和 `--svg-text-mode fidelity|native`；整理原 text-to-path 选项及其对其他格式的影响，不对所有格式生硬替换同一个含义。
-- 任意文件写出前完成能力、资源与编译检查；只验证可写并不代表场景转换正确。
-
-### 8.7 静态验收与新增测试矩阵
-
-所有新增静态用例显式设置 `exportAnimation=false`，独立验证没有 SMIL。无动画文档开启 / 关闭动画的结果应相等，但不能以此证明静态视觉正确。
-
-| 测试组 | 必须检测的行为 |
+| 必须明确的输入 | MB 契约 |
 |---|---|
-| 实例与文件结构 | 作者 ID 与 generated ID 碰撞、多实例 / externalDoc 同名、defs 单一有效引用、重复导出确定性 |
-| Mask / clip | 跨父矩阵与滚动、根 alpha、Mask composition / effects、可见 Mask 不上屏、Luminance 前景顺序、Contour stroke / evenodd / 隐藏后代 |
-| 合成与背景 | 两种 groupOpacity 的嵌套重叠，filter / blend 强制离屏，背景隔离；半透明背景补丁无二次绘制，祖先 foreground 不被提前烘焙 |
-| 字形与布局 | glyph-only TextBox、多字体、多 Painter、缺省 advance、vector offset、anchor / rotate / skew / scale、fauxBold / fauxItalic、真实位图 alpha、RTL / 竖排 / rich text |
-| 几何与描边 | 各形状内外 / 居中描边、厚描边、开放轮廓、adaptive dash、反向 / 起点、Append 重叠描边、外层 modifier、Repeater 负缩放首副本 |
-| paint 与图片 | 空 stop 和退化 bbox、几何 / Painter 分离、真实 PNG / JPEG / WebP / GIF、data URI / runtimeImage、独立 X/Y tile 和全部 scaleMode |
-| bake | conic / diamond、TextPath / 静态 modifier、一般透视 / preserve3D、antiAlias=false；成功外观、失败结果、覆盖边界、缩放 / 色彩与预算 |
-| 模板与错误 | 原 Fill / glyph / nodes 不被污染；不同格式顺序导出一致；深引用、非有限数值、预算耗尽、资源未供应、Strict 不写文件 |
+| 时间与初态 | 有限 [start,end]、各实例初始 elapsed / playing / offset、D7 或明确初始化快照；跨无公周期只对给定窗口编译 |
+| 事件与宿主 | 有限、排序、可重放的 SM / VM / trigger / Once 事件和初始化顺序；任意未来输入 / 开放历史仍 U |
+| 资源与环境 | 所属文档、图片 / 字体供应、画布 / 背景 / 色彩、固定分辨率与 D6，资源集合和回调执行边界闭合 |
+| 采样与误差 | 采样时刻、离散显示约定、运动 / 像素误差检查、帧数 / 像素 / 字节预算；不以帧端点吻合承诺任意连续时刻 |
+| tail / repeat | 尾帧保持或结束、窗口 repeat 是否允许及接缝语义；窗口重复不等同原无限多 Clock 场景 |
+| 合成与输出 | 完整 3D / backdrop / Glass / noise、复杂 shape / text / effects fallback；复用 BakeConsumption，不重复消费背景或状态 |
+| 失败 | 缺初态 / 事件 / 资源、未知 payload、无法满足约定或预算不足 → 拒绝；报告 B/MB、raster 与时间限制 |
 
-使用与动画共用的浏览器启动和图像评测设施，静态只等待资源完成后采一帧，不复用 WAAPI 时钟。比较PAGX renderer与SVG的同一画布、背景、缩放、颜色空间和D7状态来源；TemplateStatic参考使用不执行动画/状态机/默认绑定的导出局部renderer树，不能直接调用会flush绑定的PAGScene.draw产生不同初态。关键区域误差、轮廓、文字位置与像素差直接检测，SSIM作为补充；不能让大背景掩盖小主体错误。
+**拟议帧序列表示：** 对已编译的完整合成区域，在同一固定逻辑范围内为每个采样帧输出嵌入PNG的image；初始各帧hidden，使用SMIL离散visibility轨道在相邻采样时刻之间恰好显示一个帧。采用[sample[i],sample[i+1])区间，透明帧保持透明且不让前一帧透出；有限窗口之前/之后分别按明确初态与tail契约显示。repeat只复现已确认窗口，不等同源场景的无限多时钟；全部image共用BakeConsumption且不重新施加已烘焙alpha/mask/transform。
 
-源 SVG 往返样例另设两段判据：“源 SVG→PAGX”检查导入是否已损失，“PAGX→SVG”检查此次导出是否新增损失。只有后一段正确不能证明前一段覆盖所有 SVG。
+该表示的阶梯时间误差按D8另行接受或证明，不以采样帧像素吻合承诺任意连续时刻相等；不满足则拒绝。验证seek到每个采样点、区间内部、透明帧、尾帧和repeat接缝，确认不会两帧同时可见或留下旧内容。D8授权仍不能突破VectorOnly禁新增效果位图；该策略下B/MB拒绝，不能因有限场景开关自动改静态策略。
 
-### 8.8 与动画计划的关系
+MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/effects fallback及无有界公周期的多Clock；资源/状态不能有限化则U。有限host换图须先闭合第3.3节runtime payload，不能由Exporter独自假设成功。该帧序列表示仍为待确认设计，不是当前单image写出已具备的能力。
 
-S0—S6 的实例、DrawRecord、Mask、字形、资源解析、probe、诊断与预算由动画复用；M1—M6 不再复制另一套。静态阶段先修属性和作用域，动态阶段再对这些表达式按时刻编译。
+### 3.8 动效实施 M0—M6
 
-当前源码已经具备静态 Layer anchor / rotation / scale 和 LayerTransformUtils。动画白名单仍不等于所有这些字段已可动画。后续 M2 应对照当前字段和 runtime writer，不能按旧初稿“Layer 无组件字段”新增重复模型；第 5 节记录的矩阵 / Group 动画问题仍需处理。
+#### M0：动态 ledger 与同源复现
 
-### 8.9 动画能力矩阵
+- 文件：`test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`、`tools/html-snapshot`、`CMakeLists.txt`。
+- 任务：全 175 / 表外通道分类、typed XML→apply 与 F1—F18、附录 D.2 动态组合；复用静态 XML / 浏览器入口，建立真实实例 runtime oracle。
+- 验收：初态 / 中间 / 跳变 / 第二周期可击穿旧问题；不靠 animate 字符串、空图或只 top render CLI 判 nested 正确。
 
-“现有接线”只表示有代码路径，不表示组合语义已经正确。
+#### M1：实例、选择、pause scope 与 Clock
 
-| 能力 | 当前情况 | 本方案目标 | 阶段 |
-|---|---|---|---|
-| 静态 SVG 几何 / 文字 / 图片 / 渐变 / Mask / filter | 已有实现但并不完备，详见第 8.2 / 8.3 节 | S0—S6 补齐并与动画共用，不承诺还原任意源 SVG | S0—S6 / 全阶段 |
-| 顶层 Animation | 未正常进入 Plan | 按选择策略导出 | M1 |
-| Composition 多实例 / 外部文档 | 未按实例和文档正确绑定 | 独立驱动和稳定引用 | M1 |
-| Once / Loop / PingPong / offset / paused | 有实现，但多个路径不等价 | 共用运行时规则与初态 | M1 |
-| Layer alpha / visible / matrix | 已接线，有透明度与矩阵问题 | 合成及区间插值正确 | M2 / M3 |
-| Layer x / y | 未接线，运行时已有通道 | 按运行时位置叠加规则导出 | M2 |
-| Group / TextBox 变换与 alpha | 已接线，有链路和作用域问题 | 所有实际发射分支正确 | M2 / M3 |
-| Rectangle / Ellipse 几何 | 已接线，有 Hold 和派生属性问题 | 中心、尺寸、圆角、描边依赖正确；动态非正圆使用 ellipse | M2 / M3 |
-| Fill / Stroke color、alpha、width、dashOffset、miterLimit | 已接线，有因子与时钟问题 | 组合轨道不丢因子 | M2 / M3 |
-| SolidColor、渐变几何、ColorStop | 未接线 | 引用与实例语义正确，颜色和几何一起验证 | M4 |
-| Path / Polystar / TrimPath / RoundCorner / Repeater | 动态输出未完整支持 | 保留来源；对可表达结果编译，否则明确失败或降级 | M5 |
-| 可映射滤镜 / 样式参数 | 当前未支持动画 | M4 / M5 核心完成后独立扩展，复用统一轨道编译 | 后续扩展 |
-| StateMachine、交互、复杂文本重排版、3D | 不具备本方案的完整契约 | 诊断明确，不假装支持 | 后续独立方案 |
+- 文件：`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/PAGAnimation.cpp`、必要内部共享时间函数、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`。
+- 任务：根入口 / 去重、Composition 挂载、contextDoc / contains、DriverKey 与 animationId pause scope、ordered bindings；复用 content time / offset / 初态与唯一 PingPong 周期；类型准入先行。
+- 验收：F1—F4 / F13—F16；官方样例、仅 Composition、双 slot / externalDoc、同 ID paused、不同 fps / 正负 offset / Loop t=D 与 progress 分离；ordinary Layer 不错误激活。
 
-滤镜扩展时，blur 输出区域必须覆盖动画全过程，非线性倒数参数需要编译表达式，不能只换算端点后线性插值。浏览器对 `d`、颜色、字体和滤镜动画的支持以固定版本实测为依据，不沿用未经核验的兼容性断言。
+#### M2：绘制作用域与变换
 
-## 9. 分阶段实施任务
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/utils/ExporterUtils.{h,cpp}`、`test/src/PAGXSVGTest.cpp`。
+- 任务：复用 DrawRecord / LayerTransformUtils；三层 priority、shared pose / decompose / mix 顺序；位置 override、full turns / shortestArc、alpha 因子 / groupOpacity；Mask / Contour / TextBox / 各 glyph 分支与动态 ellipse。
+- 验收：F5—F6 / F8—F11 / F14；零起 alpha、捕获前后 singular、重叠内外 Painter、matrix 与 component 跨动画顺序、所有文字 / Mask 宿主；共享静态不回归。
 
-### 9.1 静态补齐阶段 S0—S6
+#### M3：统一轨道与证明预算
 
-静态阶段按影响与风险安排，不先扩充容易发射的标签而推迟合成、遮罩和字形错误。策略、诊断、预算从 S0 起确定并在各阶段生效；S6 是收口而非第一次实现错误处理。
+- 文件：`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、必要时才拆的内部编译单元、`test/src/PAGXSVGTest.cpp`、共用 SVG 评测入口、`CMakeLists.txt`。
+- 任务：统一初态 / 首尾真求值、空 / 单 / duplicate key、Hold / None / Bezier overshoot；完整表达式、序列化重建与连续误差证明；多 Clock 有界分解、采样 / 递归 / 输出预算。
+- 验收：F7 / F15 / F18；跨 duration t=0=50、float 与 Color clamp 分歧、混合 easing / 跳变、预算和无法证明时确定拒绝，无 epsilon 假 Hold。
 
-#### S0：静态能力门禁与共用验证基础
+#### M4：颜色源、渐变与可原生 effects
 
-**涉及文件：** `test/src/PAGXSVGTest.cpp`、`test/src/PAGXCliTest.cpp`、`tools/html-snapshot` 内的共用 SVG 评测入口、`CMakeLists.txt`、`include/pagx/SVGExporter.h` 的拟议契约。
+- 文件：`src/pagx/svg/SVGAnimationPlan.cpp`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`test/src/PAGXSVGTest.cpp`。
+- 任务：SolidColor / linear / radial / stops 的共享引用、defs 实例与动态 fit；LerpColor / P3 / alpha；明确扩 Blur / Drop / Inner / Blend 及 style 可等价参数，逐步输入、spread / behind / Only / region 全时段验证；其余 effect 全部 B/U 判定。
+- 验收：175 表中本阶段每项直接求值 / 像素，完整 51 effect 项不漏；Noise inactive / no-op 与 B 分开，conic / diamond 退化条件覆盖，不用“后续”冒充分类。
 
-**实施内容：**
+#### M5：动态 geometry、文字与 Selector
 
-1. 从第13章的55类、完整字段、枚举和C01—C24组合出发建立静态覆盖门禁，将ST1—ST42的缺陷/契约场景构造为显式关闭动画的输入；声明分类完整不等于像素已通过。
-2. XML 检查唯一 ID、引用、defs、有效尺寸和没有 SMIL；视觉入口使用固定资源、画布、缩放和色彩，静态和 M0 复用启动 / 比较设施而不是两套 runner。
-3. 确认 D4—D7 的表示、文字、环境和静态状态来源标准，以及失败、不写文件和资源预算契约；模板参考不执行宿主初始化，不拿自动flush绑定的scene绘制冒充同源参考。
-4. 测试区分当前实现缺陷、既有有损策略和源 SVG 模型缺失，不把所有“不相等”都归给 Exporter。
+- 文件：`src/pagx/utils/ModifierResolver.{h,cpp}`、`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`src/renderer/LayerBuilder.cpp`、`src/pagx/TextLayout.cpp`、`test/src/PAGXSVGTest.cpp`、共用评测入口。
+- 任务：Path point / Polystar / Trim / Round / Repeater 来源与局部求值；稳定 d 与显式 topology；Text 九通道、TextHolder flush / reshape、TextModifier 十三与 Selector 六通道的最终 glyph / paint；有限 host 换图先源头准入或拒绝。
+- 验收：F11 / F13 / F17；静态 modifier 不冻动态 geometry，变化 copy / glyph 数可审计，Text / fonts / faux / overlay 与路径 renderScale 正确；不污染 Font / nodes。
 
-**验收：** 静态失败场景可稳定检测；原生控制样例非空且正确；历史 163 passed 不作为新门禁结果；用例不依赖动态时钟和墙钟碰巧采对状态。
+#### MB：仅 D8 同意后的可选阶段
 
-#### S1：实例身份、坐标、Mask 与透明度合成
+- 文件：`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/utils/RasterUtils.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、共用评测入口与相关测试。
+- 任务 / 验收：严格按第 3.7 节有限编译计划；F18 和 D.2 的有限 / 无界对照、首尾 / repeat / 事件 / 完整背景 / 预算直接验证。未授权不执行，也不阻止 N/G 阶段独立交付。
 
-**涉及文件：** `src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/ExporterUtils.h`、`src/pagx/utils/ExporterUtils.cpp`、`src/pagx/utils/LayerTransformUtils.h`、`src/pagx/utils/LayerTransformUtils.cpp`、`src/pagx/nodes/Layer.cpp`、`src/pagx/PAGXDocument.cpp`、`test/src/PAGXSVGTest.cpp`；与M1/M2共用实例和绘制记录接口，布局源头变化同步PAGX runtime测试。
+#### M6：公开契约与动效交付
 
-**实施内容：**
+- 文件：`include/pagx/SVGExporter.h`、`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`src/cli/CommandExport.cpp`、所有调用方、`test/src/PAGXCliTest.cpp`、`test/src/PAGXSVGTest.cpp`、`CMakeLists.txt`。
+- 任务：落实已确认 D1—D8、选择 / Strict / BestEffort / 可选 MB、diagnostics / 文件事务；完整 classification 与真实支持状态分别公布；重复导出、共享工具与浏览器回归。
+- 验收：F1—F18 各有直接回归；每个声明支持项含初态 / 连续区间 / 边界，不静态 PNG freeze，不依赖 warnings sink，B 未授权与 U 正确拒绝。
 
-1. 在共享 Context 中建立全局 ID 分配与实例映射，作者 ID、generated ID、Mask 后缀和外部资源统一保留 / 重命名；所有引用和缓存使用同一映射。
-2. 记录 geometryToPainter、painterToLayer、placement 和合成边界；保留现有 Layer / Group 布局与变换工具，不另造组件模型。
-3. Mask 使用实例到 owner 输出空间的完整相对矩阵，包含祖先和 scrollRect；Alpha / Luminance 经过完整 Mask 层求值，nestedWriter 携带实际选项与诊断上下文。
-4. Contour 按 renderer 有效覆盖抽取，接入 stroke 展开和 clip-rule，忽略无效后代但不错误忽略舞台不可见的 Mask 根；Mask 引用定义不能重复作为舞台内容绘制。
-5. 按 renderer 离屏规则计算 alpha、blend 和 passThroughBackground；父 alpha 的传播不能用每 child 子树一个 opacity 包装替代逐项绘制。
+## 4. 共用工程、证据与最终验收
 
-**验收：** ST1—ST5 的不同父级 / 同模板复用、半透明根 Mask、Luminance 顺序、Contour stroke / 洞、嵌套 alpha 和背景隔离通过结构及像素验证；没有重复 ID、错引用或多次应用 transform / alpha。
+### 4.1 API、CLI、诊断和预算（唯一工程定义）
 
-#### S2：静态滤镜、背景效果与 3D 保外观回退
+以下是待确认接口草案，不是已新增代码。静态 enum 契约见第 2.3 节，动画 N/G/B/U 是能力分类，不直接替代 policy。
 
-**涉及文件：** `src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGFeatureProbe.h`、`src/pagx/svg/SVGFeatureProbe.cpp`、`src/pagx/utils/RasterUtils.h`、`src/pagx/utils/RasterUtils.cpp`、`test/src/PAGXSVGTest.cpp`；复用 renderer 层与效果能力。
-
-**实施内容：**
-
-1. 维护每步滤镜真实输入 / 输出，按运行时 style→filter 的顺序构图；shadowOnly、多 shadow 和上游变更不能聚合到最后就视为同义。
-2. 从实际内容与效果 bounds 计算 filterUnits / primitive 空间，优先显式 user-space 区域；不能把像素 margin 当百分比。Mask 分层后仍保持正确效果尺度。
-3. spread、blur tile、noise、style blend / excludeChildEffects、Layer.antiAlias 等已建模状态必须进入能力判断；有原生等价算法则实现，否则在 PreserveAppearance 下完整烘焙，BestEffort 才允许明确近似。shape-rendering / text-rendering 只作为环境相关提示，未经验证不能代替原生抗锯齿规则。
-4. Probe 覆盖实际引用与 Mask 路径及背景依赖。BackgroundBlur / Glass 不再默认丢弃；使用已有带背景合成能力并实现第 8.5 节的绘制前缀替换，不重复绘制已消费内容。
-5. 复用现有一般透视 / preserve3D bake，对上下文、共同深度、Mask、布局和滚动组合补测；仿射与常量 w 场景继续矢量，不笼统把全部 3D 转位图。
-6. GPU / 编码 / 像素预算失败按静态策略返回；只画目标的 PNG 不得作为背景依赖场景的“成功兜底”。
-
-**验收：** ST6 / ST7 及静态 3D 组合通过；小 bbox 大 blur 不裁、效果链顺序正确、背景补丁无二次合成、祖先前景不被提前消费，所有回退具备完整诊断和受控范围。
-
-#### S3：TextBox、真实 GlyphRun 与文字输出模式
-
-**涉及文件：** `src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/TextUtils.h`、`src/pagx/utils/TextUtils.cpp`、`src/pagx/TextLayout.h`、`src/pagx/TextLayout.cpp`、`src/pagx/TextLayoutParams.h`、`src/renderer/GlyphRunRenderer.h`、`src/renderer/GlyphRunRenderer.cpp`、`src/pagx/utils/Woff2FontGenerator.h`、`src/pagx/utils/Woff2FontGenerator.cpp`、`test/src/PAGXSVGTest.cpp`；复用现有WOFF2与最终glyph/Selector/TextPath/TextModifier求值，不复制另一套算法。
-
-**实施内容：**
-
-1. TextBox 复用 Painter 作用域，不让 glyph-only Text、非文字子项、多 Painter 或内层 Group 状态被富文本收集遗漏；foreground 发射不重复整个 TextBox。
-2. 从 renderer 的字形放置与合成样式提取或复用共用逻辑，覆盖 Font 分段、unitsPerEm、glyph offset、advance fallback、anchors、rotation / skew / scale 和 fauxBold / fauxItalic，含实际轮廓、advance 与 bounds；不把现有 TextUtils 注释或 Native CSS 字重声明当作其他字形模式等价的证据。
-3. WOFF2 / 路径 / 位图 glyph 使用相同位置与 scope alpha。不能表达的 WOFF2 run 分段或正确转轮廓，不能给整个 Text 使用首个 Font。
-4. 复用既有 TextLayout 与 FontConfig，Fidelity 不随意再猜系统字体；Native 以原文为输出但明确排版差异，保留缺字和资源失败诊断。
-5. 静态 TextPath / TextModifier / RangeSelector 优先展开最终字形；不要求恢复原 modifier 的编辑结构，无法原生表达才按策略 bake。
-6. PUA 可选择不等于原文可搜索。将可见字形、Unicode / 可访问原文和导出表示分别验证，不承诺不存在的逆映射。
-
-**验收：** ST8—ST10 的 glyph-only、多 Font、缺省位置、offset / anchor 变换、真实半透明位图、RTL / 竖排 / 富文本与前景通过；所有文字模式使用同一有效布局与资源契约，PPT / HTML 共用字形路径不回归。
-
-#### S4：几何、描边与静态修饰器完整语义
-
-**涉及文件：** `src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGPathParser.cpp`、`src/pagx/PathData.cpp`、`src/pagx/utils/StrokeGeometryUtils.h`、`src/pagx/utils/StrokeGeometryUtils.cpp`、`src/pagx/utils/ModifierResolver.h`、`src/pagx/utils/ModifierResolver.cpp`、`src/pagx/ppt/PPTExporter.cpp`及实际使用解析结果的PPT输出模块、`test/src/PAGXSVGTest.cpp`；复用tgfx path/dash/stroke与VectorContext语义，数值/共享数据变化同步回归。
-
-**实施内容：**
-
-1. 保留 primitive / Path 的原始起点、方向、renderPosition / scale 和原始 paint bounds；conic 转换采用确认的几何误差而非固定细分就宣称无损。
-2. 各形状和字形的 Inside / Outside 使用原轮廓倍宽加裁剪，或等价展开路径；虚线和非圆椭圆不能继续靠 inset 近似。Fill 和 Stroke 各自 bounds 与状态正确。
-3. 复用原生 dash 简化、自适应、cap / join 与 reversed 行为，必要时解析为显式几何；圆 / 椭圆的原生起点与 SVG 默认起点不同要处理。
-4. 修饰器作用于累积有效几何，涵盖 Group 与 Repeater 展开后的来源；Append 保留子路径而非 Union，PPT 的 evenodd 补偿移至 PPT 端。
-5. 修正 Repeater 幂、顺序、fractional copy alpha 和组合语义；源 Fill 的规则不被统一修改。局部产物返回对应 fill-rule / 来源，由输出端消费。
-6. 临时几何局部持有，维护稳定顺序和复制 / 点数预算，不污染共享模板；动态 M5 在这一正确静态解析基础上扩展。
-
-**验收：** ST11 / ST12 / ST16 的路径方向、虚线、内外描边、Append 描边、跨作用域 modifier、负缩放首副本和重复跨格式导出通过；几何细分有误差依据，模板 Fill / nodes 不被持久修改。
-
-#### S5：渐变、图案、图片与实际资源解析
-
-**涉及文件：** `src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/ImageFormatUtils.h`、`src/pagx/utils/ImageFormatUtils.cpp`、`src/pagx/utils/RasterUtils.h`、`src/pagx/utils/RasterUtils.cpp`、`src/renderer/LayerBuilder.h`、`src/renderer/LayerBuilder.cpp`、`test/src/PAGXSVGTest.cpp`；复用 tgfx ImageCodec / Gradient / ImagePattern fit。
-
-**实施内容：**
-
-1. 空渐变 stop 使用 renderer 默认黑白，退化 fit 与原生一致；在 Painter 空间解析 gradient matrix 与 geometry bounds，不让外部 Painter 随几何的 Group 错位。
-2. 共享颜色和 P3 / alpha / 插值空间保持一致；原生能等价时用原生，固定环境下仍不同的算法按策略保外观，不笼统用 CSS 声明当保真证明。
-3. 按第13.7节明确的各消费方优先链处理资源：ImagePattern的runtimeImage优先，默认VM与位图Glyph走data/dataURI/file链；不要把共用工具等同于改成同一链。每个消费方的原生/bake同源，解码/尺寸用通用能力，不以MIME代替解码或正确放置。
-4. X/Y tile 独立处理 Repeat / Mirror / Clamp / Decal，全部 scaleMode 与旋转 / skew / 负缩放 fit 一起进入 shader / pattern 计算。
-5. pattern bake 使用同一解析资源、fit matrix 和采样参数；不会因为无效 bounds / 烘焙失败就静默双轴 Repeat 或丢 scaleMode。
-6. 本方案不自动联网取未供应资源；调用方资源前置条件、缺失、解码失败、输出嵌入和 GPU 像素编码失败都有诊断。
-
-**验收：** ST13—ST15 的默认 stop / 退化轴、外部 Painter、真实多格式资源、runtimeImage 优先级、data URI、混合轴 tile、完整 fit / sampling 通过；M4 的动态资源在相同模型上扩展。
-
-#### S6：公开选项、诊断、预算与静态交付回归
-
-**涉及文件：** `include/pagx/SVGExporter.h`、`src/pagx/svg/SVGExporter.cpp`、`src/pagx/svg/SVGFeatureProbe.h`、`src/pagx/svg/SVGFeatureProbe.cpp`、`src/cli/CommandExport.cpp`、所有当前 SVGExporter 调用方、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXCliTest.cpp`、共用 SVG 评测入口、`CMakeLists.txt`。
-
-**实施内容：**
-
-1. 完成第 8.6 节静态策略与文字模式，替换语义冲突选项，更新完整调用范围、CLI 帮助及 API 参数说明，不留两套优先级。
-2. 静态和动画复用同一诊断基础；对每个有效节点 / 参数做能力台账：原生、显式解析、栅格化、拒绝或 BestEffort 损失，禁止沉默的 default 分支漏功能。
-3. 数值有限性、深引用、几何 / glyph / 复制数量、像素、输出大小和总预算在公共边界与编译计划中校验；预算耗尽不是放弃检查的理由。
-4. Strict 或 PreserveAppearance 失败不写 / 截断文件；warnings=nullptr 不改变成功判断；资源失败不会泄漏本机路径。
-5. 完成显式静态全部路径、每种策略、字体环境、比例 / 色彩和重复导出确定性门禁，以及共享工具影响的 PPT / HTML 全量回归。
-
-**验收：** 第13章55类自有/继承字段、附属输入、相关枚举与C01—C24全部有分类及直接验证；ST1—ST42的有效缺陷/契约可定位且有回归。能表达的内容不以告警代替修复，声明覆盖与像素正确分开记录；保外观和无新增raster模式按同源状态验证。源码修改与截图变化按项目既定基准流程处理。
-
-### 9.2 动画阶段 M0—M6
-
-下面保留原动画阶段，复用 S0—S6 中已完成的共用能力；不得创建重复的静态 / 动态实例、资源、Mask 或字形解释器。
-
-### M0：建立失败复现与验证入口
-
-**目的：** 在开始重构前，把 F1—F12 的关键语义变成可检测行为。
-
-工作：
-
-1. 在 `test/src/PAGXSVGTest.cpp` 增加顶层与 Composition、PingPong 各属性、整圈 / 最短弧、零 alpha、groupOpacity、Mask / native TextBox、栅格化冻结等回归输入。
-2. 将相关结构断言改为 XML 解析后的宿主、引用和轨道验证。
-3. 在 `tools/html-snapshot` 的现有浏览器与图像比较基础上增加 SVG SMIL 采帧入口；先跑无需新增功能的静态控制样例和明确的失败复现。
-4. 测试参考直接使用 PAGScene / 实例时间轴。当前 render CLI 只驱动顶层动画，不能直接拿来给嵌套动画判正确。
-5. 在 `CMakeLists.txt` 接入需要的评测目标，使后续每阶段可调用同一验证入口。
-
-验收：测试能够击穿原实现中的周期、初态、旋转、alpha 和实例错误；不因两张空白图或仅出现动画标签而通过。
-
-### M1：实例、目标作用域与时钟
-
-涉及：`SVGAnimationPlan.h`、`SVGAnimationPlan.cpp`、`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、`src/pagx/PAGAnimation.cpp`、必要的内部共享时间函数、`PAGXSVGTest.cpp`、`PAGXTest.cpp`。
-
-工作：
-
-1. 移除错误的根 animations 空列表退出和 Animation 全局去重。
-2. 按实际挂载实例枚举驱动，加入根动画选择、externalDoc 和目标成员范围校验。
-3. 明确同属性驱动应用顺序，保留每实例不同 offset / playing。
-4. 提取并复用纯时间映射；计算唯一 PingPong 周期；生成正确初始属性。
-5. 完整覆盖循环引用和可复用兄弟实例的区别。
-
-验收：官方 animation 样例能导出动画；仅 Composition 动画正常；双实例不同相位独立；transform / color / alpha / visibility 往返周期均为 2D；暂停与正负 offset 在原点及第二周期正确。
-
-### M2：绘制作用域、变换和输出分支
-
-涉及：`SVGExporter.cpp`、`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、`ExporterUtils.h`、`ExporterUtils.cpp`、`PAGXSVGTest.cpp`。
-
-工作：
-
-1. DrawRecord 分离几何 transform 链与 Painter opacity 链。
-2. 修复纯位置 override 的提前返回；Layer 动画复用当前已有的 LayerTransformUtils、组件字段及 runtime writer，按 matrix3D / matrix / 组件与布局位置的真实优先级接入，不新增重复模型，不沿用旧初稿“字段不存在”的假设。
-3. 保留标量旋转圈数、变换操作顺序与锚点；Matrix 对齐最短弧规则。
-4. 保持两种 groupOpacity 的绘制合成语义，完整计算各 alpha 因子。
-5. 接通 Mask / clipPath、native TextBox、文字轮廓 / WOFF2 / 位图字形等实际输出分支；不能只给 nestedWriter 传一个指针就认定所有遮罩变换已正确。
-6. 动态椭圆按 ellipse 输出，避免元素类型由静态正圆状态锁死。
-7. 用动态依赖闭包限制整层静态栅格化，保留变换与遮罩坐标空间边界。
-
-验收：纯位移、360 / 720 度旋转、跨 ±180 度 Matrix、Group 内外 Painter、透明度零起点、重叠子项、不同文字模式和遮罩动画通过属性及浏览器对照；共享工具的静态 SVG / PPT / HTML 不回归。
-
-### M3：统一轨道编译与误差预算
-
-涉及：`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、必要时拆出的内部编译单元、`PAGXSVGTest.cpp`、M0 的浏览器评测入口、`CMakeLists.txt`。
-
-工作：
-
-1. 所有属性使用统一首尾、单关键帧、离散段和 spline 编译入口。
-2. 原生等价轨道保留各自 easing；复合属性由完整表达式求值。
-3. 对采样输出进行序列化后重建和误差检查；加入跳变、区间内部与相位边界。
-4. 处理多时钟依赖，限制公共周期、样本量、递归和输出大小。
-5. 对奇异变换、无法证明误差和预算耗尽产生确定诊断，不退成未经说明的线性近似。
-
-验收：混合 Hold / Bezier、不同 easing 的 transform 和 alpha 乘积在区间内部正确；采样输出满足确认后的 D2；预算耗尽失败可重复、资源有界；同一输入导出稳定。
-
-### M4：颜色源与渐变动画
-
-涉及：`SVGAnimationPlan.cpp`、`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、`SVGExporter.cpp`、`PAGXSVGTest.cpp`。
-
-工作：
-
-1. 接入 SolidColor、LinearGradient、RadialGradient 和 ColorStop 的实际运行时可动画字段，以通道表为依据。
-2. 共享颜色源传播到各实际绘制引用；渐变自身参数和 stop 放在正确的 defs 实例中。
-3. fitsToGeometry 渐变与动态几何尺寸一起计算，不仅对静态 bounds 换算关键点。
-4. 颜色和 alpha 对齐 LerpColor / 色域转换；P3 样式不能把动画 presentation attribute 覆盖成静态值。
-5. 同一颜色源经多个实例或不同时钟消费时，定义缓存不能误共享。
-
-验收：共享 SolidColor 的多引用、渐变端点、径向参数、stop offset / color / alpha、动态 bounds、P3 与 alpha 同时变化，以及多实例资源引用全部有直接验证。
-
-### M5：动态修饰器与路径输出
-
-涉及：`ModifierResolver.h`、`ModifierResolver.cpp`、`SVGAnimationPlan.h`、`SVGAnimationPlan.cpp`、`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、`SVGExporter.cpp`、`PAGXSVGTest.cpp`、浏览器评测入口。
-
-工作：
-
-1. 给解析产物增加完整来源映射，涵盖源几何替换、组合和复制。
-2. 复用现有 modifier 算法，对局部求值状态生成动态几何，不持续扩张共享模板节点池。
-3. 稳定拓扑路径编译 `d`，验证插值中间形状和误差。
-4. 固定副本 Repeater 保留副本独立 transform / alpha；变化副本数和拓扑变化单独评估，不用几条字符串断言宣称支持。
-5. 不支持策略同时覆盖 modifier 失去来源和整层烘焙的情况。
-
-验收：静态 modifier 作用于动态 Rectangle / Path 不丢动画；TrimPath / RoundCorner / Polystar 可表达路径通过对照；复制来源、透明度、拓扑变化、预算耗尽与资源释放均有测试。
-
-### M6：接口、CLI、诊断与交付回归
-
-涉及：`include/pagx/SVGExporter.h`、`SVGAnimationPlan.h`、`SVGAnimationPlan.cpp`、`SVGAnimationWriter.h`、`SVGAnimationWriter.cpp`、`SVGExporter.cpp`、`src/cli/CommandExport.cpp`、`test/src/PAGXCliTest.cpp`、`PAGXSVGTest.cpp`、`CMakeLists.txt`。
-
-工作：
-
-1. 落实确认后的 D1—D7，完善公开参数、结果、诊断和选择语义说明。
-2. 严格结果不依赖 warnings sink；生成成功前不打开文件，避免失败时截断已有输出。
-3. CLI 选项校验、stderr 诊断、退出码和不写文件行为逐项测试。
-4. 强化重复导出确定性、静态开关字节相等和无动态输入不回归。
-5. 运行全量编译、测试和逐帧评测；共享工具改动覆盖 HTML / PPT。
-
-验收：Strict 与 BestEffort 契约一致；官方样例真实播放；每个白名单支持项有区间语义验证；所有有效动态依赖得到输出或明确诊断；无未解释的回归。
-
-## 10. 测试矩阵与质量门禁
-
-### 10.1 三层验证
-
-1. **结构层：** XML 合法、ID 唯一、引用完整、宿主正确、values / keyTimes / keySplines 数量匹配，时间有限有序。
-2. **语义层：** PAGScene / Channel 连续求值与导出轨道在相同时间一致，检测初态、边界、跳变和中间值。
-3. **浏览器层：** 实际 SVG 渲染与 PAGX 渲染对照，检测 transform 组合、opacity 合成、资源、字体和浏览器实现差异。
-
-Round-trip 可以补充，但不是唯一判据：导入和导出共享同一个错误时也可能互相抵消。当前没有验证其他分支的 SMIL 导入实现，不作为本方案的前置依赖。
-
-### 10.2 最低场景覆盖
-
-| 维度 | 必测场景 |
-|---|---|
-| 动画选择 | 无动画、首个顶层、指定 ID、全部并播、首个 StateMachine、未知 ID |
-| 实例作用域 | 仅 Composition、两个相同模板不同相位、外部同名 ID、越界 target、重复资源、引用环 |
-| 时钟 | Once / Loop / PingPong，正负 offset、暂停、不同 fps、周期边界及第二周期 |
-| 插值 | 单关键帧、关键点不覆盖首尾、Hold / None / Linear / Bezier 混合、不同通道 easing |
-| 变换 | 原点纯位移、整圈 / 多圈、最短弧、锚点、skewAxis、负缩放、零缩放恢复 |
-| 透明度 | 零起点、多个因子同时动画、内外 Painter、多 Painter、两种 groupOpacity 的重叠内容 |
-| 几何 / 资源 | 圆变椭圆、roundness、描边对齐与 width、共享颜色、动态渐变 bounds |
-| 输出分支 | Mask / clipPath、native TextBox、文字路径、WOFF2、位图字形、动态内容含不支持效果 |
-| 安全与确定性 | 非有限数值、类型不匹配、预算耗尽、重复导出、唯一 ID、Strict 不截断文件 |
-
-不固定“每能力只写一个测试”的数量指标。每项是否完成由上述语义分支和异常边界覆盖决定。
-
-### 10.3 浏览器采帧规则
-
-```javascript
-svg.pauseAnimations();
-svg.setCurrentTime(timeSeconds);
+```text
+SVGExportOptions:
+  exportAnimation
+  staticPolicy: SVGStaticExportPolicy = VectorOnly | PreserveAppearance | BestEffort
+  textMode: SVGTextExportMode = Fidelity | Native
+  embedFontsAsWoff2, fontConfig
+  animation: SVGAnimationOptions
+    selection: SVGAnimationSelection = Default | All | Named
+    animationId
+    policy: SVGAnimationPolicy = Strict | BestEffort
+    maxPositionError = 0.25 document pixels
+    maxAlphaError = 1/255
+    maxSamplesPerTrack = 4096
+  optionalFiniteScenePlan: disabled unless D8 explicitly authorizes MB
+Diagnostics:
+  reasonCode, instancePath, nodeId, channelOrAffectedOutput
+  reason, action: exact | approximated | frozen | dropped | rejected
+  outputClass, stateSource, consumedRangeOrFreezeTime
+Budgets:
+  referenceDepth, totalInstances, geometryPoints, glyphs, copies
+  samplesPerTrack, subdivisionDepth, commonPeriodExpansion
+  rasterPixels, rasterFrames, encodedBytes, totalOutputBytes
 ```
 
-- 使用 SMIL 的时钟接口，不直接照搬 `document.getAnimations()` 的 WAAPI seek。
-- 等待字体、图片和渲染提交完成，再采帧；采样不依赖墙钟推进。
-- 参考 PAGScene 与 SVG 使用相同画布、时间、背景、缩放和色彩假设。
-- 嵌套 timeline 从新场景按对应实例驱动到目标时刻，避免只设置根动画。
-- 初期固定 Chromium 版本建立主门禁；目标浏览器范围确认后加入对应兼容验证，不凭旧文档下结论。
-- 简单几何 / alpha 直接属性断言；复杂视觉结合像素差、关键区域与 SSIM。不要只看整图均值，防止小主体的大误差被背景掩盖。
-- 对预期有可见内容的样例检查非空区域，对纯透明时刻使用预期透明断言，不统一要求每帧非透明。
+颜色误差、总预算先由内部统一管理，仅有已确认调用需求再扩公开字段；合法 Layout NaN sentinel 不被全局 finite 校验误拒绝。未知 / 越界 / typed 不匹配、资源失败、无支持映射、误差不达标、预算耗尽和开放宿主分别给原因码；未选择不可达定义不自动使导出失败。
 
-### 10.4 编译与回归命令
+CLI：`--svg-no-animation`、`--svg-animation <id>`、`--svg-all-animations`、`--svg-animation-policy strict|best-effort`、`--svg-static-policy vector-only|preserve-appearance|best-effort`、`--svg-text-mode fidelity|native`。Named / All 互斥，关闭动画与选择互斥，未知 ID / 冲突失败不 fallback；所有 warnings 到 stderr，成功提示不掩盖损失。MB 不增加默认偷偷开启的 CLI 路径。
 
-此前评审运行过当时已有的 `PAGFullTest` 文件；本轮完整台账只做源码/文档检查，没有构建或运行测试。当前CMake源码使用后端后缀，后续新构建按项目规范使用 `PAGFullTest_OpenGL`，不把旧文件名当作新构建目标。
+ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=nullptr只影响收集，不影响成败。转换/能力/资源/编译失败不打开目标。**本方案推荐ToFile原子写出契约：** 同目录临时文件写入、flush/close全部成功后原子替换；写入或替换失败旧文件保持不变，临时产物清理有界。无法满足替换前置条件就失败，不改为直接截断目标；该契约不承诺断电/崩溃durability，失败注入须区分转换、write、flush/close和replace。
+
+### 4.2 实施顺序与三层测试
+
+严格静态先行：S0—S6 静态契约验收 → M0—M5 动效 → D8 同意才可 MB → M6。同一实例、资源、Mask、字形、预算、文件和评测基础只实现一处。
+
+1. 结构层：XML / 唯一 ID / 完整引用、defs / 宿主与轨道数量、时间有限有序；静态无 SMIL、关闭动画不执行任何嵌套 driver。
+2. 语义层：XML typed payload → Channel 真求值 → runtime ordered apply → effective text flush → draw；同初态 / 初始化 / 实例驱动 / mix 顺序，与序列化轨道重建对照。
+3. 浏览器层：固定 Chromium、资源与绘制提交完成后，SMIL `svg.pauseAnimations()` / `svg.setCurrentTime(timeSeconds)` 确定性采帧，不用 WAAPI `document.getAnimations()` 或墙钟 seek。
+
+动画参考从新场景按选择契约初始化：已选根Animation声明序apply→nested递归advance/apply→按宿主契约flush绑定和文字→draw。当前render CLI已驱动全部顶层Animation及挂载nested driver，可用于同集合/同初始化的场景，但不能直接充当Default/Named/有限事件重放参考。跨层VM先全部链接再bind，开放历史不从模板逆推；有限MB使用明确事件与同一共享VM身份。
+
+简单 transform / alpha 直接属性；复杂图像比较关键区域、轮廓 / glyph 位置和像素差，SSIM 辅助；预期可见帧检查非空，透明帧断言透明。跨浏览器、d / 字体 / filter 支持以固定目标实测，不凭旧兼容性结论。
+
+### 4.3 历史证据与当前核查状态（唯一证据汇总）
+
+| 证据 | 已知结果 | 不能推出 |
+|---|---|---|
+| 旧工作区 Debug binary 的 PAGXSVGTest | 163 / 163 passed，未重新编译 | 当前源码全部通过、组合保真或日志无异常 |
+| 历史动画 / Composition subset | 19 / 19 passed：SVG 17（16 Anim + 1 static）+ runtime 2 | 所有实例 / 初态 / 中间时刻 / pixel 正确 |
+| 历史官方 `spec/samples/animation.pagx` 导出 | 0 animate，stderr 空 | 动画已支持；该结果正暴露根入口与丢弃诊断缺口 |
+| 历史 SVG stderr | 三次 PNG 解码错误但断言仍通过，尚未定位 | 无日志异常或图片资源正确 |
+| 当前 source 声明核查 | 166 个 SVG 用例、16 个 SVGExport_Anim、0 处显式 exportAnimation=false 选项 | “166 all passed”；声明数与历史 binary 结果必须分开 |
+| 本轮文档重组 | 仅只读源码 / 声明语义核查与文档编辑 | 任何新构建、修复、测试、像素或跨浏览器认证 |
+
+现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
+
+### 4.4 后续实现时的构建与基准规则
+
+以下仅保留项目规定的未来验证命令，**本轮不执行格式化、构建、测试或基准操作**。
 
 ```bash
 ./codeformat.sh 2>/dev/null; true
@@ -842,97 +470,28 @@ cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debu
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL --gtest_filter='PAGXSVGTest.*:PAGXTest.*:PAGXCliTest.*'
 ./cmake-build-debug/PAGFullTest_OpenGL
-```
-
-共享 ExporterUtils / ModifierResolver 的行为变化，需要实际覆盖现有 PPT / HTML 用例，不能仅编译通过。涉及 HTML 评测链路时追加：
-
-```bash
 cmake --build cmake-build-debug --target HTMLTest
 ```
 
-- 测试返回非零表示失败，先定位根因，不原样重复命令直到碰巧通过。
-- 同一工作区不并行跑不同后端截图测试。
-- 不自动跳过缺失基线，不手改 version.json，不运行基准更新 target。
-- 截图基准接受仅由用户主动执行 `/accept-baseline`。
-- HTML 语料基准均值不手改；涉及有意保真提升时按项目规定的独立流程处理。
+共享 tools / TextLayout / ModifierResolver / 资源变化覆盖 PAGX runtime、静态 SVG、PPT / HTML 全量及浏览器门禁，不只编译。测试非零就是失败，不原样重跑碰运气；同工作区不并行不同后端截图。不得跳过基线、手改 version.json 或运行 baseline 更新脚本 / target；截图仅用户主动 `/accept-baseline`。HTML 均值不手改，有意提升按项目规定独立流程处理。
 
-## 11. 最终交付条件
+### 4.5 最终 accept check
 
-- [ ] D1—D7 已确认，文档与接口使用相同解释。
-- [ ] 第13章55个NodeType、自有及继承字段、附属输入、全部相关枚举具有声明集合校验；不是只登记ST缺陷样本。
-- [ ] ST1—ST42各项实际缺陷/契约有直接回归，C01—C24覆盖关键交互；静态有效绘制路径有原生、展开、完整栅格化或明确拒绝策略，声明分类与浏览器验证分别记录。
-- [ ] 静态 S0—S6 与动画 M0—M6 使用同一实例、绘制、资源、诊断和预算基础，没有重复解释器。
-- [ ] 无新增效果 raster 与保外观模式分别验收，背景补丁不会重复消费背景或提前绘制 foreground。
-- [ ] 静态 Fidelity / Native 文字、源 SVG 还原边界和 D6 环境限制明确，不把 PUA / PNG 当作原文或矢量无损的承诺。
-- [ ] F1—F12 各有直接回归验证，已修复而非只补告警掩盖可修复错误。
-- [ ] 每个已声明支持的通道同时覆盖初态、区间中间值和边界。
-- [ ] 所有实际绘制分支都携带正确实例和依赖上下文。
-- [ ] 动态依赖不会被默认静态栅格化冻结。
-- [ ] 采样误差和资源预算满足确认后的契约，不能证明时明确处理。
-- [ ] Strict 失败不写文件，BestEffort 的每处损失可定位。
-- [ ] 重复导出、ID 与资源引用稳定，无未解释的共享模板增长。
-- [ ] 静态 SVG、共享工具影响的 PPT / HTML、全量测试和浏览器门禁通过。
-- [ ] 当前支持、近似支持和不支持能力在接口与文档中一致。
+- [ ] D1—D8 逐项明确；未同意 D8 时 MB 禁用、B Strict 拒绝，开放宿主 U 不假装有限化。
+- [ ] 静态 55 / 334、31 / 111、40 / 155 声明集合与完整逐字段语义不遗漏；C01—C24、ST1—ST46 有直接验证；分类与真正实现 / pixel 状态分别登记。
+- [ ] staticPolicy / textMode / D6 / D7 正交验收；背景消费、Painter lifecycle、资源链、Font 不可变 / 串行化、singular 与 atomic file 行为闭合。
+- [ ] 动效 175 / 30、表外 Path / image / 无 writer 全分类；F1—F18 与动态 A 矩阵直接验证；每个真实支持 N/G 项有 typed apply、初态、连续误差 / 区间、边界及 browser 证据。
+- [ ] Clock / pause scope、Layer 三层 priority / ordered mix、full turns / shortestArc、Hold / overshoot / empty / key boundary 与 topology 正确；Strict 无默认 PNG freeze，损失 / 拒绝可定位。
+- [ ] 同输入重复导出与 ID / 资源稳定，无模板污染 / 无界 nodes；失败和全部写失败保旧文件按承诺测试，warnings sink 不改变成功。
+- [ ] 共用工具、PAGX runtime、静态 SVG、PPT / HTML、全量与目标浏览器门禁通过；能力文档区分 classified、supported、approximate、B/MB 和 U。
 
-## 12. 文件索引
+## 5. 完整附录与唯一核查目录
 
-| 文件 | 方案中的责任 |
-|---|---|
-| `include/pagx/SVGExporter.h` | 导出选项、动画选择、策略与公开契约 |
-| `src/pagx/svg/SVGAnimationPlan.h` | 实例绑定、驱动和依赖计划的数据结构 |
-| `src/pagx/svg/SVGAnimationPlan.cpp` | 选择、作用域、目标解析、动态依赖与诊断 |
-| `src/pagx/svg/SVGAnimationWriter.h` | 轨道与输出上下文接口 |
-| `src/pagx/svg/SVGAnimationWriter.cpp` | 原生 / 采样轨道编译与 SMIL 写出，必要时拆分内部职责 |
-| `src/pagx/svg/SVGExporter.cpp` | DrawRecord、Painter 作用域、宿主、defs、Mask、TextBox 与栅格化 |
-| `src/pagx/utils/ExporterUtils.h` | 现有共享矩阵工具的覆盖接口 |
-| `src/pagx/utils/ExporterUtils.cpp` | 位置 override 与共享变换语义 |
-| `src/pagx/utils/ModifierResolver.h` | 修饰器局部求值与来源接口 |
-| `src/pagx/utils/ModifierResolver.cpp` | 静态 / 动态修饰器语义、Append、来源与临时产物生命周期 |
-| `src/pagx/utils/LayerTransformUtils.h` / `src/pagx/utils/LayerTransformUtils.cpp` | 复用当前静态组件、anchor、布局与 3D 变换语义 |
-| `src/pagx/svg/SVGFeatureProbe.h` / `src/pagx/svg/SVGFeatureProbe.cpp` | 完整静态能力探测、Mask 旁路与背景依赖判断 |
-| `src/pagx/utils/RasterUtils.h` / `src/pagx/utils/RasterUtils.cpp` | 完整合成上下文、背景补丁与像素预算 |
-| `src/pagx/utils/TextUtils.h` / `src/pagx/utils/TextUtils.cpp` | 共用字形放置、offset / advance / alpha 与 Painter 作用域 |
-| `src/pagx/utils/ImageFormatUtils.h` / `src/pagx/utils/ImageFormatUtils.cpp` | 实际图片供应、编码与通用尺寸解析 |
-| `src/pagx/utils/StrokeGeometryUtils.h` / `src/pagx/utils/StrokeGeometryUtils.cpp` | 描边展开、裁剪、原始 paint bounds 与形状依赖 |
-| `src/pagx/utils/Woff2FontGenerator.h` / `src/pagx/utils/Woff2FontGenerator.cpp` | WOFF2 编码与多字体字形数据 |
-| `src/renderer/LayerBuilder.h` / `src/renderer/LayerBuilder.cpp` | 可复用的资源优先级、原生层与效果构建 |
-| `src/renderer/GlyphRunRenderer.h` / `src/renderer/GlyphRunRenderer.cpp` | 字形位置、advance、anchor 和变换的共用依据 |
-| `src/pagx/TextLayout.cpp` | 实际字体和静态布局，避免重复错误塑形 |
-| `src/pagx/ppt/PPTExporter.cpp` 与实际 PPT 输出模块 | 把 PPT 专用几何 / fill-rule 补偿留在 PPT 端，并回归共享工具变化 |
-| `src/pagx/svg/SVGImporter.cpp` 与 `include/pagx/nodes/Gradient.h` / `include/pagx/nodes/RadialGradient.h` | 核实源 SVG 展开与模型保留边界，不由导出端凭空补参数 |
-| `src/pagx/PAGAnimation.cpp` | 提取纯时间映射，运行时既有行为保持不变 |
-| `src/pagx/runtime/KeyframeEvaluatorImpl.h` | 复用的边界、插值与 Matrix 求值依据，不计划另造插值 |
-| `src/pagx/runtime/MatrixDecompose.h` | 复用的矩阵分解与最短弧依据 |
-| `src/pagx/PAGXNodeChannel.cpp` | 核实当前模型和可动画字段，不凭其他分支新增字段 |
-| `src/cli/CommandExport.cpp` | CLI 选项、warnings、退出码和不写文件行为 |
-| `src/cli/CommandRender.cpp` | 当前参考路径的限制；若未来复用它验收嵌套动画，需单独同步修正 |
-| `test/src/PAGXSVGTest.cpp` | 结构、属性语义、资源与导出回归 |
-| `test/src/PAGXTest.cpp` | 时间映射提取的运行时回归 |
-| `test/src/PAGXCliTest.cpp` | CLI 契约与文件行为回归 |
-| `tools/html-snapshot/eval-animation/baseline-frames.js` | 可参考的采帧基础，不直接复用其中的 WAAPI 驱动方式 |
-| `tools/html-snapshot` 内拟新增 SVG SMIL 评测入口 | 浏览器与运行时的确定性逐帧验证，文件名在 M0 落实 |
-| `CMakeLists.txt` | 新内部编译单元和评测目标接入 |
+### A. 完整模型、辅助结构与值数据
 
-## 13. 从 PAGX 模型出发的完整覆盖台账
+#### A.1 继承基类、附属结构与派生字段（31 类 / 111 项）
 
-### 13.1 权威范围、核查方法和完成含义
-
-本次按 **NodeType → 完整头文件成员与继承关系 → parser / layout / renderer 消费 → SVG 表达与现状 → 阶段及测试** 自底向上核查，不再只从 SVGExporter 或已发现的 ST 问题出发。
-
-核查基点为 `ec095ba15`，本轮没有修改源码、构建或运行渲染测试。第 3 节仍是历史二进制结果。这里的“覆盖完整”指当前闭合模型的节点、成员、枚举和关键语义路径已经登记，不指代码修复完成，更不指已穷举无限数值输入、全部组合或全部潜在缺陷。
-
-- `include/pagx/nodes/Node.h:30` 的 NodeType 有 **55 个**：文档 1、资源 12、动画 3、状态机 6、Layer 1、样式 5、滤镜 6、元素 15、文字附属 2、数据绑定 4。
-- 其中 **42 个**为静态图形、资源或布局相关节点，**13 个**为动画、状态机和数据绑定定义。后者也登记，不以“不是图形”直接漏掉其默认宿主影响。
-- 公共基类、继承成员、结构数组与 private 可观察输入另外登记。没有 NodeType 的 Timeline、Keyframe、ImportDirective、值结构和派生缓存也不能遗漏。
-- `ChannelFlags::Animatable / RequiresLayout` 只描述反射与编辑行为，**不是完整字段名单**。None、非 Anim、没有反射条目都不意味着没有静态语义，依据 `src/pagx/PAGXChannelTable.h:28`。
-- 方法不是输入字段；布局产物和缓存不要求一一变成 SVG 属性，但必须保证冷 / 热状态、重布局与重复导出结果一致。
-- 身份、元数据、结构定义覆盖可做集合检查；像素正确性仍必须按本章测试实施，不用“55 类已登记”伪装“55 类已保真”。
-
-每项最终只能落到：**原生等价、最终几何 / 字形展开、完整上下文栅格化、明确拒绝、显式 BestEffort 损失、布局消解、派生缓存、元数据策略、所选模式主动排除**。不允许用无说明 default 分支作为最后一类。
-
-### 13.2 继承、附属结构与派生状态全集
-
-下表的字段是类的**自有数据成员**。第 13.3 节按“直接基类”递归继承本表和其他节点的字段，不能只检查自有字段。`—` 表示确实没有自有成员，而不是未核查。
+字段均为自有成员；Node inventory 按直接基类递归继承。`—` 是确实没有成员，不是未核查。方法 / 静态常量 / 前置声明不算字段；反射 flags 不是模型全集（`src/pagx/PAGXChannelTable.h:28`）。
 
 | 模型类 / 结构 | 声明位置 | 直接基类 | 自有字段（完整） | 分类与处理 |
 |---|---|---|---|---|
@@ -946,50 +505,50 @@ cmake --build cmake-build-debug --target HTMLTest
 | TextSelector | `include/pagx/nodes/TextSelector.h:28` | Node | — | RangeSelector 的基础身份；选择作用于实际 glyph，不凭空引入字符 / 单词 / 行选择字段 |
 | ImportDirective | `include/pagx/nodes/Layer.h:355` | — | `source, format, content, resolvedFrom` | Layer.importDirective 的四字段；前三个需 resolve / 明确前置条件，resolvedFrom 是来源元数据 |
 | Timeline | `include/pagx/nodes/Timeline.h:40` | — | — | 非 Node；按 TimelineType 分类，不要求生成 DOM |
-| AnimationTimeline | `include/pagx/nodes/AnimationTimeline.h:32` | Timeline | `animationId, playing, evaluationOffset` | 实例驱动；模板静态主动排除时间求值，不能把 paused 当不存在的初态 |
+| AnimationTimeline | `include/pagx/nodes/AnimationTimeline.h:32` | Timeline | `animationId, playing, evaluationOffset` | 实例驱动；模板静态主动排除时间求值，paused 不等于没有初态 |
 | StateMachineTimeline | `include/pagx/nodes/StateMachineTimeline.h:32` | Timeline | `stateMachineId` | 实例宿主行为，模板静态不启动 |
 | AnimationState | `include/pagx/nodes/State.h:67` | State | `animationId` | NodeType 仍是 State；空引用表示逻辑空状态，不是另一个 NodeType |
 | TypedChannel | `include/pagx/nodes/Channel.h:94` | Channel | `keyframes` | 各实际类型实例化有序 Keyframe；类型分派不是额外 NodeType |
-| Keyframe | `include/pagx/nodes/Keyframe.h:86` | — | `time, value, interpolation, bezierOut, bezierIn` | 帧索引和值、左右段控制点；模板静态不应用，不代表求值初态可省略 |
+| Keyframe | `include/pagx/nodes/Keyframe.h:86` | — | `time, value, interpolation, bezierOut, bezierIn` | 帧索引和值、左右段控制点；静态不应用，求值初态不可省略 |
 | ImageRef | `include/pagx/nodes/Keyframe.h:66` | — | `id` | 引用所属文档 Image，不能当宿主 PAGImage |
-| FontRenderCache | `src/pagx/nodes/FontRenderCache.h:32` | — | `typeface, built` | 派生 typeface / 构建状态；冷 / 热与失败后重建契约测试 |
+| FontRenderCache | `src/pagx/nodes/FontRenderCache.h:32` | — | `typeface, built` | 派生构建状态，含失败缓存；仅按合法生命周期测试，不承诺热修改重建 |
 | TextLayoutGlyphRun | `src/pagx/TextLayout.h:42` | — | `font, glyphs, positions, xforms` | shaping 产物，GID 对应实际 font，不是直接可复制的 Font.glyphs 子集索引 |
-| Text::GlyphData | `src/pagx/TextLayout.h:49` | — | `textBlob, anchors, layoutRuns` | Text.glyphData 派生结果；Fidelity 必须兼顾 layoutRuns 与作者 glyphRuns 两路径 |
+| Text::GlyphData | `src/pagx/TextLayout.h:49` | — | `textBlob, anchors, layoutRuns` | Text.glyphData 派生结果；Fidelity 兼顾 layoutRuns 与作者 glyphRuns |
 | TextLayoutLineInfo | `src/pagx/TextLayout.h:96` | — | `baselineY, startX, lineWidth, byteStart, byteEnd` | 真实分行、位置和字节范围，不能只重算文字字符串 |
-| TextElement | `src/pagx/TextLayout.h:65` | — | `node, glyph` | 对应Text身份与实际shaping属性，后者可来自宿主覆盖，不能直接取回原模板 |
+| TextElement | `src/pagx/TextLayout.h:65` | — | `node, glyph` | Text 身份与实际 shaping 属性，后者可来自宿主覆盖，不能直接取原模板 |
 | PositionedGlyph | `src/pagx/TextLayout.h:77` | — | `glyphID, font, x, y` | 水平布局派生字形结果 |
-| VerticalPositionedGlyph | `src/pagx/TextLayout.h:84` | — | `glyphID, font, useRSXform, position, xform` | 竖排布局派生字形结果与变换模式 |
-| TextGlyphParams | `src/pagx/TextLayoutParams.h:36` | — | `text, fontFamily, fontStyle, fontSize, letterSpacing, fauxBold, fauxItalic` | 真实每Text塑形输入，来源可为模板或明确宿主状态 |
-| TextLayoutParams | `src/pagx/TextLayoutParams.h:52` | — | `boxWidth, boxHeight, textAlign, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, baseline, textScale` | 容器级有效布局投影，不应重新用低优先级author尺寸替代 |
-| tgfx::Geometry | `third_party/tgfx/src/layers/vectors/Geometry.h:71` | — | `matrix, shape, textBlob, textAnchors, glyphs, glyphRuns` | 运行时实际几何/字形与缓存，不是PAGX新增节点 |
-| tgfx::Glyph | `third_party/tgfx/src/layers/vectors/Geometry.h:50` | — | `glyphID, font, anchor, matrix, style` | 运行展开glyph与其最终样式，与PAGX Font内Glyph资源分开 |
-| tgfx::GlyphStyle | `third_party/tgfx/src/layers/vectors/Geometry.h:36` | — | `fillColor, strokeColor, strokeWidth, strokeWidthFactor, alpha` | TextModifier的最终paint覆盖结果，不只是一个RGBA |
-| tgfx::StyledGlyphRun | `third_party/tgfx/src/layers/vectors/Geometry.h:61` | — | `textBlob, matrix, style` | 连续同样式字形绘制结果，保留顺序 |
-| tgfx::Geometry::TextBlobResult | `third_party/tgfx/src/layers/vectors/Geometry.h:73` | — | `blob, commonMatrix` | geometry转换后的公共变换与TextBlob，不能叠加两次 |
-| TextLayoutResult | `src/pagx/TextLayout.h:104` | — | `bounds, horizontalGlyphs, verticalGlyphs, perTextBounds, layoutGlyphRuns, textLines` | 派生整体及每 Text 的布局；有效空结果不等于缺少 metadata |
+| VerticalPositionedGlyph | `src/pagx/TextLayout.h:84` | — | `glyphID, font, useRSXform, position, xform` | 竖排布局派生字形与变换模式 |
+| TextGlyphParams | `src/pagx/TextLayoutParams.h:36` | — | `text, fontFamily, fontStyle, fontSize, letterSpacing, fauxBold, fauxItalic` | 每 Text 塑形输入，来自模板或明确宿主状态 |
+| TextLayoutParams | `src/pagx/TextLayoutParams.h:52` | — | `boxWidth, boxHeight, textAlign, paragraphAlign, writingMode, lineHeight, wordWrap, overflow, baseline, textScale` | 容器级有效布局投影，不被低优先级 author 尺寸替代 |
+| tgfx::Geometry | `third_party/tgfx/src/layers/vectors/Geometry.h:71` | — | `matrix, shape, textBlob, textAnchors, glyphs, glyphRuns` | 运行时实际几何 / 字形与缓存，不是 PAGX 新节点 |
+| tgfx::Glyph | `third_party/tgfx/src/layers/vectors/Geometry.h:50` | — | `glyphID, font, anchor, matrix, style` | 运行展开 glyph 与最终样式，与 PAGX Font 内 Glyph 资源分开 |
+| tgfx::GlyphStyle | `third_party/tgfx/src/layers/vectors/Geometry.h:36` | — | `fillColor, strokeColor, strokeWidth, strokeWidthFactor, alpha` | TextModifier 最终 paint 覆盖，不只是 RGBA |
+| tgfx::StyledGlyphRun | `third_party/tgfx/src/layers/vectors/Geometry.h:61` | — | `textBlob, matrix, style` | 连续同样式绘制结果，保留顺序 |
+| tgfx::Geometry::TextBlobResult | `third_party/tgfx/src/layers/vectors/Geometry.h:73` | — | `blob, commonMatrix` | geometry 转换后的公共变换与 TextBlob，不叠加两次 |
+| TextLayoutResult | `src/pagx/TextLayout.h:104` | — | `bounds, horizontalGlyphs, verticalGlyphs, perTextBounds, layoutGlyphRuns, textLines` | 整体及每 Text 派生布局；有效空不等于缺 metadata |
 
-额外必须按分量 / 长度覆盖的值类型：
+#### A.2 分量、开放输入与缓存投影
 
 | 类型 | 完整分量 / 存储 | 验证要求 |
 |---|---|---|
-| Point | `x, y` | 位置、anchor、scale 等分别遵守消费方的单位与默认值 |
-| Size | `width, height` | primitive size 与 LayoutNode width / height 不是同一个字段 |
-| Rect | `x, y, width, height` | layout box、ink bounds、scroll viewport 和采样区域分开 |
-| Padding | `top, right, bottom, left` | XML 支持的 1 / 2 / 4 值按实际 parser；容器与 TextBox 两路径 |
-| Matrix | `a, b, c, d, tx, ty` | identity / finite / invertible 条件按消费方，不统一套 matrix3D 的规则 |
-| Matrix3D | `values[16]` | column-major；全部分量、affine、constant w、一般投影及深度组合 |
-| Color | `red, green, blue, alpha, colorSpace` | 默认 Color 是不透明黑；透明度、色域转换和空间插值单列 |
-| ColorMatrixFilter.matrix | `matrix[20]` | 四行各五项：RGBA 系数及 bias；20 项 one-hot / bias 测试，不只 identity |
-| DataConverter.params | 开放 `string → string` map | 全部内建参数和宿主开放注册边界；未知参数不能按有限枚举假装穷举 |
-| Data / PAGImage / FontConfig | 编码数据、宿主图片、字体供应接口 | 非 NodeType；验证实际来源、尺寸、可读回像素、字体选择与生命周期，不把运行库所有内部成员列为作者字段 |
+| Point | `x, y` | 位置、anchor、scale 各按消费者单位与默认 |
+| Size | `width, height` | primitive size 不等于 LayoutNode width / height |
+| Rect | `x, y, width, height` | layout、ink、scroll viewport 与采样区域分开 |
+| Padding | `top, right, bottom, left` | XML 1 / 2 / 4 值按 parser，容器与 TextBox 两路径 |
+| Matrix | `a, b, c, d, tx, ty` | identity / finite / invertible 按消费方，不统一套 3D 规则 |
+| Matrix3D | `values[16]` | column-major，全部分量、affine、constant w、投影 / 深度 |
+| Color | `red, green, blue, alpha, colorSpace` | 默认不透明黑；alpha、色域 / 空间插值单列 |
+| ColorMatrixFilter.matrix | `matrix[20]` | 四行五项 RGBA + bias；20 项 one-hot / bias，不只 identity |
+| DataConverter.params | 开放 `string → string` map | 四内建参数与宿主注册边界；未知参数不能当闭合 enum |
+| Data / PAGImage / FontConfig | 编码数据、宿主图片、字体供应接口 | 实际来源、尺寸、像素可读回、字体选择与生命周期；非 NodeType，不枚举运行库所有内部成员 |
 
-PAGXDocument 的 `_fontConfig` 是有效字体输入；`layoutApplied` 是流程状态；`nodeMap, nodeSet` 是索引；`liveScenes` 是生命周期；`layersByImageFilePath, layersByImageFilePathBuilt` 是缓存。Font.renderCache、Text 的 `glyphData, textBounds, textScale` 和 PathData 的 `_cachedBounds, _boundsDirty` 是派生状态。**Image.runtimeImage、PathData._verbs / _points 虽然 private，却是可观察的输入，不排除。**
+Document._fontConfig 是输入，layoutApplied 是流程状态；nodeMap / nodeSet 是索引，liveScenes 是生命周期，layersByImageFilePath / Built 是缓存。Font.renderCache、Text.glyphData / textBounds / textScale、PathData._cachedBounds / _boundsDirty 是派生状态；Image.runtimeImage、PathData._verbs / _points 虽 private 却是可观察输入，不排除。
 
-`PropertyData` 是 runtime 反射投影，不是节点模型的替代清单：基类 `propertyType, propertyName, customDataMap`；Number 子类 `defaultValue, minValue, maxValue`；String / Boolean / Color 子类 `defaultValue`；ViewModel 子类 `viewModelId`；Enum 子类 `options, defaultValue`；Image / Trigger 子类无附加字段。ImagePropertyData 没暴露 defaultImage，因此不得据此遗漏真实默认图片依赖，依据 `include/pagx/PropertyData.h:36`。
+PropertyData 是 runtime 投影而非模型清单（`include/pagx/PropertyData.h:36`）：基类 `propertyType, propertyName, customDataMap`；Number `defaultValue, minValue, maxValue`；String / Boolean / Color `defaultValue`；ViewModel `viewModelId`；Enum `options, defaultValue`；Image / Trigger 无附加字段。ImagePropertyData 未暴露 defaultImage 不代表真实图片默认依赖不存在。
 
-### 13.3 全部 55 个 NodeType 的模型、字段和处理归属
+#### A.3 Node inventory（55 NodeType / 334 自有字段；保留原表格式）
 
-下面每个 NodeType 恰好登记一次。字段只列该模型类自有成员，全部继承成员按第 13.2 节展开；TextBox 还继承 Group，State 的具体 AnimationState、Channel 的具体 TypedChannel 已在附属结构登记。声明列给当前文件，细分语义与直接测试见第 13.4—13.8 节。
+每 NodeType 恰好一行，继承按 A.1 递归；TextBox 继承 Group，State / Channel 的具体附属类型不另造 NodeType。42 类静态图形 / 资源 / 布局，13 类动画 / SM / 绑定定义；后者仍登记宿主影响。
 
 | NodeType | 模型类 | 声明文件 | 直接基类 | 自有字段（完整） | SVG 路径 / 计划归属 |
 |---|---|---|---|---|---|
@@ -1000,350 +559,406 @@ PAGXDocument 的 `_fontConfig` 是有效字体输入；`layoutApplied` 是流程
 | SolidColor | SolidColor | `include/pagx/nodes/SolidColor.h` | ColorSource | `color` | 单色与 alpha / 色彩空间；S5 |
 | LinearGradient | LinearGradient | `include/pagx/nodes/LinearGradient.h` | Gradient | `startPoint, endPoint` | 渐变原生或退化常量；S5 |
 | RadialGradient | RadialGradient | `include/pagx/nodes/RadialGradient.h` | Gradient | `center, radius` | 径向渐变与退化规则；S5 |
-| ConicGradient | ConicGradient | `include/pagx/nodes/ConicGradient.h` | Gradient | `center, startAngle, endAngle` | 一般情况完整 paint bake，退化可为常量；S2 / S5 |
-| DiamondGradient | DiamondGradient | `include/pagx/nodes/DiamondGradient.h` | Gradient | `center, radius` | 菱形 paint bake / 常量；不能用 radial 冒充，S2 / S5 |
-| ImagePattern | ImagePattern | `include/pagx/nodes/ImagePattern.h` | ColorSource | `image, tileModeX, tileModeY, filterMode, mipmapMode, matrix, scaleMode` | 实际资源、独立轴、fit 与采样；S5 |
-| ColorStop | ColorStop | `include/pagx/nodes/ColorStop.h` | Node | `offset, color` | stop 列表、空间颜色与 alpha；S5 |
-| Font | Font | `include/pagx/nodes/Font.h` | Node | `unitsPerEm, file, fileOriginal, glyphs, renderCache` | 字体来源、字形及 WOFF2 / 轮廓；S3 / S5 |
-| Glyph | Glyph | `include/pagx/nodes/Font.h` | Node | `path, image, offset, advance` | design-space 字形及资源；S3 / S5 |
-| Animation | Animation | `include/pagx/nodes/Animation.h` | Node | `duration, frameRate, loop, objects` | 模板静态主动排除驱动；M 阶段 / S0 / S6 |
-| AnimationObject | AnimationObject | `include/pagx/nodes/AnimationObject.h` | Node | `target, channels` | 同上，目标作用域仍登记；S0 / S1 / S6 |
-| Channel | Channel | `include/pagx/nodes/Channel.h` | Node | `name` | TypedChannel.keyframes 附属登记；静态不求值，S0 / S6 |
-| StateMachine | StateMachine | `include/pagx/nodes/StateMachine.h` | Node | `inputs, regions` | 宿主行为排除 / 显式状态来源；S0 / S6 |
-| StateRegion | StateRegion | `include/pagx/nodes/StateRegion.h` | Node | `name, initialState, states, transitions` | 初态与并行 region 分类；S0 / S1 / S6 |
-| State | State | `include/pagx/nodes/State.h` | Node | `name` | AnimationState.animationId 已补；静态不启动，S0 / S6 |
-| StateTransition | StateTransition | `include/pagx/nodes/StateTransition.h` | Node | `from, to, duration, frameRate, interpolation, bezierOut, bezierIn, enableEarlyExit, pauseOnExit, conditions` | 事件和转场排除，不伪造 SMIL；S0 / S6 |
-| TransitionCondition | TransitionCondition | `include/pagx/nodes/TransitionCondition.h` | Node | `inputName, op, valueBool, valueNumber` | 条件类型与默认值分类；S0 / S6 |
-| StateMachineInput | StateMachineInput | `include/pagx/nodes/StateMachineInput.h` | Node | `name, type, defaultBool, defaultNumber` | 宿主输入与 trigger，S0 / S6 |
-| Layer | Layer | `include/pagx/nodes/Layer.h` | Node, LayoutNode | `name, visible, alpha, blendMode, x, y, z, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, skewX, skewY, perspective, matrix, matrix3D, anchor, anchorZ, preserve3D, antiAlias, groupOpacity, passThroughBackground, scrollRect, hasScrollRect, clipToBounds, mask, maskType, composition, compositionFilePath, externalDoc, timelines, vmContext, contents, styles, filters, children, layout, gap, flex, padding, alignment, arrangement, includeInLayout, importDirective` | 46 个自有字段按下表逐组处理；S1 / S2 / S5 / S6 |
-| DropShadowStyle | DropShadowStyle | `include/pagx/nodes/DropShadowStyle.h` | LayerStyle | `offsetX, offsetY, blurX, blurY, color, showBehindLayer, spread` | Below 样式与真实来源 / blend；S2 |
-| InnerShadowStyle | InnerShadowStyle | `include/pagx/nodes/InnerShadowStyle.h` | LayerStyle | `offsetX, offsetY, blurX, blurY, color, spread` | Above 样式与顺序；S2 |
-| BackgroundBlurStyle | BackgroundBlurStyle | `include/pagx/nodes/BackgroundBlurStyle.h` | LayerStyle | `blurX, blurY, tileMode` | 实际背景 blur，默认 no-op 分类；S2 |
-| NoiseStyle | NoiseStyle | `include/pagx/nodes/NoiseStyle.h` | LayerStyle | `mode, size, density, seed, color, firstColor, secondColor, opacity` | Above 三模式及来源 / blend；S2 |
-| GlassStyle | GlassStyle | `include/pagx/nodes/GlassStyle.h` | LayerStyle | `refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity` | own geometry、真实背景、SDF / UDF；S2 |
-| BlurFilter | BlurFilter | `include/pagx/nodes/BlurFilter.h` | LayerFilter | `blurX, blurY, tileMode` | blur 双轴及边缘采样；S2 |
-| DropShadowFilter | DropShadowFilter | `include/pagx/nodes/DropShadowFilter.h` | LayerFilter | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | 当前输入 shadow，推进有序链；S2 |
-| InnerShadowFilter | InnerShadowFilter | `include/pagx/nodes/InnerShadowFilter.h` | LayerFilter | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | 同上，内部遮罩；S2 |
+| ConicGradient | ConicGradient | `include/pagx/nodes/ConicGradient.h` | Gradient | `center, startAngle, endAngle` | 一般完整 paint bake，退化可常量；S2 / S5 |
+| DiamondGradient | DiamondGradient | `include/pagx/nodes/DiamondGradient.h` | Gradient | `center, radius` | diamond bake / 常量，不用 radial 冒充；S2 / S5 |
+| ImagePattern | ImagePattern | `include/pagx/nodes/ImagePattern.h` | ColorSource | `image, tileModeX, tileModeY, filterMode, mipmapMode, matrix, scaleMode` | 资源、独立轴、fit 与 sampling；S5 |
+| ColorStop | ColorStop | `include/pagx/nodes/ColorStop.h` | Node | `offset, color` | 有序 stops、空间颜色与 alpha；S5 |
+| Font | Font | `include/pagx/nodes/Font.h` | Node | `unitsPerEm, file, fileOriginal, glyphs, renderCache` | 字体来源、glyph 与 WOFF2 / 轮廓；S3 / S5 |
+| Glyph | Glyph | `include/pagx/nodes/Font.h` | Node | `path, image, offset, advance` | design-space 字形与资源；S3 / S5 |
+| Animation | Animation | `include/pagx/nodes/Animation.h` | Node | `duration, frameRate, loop, objects` | TemplateStatic 排除驱动；M 阶段 / S0 / S6 |
+| AnimationObject | AnimationObject | `include/pagx/nodes/AnimationObject.h` | Node | `target, channels` | 目标作用域与定义；S0 / S1 / S6 / M1 |
+| Channel | Channel | `include/pagx/nodes/Channel.h` | Node | `name` | TypedChannel 附属登记；静态不求值；S0 / S6 / M3 |
+| StateMachine | StateMachine | `include/pagx/nodes/StateMachine.h` | Node | `inputs, regions` | 宿主排除 / 明确状态来源；S0 / S6 |
+| StateRegion | StateRegion | `include/pagx/nodes/StateRegion.h` | Node | `name, initialState, states, transitions` | 初态 / 并行 region；S0 / S1 / S6 |
+| State | State | `include/pagx/nodes/State.h` | Node | `name` | AnimationState 附属登记；S0 / S6 |
+| StateTransition | StateTransition | `include/pagx/nodes/StateTransition.h` | Node | `from, to, duration, frameRate, interpolation, bezierOut, bezierIn, enableEarlyExit, pauseOnExit, conditions` | 事件 / 转场排除，不伪造 SMIL；S0 / S6 |
+| TransitionCondition | TransitionCondition | `include/pagx/nodes/TransitionCondition.h` | Node | `inputName, op, valueBool, valueNumber` | 条件类型与默认值；S0 / S6 |
+| StateMachineInput | StateMachineInput | `include/pagx/nodes/StateMachineInput.h` | Node | `name, type, defaultBool, defaultNumber` | 宿主 persistent 输入 / trigger；S0 / S6 |
+| Layer | Layer | `include/pagx/nodes/Layer.h` | Node, LayoutNode | `name, visible, alpha, blendMode, x, y, z, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, skewX, skewY, perspective, matrix, matrix3D, anchor, anchorZ, preserve3D, antiAlias, groupOpacity, passThroughBackground, scrollRect, hasScrollRect, clipToBounds, mask, maskType, composition, compositionFilePath, externalDoc, timelines, vmContext, contents, styles, filters, children, layout, gap, flex, padding, alignment, arrangement, includeInLayout, importDirective` | 46 个自有字段按 B.1 分组；S1 / S2 / S5 / S6 |
+| DropShadowStyle | DropShadowStyle | `include/pagx/nodes/DropShadowStyle.h` | LayerStyle | `offsetX, offsetY, blurX, blurY, color, showBehindLayer, spread` | Below 与真实来源 / blend；S2 |
+| InnerShadowStyle | InnerShadowStyle | `include/pagx/nodes/InnerShadowStyle.h` | LayerStyle | `offsetX, offsetY, blurX, blurY, color, spread` | Above 与顺序；S2 |
+| BackgroundBlurStyle | BackgroundBlurStyle | `include/pagx/nodes/BackgroundBlurStyle.h` | LayerStyle | `blurX, blurY, tileMode` | backdrop 与 no-op；S2 |
+| NoiseStyle | NoiseStyle | `include/pagx/nodes/NoiseStyle.h` | LayerStyle | `mode, size, density, seed, color, firstColor, secondColor, opacity` | Above 三模式与来源；S2 |
+| GlassStyle | GlassStyle | `include/pagx/nodes/GlassStyle.h` | LayerStyle | `refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity` | own geometry、背景与 SDF / UDF；S2 |
+| BlurFilter | BlurFilter | `include/pagx/nodes/BlurFilter.h` | LayerFilter | `blurX, blurY, tileMode` | 双轴与边缘采样；S2 |
+| DropShadowFilter | DropShadowFilter | `include/pagx/nodes/DropShadowFilter.h` | LayerFilter | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | 当前输入 shadow，有序 output；S2 |
+| InnerShadowFilter | InnerShadowFilter | `include/pagx/nodes/InnerShadowFilter.h` | LayerFilter | `offsetX, offsetY, blurX, blurY, color, shadowOnly` | 内侧覆盖与 output；S2 |
 | BlendFilter | BlendFilter | `include/pagx/nodes/BlendFilter.h` | LayerFilter | `color, blendMode` | ColorFilter source / dest / alpha；S2 / S5 |
-| ColorMatrixFilter | ColorMatrixFilter | `include/pagx/nodes/ColorMatrixFilter.h` | LayerFilter | `matrix` | 20 项 matrix 与有序输入；S2 |
-| NoiseFilter | NoiseFilter | `include/pagx/nodes/NoiseFilter.h` | LayerFilter | `mode, size, density, seed, blendMode, color, firstColor, secondColor, opacity` | 当前滤镜输入的三模式与输出；S2 |
-| Rectangle | Rectangle | `include/pagx/nodes/Rectangle.h` | Element, LayoutNode | `position, size, roundness, reversed` | 原生 / 路径，退化与方向；S4 |
-| Ellipse | Ellipse | `include/pagx/nodes/Ellipse.h` | Element, LayoutNode | `position, size, reversed` | oval / path，起点与描边；S4 |
-| Polystar | Polystar | `include/pagx/nodes/Polystar.h` | Element, LayoutNode | `position, type, pointCount, outerRadius, innerRadius, rotation, outerRoundness, innerRoundness, reversed` | 最终路径、分数顶点和布局；S4 |
-| Path | Path | `include/pagx/nodes/Path.h` | Element, LayoutNode | `data, position, reversed` | 路径引用、统一 scale 与方向；S4 |
-| Text | Text | `include/pagx/nodes/Text.h` | Element, LayoutNode | `text, position, fontFamily, fontStyle, fontSize, letterSpacing, fauxBold, fauxItalic, textAnchor, glyphRuns, baseline, glyphData, textBounds, textScale` | authored 与 layout 字形两路径；S3 |
-| Fill | Fill | `include/pagx/nodes/Fill.h` | Element | `color, alpha, blendMode, fillRule, placement` | 捕获有效几何的 Painter，S1 / S4 / S5 |
-| Stroke | Stroke | `include/pagx/nodes/Stroke.h` | Element | `color, width, alpha, blendMode, cap, join, miterLimit, dashes, dashOffset, dashAdaptive, align, placement` | 原轮廓与 dash / clip / fit；S4 / S5 |
-| TrimPath | TrimPath | `include/pagx/nodes/TrimPath.h` | Element | `start, end, offset, type` | Separate / Continuous 与完整作用域；S4 |
-| RoundCorner | RoundCorner | `include/pagx/nodes/RoundCorner.h` | Element | `radius` | 最终 geometry 的圆角；S4 |
-| MergePath | MergePath | `include/pagx/nodes/MergePath.h` | Element | `mode` | 合并最终 geometry 并清旧 Painter；S4 |
-| TextModifier | TextModifier | `include/pagx/nodes/TextModifier.h` | Element | `anchor, position, rotation, scale, skew, skewAxis, alpha, fillColor, strokeColor, strokeWidth, selectors` | 最终 glyph 矩阵、样式及复合绘制；S3 |
-| TextPath | TextPath | `include/pagx/nodes/TextPath.h` | Element, LayoutNode | `path, baselineOrigin, baselineAngle, firstMargin, lastMargin, perpendicular, reversed, forceAlignment` | 沿曲线的最终 glyph，不仅 textPath 标签；S3 |
-| TextBox | TextBox | `include/pagx/nodes/TextBox.h` | Group | `textAlign, paragraphAlign, writingMode, lineHeight, wordWrap, overflow` | 容器 / modifier 两模式，布局与绘制；S3 |
-| Group | Group | `include/pagx/nodes/Group.h` | Element, LayoutNode | `anchor, position, rotation, scale, skew, skewAxis, alpha, elements, padding` | 几何与 Painter 分离作用域；S1 / S4 |
-| Repeater | Repeater | `include/pagx/nodes/Repeater.h` | Element | `copies, offset, order, anchor, position, rotation, scale, startAlpha, endAlpha` | geometry / Painter 复制、重绑定及次序；S4 |
-| RangeSelector | RangeSelector | `include/pagx/nodes/RangeSelector.h` | TextSelector | `start, end, offset, unit, shape, easeIn, easeOut, mode, weight, randomOrder, randomSeed` | glyph factor 完整算法与稳定随机；S3 |
-| GlyphRun | GlyphRun | `include/pagx/nodes/GlyphRun.h` | Node | `font, fontSize, glyphs, x, y, xOffsets, positions, anchors, scales, rotations, skews, bounds` | 12 项、7 数组，真实字形；S3 |
-| ViewModel | ViewModel | `include/pagx/nodes/ViewModel.h` | Node | `properties` | schema 与默认宿主来源，S0 / S6 |
-| ViewModelProperty | ViewModelProperty | `include/pagx/nodes/ViewModelProperty.h` | Node | `name, propertyType, dataConverter, viewModelRef, defaultNumber, minValue, maxValue, defaultString, defaultBoolean, defaultColor, defaultImage, enumOptions, defaultEnum` | 八类型默认值、嵌套及约束元数据，S0 / S5 / S6 |
-| DataBind | DataBind | `include/pagx/nodes/DataBind.h` | Node | `source, target, channel, direction` | 一次 / 持续 / 反向绑定与作用域，S0 / S6 |
-| DataConverter | DataConverter | `include/pagx/nodes/DataConverter.h` | Node | `converterType, params` | 内建与宿主开放转换，S0 / S6 |
+| ColorMatrixFilter | ColorMatrixFilter | `include/pagx/nodes/ColorMatrixFilter.h` | LayerFilter | `matrix` | 20 项与有序输入；S2 |
+| NoiseFilter | NoiseFilter | `include/pagx/nodes/NoiseFilter.h` | LayerFilter | `mode, size, density, seed, blendMode, color, firstColor, secondColor, opacity` | 当前输入三 mode；S2 |
+| Rectangle | Rectangle | `include/pagx/nodes/Rectangle.h` | Element, LayoutNode | `position, size, roundness, reversed` | 原生 / path、退化与方向；S4 |
+| Ellipse | Ellipse | `include/pagx/nodes/Ellipse.h` | Element, LayoutNode | `position, size, reversed` | oval / path、起点与描边；S4 |
+| Polystar | Polystar | `include/pagx/nodes/Polystar.h` | Element, LayoutNode | `position, type, pointCount, outerRadius, innerRadius, rotation, outerRoundness, innerRoundness, reversed` | 最终 path、分数点与布局；S4 |
+| Path | Path | `include/pagx/nodes/Path.h` | Element, LayoutNode | `data, position, reversed` | 数据引用、统一 scale 与方向；S4 |
+| Text | Text | `include/pagx/nodes/Text.h` | Element, LayoutNode | `text, position, fontFamily, fontStyle, fontSize, letterSpacing, fauxBold, fauxItalic, textAnchor, glyphRuns, baseline, glyphData, textBounds, textScale` | authored / layout glyph；S3 |
+| Fill | Fill | `include/pagx/nodes/Fill.h` | Element | `color, alpha, blendMode, fillRule, placement` | 捕获 geometry 的 Painter；S1 / S4 / S5 |
+| Stroke | Stroke | `include/pagx/nodes/Stroke.h` | Element | `color, width, alpha, blendMode, cap, join, miterLimit, dashes, dashOffset, dashAdaptive, align, placement` | 原轮廓、dash / clip / fit；S4 / S5 |
+| TrimPath | TrimPath | `include/pagx/nodes/TrimPath.h` | Element | `start, end, offset, type` | Separate / Continuous 与完整 scope；S4 |
+| RoundCorner | RoundCorner | `include/pagx/nodes/RoundCorner.h` | Element | `radius` | 累积 geometry 圆角；S4 |
+| MergePath | MergePath | `include/pagx/nodes/MergePath.h` | Element | `mode` | 合并 final geometry、清旧 Painter；S4 |
+| TextModifier | TextModifier | `include/pagx/nodes/TextModifier.h` | Element | `anchor, position, rotation, scale, skew, skewAxis, alpha, fillColor, strokeColor, strokeWidth, selectors` | 最终 glyph 矩阵 / 样式 / 多 paint；S3 |
+| TextPath | TextPath | `include/pagx/nodes/TextPath.h` | Element, LayoutNode | `path, baselineOrigin, baselineAngle, firstMargin, lastMargin, perpendicular, reversed, forceAlignment` | 沿 path 最终 glyph；S3 |
+| TextBox | TextBox | `include/pagx/nodes/TextBox.h` | Group | `textAlign, paragraphAlign, writingMode, lineHeight, wordWrap, overflow` | 容器 / modifier 两模式；S3 |
+| Group | Group | `include/pagx/nodes/Group.h` | Element, LayoutNode | `anchor, position, rotation, scale, skew, skewAxis, alpha, elements, padding` | geometry / Painter 分离；S1 / S4 |
+| Repeater | Repeater | `include/pagx/nodes/Repeater.h` | Element | `copies, offset, order, anchor, position, rotation, scale, startAlpha, endAlpha` | geometry / Painter 复制与顺序；S4 |
+| RangeSelector | RangeSelector | `include/pagx/nodes/RangeSelector.h` | TextSelector | `start, end, offset, unit, shape, easeIn, easeOut, mode, weight, randomOrder, randomSeed` | glyph factor 与稳定随机；S3 |
+| GlyphRun | GlyphRun | `include/pagx/nodes/GlyphRun.h` | Node | `font, fontSize, glyphs, x, y, xOffsets, positions, anchors, scales, rotations, skews, bounds` | 12 项、7 数组、真实 glyph；S3 |
+| ViewModel | ViewModel | `include/pagx/nodes/ViewModel.h` | Node | `properties` | schema 与默认宿主；S0 / S6 |
+| ViewModelProperty | ViewModelProperty | `include/pagx/nodes/ViewModelProperty.h` | Node | `name, propertyType, dataConverter, viewModelRef, defaultNumber, minValue, maxValue, defaultString, defaultBoolean, defaultColor, defaultImage, enumOptions, defaultEnum` | 八类型默认 / 嵌套 / 约束元数据；S0 / S5 / S6 |
+| DataBind | DataBind | `include/pagx/nodes/DataBind.h` | Node | `source, target, channel, direction` | Once / 持续 / 回写与 scope；S0 / S6 |
+| DataConverter | DataConverter | `include/pagx/nodes/DataConverter.h` | Node | `converterType, params` | 内建 / 开放注册；S0 / S6 |
 
-### 13.4 文档、布局、Layer 与资源的逐字段语义台账
+### B. 按字段运行语义与直接验收
 
-字段分组仅合并同一消费路径；完整字段集合仍以上表为准。验收列中的用例是计划，不是本轮已通过结果。
+分组仅合并同一消费路径，不删字段语义；以下验收均是未来任务。状态 / policy 权威定义只在正文，宿主表只登记字段事实。
+
+#### B.1 文档、布局、Layer 与资源
 
 | 节点 / 字段组 | PAGX 实际语义与 SVG 现状 | 表达 / 修复方案与直接验收 |
 |---|---|---|
-| Node.id | 文档内身份，作者 / generated / 实例 ID 需一致；当前主要 Layer 保留，生成 ID 不避碰 | S1：唯一分配、所有引用改写，测试作者 grad0、重复实例、外部同名、Mask 后缀碰撞 |
-| Node.customData / sourceLine；Layer.name | 非视觉元数据 / 来源 / 显示名称；根 parser 与普通节点读取路径不同，bake 提前返回可能丢标签 | S6：定义全节点 metadata 保留或显式排除；特殊字符、根 / Layer / resource、栅格路径对照；customData 排序，sourceLine 无行号可用 -1 |
-| Document.width / height / layers | 固定画布与顶层绘制顺序，SVG 已输出根尺寸 / viewBox | S1：正尺寸与有效空文档、非有限 / 负尺寸契约；重叠 Layer 交换顺序，顶层百分比约束 |
-| Document.nodes / errors | nodes 是所有权，不是舞台；errors 非空仍可返回文档 | S0 / S6：遍历有效资源和结构；不可达资源分类，严格输入错误不能只因返回非空 SVG 成功 |
-| Document._fontConfig / layoutApplied | 文档字体是真实输入，布局标志只是状态；applyLayout(null) 用文档字体，但 SVG 新 LayoutContext(options.fontConfig) 可另用系统字体 | S3：统一有效字体配置；只给 document.fontConfig 注册字体、冷 / 热布局、外部文档字体对照，依据 `src/pagx/svg/SVGExporter.cpp:3678` |
-| Document.nodeMap / nodeSet / liveScenes / layersByImageFilePath / layersByImageFilePathBuilt | 索引、归属、生命周期及资源查找缓存 | S6：热冷不改变输出，多 scene 不能污染模板，资源变更按所属 document notifyChange；不输出 cache 成员 |
-| LayoutNode.left / right / top / bottom / centerX / centerY | 普通约束位置：center→双边→起边→末边，尺寸双边优先；容器 flow 另走真实算法 | S1：每个 LayoutNode 派生类两轴全分支、center 与双边冲突、非零原点 / padding，不在 SVG 重建另一套约束 |
-| LayoutNode.percentWidth / percentHeight / width / height | XML 百分比由 width / height 解析到 percent 字段；双边→百分比→首选尺寸；Path / Text 等统一缩放 | S1 / S3 / S4：10 项所有默认 / 单设 / 冲突输入，明确 size.width 与 layout width 区别，显式 NaN 是 unset 不是非法数值 |
-| LayoutNode.preferredX / preferredY / preferredWidth / preferredHeight / layoutX / layoutY / layoutWidth / layoutHeight | 测量和布局产物；生成零位置与未生成 NaN 不同；约束尺寸 ceil、位置 round | S1：从 render accessor 消费一次；重布局、先 bounds 再修改、负 origin、几何 / 文字的统一 scale 验证 |
-| Layer.visible | 普通隐藏 Layer 已省略；当前隐藏且有自身 mask 的 owner 可未被省略，静态没有 hidden 输出 | S1：区分舞台 owner 可见性与 Mask 根用于覆盖的可见性；visible=false+mask、Mask 作为别的父级舞台内容的用例 |
-| Layer.alpha / groupOpacity / blendMode / passThroughBackground | 整体 / 逐项及离屏条件依赖 filters、像素 Mask、blend、背景隔离，不仅 groupOpacity 布尔 | S1 / S2：真实重叠背景，18 blend 各上下文，两级 alpha、filter / mask 强制离屏、背景隔离；没有简单 g 映射就完整 bake / 拒绝 |
-| Layer.x / y / z / rotationX / rotationY / rotationZ / scaleX / scaleY / scaleZ / skewX / skewY / perspective / matrix / matrix3D / anchor / anchorZ | 当前组件与anchor已实现：非恒等matrix3D优先；非恒等2D matrix覆盖x/y及其他组件但仍通过LiftMatrixToMatrix3D叠加z；未设有效matrix才组合其余组件。anchor在选择后作用，布局位移在外部；Group.anchor不同 | S1 / S2：每分量、identity / 非 identity、负 / 零缩放、matrix 掩盖 x/y、anchor 深度、常量 w / 一般透视；依据 `src/pagx/utils/LayerTransformUtils.cpp:93` |
-| Layer.preserve3D / antiAlias | 共享深度受 effect / mask / scroll 扁平化；已有透视 / 有效 preserve3D bake，antiAlias 原生未对齐 | S2：深度相交，逐项加 flatten 条件；antiAlias=false 斜边 / clip；只可证明等价的 affine 保矢量 |
-| Layer.scrollRect / hasScrollRect / clipToBounds | 视口与内容负 offset；clipToBounds 由布局生成 scrollRect；当前生成 flag 与 authored flag 没区分，重布局可能保留旧尺寸 | S1：authored scroll 优先、空 flag / rect 组合、首次 / 二次尺寸变化；生成 rect 失效从源头处理，依据 `src/pagx/nodes/Layer.cpp:289` |
-| Layer.mask / maskType | 三种覆盖语义、实例相对坐标；stage hidden Mask 仍用于遮罩，不按一般舞台过滤 | S1 / S4：Alpha / Luminance / Contour、半透明根、composition / scroll / effect、描边环 / 洞、共同祖先 / 子 Mask / 两实例 |
-| Layer.composition / contents / children | renderer 选择 composition 后不再同时渲染本层 contents；SVG 当前先 contents 再 composition；children 和 placement 有序 | S1：遵循 renderer 有效内容优先级，冲突组合诊断；测试同时非空，子层前后 foreground，依据 `src/renderer/LayerBuilder.cpp:1177` |
-| Layer.compositionFilePath / externalDoc | 未供应外部依赖与已供应所属文档；externalDoc 不是普通 cache，内部 Font / Image / VM 必须所属文档处理 | S1 / S5：两外部同名、递归外部、已加载 / 未加载、根 / 外部字体供应；不能只根 doc.nodes 构 WOFF2 |
-| Layer.styles / filters | Below / Above 内作者顺序、不同输入 bucket、foreground 之后的有序滤镜 | S2：第 13.6 节全字段与 C07—C11 组合，不只标签检查 |
-| Layer.layout / gap / flex / padding / alignment / arrangement / includeInLayout | 容器布局消解，padding 改参考框；exclude flow 不等于 hidden；hidden 但 include=true 可占位 | S1：3 layout×4 alignment×6 arrangement，0 / 1 / 多 children、明确 / 百分比尺寸、flex 1:2、exclude flow 仍绘制 |
-| Layer.importDirective.source / format / content / resolvedFrom | source / inline content 必须先 resolve；resolvedFrom 不应再次导入；CLI 拒绝 unresolved 而 SDK 缺统一契约 | S0 / S5 / S6：未 resolve SDK / CLI一致，source+content 冲突、无扩展名+format、转义元数据；不 raw passthrough 规避模型 |
-| Document / Composition.animations / viewModel / dataBinds；Layer.timelines / vmContext | 定义、挂载与宿主上下文，模板静态不自动 apply；默认 VM 仍能改变首次 scene 绘制 | S0 / S6：D7 状态来源单列；模板≠首 key≠默认绑定，两个 vmContext、未知 driver / target 和 nested 绑定分类 |
-| Composition.width / height / layers | intrinsic 与内部约束，实例 Layer 尺寸不自动表示内容两倍拉伸或裁剪 | S1：模板宽100实例宽200、内部right / bottom、两实例不同父空间、Mask引用和 bake lookup |
-| Image.data / filePath / runtimeImage | data bytes、磁盘 / URL / data URI、宿主 decoded image；ImagePattern 优先 runtimeImage，默认 VM 图片另有链 | S5：真实4格式、损坏 / 缺失、GPU-only readback、红 data+蓝 runtimeImage；没有擅自下载外部URL |
-| Font.unitsPerEm / file / fileOriginal / glyphs / renderCache | design scale、源字体与原始路径、实际子集；cache不代表已嵌入资源；当前根 WOFF2扫描可能漏external | S3 / S5：源字体先注册 / embed、空 glyph、可见 blank、null / mixed glyph、6400 PUA预算、外部 Font，温冷结果一致 |
-| Glyph.path / image / offset / advance | outline或bitmap，design offset，两者与advance都真实影响；blank可无墨迹但有advance | S3：vector / bitmap offset、blank与GID0 / 越界区分、path+image冲突、同 Font 类型一致性，WOFF2量化验证 |
-| PathData._verbs / _points / _cachedBounds / _boundsDirty | M/L/Q/C/Z真实输入；layout与paint-fit均须使用实际消费方的bounds，覆盖范围另算；当前renderer路径getBounds包含控制点，不能自动换tight bounds；输出%g有有限精度 | S4：每verb点数、多contour、Q/C控制点远离实际曲线、大坐标小差值、共享数据、先bounds后transform；依据 `src/pagx/svg/SVGPathParser.cpp:31` |
+| Node.id | 文档身份；当前主要 Layer 保留，generated 不避碰 | S1：作者 grad0、实例 / 外部同名 / Mask 后缀碰撞，全引用改写 |
+| Node.customData / sourceLine；Layer.name | 非视觉元数据 / 来源 / 名称，根 parser 特例，bake 可丢标签 | S6：全节点保留或显式排除，根 / Layer / resource / bake、转义、customData 排序、sourceLine=-1 |
+| Document.width / height / layers | 固定画布与顶层顺序，已有根尺寸 / viewBox | S1：正尺寸、有效空、负 / 非有限契约；重叠换序、顶层百分比 |
+| Document.nodes / errors | nodes 是所有权不是舞台；errors 非空仍可返回文档 | S0/S6：有效结构 / 不可达资源分类，严格错误不因非空 SVG 成功 |
+| Document._fontConfig / layoutApplied | 字体输入与布局状态；applyLayout(null) 用文档 font，但 SVG 可另用系统 | S3：有效配置同源，doc-only 注册、合法冷热 / 外部字体；`src/pagx/svg/SVGExporter.cpp:3678` |
+| Document.nodeMap / nodeSet / liveScenes / layersByImageFilePath / layersByImageFilePathBuilt | 索引、归属、生命周期与查找缓存 | S6：合法冷热 / 多 scene、资源变化 notifyChange 所属 doc；不输出 cache，外部串行化 |
+| LayoutNode.left / right / top / bottom / centerX / centerY | 普通位置 center→双边→起边→末边，尺寸双边优先；flow 另算法 | S1：各派生类两轴全分支、冲突、非零 origin / padding，不重造约束 |
+| LayoutNode.percentWidth / percentHeight / width / height | XML 百分比解析到 percent；双边→百分比→preferred，Path / Text 统一 scale | S1/S3/S4：10 项默认 / 单设 / 冲突；primitive size 区分、NaN unset |
+| LayoutNode.preferredX / preferredY / preferredWidth / preferredHeight / layoutX / layoutY / layoutWidth / layoutHeight | 测量 / 布局产物，0 与 NaN 不同；尺寸 ceil、位置 round | S1：render accessor 只消费一次，重布局、先 bounds 再改、负 origin / 统一 scale |
+| Layer.visible | 普通 hidden 省略；hidden 且自身有 mask 可泄漏 | S1：hidden owner 与 Mask 根特殊覆盖区分；外父舞台 Mask 不额外绘制 |
+| Layer.alpha / groupOpacity / blendMode / passThroughBackground | 整体 / 逐项、离屏受 filter / pixel Mask / blend / 背景隔离影响 | S1/S2：18 blend 各上下文、两级 alpha、半透明重叠、强制离屏与隔离；不等价则完整 bake / 拒绝 |
+| Layer.x / y / z / rotationX / rotationY / rotationZ / scaleX / scaleY / scaleZ / skewX / skewY / perspective / matrix / matrix3D / anchor / anchorZ | 非恒等 3D 优先；非恒等 2D 覆 x/y 与组件但 Lift 叠 z；anchor 后作用、layout 外部；Group anchor 不同 | S1/S2：每分量、identity / 非 identity、零 / 负 scale、masked x/y、anchor depth、constant w / 透视；`src/pagx/utils/LayerTransformUtils.cpp:93` |
+| Layer.preserve3D / antiAlias | effect / mask / scroll flatten；已有一般透视 / 有效 preserve3D bake，原生 AA 未对齐 | S2：交叉深度逐项加 flatten、AA=false 斜边 / clip；仅可证 affine 保矢量 |
+| Layer.scrollRect / hasScrollRect / clipToBounds | 视口与负 offset；layout 生成 rect，当前 authored / generated 未分导致旧尺寸 | S1：explicit 优先、flag / rect 组合、首次 / 二次尺寸变化；源头失效；`src/pagx/nodes/Layer.cpp:289` |
+| Layer.mask / maskType | 三覆盖、实例相对坐标；stage hidden Mask 仍覆盖 | S1/S4：三 type、根 alpha、composition / scroll / effects、描边环 / 洞、共同祖先 / 子 Mask / 双实例 |
+| Layer.composition / contents / children | runtime 选 composition 后不同时画 contents；SVG 当前双画；children / placement 有序 | S1：两内容冲突、子层 / foreground 顺序，按实际有效优先级；`src/renderer/LayerBuilder.cpp:1177` |
+| Layer.compositionFilePath / externalDoc | 未供应与已加载所属 doc；externalDoc 非普通 cache | S1/S5：外部同名 / 递归、加载与未加载、Font / Image / VM 所属归属，WOFF2 不只根 nodes |
+| Layer.styles / filters | Below / Above 作者顺序、真实输入 bucket、foreground 后有序 filter | S2：B.3 全字段与 C07—C11，不只标签 |
+| Layer.layout / gap / flex / padding / alignment / arrangement / includeInLayout | flow 消解，padding 改框，exclude flow 不 hidden；hidden include 可占位 | S1：3×4×6、0/1/多 child、explicit / percent、flex 1:2、exclude 仍画 |
+| Layer.importDirective.source / format / content / resolvedFrom | source / inline 先 resolve，resolvedFrom 不重导入；CLI 拒 unresolved、SDK 不统一 | S0/S5/S6：SDK / CLI 同前置、source+content 冲突、无扩展名+format、metadata 转义；不 raw passthrough |
+| Document / Composition.animations / viewModel / dataBinds；Layer.timelines / vmContext | 定义、挂载、宿主；默认 VM 能改首次 draw | S0/S6：模板≠首 key≠默认绑定；两 vmContext、未知 driver / target、nested 分类，状态按 D7 |
+| Composition.width / height / layers | intrinsic / 内部约束，instance 尺寸不自动两倍拉伸或裁剪 | S1：模板100 / instance200、right / bottom、双父空间、Mask 与 bake lookup |
+| Image.data / filePath / runtimeImage | bytes、路径 / URL / data URI、宿主 decoded image，消费者链不同 | S5：真实4格式、损坏 / 缺失、GPU-only readback、红 data / 蓝 runtime；不擅自联网 |
+| Font.unitsPerEm / file / fileOriginal / glyphs / renderCache | design scale、源字体 / 原路径 / 实际子集，cache 非已嵌入 | S3/S5：注册 / embed、empty / blank / null / mixed、6400 PUA、external Font；合法同输入冷热 / 新对象，不热改 glyphs |
+| Glyph.path / image / offset / advance | outline / bitmap + design offset / advance；blank 无墨迹可有 advance | S3：vector / bitmap offset、blank 与 GID0 / 越界、path+image、Font 类型一致、WOFF2 量化 |
+| PathData._verbs / _points / _cachedBounds / _boundsDirty | M/L/Q/C/Z，实际消费 bounds 与 coverage 分开；getBounds 包控制点，%g 精度有限 | S4：每 verb 点数、多 contour、远 Q/C 控制点、大坐标小差、共享 / 先 bounds 后 transform；`src/pagx/svg/SVGPathParser.cpp:31` |
 
-根 Node.id / sourceLine 的 parser 特例也要分类：普通节点经 makeNodeFromXML 登记，根 ParseDocument 只取尺寸和 customData 的路径不能自动视为“全部作者元数据保留”，依据 `src/pagx/PAGXImporter.cpp:3115`。按接口实际支持与所选 metadata 契约处理，不凭 SVG writer 补出从未保存的根字段。
+根 ParseDocument 只取尺寸 / customData，普通 makeNodeFromXML 身份路径不同；不能由 SVG 补出从未保存的根 id / sourceLine（`src/pagx/PAGXImporter.cpp:3115`）。
 
-### 13.5 几何、Painter、文字与颜色的逐字段语义台账
+#### B.2 几何、Painter、文字与颜色
 
 | 节点 / 字段组 | renderer 实际语义与现状 | SVG方案、阶段和直接测试 |
 |---|---|---|
-| Group.anchor / position / rotation / scale / skew / skewAxis / alpha / elements / padding | geometry 上行带最终矩阵，Group内Painter才带alpha；padding / LayoutNode定义布局框，不自动clip | S1 / S4：内外Painter、非均匀scale+skewAxis、同geometry多个paint、后置modifier；保留capture矩阵和最终矩阵 |
-| Rectangle.position / size / roundness / reversed | 中心定位、resolved size、统一圆角和方向；零 / 负轴 renderer 有可描边微轮廓 | S4：原生rect可表达时使用；方向 / 起点 / 薄轴 / 厚stroke / Trim / dash转最终路径，NaN position默认布局单列 |
-| Ellipse.position / size / reversed | 原生oval从顶部开始，反向影响dash / measure；退化有微轮廓 | S4：正圆 / 非圆、两方向、零轴、内外stroke+round cap、局部约束，不拿SVG右侧起点当相同 |
-| Path.data / position / reversed | 最终path受layout统一scale，stroke保持Painter空间；reversed需改变geometry | S4 / S5：数据origin、renderScale、Q/C的运行时fit与覆盖bounds、反向dash、空/共享path，不能只改transform导致paint空间改变 |
-| Polystar.position / type / pointCount / outerRadius / innerRadius / rotation / outerRoundness / innerRoundness / reversed | Polygon floor / Star分数点不同；radius受统一layout scale，roundness与方向真实 | S4：两type、整数 / 分数 / 极少点、全部半径圆角旋转方向；resolveModifiers=false不能默默丢整形，策略应明确 |
-| Fill.color / alpha / blendMode / fillRule / placement | color是ColorSource引用、null默认黑；捕获几何，不是最终状态标签；缺图片不应黑占位 | S1 / S4 / S5：多fill、两placement、18blend、两fill-rule、同geometry先后modifier、透明 / null / missing pattern |
-| Stroke.color / width / alpha / blendMode / cap / join / miterLimit / dashes / dashOffset / dashAdaptive / align / placement | width不是布局宽；≤0不产生有效stroke；奇数dash复制并按cap / width简化，align为倍宽+clip，fit用原geometry bounds | S4 / S5：全部枚举、奇数 / 零 / adaptive dash、尖角miter临界、开放 / 洞 / 字形、先后Fill/Stroke、捕获前后scale |
-| TrimPath.start / end / offset / type | start/end归一化，offset度数；Separate逐几何、Continuous累计长度；可将Text变Shape | S4：多contour / 空 / 零长 / 反向区间 / 正负offset，Text和Group / Repeater结果，Painter已捕获后Trim |
-| RoundCorner.radius | 对已累积有效几何作corner effect，含Text→Shape；≤0 no-op | S4：开放端点、已圆角、字形 / Group、与Trim / Merge换顺序，no-op保留geometry |
-| MergePath.mode | Append/布尔合并按final matrix；renderer清旧geometry和Painter，再放mergedShape；当前resolver保留旧Painter | S4：五mode、不同contour方向；Rect→Fill→Rect→Merge→Stroke 只剩后Painter，Merge后无Painter不应画；Text与Group转geometry |
-| Repeater.copies / offset / order / anchor / position / rotation / scale / startAlpha / endAlpha | ceil副本、progress=i+offset、scale幂，末副本fractional alpha；复制Painter并重绑定；当前顺序 / 幂偏差 | S4：两order带真实重叠与不同alpha、0 / 负 / 分数copies、整数负幂、anchor、连续Repeater与外部Painter；负底数分数幂是另一个需明确的运行边界，不能“自造SignedPow”称等价 |
-| Text.text / position / fontFamily / fontStyle / fontSize / letterSpacing / textAnchor / baseline | readable输入与真实字体shaping、baseline和origin；有layoutRuns / glyphRuns时实际glyph优先 | S3：fontConfig同源、LineBox/Alphabetic、Start/Center/End、tracking、空格 / tab / 空行 / CJK justify / BiDi，Native损失独立验收 |
-| Text.fauxBold / fauxItalic | 合成样式不同于选真实Bold/Italic face；Native属性不代表glyph路径完成 | S3：真实style+四种faux组合，最终轮廓 / advance / bounds / mask，在Native / WOFF2 / path分别验收 |
-| Text.glyphRuns / glyphData / textBounds / textScale | glyphRuns是作者 / embed数据；glyphData.layoutRuns是shaping产物；后两个派生布局状态 | S3：无embed的Fidelity也消费layoutRuns；不能fallback Native宣称保真；冷热、重新布局、约束字号、空有效布局，不应用两次scale |
-| GlyphRun.font / fontSize / glyphs / x / y / bounds | 每run独立font / size；GID0 missing，越界与blank不同；bounds通常首run给整Text linebox，不是单glyph ink | S3：同Text多font / 多size、GID0 / 越界 / 空白、非首run bounds边界、constraint scale；不能用首font覆盖全部run |
-| GlyphRun.xOffsets / positions | 按每索引优先positions，再加xOffset；缺两个时用default cursor；当前三种出口推进规则不同 | S3：7数组空 / 短 / 完整 / 超长后缀，其中只第一glyph显式位置的第二glyph行为需对齐renderer，不强制所有数组等长 |
-| GlyphRun.anchors / scales / rotations / skews | 实际advance中心+pivot，围绕glyph原点组合；不是SVG字符原点rotate | S3：非零run origin+anchor+rotate+skew+负scale、vector offset、位图与向量run交错重叠，保持原glyph绘制次序 |
-| TextBox.textAlign / paragraphAlign / writingMode / lineHeight / wordWrap / overflow | 有elements容器 / 空elements modifier两模式；logical axes不同，Hidden丢整行 / 列；resolved尺寸高于旧authored | S3：6项全分支、约束width覆盖author width、全部/部分overflow丢弃、glyph-only / 非Text子项 / foreground，不能把有效空结果当缺metadata重新画原文 |
-| TextPath.path / baselineOrigin / baselineAngle / firstMargin / lastMargin / perpendicular / reversed / forceAlignment | 布局path / baseline到共同空间；normal保法向偏移；force按advance均匀重排；开放超端延伸、闭合回绕、当前首contour | S3：八项和布局全分支，normal与force、单/多glyph、两方向、0/90baseline角、首/末margin；当前force有效长度 `pathLength+lastMargin-firstMargin`，不按注释猜相反符号 |
-| TextModifier.anchor / position / rotation / scale / skew / skewAxis / alpha | 当前scope glyph全局index，带符号factor用于transform、绝对factor用于alpha/paint，scale为1+(scale-1)*factor | S3：跨Text/GlyphRun、factor -1/0/部分/1、多个modifier顺序、已有Painter后modifier，最终glyph矩阵共用 |
-| TextModifier.fillColor / strokeColor / strokeWidth / selectors | optional未设与零不同；override alpha用于覆盖权重，可产生base+overlay多次paint，stroke有独立factor | S3 / S1：base gradient/pattern+半透明override，串联modifier、非Normal blend、explicit零width，无selector factor=1；不能只改RGBA字符串 |
-| RangeSelector.start / end / offset / unit / shape / easeIn / easeOut / mode / weight / randomOrder / randomSeed | 实际glyph数量不是原文长度；Index仅start/end先归一化，offset后直接相加；ease当前Triangle使用；6shape/6mode与首selector规则，random seed传uint16 | S3：两unit×六shape×六mode、顺序 / 首Subtract、连字 / 组合符 / RTL、0及大seed、swap start/end，直接factor与最终glyph视觉验证 |
-| SolidColor.color | RGBA与ColorSpace，P3不能只拿分量当sRGB fallback | S5：两色域、透明/半透明/不透明、转换及量化、不同blend底色，固定目标空间验证 |
-| Gradient.matrix / colorStops / fitsToGeometry | 按Painter空间与每geometry fit，stop列表包含默认 / 单色 / 重复 / 单调收口；空间插值含alpha与premultiply时点，不是动画LerpColor | S5：empty / one / repeated / missing ends / nonmonotonic stop，退化fit轴、mixed space、透明红→蓝中间位置，实际renderer的paint-fit bounds与layout / coverage bounds分开，不能擅自改为tight |
-| LinearGradient.startPoint / endPoint | 正常linear；当前同/近端点shader首色，与注释“end color”不同 | S5：正常 / 完全重合 / 阈值两侧，默认stops再退化，matrix+fit；复用真实shader判定 |
-| RadialGradient.center / radius | 非圆fit生成ellipse gradient，近0末色、单stop自身色、负radius无效 | S5：偏心（center非独立focus）、bbox非圆、radius0/临界/负、matrix及fit，不能补造fx/fy |
-| ConicGradient.center / startAngle / endAngle | renderer sweep，有角度区间、近相等首色；一般SVG无对应portable primitive，现默认bake / fallback radial | S2 / S5：正/反/部分角、近相等、单stop、matrix / fit / Mask；能退化常量时不强制整层bake |
-| DiamondGradient.center / radius | diamond空间函数，近0末色、负radius无效，现bake / radial fallback | S2 / S5：四角颜色、退化/临界radius、matrix/fit/Mask；BestEffort才允许有说明的radial |
-| ImagePattern.image / matrix / scaleMode | image资源，fit基于matrix变换后的rect，不只natural尺寸；None连续，其他fit到geometry | S5：4scaleMode、旋转/skew/负scale、bbox非零、真实多格式/runtimeImage；所有tiling分支同fit |
-| ImagePattern.tileModeX / tileModeY / filterMode / mipmapMode | 两轴独立4×4，filter2×mipmap3，renderer已传SamplingOptions；原生与RenderTiledPattern当前均漏采样 | S5 / S2：16axis×6sampling分别在放大/缩小/旋转高频图和透明边缘测；image-rendering不是mipmap等价证明 |
-| ColorStop.offset / color | 空列表默认来自builder；序列规范化与每位置颜色空间、alpha真实生效 | S5：字段逐分量，offset缺边界/重复/乱序契约，透明渐变内部采样，不仅比stop端点 |
+| Group.anchor / position / rotation / scale / skew / skewAxis / alpha / elements / padding | geometry 上行带 final matrix，内 Painter 才带 alpha；padding / layout 不自动 clip | S1/S4：内外 Painter、非均匀 scale / skewAxis、多 paint、后 modifier、capture / final 区分 |
+| Rectangle.position / size / roundness / reversed | 中心、resolved size、圆角 / 方向；零 / 负轴微轮廓可 stroke | S4：rect 可等价才原生；起点 / 薄轴 / 厚 stroke / Trim / dash 转 path，NaN 默认位置单列 |
+| Ellipse.position / size / reversed | oval 顶部起点，方向影响 dash / measure，退化微轮廓 | S4：圆 / 非圆、两方向 / 零轴、内外 stroke / round cap / 约束，非 SVG 右侧起点 |
+| Path.data / position / reversed | layout 统一 scale，stroke 在 Painter 空间；reversed 改 geometry | S4/S5：data origin、renderScale、Q/C fit / coverage、dash、空 / 共享，不能仅 transform 改 paint 空间 |
+| Polystar.position / type / pointCount / outerRadius / innerRadius / rotation / outerRoundness / innerRoundness / reversed | Polygon floor 与 Star 分数点不同，radius 受 layout scale | S4：两 type、整 / 分数 / 少点、全部半径 / 圆角 / 旋转 / 方向；不能关闭解析丢形 |
+| Fill.color / alpha / blendMode / fillRule / placement | ColorSource 引用、null 黑；捕获 geometry，不是最终标签 | S1/S4/S5：多 fill、两 placement、18 blend、两 rule、前后 modifier、透明 / null / missing pattern 不黑占位 |
+| Stroke.color / width / alpha / blendMode / cap / join / miterLimit / dashes / dashOffset / dashAdaptive / align / placement | width 非布局宽，≤0 无 stroke；奇数 dash 复制并按 cap / width 简化，align 倍宽 clip，fit 原 bounds | S4/S5：全 enum、奇 / 零 / adaptive dash、miter 临界、open / 洞 / glyph、多 Painter、捕获前后 scale |
+| TrimPath.start / end / offset / type | start/end 归一、offset 度；Separate 逐 geometry、Continuous 累计；Text 可转 Shape | S4：多 / 空 / 零长 / reversed range / ±offset、Text / Group / Repeater、已捕获 Painter 后 Trim |
+| RoundCorner.radius | 累积 geometry corner effect 含 Text→Shape，≤0 no-op | S4：open 端、已圆角、glyph / Group、Trim / Merge 顺序，no-op 保 geometry |
+| MergePath.mode | final matrix 上 Append / boolean，清旧 geometry / Painter 后放 merged；resolver 未清 Painter | S4：五 mode / contour 方向，Rect→Fill→Rect→Merge→Stroke 只后 paint；Merge 后无 Painter 不画、Text / Group |
+| Repeater.copies / offset / order / anchor / position / rotation / scale / startAlpha / endAlpha | ceil、progress=i+offset、scale 幂、末 copy fractional alpha；复制 / 重绑定 Painter | S4：两 order 真重叠 / alpha、0 / 负 / 分数 copies、整数负幂、anchor / 连续 Repeater / 外 Painter；负底数分数幂单独边界，不自造 SignedPow |
+| Text.text / position / fontFamily / fontStyle / fontSize / letterSpacing / textAnchor / baseline | readable 输入、font shaping、baseline / origin；有效 layoutRuns / glyphRuns 优先 | S3：同源 fontConfig、两 baseline / 三 anchor、tracking、space / tab / 空行 / CJK justify / BiDi；Native 损失独立 |
+| Text.fauxBold / fauxItalic | 合成样式不等于选真实 face，Native CSS 不证 path 等价 | S3：真实 style × 四 faux，outline / advance / bounds / Mask，Native / WOFF2 / path 分验 |
+| Text.glyphRuns / glyphData / textBounds / textScale | authored embed、glyphData.layoutRuns shaping、派生 bounds / scale | S3：无 embed Fidelity 仍用 layoutRuns；不 Native 假保真；合法冷热 / 重布局 / 约束字号 / valid empty，scale 一次 |
+| GlyphRun.font / fontSize / glyphs / x / y / bounds | 各 run font / size，GID0 missing 与越界 / blank 区分；bounds 通常首 run 整 Text linebox | S3：多 Font / size、GID0 / 越界 / 空白、非首 bounds、constraint scale，不首 font 覆全部 |
+| GlyphRun.xOffsets / positions | 每索引 positions 优先再加 xOffset；两者缺用 default cursor，三出口推进不同 | S3：7 数组 empty / short / full / extra；首 glyph 有 explicit position 后第二 glyph 对齐 runtime，不强制等长 |
+| GlyphRun.anchors / scales / rotations / skews | advance 中心+pivot，绕 glyph 原点组合，不是 SVG 字符 rotate | S3：非零 run origin / anchor / rotate / skew / 负 scale / vector offset，bitmap / vector 交错保持次序 |
+| TextBox.textAlign / paragraphAlign / writingMode / lineHeight / wordWrap / overflow | 有 elements 容器 / 空 elements modifier；logical axes，Hidden 丢整行 / 列，resolved 优先 | S3：6 项全分支、constraint 覆 author、all/some/none overflow、glyph-only / 非 Text / foreground；valid empty 不画原文 |
+| TextPath.path / baselineOrigin / baselineAngle / firstMargin / lastMargin / perpendicular / reversed / forceAlignment | path / baseline 共同空间；normal 法向，force 按 advance 重排；open 超端延伸 / closed 回绕，当前首 contour | S3：八项 / layout、normal / force、单 / 多 glyph、两方向、0/90°、margin；force 长度 pathLength+lastMargin-firstMargin，不猜注释 |
+| TextModifier.anchor / position / rotation / scale / skew / skewAxis / alpha | scope 全局 glyph index；signed factor transform、abs factor alpha/paint；scale=1+(scale-1)*factor | S3：跨 Text/run、factor -1/0/部分/1、modifier 顺序、已有 Painter 后改、共用 final matrix |
+| TextModifier.fillColor / strokeColor / strokeWidth / selectors | optional unset≠0；override alpha 是权重，可 base+overlay 多 paint，独立 stroke factor | S3/S1：base gradient / pattern+半透明 override、串联、非 Normal blend、explicit0 width、无 selector factor1；非只改 RGBA |
+| RangeSelector.start / end / offset / unit / shape / easeIn / easeOut / mode / weight / randomOrder / randomSeed | glyph 数非原文长；Index 仅 start/end 归一后 offset 直接加；Triangle ease、6 shape / 6 mode / 首 selector、seed uint16 | S3：2×6×6、顺序 / 首 Subtract、连字 / combining / RTL、0/大 seed、swap start/end、factor 与像素 |
+| SolidColor.color | RGBA / ColorSpace，P3 分量不直接当 sRGB fallback | S5：两空间、三 alpha、转换 / 量化 / blend 底色、固定目标 |
+| Gradient.matrix / colorStops / fitsToGeometry | Painter 空间 / 每 geometry fit；default / 单色 / 重复 / 单调收口；空间 alpha / premultiply 非时间 LerpColor | S5：empty / one / repeat / missing ends / nonmonotonic、退化轴 / mixed space / 透明红蓝；实际 fit 非随意 tight |
+| LinearGradient.startPoint / endPoint | linear，同 / 近端点 shader 首色，非注释 end color | S5：正常 / 相等 / 阈值两侧、默认 stop 再退化、matrix / fit |
+| RadialGradient.center / radius | 非圆 fit 生成 ellipse gradient；近0末色、单 stop 自身色、负无效 | S5：center 非独立 focus、非圆 bbox、0 / 临界 / 负 radius / matrix / fit，不补造 fx/fy |
+| ConicGradient.center / startAngle / endAngle | sweep、角区间 / 近等首色，现 bake / radial fallback | S2/S5：正 / 反 / 部分角、近等 / 单 stop / matrix / fit / Mask；退化常量不强制整层 bake |
+| DiamondGradient.center / radius | diamond 空间、近0末色、负无效，现 bake / radial fallback | S2/S5：四角、退化 / 临界 / matrix / fit / Mask，仅 BestEffort 明示 radial |
+| ImagePattern.image / matrix / scaleMode | fit 根据 matrix 后 rect 非仅 natural size；None 连续，其他 fit geometry | S5：4 fit、旋转 / skew / 负 scale、非零 bbox、多格式 / runtimeImage，各 tile 同 fit |
+| ImagePattern.tileModeX / tileModeY / filterMode / mipmapMode | 独立 4×4 / sampling2×3；runtime 已传，原生 / RenderTiledPattern 漏采样 | S5/S2：16×6、放大 / 缩小 / 旋转高频 / 透明边缘；image-rendering 非 mipmap 证明 |
+| ColorStop.offset / color | builder 空列表默认，规范化 / 各位置 colorSpace / alpha | S5：逐分量、缺边界 / 重复 / 乱序契约、透明渐变内部，不只端点 |
 
-实际数据流依据：`third_party/tgfx/src/layers/VectorLayer.cpp:69`、`third_party/tgfx/src/layers/vectors/Painter.cpp:25`、`third_party/tgfx/src/layers/vectors/VectorGroup.cpp:162`。Painter 捕获的 geometry 引用和 innerMatrix 与最终 geometry / matrix 都要保留。Merge 清旧Painter见 `third_party/tgfx/src/layers/vectors/MergePath.cpp:70`；Repeater实际顺序见 `third_party/tgfx/src/layers/vectors/Repeater.cpp:139`。不能只做“modifier先全部resolve，再遇Painter立即输出”的近似而漏掉Painter生命周期。
+复用依据：TextPath `third_party/tgfx/src/layers/vectors/TextPath.cpp:170`；Selector `third_party/tgfx/src/layers/vectors/TextSelector.cpp:320`、`third_party/tgfx/src/layers/vectors/TextSelector.cpp:436`；TextModifier `third_party/tgfx/src/layers/vectors/TextModifier.cpp:177`。最终 glyph paint 不能只读 Text 字段还原。
 
-TextPath / Selector / TextModifier 的完整静态逻辑复用 `third_party/tgfx/src/layers/vectors/TextPath.cpp:170`、`third_party/tgfx/src/layers/vectors/TextSelector.cpp:320`、`third_party/tgfx/src/layers/vectors/TextSelector.cpp:436`、`third_party/tgfx/src/layers/vectors/TextModifier.cpp:177`；最终glyph paint不是只读公开Text字段就能还原。
+fit 依据：shape 的 `third_party/tgfx/src/layers/vectors/FillStyle.cpp:51`、`third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:55` 用 Path.getBounds；`third_party/tgfx/src/core/PathRef.cpp:42` 包括全部 Bezier 控制点，不是 tight bounds。glyph 的 `third_party/tgfx/src/layers/vectors/FillStyle.cpp:73`、`third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:72` 用 textBlob.getTightBounds。Q/C 远控制点与 glyph 保守 / 紧边界分别验证，layout / coverage / bake 另算。
 
-**bounds依据补充：** shape分支在 `third_party/tgfx/src/layers/vectors/FillStyle.cpp:51` 与 `third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:55` 使用 `getPath().getBounds()`；`third_party/tgfx/src/core/PathRef.cpp:42` 对全部路径点求边界，包含Bezier控制点，不是computeTightBounds。glyph-run分支则在 `third_party/tgfx/src/layers/vectors/FillStyle.cpp:73` 与 `third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:72` 使用 `textBlob->getTightBounds()`。保真导出按实际shape或glyph消费者选择fit，不推广某一种bounds到所有节点；layout/coverage/烘焙裁剪另按各自语义。Q/C路径控制点远离曲线与TextBlob保守/紧边界分别对照，不能借“更紧”之名改变原生shape的渐变/图片适配。
+#### B.3 全部 effects 字段
 
-### 13.6 全部效果字段的语义和映射台账
-
-滤镜是逐步串行，样式则有 Below / Above、自己的blend和输入bucket。`excludeChildEffects` 选择实际排除子层效果的输入，不能从一个最终 SourceGraphic 里事后删除。每项同时继承第 13.2 节 Node 元数据；每个Style还继承 blendMode / excludeChildEffects。
+Style 继承 Node 与 LayerStyle；filter 不继承 style 的 blend / exclude。excludeChildEffects 选择真实源，不能从最终 SourceGraphic 事后删除；inactive / no-op / invalid / unsupported 分开。
 
 | 节点 / 字段组 | 实际语义 / 当前覆盖 | SVG方案与直接测试（S2，颜色协同S5） |
 |---|---|---|
-| LayerStyle.blendMode / excludeChildEffects | 各Style有不同位置 / 背景，exclude选择含/不含child effects的来源；SVG多处没消费 | 18blend分上下文、exclude两值，child-only / 子shadow / own content；分别记录content、contour和own geometry，不统一SourceAlpha |
-| BlurFilter.blurX / blurY / tileMode | 双轴blur与contentScale，default Decal；SVG只stdDeviation，漏tile | 单/双/零blur、四tile、边缘高对比、巨大halo和连续blur；原生候选经验证才用，不同tile不能都透明延伸 |
-| DropShadowFilter.offsetX / offsetY / blurX / blurY / color / shadowOnly | shadow来源是上一步输入；Only及组合均成为新输出，RGBA及colorSpace有效；当前固定SourceAlpha且不推进链 | 正负offset、各向异性blur、两Only、半透明/P3，Blur→Shadow、Shadow→Blur / Matrix / Noise、连续Only，禁止末尾统一merge冒充 |
-| InnerShadowFilter.offsetX / offsetY / blurX / blurY / color / shadowOnly | 当前输入内侧遮罩及Only语义；非Style，没有spread/extra blend继承 | 同上加带洞轮廓、alpha边缘，Inner / Drop换顺序，后续矩阵处理完整输出 |
-| ColorMatrixFilter.matrix | 20系数全部有效，当前values已有；bias可改变透明区alpha，连续链仍须正确 | 20one-hot / bias、RGBA交换、alpha bias、灰度、透明黑、nonfinite、前后shadow/noise；region覆盖变化 |
-| BlendFilter.color / blendMode | ColorFilter的常量source与当前像素destination，可能改变alpha；现feFlood+feBlend后额外in裁剪且Plus无mode | 18mode、source/dest分别0/0.5/1 alpha、非交换色，P3、空洞；校验额外alpha裁剪是否等价，Plus不得silently normal |
-| NoiseFilter.mode / size / density / seed / blendMode | 三mode、频率1/(size*scale)、内容中心相位与上游output offset；density0返回input；现表仍有bucket | 三mode、零/阈值density、size无效/no-op消解、float seed、前置Blur偏移后纹理不漂，18mode；无法精确复现Perlin则完整bake |
-| NoiseFilter.color / firstColor / secondColor / opacity | Mono只color，Duo两色，Multi只opacity；inactive不影响；Duo内部SrcOver不同现SVG screen | 活跃字段逐项及inactive扰动，双色半透明 / alpha0，Mono/Duo/Multi分别与layer opacity / Mask结合 |
-| DropShadowStyle.offsetX / offsetY / blurX / blurY / color / showBehindLayer / spread | Below，showBehind=false剔除原contour内shadow；spread使用SpreadUtils现有shape/bounds规则，不自动等于morphology | 两behind、正负/塌陷spread、规则 / 不规则 / text / child-only、各stroke align、P3/18blend/exclude；原生等价否则完整bake |
-| InnerShadowStyle.offsetX / offsetY / blurX / blurY / color / spread | Above，spread可能反向作用且塌陷可整块shadow；没有shadowOnly或showBehind | 正负spread、洞、塌陷、和Noise交换作者顺序、foreground覆盖、18blend/exclude，后续filters作用于整体Style输出 |
-| BackgroundBlurStyle.blurX / blurY / tileMode | actual backdrop，default Mirror；双零no-op。当前renderer onDraw使用Src，不按普通Style blend；exclude影响限定输入 | 四tile、两轴、真实半透明背景和Mask/scroll，style blend inactive按实际登记，no-op不造空filter；完整背景前缀替换 |
-| NoiseStyle.mode / size / density / seed / color / firstColor / secondColor / opacity | Above三mode，density0不画；DuoStyle dark再bright各按style blend，不是预合成一次blend；默认center相位 | 全mode活跃 / inactive，零density、同位置两个Style、Inner↔Noise、exclude/foreground、18blend/P3、后filters |
-| GlassStyle.refraction / depth / frost / dispersion / splay / lightAngle / lightIntensity | 七项真实shader；default80/20/5/50/0/45/80；frost0仍有sigma下限；own geometry决定SDF/UDF、背景采样和光照 | 每项改值、boundary、默认效果非空、SDF/UDF、zero alpha geometry、bitmap孔、child-only fallback、缩放、blend/exclude；完整上下文bake不以普通blur替代 |
+| LayerStyle.blendMode / excludeChildEffects | 各位置 / 背景，选择含 / 不含 child effects 输入；多处未消费 | 18 blend × exclude，child-only / 子 shadow / own；content / contour / own geometry 三来源，非统一 SourceAlpha |
+| BlurFilter.blurX / blurY / tileMode | 双轴 / contentScale，default Decal；仅 stdDeviation 漏 tile | 单 / 双 / 零、4 tile、边缘、巨大 halo / 连续 blur；原生验证后用，不全透明延伸 |
+| DropShadowFilter.offsetX / offsetY / blurX / blurY / color / shadowOnly | 上一步输入 shadow，Only / 合成为新 output；RGBA / space；现固定 SourceAlpha 不推进 | ±offset、各向异性、两 Only、半透明/P3、Blur→Shadow、Shadow→Blur/Matrix/Noise、连续 Only，非末尾 merge |
+| InnerShadowFilter.offsetX / offsetY / blurX / blurY / color / shadowOnly | 当前输入内侧及 Only；无 spread / style blend | 同上加洞 / alpha 边、Inner / Drop 换序、后矩阵处理完整 output |
+| ColorMatrixFilter.matrix | 20 项；bias 改透明区 alpha，values 已有但链仍须修 | 20 one-hot / bias、RGBA 换、alpha bias / 灰 / 透明黑 / nonfinite / shadow-noise 前后、region |
+| BlendFilter.color / blendMode | 常量 source / 当前 pixel dest 可改 alpha；现额外 in clip，Plus 无 mode | 18 mode × source/dest 0/0.5/1、非交换色/P3/洞；验证 extra clip，Plus 不 silent Normal |
+| NoiseFilter.mode / size / density / seed / blendMode | 三 mode、1/(size*scale)、中心 phase / 上游 offset，density0 返回 input，现 bucket 残留 | 三 mode、0/阈值 density、无效size/no-op、float seed、前 Blur 后不漂、18 blend；不能等价 Perlin 则完整 bake |
+| NoiseFilter.color / firstColor / secondColor / opacity | Mono color、Duo 两色、Multi opacity；inactive 不影响，Duo SrcOver 非 SVG screen | 活跃逐项 / inactive 扰动、半透明双色 / alpha0、三 mode+Layer alpha / Mask |
+| DropShadowStyle.offsetX / offsetY / blurX / blurY / color / showBehindLayer / spread | Below；behind=false 剔 contour 内 shadow；SpreadUtils shape/bounds 非自动 morphology | 两 behind、±/塌陷 spread、规则 / 不规则 / Text / child-only、align/P3/18blend/exclude，非等价 bake |
+| InnerShadowStyle.offsetX / offsetY / blurX / blurY / color / spread | Above，spread 反向 / 塌陷可整块；无 Only / behind | ±spread / 洞 / 塌陷、Inner↔Noise 顺序、foreground、18blend/exclude、后 filters 整体 |
+| BackgroundBlurStyle.blurX / blurY / tileMode | actual backdrop、default Mirror、双零 no-op；onDraw 用 Src 非普通 style blend，exclude 影响限定输入 | 4 tile / 两轴 / 半透明背景 / Mask-scroll，inactive blend 如实登记，no-op 不空 filter，消费前缀 |
+| NoiseStyle.mode / size / density / seed / color / firstColor / secondColor / opacity | Above，density0 不画，Duo dark 后 bright 各 style blend，非预合成一次；default center phase | 全 mode 活跃/inactive、0 density、同位置双 Style、Inner↔Noise、exclude/foreground/18blend/P3/后 filters |
+| GlassStyle.refraction / depth / frost / dispersion / splay / lightAngle / lightIntensity | 七 shader 参数 default80/20/5/50/0/45/80；frost0 有 sigma 下限，own geometry / SDF-UDF / 背景 / 光照 | 每项/boundary/default 非空、SDF-UDF、alpha0 geometry、bitmap 孔、child-only fallback、scale/blend/exclude；不普通 blur 冒充 |
 
-依据：`src/renderer/LayerBuilder.cpp:2809`、`src/renderer/LayerBuilder.cpp:3497`、`third_party/tgfx/src/layers/Layer.cpp:1805`、`third_party/tgfx/src/layers/Layer.cpp:1952`。Noise零密度和内容中心见 `third_party/tgfx/src/layers/filters/NoiseFilter.cpp:139`；Glass七参数与own geometry见 `include/pagx/nodes/GlassStyle.h:25`。
+构建 / 样式依据：`src/renderer/LayerBuilder.cpp:2809`、`src/renderer/LayerBuilder.cpp:3497`、`third_party/tgfx/src/layers/Layer.cpp:1805`、`third_party/tgfx/src/layers/Layer.cpp:1952`；Noise density / phase `third_party/tgfx/src/layers/filters/NoiseFilter.cpp:139`；Glass `include/pagx/nodes/GlassStyle.h:25`。Blur0 / density0 / single stop / 退化常量不扩大 bake，invalid Noise 不生成空 filter；effect P3 与 SolidColor 同源。
 
-原生能力判断必须包含 inactive、no-op、无效输入和不支持四种不同结果。无效Noise不产生primitive时不能仍生成错误空filter。Blur=0、density=0、单stop、退化常量不应不必要扩大bake范围。效果color的P3转换与直接SolidColor同源，不能忽略 `colorSpace`。
+#### B.4 时间、宿主定义参数与 converter
 
-### 13.7 时间、状态机、绑定与静态状态来源
+以下保留定义全部字段和实际消费；正文状态契约不在此重复。开放宿主历史 U，有限事件只能按 D8 / MB。
 
-**D7（新增待确认）：静态结果究竟采用哪种状态来源？** 推荐保持 `exportAnimation=false` 为 **TemplateStatic**：布局后的模板绘制字段+明确供应的图片/字体，不执行时间线、状态机或默认DataBind；有效绑定需标明“未初始化宿主”，不能因此承诺与任意PAGScene首次draw相同。DefaultHostInitialization与ExistingSceneSnapshot是独立后续入口，不能用关闭SMIL偷偷替代。
-
-| 状态来源 | 实际含义 | 本方案处理 |
+| 节点 / 全字段组 | 运行时事实 | 分类验收（S0/S1/S6，目标协同S2/S3/S5及M） |
 |---|---|---|
-| TemplateStatic | 模板字段、有效资源与布局；不应用动画 / SM / VM绑定 | 当前静态主契约。Native和bake都用同源状态，比较参考时禁用行为初始化 |
-| DefaultHostInitialization | 新scene、VM默认值、dirty绑定、Once、文本flush；是否apply/advance另须定义 | 如用户要求此结果，先确认初始化顺序及实例内求值，再materialize；不能直接ToSVG原document |
-| ExistingSceneSnapshot | 某scene的业务值、播放位置、trigger、Once历史及实际供应资源 | 独立快照设计；本方案不声称已支持，也不能从模板逆推 |
-
-当前 `PAGScene::draw` 在绘制前调用 `flushDataBinds / flushTextHolders`，依据 `src/pagx/PAGScene.cpp:514`。因此“没有播放动画”不等于“只有模板值”。Mask / gradient / TextModifier这些静态绘制参数仍生效，不能因名称含Modifier就当宿主行为排除。
-
-| 节点 / 全字段组 | 运行时事实及静态处理 | 分类验收（S0 / S1 / S6，值目标协同S2 / S3 / S5） |
-|---|---|---|
-| Animation.duration / frameRate / loop / objects | 时间定义，TemplateStatic不apply首key；初态求值时空channel会T{}、首/末范围保持 | 模板alpha≠首key，三loop、空/单key、paused / offset，静态无SMIL且不改模板值 |
-| AnimationObject.target / channels；Channel.name / TypedChannel.keyframes | 目标须属于实例binding，TypedChannel含float/bool/int/string/ImageRef/Color/Matrix/Matrix3D；PAGImage是runtime值非关键帧实例 | unknown /跨域 /外部target、各类型key，TemplateStatic主动排除，不能无说明说已保留动态 |
-| Keyframe.time / value / interpolation / bezierOut / bezierIn；Timeline drivers全部字段 | 段左侧interpolation与当前out/下一in；playing影响advance不是apply；offset影响求值相位 | 四interp、帧率、playing两值、offset±，no driver不自动激活，模板模式不求任何零帧 |
-| StateMachine.inputs / regions | 多region与共享输入，TemplateStatic不启动 | 顶层/Composition/外部定义全分类，不复用只顶层SM warning当全集 |
-| StateRegion.name / initialState / states / transitions；State.name / AnimationState.animationId | 初始状态按name，未命中可取首state；空anim为空状态 | 空state、未知initial、多region、定义顺序；模板模式不应用initial animation |
-| StateTransition.from / to / duration / frameRate / interpolation / bezierOut / bezierIn / enableEarlyExit / pauseOnExit / conditions | any优先、条件AND、零duration可即时、new-over-old实际混合，不按头注释重写；没有exitTime字段 | 全bool/4interp、empty条件、zero delta可连跳；默认不fire事件，不能把advance(0)假设no-op |
-| TransitionCondition.inputName / op / valueBool / valueNumber；StateMachineInput.name / type / defaultBool / defaultNumber | 类型决定有效value，Bool/Number默认与Trigger事件不同 | Bool仅Equal/NotEqual，Number六op、Trigger；inactive默认不影响，TemplateStatic不求transition |
-| ViewModel.properties | schema而非values；未被有效绑定消费的定义非视觉 | 空/多property、嵌套引用环，元数据与有效宿主影响分开 |
-| ViewModelProperty.name / propertyType / dataConverter / viewModelRef | 八类型与嵌套scope / converter；不允许拿PropertyData反射替代原schema | 类型与source leaf校验，nested parent vmContext、多实例、converter未知/开放注册 |
-| ViewModelProperty.defaultNumber / defaultString / defaultBoolean / defaultColor / defaultImage / defaultEnum | 按type生效，默认VM可改alpha / text / visible / color / image / enum；defaultImage=null可清空 | 八类型default各自异于模板、inactive字段扰动、Once、默认文字重新shaping；TemplateStatic明确不应用 |
-| ViewModelProperty.minValue / maxValue / enumOptions | number范围是元数据，当前setter并不自动clamp；Enum default / target index与字符串不同 | 值在min/max外、enum index越界和converter后目标类型；按真实input contract不擅自clamp |
-| DataBind.source / target / channel / direction | ToTarget/TwoWay首次dirty应用，Once一次；ToSource回写可影响共享源；matrix / matrix3D绑定在runtime有拒绝规则 | 四direction、一源多目标、先syncBack后update、nested scope、unknown target/channel、共享动画channel，未初始化宿主的诊断不依赖warnings |
-| DataConverter.converterType / params | 类型开放注册，当前四内建；unknown passthrough是runtime事实，不等于默认宿主结果已可重现 | params全键、type mismatch、unknown/custom、nonfinite/输出预算；不擅自执行不受控回调或循环绑定 |
-
-内建 converter（不是闭合 NodeType 枚举）依据 `src/pagx/DataConverterRegistry.cpp:37`：
+| Animation.duration / frameRate / loop / objects | 时间定义；空 channel T{}，首 / 末保持；模板不首 key apply | 模板 alpha≠首 key、三 loop、空/单/paused/offset、静态无 SMIL |
+| AnimationObject.target / channels；Channel.name / TypedChannel.keyframes | binding 作用域，八实际 TypedChannel；PAGImage 非 key 实例 | unknown/跨域/external target、各类型 XML→evaluate→apply，imageRef≠PAGImage |
+| Keyframe.time / value / interpolation / bezierOut / bezierIn；AnimationTimeline.animationId / playing / evaluationOffset；StateMachineTimeline.stateMachineId | 左 interpolation、当前 out/下一 in；playing 只 advance、offset phase | 四 interp、fps / ±offset、同 ID pause scope、no driver 不激活、空/单/duplicate/key 边界 |
+| StateMachine.inputs / regions | 并行 region 与共享输入 | 根/Composition/external 全定义分类，非只 top warning |
+| StateRegion.name / initialState / states / transitions；State.name / AnimationState.animationId | name 初态、未命中可首 state，空 animation 空状态 | 空/unknown initial、多 region/顺序；模板不 initial apply |
+| StateTransition.from / to / duration / frameRate / interpolation / bezierOut / bezierIn / enableEarlyExit / pauseOnExit / conditions | any 优先、条件 AND、zero 可即时，new-over-old mix；无 exitTime | 全 bool/4interp/empty 条件，zero delta 可连跳，不假设 advance(0) no-op、不重写注释 |
+| TransitionCondition.inputName / op / valueBool / valueNumber；StateMachineInput.name / type / defaultBool / defaultNumber | 按类型有效值，persistent Bool/Number≠Trigger | Bool Equal/NotEqual、Number 六 op、Trigger；inactive 默认扰动、模板不 transition |
+| ViewModel.properties | schema 非 values，不被有效消费定义非视觉 | empty/multi/nested cycle、metadata 与宿主影响分开 |
+| ViewModelProperty.name / propertyType / dataConverter / viewModelRef | 八类型、nested scope/converter；parent slot referenceInstance与Composition共享，open slot回填，全VM链接后才bind，非PropertyData替代 | source leaf/type、跨层source、open slot回填、父子共享值、多实例身份和unknown/open converter；`src/pagx/PAGScene.cpp:318`、`src/pagx/PAGScene.cpp:366` |
+| ViewModelProperty.defaultNumber / defaultString / defaultBoolean / defaultColor / defaultImage / defaultEnum | type 活跃 default 可改 alpha/text/visible/color/image/enum；null image 可清空 | 八 default 异于模板、inactive、Once、默认 text reshape；模板主动排除 |
+| ViewModelProperty.minValue / maxValue / enumOptions | number 范围 metadata，setter 不自动 clamp；enum index 非 string | 越 min/max、enum 越界、converter 后 type，不擅 clamp |
+| DataBind.source / target / channel / direction | ToTarget/TwoWay dirty、Once、ToSource 回写；matrix/3D 绑定有拒绝 | 四方向、一源多目标、先 syncBack 后 update、nested/unknown/shared channel；`src/pagx/DataBindRuntime.cpp:127` |
+| DataConverter.converterType / params | 开放注册、四内建；unknown passthrough 非已可重现默认宿主 | 全 params / mismatch / unknown/custom / nonfinite / 输出预算，不擅执行无限回调/循环 |
 
 | 名称 | 全部内建参数与默认 | 正 / 反向运行规则及验收 |
 |---|---|---|
-| secondsToFrames | `frameRate=30` | 秒×fps / 帧÷fps，解析结果0回退30；float类型不符passthrough；测缺省、0、非法、非有限 |
-| priceFormat | `prefix="", suffix="", decimals=0` | float/int格式化string / 去前后缀解析float；特殊字符、负值、precision预算与类型不符 |
-| rangeMapper | `inputMin=0, inputMax=1, outputMin=0, outputMax=100` | 线性正/反映射，不clamp；零区间取输出/输入min，测范围外与反向 |
-| degsToRads | 无内建参数 | float度 / 弧度互转，类型不符passthrough |
+| secondsToFrames | `frameRate=30` | 秒×fps / 帧÷fps，解析0回退30；float mismatch passthrough；缺省/0/非法/非有限 |
+| priceFormat | `prefix="", suffix="", decimals=0` | float/int→string / 去前后缀解析float；特殊字符/负数/precision预算/mismatch |
+| rangeMapper | `inputMin=0, inputMax=1, outputMin=0, outputMax=100` | 正反线性不 clamp；zero 区间取 output/input min，范围外 / 反向 |
+| degsToRads | 无内建参数 | float 度 / 弧互转；mismatch passthrough |
 
-图片解码不能不分消费方统一改优先级：
+Converter 依据 `src/pagx/DataConverterRegistry.cpp:37`；AnyStateName="any" 是保留字符串，params / converterType 是开放集而非 enum。
 
-- ImagePattern优先runtimeImage，再解码data→dataURI→filePath，依据 `include/pagx/PAGXDocument.h:208`。
-- 默认VM图片经 `src/pagx/PAGScene.cpp:53` 的data→dataURI→filePath，不读runtimeImage。
-- 位图Glyph经 `src/renderer/GlyphRunRenderer.cpp:157` 的codec data→dataURI→filePath，也不读runtimeImage；同Image供图案和字形时，两者不能被新共用工具悄悄改为同一优先链。
-- Woff2FontGenerator的bitmap编码只消费Image.data，依据 `src/pagx/utils/Woff2FontGenerator.cpp:1263`；当前SVG入口会跳过bitmap Font的WOFF2预构建，走逐字形image。这一内部能力不被误算为当前SVG已启用的资源路径。
+### C. 完整 enum（40 类 / 155 值，NodeType 另见 A.3）
 
-每个消费方的原生输出与bake使用相同的有效资源；若未来统一这些不同的公开/runtime链，先确认源头行为变化。格式被MIME识别不代表renderer能解码，PNG/JPEG/WebP/GIF使用真实数据得到有效输出或明确拒绝，不依据伪头或后缀承诺支持。
-
-### 13.8 所有相关枚举与分支全集
-
-下表每个值都是实际模型名称。测试至少覆盖各单值和列出的上下文，不把“存在映射字符串”视为视觉支持。
+每值是真实模型名，存在映射字符串不代表视觉支持；bool / optional / 数组边界遵循正文验收。
 
 | 枚举 | 完整值 | 直接测试 / 阶段 |
 |---|---|---|
-| LayoutMode | `None, Horizontal, Vertical` | 0/1/多child、intrinsic/explicit/flex，S1 |
-| Alignment | `Start, Center, End, Stretch` | 交叉轴显式/百分比/unset；S1 |
-| Arrangement | `Start, Center, End, SpaceBetween, SpaceEvenly, SpaceAround` | 主轴剩余空间、gap、单child，S1 |
-| MaskType | `Alpha, Luminance, Contour` | 同mask三角色、root alpha、stroke/洞、cross-parent，S1/S4 |
-| BlendMode | `Normal, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn, HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity, PlusLighter, PlusDarker` | 18值分Layer/Fill/Stroke/BlendFilter/Noise/Style各位置真实透明背景；feBlend不支持Plus不能silently normal，S1/S2/S5 |
-| FillRule | `Winding, EvenOdd` | 方向不同contour与重叠、bool shape、clip-rule，S4 |
-| LayerPlacement | `Background, Foreground` | children/composition及Style前后、TextBox多遍，S1/S3 |
-| LineCap | `Butt, Round, Square` | open/zero segment和dash简化，S4 |
-| LineJoin | `Miter, Round, Bevel` | miter临界角、厚stroke，S4 |
-| StrokeAlign | `Center, Inside, Outside` | primitive/path/glyph/洞、dash，S4 |
-| PolystarType | `Polygon, Star` | floor/分数pointCount、radius圆角，S4 |
-| TrimType | `Separate, Continuous` | 长度/多contour/外scope，S4 |
-| MergePathMode | `Append, Union, Intersect, Xor, Difference` | append保子路径、清Painter、非交换顺序，S4 |
-| RepeaterOrder | `BelowOriginal, AboveOriginal` | 有重叠和不同copyAlpha，S4 |
-| PathVerb | `Move, Line, Quad, Cubic, Close` | 点数1/1/2/3/0，多contour与精度，S4 |
-| TextAlign | `Start, Center, End, Justify` | CJK/tab/space、末行、logical inline axis，S3 |
-| ParagraphAlign | `Near, Middle, Far` | 两writing axes、padding、resolvedbox，S3 |
-| WritingMode | `Horizontal, Vertical` | CJK/Latin/标点/BiDi，S3 |
-| Overflow | `Visible, Hidden` | none/some/all line丢弃，S3 |
-| TextAnchor | `Start, Center, End` | standalone与TextBox覆盖，RTL，S3 |
-| TextBaseline | `LineBox, Alphabetic` | 同position下不同baseline，S3 |
-| SelectorUnit | `Index, Percentage` | index归一化与offset真实规则，S3 |
-| SelectorShape | `Square, RampUp, RampDown, Triangle, Round, Smooth` | 每shape及ease活跃分支，S3 |
-| SelectorMode | `Add, Subtract, Intersect, Min, Max, Difference` | 第一selector特例及两selector顺序，S3 |
-| ColorSpace | `SRGB, DisplayP3` | single/mixed空间、alpha与空间采样，S5 |
-| TileMode | `Clamp, Repeat, Mirror, Decal` | image两轴16组、blur/background四模式，S2/S5 |
-| FilterMode | `Nearest, Linear` | 放大/旋转/alpha边缘，S5 |
-| MipmapMode | `None, Nearest, Linear` | 缩小高频、6sampling组合，S5 |
-| ScaleMode | `None, Stretch, LetterBox, Zoom` | transform后fit、各tile同fit，S5 |
-| NoiseMode | `Mono, Duo, Multi` | color / twoColors / opacity活跃参数与inactive不变，S2 |
-| LoopMode | `Once, Loop, PingPong` | TemplateStatic主动排除，M阶段时间语义 |
-| TimelineType | `Animation, StateMachine` | 挂载分类 / paused / offset / nested，S0/S6 |
-| KeyframeInterpolationType | `None, Linear, Bezier, Hold` | TemplateStatic不apply，M阶段连续/离散 |
-| ChannelValueType | `Float, Bool, Int, String, ImageRef, Color, Matrix, PAGImage, Matrix3D` | 九KeyValue alternative；PAGImage为宿主值而非实际TypedChannel实例，S0/S6 |
-| StateType | `Animation` | AnimationState与空状态，不造BlendState，S0/S6 |
-| StateMachineInputType | `Bool, Number, Trigger` | 默认persistent vs event，S0/S6 |
-| TransitionConditionOp | `Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, Trigger` | 按input类型合法子集，AND / any / default，S0/S6 |
-| ViewModelPropertyType | `Number, String, Boolean, Color, Image, ViewModel, Enum, Trigger` | 8类型、活跃default与资源，S0/S5/S6 |
-| DataBindDirection | `ToTarget, ToSource, TwoWay, Once` | 初始化/回写/一次更新，不与时间简单等同，S0/S6 |
-| ChannelFlags | `None, Animatable, RequiresLayout` | bitmask两轴正交；None与未反射仍有静态字段，S0/S6 |
+| LayoutMode | `None, Horizontal, Vertical` | 0/1/多 child、intrinsic/explicit/flex；S1 |
+| Alignment | `Start, Center, End, Stretch` | 交叉轴 explicit/percent/unset；S1 |
+| Arrangement | `Start, Center, End, SpaceBetween, SpaceEvenly, SpaceAround` | 剩余空间/gap/单 child；S1 |
+| MaskType | `Alpha, Luminance, Contour` | root alpha/stroke/洞/cross-parent；S1/S4 |
+| BlendMode | `Normal, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn, HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity, PlusLighter, PlusDarker` | 18值分Layer/Fill/Stroke/BlendFilter/Noise/Style真实透明背景，Plus不silent Normal；S1/S2/S5 |
+| FillRule | `Winding, EvenOdd` | contour方向/重叠/boolean/clip-rule；S4 |
+| LayerPlacement | `Background, Foreground` | children/composition/Style/TextBox多遍；S1/S3 |
+| LineCap | `Butt, Round, Square` | open/zero segment/dash；S4 |
+| LineJoin | `Miter, Round, Bevel` | miter临界/厚stroke；S4 |
+| StrokeAlign | `Center, Inside, Outside` | primitive/path/glyph/洞/dash；S4 |
+| PolystarType | `Polygon, Star` | floor/分数pointCount/radius/round；S4 |
+| TrimType | `Separate, Continuous` | 长度/多contour/外scope；S4 |
+| MergePathMode | `Append, Union, Intersect, Xor, Difference` | append保子路径/清Painter/非交换顺序；S4 |
+| RepeaterOrder | `BelowOriginal, AboveOriginal` | 重叠/不同copy alpha；S4 |
+| PathVerb | `Move, Line, Quad, Cubic, Close` | 点数1/1/2/3/0、多contour/精度；S4 |
+| TextAlign | `Start, Center, End, Justify` | CJK/tab/space/末行/logical axis；S3 |
+| ParagraphAlign | `Near, Middle, Far` | 双writing axes/padding/resolvedbox；S3 |
+| WritingMode | `Horizontal, Vertical` | CJK/Latin/标点/BiDi；S3 |
+| Overflow | `Visible, Hidden` | none/some/all line丢弃；S3 |
+| TextAnchor | `Start, Center, End` | standalone/TextBox覆盖/RTL；S3 |
+| TextBaseline | `LineBox, Alphabetic` | 同position两baseline；S3 |
+| SelectorUnit | `Index, Percentage` | Index归一/offset；S3 |
+| SelectorShape | `Square, RampUp, RampDown, Triangle, Round, Smooth` | 每shape/ease活跃；S3 |
+| SelectorMode | `Add, Subtract, Intersect, Min, Max, Difference` | 首selector/双selector顺序；S3 |
+| ColorSpace | `SRGB, DisplayP3` | single/mixed/alpha/空间采样；S5 |
+| TileMode | `Clamp, Repeat, Mirror, Decal` | image16axis、blur/backdrop4；S2/S5 |
+| FilterMode | `Nearest, Linear` | 放大/旋转/alpha边；S5 |
+| MipmapMode | `None, Nearest, Linear` | 缩小高频/6sampling；S5 |
+| ScaleMode | `None, Stretch, LetterBox, Zoom` | transform后fit/各tile同fit；S5 |
+| NoiseMode | `Mono, Duo, Multi` | color/两color/opacity活跃/inactive；S2 |
+| LoopMode | `Once, Loop, PingPong` | 静态主动排除、M content time |
+| TimelineType | `Animation, StateMachine` | 挂载/paused/offset/nested；S0/S6/M1 |
+| KeyframeInterpolationType | `None, Linear, Bezier, Hold` | 静态不apply、连续/离散；M3 |
+| ChannelValueType | `Float, Bool, Int, String, ImageRef, Color, Matrix, PAGImage, Matrix3D` | 九alternative、PAGImage宿主非TypedChannel；S0/S6/M1 |
+| StateType | `Animation` | AnimationState/空state，不造BlendState；S0/S6 |
+| StateMachineInputType | `Bool, Number, Trigger` | persistent default/event；S0/S6 |
+| TransitionConditionOp | `Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, Trigger` | 按input合法子集/AND/any/default；S0/S6 |
+| ViewModelPropertyType | `Number, String, Boolean, Color, Image, ViewModel, Enum, Trigger` | 八type/default/资源；S0/S5/S6 |
+| DataBindDirection | `ToTarget, ToSource, TwoWay, Once` | 初始化/回写/Once，非简单time；S0/S6 |
+| ChannelFlags | `None, Animatable, RequiresLayout` | bitmask正交、None/未反射仍静态有效；S0/S6 |
 
-布尔参数全部覆盖true/false，optional字段覆盖unset/explicit0/非0，向量覆盖empty/短/完整/超预算。`AnyStateName="any"` 是保留字符串不是新的enum；converterType和params是开放集，不假装可列出全部宿主实现。
+### D. 完整组合矩阵
 
-### 13.9 关键交互组合矩阵
+闭合 enum 逐值；连续参数按边界 / 性质 / 误差界，不承诺无限笛卡尔积。静态 C 与动态 A 分开，组合不能被逐字段孤立测试替代。
 
-不要求对无限连续参数做无法完成的全笛卡尔积，也不能只逐字段独立测试。闭合枚举逐值，组合按以下不可互相替代的责任路径覆盖；数值分段、边界与性质断言补充连续空间。
+#### D.1 静态 C01—C24
 
 | 组合编号 | 必测交互 | 检测标准 / 阶段 |
 |---|---|---|
-| C01 | 每个LayoutNode派生类×约束/百分比/explicit/intrinsic×padding，cold/warm/re-layout | 位置/size/scale只作用一次、NaN unset与0生成区别，S1/S3/S4 |
-| C02 | Layer matrix3D/matrix/components优先级×anchor×layout×scroll | 完整矩阵分量与像素、非恒等matrix仍保留z的深度路径、matrix3D覆盖z、3D flatten，S1/S2 |
-| C03 | 同Composition两实例×cross-parentMask×外部同名资源×ID生成 | 实例与父空间正确、no重复ID、每引用实际正确，S1/S5 |
-| C04 | stage visible owner/Mask根/Mask后代×alpha×三MaskType×scroll/effects/composition | owner隐藏不泄漏、Mask根特殊可见性、Contour描边/holes，S1/S2/S4 |
-| C05 | Group几何上行×内部/外部Painter×前后scale/skew×渐变/图案/Stroke | capture innerMatrix与finalMatrix区分，paint/width/bounds空间正确，S1/S4/S5 |
-| C06 | geometry→Painter→modifier→Painter×Group/Text/Repeater/Merge | 旧Painter生命周期、reference更新、Merge清空、复制顺序与alpha，S1/S4 |
-| C07 | 两级groupOpacity×18blend上下文×filter/pixelMask/background隔离 | direct/offscreen切换相同，半透明重叠区域直接像素验证，S1/S2 |
-| C08 | BelowStyle顺序×AboveStyle顺序×children×foreground×后续filter | 不按Style类型重排、真实输入bucket，S1/S2 |
-| C09 | Blur/Drop/Inner/Matrix/Blend/Noise的有序非交换链×shadowOnly×outputOffset | 上一步完整输出成为下一步输入、bounds累计，不末尾merge冒充，S2 |
-| C10 | excludeChildEffects×own/child-only内容×child effects×spread/showBehind | 内容/contour/geometry三来源、spread实际规则，S2/S4 |
-| C11 | Glass/BackgroundBlur×alpha0 owngeometry/图片洞/SDF-UDF×祖先foreground×bake | 正确backdrop与覆盖、halo、无二次背景、已消费draw前缀，S2/S5 |
-| C12 | Text shaping layoutRuns/authored glyphRuns×多Font/mixedSize×短数组×faux/anchor | 共用placement/paint，Font/GID/advance与bounds一致，S3 |
-| C13 | TextBox两模式×nestedGroup/Painter/foreground×resolvedsize×overflow | glyph-only不丢、非文字保留、valid empty不fallback画原文，S3 |
-| C14 | TextPath normal/force×open/closed×margin×Selector×TextModifier先后 | 最终glyph矩阵、法向偏移、顺序、base/overlay，S3 |
-| C15 | 2unit×6shape×6mode×glyph连字/RTL/multipleText×seed/weight | direct factor、首selector规则、random稳定、活跃参数，S3 |
-| C16 | primitive/path/glyph×cap/join/align×dash×reversed×degenerate×paint fit | 原轮廓、退化Stroke、dash起点与bounds，不只标签，S4 |
-| C17 | gradient四type×stop空/单/重复/边界×matrix/fit×mixedColorSpace/alpha | 空默认及退化常量、空间颜色与premultiply、真实runtime fit bounds，S5 |
-| C18 | image来源data/dataURI/file/runtimeImage×4formats×16tile×4fit×6sampling | 按消费方资源优先级、dimensions、真实纹理及预算，S5 |
-| C19 | vector/bitmap glyph交错顺序×overlap×scope/painter alpha×resourcefailure | 原run遮挡顺序、image opacity、missing与blank区分，S3/S5 |
-| C20 | TemplateStatic/defaultHost/已有scene对照×VM8type×4BindDirection×converter | 主动排除说明，不拿不同状态来源做错误像素参考；D7/S0/S6 |
-| C21 | SVG→PPT→SVG及同Document重复导出×sharedFill/PathData/Font×cache热冷 | 源模板与nodes稳定，metadata/IDs稳定，无永久填充规则污染，S4/S6 |
-| C22 | 3staticPolicy×2textMode×animationStrict/BestEffort×bake资源/预算失败 | 正交策略，不冻结Strict动态、不新增VectorOnly补丁、不silently成功，S0/S6 |
-| C23 | deep/cyclic reference×乘性Repeater×glyph/points/image/output预算 | 有限性与数量边界安全，budget耗尽确定失败，不把input NaN sentinel误拒绝，S0/S6 |
-| C24 | sourceSVG→PAGX与PAGX→SVG两段×未保留源参数 | 分离导入损失和新增导出损失，不以roundtrip掩盖双方同错，S0/S6 |
+| C01 | 每LayoutNode派生×约束/percent/explicit/intrinsic×padding×合法cold/warm/re-layout | position/size/scale一次，NaN unset≠0产物；S1/S3/S4 |
+| C02 | Layer matrix3D/matrix/components×anchor×layout×scroll | 全分量/pixel、matrix保z、3D覆z、flatten；S1/S2 |
+| C03 | 同Composition双实例×cross-parentMask×external同名×ID | 实例/父空间/no重复ID/引用正确；S1/S5 |
+| C04 | stage owner/Mask根/后代visible×alpha×三Mask×scroll/effect/composition | hidden owner不漏、根特例、Contour stroke/洞；S1/S2/S4 |
+| C05 | Group上行geometry×内外Painter×前后scale/skew×gradient/pattern/Stroke | capture inner/final分离、paint/width/bounds；S1/S4/S5 |
+| C06 | geometry→Painter→modifier→Painter×Group/Text/Repeater/Merge | Painter lifetime/reference更新/Merge清/复制序与alpha；S1/S4 |
+| C07 | 两级groupOpacity×18blend上下文×filter/pixelMask/背景隔离 | direct/offscreen一致、半透明重叠直接pixel；S1/S2 |
+| C08 | Below顺序×Above顺序×children×foreground×后filter | 不按Style类型重排、真实bucket；S1/S2 |
+| C09 | Blur/Drop/Inner/Matrix/Blend/Noise非交换链×Only×outputOffset | 前output→后input、bounds累计、不末尾merge；S2 |
+| C10 | excludeChildEffects×own/child-only×child effects×spread/behind | content/contour/geometry三源、spread实际规则；S2/S4 |
+| C11 | Glass/backdrop×alpha0 own/bitmap孔/SDF-UDF×祖先foreground×bake | backdrop/coverage/halo、无二次背景、consume前缀；S2/S5 |
+| C12 | layoutRuns/authored runs×多Font/size×短数组×faux/anchor | placement/paint、Font/GID/advance/bounds；S3 |
+| C13 | TextBox两模式×nestedGroup/Painter/foreground×resolvedsize×overflow | glyph-only/非text/valid empty不画原文；S3 |
+| C14 | TextPath normal/force×open/closed×margin×Selector×Modifier序 | final glyph/normal/顺序/base-overlay；S3 |
+| C15 | 2unit×6shape×6mode×连字/RTL/multiText×seed/weight | factor/首selector/random稳定/活跃；S3 |
+| C16 | primitive/path/glyph×cap/join/align×dash×reversed×退化×fit | 原轮廓/退化Stroke/dash起点/bounds；S4 |
+| C17 | 四gradient×stop空/单/重复/边界×matrix/fit×space/alpha | 默认/退化、空间premultiply、runtime fit；S5 |
+| C18 | data/dataURI/file/runtimeImage×4format×16tile×4fit×6sampling | 各消费者优先链/dimensions/纹理/预算；S5 |
+| C19 | vector/bitmap交错×overlap×scope/painter alpha×failure | run遮挡序/image opacity/missing≠blank；S3/S5 |
+| C20 | 模板/defaultHost/已有scene×VM8type×4direction×converter×open/shared slot | 全referenceInstance链接→统一bind→首次flush，父slot/Composition共享VM、open slot回填与跨层source；主动排除、同状态参考；D7/S0/S6 |
+| C21 | SVG→PPT→SVG/同doc重复×sharedFill/PathData/Font×合法冷热 | 模板/nodes/metadata/ID稳定，Font不热改，无Fill污染；S4/S6 |
+| C22 | 3staticPolicy×2textMode×animationStrict/BestEffort×bake失败 | 正交、不冻Strict、不VectorOnly新增补丁、不silent成功；S0/S6 |
+| C23 | deep/cycle×乘性Repeater×glyph/points/image/output预算 | 有限/数量安全、预算确定失败、NaN sentinel不误拒；S0/S6 |
+| C24 | sourceSVG→PAGX/PAGX→SVG两段×未保存源参数 | 分离import损失/export新增损失，非roundtrip掩同错；S0/S6 |
 
-### 13.10 本次全集核查补出的具体缺口与阶段修正
+#### D.2 动态 A01—A22
 
-ST1—ST18 继续保留，下面不是重复统计，而是原先缺口清单未具体覆盖的行为。每项都有声明或实际消费依据；尚未新增运行测试。
-
-| 编号 | 新明确的缺口 / 证据 | 复现与修复 / 阶段 |
+| 组合编号 | 必测动态交互 | 检测 / 分类 |
 |---|---|---|
-| ST19 | SamplingOptions模型已有，`src/renderer/LayerBuilder.cpp:2261` 传filter/mipmap，`src/pagx/utils/RasterUtils.cpp:401` bake没传 | 6sampling×16tile在放缩旋转真实图上验证；原生与bake同源，S5 |
-| ST20 | RangeSelector完整算法未纳入旧方案，`third_party/tgfx/src/layers/vectors/TextSelector.cpp:436` Index offset/shape与首mode规则真实 | 直接factor与全glyph/mode/seed矩阵；不按字符串长度，S3 |
-| ST21 | TextModifier覆盖可base+overlay，`third_party/tgfx/src/layers/vectors/TextModifier.cpp:225` 与FillStyle/StrokeStyle消费 | gradient+半透明override及strokeWidth factor/串联modifier，输出最终paint而非只改属性，S3/S1 |
-| ST22 | TextPath具有baseline/法向/force/margin/open延伸/closed回绕，`third_party/tgfx/src/layers/vectors/TextPath.cpp:170` | 八字段完整最终glyph求值，不能加textPath即算完成，S3 |
-| ST23 | Merge清旧Painter，`third_party/tgfx/src/layers/vectors/MergePath.cpp:70`，resolver只替shapeSlots；Text转Shape也未覆盖 | Rect→Fill→Rect→Merge→Stroke与Merge后无Painter；完整VectorContext语义，S4 |
-| ST24 | `third_party/tgfx/src/layers/vectors/Repeater.cpp:139` Below从末副本开始；`src/pagx/utils/ModifierResolver.cpp:711` 相反 | 相交副本及不同alpha，修真次序与整数幂；分数负幂单独契约，S4 |
-| ST25 | 静态空间gradient插值/目标色域/premultiply未独立验收，`third_party/tgfx/src/core/shaders/GradientShader.cpp:140` | 透明红到蓝内部位置、P3/mixed stop，非时间LerpColor，S5 |
-| ST26 | `third_party/tgfx/src/core/shaders/GradientShader.cpp:337` 端点/radius/angle退化与单stop真实规则 | linear/conic近相等首色，radial/diamond近0末色；正常/阈值/无效分支，S5 |
-| ST27 | 零轴primitive原生微轮廓仍可Stroke，SVG zero尺寸消失，`third_party/tgfx/src/layers/vectors/Rectangle.cpp:80` | 零宽/高/负轴+Stroke/cap/dash/Trim，与Fill分开，S4 |
-| ST28 | `src/pagx/utils/TextUtils.cpp:492` Native box优先author尺寸而非更高约束resolved尺寸 | width80+双边分配120、竖排height，使用同布局结果，S3/S1 |
-| ST29 | `src/pagx/svg/SVGExporter.cpp:2839` 空行fallback可重画Hidden丢弃文字 | height小于首行、all/some/none有效行，区分空layout与missingmetadata，S3 |
-| ST30 | Native空白/BiDi/justify不等价，`src/pagx/svg/SVGExporter.cpp:2504` 与 `src/pagx/TextLayout.cpp:1082` | 前后连续space/tab/CJK无space/RTL数字富文本；Fidelity与Native独立契约，S3 |
-| ST31 | `src/pagx/svg/SVGExporter.cpp:2316` 先所有path再所有bitmap重排glyph | 同Text合法多Font run先bitmap后vector重叠，保持原次序，S3 |
-| ST32 | 仅反射/Anim台账漏结构引用、None字段和derived输入 | 本章55NodeType+全部成员/枚举集合对照；新增字段必须未分类阻断，S0/S6 |
-| ST33 | Layer隐藏+有mask可漏舞台过滤，`src/pagx/svg/SVGExporter.cpp:3391` | hidden owner与hidden Mask根区别，S1 |
-| ST34 | composition和contents同时存在，builder选其一 `src/renderer/LayerBuilder.cpp:1177`，SVG两者都画 | 同Layer两内容有相交颜色，遵循实际优先级或拒绝明确冲突，S1 |
-| ST35 | clipToBounds生成scrollRect后重布局被hasScrollRect阻断，`src/pagx/nodes/Layer.cpp:289` | 宽100→200、显式scroll优先，源布局生成状态失效，S1 |
-| ST36 | SVG重新文字布局FontConfig与doc有效字体不同，`src/pagx/svg/SVGExporter.cpp:3689` | 仅doc注册定制font、第一次布局后导出，统一有效配置，S3/S5 |
-| ST37 | 外部Font资源预扫只根doc.nodes，`src/pagx/svg/SVGExporter.cpp:3709`；SDK unresolved资源缺统一入口 | 外部embedded font / bitmap / nested未供应、SDK与CLI等价前置检查，S5/S6 |
-| ST38 | Noise density0 renderer no-op，SVGband仍留bucket，`third_party/tgfx/src/layers/filters/NoiseFilter.cpp:144` | Mono/Duo/Multi零density、无效size不得空filter，中心相位及串行offset、Duo合成，S2 |
-| ST39 | Style继承/特有字段未完整消费，`include/pagx/nodes/LayerStyle.h:30`、`include/pagx/nodes/DropShadowStyle.h:34` | showBehind、exclude、blend所有位置、Below/Above顺序、spread实际轮廓/塌陷，S2 |
-| ST40 | BlendFilter额外alpha裁剪与Plus silent normal，`src/pagx/svg/SVGExporter.cpp:1076` | 18mode×source/dest透明度含透明洞，对齐真正ColorFilter，S2/S5 |
-| ST41 | false关闭SMIL≠默认宿主初始化，`src/pagx/PAGScene.cpp:514` draw先flushbinds | 模板值与Once/defaultVM不同，D7明确选择及同源bake/reference，不silently取首帧，S0/S6 |
-| ST42 | 路径数字%g精度及布局/paint-fit/coverage边界契约未独立覆盖，`src/pagx/svg/SVGPathParser.cpp:43`；renderer实际fit使用包含控制点的getBounds | 大坐标局部小差值、Q/C控制点远离曲线、LetterBox fit与输出coverage分别对照，不擅自tight化运行语义，S4/S5 |
+| A01 | Default/Named/All×首SM/unknown×无根仅Composition | 选择不暗跳、定义≠激活；N/G或明确U；M1 |
+| A02 | 同template双slot×external同名×contains×普通Layer timeline | 实例binding/所属doc、无越界/误激活；M1 |
+| A03 | 同slot同animationId多driver×任一paused×兄弟slot | shared pause scope禁advance但全apply，兄弟独立；M1 |
+| A04 | 三Loop×±offset/paused×fps×D/2D/第二周期 | content与progress分离、初态/唯一周期；M1 |
+| A05 | 静态masked pose×同anim跨Object priority×跨anim matrix/component/mix | merge后filter、anchor/z例外、ordered decompose；M2 |
+| A06 | scalar full turns×Matrix shortestArc×anchor/skewAxis/负/零scale | 全圈/连续角/捕获前后singular，不inverse恢复；M2/M3 |
+| A07 | 多easing×scope/Painter/color alpha×零起点×两groupOpacity | 完整乘积与重叠合成；N或有证明G；M2/M3 |
+| A08 | 跨duration/空/单/duplicate ordered key×1-frame/D1/D0 | t0真值50、T{}≠无channel、重复边界按runtime；M3 |
+| A09 | None/Hold/Linear/Bezier×overshoot float/Color×镜像 | No epsilon、float不clamp因子/Color分量clamp；M3 |
+| A10 | XML整数/浮点/string/enum/ImageRef×实际writer | parse→evaluate→apply，blendMode/image mismatch源修或U；M1/M5 |
+| A11 | shared color/gradient/stop×实例/Clock×dynamic fit/space/alpha | defs依赖、连续bounds/退化与颜色；N/G或B；M4 |
+| A12 | 动态blur/shadow/behind/Only/spread×有序effect链×region/offset | 全时段来源/halo/非线性参数；N/G可证，否则B；M4 |
+| A13 | Noise活跃/inactive/density0×backdrop/Glass×动态背景 | 无writer/no贡献≠B；B只D8/MB；M4/MB |
+| A14 | 动态Rect/Ellipse/Polystar×静态Trim/Round/Merge×Painter | 来源不丢、形变/拓扑/painter lifetime；G或B；M5 |
+| A15 | Path pointN×renderScale×verb长度/overflow×fit/dash | 原始点求值后完整geometry；G，非法U；M5 |
+| A16 | Repeater copies/offset/幂/alpha×copy order×外Painter | bounded副本/离散拓扑，非法幂U、复杂B；M5 |
+| A17 | Text九channel×字体供应×TextBox/overflow×glyph count切换 | TextHolder/flush/reshape/有效空；G证明或B/U；M5 |
+| A18 | Selector六channel×Modifier十三×TextPath×base-overlay paint | glyph index/factor/矩阵/顺序、拓扑与预算；G或B；M5 |
+| A19 | Mask/Contour/TextBox/WOFF2/path/bitmap分支×祖先/实例动画 | 实际宿主带共用上下文、覆盖与alpha；M2/M5 |
+| A20 | 多Clock无有界公周期×组合依赖×有限window/repeat | 分解可证N/G；明确窗口B；无界/未知U；M3/MB |
+| A21 | finite事件/Once/初态/资源×3D/conic/diamond/noise/backdrop/complex fallback×staticPolicy | D8未同意或VectorOnly拒绝；有限MB离散image每区间恰好一帧、透明/尾帧/repeat/seek/消费范围，无隐式改policy；MB |
+| A22 | 175全集分类×实际输出×staticPolicy×预算/写失败 | classified≠supported、Strict不PNG冻、B/U确定拒绝、旧file不变；M6 |
 
-ST20 / ST22 / ST32是原计划完整性细化，ST23 / ST24 / ST28 / ST29 / ST33—ST40包含具体实现偏差；不得把新增条数当“已修复数量”。renderer 本身存在边界或注释漂移时，不在导出里猜更好的语义：先记录实际行为，非法 / 不可复现输入按策略处理；确需改变共享运行语义则单独确认并回归。
+### E. 唯一静态 ST1—ST46 目录
 
-各阶段追加内容已经闭合：
+ST1—ST42 合为一表，不再旧 / 新两篇；ST43—ST46 是本轮契约补核查。下列是开发输入与待验证场景，条数不是修复数量。
 
-- **S0**：55类声明台账、公共 / 非反射 / 动态附属字段、D7、no-op/inactive/有效空分类，新增ST19—ST42与组合门禁。
-- **S1**：捕获geometry集合与innerMatrix / finalMatrix、Painter lifetime、Layer有效内容与hidden、生成clip失效、实例与Mask。
-- **S2**：11种effect完整字段、全部blend/tile/noise分支，shadow逐步输出、Style真实bucket与顺序、Glass owngeometry与bake消费前缀。
-- **S3**：layoutRuns和glyphRuns、7数组边界、TextPath / Selector / TextModifier完整最终字形及paint、resolvedbox/有效空/Native损失/run绘制序。
-- **S4**：Text→Shape、Merge清Painter、真正Append、Repeater顺序/幂、原轮廓与退化Stroke、数值精度与局部生命周期。
-- **S5**：渐变空间插值/退化、真实paint-fit与独立coverage bounds、全部tile/fit/sampling、externalFont、按消费方资源优先级和FontConfig。
-- **S6**：集合缺项阻断、公开策略及D7、诊断不依赖动画plan、SDK/CLI、模板不污染、数量/像素/字节预算与同源交付回归。
-
-### 13.11 覆盖台账的维护和验收门禁
-
-**本轮文档校验结果**：
-
-| 核查项 | 当前声明集合对照结果 | 不代表的结果 |
+| 编号 | 源码依据与根因 / 契约 | 直接复现、修复与阶段 |
 |---|---|---|
-| NodeType与模型类 | 55/55，无遗漏、无重复；直接继承关系逐类一致 | 不是55类视觉测试通过 |
-| 模型自有数据成员 | 55类共334个自有成员逐名一致，含private输入/缓存；方法、前置声明、静态常量不算成员输入 | 不代表334个成员都有已实现的等价输出 |
-| 继承基类与附属/派生结构 | 31个登记结构的111个自有成员一致；继承从同一表递归展开 | 不把111项派生状态都称为作者输入 |
-| 相关enum | 除NodeType外40类、155个值对照nodes/types声明及ChannelFlags，无缺值 | 不代表所有组合都跑过 |
-| 组合与缺口归属 | C01—C24及ST1—ST42逐项有语义、阶段和验收要求 | 缺陷样本数量不是全部潜在bug数量，也不是修复数量 |
+| ST1 | `src/pagx/svg/SVGExporter.cpp:319` ID不避作者；`src/pagx/svg/SVGExporter.cpp:3537`重复内联，Mask按template cache | grad0、双实例内部同ID、Mask后缀/external碰撞；S1 |
+| ST2 | `src/pagx/svg/SVGExporter.cpp:1858`跨父只告警；`src/pagx/svg/SVGExporter.cpp:1814`只自身matrix | 祖先平移/旋转/scroll、子Mask、双实例；完整相对空间；S1 |
+| ST3 | `src/pagx/svg/SVGExporter.cpp:1828`根alpha=1，绕effects/composition/scroll/probe | alpha0/0.5、仅composition、filters/scroll/TextPath、Luminance前景白背景黑；S1/S2 |
+| ST4 | `src/pagx/svg/SVGExporter.cpp:1842`Contour普通paint、未抽覆盖；`src/pagx/svg/SVGExporter.cpp:3557`只跳直接Mask child | stroke环/evenodd洞/hidden后代，外父stage Mask不额外画；S1/S4 |
+| ST5 | `src/pagx/svg/SVGExporter.cpp:3432`、`src/pagx/svg/SVGExporter.cpp:3539`简化alpha包装 | nested groupOpacity=false重叠、filter/blend/pixelMask/passThrough=false；真实离屏；S1 |
+| ST6 | `src/pagx/svg/SVGExporter.cpp:1711`px margin当%；`src/pagx/svg/SVGExporter.cpp:1453`shadow不推进；`src/pagx/svg/SVGExporter.cpp:1729`filter先style | 小bbox大blur/offset、连续非交换链、style后filter、Mask缩放尺度；S2 |
+| ST7 | `src/pagx/svg/SVGExporter.cpp:1521`忽略spread；`src/pagx/svg/SVGExporter.cpp:1576`、`src/pagx/svg/SVGExporter.cpp:1652`跳Glass/backdrop | ±spread/tile/noise、渐变背景半透明Glass/祖先foreground，不能孤立目标PNG；S2 |
+| ST8 | `src/pagx/svg/SVGExporter.cpp:3334`TextBox富文本旁路；`src/pagx/utils/TextUtils.h:74`只非空text且丢内Group状态 | glyph-only/Rect/多Painter/transform-alpha/foreground双遍；S3 |
+| ST9 | `src/pagx/svg/SVGExporter.cpp:2388`WOFF2多Font/advance/anchor不全；`src/pagx/utils/TextUtils.cpp:84`matrix不同、`src/pagx/utils/TextUtils.cpp:192`漏offset | 双Font、无position/xOffset、非零anchor/rotate-scale-skew/vector offset；S3 |
+| ST10 | `src/pagx/svg/SVGExporter.cpp:2293`fill-opacity；`src/pagx/svg/SVGExporter.cpp:2334`image漏因子 | 真实PNG/WebP glyph、scope/Painter alpha、缺resource诊断；S3/S5 |
+| ST11 | `src/pagx/svg/SVGExporter.cpp:2118`inset；`src/pagx/svg/SVGExporter.cpp:1990`简dash；`src/pagx/svg/SVGExporter.cpp:2217`漏reversed | 厚非圆ellipse、open/closed Path/Text内外stroke、adaptive/roundcap/reverse/原fit；S4 |
+| ST12 | `src/pagx/utils/ModifierResolver.cpp:499`PPT Append→Union；`src/pagx/utils/ModifierResolver.cpp:596`Group不进slots；`src/pagx/utils/ModifierResolver.cpp:720`Repeater清槽 | Append overlap stroke、外Trim/Merge、负scale首copy幂、shared Fill rule；S4 |
+| ST13 | `src/pagx/svg/SVGExporter.cpp:665`empty stop；`src/pagx/svg/SVGExporter.cpp:639`退化fit；`src/pagx/svg/SVGExporter.cpp:3293`未携Painter空间 | 默认黑白、零轴gradient、Group geometry由外user-space paint；S5 |
+| ST14 | `src/pagx/svg/SVGExporter.cpp:872`仅PNG尺寸；`src/pagx/svg/SVGExporter.cpp:816`任Repeat双轴；`src/pagx/svg/SVGExporter.cpp:915`旋转丢fit | 真实JPEG/WebP/GIF、Repeat/Decal、Mirror+LetterBox、rotate/负scale+Stretch/Zoom；S5 |
+| ST15 | `src/pagx/utils/ImageFormatUtils.cpp:270`、`src/pagx/utils/RasterUtils.cpp:393`只data/file；`src/renderer/LayerBuilder.cpp:2295`runtimeImage优先 | dataURI/供应runtime、红data蓝runtime、missing拒绝不泄本机路径；按消费者闭合；S5/S6 |
+| ST16 | `src/pagx/utils/ModifierResolver.cpp:736`改shared Fill、makeNode临时增长 | 重复SVG→PPT→SVG、Fill/nodes稳定、nonfinite/deep/乘性copy/像素预算；S4/S6 |
+| ST17 | `src/renderer/LayerBuilder.cpp:2756`消费AA；`src/pagx/svg/SVGExporter.cpp:3575`未承载 | AA=false斜边/rotate/clip固定scale，不以hint未经验证视等价；S1/S2 |
+| ST18 | `src/renderer/GlyphRunRenderer.cpp:200`faux；`src/pagx/svg/SVGExporter.cpp:2480`WOFF2/outline漏样式 | 真实style+faux、outline/advance/bounds/Mask、Native/WOFF2/path/bitmap分别；S3 |
+| ST19 | `src/renderer/LayerBuilder.cpp:2261`sampling；`src/pagx/utils/RasterUtils.cpp:401`bake漏 | 6sampling×16tile、放缩旋转真实纹理，native/bake同源；S5 |
+| ST20 | `third_party/tgfx/src/layers/vectors/TextSelector.cpp:436`Index offset/shape/首mode | 完整factor/glyph/mode/seed，非字符串长；S3 |
+| ST21 | `third_party/tgfx/src/layers/vectors/TextModifier.cpp:225`base+overlay | gradient+半透明override/stroke factor/串联，最终paint非仅属性；S3/S1 |
+| ST22 | `third_party/tgfx/src/layers/vectors/TextPath.cpp:170`完整沿线glyph | 八字段/baseline/法向/force/margin/open延伸/closed回绕；S3 |
+| ST23 | `third_party/tgfx/src/layers/vectors/MergePath.cpp:70`清旧Painter，resolver只换slots | Rect→Fill→Rect→Merge→Stroke、Merge后无Painter、Text→Shape；S4 |
+| ST24 | `third_party/tgfx/src/layers/vectors/Repeater.cpp:139`Below末copy先；`src/pagx/utils/ModifierResolver.cpp:711`反序 | 相交不同alpha、真次序/整数幂，负底分数幂独立边界；S4 |
+| ST25 | `third_party/tgfx/src/core/shaders/GradientShader.cpp:140`空间插值/premultiply | 透明红蓝内部、P3/mixed，非时间LerpColor；S5 |
+| ST26 | `third_party/tgfx/src/core/shaders/GradientShader.cpp:337`退化/单stop | linear/conic近等首色、radial/diamond近0末色、正常/阈值/无效；S5 |
+| ST27 | `third_party/tgfx/src/layers/vectors/Rectangle.cpp:80`零轴微轮廓 | 零/负轴+Stroke/cap/dash/Trim，Fill独立，与singular区分；S4 |
+| ST28 | `src/pagx/utils/TextUtils.cpp:492`Native author尺寸优先 | width80双边resolved120、竖height，同layout结果；S3/S1 |
+| ST29 | `src/pagx/svg/SVGExporter.cpp:2839`empty fallback重画Hidden文字 | all/some/none有效行，valid empty≠missing metadata；S3 |
+| ST30 | `src/pagx/svg/SVGExporter.cpp:2504`、`src/pagx/TextLayout.cpp:1082`Native空白/BiDi/justify差 | 连space/tab/CJK无space/RTL数字rich text、两text模式；S3 |
+| ST31 | `src/pagx/svg/SVGExporter.cpp:2316`先path后bitmap | 合法多Font先bitmap后vector重叠，保run序；S3 |
+| ST32 | `include/pagx/nodes/Node.h:30`、`src/pagx/PAGXChannelTable.h:28`反射非全集 | 55/334+31/111+40/155集合与结构/None/derived输入，漏分类阻断；S0/S6 |
+| ST33 | `src/pagx/svg/SVGExporter.cpp:3391`hidden+mask漏stage过滤 | hidden owner≠hidden Mask根；S1 |
+| ST34 | `src/renderer/LayerBuilder.cpp:1177`composition优先、SVG双画 | 双内容相交颜色，实际优先级或明确拒冲突；S1 |
+| ST35 | `src/pagx/nodes/Layer.cpp:289`生成scroll被hasScroll阻断失效 | width100→200、explicit scroll优先，源layout修；S1 |
+| ST36 | `src/pagx/svg/SVGExporter.cpp:3689`有效fontConfig不同 | 仅doc注册字体、首次layout后export、同源配置；S3/S5 |
+| ST37 | `src/pagx/svg/SVGExporter.cpp:3709`根nodes预扫external Font遗漏 | external embed/bitmap/nested未供应、SDK/CLI同前置；S5/S6 |
+| ST38 | `third_party/tgfx/src/layers/filters/NoiseFilter.cpp:144`density0 input no-op | 三mode零density、无效size不空filter、phase/offset/Duo合成；S2 |
+| ST39 | `include/pagx/nodes/LayerStyle.h:30`、`include/pagx/nodes/DropShadowStyle.h:34`继承/特有漏消费 | behind/exclude/blend/Below-Above顺序/spread contour塌陷；S2 |
+| ST40 | `src/pagx/svg/SVGExporter.cpp:1076`Blend额外alpha clip/Plus Normal | 18×source/dest alpha与透明洞、真正ColorFilter；S2/S5 |
+| ST41 | `src/pagx/PAGScene.cpp:514`draw先flush绑定 | false关SMIL≠defaultHost、Once/默认VM≠模板、同源bake/reference；S0/S6 |
+| ST42 | `src/pagx/svg/SVGPathParser.cpp:43`%g；`third_party/tgfx/src/core/PathRef.cpp:42`全控制点bounds | 大坐标小差/Q-C远点/LetterBox fit、layout-fit-coverage分开，不擅tight化；S4/S5 |
+| ST43 | `src/pagx/utils/ModifierResolver.cpp:596`、`src/pagx/svg/SVGFeatureProbe.cpp:86`解析与probe有效路径 | 移除resolveModifiers丢效果开关；Polystar/Group/Text/Mask静动默认完整解析，偏好不绕policy；S0/S4/S6 |
+| ST44 | `include/pagx/nodes/Font.h:103`glyphs首render后undefined；`src/renderer/GlyphRunRenderer.cpp:109`失败也built | 合法同输入cold/warm、新Font/既定清理、失败缓存、共享layout/cache外部串行；不承诺热改自动重建；S1/S3/S6 |
+| ST45 | `third_party/tgfx/src/core/shapes/MatrixShape.cpp:30`singular→null；`third_party/tgfx/src/layers/vectors/Rectangle.cpp:80`微轮廓不同 | Painter捕获前后零scale/恢复、Fill/Stroke/Mask，保runtime空几何不inverse强恢复；S1/S4 |
+| ST46 | `src/cli/CommandExport.cpp:184`、`src/pagx/svg/SVGExporter.cpp:3673`入口输出契约需闭合 | 推荐转换成功后同目录tmp→write/flush/close→atomic replace；逐步失败注入，旧file不变、清理有界、不承诺crash durability；S0/S6 |
 
-以上通过只读的声明/文档集合校验和独立审阅完成，不创建源文件，不代表任何新构建、像素或跨浏览器测试已经通过。后续声明新增时本结果失效，必须重新枚举核对。
+复用静态证据：倍宽 alignment clip `third_party/tgfx/src/layers/contents/ShapeContent.cpp:129`；adaptive dash `third_party/tgfx/src/layers/DashEffect.cpp:24`；Contour stroke `third_party/tgfx/src/layers/contents/DrawContent.cpp:70`；离屏与Mask相对matrix `third_party/tgfx/src/layers/Layer.cpp:1185`、`third_party/tgfx/src/layers/Layer.cpp:1277`；glyph offset / advance / anchor `src/renderer/GlyphRunRenderer.cpp:137`、`src/renderer/GlyphRunRenderer.cpp:218`；空stop `src/renderer/LayerBuilder.cpp:2097`、退化fit `third_party/tgfx/src/layers/vectors/Gradient.cpp:93`、image fit `third_party/tgfx/src/layers/vectors/ImagePattern.cpp:95`。
 
-**实施期门禁**：
+### F. 唯一动效 F1—F18 目录
 
-1. 从NodeType与完整模型声明建立集合，与第13.2/13.3节一一对照：没有漏类，没有重复NodeType，没有漏继承或结构字段，新增节点/字段/枚举值首先标为未分类而失败。
-2. 每个真实输入字段至少有默认、非默认、合法边界与其关键依赖测试；cache有温冷/失效测试，元数据有转义/确定性或显式排除测试，宿主定义有主动排除/状态来源测试。
-3. 每个有效绘制节点必须记录renderer消费与SVG表达结果。布局消解不要求同名SVG属性，结构展开不要求还原源标签，但结果不可丢。
-4. 所有闭合enum逐值覆盖，bool双值、optional三态、数组长度边界和公开资源输入源全覆盖；开放注册converter与任意URL的前置条件如实声明，不能标“穷举完成”。
-5. C01—C24每组有直接语义与视觉断言，涉及连续算法用边界、误差界及性质验证；不能用表格完整度代替像素正确率，也不能用全图均值盖住小主体。
-6. 完整field ledger中的缺口映射S阶段、ST回归和目标browser验证；不能用旧测试接受的有损输出作为正确参考。
-7. TemplateStatic、Native/Fidelity、VectorOnly/PreserveAppearance/BestEffort和动态模式各自具有可见契约。所有路径输出或确定拒绝，资源失败和预算耗尽不silently跳过。
-8. 修改shared布局/字形/modifier/资源语义后，SVG/PPT/HTML与PAGX runtime回归；源码构建、截图与基准流程仍按第10节，不手改基准消除差异。
+F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证据外，本轮没有新增运行复现；可修错误从源头修，不以 unsupported 告警掩盖。
 
-本章完成的是**当前55种模型及成员的开发方案分类**。代码实现、测试用例、浏览器像素验证和ST修复均尚未完成；这一状态在后续开发时逐项更新，不能直接把本章台账标成生产能力。
+| 编号 | 根因与源码定位 | 复现 / 预期与阶段 |
+|---|---|---|
+| F1 | `src/pagx/svg/SVGAnimationPlan.cpp:124`提前返，只扫Layer driver | 根Animation无Layer driver、仅Composition且根定义空仍按实际激活导出；M1 |
+| F2 | `src/pagx/svg/SVGAnimationPlan.cpp:131`pointer去重、`src/pagx/svg/SVGAnimationPlan.cpp:153`根doc解析/Node binding | 双slot不同phase/playing、external同名不根误绑、scope contains；M1 |
+| F3 | `src/pagx/svg/SVGAnimationWriter.cpp:599`共享duration重复翻倍、`src/pagx/svg/SVGAnimationWriter.cpp:1283`color同、`src/pagx/svg/SVGAnimationWriter.cpp:1212`visibility未镜像 | PingPong 2D统一，现transform16D/color4D，visibility往返；M1 |
+| F4 | `src/pagx/svg/SVGAnimationWriter.cpp:253`offset/paused仅begin | delay前/paused真实初态、Loop正offset原点模回绕，不等待begin；M1 |
+| F5 | `src/pagx/utils/ExporterUtils.cpp:160`identity漏position override | 默认Group position.x 0→100中点50；M2 |
+| F6 | `src/pagx/svg/SVGAnimationWriter.cpp:537`重decompose丢标量圈数/shortestArc | scalar0→360整圈，Matrix170→190中点180非0；M2 |
+| F7 | `src/pagx/svg/SVGAnimationWriter.cpp:432`不Hold、`src/pagx/svg/SVGAnimationWriter.cpp:940`派生连续/首尾不一 | width100 Hold→200中点100、15/45key duration60真补端、不同easing内部；M2/M3 |
+| F8 | `src/pagx/svg/SVGAnimationWriter.cpp:772`、`src/pagx/svg/SVGAnimationWriter.cpp:816`零alpha退出、`src/pagx/svg/SVGAnimationWriter.cpp:834`静态比率、`src/pagx/svg/SVGExporter.cpp:2060`缺Painter/color因子 | 零起淡入、0.5³=0.125、多因子同时animate组合；M2/M3 |
+| F9 | `src/pagx/svg/SVGExporter.cpp:3432`任Layer animation改perChildAlpha、`src/pagx/svg/SVGExporter.cpp:3584`组opacity不等价 | groupOpacity=false静alpha0.5仅matrix动仍逐项重叠合成；M2 |
+| F10 | `src/pagx/svg/SVGExporter.cpp:1794`Mask writer漏Plan、`src/pagx/svg/SVGExporter.cpp:3334`Native TextBox路径不全 | Mask内部、TextBox/祖先轨道到实际宿主且空间正确；M2 |
+| F11 | `src/pagx/svg/SVGExporter.cpp:3406`只自身依赖、resolver产物失来源 | 内Group/Rect/Fill动态不单PNG freeze，替换geometry保依赖；M2/M5 |
+| F12 | `src/cli/CommandExport.cpp:184`不收warnings | stderr损失可见、Strict非零、不成功提示掩盖；M6 |
+| F13 | `src/pagx/PAGXImporter.cpp:1906`、`src/pagx/PAGXImporter.cpp:1933`typed parsing；`src/renderer/LayerBuilder.cpp:1239`、`src/renderer/LayerBuilder.cpp:1939`writer mismatch | 全typed XML→evaluate→actual apply；int/float/enum/imageRef≠runtimeImage、Path point长度与溢出，源修或U；M1/M5 |
+| F14 | `src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111`merge/filter；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267`shared pose | 静态masked/同anim跨Object/跨anim ordered mix三层，matrix不屏z/anchor、后component decompose；M2 |
+| F15 | `src/pagx/runtime/KeyframeEvaluatorImpl.h:106`T{}、`src/pagx/svg/SVGAnimationWriter.cpp:129`clamp key、`src/pagx/svg/SVGAnimationWriter.cpp:191`Hold近似；`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`overshoot | 跨duration t0=50、空≠无、单/1-frame/D1/D0/nonfinite/duplicate ordered keys、float不clamp/Color分量clamp、No epsilon；M3 |
+| F16 | `src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:130`paused IDs共享 | 同slot同ID任paused禁全advance但apply全执行，兄弟slot独立、ordinal≠pause scope；M1 |
+| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry、`src/pagx/svg/SVGAnimationPlan.cpp:67`39/7白名单 | 每通道primary/组合和真实output审计，51 effect/九Text/十三Modifier/六Selector/表外不漏；classified≠supported；M0/M4/M5/M6 |
+| F18 | `src/pagx/PAGAnimation.cpp:274`Clock、`src/pagx/PAGScene.cpp:514`宿主flush、`src/pagx/utils/RasterUtils.cpp:351`背景合成契约 | 多Clock无公周期、finite事件/3D/noise/complex fallback；D8禁用拒绝、明确MB初态/window/resources/resolution/sampling/tail/repeat/预算，无界U；M3/MB/M6 |
 
-本轮交付仍仅为完善后的方案文档。实现、源码格式化、编译和基线变更应在方案确认后按上述阶段执行。
+### 5.1 只读 coverage 校验与维护门禁
+
+| 核查集合 | 已登记范围 / 只读校验要求 | 不代表 |
+|---|---|---|
+| Node inventory A.3 | 55/55，334 自有字段逐名 / 直接基类一致；private输入/缓存不漏，NodeType恰好一次 | 55类视觉或334字段等价输出已实现 |
+| 辅助 A.1 | 31类 / 111自有字段，按表递归继承，非Node附属 / 派生完整 | 111项都是作者输入、非法Font热修改受支持 |
+| enum C | NodeType之外40类 / 155值，与nodes/types/ChannelFlags集合一致 | 无限组合穷举或所有值pixel通过 |
+| dynamic ledger 3.2 | 30类 / 175全名，与反射Anim集合一致；styles/filters51、Group/TextBox各10；表外另账 | 175全部支持、39白名单保真或B已经实现 |
+| 组合 / 缺口 | C01—C24、A01—A22、唯一ST1—ST46 / F1—F18，无漏号 / 重号，阶段闭合 | 缺陷总数、修复数量或新测试通过数 |
+
+重组后重新对照当前声明，55节点/334字段及继承、31附属结构/111字段、40枚举/155值、30类/175动效通道全部一致；ST/F/C/A编号唯一完整，D决策、代码块与章节引用已核对。文中file:line引用逐项检查了文件存在与行号范围，并经独立语义复审；这些检查不执行渲染，也不证明所有引用行为已运行复现。源码新增声明使旧计数失效，必须重新枚举；未分类项先阻断，不能静默default。
+
+后续每有效输入至少默认 / 非默认 / 合法边界 / 关键依赖；cache按合法生命周期、metadata按转义 / 确定性或排除、宿主按主动排除 / 状态来源；所有有效 draw 与 channel 有输出 / 确定拒绝记录。开放 converter / URL / 业务历史不能标“穷举”。连续 N/G 按误差证明，B按明确有限契约；视觉与集合门禁分别报告，共享源变化回归按第4节。
+
+### 5.2 压缩文件索引（未来责任范围）
+
+| 文件 / 模块 | 责任 |
+|---|---|
+| `include/pagx/SVGExporter.h` | policy/text/selection/诊断公开契约，替代冲突选项 |
+| `src/pagx/svg/SVGAnimationPlan.{h,cpp}` | instance/driver/pause scope、typed绑定/ordered apply、依赖/分类计划 |
+| `src/pagx/svg/SVGAnimationWriter.{h,cpp}` | compiled track / native-G-discrete、序列化；职责挤占时才拆内部单元 |
+| `src/pagx/svg/SVGExporter.cpp` | 共用Context/DrawRecord、Painter/defs/Mask/TextBox/bake消费 |
+| `src/pagx/utils/ExporterUtils.{h,cpp}`、`src/pagx/utils/LayerTransformUtils.{h,cpp}` | position override、组件/anchor/layout/3D与共用矩阵 |
+| `src/pagx/utils/ModifierResolver.{h,cpp}` | VectorContext、局部结果/provenance/lifetime、Append/Merge/Repeater |
+| `src/pagx/svg/SVGFeatureProbe.{h,cpp}`、`src/pagx/utils/RasterUtils.{h,cpp}` | 完整能力/引用/背景/3D、消费范围与像素预算 |
+| `src/pagx/utils/TextUtils.{h,cpp}`、`src/pagx/utils/Woff2FontGenerator.{h,cpp}` | glyph放置/alpha/faux、Font分段与WOFF2 |
+| `src/pagx/utils/ImageFormatUtils.{h,cpp}`、`src/pagx/utils/StrokeGeometryUtils.{h,cpp}` | 消费者资源链/解码尺寸、描边/clip/dash/fit |
+| `src/renderer/LayerBuilder.{h,cpp}`、`src/renderer/GlyphRunRenderer.{h,cpp}` | runtime writer/type/pose、资源/effect、glyph与cache源头依据 |
+| `src/pagx/TextLayout.{h,cpp}`、`src/pagx/TextLayoutParams.h` | 字体/布局/有效TextHolder参数、reshape与最终glyph |
+| `src/pagx/nodes/Layer.cpp`、`src/pagx/PAGXDocument.cpp`、`src/pagx/PathData.cpp` | layout失效/归属/生命周期、路径与缓存 |
+| `src/pagx/ppt/PPTExporter.cpp`及实际PPT模块 | PPT专用补偿，只在自身输出端处理，共用回归 |
+| `src/pagx/svg/SVGImporter.cpp`、`include/pagx/nodes/Gradient.h`、`include/pagx/nodes/RadialGradient.h` | 源SVG展开和模型未保留边界 |
+| `src/pagx/PAGAnimation.cpp`、`src/pagx/runtime/KeyframeEvaluatorImpl.h`、`src/pagx/runtime/MatrixDecompose.h` | 复用content Clock/evaluate/shortestArc，不另造求值器 |
+| `src/pagx/PAGXNodeChannel.cpp`、`src/pagx/PAGXImporter.cpp`、`src/pagx/runtime/PAGComposition.cpp` | channel声明/typed解析、有效实例和pause scope |
+| `src/cli/CommandExport.cpp`、`src/cli/CommandRender.cpp` | CLI选项/warnings/失败；render已有top和nested，选择集合/初始化/事件契约需与参考一致 |
+| `test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`、`test/src/PAGXCliTest.cpp` | XML/语义/资源/pixel、runtime Clock与CLI事务 |
+| `tools/html-snapshot/eval-animation/baseline-frames.js`、`tools/html-snapshot`共用入口、`CMakeLists.txt` | 借采帧基础而非WAAPI时钟，接入SMIL与构建/评测目标 |
+
+本轮交付仅为重组后的完整方案。D决策确认、源码实现、修复验证、浏览器像素、共享格式回归和基准审核仍未完成。
