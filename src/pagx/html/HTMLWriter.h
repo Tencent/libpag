@@ -175,6 +175,8 @@ struct RepeaterValues {
   float scaleX = 1.0f;
   float scaleY = 1.0f;
   float rotation = 0.0f;
+  // `offset` shifts every copy's progressive index (copy index + offset).
+  float offset = 0.0f;
   float startAlpha = 1.0f;
   float endAlpha = 1.0f;
 };

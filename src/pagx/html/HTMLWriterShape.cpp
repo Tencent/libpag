@@ -953,6 +953,7 @@ RepeaterValues RepeaterValuesFrom(const Repeater* rep) {
   values.scaleX = rep->scale.x;
   values.scaleY = rep->scale.y;
   values.rotation = rep->rotation;
+  values.offset = rep->offset;
   values.startAlpha = rep->startAlpha;
   values.endAlpha = rep->endAlpha;
   return values;
