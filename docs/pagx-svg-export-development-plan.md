@@ -529,7 +529,9 @@ ST8 进度：带 `GlyphRun` 的 run 在两条路径上都改为输出轮廓 `<g>
 
 ST9 / ST10 / ST18 / ST29 / ST31 已收口：`writeTextAsFont` 走字形 advance（无 positions / xOffsets 时按字宽推进）、要求单一 Font 且无旋转（旋转轴心与 anchor 无法在 `<text>` 表达），否则回落到轮廓；`<text>` 的 x 列表因此与 `WalkGlyphs` 的笔位一致。字形 `<g>` 的 fill / stroke opacity 携带累计 alpha，位图字形单独补 `opacity`。fauxBold / fauxItalic 在 WOFF2 与原生 `<text>` 两条路径都输出 `font-weight` / `font-style`。`overflow="hidden"` 丢光所有行时不再由兜底分支重画。字形改由 `ComputeGlyphDrawItems` 按 glyph 顺序返回，vector / bitmap 混排不再先画全部 path 再画 image。
 
-ST20 / ST21 / ST22 依赖 ModifierResolver 对 RangeSelector / TextModifier / TextPath 的解析产物，向量语义尚未补齐；默认 `bakeUnsupported=true` 时这些图层仍以 PNG 补丁保真。ST28 所述 Native 模式在本仓库 `TextBox` 上不存在（仅有 width / height / wordWrap / overflow），无对应改动入口。
+ST20 已收口：新增 `TextSelectorEvaluator`（`src/pagx/utils/TextSelectorUtils.h`）实现 RangeSelector 的单位换算（Percentage / Index）、offset 先作用于两端、start > end 交换、六种 shape（Square / RampUp / RampDown / Triangle / Round / Smooth，Triangle 吃 easeIn / easeOut）、randomOrder 的确定性洗牌，以及多选择器按序合并（首个选择器直接取值，Subtract 从 1 起算，逐次 clamp 到 [-1, 1]）。`ModifierResolver` 遇到仅含几何通道的 TextModifier 时，把 position / rotation / scale / skew / anchor 按字符权重烘进前置 Text 的 GlyphRun 通道并丢弃该 modifier；含 alpha / fillColor / strokeColor / strokeWidth 或 skewAxis 的 modifier 仍保留给烘焙路径。SVG 侧用 `ModifierResolver::CanBakeTextModifiers` 让探针跳过这类图层，不再整层栅格化；原生 TextBox 的元素列表也会先经过 resolver。
+
+ST21 / ST22 仍未收口：per-character alpha / paint 覆盖没有 GlyphRun 通道可承载，TextPath 的八字段沿线布局仍只有 tgfx 实现。默认 `bakeUnsupported=true` 时这两类图层继续以 PNG 补丁保真。ST28 所述 Native 模式在本仓库 `TextBox` 上不存在（仅有 width / height / wordWrap / overflow），无对应改动入口。
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
