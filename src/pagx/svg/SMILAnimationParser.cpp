@@ -398,13 +398,16 @@ static SyncBaseRef ParseSyncBase(const std::string& token) {
   // Split the trailing +/- clock offset, if any. The sign must follow the event suffix and be
   // followed by a clock value: a hyphen inside a legal id ("fade-in.end") is part of the id.
   double offset = 0;
-  const auto suffixDot = s.rfind('.');
-  const size_t offsetSearchStart = suffixDot == std::string::npos ? 1 : suffixDot + 1;
-  for (size_t i = offsetSearchStart; i < s.size(); ++i) {
+  for (size_t i = 1; i < s.size(); ++i) {
     if (s[i] != '+' && s[i] != '-') {
       continue;
     }
     if (!IsClockToken(s.substr(i + 1))) {
+      continue;
+    }
+    // The sign only starts an offset when an event suffix precedes it, so a hyphen inside a legal
+    // id ("fade-in.end") stays part of the id while "base.begin+0.5s" still splits.
+    if (s.substr(0, i).rfind('.') == std::string::npos) {
       continue;
     }
     offset = SMILAnimationParser::parseSMILClockValue(s.substr(i));

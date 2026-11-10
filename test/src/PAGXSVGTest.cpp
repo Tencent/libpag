@@ -6587,18 +6587,20 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateVaryingCenter) {
   ASSERT_EQ(obj->channels.size(), 1u);
   EXPECT_EQ(obj->channels[0]->name, "matrix");
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
-  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // An exact 180 degree sweep is subdivided into <=179 degree steps so the
+  // runtime keeps the sweep direction; assert the end pose, not the count.
+  ASSERT_GE(ch->keyframes.size(), 2u);
   EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
   auto expected = pagx::Matrix::Translate(100.0f, 100.0f) * pagx::Matrix::Rotate(180.0f) *
                   pagx::Matrix::Translate(-100.0f, -100.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.b, expected.b);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.c, expected.c);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.d, expected.d);
   // A varying center cannot be carried by a single Layer.anchor yet, so the pivot stays baked into
   // the keyframe translation.
-  EXPECT_NEAR(ch->keyframes[1].value.tx, 200.0f, 1e-3f);
-  EXPECT_NEAR(ch->keyframes[1].value.ty, 200.0f, 1e-3f);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 200.0f, 1e-3f);
+  EXPECT_NEAR(ch->keyframes.back().value.ty, 200.0f, 1e-3f);
 }
 
 /**
@@ -6615,14 +6617,16 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   ASSERT_EQ(obj->channels.size(), 1u);
   EXPECT_EQ(obj->channels[0]->name, "matrix");
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
-  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // An exact 180 degree sweep is subdivided into <=179 degree steps so the
+  // runtime keeps the sweep direction; assert the end pose, not the count.
+  ASSERT_GE(ch->keyframes.size(), 2u);
   EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
   auto expected = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(180.0f) *
                   pagx::Matrix::Translate(-50.0f, -50.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.a, expected.a);
   // The pivot is still baked into the keyframe translation; emitting it as Layer.anchor is a
   // separate change that has not landed on this branch yet.
-  EXPECT_NEAR(ch->keyframes[1].value.tx, 100.0f, 1e-3f);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 100.0f, 1e-3f);
 }
 
 /**
