@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Both gradient fillers move at once: the linear ramp animates both endpoints while its first stop
+     re-tints, the radial one animates center.x / center.y / radius while its inner stop re-tints.
+     Target: Composite  Channel: startPoint.x,startPoint.y,endPoint.x,endPoint.y,color,center.x,center.y,radius,color  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="95,100" size="150,120" roundness="16"/>
+    <Fill>
+      <LinearGradient id="gradLinear" startPoint="0,0" endPoint="1,0">
+        <ColorStop id="stopA" offset="0" color="#0891B2"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="240,100" size="120,120"/>
+    <Fill>
+      <RadialGradient id="gradRadial" center="0.5,0.5" radius="0.35">
+        <ColorStop id="stopB" offset="0" color="#FDE047"/>
+        <ColorStop offset="1" color="#4338CA"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="gradLinear">
+        <Channel name="startPoint.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.25"/>
+        </Channel>
+        <Channel name="startPoint.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="40" value="0.3"/>
+          <Key time="60" value="0.1"/>
+        </Channel>
+        <Channel name="endPoint.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+        <Channel name="endPoint.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.6"/>
+        </Channel>
+      </Object>
+      <Object target="stopA">
+        <Channel name="color" type="color">
+          <Key time="0" value="#0891B2" interpolation="linear"/>
+          <Key time="60" value="#DB2777"/>
+        </Channel>
+      </Object>
+      <Object target="gradRadial">
+        <Channel name="center.x" type="float">
+          <Key time="0" value="0.5" interpolation="linear"/>
+          <Key time="60" value="0.3"/>
+        </Channel>
+        <Channel name="center.y" type="float">
+          <Key time="0" value="0.5" interpolation="linear"/>
+          <Key time="35" value="0.7"/>
+          <Key time="60" value="0.5"/>
+        </Channel>
+        <Channel name="radius" type="float">
+          <Key time="0" value="0.35" interpolation="linear"/>
+          <Key time="60" value="0.6"/>
+        </Channel>
+      </Object>
+      <Object target="stopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#FDE047" interpolation="linear"/>
+          <Key time="60" value="#22C55E"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

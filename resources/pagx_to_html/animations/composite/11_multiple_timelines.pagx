@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: One element driven by a single animation that mixes a fast rotation with a slow translate and fade on
+     the same object, so the merged keyframe stops have to keep per-channel timing rather than one shared
+     curve.
+     Target: Composite  Channel: rotation.z,x,alpha  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="multiBox" x="90" y="60" width="120" height="90">
+    <Rectangle position="60,45" size="120,90" roundness="12"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="multiBox">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="18"/>
+        </Channel>
+        <Channel name="x" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="90" value="190"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="90" value="0.45"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: The painter stack moves together: Fill color, Stroke color / alpha / width / dashOffset and TrimPath
+     start / end / offset on one path, plus RoundCorner.radius on a second shape. Stroke parameters,
+     dash phase and the trim window all rewrite the same SVG element per frame.
+     Target: Composite  Channel: color,color,alpha,width,dashOffset,miterLimit,start,end,offset,radius  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="paintRect" position="100,100" size="150,110" roundness="18"/>
+    <Fill color="#DB2777" alpha="1"/>
+    <Stroke id="paintStroke" color="#0E7490" alpha="1" width="6" dashOffset="0" miterLimit="4" join="miter"/>
+    <TrimPath id="paintTrim" start="0" end="1" offset="0" type="separate"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="paintStar" position="245,100" type="polygon" pointCount="6" outerRadius="55" rotation="-90"/>
+    <RoundCorner id="paintCorner" radius="0"/>
+    <Fill color="#0284C7" alpha="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="paintRect">
+        <Channel name="color" type="color">
+          <Key time="0" value="#DB2777" interpolation="linear"/>
+          <Key time="60" value="#F59E0B"/>
+        </Channel>
+      </Object>
+      <Object target="paintStroke">
+        <Channel name="miterLimit" type="float">
+          <Key time="0" value="4" interpolation="linear"/>
+          <Key time="60" value="12"/>
+        </Channel>
+        <Channel name="color" type="color">
+          <Key time="0" value="#0E7490" interpolation="linear"/>
+          <Key time="30" value="#1E1B4B"/>
+          <Key time="60" value="#0E7490"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.45"/>
+        </Channel>
+        <Channel name="width" type="float">
+          <Key time="0" value="6" interpolation="linear"/>
+          <Key time="40" value="14"/>
+          <Key time="60" value="4"/>
+        </Channel>
+        <Channel name="dashOffset" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="18"/>
+        </Channel>
+      </Object>
+      <Object target="paintTrim">
+        <Channel name="start" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.15"/>
+        </Channel>
+        <Channel name="end" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.75"/>
+        </Channel>
+        <Channel name="offset" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+      <Object target="paintStar">
+        <Channel name="radius" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="22"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
