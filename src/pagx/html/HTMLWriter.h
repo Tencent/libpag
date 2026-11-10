@@ -408,6 +408,20 @@ class HTMLWriterContext {
     // Gradient colour source -> id of the <linearGradient>/<radialGradient>/... element it paints
     // with. A gradient's coordinates are attributes, so the frame moves them with `transform`.
     std::unordered_map<const Node*, std::string> gradientIds = {};
+    // DropShadowStyle -> id of the blurred sibling div that paints it. The div is a plain CSS box,
+    // so offset / colour / spread animate as left, top, background-color, size and radius.
+    std::unordered_map<const Node*, std::string> shadowStyleIds = {};
+    // The box that div was emitted for, in layer-local coordinates, so a frame can recompute it.
+    struct ShadowBox {
+      float left = 0.0f;
+      float top = 0.0f;
+      float width = 0.0f;
+      float height = 0.0f;
+      bool hasRadius = false;
+      float radius = 0.0f;
+      bool radiusPercent = false;
+    };
+    std::unordered_map<const Node*, ShadowBox> shadowBoxes = {};
     // ColorStop -> id of the <stop> element it writes, so a colour channel can animate stop-color.
     std::unordered_map<const Node*, std::string> colorStopIds = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};

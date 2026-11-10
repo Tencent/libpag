@@ -3895,6 +3895,68 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
 // One CSS stop carries one timing function for every property in its rule, so a bezier-eased
 // opacity and a linear translation cannot share a rule. They are emitted as two rules with disjoint
 // properties and one comma-separated animation list, which keeps both curves exact - no sampling.
+// A DropShadowStyle on a box shape is painted by its own blurred div, so offsetX/offsetY/spread/color
+// are plain CSS on that div; an InnerShadowStyle is an SVG filter, where only the feFlood colour can
+// animate.
+CLI_TEST(PAGXHtmlTest, AnimationShadowStyleKeyframes) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle position="90,100" size="110,90" roundness="14"/>
+      <Fill color="#FFFFFF"/>
+      <DropShadowStyle id="shadowA" offsetX="0" offsetY="16" blurX="12" blurY="12" color="#1E1B4B80"
+                       spread="0"/>
+    </Layer>
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Rectangle position="230,100" size="110,90" roundness="14"/>
+      <Fill color="#E0E7FF"/>
+      <InnerShadowStyle id="innerB" offsetX="0" offsetY="6" blurX="10" blurY="10" color="#1E1B4B"/>
+    </Layer>
+    <Animations>
+      <Animation id="styleMix" duration="60" frameRate="60" loop="once">
+        <Object target="shadowA">
+          <Channel name="spread" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="18"/>
+          </Channel>
+          <Channel name="offsetX" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="26"/>
+          </Channel>
+          <Channel name="color" type="color">
+            <Key time="0" value="#1E1B4B80" interpolation="linear"/>
+            <Key time="60" value="#B4530980"/>
+          </Channel>
+        </Object>
+        <Object target="innerB">
+          <Channel name="color" type="color">
+            <Key time="0" value="#1E1B4B" interpolation="linear"/>
+            <Key time="60" value="#F59E0B"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // The drop shadow div carries the box channels: offset moves it, spread grows it on every side.
+  auto shadowTag = FindTagContaining(html, "id=\"shadow0\"");
+  ASSERT_FALSE(shadowTag.empty()) << html;
+  auto shadowRule = KeyframesRuleNamed(html, AnimationNameOfTag(shadowTag));
+  ASSERT_FALSE(shadowRule.empty()) << html;
+  EXPECT_NE(shadowRule.find("left: 35px"), std::string::npos) << shadowRule;
+  EXPECT_NE(shadowRule.find("width: 146px"), std::string::npos) << shadowRule;
+  EXPECT_NE(shadowRule.find("background-color:"), std::string::npos) << shadowRule;
+  // The inner shadow's colour is a CSS property on its feFlood element.
+  auto floodTag = FindTagContaining(html, "<feFlood");
+  ASSERT_FALSE(floodTag.empty()) << html;
+  auto floodRule = KeyframesRuleNamed(html, AnimationNameOfTag(floodTag));
+  ASSERT_FALSE(floodRule.empty()) << html;
+  EXPECT_NE(floodRule.find("flood-color:"), std::string::npos) << floodRule;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="splitBox" x="40" y="60" width="80" height="80">

@@ -46,7 +46,7 @@ python3 tools/anim_coverage.py --check
 | Layer | `scale.z` | ✘ | — |
 | Layer | `skew.x` | ✔ | `layer/15` |
 | Layer | `skew.y` | ✔ | `layer/16` |
-| Layer | `visible` | ✔ | `layer/06` |
+| Layer | `visible` | ✔ | `composite/12`、`layer/06` |
 | Layer | `x` | ✔ | `boundary/03`、`combo/*`（4）、`layer/02·05` |
 | Layer | `y` | ✔ | `combo/01`、`layer/03` |
 | Layer | `z` | ✔ | `layer/14` |
@@ -152,13 +152,13 @@ python3 tools/anim_coverage.py --check
 | ColorStop | `offset` | ✘ | — |
 | DropShadowStyle | `blurX` | ✘ | `style/06` |
 | DropShadowStyle | `blurY` | ✘ | `style/07` |
-| DropShadowStyle | `color` | ✘ | `style/08` |
-| DropShadowStyle | `offsetX` | ✘ | `style/01` |
-| DropShadowStyle | `offsetY` | ✘ | `style/09` |
+| DropShadowStyle | `color` | ✔ | `style/08` |
+| DropShadowStyle | `offsetX` | ✔ | `style/01` |
+| DropShadowStyle | `offsetY` | ✔ | `style/09` |
 | DropShadowStyle | `showBehindLayer` | ✘ | `style/10` |
-| DropShadowStyle | `spread` | ✘ | `style/11` |
+| DropShadowStyle | `spread` | ✔ | `style/11` |
 | InnerShadowStyle | `blurX` `blurY` | ✘ | `style/02` |
-| InnerShadowStyle | `color` | ✘ | `style/12` |
+| InnerShadowStyle | `color` | ✔ | `style/12` |
 | InnerShadowStyle | `offsetX` | ✘ | `style/13` |
 | InnerShadowStyle | `offsetY` | ✘ | `style/14` |
 | InnerShadowStyle | `spread` | ✘ | `style/15` |
@@ -197,6 +197,7 @@ python3 tools/anim_coverage.py --check
 | `Layer.rotation.x` | 3 | `anchor/04·07`、`layer/17` |
 | `Layer.rotation.y` | 3 | `anchor/03·06`、`layer/11` |
 | `Layer.rotation.z` | 3 | `anchor/01·08`、`layer/10` |
+| `Layer.visible` | 2 | `composite/12`、`layer/06` |
 | `Layer.x` | 7 | `boundary/03`、`combo/*`（4）、`layer/02·05` |
 | `Layer.y` | 2 | `combo/01`、`layer/03` |
 | `Group.rotation` | 3 | `combo/04`、`group/04·07` |
@@ -263,29 +264,44 @@ python3 tools/anim_coverage.py --check
 offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EXEMPTIONS`，标注为
 「需 JS 侧逐帧重写滤镜」，不属于 CSS 这一期。
 
-**豁免的判定标准（只看三种情况，别扩大）**：一个通道只有在"用例永远不可能有意义"时才进
-`CHANNEL_EXEMPTIONS` / `NODE_EXEMPTIONS`——① 数值无法改变画面（`Layer.scale.z`）；② 渲染器不应用它，
-参考帧根本不动（`TextPath`）；③ 节点没有静态导出，参考帧是空的（`NoiseStyle`、`NoiseFilter`）。
+**豁免清单的定位：不是"永远做不了"，而是"CSS 这一期做不了、留给下一期 JS"。** 每个条目都写清了原因和
+下一期要做什么，通道的 `Expect: gap` 用例继续保留，缺口仍然可度量。
 
-**仅仅是"导出侧还没实现"的通道不进豁免**：那种通道保留 `Expect: gap` 用例，它就是待办清单——实现后把
-`Expect` 改成 `supported` 即可。比如 `Rectangle.position.x`、`Rectangle.size.height` 目前仍未实现，
-它们仍是 gap 用例而不是豁免项；这类通道和已实现通道组成的复合动画（如 `position.x + size.height`）
-现在只会因为"那个通道没实现"而分数低，不会再有结构冲突——`combo/06`、`combo/07` 就是用来锁住这一点的。
+按原因分三类：
+
+| 原因 | 例子 | 下一期怎么做 |
+|------|------|--------------|
+| CSS 无法表达 | 单轴模糊（`DropShadowStyle.blurX`、`BackgroundBlurStyle.blurY`）、内阴影的 offset/blur/spread、玻璃参数、SVG 滤镜原语的几何属性、`ColorStop.offset` | JS 逐帧重写滤镜/重绘 |
+| 渲染器尚未写入 | `TextPath` 的 10 个通道（`convertTextPath()` 没有注册 writer，参考帧不动） | 渲染器补 writer 后再谈导出 |
+| 数值本身无意义 | `Layer.scale.z`（合成顺序决定它不改变画面） | 不需要 |
+
+**"导出侧还没实现"的通道依然不进豁免**：那种通道保留 `Expect: gap` 用例，它就是待办清单——实现后把 `Expect`
+改成 `supported`。比如 `Rectangle.position.x`、`Ellipse.roundness` 目前仍走这条路。
+
+### 样式（`style/*`）的 CSS 边界
+
+`DropShadowStyle` 在静态导出里是**独立的模糊 div**，所以它的盒子参数天然是 CSS；内阴影是 SVG 滤镜，只有颜色能
+动。已实现（`supported`）：
+
+| 通道 | 映射 | 逐帧 SSIM |
+|------|------|------:|
+| `DropShadowStyle.offsetX` / `offsetY` | 阴影 div 的 `left` / `top` | 0.9985 / 0.9955 |
+| `DropShadowStyle.color` | `background-color` | 0.9961 |
+| `DropShadowStyle.spread` | 阴影 div 的 `left/top/width/height/border-radius` | 0.9985 |
+| `InnerShadowStyle.color` | `<feFlood>` 的 `flood-color` | 0.9964 |
+
+其余样式通道已列入 `CHANNEL_EXEMPTIONS`（`STYLE_CSS_UNSUPPORTED`）：单轴模糊的 CSS 模糊是各向同性的（实测只能到
+0.96），内阴影的 offset/blur/spread 是滤镜原语属性，玻璃参数在静态里就只是近似。
 
 **静态导出缺失的节点（整节点豁免）**：
 
 | 节点 | 状态 | 依据 |
 |------|------|------|
-| `NoiseStyle` | 静态不渲染：`src/pagx/html` 中**零引用**，导出的 t=0 画面为空 | 已从语料中移除对应用例，节点整体列入 `tools/anim_coverage.py` 的 `NODE_EXEMPTIONS` |
+| `NoiseStyle` | 静态不渲染：`src/pagx/html` 中**零引用**，导出的 t=0 画面为空 | 已从语料中移除对应用例，节点整体列入 `NODE_EXEMPTIONS` |
 | `NoiseFilter` | 静态不渲染噪声：导出只有底色（5582px），参考有噪点（12613px） | 同上 |
 
-这两个节点需要先补静态能力（把噪点画出来），动画通道才有意义。补齐后删除 `NODE_EXEMPTIONS` 里的条目并补用例。
-
-**豁免的通道族：`TextPath`（10 个通道）**。这些通道在 `PAGXNodeChannel.cpp` 里标为可动画，但
-`src/renderer/LayerBuilder.cpp` 的 `convertTextPath()` 没有注册任何通道 writer（对比
-`convertTextModifier()` 有 `setAccessor`），实测 `rotation` / `position.x` / `scale.x` / `alpha` 动画在
-`pagx render --time` 下的首尾帧差值都是 0，写不出"参考确实在动"的用例。它们已列入
-`tools/anim_coverage.py` 的 `CHANNEL_EXEMPTIONS`；渲染器补上 writer 后，删除豁免并补用例。
+**`TextPath`（10 个通道）**：`src/renderer/LayerBuilder.cpp` 的 `convertTextPath()` 没有注册任何通道 writer，
+实测 `rotation` / `position.x` / `scale.x` / `alpha` 动画的首尾帧差值为 0，写不出"参考确实在动"的用例。
 
 **已知映射问题**：`{SolidColor, "alpha"}` 与 `{DropShadowFilter, "alpha"}` 指向不存在的通道，`--check`
 报 WARN。
