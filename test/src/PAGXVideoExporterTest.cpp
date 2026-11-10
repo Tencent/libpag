@@ -139,9 +139,10 @@ void SetDocumentFrameRate(const std::shared_ptr<pagx::PAGXDocument>& document, f
 void ConsumeAsyncFrame(const std::shared_ptr<pagx::VideoExportFrame>& frame, int width, int height,
                        std::vector<uint8_t>* pixels) {
   ASSERT_TRUE(frame != nullptr);
-  for (int attempt = 0; attempt < 5000 && frame->status() == pagx::VideoExportFrameStatus::Pending;
-       ++attempt) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (frame->status() == pagx::VideoExportFrameStatus::Pending &&
+         std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   ASSERT_EQ(frame->status(), pagx::VideoExportFrameStatus::Ready) << frame->error();
   auto rowBytes = static_cast<size_t>(width) * 4 + 16;
