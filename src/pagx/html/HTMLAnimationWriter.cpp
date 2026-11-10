@@ -742,6 +742,10 @@ enum class TargetChannelRole {
   GradientStartAngle,
   // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
   StopColor,
+  // RangeSelector falloff shaping (triangle curve handles and the overall weight).
+  RangeEaseIn,
+  RangeEaseOut,
+  RangeWeight,
   // `mix-blend-mode` is discrete, so its keys step instead of interpolating.
   LayerBlendMode,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
@@ -851,6 +855,9 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::RangeSelector, "start", TargetChannelRole::RangeSelectorStart},
     {NodeType::RangeSelector, "end", TargetChannelRole::RangeSelectorEnd},
     {NodeType::RangeSelector, "offset", TargetChannelRole::RangeSelectorOffset},
+    {NodeType::RangeSelector, "easeIn", TargetChannelRole::RangeEaseIn},
+    {NodeType::RangeSelector, "easeOut", TargetChannelRole::RangeEaseOut},
+    {NodeType::RangeSelector, "weight", TargetChannelRole::RangeWeight},
     {NodeType::RoundCorner, "radius", TargetChannelRole::RoundCornerRadius},
 
     // Group & TextBox channels
@@ -996,6 +1003,9 @@ struct BundleChannelSet {
   const Channel* rangeStartCh = nullptr;
   const Channel* rangeEndCh = nullptr;
   const Channel* rangeOffsetCh = nullptr;
+  const Channel* rangeEaseInCh = nullptr;
+  const Channel* rangeEaseOutCh = nullptr;
+  const Channel* rangeWeightCh = nullptr;
   const HTMLWriterContext::AnimationState::RangeSelectorGlyph* rangeGlyph = nullptr;
   // A RoundCorner on a Rectangle is exactly CSS border-radius, so it stays on the div and can share
   // the element with the shape's own geometry channels instead of taking over its `d`.
@@ -1157,6 +1167,15 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::RangeSelectorEnd:
       out.rangeEndCh = ch;
+      return true;
+    case TargetChannelRole::RangeEaseIn:
+      out.rangeEaseInCh = ch;
+      return true;
+    case TargetChannelRole::RangeEaseOut:
+      out.rangeEaseOutCh = ch;
+      return true;
+    case TargetChannelRole::RangeWeight:
+      out.rangeWeightCh = ch;
       return true;
     case TargetChannelRole::RangeSelectorOffset:
       out.rangeOffsetCh = ch;
@@ -2682,9 +2701,13 @@ RangeValues RangeValuesAt(const BundleChannelSet& chSet, double t) {
 double RangeGlyphFactorAt(const BundleChannelSet& chSet, double t) {
   const RangeSelectorGlyph* glyph = chSet.rangeGlyph;
   RangeValues values = RangeValuesAt(chSet, t);
+  const RangeSelector* selector = glyph->selector;
   float factor = ComputeRangeSelectorFactor(
-      glyph->selector, glyph->glyphIndex, glyph->totalGlyphs, static_cast<float>(values.start),
-      static_cast<float>(values.end), static_cast<float>(values.offset));
+      selector, glyph->glyphIndex, glyph->totalGlyphs, static_cast<float>(values.start),
+      static_cast<float>(values.end), static_cast<float>(values.offset),
+      EvalLinearFloatAt(chSet.rangeEaseInCh, t, selector->easeIn),
+      EvalLinearFloatAt(chSet.rangeEaseOutCh, t, selector->easeOut),
+      EvalLinearFloatAt(chSet.rangeWeightCh, t, selector->weight));
   return std::clamp(static_cast<double>(factor), -1.0, 1.0);
 }
 
@@ -2848,6 +2871,82 @@ std::string FormatCubicBezier(const CubicBezierCurve& curve) {
 
 // Appends the stops covering [t0, t1]. A monotonic rational piece is one stop eased by a fitted
 // cubic-bezier; a piece the fit cannot reach within the tolerance is split in half.
+// A falloff shape that is not a ramp/square is not a rational function of time, so its bend has to
+// come from the easing curve itself: fit all four bezier parameters to the piece instead of
+// sampling the frame. Returns false when no curve gets within `tolerance`.
+bool FitGenericEase(const BundleChannelSet& chSet, double t0, double t1, double f0, double f1,
+                    double tolerance, CubicBezierCurve& out) {
+  constexpr int kSamples = 20;
+  double targets[kSamples + 1];
+  double span = t1 - t0;
+  for (int i = 0; i <= kSamples; ++i) {
+    double u = static_cast<double>(i) / kSamples;
+    double factor = RangeGlyphFactorAt(chSet, t0 + span * u);
+    targets[i] = std::clamp((factor - f0) / (f1 - f0), 0.0, 1.0);
+  }
+  // A non-monotone piece cannot be an easing at all.
+  for (int i = 1; i <= kSamples; ++i) {
+    if (targets[i] + 1e-6 < targets[i - 1]) {
+      return false;
+    }
+  }
+  auto error = [&targets](const CubicBezierCurve& curve) {
+    double worst = 0.0;
+    for (int i = 1; i < kSamples; ++i) {
+      double u = static_cast<double>(i) / kSamples;
+      worst = std::max(
+          worst, std::abs(CubicBezierEase(curve.x1, curve.y1, curve.x2, curve.y2, u) - targets[i]));
+    }
+    return worst;
+  };
+  CubicBezierCurve best = {0.33, 0.33, 0.67, 0.67};
+  double bestError = error(best);
+  for (double x1 = 0.0; x1 <= 1.0001; x1 += 0.1) {
+    for (double y1 = 0.0; y1 <= 1.0001; y1 += 0.1) {
+      for (double x2 = 0.0; x2 <= 1.0001; x2 += 0.1) {
+        for (double y2 = 0.0; y2 <= 1.0001; y2 += 0.1) {
+          CubicBezierCurve candidate = {x1, y1, x2, y2};
+          double e = error(candidate);
+          if (e < bestError) {
+            bestError = e;
+            best = candidate;
+          }
+        }
+      }
+    }
+  }
+  for (double step = 0.02; step > 0.002; step *= 0.5) {
+    bool improved = true;
+    while (improved) {
+      improved = false;
+      const double moves[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+      (void)moves;
+      for (int k = 0; k < 4; ++k) {
+        for (double delta : {step, -step}) {
+          CubicBezierCurve candidate = best;
+          double* fields[4] = {&candidate.x1, &candidate.y1, &candidate.x2, &candidate.y2};
+          *fields[k] += delta;
+          if (candidate.x1 < 0.0 || candidate.x1 > 1.0 || candidate.x2 < 0.0 ||
+              candidate.x2 > 1.0) {
+            continue;
+          }
+          double e = error(candidate);
+          if (e < bestError) {
+            bestError = e;
+            best = candidate;
+            improved = true;
+          }
+        }
+      }
+    }
+  }
+  if (bestError > tolerance) {
+    return false;
+  }
+  out = best;
+  return true;
+}
+
 void AppendRangeGlyphPiece(const BundleChannelSet& chSet, double t0, double t1, double tolerance,
                            int depth, std::vector<RangeGlyphStop>& stops) {
   constexpr int kMaxDepth = 6;
@@ -2856,9 +2955,20 @@ void AppendRangeGlyphPiece(const BundleChannelSet& chSet, double t0, double t1, 
   // A hold key jumps at t1: the value just before it is what this piece shows.
   double f1 = RangeGlyphFactorAt(chSet, t1 - span * 1e-6);
   if (std::abs(f1 - f0) < 1e-9) {
-    double after = RangeGlyphFactorAt(chSet, t1);
-    stops.push_back({t0, f0, std::abs(after - f1) > 1e-9 ? "steps(1, end)" : "linear"});
-    return;
+    // Equal endpoints do not make a flat piece: a triangle falloff whose handles move can hump in
+    // between, and collapsing it would emit a constant rule for a glyph the reference lifts.
+    bool flat = true;
+    for (double probe : {0.25, 0.5, 0.75}) {
+      if (std::abs(RangeGlyphFactorAt(chSet, t0 + span * probe) - f0) > 1e-9) {
+        flat = false;
+        break;
+      }
+    }
+    if (flat) {
+      double after = RangeGlyphFactorAt(chSet, t1);
+      stops.push_back({t0, f0, std::abs(after - f1) > 1e-9 ? "steps(1, end)" : "linear"});
+      return;
+    }
   }
   double h = (RangeGlyphFactorAt(chSet, t0 + span * 0.5) - f0) / (f1 - f0);
   if (h > 1e-6 && h < 1.0 - 1e-6) {
@@ -2875,7 +2985,18 @@ void AppendRangeGlyphPiece(const BundleChannelSet& chSet, double t0, double t1, 
       double actual = RangeGlyphFactorAt(chSet, t0 + span * u);
       worst = std::max(worst, std::abs(f0 + (f1 - f0) * eased - actual));
     }
-    if (worst <= tolerance || depth >= kMaxDepth) {
+    if (worst <= tolerance) {
+      stops.push_back({t0, f0, linear ? "linear" : FormatCubicBezier(curve)});
+      return;
+    }
+    // Ramp/square pieces are rational; anything else (a triangle falloff whose handles move) is not,
+    // and its bend has to come from a free bezier fit before falling back to splitting.
+    CubicBezierCurve generic = {};
+    if (FitGenericEase(chSet, t0, t1, f0, f1, tolerance, generic)) {
+      stops.push_back({t0, f0, FormatCubicBezier(generic)});
+      return;
+    }
+    if (depth >= kMaxDepth) {
       stops.push_back({t0, f0, linear ? "linear" : FormatCubicBezier(curve)});
       return;
     }
@@ -2973,6 +3094,7 @@ std::string EmitRangeSelectorGlyphStops(const BundleChannelSet& chSet,
     }
   }
   const std::vector<double> times(cuts.begin(), cuts.end());
+
   const double tolerance = RangeGlyphFactorTolerance(*chSet.rangeGlyph);
   std::vector<RangeGlyphStop> pieces = {};
   for (size_t k = 0; k + 1 < times.size(); ++k) {
@@ -3368,7 +3490,9 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           auto role = LookupChannelRole(nType, ch->name);
           if (role == TargetChannelRole::RangeSelectorStart ||
               role == TargetChannelRole::RangeSelectorEnd ||
-              role == TargetChannelRole::RangeSelectorOffset) {
+              role == TargetChannelRole::RangeSelectorOffset ||
+              role == TargetChannelRole::RangeEaseIn || role == TargetChannelRole::RangeEaseOut ||
+              role == TargetChannelRole::RangeWeight) {
             bound = true;
             exact = exact && IsLinearOrHoldFloatChannel(ch);
           }

@@ -109,16 +109,16 @@ python3 tools/anim_coverage.py --check
 | TrimPath | `offset` | ✔ | `geometry/20` |
 | TrimPath | `start` | ✔ | `modifier/02` |
 | RoundCorner | `radius` | ✔ | `modifier/01` |
-| Repeater | `anchor.x` | ✘ | `modifier/08` |
-| Repeater | `anchor.y` | ✘ | `modifier/09` |
+| Repeater | `anchor.x` | ✔ | `modifier/08` |
+| Repeater | `anchor.y` | ✔ | `modifier/09` |
 | Repeater | `copies` | ✔ | `modifier/03` |
-| Repeater | `endAlpha` | ✘ | `modifier/11` |
-| Repeater | `offset` | ✘ | `modifier/12` |
+| Repeater | `endAlpha` | ✔ | `modifier/11` |
+| Repeater | `offset` | ✔ | `modifier/12` |
 | Repeater | `position.x` | ✔ | `modifier/13` |
-| Repeater | `position.y` | ✘ | `modifier/14` |
+| Repeater | `position.y` | ✔ | `modifier/14` |
 | Repeater | `rotation` | ✔ | `modifier/04` |
-| Repeater | `scale.x` | ✘ | `modifier/15` |
-| Repeater | `scale.y` | ✘ | `modifier/16` |
+| Repeater | `scale.x` | ✔ | `modifier/15` |
+| Repeater | `scale.y` | ✔ | `modifier/16` |
 | Repeater | `startAlpha` | ✔ | `modifier/10` |
 | TextModifier | `alpha` | ✘ | `text/02` |
 | TextModifier | `anchor.x` | ✘ | `text/12` |
@@ -133,12 +133,12 @@ python3 tools/anim_coverage.py --check
 | TextModifier | `skewAxis` | ✘ | `text/20` |
 | TextModifier | `strokeColor` | ✘ | `text/21` |
 | TextModifier | `strokeWidth` | ✘ | `text/22` |
-| RangeSelector | `easeIn` | ✘ | `modifier/17` |
-| RangeSelector | `easeOut` | ✘ | `modifier/18` |
+| RangeSelector | `easeIn` | ✔ | `easing/01` |
+| RangeSelector | `easeOut` | ✔ | `easing/02` |
 | RangeSelector | `end` | ✔ | `modifier/06` |
 | RangeSelector | `offset` | ✔ | `modifier/07` |
 | RangeSelector | `start` | ✔ | `modifier/05` |
-| RangeSelector | `weight` | ✘ | `modifier/19` |
+| RangeSelector | `weight` | ✔ | `easing/03` |
 | SolidColor | `color` | ✔ | `sharing/01`、`solid_color/01`、`timing/04·06` |
 | LinearGradient | `endPoint.x` | ✔ | `gradient/01` |
 | LinearGradient | `endPoint.y` | ✔ | `gradient/09` |
@@ -231,6 +231,16 @@ python3 tools/anim_coverage.py --check
 
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
+
+**两套"缓动"不要混为一谈**：
+
+| | 时间缓动 | 选区衰减 |
+|---|---|---|
+| 载体 | 每个关键帧的 `interpolation` + `bezierOut`/`bezierIn` | `RangeSelector` 的 `easeIn` / `easeOut` / `weight` 与 `shape` |
+| 作用 | 属性值随**时间**怎么走 | 字形离选区中心的距离 → 影响系数的**空间**曲线 |
+| 用例族 | `interpolation/`（01–04） | `easing/`（01–03） |
+
+`interpolation/` 已经全绿（hold、自定义把手、默认把手、分段混合）；`easing/` 收的是选区衰减曲线，它改的是"曲线形状"而不是某个属性值，所以不放在 `modifier/` 里。
 
 **渐变的坐标靠变换表达**：`<linearGradient>` / `<radialGradient>` 的 `x1/y1/x2/y2`、`cx/cy/r` 都是 XML
 属性，关键帧对它们无效（实测 0 像素变化）；但 Chromium 会把渐变元素上的 CSS `transform` 映射成
