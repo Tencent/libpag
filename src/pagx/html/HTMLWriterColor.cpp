@@ -334,6 +334,19 @@ std::string HTMLWriter::colorToCSS(const ColorSource* src, float* outAlpha, floa
   }
 }
 
+// Marks a <stop> whose colour animates: `stop-color` is a CSS property, so the id lets the weaver
+// attach keyframes to it.
+static void AddColorStopId(HTMLBuilder& builder, const HTMLWriterContext& ctx,
+                           const ColorStop* stop) {
+  if (stop == nullptr) {
+    return;
+  }
+  auto it = ctx.animation.colorStopIds.find(stop);
+  if (it != ctx.animation.colorStopIds.end()) {
+    builder.addAttr("id", it->second);
+  }
+}
+
 std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, float bboxX,
                                        float bboxY, float bboxW, float bboxH) {
   if (!src) {
@@ -350,7 +363,9 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
     return ColorToSVGHex(sc->color);
   }
   if (src->nodeType() == NodeType::LinearGradient || src->nodeType() == NodeType::RadialGradient) {
-    std::string id = _ctx->nextId("grad");
+    auto animIt = _ctx->animation.gradientIds.find(src);
+    std::string id =
+        animIt != _ctx->animation.gradientIds.end() ? animIt->second : _ctx->nextId("grad");
     writeSVGGradientDef(src, id);
     if (outAlpha) {
       *outAlpha = 1.0f;
@@ -438,7 +453,9 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
   if (src->nodeType() == NodeType::DiamondGradient) {
     // Approximate diamond gradient with SVG radialGradient
     auto g = static_cast<const DiamondGradient*>(src);
-    std::string id = _ctx->nextId("grad");
+    auto animIt = _ctx->animation.gradientIds.find(src);
+    std::string id =
+        animIt != _ctx->animation.gradientIds.end() ? animIt->second : _ctx->nextId("grad");
     _defs->openTag("radialGradient");
     _defs->addAttr("id", id);
     _defs->addAttr("cx", CssFloatToString(g->center.x));
@@ -454,6 +471,7 @@ std::string HTMLWriter::colorToSVGFill(const ColorSource* src, float* outAlpha, 
         continue;
       }
       _defs->openTag("stop");
+      AddColorStopId(*_defs, *_ctx, stop);
       _defs->addAttr("offset", CssFloatToString(stop->offset));
       _defs->addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
@@ -584,6 +602,7 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
         continue;
       }
       builder.openTag("stop");
+      AddColorStopId(builder, *_ctx, stop);
       builder.addAttr("offset", CssFloatToString(stop->offset));
       builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {
@@ -617,6 +636,7 @@ void HTMLWriter::writeSVGGradientDefInto(HTMLBuilder& builder, const ColorSource
         continue;
       }
       builder.openTag("stop");
+      AddColorStopId(builder, *_ctx, stop);
       builder.addAttr("offset", CssFloatToString(stop->offset));
       builder.addAttr("stop-color", ColorToSVGHex(stop->color));
       if (stop->color.alpha < 1.0f) {

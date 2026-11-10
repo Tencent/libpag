@@ -398,6 +398,11 @@ class HTMLWriterContext {
     // LayerFilter -> id of the <feFlood> its colour lands on. Colour is a CSS property on that
     // element, while the filter's geometry attributes (dx, dy, stdDeviation) are not animatable.
     std::unordered_map<const Node*, std::string> filterFloodIds = {};
+    // Gradient colour source -> id of the <linearGradient>/<radialGradient>/... element it paints
+    // with. A gradient's coordinates are attributes, so the frame moves them with `transform`.
+    std::unordered_map<const Node*, std::string> gradientIds = {};
+    // ColorStop -> id of the <stop> element it writes, so a colour channel can animate stop-color.
+    std::unordered_map<const Node*, std::string> colorStopIds = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     std::vector<RangeSelectorGlyph> rangeSelectorGlyphs = {};
 

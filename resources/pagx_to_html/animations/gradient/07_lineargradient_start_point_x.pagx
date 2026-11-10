@@ -2,7 +2,7 @@
 <!-- Tests: LinearGradient startPoint.x pulls the ramp's origin to the middle, so the left half becomes a
      flat plate of the first stop colour.
      Target: LinearGradient  Channel: startPoint.x  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

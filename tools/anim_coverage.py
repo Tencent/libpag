@@ -48,7 +48,13 @@ CHANNEL_EXEMPTIONS = {
 # Whole nodes with no static export: `src/pagx/html` never references them, so nothing is painted at
 # t=0 and a channel case would compare a drawn reference against an empty frame. Listed as static
 # gaps in the README; drop the entry once the node is exported.
+# Conic and Diamond gradients are rasterised to a PNG at export time (a CSS conic-gradient inside
+# pattern/foreignObject does not paint reliably in headless Chromium), so the fill is an <image>:
+# there is no CSS gradient left to move. Animating them needs a per-frame raster, i.e. the JS side.
+RASTER_GRADIENT = "静态导出会光栅化成 PNG，画面上只剩 <image>，CSS 无渐变可动画，需逐帧重绘位图"
 NODE_EXEMPTIONS = {
+    "ConicGradient": RASTER_GRADIENT,
+    "DiamondGradient": RASTER_GRADIENT,
     "NoiseStyle": "静态导出未实现该节点（writer 无引用），t=0 画面为空，需先补静态能力",
     "NoiseFilter": "静态导出未实现该节点（writer 无引用），t=0 只画出底色、无噪声，需先补静态能力",
 }
@@ -62,6 +68,8 @@ FILTER_CSS_UNSUPPORTED = "SVG 滤镜原语的几何属性不是 CSS 属性，关
 for _channel in ("blurX", "blurY", "offsetX", "offsetY", "shadowOnly"):
     CHANNEL_EXEMPTIONS[("InnerShadowFilter", _channel)] = FILTER_CSS_UNSUPPORTED
 CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = FILTER_CSS_UNSUPPORTED
+# A colour stop's position is the `offset` attribute of <stop>, not a CSS property.
+CHANNEL_EXEMPTIONS[("ColorStop", "offset")] = "stop 的 offset 是 XML 属性，不是 CSS 属性，无法用关键帧驱动"
 
 # TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
 # applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()
