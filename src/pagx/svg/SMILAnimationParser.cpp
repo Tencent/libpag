@@ -2417,6 +2417,11 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
                     IsIndefiniteRepeat(setElement);
   if (durSeconds > 0.0) {
     endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
+  } else if (timing.endSeconds >= 0.0 && timing.endSeconds > timing.beginSeconds) {
+    // A <set> without dur is indefinite, but a finite end still bounds its active duration; with
+    // the default fill="remove" the value must revert after that end instead of holding forever.
+    endFrame = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    fillFreeze = false;
   }
   // end limits the active duration: the set value holds until end, then remove reverts.
   // endSeconds < 0 means "no end constraint" (see ResolvedTiming). Comparing it directly against a
