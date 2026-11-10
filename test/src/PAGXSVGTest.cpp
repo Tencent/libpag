@@ -5526,4 +5526,42 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunRunWarns) {
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// ST8: a TextBox run with usable glyph outlines is emitted as a <g> of <path>s instead of being
+// re-shaped. TextLayout never reports lines for embedded GlyphRuns, so this always goes through
+// the per-run fallback path.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunEmitsOutlines) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("vectorFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "A";
+  text->fontSize = 40;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 40;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  for (const auto& warning : warnings) {
+    EXPECT_EQ(warning.find("no line layout"), std::string::npos) << warning;
+    EXPECT_EQ(warning.find("no usable glyph outline"), std::string::npos) << warning;
+  }
+}
+
 }  // namespace pag

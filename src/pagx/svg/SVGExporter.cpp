@@ -3214,16 +3214,39 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   }
 
   if (!useLineLayout) {
-    // Fallback: vertical writing mode or missing line info — emit per-run
-    // independent <text> elements (original behavior).
+    // Fallback: vertical writing mode or missing line info — emit per-run independent elements.
+    // TextLayout never reports lines for a Text carrying embedded GlyphRuns, so this is the only
+    // path such a run can take; emit its outlines here instead of re-shaping its characters.
     for (const auto& run : runs) {
-      if (run.text->text.empty()) {
+      if (run.text->text.empty() && run.text->glyphRuns.empty()) {
         continue;
       }
       FillStrokeInfo runFs = {};
       runFs.fill = run.fill ? run.fill : topLevelFs.fill;
       runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
       runFs.textBox = textBox;
+      if (!run.text->glyphRuns.empty()) {
+        // The layout reports the run's origin through its glyph positions when available; the
+        // authored x/y is subtracted because ComputeGlyphPathsAndImages adds it back internally.
+        auto origin = run.text->renderPosition();
+        auto* layoutRuns = layoutResult.getGlyphRuns(const_cast<Text*>(run.text));
+        if (layoutRuns != nullptr && !layoutRuns->empty() && !(*layoutRuns)[0].positions.empty()) {
+          origin.x = (*layoutRuns)[0].positions[0].x;
+          origin.y = (*layoutRuns)[0].positions[0].y;
+        }
+        if (run.text->glyphRuns.size() == 1) {
+          origin.x -= run.text->glyphRuns[0]->x;
+          origin.y -= run.text->glyphRuns[0]->y;
+        }
+        if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha,
+                               MatrixToSVGTransform(transform))) {
+          continue;
+        }
+        addWarning("TextBox '" + textBox->id +
+                   "' has a run with GlyphRun data but no usable glyph outline; the run is "
+                   "dropped.");
+        continue;
+      }
       writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha);
     }
     return;
