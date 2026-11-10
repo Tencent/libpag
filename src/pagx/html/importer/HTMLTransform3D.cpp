@@ -531,6 +531,25 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   return false;
 }
 
+// Which axis a `transform-origin` token may occupy. `left` / `right` are horizontal, `top` /
+// `bottom` vertical; `center`, lengths and percentages fill either axis.
+enum class OriginAxis { Horizontal, Vertical, Any };
+
+OriginAxis OriginAxisOf(const std::string& token) {
+  if (token == "left" || token == "right") {
+    return OriginAxis::Horizontal;
+  }
+  if (token == "top" || token == "bottom") {
+    return OriginAxis::Vertical;
+  }
+  return OriginAxis::Any;
+}
+
+bool IsOriginKeyword(const std::string& token) {
+  return token == "left" || token == "right" || token == "top" || token == "bottom" ||
+         token == "center";
+}
+
 }  // namespace
 
 bool IsSupportedTransformFunction(const std::string& name) {
@@ -588,25 +607,6 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
     index = closeParen + 1;
   }
   return !out->empty();
-}
-
-// Which axis a `transform-origin` token may occupy. `left` / `right` are horizontal, `top` /
-// `bottom` vertical; `center`, lengths and percentages fill either axis.
-enum class OriginAxis { Horizontal, Vertical, Any };
-
-OriginAxis OriginAxisOf(const std::string& token) {
-  if (token == "left" || token == "right") {
-    return OriginAxis::Horizontal;
-  }
-  if (token == "top" || token == "bottom") {
-    return OriginAxis::Vertical;
-  }
-  return OriginAxis::Any;
-}
-
-bool IsOriginKeyword(const std::string& token) {
-  return token == "left" || token == "right" || token == "top" || token == "bottom" ||
-         token == "center";
 }
 
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
@@ -769,9 +769,10 @@ bool IsFlatTransform(const Matrix3D& matrix) {
   //
   // This is a *geometric* test, so it deliberately differs from `HasPerspective` in
   // `LayerTransformUtils.h`, which asks whether the matrix carries a projection row at all (an exact
-  // `!= 0`). A camera beyond `kPoseEpsilon` distance (`perspective(1000000px)`) therefore reads as
-  // flat here while `HasPerspective` still sees a projection: on the z = 0 plane the two disagree by
-  // less than a pixel, and the exact test is what export needs to keep the row it was given.
+  // `!= 0`). The projection coefficient is `1 / distance`, so a camera at `distance >= 1 / kPoseEpsilon`
+  // (i.e. `perspective(1000000px)` or further) reads as flat here while `HasPerspective` still sees a
+  // projection: on the z = 0 plane the two disagree by less than a pixel, and the exact test is what
+  // export needs to keep the row it was given.
   return NearlyZero(matrix.getRowColumn(2, 0)) && NearlyZero(matrix.getRowColumn(2, 1)) &&
          NearlyOne(matrix.getRowColumn(2, 2)) && NearlyZero(matrix.getRowColumn(2, 3)) &&
          NearlyZero(matrix.getRowColumn(3, 0)) && NearlyZero(matrix.getRowColumn(3, 1)) &&
