@@ -773,6 +773,7 @@ PAG_TEST(PAGDiskCacheTest, RepeatedCacheDirectorySetup) {
 /**
  * Registering the HarmonyOS default directory must preserve an existing custom directory, and
  * native empty-string resets must restore the default paths before the first cache write.
+ * Configuration scans may create empty directories, but cached files must use the default directory.
  */
 PAG_TEST(PAGDiskCacheTest, DefaultCacheDirectoryReset) {
   ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());
@@ -806,8 +807,10 @@ PAG_TEST(PAGDiskCacheTest, DefaultCacheDirectoryReset) {
     ASSERT_EQ(diskCache->configPath, Directory::JoinPath(defaultDir, "cache.cfg"));
     ASSERT_EQ(diskCache->cacheFolder, Directory::JoinPath(defaultDir, "files"));
   }
-  ASSERT_FALSE(std::filesystem::exists(defaultDir));
-  ASSERT_FALSE(std::filesystem::exists(customDir));
+  ASSERT_FALSE(std::filesystem::exists(Directory::JoinPath(defaultDir, "cache.cfg")));
+  ASSERT_FALSE(std::filesystem::exists(Directory::JoinPath(customDir, "cache.cfg")));
+  ASSERT_TRUE(Directory::FindFiles(Directory::JoinPath(defaultDir, "files"), ".bin").empty());
+  ASSERT_TRUE(Directory::FindFiles(Directory::JoinPath(customDir, "files"), ".bin").empty());
   const std::string cacheKey = "DefaultCacheDirectoryReset";
   auto data = tgfx::Data::MakeWithCopy(cacheKey.data(), cacheKey.size());
   ASSERT_TRUE(data != nullptr);
@@ -824,7 +827,9 @@ PAG_TEST(PAGDiskCacheTest, DefaultCacheDirectoryReset) {
   EXPECT_TRUE(std::filesystem::exists(Directory::JoinPath(defaultDir, "cache.cfg")));
   EXPECT_TRUE(std::filesystem::exists(
       Directory::JoinPath(Directory::JoinPath(defaultDir, "files"), fileName)));
-  EXPECT_FALSE(std::filesystem::exists(customDir));
+  EXPECT_FALSE(std::filesystem::exists(Directory::JoinPath(customDir, "cache.cfg")));
+  EXPECT_FALSE(std::filesystem::exists(
+      Directory::JoinPath(Directory::JoinPath(customDir, "files"), fileName)));
   auto cacheData = DiskCache::ReadFile(cacheKey);
   ASSERT_TRUE(cacheData != nullptr);
   ASSERT_EQ(cacheData->size(), data->size());
