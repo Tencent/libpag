@@ -4954,4 +4954,72 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimKeyframeBeforeOriginKeepsInterpolatedStart)
   EXPECT_NE(svg.find("keyTimes=\"0;0.1;1\""), std::string::npos);
 }
 
+//==============================================================================
+// P1: filter parameter animation
+//==============================================================================
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBlurFilterStdDeviation) {
+  auto doc = MakeRectDocument();
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 0.0f;
+  blur->blurY = 0.0f;
+  doc->layers[0]->filters.push_back(blur);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "blur");
+  auto* channel = MakeChannel<float>(doc.get(), object, "blurX");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"stdDeviation\""), std::string::npos);
+  // The non-animated axis keeps its authored value, so the pair form is used throughout.
+  EXPECT_NE(svg.find("values=\"0 0;8 0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowOffset) {
+  auto doc = MakeRectDocument();
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>("shadow");
+  shadow->offsetX = 0.0f;
+  shadow->offsetY = 0.0f;
+  shadow->blurX = 0.0f;
+  shadow->blurY = 0.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  doc->layers[0]->filters.push_back(shadow);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadow");
+  auto* channel = MakeChannel<float>(doc.get(), object, "offsetX");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"dx\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;10\""), std::string::npos);
+  // No blur channel, so the blur primitive stays static.
+  EXPECT_EQ(svg.find("attributeName=\"stdDeviation\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBlendFilterColor) {
+  auto doc = MakeRectDocument();
+  auto* blend = doc->makeNode<pagx::BlendFilter>("blend");
+  blend->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  doc->layers[0]->filters.push_back(blend);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "blend");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#0000FF\""), std::string::npos);
+}
+
 }  // namespace pag

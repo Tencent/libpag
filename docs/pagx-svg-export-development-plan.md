@@ -477,6 +477,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 当前 source 声明核查 | 166 个 SVG 用例、16 个 SVGExport_Anim、0 处显式 exportAnimation=false 选项 | “166 all passed”；声明数与历史 binary 结果必须分开 |
 | 本轮文档重组 | 仅只读源码 / 声明语义核查与文档编辑 | 任何新构建、修复、测试、像素或跨浏览器认证 |
 | 本轮 H0 热修（2026-11-10） | F3 / F5 / F9 / A08 已修，各带一个回归用例；`PAGXSVGTest` 170 / 170 通过（本机 SwiftShader） | 其余 F / ST 编号、像素门禁与跨浏览器结果 |
+| 本轮 P1 增量（2026-11-10） | `BlurFilter` blurX/blurY、`DropShadowFilter` / `InnerShadowFilter` 的 offset + blur、`BlendFilter.color` 已可动画；滤镜区域改为按通道最大绝对值扩大；`PAGXSVGTest` 173 / 173 | 阴影 `color`（烘焙在 feColorMatrix 常量列）、Noise 参数、像素门禁 |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 

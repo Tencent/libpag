@@ -499,19 +499,20 @@ class SVGWriter {
 
   // Filter defs (write to _defs)
   void writeShadowBlurAndOffset(float blurX, float blurY, float offsetX, float offsetY,
-                                const std::string& blurResult, const std::string& offsetResult);
+                                const std::string& blurResult, const std::string& offsetResult,
+                                const Node* owner);
   void writeShadowColorMatrix(const Color& c, const std::string& inResult,
                               const std::string& outResult);
   // Emits a drop-shadow fragment (blur + offset + color matrix) and returns the
   // result name of the final colored shadow. Shared between DropShadowFilter and
   // DropShadowStyle which differ only in source node type.
   std::string writeDropShadowFragment(float blurX, float blurY, float offsetX, float offsetY,
-                                      const Color& color, int shadowIndex);
+                                      const Color& color, int shadowIndex, const Node* owner);
   // Emits an inner-shadow fragment (blur + offset + invert composite + color matrix)
   // and returns the result name of the final colored inner shadow. Shared between
   // InnerShadowFilter and InnerShadowStyle.
   std::string writeInnerShadowFragment(float blurX, float blurY, float offsetX, float offsetY,
-                                       const Color& color, int shadowIndex);
+                                       const Color& color, int shadowIndex, const Node* owner);
   // Image-transforming filter primitives. Each reads from `currentSource` and
   // updates it to its own result so that a chain of filters (e.g. Blur →
   // ColorMatrix → Blend) flows through consecutive primitives rather than
@@ -985,19 +986,31 @@ std::string SVGWriter::getColorSourceRef(const ColorSource* source, float* outAl
 
 void SVGWriter::writeShadowBlurAndOffset(float blurX, float blurY, float offsetX, float offsetY,
                                          const std::string& blurResult,
-                                         const std::string& offsetResult) {
+                                         const std::string& offsetResult, const Node* owner) {
   _defs->openElement("feGaussianBlur");
   _defs->addAttribute("in", "SourceAlpha");
   _defs->addAttribute("stdDeviation", FormatBlurStdDev(blurX, blurY));
   _defs->addAttribute("result", blurResult);
-  _defs->closeElementSelfClosing();
+  if (owner == nullptr || !_animWriter.HasFilterBlurAnimates(owner)) {
+    _defs->closeElementSelfClosing();
+  } else {
+    _defs->closeElementStart();
+    _animWriter.WriteFilterBlurAnimates(*_defs, owner);
+    _defs->closeElement();
+  }
 
   _defs->openElement("feOffset");
   _defs->addAttribute("in", blurResult);
   _defs->addAttributeIfNonZero("dx", offsetX);
   _defs->addAttributeIfNonZero("dy", offsetY);
   _defs->addAttribute("result", offsetResult);
-  _defs->closeElementSelfClosing();
+  if (owner == nullptr || !_animWriter.HasFilterOffsetAnimates(owner)) {
+    _defs->closeElementSelfClosing();
+  } else {
+    _defs->closeElementStart();
+    _animWriter.WriteFilterOffsetAnimates(*_defs, owner);
+    _defs->closeElement();
+  }
 }
 
 void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResult,
@@ -1025,23 +1038,24 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
 }
 
 std::string SVGWriter::writeDropShadowFragment(float blurX, float blurY, float offsetX,
-                                               float offsetY, const Color& color, int shadowIndex) {
+                                               float offsetY, const Color& color, int shadowIndex,
+                                               const Node* owner) {
   std::string idx = std::to_string(shadowIndex);
   std::string offsetResult = "shadowOffset" + idx;
   std::string shadowResult = "shadow" + idx;
-  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "shadowBlur" + idx, offsetResult);
+  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "shadowBlur" + idx, offsetResult, owner);
   writeShadowColorMatrix(color, offsetResult, shadowResult);
   return shadowResult;
 }
 
 std::string SVGWriter::writeInnerShadowFragment(float blurX, float blurY, float offsetX,
-                                                float offsetY, const Color& color,
-                                                int shadowIndex) {
+                                                float offsetY, const Color& color, int shadowIndex,
+                                                const Node* owner) {
   std::string idx = std::to_string(shadowIndex);
   std::string offsetResult = "innerOffset" + idx;
   std::string compositeResult = "innerComposite" + idx;
   std::string shadowResult = "innerShadow" + idx;
-  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "innerBlur" + idx, offsetResult);
+  writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "innerBlur" + idx, offsetResult, owner);
 
   // Inner shadow carves away the offset/blurred alpha from inside the source:
   // result = k1*S*O + k2*S = S*(1 - O), where S = SourceAlpha, O = offsetResult.
@@ -1080,7 +1094,13 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   _defs->openElement("feFlood");
   applyFloodColor(blend->color);
   _defs->addAttribute("result", floodResult);
-  _defs->closeElementSelfClosing();
+  if (_animWriter.HasFilterAnimates(blend)) {
+    _defs->closeElementStart();
+    _animWriter.WriteFilterColorAnimates(*_defs, blend);
+    _defs->closeElement();
+  } else {
+    _defs->closeElementSelfClosing();
+  }
 
   // PAGX's BlendFilter treats the stored color as the source and the layer
   // content as the destination (backdrop) — see
@@ -1464,15 +1484,21 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
         _defs->addAttribute("in", currentSource);
         _defs->addAttribute("stdDeviation", FormatBlurStdDev(blur->blurX, blur->blurY));
         _defs->addAttribute("result", resultName);
-        _defs->closeElementSelfClosing();
+        if (_animWriter.HasFilterBlurAnimates(blur)) {
+          _defs->closeElementStart();
+          _animWriter.WriteFilterBlurAnimates(*_defs, blur);
+          _defs->closeElement();
+        } else {
+          _defs->closeElementSelfClosing();
+        }
         currentSource = resultName;
         break;
       }
       case NodeType::DropShadowFilter: {
         auto shadow = static_cast<const DropShadowFilter*>(filter);
-        agg.dropShadowResults.push_back(writeDropShadowFragment(shadow->blurX, shadow->blurY,
-                                                                shadow->offsetX, shadow->offsetY,
-                                                                shadow->color, shadowIndex++));
+        agg.dropShadowResults.push_back(
+            writeDropShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                    shadow->color, shadowIndex++, filter));
         if (!shadow->shadowOnly) {
           agg.needSourceGraphic = true;
         }
@@ -1480,9 +1506,9 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
       }
       case NodeType::InnerShadowFilter: {
         auto shadow = static_cast<const InnerShadowFilter*>(filter);
-        agg.innerShadowResults.push_back(writeInnerShadowFragment(shadow->blurX, shadow->blurY,
-                                                                  shadow->offsetX, shadow->offsetY,
-                                                                  shadow->color, shadowIndex++));
+        agg.innerShadowResults.push_back(
+            writeInnerShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                     shadow->color, shadowIndex++, filter));
         if (!shadow->shadowOnly) {
           agg.needSourceGraphic = true;
         }
@@ -1523,9 +1549,9 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
               "DropShadowStyle spread is not supported by SVG export and was ignored for style '" +
               shadow->id + "'.");
         }
-        agg.dropShadowResults.push_back(writeDropShadowFragment(shadow->blurX, shadow->blurY,
-                                                                shadow->offsetX, shadow->offsetY,
-                                                                shadow->color, shadowIndex++));
+        agg.dropShadowResults.push_back(
+            writeDropShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                    shadow->color, shadowIndex++, style));
         // DropShadowStyle always composites below the source graphic (it is a
         // style layer, not a filter that can hide the source).
         agg.needSourceGraphic = true;
@@ -1538,9 +1564,9 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
               "InnerShadowStyle spread is not supported by SVG export and was ignored for style '" +
               shadow->id + "'.");
         }
-        agg.innerShadowResults.push_back(writeInnerShadowFragment(shadow->blurX, shadow->blurY,
-                                                                  shadow->offsetX, shadow->offsetY,
-                                                                  shadow->color, shadowIndex++));
+        agg.innerShadowResults.push_back(
+            writeInnerShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
+                                     shadow->color, shadowIndex++, style));
         agg.needSourceGraphic = true;
         break;
       }
@@ -1672,8 +1698,8 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     switch (filter->nodeType()) {
       case NodeType::BlurFilter: {
         auto blur = static_cast<const BlurFilter*>(filter);
-        float ex = blur->blurX * BLUR_MULTIPLIER;
-        float ey = blur->blurY * BLUR_MULTIPLIER;
+        float ex = _animWriter.MaxChannelValue(blur, "blurX", blur->blurX) * BLUR_MULTIPLIER;
+        float ey = _animWriter.MaxChannelValue(blur, "blurY", blur->blurY) * BLUR_MULTIPLIER;
         marginLeft = std::max(marginLeft, ex);
         marginRight = std::max(marginRight, ex);
         marginTop = std::max(marginTop, ey);
@@ -1682,12 +1708,15 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
       }
       case NodeType::DropShadowFilter: {
         auto shadow = static_cast<const DropShadowFilter*>(filter);
-        float ex = shadow->blurX * BLUR_MULTIPLIER;
-        float ey = shadow->blurY * BLUR_MULTIPLIER;
-        marginLeft = std::max(marginLeft, ex + std::max(0.0f, -shadow->offsetX));
-        marginRight = std::max(marginRight, ex + std::max(0.0f, shadow->offsetX));
-        marginTop = std::max(marginTop, ey + std::max(0.0f, -shadow->offsetY));
-        marginBottom = std::max(marginBottom, ey + std::max(0.0f, shadow->offsetY));
+        float ex = _animWriter.MaxChannelValue(shadow, "blurX", shadow->blurX) * BLUR_MULTIPLIER;
+        float ey = _animWriter.MaxChannelValue(shadow, "blurY", shadow->blurY) * BLUR_MULTIPLIER;
+        // The region covers the whole animation, so both sides grow by the largest offset seen.
+        float offsetX = _animWriter.MaxChannelMagnitude(shadow, "offsetX", shadow->offsetX);
+        float offsetY = _animWriter.MaxChannelMagnitude(shadow, "offsetY", shadow->offsetY);
+        marginLeft = std::max(marginLeft, ex + offsetX);
+        marginRight = std::max(marginRight, ex + offsetX);
+        marginTop = std::max(marginTop, ey + offsetY);
+        marginBottom = std::max(marginBottom, ey + offsetY);
         break;
       }
       default:

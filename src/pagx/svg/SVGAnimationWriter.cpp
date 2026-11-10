@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Channel.h"
@@ -877,6 +878,225 @@ bool SVGAnimationWriter::WriteElementOpacityAnimates(XMLBuilder& out,
     timing.durationSeconds *= 2.0;
   }
   WriteAnimateElement(out, attributeName, nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+namespace {
+
+// Reads a scalar field from the node's static state so an axis that is not animated keeps its
+// authored value in the emitted values list.
+float StaticNodeFloat(const Node* node, const char* channelName) {
+  KeyValue value;
+  if (!GetNodeChannel(node, channelName, &value)) {
+    return 0.0f;
+  }
+  auto* result = std::get_if<float>(&value);
+  return result != nullptr ? *result : 0.0f;
+}
+
+// Emits one scalar attribute track from a channel that may be null (static value only).
+bool WriteScalarTrack(XMLBuilder& out, const Channel* channel, float staticValue, Frame duration,
+                      SmilTiming timing, const char* attributeName) {
+  std::vector<Frame> frames;
+  AppendTrackFrames(channel, duration, &frames);
+  if (frames.size() < 2) {
+    return false;
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+  auto span = static_cast<double>(duration);
+  SmilSequence sequence;
+  for (Frame frame : frames) {
+    sequence.values.push_back(
+        FloatToString(channel != nullptr ? EvaluateChannelFloat(channel, frame) : staticValue));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, attributeName, nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+}  // namespace
+
+bool SVGAnimationWriter::HasFilterAnimates(const Node* node) const {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  return _plan->Find(node, "blurX") != nullptr || _plan->Find(node, "blurY") != nullptr ||
+         _plan->Find(node, "offsetX") != nullptr || _plan->Find(node, "offsetY") != nullptr ||
+         _plan->Find(node, "color") != nullptr;
+}
+
+bool SVGAnimationWriter::HasFilterBlurAnimates(const Node* node) const {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  return _plan->Find(node, "blurX") != nullptr || _plan->Find(node, "blurY") != nullptr;
+}
+
+bool SVGAnimationWriter::HasFilterOffsetAnimates(const Node* node) const {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  return _plan->Find(node, "offsetX") != nullptr || _plan->Find(node, "offsetY") != nullptr;
+}
+
+float SVGAnimationWriter::MaxChannelValue(const Node* node, const char* channelName,
+                                          float fallback) const {
+  if (_plan == nullptr || node == nullptr) {
+    return fallback;
+  }
+  auto* binding = _plan->Find(node, channelName);
+  if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Float) {
+    return fallback;
+  }
+  const auto* typed = static_cast<const TypedChannel<float>*>(binding->channel);
+  float result = fallback;
+  for (const auto& keyframe : typed->keyframes) {
+    result = std::max(result, keyframe.value);
+  }
+  return result;
+}
+
+float SVGAnimationWriter::MaxChannelMagnitude(const Node* node, const char* channelName,
+                                              float fallback) const {
+  if (_plan == nullptr || node == nullptr) {
+    return fallback;
+  }
+  auto* binding = _plan->Find(node, channelName);
+  if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Float) {
+    return fallback;
+  }
+  const auto* typed = static_cast<const TypedChannel<float>*>(binding->channel);
+  float result = std::fabs(fallback);
+  for (const auto& keyframe : typed->keyframes) {
+    result = std::max(result, std::fabs(keyframe.value));
+  }
+  return result;
+}
+
+bool SVGAnimationWriter::WriteFilterBlurAnimates(XMLBuilder& out, const Node* node) {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  auto* xBinding = _plan->Find(node, "blurX");
+  auto* yBinding = _plan->Find(node, "blurY");
+  if (xBinding == nullptr && yBinding == nullptr) {
+    return false;
+  }
+  if (xBinding != nullptr && yBinding != nullptr && xBinding->animation != yBinding->animation) {
+    return false;
+  }
+  const auto* animation = xBinding != nullptr ? xBinding->animation : yBinding->animation;
+  const auto* timeline = xBinding != nullptr ? xBinding->timeline : yBinding->timeline;
+  SmilTiming timing;
+  if (!ResolveTiming(animation, timeline, &timing)) {
+    return false;
+  }
+  std::vector<Frame> frames;
+  AppendTrackFrames(xBinding != nullptr ? xBinding->channel : nullptr, animation->duration,
+                    &frames);
+  AppendTrackFrames(yBinding != nullptr ? yBinding->channel : nullptr, animation->duration,
+                    &frames);
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+
+  float staticX = StaticNodeFloat(node, "blurX");
+  float staticY = StaticNodeFloat(node, "blurY");
+  // stdDeviation takes either one value for both axes or one pair; the emitted list has to keep the
+  // same shape for every keyframe, so two values are used as soon as any frame differs.
+  bool twoValues = false;
+  std::vector<float> xs;
+  std::vector<float> ys;
+  for (Frame frame : frames) {
+    float x = xBinding != nullptr ? EvaluateChannelFloat(xBinding->channel, frame) : staticX;
+    float y = yBinding != nullptr ? EvaluateChannelFloat(yBinding->channel, frame) : staticY;
+    twoValues = twoValues || FloatToString(x) != FloatToString(y);
+    xs.push_back(x);
+    ys.push_back(y);
+  }
+  auto span = static_cast<double>(animation->duration);
+  SmilSequence sequence;
+  for (size_t i = 0; i < frames.size(); ++i) {
+    sequence.values.push_back(twoValues ? FloatToString(xs[i]) + " " + FloatToString(ys[i])
+                                        : FloatToString(xs[i]));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frames[i]) / span, 0.0, 1.0));
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "stdDeviation", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+bool SVGAnimationWriter::WriteFilterOffsetAnimates(XMLBuilder& out, const Node* node) {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  auto* xBinding = _plan->Find(node, "offsetX");
+  auto* yBinding = _plan->Find(node, "offsetY");
+  if (xBinding == nullptr && yBinding == nullptr) {
+    return false;
+  }
+  if (xBinding != nullptr && yBinding != nullptr && xBinding->animation != yBinding->animation) {
+    return false;
+  }
+  const auto* animation = xBinding != nullptr ? xBinding->animation : yBinding->animation;
+  const auto* timeline = xBinding != nullptr ? xBinding->timeline : yBinding->timeline;
+  SmilTiming timing;
+  if (!ResolveTiming(animation, timeline, &timing)) {
+    return false;
+  }
+  bool wrote = false;
+  if (xBinding != nullptr) {
+    wrote = WriteScalarTrack(out, xBinding->channel, StaticNodeFloat(node, "offsetX"),
+                             animation->duration, timing, "dx") ||
+            wrote;
+  }
+  if (yBinding != nullptr) {
+    wrote = WriteScalarTrack(out, yBinding->channel, StaticNodeFloat(node, "offsetY"),
+                             animation->duration, timing, "dy") ||
+            wrote;
+  }
+  return wrote;
+}
+
+bool SVGAnimationWriter::WriteFilterColorAnimates(XMLBuilder& out, const Node* node) {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  auto* binding = _plan->Find(node, "color");
+  if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Color) {
+    return false;
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(binding->animation, binding->timeline, &timing)) {
+    return false;
+  }
+  SmilSequence colorSequence;
+  SmilSequence alphaSequence;
+  if (!BuildColorSequences(binding->channel, binding->animation->duration, 1.0f, &colorSequence,
+                           &alphaSequence)) {
+    return false;
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&colorSequence);
+    ApplyPingPong(&alphaSequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "flood-color", nullptr, false, colorSequence, timing, nullptr, nullptr);
+  WriteAnimateElement(out, "flood-opacity", nullptr, false, alphaSequence, timing, nullptr,
+                      nullptr);
   return true;
 }
 

@@ -82,6 +82,17 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
     case NodeType::Stroke:
       return name == "color" || name == "alpha" || name == "width" || name == "dashOffset" ||
              name == "miterLimit";
+    case NodeType::BlurFilter:
+      return name == "blurX" || name == "blurY";
+    case NodeType::DropShadowFilter:
+    case NodeType::InnerShadowFilter:
+    case NodeType::DropShadowStyle:
+    case NodeType::InnerShadowStyle:
+      // `color` is not listed: the shadow colour is baked into feColorMatrix constants, so it has
+      // no single animatable attribute yet.
+      return name == "offsetX" || name == "offsetY" || name == "blurX" || name == "blurY";
+    case NodeType::BlendFilter:
+      return name == "color";
     default:
       return false;
   }

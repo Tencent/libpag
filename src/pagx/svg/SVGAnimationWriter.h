@@ -144,6 +144,40 @@ class SVGAnimationWriter {
    */
   bool WriteShapeGeometryAnimates(XMLBuilder& out, const Node* element, const Stroke* stroke);
 
+  /**
+   * Emits the SMIL children for the filter / style primitive that is currently open in <defs>:
+   * `feGaussianBlur` (stdDeviation), `feOffset` (dx / dy) and `feFlood` (flood-color /
+   * flood-opacity). Each returns false when the node has no animation for that primitive.
+   */
+  bool WriteFilterBlurAnimates(XMLBuilder& out, const Node* node);
+
+  bool WriteFilterOffsetAnimates(XMLBuilder& out, const Node* node);
+
+  bool WriteFilterColorAnimates(XMLBuilder& out, const Node* node);
+
+  /**
+   * True when the filter / style node drives at least one of the primitives above, so the caller
+   * must open the element instead of self-closing it.
+   */
+  bool HasFilterAnimates(const Node* node) const;
+
+  bool HasFilterBlurAnimates(const Node* node) const;
+
+  bool HasFilterOffsetAnimates(const Node* node) const;
+
+  /**
+   * Largest value the channel reaches across its keyframes, or `fallback` when the channel is not
+   * animated. Filter regions are emitted once for the whole element, so they must cover the whole
+   * animation rather than only frame 0.
+   */
+  float MaxChannelValue(const Node* node, const char* channelName, float fallback) const;
+
+  /**
+   * Largest absolute value the channel reaches across its keyframes, used for offsets whose sign
+   * decides which side of the bbox grows.
+   */
+  float MaxChannelMagnitude(const Node* node, const char* channelName, float fallback) const;
+
  private:
   const SVGAnimationPlan* _plan = nullptr;
   std::vector<std::string>* _warnings = nullptr;
