@@ -5314,4 +5314,20 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ContourMaskUsesClipRule) {
   EXPECT_EQ(svg.find("fill-rule=\"evenodd\""), std::string::npos);
 }
 
+// ST5: a layer that needs an offscreen composite (here a blur filter) must fold its alpha onto the
+// group instead of distributing it to each child, otherwise the filter runs before the group alpha.
+PAGX_TEST(PAGXSVGTest, SVGExport_IsolatedLayerUsesGroupAlpha) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->groupOpacity = false;
+  doc->layers[0]->alpha = 0.5f;
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 4.0f;
+  blur->blurY = 4.0f;
+  doc->layers[0]->filters.push_back(blur);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find(" opacity=\"0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
 }  // namespace pag

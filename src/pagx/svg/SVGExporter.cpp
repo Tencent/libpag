@@ -311,6 +311,18 @@ static std::string BuildLayerTransform(const Layer* layer) {
   return MatrixToSVGTransform(m);
 }
 
+// True when the layer must be composited as a whole before its alpha is applied: a filter, a layer
+// style, a blend mode and a pixel mask all consume the composited result, so folding alpha into
+// each child would apply the effect before the group alpha instead of after it.
+static bool NeedsLayerIsolation(const Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  return !layer->filters.empty() || !layer->styles.empty() ||
+         layer->blendMode != BlendMode::Normal ||
+         (layer->mask != nullptr && layer->maskType != MaskType::Contour);
+}
+
 // Inverse of a 2D affine matrix; identity when the matrix is singular.
 static Matrix InvertAffineMatrix(const Matrix& matrix) {
   float determinant = matrix.a * matrix.d - matrix.b * matrix.c;
@@ -3547,11 +3559,13 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect || animated;
 
   // Only an animated alpha forces the group form; a transform-only animation must keep the static
-  // per-child distribution so overlapping children keep compositing exactly as before.
+  // per-child distribution so overlapping children keep compositing exactly as before. A layer that
+  // needs an offscreen composite (filter, style, blend, pixel mask) must also fold alpha onto the
+  // group: distributing it per child would apply the effect before the group alpha instead of after.
   bool alphaAnimated =
       _animWriter.plan() != nullptr && _animWriter.plan()->HasAlphaAnimation(layer);
-  float perChildAlpha =
-      (!layer->groupOpacity && layer->alpha < 1.0f && !alphaAnimated) ? layer->alpha : 1.0f;
+  bool useGroupAlpha = alphaAnimated || layer->groupOpacity || NeedsLayerIsolation(layer);
+  float perChildAlpha = (!useGroupAlpha && layer->alpha < 1.0f) ? layer->alpha : 1.0f;
 
   if (!needsGroup) {
     writeLayerBody(out, layer, perChildAlpha);
@@ -3709,7 +3723,7 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
     out.addAttribute(("data-" + key).c_str(), value);
   }
 
-  if (layer->alpha < 1.0f && layer->groupOpacity) {
+  if (layer->alpha < 1.0f && (layer->groupOpacity || NeedsLayerIsolation(layer))) {
     out.addAttribute("opacity", FloatToString(layer->alpha));
   } else if (_animWriter.plan() != nullptr && _animWriter.plan()->HasAlphaAnimation(layer)) {
     // Animated alpha always takes the group form, so the static value becomes the SMIL baseline.
