@@ -34,10 +34,12 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -761,6 +763,11 @@ enum class TargetChannelRole {
   GradientStartAngle,
   // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
   StopColor,
+  // DropShadowStyle on a box shape: the shadow is its own blurred div, so these are plain CSS.
+  ShadowOffsetX,
+  ShadowOffsetY,
+  ShadowColor,
+  ShadowSpread,
   // RangeSelector falloff shaping (triangle curve handles and the overall weight).
   RangeEaseIn,
   RangeEaseOut,
@@ -860,6 +867,11 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::RadialGradient, "center.y", TargetChannelRole::GradientCenterY},
     {NodeType::RadialGradient, "radius", TargetChannelRole::GradientRadius},
     {NodeType::ColorStop, "color", TargetChannelRole::StopColor},
+    {NodeType::DropShadowStyle, "offsetX", TargetChannelRole::ShadowOffsetX},
+    {NodeType::DropShadowStyle, "offsetY", TargetChannelRole::ShadowOffsetY},
+    {NodeType::DropShadowStyle, "color", TargetChannelRole::ShadowColor},
+    {NodeType::DropShadowStyle, "spread", TargetChannelRole::ShadowSpread},
+    {NodeType::InnerShadowStyle, "color", TargetChannelRole::FilterFloodColor},
     {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
     {NodeType::Repeater, "copies", TargetChannelRole::RepeaterCopies},
     {NodeType::Repeater, "startAlpha", TargetChannelRole::RepeaterStartAlpha},
@@ -950,6 +962,9 @@ struct DomTargetBundle {
   int repeaterIndex = -1;
   // Set for a RangeSelector glyph bundle: index into AnimationState::rangeSelectorGlyphs.
   int rangeGlyphIndex = -1;
+  // Set for a DropShadowStyle bundle: the box its shadow div was emitted for.
+  bool hasShadowBox = false;
+  HTMLWriterContext::AnimationState::ShadowBox shadowBox = {};
   // Set for a Text bundle whose x/y channel is animated: the left/top the tag was placed at.
   bool hasTextOrigin = false;
   float textOriginX = 0.0f;
@@ -993,6 +1008,12 @@ struct BundleChannelSet {
   const Channel* gradRadiusCh = nullptr;
   const Channel* gradStartAngleCh = nullptr;
   const Channel* stopColorCh = nullptr;
+  // DropShadowStyle channels and the style node they belong to.
+  const Node* shadowStyleTarget = nullptr;
+  const Channel* shadowOffsetXCh = nullptr;
+  const Channel* shadowOffsetYCh = nullptr;
+  const Channel* shadowColorCh = nullptr;
+  const Channel* shadowSpreadCh = nullptr;
   const Channel* blendModeCh = nullptr;
   Color stopBaseColor = {};
   // Polystar: every channel rewrites the outline, so one struct keeps them together.
@@ -1267,6 +1288,22 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::LayerBlendMode:
       out.blendModeCh = ch;
       return true;
+    case TargetChannelRole::ShadowOffsetX:
+      out.shadowOffsetXCh = ch;
+      out.shadowStyleTarget = objTarget;
+      return true;
+    case TargetChannelRole::ShadowOffsetY:
+      out.shadowOffsetYCh = ch;
+      out.shadowStyleTarget = objTarget;
+      return true;
+    case TargetChannelRole::ShadowColor:
+      out.shadowColorCh = ch;
+      out.shadowStyleTarget = objTarget;
+      return true;
+    case TargetChannelRole::ShadowSpread:
+      out.shadowSpreadCh = ch;
+      out.shadowStyleTarget = objTarget;
+      return true;
     case TargetChannelRole::StopColor:
       out.stopColorCh = ch;
       if (objTarget != nullptr && objTarget->nodeType() == NodeType::ColorStop) {
@@ -1457,6 +1494,8 @@ bool BindChannelToBundleSet(
         out.floodBaseColor = static_cast<const InnerShadowFilter*>(objTarget)->color;
       } else if (objTarget != nullptr && objTarget->nodeType() == NodeType::BlendFilter) {
         out.floodBaseColor = static_cast<const BlendFilter*>(objTarget)->color;
+      } else if (objTarget != nullptr && objTarget->nodeType() == NodeType::InnerShadowStyle) {
+        out.floodBaseColor = static_cast<const InnerShadowStyle*>(objTarget)->color;
       }
       return true;
     case TargetChannelRole::FilterBlurX:
@@ -2098,6 +2137,32 @@ void EmitTextCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& c
   }
 }
 
+// A DropShadowStyle on a box shape is painted by its own blurred div, so its channels are ordinary
+// CSS: the offset moves the div, the spread grows it on every side, the colour tints it.
+void EmitShadowStyleCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
+                               Frame t, std::string& decls) {
+  if (!bundle.hasShadowBox || chSet.shadowStyleTarget == nullptr) {
+    return;
+  }
+  auto* style = static_cast<const DropShadowStyle*>(chSet.shadowStyleTarget);
+  const auto& box = bundle.shadowBox;
+  float spread = EvalFloatChannel(chSet.shadowSpreadCh, t, style->spread);
+  float dx = EvalFloatChannel(chSet.shadowOffsetXCh, t, style->offsetX);
+  float dy = EvalFloatChannel(chSet.shadowOffsetYCh, t, style->offsetY);
+  AppendCssDecl(decls, "left", CssFloatToString(box.left + dx - spread) + "px");
+  AppendCssDecl(decls, "top", CssFloatToString(box.top + dy - spread) + "px");
+  AppendCssDecl(decls, "width", CssFloatToString(box.width + 2.0f * spread) + "px");
+  AppendCssDecl(decls, "height", CssFloatToString(box.height + 2.0f * spread) + "px");
+  if (box.hasRadius && !box.radiusPercent) {
+    // The shadow div's radius follows the shape's own rounding plus the spread.
+    AppendCssDecl(decls, "border-radius", CssFloatToString(box.radius + spread) + "px");
+  }
+  if (chSet.shadowColorCh != nullptr) {
+    AppendCssDecl(decls, "background-color",
+                  ColorToRGBA(EvalColorChannel(chSet.shadowColorCh, t, style->color)));
+  }
+}
+
 // A gradient's geometry lives in attributes (x1/y1/x2/y2, cx/cy/r), which CSS cannot animate, but
 // Chromium maps a CSS `transform` on the gradient element onto gradientTransform. So the frame solves
 // for the affine move that takes the authored gradient geometry to this frame's geometry: a linear
@@ -2427,6 +2492,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   if (!wantsRest) {
     return decls;
   }
+  EmitShadowStyleCssAtFrame(bundle, chSet, t, decls);
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
   if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr ||
@@ -2563,6 +2629,20 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::DropShadowStyle) {
+      auto idIt = ctx.animation.elementIds.find(targetNode);
+      auto boxIt = ctx.animation.shadowBoxes.find(targetNode);
+      if (idIt != ctx.animation.elementIds.end() && boxIt != ctx.animation.shadowBoxes.end()) {
+        DomTargetBundle shadowBundle;
+        shadowBundle.domId = idIt->second;
+        shadowBundle.primaryHost = targetNode;
+        shadowBundle.objects.push_back(obj);
+        shadowBundle.hasShadowBox = true;
+        shadowBundle.shadowBox = boxIt->second;
+        bundles.push_back(std::move(shadowBundle));
+        continue;
+      }
+    }
     if (nType == NodeType::ColorStop) {
       auto idIt = ctx.animation.elementIds.find(targetNode);
       if (idIt != ctx.animation.elementIds.end()) {
@@ -2586,7 +2666,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         continue;
       }
     }
-    if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter) {
+    if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter ||
+        nType == NodeType::InnerShadowStyle) {
       auto idIt = ctx.animation.elementIds.find(targetNode);
       if (idIt != ctx.animation.elementIds.end()) {
         DomTargetBundle floodBundle;
@@ -3633,6 +3714,28 @@ void HTMLAnimationSession::ResolveAnimationTargets(
               auto& slot = _ctx.animation.repeaterMaxCopies[repeater];
               slot = std::max(slot, emitted);
             }
+          }
+        }
+      } else if (nType == NodeType::InnerShadowStyle) {
+        for (auto* channel : obj->channels) {
+          if (channel != nullptr &&
+              LookupChannelRole(nType, channel->name) == TargetChannelRole::FilterFloodColor) {
+            std::string floodId = _ctx.nextId("flood");
+            _ctx.animation.filterFloodIds[targetNode] = floodId;
+            _ctx.animation.elementIds[targetNode] = floodId;
+          }
+        }
+      } else if (nType == NodeType::DropShadowStyle) {
+        for (auto* channel : obj->channels) {
+          auto role = channel != nullptr ? LookupChannelRole(nType, channel->name)
+                                         : TargetChannelRole::Unknown;
+          if (role == TargetChannelRole::ShadowOffsetX ||
+              role == TargetChannelRole::ShadowOffsetY || role == TargetChannelRole::ShadowColor ||
+              role == TargetChannelRole::ShadowSpread) {
+            std::string id = _ctx.nextId("shadow");
+            _ctx.animation.shadowStyleIds[targetNode] = id;
+            _ctx.animation.elementIds[targetNode] = id;
+            break;
           }
         }
       } else if (nType == NodeType::ColorStop) {

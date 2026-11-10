@@ -2,7 +2,7 @@
 <!-- Tests: DropShadowStyle spread dilates the shadow silhouette before it is blurred, so the halo grows
      outwards.
      Target: DropShadowStyle  Channel: spread  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

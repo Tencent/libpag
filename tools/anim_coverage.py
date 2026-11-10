@@ -41,6 +41,11 @@ NODE_ORDER = [
 # A channel that is merely not implemented yet does NOT belong here: its `Expect: gap` case is the
 # roadmap entry, and it turns into `supported` when the channel lands. Exempting it would hide the
 # work item and drop it from the coverage table.
+# The exemptions are not "this can never work": they are "the CSS exporter cannot express it, so it
+# waits for the JS pass". Each entry names the reason and what the JS side would have to do. A
+# channel listed here still keeps its `Expect: gap` case whenever one exists, so the gap stays
+# measured instead of disappearing from the table.
+STYLE_CSS_UNSUPPORTED = "CSS 无法表达该样式参数，留待下一期由 JS 逐帧重绘"
 CHANNEL_EXEMPTIONS = {
     ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
 }
@@ -70,6 +75,20 @@ for _channel in ("blurX", "blurY", "offsetX", "offsetY", "shadowOnly"):
 CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = FILTER_CSS_UNSUPPORTED
 # A colour stop's position is the `offset` attribute of <stop>, not a CSS property.
 CHANNEL_EXEMPTIONS[("ColorStop", "offset")] = "stop 的 offset 是 XML 属性，不是 CSS 属性，无法用关键帧驱动"
+# Style channels the CSS exporter cannot drive, kept for the JS pass:
+# - a single-axis blur (blurX or blurY alone) has no CSS equivalent: filter:blur() and
+#   backdrop-filter:blur() are isotropic, measured 0.96 against the reference;
+# - an inner shadow's offset / blur / spread live on SVG filter primitives (feOffset, feGaussianBlur),
+#   which are attributes, not CSS properties;
+# - the glass parameters have no CSS counterpart at all, the static export only approximates them.
+for _channel in ("blurX", "blurY", "showBehindLayer"):
+    CHANNEL_EXEMPTIONS[("DropShadowStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+for _channel in ("blurX", "blurY", "offsetX", "offsetY", "spread"):
+    CHANNEL_EXEMPTIONS[("InnerShadowStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+for _channel in ("blurX", "blurY"):
+    CHANNEL_EXEMPTIONS[("BackgroundBlurStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+for _channel in ("depth", "dispersion", "frost", "lightAngle", "lightIntensity", "refraction", "splay"):
+    CHANNEL_EXEMPTIONS[("GlassStyle", _channel)] = STYLE_CSS_UNSUPPORTED
 
 # TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
 # applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()

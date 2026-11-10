@@ -2043,6 +2043,13 @@ std::string HTMLWriter::emitInnerShadowFilterDef(const InnerShadowStyle* is) {
       blurredResult = "iOff";
     }
     _defs->openTag("feFlood");
+    {
+      // A colour channel animates flood-color on this element, which CSS can do.
+      auto floodIt = _ctx->animation.filterFloodIds.find(is);
+      if (floodIt != _ctx->animation.filterFloodIds.end()) {
+        _defs->addAttr("id", floodIt->second);
+      }
+    }
     _defs->addAttr("flood-color", ColorToSVGHex(is->color));
     if (is->color.alpha < 1.0f) {
       _defs->addAttr("flood-opacity", CssFloatToString(is->color.alpha));
@@ -2507,7 +2514,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // layer's primary fill shape — critical for parity with tgfx when the layer has descendants
   // that paint their own filters (otherwise those descendants leak into the shadow's alpha
   // source and darken/widen the shadow beyond the layer silhouette).
-  std::vector<std::string> pendingSiblingShadows;
+  // (id, style): the id is non-empty only for a DropShadowStyle whose channels animate, so an
+  // untouched shadow keeps byte-identical output.
+  std::vector<std::pair<std::string, std::string>> pendingSiblingShadows;
   std::vector<const DropShadowStyle*> pendingFilterDropShadows;
   bool hasNestedDomContent = !layer->children.empty() || layer->composition != nullptr;
   auto appendBoxShadow = [&boxShadowValue](const DropShadowStyle* ds) {
@@ -2604,7 +2613,27 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           if (blurAvg > 0) {
             style += ";filter:blur(" + CssFloatToString(blurAvg) + "px)";
           }
-          pendingSiblingShadows.push_back(style);
+          std::string shadowId = {};
+          auto idIt = _ctx->animation.shadowStyleIds.find(ds);
+          if (idIt != _ctx->animation.shadowStyleIds.end()) {
+            shadowId = idIt->second;
+            // The frame recomputes the box from these values plus the channel values.
+            HTMLWriterContext::AnimationState::ShadowBox box = {};
+            box.left = shape.left;
+            box.top = shape.top;
+            box.width = shape.width;
+            box.height = shape.height;
+            if (!shape.radius.empty()) {
+              box.hasRadius = true;
+              if (shape.radius.back() == '%') {
+                box.radiusPercent = true;
+              } else {
+                box.radius = std::strtof(shape.radius.c_str(), nullptr);
+              }
+            }
+            _ctx->animation.shadowBoxes[ds] = box;
+          }
+          pendingSiblingShadows.emplace_back(shadowId, style);
           continue;
         }
       }
@@ -2788,7 +2817,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // elements and the layer's own contents/children in painter's order.
   for (const auto& shadowStyle : pendingSiblingShadows) {
     out.openTag("div");
-    out.addAttr("style", shadowStyle);
+    if (!shadowStyle.first.empty()) {
+      out.addAttr("id", shadowStyle.first);
+    }
+    out.addAttr("style", shadowStyle.second);
     out.closeTagSelfClosing();
   }
 

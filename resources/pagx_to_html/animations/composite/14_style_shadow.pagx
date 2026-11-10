@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A card whose drop shadow grows (spread), slides (offsetX) and re-tints (color) while an
+     inner shadow on the second card re-colours: two style nodes animating on the same timeline.
+     Target: DropShadowStyle, InnerShadowStyle  Channel: spread, offsetX, color  Type: mixed
+     Expect: supported
+     Ref: PAGXHtmlTest.AnimationShadowStyleKeyframes -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="cardA" position="90,100" size="110,90" roundness="14"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle id="shadowA" offsetX="0" offsetY="16" blurX="12" blurY="12" color="#1E1B4B80"
+                     spread="0"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="cardB" position="230,100" size="110,90" roundness="14"/>
+    <Fill color="#E0E7FF"/>
+    <InnerShadowStyle id="innerB" offsetX="0" offsetY="6" blurX="10" blurY="10" color="#1E1B4B"/>
+  </Layer>
+  <Animations>
+    <Animation id="styleMix" duration="60" frameRate="60" loop="once">
+      <Object target="shadowA">
+        <Channel name="spread" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="18"/>
+        </Channel>
+        <Channel name="offsetX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="26"/>
+        </Channel>
+        <Channel name="color" type="color">
+          <Key time="0" value="#1E1B4B80" interpolation="linear"/>
+          <Key time="60" value="#B4530980"/>
+        </Channel>
+      </Object>
+      <Object target="innerB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#1E1B4B" interpolation="linear"/>
+          <Key time="60" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
