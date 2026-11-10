@@ -3058,6 +3058,13 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
   }
 
   if (isVertical || !lines || lines->empty()) {
+    if (!text->glyphRuns.empty()) {
+      // No line layout: the whole string is emitted as one <text>, so a pre-shaped run cannot be
+      // segmented into outlines and the viewer re-shapes its characters.
+      addWarning(
+          "run with GlyphRun data has no line layout; it is re-shaped from its text and the "
+          "pre-shaped glyphs are not preserved.");
+    }
     // Fallback for: vertical mode with no usable column info (e.g. layout
     // produced nothing), or horizontal mode with no line info. Emit the whole
     // string as one <text>; horizontal mode needs a baseline shift by font
@@ -3136,9 +3143,20 @@ struct SVGLineEntry {
   uint32_t byteEnd = 0;
 };
 
+// A TextBox run whose Text carries pre-shaped GlyphRun data. Its outlines form a <g>, which cannot
+// be a child of <text>, so the run is emitted right after the line's <text> element.
+struct SVGGlyphRunEmission {
+  const Text* text = nullptr;
+  const Fill* fill = nullptr;
+  const Stroke* stroke = nullptr;
+  float originX = 0;
+  float originY = 0;
+};
+
 }  // namespace
 
-void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,                                  const std::vector<Element*>& elements, const Matrix& transform,
+void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
+                                  const std::vector<Element*>& elements, const Matrix& transform,
                                   float alpha) {
   auto topLevelFs = CollectFillStroke(elements);
   std::vector<SVGRichTextRun> runs;
@@ -3273,12 +3291,37 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,      
     }
     out.closeElementStart();
 
+    std::vector<SVGGlyphRunEmission> glyphRunsOnLine = {};
     while (i < lineEntries.size() &&
            std::fabs(lineEntries[i].baselineY - baseline) < baselineEpsilon) {
       const auto& entry = lineEntries[i];
       const auto& run = runs[entry.runIndex];
       const Fill* effectiveFill = run.fill ? run.fill : topLevelFs.fill;
       const Stroke* effectiveStroke = run.stroke ? run.stroke : topLevelFs.stroke;
+      FillStrokeInfo runFs = {};
+      runFs.fill = effectiveFill;
+      runFs.stroke = effectiveStroke;
+      if (!run.text->glyphRuns.empty()) {
+        // The layout reports the run's own origin through its glyph positions; the authored x/y is
+        // subtracted because ComputeGlyphPathsAndImages adds it back internally.
+        SVGGlyphRunEmission emission = {};
+        emission.text = run.text;
+        emission.fill = effectiveFill;
+        emission.stroke = effectiveStroke;
+        emission.originX = entry.startX;
+        emission.originY = entry.baselineY;
+        auto* layoutRuns = layoutResult.getGlyphRuns(const_cast<Text*>(run.text));
+        if (layoutRuns != nullptr && !layoutRuns->empty() && !(*layoutRuns)[0].positions.empty()) {
+          emission.originX = (*layoutRuns)[0].positions[0].x;
+        }
+        if (run.text->glyphRuns.size() == 1) {
+          emission.originX -= run.text->glyphRuns[0]->x;
+          emission.originY -= run.text->glyphRuns[0]->y;
+        }
+        glyphRunsOnLine.push_back(emission);
+        ++i;
+        continue;
+      }
       std::string lineText =
           run.text->text.substr(entry.byteStart, entry.byteEnd - entry.byteStart);
       if (lineText.empty()) {
@@ -3287,14 +3330,23 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,      
       }
       out.openElement("tspan");
       WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
-      FillStrokeInfo runFs = {};
-      runFs.fill = effectiveFill;
-      runFs.stroke = effectiveStroke;
       applyPainters(out, runFs, {}, alpha);
       finishTextElement(out, runFs, alpha, lineText);
       ++i;
     }
     out.closeElement();
+
+    for (const auto& emission : glyphRunsOnLine) {
+      FillStrokeInfo runFs = {};
+      runFs.fill = emission.fill;
+      runFs.stroke = emission.stroke;
+      if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs, alpha,
+                              svgTransform)) {
+        addWarning("TextBox '" + textBox->id +
+                   "' has a run with GlyphRun data but no usable glyph outline; the run is "
+                   "dropped.");
+      }
+    }
   }
 }
 
