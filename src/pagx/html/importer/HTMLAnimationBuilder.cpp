@@ -1497,7 +1497,22 @@ bool HTMLAnimationBuilder::buildForElement(
   // cannot be `layer->matrix3D` alone: a static 2D `matrix` (or components) would be read as the
   // identity and the fill-mode holds would hide it before the animation starts and after it ends.
   const Matrix matrixChannelBaseline = baselineMatrix;
-  const Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
+  Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
+  if (!IsInvertibleMatrix3D(matrix3DChannelBaseline)) {
+    // A singular static pose (`scale(0)`) cannot travel on the `matrix3D` channel: PAGX rejects a
+    // non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
+    // Collapsing the linear block to a tiny uniform scale keeps the element as invisible as
+    // `scale(0)` renders while staying valid; the translation column is preserved.
+    constexpr float kCollapsedScale = 1e-4f;
+    Matrix3D collapsed = {};
+    collapsed.setRowColumn(0, 0, kCollapsedScale);
+    collapsed.setRowColumn(1, 1, kCollapsedScale);
+    collapsed.setRowColumn(2, 2, kCollapsedScale);
+    for (int row = 0; row < 3; ++row) {
+      collapsed.setRowColumn(row, 3, matrix3DChannelBaseline.getRowColumn(row, 3));
+    }
+    matrix3DChannelBaseline = collapsed;
+  }
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
   if (!colorKeys.empty()) {
