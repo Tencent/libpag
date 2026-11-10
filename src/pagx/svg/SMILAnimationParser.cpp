@@ -280,17 +280,27 @@ static std::vector<float> ParseFloatParams(const std::string& token) {
 // Computes the bezier handles for keyframe i given the interpolation mode and splines list.
 // Returns {bezierOut, bezierIn} via out params; both are zero when interpolation is not Bezier
 // or i is the last keyframe.
-static void ComputeBezierHandles(KeyframeInterpolationType interpolation,
-                                 const std::vector<BezierControlPoints>& splines, size_t i,
-                                 size_t keyframeCount, Point* outBezierOut, Point* outBezierIn) {
+// A segment i runs from keyframe i to i + 1. The evaluator reads the easing handles as
+// keyframe[i].bezierOut and keyframe[i + 1].bezierIn, so p1 belongs to the segment start and p2 to
+// the segment end; writing both onto keyframe i leaves the end handle at its default.
+static void ComputeBezierOutHandle(KeyframeInterpolationType interpolation,
+                                   const std::vector<BezierControlPoints>& splines, size_t i,
+                                   size_t keyframeCount, Point* outBezierOut) {
   *outBezierOut = {};
-  *outBezierIn = {};
   if (interpolation == KeyframeInterpolationType::Bezier && i < keyframeCount - 1 &&
       i < splines.size()) {
     outBezierOut->x = static_cast<float>(splines[i].p1x);
     outBezierOut->y = static_cast<float>(splines[i].p1y);
-    outBezierIn->x = static_cast<float>(splines[i].p2x);
-    outBezierIn->y = static_cast<float>(splines[i].p2y);
+  }
+}
+
+static void ComputeBezierInHandle(KeyframeInterpolationType interpolation,
+                                  const std::vector<BezierControlPoints>& splines, size_t i,
+                                  Point* outBezierIn) {
+  *outBezierIn = {};
+  if (interpolation == KeyframeInterpolationType::Bezier && i > 0 && i - 1 < splines.size()) {
+    outBezierIn->x = static_cast<float>(splines[i - 1].p2x);
+    outBezierIn->y = static_cast<float>(splines[i - 1].p2y);
   }
 }
 
@@ -2535,7 +2545,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       float prevAngle = (paramSets[i - 1].size() > 0) ? paramSets[i - 1][0] : 0.0f;
       float curAngle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
       float delta = curAngle - prevAngle;
-      if (std::abs(delta) <= 180.0f) {
+      if (std::abs(delta) < 180.0f) {
         expandedParams.push_back(paramSets[i]);
         expandedTimes.push_back(keyTimes[i]);
         continue;
@@ -2614,7 +2624,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
       m = ctx.getContentMatrix() * m;
     }
     Point bo = {}, bi = {};
-    ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
+    ComputeBezierOutHandle(interpolation, splines, i, paramSets.size(), &bo);
+    ComputeBezierInHandle(interpolation, splines, i, &bi);
     Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
     AppendKeyframe(ch, ChannelValueType::Matrix, time, m, interpolation, bo, bi);
   }
@@ -2861,10 +2872,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     }
     if (additive) {
       // See parseAnimateTransform: the static pose is applied once after merging.
-    } else if (ctx.contentMatrixLayer() == nodeInfo.targetLayer) {
-      // Same rule as transform animations: the viewBox mapping only belongs to the layer that
-      // actually carries it, otherwise a hoisted pivot parent would apply it twice.
-      m = ctx.getContentMatrix() * m;
+    } else {
+      // animateMotion supplements the element's own transform even without additive="sum"; SVG
+      // never lets a motion path replace the base transform. staticMatrix already carries the
+      // viewBox mapping, so no separate content-matrix step is needed here.
+      m = staticMatrix * m;
     }
     double sampleTime = motionKeyTimes.empty() ? normalizedTime : motionKeyTimes[i];
     Frame time = beginFrames + static_cast<Frame>(std::round(sampleTime * durFrames));
