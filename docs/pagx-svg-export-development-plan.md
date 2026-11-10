@@ -504,6 +504,26 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST40 部分（2026-11-10） | 没有 feBlend 对应物的 blend mode（plus-lighter / plus-darker）改为显式告警，不再静默按 normal 渲染；`PAGXSVGTest` 184 / 184 | BlendFilter 的 source/dest alpha 组合与透明洞仍未逐 mode 验证；Glass / backdrop 仍是 B 类 |
 | 本轮 ST17（2026-11-10） | `antiAlias=false` 的层输出 `shape-rendering="crispEdges"` 并强制成组，默认值不改变输出；`PAGXSVGTest` 185 / 185 | 斜边 / 旋转 / clip 下的 AA 仍无像素级验证 |
 | 本轮 ST43（2026-11-10） | `resolveModifiers` 不再作为「关闭就丢效果」的开关，修饰器一律解析，false 只产生告警；`PAGXSVGTest` 186 / 186 | — |
+| 本轮 ST6 链 + ST7 backdrop（2026-11-10） | 阴影滤镜内联 `feMerge` 并推进 `currentSource`，后续滤镜读到阴影输出；`BackgroundBlurStyle` / `GlassStyle` 在预扫描阶段显式告警；顺带修好嵌套 mask writer 丢失 warnings 的问题；`PAGXSVGTest` 189 / 189 | S3 文字、S4 几何、S5 资源、S6 API 未开始 |
+
+### 4.8 S3 文字待办清单（下一批入口）
+
+按文档 S3 拆成可独立验收的条目，每条的源码入口已定位：
+
+| 编号 | 问题 | 入口 |
+|---|---|---|
+| ST8 | `writeTextBoxGroup` 只重排 `run.text->text`，丢弃 `GlyphRun`、多 Painter、transform / alpha、foreground 双遍 | `SVGExporter::writeTextBoxGroup` |
+| ST9 | WOFF2 路径多 Font / 多字号 / advance / anchor 不完整 | `writeTextAsFont`、`WriteSharedTextAttrs` |
+| ST10 | glyph `fill-opacity` 与位图字形缺 alpha 因子 | `writeTextAsPath` |
+| ST18 | `fauxBold` / `fauxItalic` 在 WOFF2 与 outline 路径上丢失 | `BuildStyledTypeface` |
+| ST20 | `RangeSelector` 的 index offset / shape / 首 mode | `TextUtils::CollectRichTextRuns` 一带 |
+| ST21 | `TextModifier` 的 base + overlay 多层 paint | 同上 |
+| ST22 | `TextPath` 八字段沿线布局 | `writeTextWithLayout` |
+| ST28 | Native 模式 width 优先于双边约束 | `MakeTextBoxParams` |
+| ST29 | 空布局 fallback 重新画出被 Hidden 的行 | `writeTextWithLayout` |
+| ST31 | 同一 run 内 vector / bitmap 字形先 path 后 image，破坏遮挡序 | `ComputeGlyphPathsAndImages` + `writeTextAsPath` |
+
+其中 ST31 需要把两个 `glyphPaths` / `glyphImages` 容器合并成带序号的单一列表，改动会波及 `TextUtils`；其余多为局部修正。
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
