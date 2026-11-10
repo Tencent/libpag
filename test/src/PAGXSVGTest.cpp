@@ -4433,13 +4433,14 @@ PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerMaskAndContourEmitDistinctDefs) 
  * divergence is visible to CI / log readers, while still emitting the <mask> def so the
  * owner is not silently dropped from the SVG.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
+PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskUsesRelativeMatrix) {
   auto doc = pagx::PAGXDocument::Make(400, 400);
 
   auto* topA = doc->makeNode<pagx::Layer>();
   topA->id = "topA";
   auto* maskLayer = doc->makeNode<pagx::Layer>();
   maskLayer->id = "crossParentMask";
+  maskLayer->x = 10.0f;
   auto* maskRect = doc->makeNode<pagx::Rectangle>();
   maskRect->position = {50, 50};
   maskRect->size = {80, 80};
@@ -4450,6 +4451,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
 
   auto* topB = doc->makeNode<pagx::Layer>();
   topB->id = "topB";
+  topB->x = 100.0f;
   auto* owner = doc->makeNode<pagx::Layer>();
   owner->id = "crossParentOwner";
   owner->mask = maskLayer;
@@ -4465,23 +4467,15 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
   std::vector<std::string> warnings;
   auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
 
-  // The cross-parent reference must be flagged for CI / log visibility.
-  bool sawCrossParentWarning = false;
-  for (const auto& w : warnings) {
-    if (w.find("crossParentMask") != std::string::npos &&
-        w.find("crossParentOwner") != std::string::npos &&
-        w.find("across parent boundaries") != std::string::npos) {
-      sawCrossParentWarning = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(sawCrossParentWarning);
-
-  // Emission is preserved (warning-only, not skip): the <mask> def appears in <defs> and the
-  // owner still carries the mask attribute. A regression that silently drops the def would
-  // leave the SVG without `<mask id=...>` and the owner without its `mask=` attribute.
+  // The mask body is placed in the owner's parent space: translate(10) relative to translate(100)
+  // is matrix(1,0,0,1,-90,0). The old implementation applied only the mask layer's own matrix and
+  // reported a warning instead.
   EXPECT_NE(svg.find("id=\"crossParentMask_a\""), std::string::npos);
   EXPECT_NE(svg.find("mask=\"url(#crossParentMask_a)\""), std::string::npos);
+  EXPECT_NE(svg.find("matrix(1,0,0,1,-90,0)"), std::string::npos);
+  for (const auto& warning : warnings) {
+    EXPECT_EQ(warning.find("across parent boundaries"), std::string::npos) << warning;
+  }
 }
 
 //==============================================================================

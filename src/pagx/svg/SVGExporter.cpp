@@ -311,6 +311,23 @@ static std::string BuildLayerTransform(const Layer* layer) {
   return MatrixToSVGTransform(m);
 }
 
+// Inverse of a 2D affine matrix; identity when the matrix is singular.
+static Matrix InvertAffineMatrix(const Matrix& matrix) {
+  float determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+  if (std::fabs(determinant) < 1e-9f) {
+    return Matrix::Identity();
+  }
+  float inverse = 1.0f / determinant;
+  Matrix result = {};
+  result.a = matrix.d * inverse;
+  result.b = -matrix.b * inverse;
+  result.c = -matrix.c * inverse;
+  result.d = matrix.a * inverse;
+  result.tx = -(result.a * matrix.tx + result.c * matrix.ty);
+  result.ty = -(result.b * matrix.tx + result.d * matrix.ty);
+  return result;
+}
+
 //==============================================================================
 // SVGWriterContext - shared state across SVGWriter instances
 //==============================================================================
@@ -381,13 +398,17 @@ class SVGWriterContext {
   struct MaskDefKey {
     const Layer* layer;
     MaskType maskType;
+    // The coordinate space the mask body is placed in: the owner's parent. Two owners in different
+    // parents need different defs for the same mask layer, because the relative matrix differs.
+    const Layer* space;
     bool operator==(const MaskDefKey& other) const {
-      return layer == other.layer && maskType == other.maskType;
+      return layer == other.layer && maskType == other.maskType && space == other.space;
     }
   };
   struct MaskDefKeyHash {
     size_t operator()(const MaskDefKey& k) const noexcept {
-      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.maskType) << 1);
+      return std::hash<const Layer*>{}(k.layer) ^ (static_cast<size_t>(k.maskType) << 1) ^
+             (std::hash<const Layer*>{}(k.space) << 3);
     }
   };
   std::unordered_map<MaskDefKey, std::string, MaskDefKeyHash> emittedMaskDefs = {};
@@ -440,6 +461,10 @@ class SVGWriter {
   const std::vector<SVGGroupTransformStep>* _pendingGroupSteps = nullptr;
   Matrix _pendingStaticTransform = {};
   const Element* _pendingGeometry = nullptr;
+
+  // Total transform applied to the mask layer body while a <mask> / <clipPath> def is being
+  // written. Set by writeMaskOrClipDef so the content writers do not have to recompute it.
+  Matrix _maskContentTransform = {};
 
   std::string generateId(const std::string& prefix) {
     return _context->generateId(prefix);
@@ -575,7 +600,14 @@ class SVGWriter {
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
-  std::string writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType);
+  std::string writeMaskOrClipDef(const Layer* maskLayer, const Layer* owner, MaskType maskType);
+
+  // Transform from the mask layer's local space into the owner's parent space, matching
+  // Layer::getRelativeMatrix3D(owner) which excludes the owner's own matrix.
+  Matrix maskRelativeMatrix(const Layer* maskLayer, const Layer* owner);
+
+  // Accumulated transform from the document root down to and including `layer`.
+  Matrix accumulatedLayerMatrix(const Layer* layer);
   void writeMaskContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContent(SVGBuilder& out, const Layer* layer);
   void writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
@@ -1795,7 +1827,34 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
+Matrix SVGWriter::accumulatedLayerMatrix(const Layer* layer) {
+  std::vector<const Layer*> chain = {};
+  std::unordered_set<const Layer*> guard = {};
+  const Layer* current = layer;
+  while (current != nullptr && guard.insert(current).second) {
+    chain.push_back(current);
+    current = findLayerParent(current);
+  }
+  Matrix result = {};
+  for (auto iter = chain.rbegin(); iter != chain.rend(); ++iter) {
+    result = result * BuildLayerMatrix(*iter);
+  }
+  return result;
+}
+
+Matrix SVGWriter::maskRelativeMatrix(const Layer* maskLayer, const Layer* owner) {
+  if (owner == nullptr) {
+    return BuildLayerMatrix(maskLayer);
+  }
+  // The mask body lives in the owner's parent space: Layer::getMaskData evaluates
+  // mask->getRelativeMatrix3D(owner), which excludes the owner's own matrix.
+  auto* ownerParent = findLayerParent(owner);
+  Matrix space = ownerParent != nullptr ? accumulatedLayerMatrix(ownerParent) : Matrix{};
+  return InvertAffineMatrix(space) * accumulatedLayerMatrix(maskLayer);
+}
+
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* owner,
+                                          MaskType maskType) {
   // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
   // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements
   // with the same id in <defs>, which is undefined per the SVG spec — browsers typically use
@@ -1814,7 +1873,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   ContentWriter writer =
       isClipPath ? &SVGWriter::writeClipPathContent : &SVGWriter::writeMaskContent;
 
-  SVGWriterContext::MaskDefKey key{maskLayer, maskType};
+  SVGWriterContext::MaskDefKey key{maskLayer, maskType, findLayerParent(owner)};
   auto cached = _context->emittedMaskDefs.find(key);
   if (cached != _context->emittedMaskDefs.end()) {
     return cached->second;
@@ -1851,6 +1910,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   _defs->closeElementStart();
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
                          _doc);
+  nestedWriter._maskContentTransform = maskRelativeMatrix(maskLayer, owner);
   (nestedWriter.*writer)(*_defs, maskLayer);
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
@@ -1869,7 +1929,10 @@ void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
   // when mask and owner share a parent reduces to mask->matrix). Wrap the
   // mask body in a <g transform="..."> so the mask layer's own left/top/
   // matrix moves the mask shape correctly without leaking onto the owner.
-  std::string transform = BuildLayerTransform(layer);
+  // The mask body is placed in the owner's parent space. _maskContentTransform carries the full
+  // relative matrix (mask -> common ancestor -> owner parent), which is exactly what
+  // Layer::getRelativeMatrix3D(owner) computes, so a cross-parent mask no longer drifts.
+  std::string transform = MatrixToSVGTransform(_maskContentTransform);
   bool needsWrapper = !transform.empty();
   if (needsWrapper) {
     out.openElement("g");
@@ -1894,7 +1957,13 @@ void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeClipPathContent(SVGBuilder& out, const Layer* layer) {
-  writeClipPathContentRecursive(out, layer);
+  // _maskContentTransform already includes the mask layer's own matrix, so the root layer is
+  // emitted with it directly and children keep accumulating their own transforms.
+  writeLayerContents(out, layer, _maskContentTransform, 1.0f, LayerPlacement::Background,
+                     /*acceptAnyPlacement=*/true);
+  for (const auto* child : layer->children) {
+    writeClipPathContentRecursive(out, child, _maskContentTransform);
+  }
 }
 
 void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* layer,
@@ -1914,28 +1983,12 @@ void SVGWriter::writeClipPathContentRecursive(SVGBuilder& out, const Layer* laye
 }
 
 std::string SVGWriter::writeMaskDef(const Layer* maskLayer, const Layer* owner, MaskType maskType) {
-  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
-    // PAGX renders mask geometry in the owner's parent space via mask->getRelativeMatrix3D(
-    // owner), walking mask -> common-ancestor -> owner-parent. The SVG output here only
-    // applies the mask layer's own matrix (BuildLayerTransform), which coincides with the
-    // renderer's matrix when mask and owner share a parent and diverges otherwise. Surface
-    // a warning so CI / log readers see the divergence; emission is preserved so cross-
-    // parent owners are not silently dropped from the SVG. A follow-up PR can wire the full
-    // chain matrix through to restore exact correctness.
-    addWarning(
-        "mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-        "' across parent boundaries; SVG <mask> placement may diverge from the PAGX renderer.");
-  }
-  return writeMaskOrClipDef(maskLayer, maskType);
+  // Cross-parent placement is handled by maskRelativeMatrix, so no divergence warning is needed.
+  return writeMaskOrClipDef(maskLayer, owner, maskType);
 }
 
 std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* owner) {
-  if (owner != nullptr && findLayerParent(maskLayer) != findLayerParent(owner)) {
-    addWarning("mask layer '" + maskLayer->id + "' references owner '" + owner->id +
-               "' across parent boundaries; SVG <clipPath> placement may diverge from the PAGX "
-               "renderer.");
-  }
-  return writeMaskOrClipDef(maskLayer, MaskType::Contour);
+  return writeMaskOrClipDef(maskLayer, owner, MaskType::Contour);
 }
 
 const Layer* SVGWriter::findLayerParent(const Layer* layer) {
