@@ -5497,4 +5497,33 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BackdropStylesAreReported) {
   EXPECT_EQ(reported, 2u);
 }
 
+// ST8: a TextBox run that carries pre-shaped GlyphRun data is re-shaped from its characters on the
+// <tspan> path, so the loss has to be reported. The warning has to survive the no-line-info
+// fallback, which returns before the run loop.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunRunWarns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  auto* glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->glyphs = {1};
+  text->glyphRuns.push_back(glyphRun);
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_FALSE(svg.empty());
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("GlyphRun data") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 }  // namespace pag

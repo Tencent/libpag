@@ -3131,6 +3131,18 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   if (runs.empty()) {
     return;
   }
+  // A TextBox line is one <text> whose runs flow through <tspan>; a run with pre-shaped GlyphRun
+  // data cannot keep it there, so the viewer re-shapes the characters and may pick different
+  // glyphs. Reported here rather than next to the run loop because the no-line-info fallback below
+  // returns before that point.
+  for (const auto& run : runs) {
+    if (run.text != nullptr && !run.text->glyphRuns.empty()) {
+      addWarning("TextBox '" + textBox->id +
+                 "' contains a run with GlyphRun data; runs inside a TextBox are re-shaped from "
+                 "their text, so the pre-shaped glyphs and per-run transforms are not preserved.");
+      break;
+    }
+  }
 
   std::vector<Text*> mutableTexts;
   mutableTexts.reserve(runs.size());
