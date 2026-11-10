@@ -2,9 +2,10 @@
 
 本文只写已确定的方案与实现约定，面向编码。选型论证过程不在本文范围内。
 
-- 输入：已带动画轨道的 `pagx::PAGXDocument` 或 `.pagx` 文件
-- 输出：MP4（H.264 + AAC）
-- 落点：`pagx export --format mp4`（native CLI）与 ardot 编辑器（web 版与 CEF 桌面版共用 JS 侧 WebCodecs 编码层，见 §10）
+- 输入：`pagx::PAGXDocument` 或 `.pagx` 文件，支持动态与纯静态文档；存在顶层动画时其 ID 必须非空且唯一
+- 输出：P1 为 MP4（H.264、无音轨）；AAC 音频见 §5 后续设计
+- 当前已完成：`pagx export --format mp4`（native CLI）及 native C++ 帧源
+- 待实施：Web embind、WebCodecs/muxer、ardot adapter 与 WebGPU 异步帧源；WebGL wasm 仅表示 C++ 实现可摘编，不代表已有 JS 导出能力（见 §10）
 
 ## 1. 方案概要
 
@@ -40,7 +41,7 @@
 │ web：   WebCodecs VideoEncoder(avc1) + muxer               │
 └───────────────────────────────────────────────────────────┘
 ┌─ 帧产出（pagx 公开 API，native/wasm 完全一致）─────────────┐
-│ include/pagx/VideoExporter.h + src/pagx/video/VideoExporter.cpp │
+│ include/pagx/VideoExporter.h + src/pagx/VideoExporter.cpp       │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -64,16 +65,17 @@ namespace pagx {
 /**
  * Export options for VideoExporter.
  *
- * ABI stability: this struct is part of the public API. New optional fields must be appended at
- * the end with sensible defaults so that callers compiled against an older header continue to
- * link and behave correctly.
+ * No binary ABI stability is promised. Callers and the library must use compatible headers;
+ * changing the field layout requires recompilation.
  */
 struct VideoExportOptions {
-  /** Sampling frame rate; 0 means "use the document animation frame rate". */
+  /** Sampling frame rate; 0 uses one consistent integer document frame rate, otherwise 1-120.
+   *  Mixed or non-integer document rates require an explicit rate. */
   int frameRate = 0;
-  /** Sequence length in seconds; <= 0 means "the longest animation's duration". */
+  /** Sequence length in seconds; <= 0 means the longest full playback period for animated
+   *  documents, or one frame for static documents. */
   float duration = -1.0f;
-  /** Output scale factor applied to the document size. */
+  /** Output scale factor; must be finite and positive. */
   float scale = 1.0f;
   /** Background color drawn under the content. Whether it must be opaque is decided by the
    *  output container, not here: H.264 carries no alpha, VP9 does. */
@@ -133,7 +135,7 @@ class VideoExporter {
 1. **必须 pull**：宿主一次取一帧，中间可以 `SubmitTask` 让出主线程。禁止一次跑完全部帧。
 2. **`Make()` 绑定 GL 线程**：wasm 下 `Devices::MakeDefault()` 只返回当前线程已绑定的 device，其他线程是 nullptr。
 3. **是否要求不透明由输出格式决定**：mp4 要求不透明，`alpha=255` 时预乘等于直通，无需 unpremultiply；将来支持带 alpha 的容器时由宿主做 unpremultiply，库不参与该决策。
-4. **`pixels()` 只到下一次 `nextFrame()`**：复用同一块 surface 内存，宿主必须当场消费。
+4. **`pixels()` 只到下一次 `nextFrame()`**：帧会回读进专用 CPU 缓冲（一次性分配的 `tgfx::Bitmap`，逐帧覆写），不是 surface 的后备显存；契约仍是「只到下一次 `nextFrame()`」，宿主必须当场消费。
 
 宿主调用形态：
 
@@ -141,24 +143,57 @@ class VideoExporter {
 // native: the CLI wiring, VideoEncoder lives in src/cli (not in the library)
 auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
 auto encoder = VideoEncoder::Start(ffmpegPath, *FindVideoFormat("mp4"), encodeOptions, &errorMsg);
-while (exporter->nextFrame()) {
-  encoder->writeFrame(exporter->pixels(), exporter->rowBytes(), &errorMsg);
+if (!exporter || !encoder) {
+  return;  // Report errorMsg.
 }
-encoder->finish(&errorMsg);
+while (exporter->nextFrame()) {
+  if (!encoder->writeFrame(exporter->pixels(), exporter->rowBytes(), &errorMsg)) {
+    encoder->abort();
+    return;  // Do not publish a partial video.
+  }
+}
+if (exporter->currentFrame() < exporter->frameCount()) {
+  encoder->abort();
+  return;  // draw() or readPixels() failed.
+}
+if (!encoder->finish(&errorMsg)) {
+  return;  // Report errorMsg; finish() only publishes after a trusted exit code 0.
+}
 ```
 
 ```ts
 // wasm / JS
-while (exporter.nextFrame()) {
-  const view = HEAPU8.subarray(ptr, ptr + rowBytes * height);   // 零拷贝视图
-  const frame = new VideoFrame(view, {format: 'RGBA', codedWidth: width, codedHeight: height,
-                                      timestamp: currentFrame * 1e6 / fps});
-  encoder.encode(frame, {keyFrame: currentFrame % gop === 0});
-  frame.close();
-  if (encoder.encodeQueueSize > 8) await drainEncoded();
-  await yieldToUI();
+try {
+  while (exporter.nextFrame()) {
+    const frameIndex = exporter.currentFrame() - 1;  // currentFrame() 返回下一帧索引
+    const view = HEAPU8.subarray(ptr, ptr + rowBytes * height);
+    const packedRowBytes = width * 4;
+    let pixels = view;
+    if (rowBytes !== packedRowBytes) {
+      pixels = new Uint8Array(packedRowBytes * height);
+      for (let row = 0; row < height; ++row) {
+        pixels.set(view.subarray(row * rowBytes, row * rowBytes + packedRowBytes),
+                   row * packedRowBytes);
+      }
+    }
+    const timestampUs = Math.round(frameIndex * 1e6 / fps);
+    const frame = new VideoFrame(pixels, {format: 'RGBA', codedWidth: width, codedHeight: height,
+                                           timestamp: timestampUs});
+    encoder.encode(frame, {keyFrame: frameIndex % gop === 0});
+    frame.close();
+    if (encoder.encodeQueueSize > 8) await drainEncoded();
+    await yieldToUI();
+  }
+  if (exporter.currentFrame() < exporter.frameCount()) {
+    throw new Error('rendering failed before the sequence completed');
+  }
+  await muxer.finalize();  // 只有完整帧序列才能封箱发布。
+} finally {
+  encoder.close();  // 渲染、编码或 finalize 失败时不调用/不再重复调用 finalize，并丢弃 muxer。
 }
 ```
+
+这里的“零拷贝”只指 `HEAPU8.subarray()` 不复制 wasm 堆数据；`rowBytes > width * 4` 时仍必须逐行打包成紧凑 RGBA。`VideoFrame(BufferSource)` 构造会取得自己的帧数据，`encode()` 也会克隆帧，因此编码器不会异步持有 exporter 的 CPU 缓冲或临时打包数组；若未来引入真正的 external-memory 零拷贝路径，才需要额外所有权与释放回调。
 
 ## 4. CLI 层
 
@@ -180,21 +215,23 @@ pagx export --format mp4 --input in.pagx --output out.mp4
 | `--input <file>` | 必填 | 单输入（视频格式不允许重复） |
 | `--output <file>` | `<input>.<format>` | 输出路径 |
 | `--format mp4` | 从 `--output` 推断 | 目前只接受 `mp4`，其他值走现有 unsupported 分支 |
-| `--fps <n>` | 文档动画帧率，缺省 60 | 采样帧率 |
-| `--duration <s>` | 最长动画一个周期 | 序列时长 |
-| `--scale <f>` | 1.0 | 缩放（`export` 此前无此参数，需新增） |
+| `--fps <n>` | 所有顶层动画一致的整数帧率，缺省 60 | 采样帧率；多个已声明帧率必须一致且为整数，混合或 23.976/29.97 等非整数帧率必须显式指定，不静默取整；负值和非有限值即使显式指定 fps 也会在场景构建前拒绝，播放周期溢出同样报错 |
+| `--duration <s>` | 动态文档为最长动画一个完整播放周期；静态文档为一帧 | 静态文档默认只输出一帧，媒体时长为 `1 / fps`；显式指定正数 duration 时重复静态画面，首帧绘制和回读后直接复用 RGBA，不再逐帧渲染。通用帧数为 `llround(duration * fps)`，最终媒体时长为 `frameCount / fps`，可能略大于或小于请求值；动态默认时长还会经过 int64 微秒到 float 秒的精度转换 |
+| `--scale <f>` | 1.0 | 按文档尺寸缩放；若目标任一边超过运行时 `maxTextureDimension2D`，参考 ardot CLI 按 `min(M / 文档宽, M / 文档高)` 自动等比缩小并打印警告，再进行偶数对齐；帧率和时长不变 |
 | `--background` | `#FFFFFF` 不透明 | 与 Figma 行为一致；mp4 要求 alpha=255，传入带 alpha 的颜色直接报错 |
 | `--crf <0-51>` | 20 | 质量 |
 | `--no-crf` | — | 不下发 `-crf`，供 `h264_videotoolbox` 等无 CRF 选项的编码器使用 |
 | `--preset` | `medium` | x264 preset |
 | `--no-preset` | — | 不下发 `-preset`，同上 |
 | `--encoder` | 取格式表默认值 | 内部版可换 `libo264rt`，mac 可换 `h264_videotoolbox` |
-| `--encoder-args` | 空 | 原样追加到命令行 |
+| `--encoder-args` | 空 | 按空白拆分，单双引号保留空格和空参数，再作为 argv 追加；未闭合引号报错，不是 shell 原文透传 |
 | `--font` / `--fallback` | — | **必须新增**。`export` 现有路径不加载字体（靠文档内嵌 GlyphRun），而 mp4 是真实渲染，缺少时会 fallback 或渲染不出文本 |
 | `--ffmpeg <path>` | — | 显式路径，优先级最高 |
-| `--dry-run` | false | 打印最终命令行而不执行 |
+| `--dry-run` | false | 打印命令而不启动编码或落盘；当前仍要求发现可执行 ffmpeg，并会加载文档、应用布局和创建 GPU surface，不是纯文本预演 |
 
-ffmpeg 发现顺序：`--ffmpeg` > `FFMPEG_BIN` 环境变量 > PATH 探测。全部失败时报错并给出安装指引与 `--frames-dir` 降级提示。
+`--encoder-args` 虽然不经过 shell，但仍是受信任用户的 ffmpeg 原语透传接口，可触发额外输入、文件和网络协议访问；未来用于服务端时不能直接暴露给不可信调用方。
+
+ffmpeg 发现顺序：`--ffmpeg` > `FFMPEG_BIN` 环境变量 > PATH 探测。全部失败时报错并给出安装指引与 `--frames-dir` 降级提示。POSIX 执行阶段用 `execv()` 运行发现阶段已校验的路径，Windows 将该路径显式传给 `CreateProcessW()` 的 `lpApplicationName`，均不再依赖模块搜索，避免显式相对路径校验一个文件却执行另一个文件。
 
 ### 4.2 ffmpeg 命令
 
@@ -204,17 +241,22 @@ ffmpeg -hide_banner -loglevel error -y \
   -an -c:v {encoder} -preset {preset} -crf {crf} -pix_fmt {pixFmt} \
   -vf scale=in_color_matrix=bt709:out_color_matrix=bt709:out_range=tv,format={pixFmt} \
   -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
-  -movflags +faststart -f {container} {out}.part
+  -movflags +faststart -f {container} {out}.part.<unique>
 ```
 
-四个必须处理的细节：
+五个必须处理的细节：
 
 1. **rowBytes 对齐**：`rawvideo` 没有 stride 概念。若 `pixmap.rowBytes() != width * 4`，必须逐行打包再写，否则画面斜切。
-2. **SIGPIPE**：ffmpeg 提前退出时 `write()` 触发 SIGPIPE 会直接杀掉 CLI。视频路径启动前 `signal(SIGPIPE, SIG_IGN)`，把 `EPIPE` 转换为「ffmpeg 提前退出（退出码 N）」。
-3. **`-f {container}` 必须显式写**：临时文件后缀是 `.part`，ffmpeg 无法从后缀推断封装格式。
-4. **临时文件 + rename**：先写 `{out}.part`，`waitpid` 返回 0 后才改名。顺序必须是「关闭 stdin → 等待退出码 → 改名」。
+2. **SIGPIPE**：ffmpeg 提前退出时 `write()` 触发 SIGPIPE 会直接杀掉 CLI。视频路径启动前 `signal(SIGPIPE, SIG_IGN)`，把 `EPIPE` 转换为「ffmpeg 提前退出（退出码 N）」。当前实现是进程级设置且不恢复，因此可复用宿主或多线程并发导出需要另行管理信号语义。
+3. **`-f {container}` 必须显式写**：临时文件名以 `.part.<unique>` 结尾，ffmpeg 无法从后缀推断封装格式。
+4. **唯一临时文件 + 原子发布**：启动 ffmpeg 前在输出目录以排他方式创建 `{out}.part.<unique>`，只清理由本次实例拥有的文件。顺序必须是「关闭 stdin → 确认成功取得退出状态且退出码为 0 → 替换输出」。POSIX 直接 rename 替换，Windows 用 `MoveFileExW(REPLACE_EXISTING)`；发布失败保留临时文件供恢复。`--dry-run` 不创建文件，命令中的 `{out}.part` 只是临时路径占位。该机制解决碰撞和误删，但临时文件关闭后 ffmpeg 会按路径重新打开；在攻击者可写的共享目录仍存在 symlink 替换窗口，因此输出目录必须是可信或私有的。
+5. **管道 fd 不得跨编码器继承**：POSIX 管道两端设置 `FD_CLOEXEC`，子进程仅对复制后的 stdin 清除该标记。否则后启动的 ffmpeg 会持有前一个输入管道的写端，使前一个进程在关闭 stdin 后仍收不到 EOF。`pipe()` 与设置标记不是原子操作，因此 `VideoEncoder` 仍是 CLI 内部非线程安全组件，不支持不同线程并发 `Start()`；通用多线程宿主需要原子管道创建或额外互斥。
+
+当前 native CLI 没有取消令牌或子进程超时，`finish()` 及写失败后的回收都可能阻塞等待 ffmpeg。`abort()` 只是请求终止并尝试回收，`kill()/TerminateProcess()` 失败未单独报告，仍可能等待；交互式宿主不能把它当作保证及时返回的取消接口，需要另行定义超时、取消和线程同步协议。
 
 色彩必须双向指定：`-colorspace/-color_primaries` 只写容器元数据，真正决定 swscale 转换矩阵的是 `-vf scale=...in_color_matrix/out_color_matrix`。只写前者会在播放器里出现肤色偏移。
+
+**transfer 是有意的兼容性取舍**：源渲染像素采用 sRGB 语义，当前只转换到 BT.709 matrix + limited range，并标记 BT.709 transfer，不执行 sRGB → BT.709 的真实 transfer 转换。因此它与 Figma 的 `iec61966-2-1` 标签并非严格等价；若后续要求严格色彩一致，需选择 sRGB 标签或增加真实 transfer 转换，并用解码像素验证。
 
 **实测补充（ffmpeg 7.1.1 / libx264）**：`-color_primaries bt709 -color_trc bt709` 实际**不会**写进 H.264 VUI，`ffprobe` 仍报 `color_primaries=unknown / color_transfer=unknown`，只有 `-colorspace` 生效。要写进 VUI 必须用 `-x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709`，但那是 x264 专属、会破坏 `--encoder` 可替换性，因此**不下发**；需要严格元数据的用户用 `--encoder-args` 自行补。像素结果不受影响（矩阵由 `-vf` 决定）。
 
@@ -222,7 +264,7 @@ ffmpeg -hide_banner -loglevel error -y \
 
 ### 4.3 格式扩展点
 
-P1 只实现 mp4，但参数分派按一张格式表走，新增单遍编码格式（如 webm/VP9）只需追加一行：
+P1 只实现 mp4，格式表是格式发现的统一入口。新增格式需要先追加一行，再覆盖该格式所需的背景、像素布局、alpha 和 muxer 参数分派，不能只加一行就视为完成：
 
 ```cpp
 // src/cli/VideoEncoder.h
@@ -246,7 +288,7 @@ static const VideoFormatSpec kVideoFormats[] = {
 
 两点保留说明：
 
-- **webm** 属"追加一行"类型（`libvpx-vp9` + `yuva420p` + `requiresOpaque=false`），但透明输出需要宿主先 unpremultiply。
+- **webm** 可用同一帧管线（`libvpx-vp9` + `yuva420p` + `requiresOpaque=false`），但透明输出需要宿主先 unpremultiply，且命令构建需停止下发 MP4 专用的 `-movflags +faststart`。
 - **gif 不能只靠加一行**：`palettegen` 需统计完整片段，`split` + `palettegen` 会把整段视频缓冲在滤镜图里，管道输入会 OOM。到时要么限制时长/尺寸，要么先出中间 mp4 再二次转码，是一个独立流程分支。
 
 ## 5. 音频
@@ -307,7 +349,7 @@ P1 只依赖「一个能跑的 ffmpeg 可执行文件」，来源作为部署问
 
 **换编码器 / 硬编的实测注意**：`h264_videotoolbox` 不消费 `-preset` / `-crf`，但 ffmpeg **只打 warning 不报错**（`Codec AVOption preset ... has not been used for any stream`），而 CLI 用 `-loglevel error` 把这个 warning 屏蔽了，所以 `--encoder h264_videotoolbox` **不加** `--no-crf --no-preset` 也能正常出片（macOS 已实测）。这两个开关的作用只是让命令行干净；加上后同样实测通过。
 
-硬编码器下画质不可控（既无 CRF 也无 preset），走的是编码器默认码率（实测 `h264_videotoolbox` 在 1200×738@60 下约 4.8 Mbps），要控制码率目前只能用 `--encoder-args "-b:v 8M"`。
+硬编码器不能通过 CRF/preset 控制画质，未显式指定时使用编码器默认码率（实测 `h264_videotoolbox` 在 1200×738@60 下约 4.8 Mbps）；要控制码率可用 `--encoder-args "-b:v 8M"`，其他质量参数由具体编码器决定。
 
 **当前设计对硬编的支持边界**：
 
@@ -324,10 +366,10 @@ Figma 导出样例（808×332 / 30fps / 2.07s / h264 High）的实测特征，�
 
 | 项 | Figma 行为 | 我们的取值 |
 |---|---|---|
-| 背景 | `#FFFFFF` 不透明（原始 YUV `Y=235 / Cb=Cr=128`） | 默认白底不透明 |
+| 背景 | `#FFFFFF` 不透明（原始 YUV `Y=235 / Cb=Cr=128`） | CLI 默认 `--background #FFFFFF`；库层 `hasBackground` 默认 false（透明），mp4 宿主须显式开启 |
 | muxer | WebCodecs + mediabunny（`MediabunnyVideoHandler`） | ardot 侧同栈 |
-| 色彩 | `yuv420p(tv, bt709/bt709/iec61966-2-1)` | bt709 matrix + tv range，`-color_trc` 用规范值 `bt709` |
-| 尺寸 | 808×332，非 16 整数倍 | 不做对齐约束，按 scale 后取整 |
+| 色彩 | `yuv420p(tv, bt709/bt709/iec61966-2-1)` | BT.709 matrix + TV range + BT.709 transfer 标签；不做真实 transfer 转换，因此不与 Figma 严格等价 |
+| 尺寸 | 808×332，非 16 整数倍 | 不要求 16 的倍数；按 scale 计算后，MP4/yuv420p 仍向上取偶 |
 | 音轨 | AAC LC 48kHz stereo | 见 §5 |
 
 ## 8. 实施顺序
@@ -373,8 +415,10 @@ cmp /tmp/out.mp4 /tmp/manual.mp4 && echo identical
 
 # 单元测试（ffmpeg 缺失时相关用例自动 SKIP）
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
-./cmake-build-debug/PAGFullTest_OpenGL --gtest_filter='PAGXCliTest.Video*:PAGXCliTest.Export*'
+./cmake-build-debug/PAGFullTest_OpenGL --gtest_filter='PAGXCliTest.Video*:PAGXCliTest.Export*:PAGXCliTest.Render_FrameSequenceMatchesSingleFrameTimes:PAGXVideoExporterTest.*'
 ```
+
+自动化媒体回归 `Export_Mp4MetadataAndDecodedFramesMatch` 还会通过 ffprobe 校验 H.264、300×100、20fps、7 帧、0.35s、yuv420p 和无音轨，再用 ffmpeg 解码 MP4，与 `--time` 参考帧逐帧计算 PSNR（要求 >30dB）。`VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable` 同样解码并与逐行生成的参考帧比较，持续防止 stride 斜切。ffmpeg 缺失时跳过；ffprobe 缺失时仅媒体检查用例跳过，不把它视为 ffmpeg 的必然伴生工具。
 
 帧序列与 mp4 的比对前提是**背景不透明**（默认 `--background #FFFFFF`），此时预乘等于直通，PNG 与 rawvideo 送进编码器的字节完全一致；带透明像素时预乘值会被当作直通值，两条路径都不适用。
 
@@ -399,11 +443,11 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 | 宿主 | 帧源 | 回读 | 编码 + 封箱 |
 |---|---|---|---|
 | libpag viewer（示例/回归） | wasm `VideoExporter` 或 canvas | 同步（WebGL） | WebCodecs + JS muxer |
-| ardot web 版 | wasm（GL / WebGPU） | 同步 / **异步**（WebGPU 必须） | 同上（同一份代码） |
+| ardot web 版 | wasm WebGL：当前 `VideoExporter`；WebGPU：待新增异步帧源 | 同步 / **异步**（WebGPU 必须） | 同上（同一份代码） |
 | ardot 桌面版（CEF） | native（渲染进程内 GL device） | 同步 | 同上（同一份代码） |
 | pagx CLI / 无 CEF 的批处理 | 库内 `VideoExporter` | 同步 | ffmpeg 子进程（§4） |
 
-同步/异步差异**属于渲染后端**而非宿主：WebGL/Metal/D3D12 可同步读回，WebGPU 必须 `mapAsync`（非 Asyncify 构建下同步 `Surface::readPixels` 不可用）。所以帧源接口一律设计成 async，同步实现用 `async` 包一层。
+同步/异步差异**属于渲染后端**而非宿主：WebGL/Metal/D3D12 可同步读回，WebGPU 必须 `mapAsync`（非 Asyncify 构建下同步 `Surface::readPixels` 不可用）。共享帧源接口应设计成 async，但这只是必要条件：当前 `VideoExporter::nextFrame()` 内部固定调用同步 `PAGSurface::readPixels()`，所以 **WebGPU 当前不能走该类**。接入前必须先在库层拆分绘制、异步回读和完成通知，或为 WebGPU 提供独立帧源，不能只在 JS adapter 外包一层 `async`。
 
 ### 10.3 实测基线（ardot 桌面端，CEF / Chromium 144，1080×1920）
 
@@ -428,12 +472,12 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 不维护“尺寸 → level”硬编码表，改为**从高到低探测 + 结果缓存**，且必须带真实的 `width/height/framerate`：
 
 ```text
-avc1.640034 → avc1.640033 → avc1.4d002A → avc1.4d0028 → avc1.42E01F → vp09.00.10.08
+avc1.640034 → avc1.640033 → avc1.4d002A → avc1.4d0028 → avc1.42E01F
 ```
 
-逐个 `VideoEncoder.isConfigSupported()`，取第一个 `supported === true` 的；全部失败才向用户报“该浏览器不支持 H.264/VP9 编码”。其他约定：
+逐个 `VideoEncoder.isConfigSupported()`，取第一个 `supported === true` 的；全部失败则向用户报“该浏览器不支持所需的 H.264 编码”。P1 不回退 VP9，避免在未明确变更格式与兼容性契约时产出不同编码的 MP4。其他约定：
 
-- `latencyMode: 'quality'`，关键帧间隔 2s（`8000 * 2` 个微秒）
+- `latencyMode: 'quality'`，关键帧间隔 2s = `1_000_000 * 2` 微秒（WebCodecs 时间戳单位是微秒，等价于每 `frameRate * 2` 帧一个关键帧）
 - 码率按像素数从 1080p 的 8–12 Mbps 线性缩放
 - 不暴露 `hardwareAcceleration` 给上层（见 §10.3 结论 5）
 
@@ -442,7 +486,8 @@ avc1.640034 → avc1.640033 → avc1.4d002A → avc1.4d0028 → avc1.42E01F → 
 ```ts
 interface VideoFrameSource {
   width: number; height: number; frameRate: number; frameCount: number;
-  /** 第 index 帧的紧凑 RGBA（已去 stride），timestampUs = round(index * 1e6 / fps) */
+  /** 第 index 帧的紧凑 RGBA（已去 stride），timestampUs = round(index * 1e6 / fps)。
+   *  必须从 0 开始按 index 递增 1 调用，不支持随机访问。 */
   readFrame(index: number): Promise<{ rgba: Uint8Array; timestampUs: number }>;
 }
 encodeToMp4(source: VideoFrameSource, params: EncodeParams): Promise<Blob>
@@ -451,13 +496,14 @@ encodeToMp4(source: VideoFrameSource, params: EncodeParams): Promise<Blob>
 - `encodeToMp4` 是唯一的共享实现：编码配置 + `VideoFrame` 构造 + 时间戳 + muxer + 进度回调 + 取消。
 - 三个宿主各写一个 adapter：viewer / ardot-web（wasm 堆）、ardot 桌面（native buffer，可零拷贝包成 external ArrayBuffer）。
 - 时间戳必须与 native 侧一致（`llround(index * 1e6 / fps)`），否则无法做跨端产物对比。
+- H.264 编码配置与 muxer 必须统一使用 MP4 所需的 length-prefixed AVC：WebCodecs 使用 `avc: { format: 'avc' }`，不得把 Annex B 裸流直接交给 MP4 muxer。
 
 ### 10.6 已知坑
 
 1. **canvas 抓帧必须同 task**：tgfx 的 WebGL canvas 没有开 `preserveDrawingBuffer`（`WebGLDevice.cpp` 只透传 attrs，pagx/viewer 侧未开启），`VideoFrame(canvas)` 必须紧跟 `_draw()` 在同一个任务里执行，跨 `await` 会拿到清屏后的空帧。
-2. **WebGPU 必须异步**：非 Asyncify 构建下同步 `readPixels` 不可用，帧源 adapter 要 await 每帧回读完成。
+2. **WebGPU 必须异步**：非 Asyncify 构建下同步 `readPixels` 不可用；除了帧源 adapter await 每帧结果，底层帧产出还必须提供真实异步回读，当前 `VideoExporter` 尚不具备该能力。
 3. **RGBA→I420 转换是主要成本**（1080p 约 4–8ms/帧），两条编码路径都要付。桌面端的优化方向是 native 直接出 I420/NV12（待确认 tgfx 的 `PixelFormat` 是否支持）。
-4. **不能把 wasm/native 内存直接交给 `VideoFrame`**：构造后编码器会异步引用，必须拷贝或转移所有权（external ArrayBuffer + 释放回调）。
+4. **区分堆视图与帧数据所有权**：`HEAPU8.subarray()` 只创建零拷贝视图；`VideoFrame(BufferSource)` 构造取得自己的数据，`encode()` 克隆帧，因此不会让编码器异步持有 exporter 缓冲。只有未来自定义 external-memory 零拷贝路径才需要显式所有权和释放回调。
 5. **渲染进程崩溃面**：CEF 桌面端编码器在渲染进程内，长序列导出要有内存上限与取消（`encoder.close()` + 丢弃 muxer）。
 6. **产物不能跨端逐字节对齐**：viewer(WebGL) / ardot(WebGPU) / native(ffmpeg) 渲染与编码都不同，跨端只能用 PSNR/SSIM 门禁；逐字节一致只在同宿主同后端内成立。
 
