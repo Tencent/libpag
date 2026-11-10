@@ -704,6 +704,12 @@ enum class TargetChannelRole {
   PolystarRotation,
   PolystarPositionX,
   PolystarPositionY,
+  // Rectangle / Ellipse geometry: the shape is a box, so these map onto CSS box properties.
+  GeometryHeight,
+  GeometryPosX,
+  GeometryPosY,
+  // TrimPath offset shifts the visible run along the path (degrees, 360 = one full lap).
+  TrimOffset,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
@@ -757,10 +763,17 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Polystar, "position.x", TargetChannelRole::PolystarPositionX},
     {NodeType::Polystar, "position.y", TargetChannelRole::PolystarPositionY},
     {NodeType::Rectangle, "size.width", TargetChannelRole::GeometryWidth},
+    {NodeType::Rectangle, "size.height", TargetChannelRole::GeometryHeight},
+    {NodeType::Rectangle, "position.x", TargetChannelRole::GeometryPosX},
+    {NodeType::Rectangle, "position.y", TargetChannelRole::GeometryPosY},
+    {NodeType::Ellipse, "size.height", TargetChannelRole::GeometryHeight},
+    {NodeType::Ellipse, "position.x", TargetChannelRole::GeometryPosX},
+    {NodeType::Ellipse, "position.y", TargetChannelRole::GeometryPosY},
     {NodeType::Rectangle, "roundness", TargetChannelRole::RectangleRoundness},
     {NodeType::Ellipse, "size.width", TargetChannelRole::GeometryWidth},
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
+    {NodeType::TrimPath, "offset", TargetChannelRole::TrimOffset},
     {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
     {NodeType::Repeater, "copies", TargetChannelRole::RepeaterCopies},
     {NodeType::Repeater, "startAlpha", TargetChannelRole::RepeaterStartAlpha},
@@ -869,6 +882,10 @@ struct BundleChannelSet {
   const Channel* trimStartCh = nullptr;
   const Channel* repeaterRotationCh = nullptr;
   const Channel* floodColorCh = nullptr;
+  const Channel* geometryHeightCh = nullptr;
+  const Channel* geometryPosXCh = nullptr;
+  const Channel* geometryPosYCh = nullptr;
+  const Channel* trimOffsetCh = nullptr;
   // Polystar: every channel rewrites the outline, so one struct keeps them together.
   bool hasPolystarGeometry = false;
   const Channel* starPointCountCh = nullptr;
@@ -999,6 +1016,15 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::GeometryWidth:
       out.geometryWidthCh = ch;
       return true;
+    case TargetChannelRole::GeometryHeight:
+      out.geometryHeightCh = ch;
+      return true;
+    case TargetChannelRole::GeometryPosX:
+      out.geometryPosXCh = ch;
+      return true;
+    case TargetChannelRole::GeometryPosY:
+      out.geometryPosYCh = ch;
+      return true;
     case TargetChannelRole::RectangleRoundness:
       out.roundnessCh = ch;
       return true;
@@ -1067,6 +1093,15 @@ bool BindChannelToBundleSet(
       out.repeaterRotationCh = ch;
       out.repeaterTarget = static_cast<const Repeater*>(objTarget);
       return true;
+    case TargetChannelRole::TrimOffset: {
+      auto* trim = static_cast<const TrimPath*>(objTarget);
+      if (trim->type != TrimType::Separate) {
+        return false;
+      }
+      out.trimOffsetCh = ch;
+      out.trimTarget = trim;
+      return true;
+    }
     case TargetChannelRole::TrimStart: {
       auto* trim = static_cast<const TrimPath*>(objTarget);
       if (trim->type != TrimType::Separate || trim->offset != 0.0f) {
@@ -1981,10 +2016,16 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
   }
   Point center = {};
   float staticWidth = 0.0f;
+  float staticHeight = 0.0f;
   if (type == NodeType::Rectangle) {
     auto* rect = static_cast<const Rectangle*>(bundle.primaryHost);
     center = rect->renderPosition();
     staticWidth = rect->renderSize().width;
+    staticHeight = rect->renderSize().height;
+    // A position channel is authored in the node's own space while renderPosition() folds in the
+    // layout slot, so the frame applies the delta.
+    center.x += EvalFloatChannel(chSet.geometryPosXCh, t, rect->position.x) - rect->position.x;
+    center.y += EvalFloatChannel(chSet.geometryPosYCh, t, rect->position.y) - rect->position.y;
     if (chSet.roundnessCh != nullptr) {
       float roundness = EvalFloatChannel(chSet.roundnessCh, t, rect->roundness);
       if (tagName == "rect") {
@@ -1998,19 +2039,33 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
     auto* ellipse = static_cast<const Ellipse*>(bundle.primaryHost);
     center = ellipse->renderPosition();
     staticWidth = ellipse->renderSize().width;
+    staticHeight = ellipse->renderSize().height;
+    center.x +=
+        EvalFloatChannel(chSet.geometryPosXCh, t, ellipse->position.x) - ellipse->position.x;
+    center.y +=
+        EvalFloatChannel(chSet.geometryPosYCh, t, ellipse->position.y) - ellipse->position.y;
   }
-  if (chSet.geometryWidthCh != nullptr) {
-    float width = EvalFloatChannel(chSet.geometryWidthCh, t, staticWidth);
-    if (tagName == "ellipse") {
-      AppendCssDecl(decls, "rx", CssFloatToString(width * 0.5f) + "px");
-    } else {
-      // PAGX sizes shapes around their center. The CSS div/rect has a top-left origin, so the
-      // left/x coordinate must move by half of the width delta to keep that center fixed.
-      AppendCssDecl(decls, tagName == "rect" ? "x" : "left",
-                    CssFloatToString(center.x - width * 0.5f) + "px");
-      AppendCssDecl(decls, "width", CssFloatToString(width) + "px");
-    }
+  if (chSet.geometryWidthCh == nullptr && chSet.geometryHeightCh == nullptr &&
+      chSet.geometryPosXCh == nullptr && chSet.geometryPosYCh == nullptr) {
+    return;
   }
+  float width = EvalFloatChannel(chSet.geometryWidthCh, t, staticWidth);
+  float height = EvalFloatChannel(chSet.geometryHeightCh, t, staticHeight);
+  if (tagName == "ellipse") {
+    AppendCssDecl(decls, "cx", CssFloatToString(center.x) + "px");
+    AppendCssDecl(decls, "cy", CssFloatToString(center.y) + "px");
+    AppendCssDecl(decls, "rx", CssFloatToString(width * 0.5f) + "px");
+    AppendCssDecl(decls, "ry", CssFloatToString(height * 0.5f) + "px");
+    return;
+  }
+  // PAGX sizes shapes around their center. The CSS div/rect has a top-left origin, so the left/x
+  // coordinate must move by half of the width delta to keep that center fixed.
+  AppendCssDecl(decls, tagName == "rect" ? "x" : "left",
+                CssFloatToString(center.x - width * 0.5f) + "px");
+  AppendCssDecl(decls, tagName == "rect" ? "y" : "top",
+                CssFloatToString(center.y - height * 0.5f) + "px");
+  AppendCssDecl(decls, "width", CssFloatToString(width) + "px");
+  AppendCssDecl(decls, "height", CssFloatToString(height) + "px");
 }
 
 std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
@@ -2030,7 +2085,9 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
-  if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr) && chSet.trimTarget != nullptr) {
+  if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr ||
+       chSet.trimOffsetCh != nullptr) &&
+      chSet.trimTarget != nullptr) {
     // The visible run is [start, end]; pathLength="1" keeps both in path fractions.
     float start = EvalFloatChannel(chSet.trimStartCh, t, chSet.trimTarget->start);
     float end = EvalFloatChannel(chSet.trimEndCh, t, chSet.trimTarget->end);
@@ -2038,8 +2095,11 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "stroke-dasharray",
                   CssFloatToString(visibleLength) + " " + CssFloatToString(1.0f - visibleLength));
     // The dash pattern starts at the path origin, so the shift places the visible run at `start`.
-    if (chSet.trimStartCh != nullptr || !FloatNearlyZero(start)) {
-      AppendCssDecl(decls, "stroke-dashoffset", CssFloatToString(-start));
+    // `offset` slides the whole run along the path and is authored in degrees (360 = one lap).
+    float offsetFrac = EvalFloatChannel(chSet.trimOffsetCh, t, chSet.trimTarget->offset) / 360.0f;
+    if (chSet.trimStartCh != nullptr || chSet.trimOffsetCh != nullptr || !FloatNearlyZero(start) ||
+        !FloatNearlyZero(offsetFrac)) {
+      AppendCssDecl(decls, "stroke-dashoffset", CssFloatToString(-(start + offsetFrac)));
     }
     // A zero-length dash still paints a dot with round caps. CSS visibility stays visible until
     // the end of a visible-to-hidden transition, so only the empty end frame is suppressed.
@@ -3078,11 +3138,15 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         }
       } else if (nType == NodeType::TrimPath) {
         auto* trim = static_cast<const TrimPath*>(targetNode);
-        if (trim->type == TrimType::Separate && trim->start == 0.0f && trim->offset == 0.0f) {
+        // A CSS dash animation models a separate trim on a single path; `start` and `end` keep the
+        // authored constraints, while an animated `offset` is exactly what makes the shift move, so
+        // it may be non-zero here.
+        if (trim->type == TrimType::Separate && (trim->offset == 0.0f || trim->start == 0.0f)) {
           for (auto* channel : obj->channels) {
             auto role = channel != nullptr ? LookupChannelRole(nType, channel->name)
                                            : TargetChannelRole::Unknown;
-            if (role == TargetChannelRole::TrimEnd || role == TargetChannelRole::TrimStart) {
+            if (role == TargetChannelRole::TrimEnd || role == TargetChannelRole::TrimStart ||
+                role == TargetChannelRole::TrimOffset) {
               _ctx.animation.elementIds[trim] =
                   trim->id.empty() ? _ctx.nextId("animTrim") : trim->id;
               break;

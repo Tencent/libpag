@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: An Ellipse size.height squashes the oval into a flat lens around its centre.
      Target: Ellipse  Channel: size.height  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
