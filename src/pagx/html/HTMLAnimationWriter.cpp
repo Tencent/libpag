@@ -313,6 +313,15 @@ void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
   }
 }
 
+int EvalIntChannel(const Channel* ch, Frame frame, int fallback) {
+  if (ch == nullptr || ch->valueType() != ChannelValueType::Int) {
+    return fallback;
+  }
+  KeyValue value = ch->evaluateAt(frame);
+  const auto* v = std::get_if<int>(&value);
+  return v != nullptr ? *v : fallback;
+}
+
 bool EvalBoolChannel(const Channel* ch, Frame frame, bool fallback) {
   if (ch == nullptr) {
     return fallback;
@@ -726,6 +735,8 @@ enum class TargetChannelRole {
   GradientStartAngle,
   // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
   StopColor,
+  // `mix-blend-mode` is discrete, so its keys step instead of interpolating.
+  LayerBlendMode,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
@@ -754,6 +765,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Layer, "y", TargetChannelRole::LayerY},
     {NodeType::Layer, "matrix", TargetChannelRole::LayerMatrix},
     {NodeType::Layer, "visible", TargetChannelRole::LayerVisibility},
+    {NodeType::Layer, "blendMode", TargetChannelRole::LayerBlendMode},
     // The Layer spin is "rotation.z" in PAGX; a bare "rotation" never matches a Layer channel.
     {NodeType::Layer, "rotation.z", TargetChannelRole::Rotation},
     {NodeType::Layer, "skew.x", TargetChannelRole::LayerSkewX},
@@ -921,6 +933,7 @@ struct BundleChannelSet {
   const Channel* gradRadiusCh = nullptr;
   const Channel* gradStartAngleCh = nullptr;
   const Channel* stopColorCh = nullptr;
+  const Channel* blendModeCh = nullptr;
   Color stopBaseColor = {};
   // Polystar: every channel rewrites the outline, so one struct keeps them together.
   bool hasPolystarGeometry = false;
@@ -1128,6 +1141,9 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::RepeaterRotation:
       out.repeaterRotationCh = ch;
       out.repeaterTarget = static_cast<const Repeater*>(objTarget);
+      return true;
+    case TargetChannelRole::LayerBlendMode:
+      out.blendModeCh = ch;
       return true;
     case TargetChannelRole::StopColor:
       out.stopColorCh = ch;
@@ -2225,6 +2241,14 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   if (chSet.alphaCh != nullptr) {
     float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
     AppendCssDecl(decls, "opacity", CssFloatToString(a));
+  }
+  if (chSet.blendModeCh != nullptr && bundle.primaryHost != nullptr &&
+      bundle.primaryHost->nodeType() == NodeType::Layer) {
+    auto* host = static_cast<const Layer*>(bundle.primaryHost);
+    auto mode = static_cast<BlendMode>(
+        EvalIntChannel(chSet.blendModeCh, t, static_cast<int>(host->blendMode)));
+    auto css = BlendModeToMixBlendMode(mode);
+    AppendCssDecl(decls, "mix-blend-mode", css != nullptr ? css : "normal");
   }
   if (chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
       bundle.primaryHost->nodeType() == NodeType::Layer) {
