@@ -77,6 +77,7 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
   if (file == nullptr) {
     return;
   }
+  handle = std::make_shared<SequenceFileHandle>(file);
   fseek(file, 0, SEEK_END);
   _fileSize = static_cast<size_t>(ftell(file));
   if (_fileSize == 0) {
@@ -86,8 +87,9 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
     cachedFrames = 0;
     memset(frames.data(), 0, sizeof(FrameLocation) * frames.size());
     _fileSize = 0;
-    fclose(file);
+    handle->closeOnce();
     file = fopen(filePath.c_str(), "wb+");
+    handle = file == nullptr ? nullptr : std::make_shared<SequenceFileHandle>(file);
     LOGE("The existing sequence file has been reset, which may be corrupted!");
   }
 }
@@ -96,21 +98,21 @@ SequenceFile::~SequenceFile() {
   // Move the synchronous file IO (fclose flushes buffers) and the DiskCache notification (which
   // may trigger further disk operations like checkDiskSpace/saveConfig) to the DiskIOWorker to
   // avoid blocking the calling thread (which could be the main/render thread).
-  FILE* fileToClose = nullptr;
+  std::shared_ptr<SequenceFileHandle> handleToClose = nullptr;
   DiskCache* cache = nullptr;
   uint32_t id = 0;
   {
-    // Lock to safely read and clear file/diskCache, preventing races with writeFrame().
+    // Lock to safely read and clear handle/diskCache, preventing races with writeFrame().
     std::lock_guard<std::mutex> autoLock(locker);
-    fileToClose = file;
+    handleToClose = std::move(handle);
     cache = diskCache;
     id = fileID;
     file = nullptr;
     diskCache = nullptr;
   }
-  if (fileToClose != nullptr || cache != nullptr) {
+  if (handleToClose != nullptr || cache != nullptr) {
     DiskIOWorker::GetInstance()->submit(
-        std::bind(&DiskCache::CloseFileTask, fileToClose, cache, id));
+        std::bind(&DiskCache::CloseFileTask, std::move(handleToClose), cache, id));
   }
 }
 

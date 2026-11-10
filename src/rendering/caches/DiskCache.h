@@ -19,7 +19,9 @@
 #pragma once
 
 #include <atomic>
+#include <cstdio>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include "DiskIOWorker.h"
@@ -28,6 +30,37 @@
 
 namespace pag {
 class FileInfo;
+
+/**
+ * Owns the file handle of a SequenceFile so that it may outlive the SequenceFile object. The actual
+ * fclose() can therefore run asynchronously on the DiskIOWorker, while a caller that wants to open
+ * the same cache file again can still make sure the pending close has flushed the file.
+ */
+class SequenceFileHandle {
+ public:
+  explicit SequenceFileHandle(FILE* file) : file(file) {
+  }
+
+  ~SequenceFileHandle() {
+    closeOnce();
+  }
+
+  /**
+   * Closes the file if it is still open, otherwise waits for the close in progress to finish.
+   * Returns only after the file has been closed.
+   */
+  void closeOnce() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (file != nullptr) {
+      fclose(file);
+      file = nullptr;
+    }
+  }
+
+ private:
+  std::mutex locker = {};
+  FILE* file = nullptr;
+};
 
 class DiskCache {
  public:
@@ -55,6 +88,16 @@ class DiskCache {
  private:
   static constexpr uint32_t InitialFileID = 1;
 
+  /**
+   * An entry of openedFiles. The handle is registered when the file is opened and keeps the file
+   * handle alive after the SequenceFile has been released, so that a reopen of the same file can
+   * complete the pending close before reading the file.
+   */
+  struct OpenedFile {
+    std::weak_ptr<SequenceFile> sequenceFile = {};
+    std::shared_ptr<SequenceFileHandle> handle = nullptr;
+  };
+
   std::mutex locker = {};
   std::string customCacheDir;
   std::string configPath;
@@ -65,7 +108,7 @@ class DiskCache {
   std::unordered_map<std::string, uint32_t> cachedFileIDs = {};
   std::unordered_map<uint32_t, std::shared_ptr<FileInfo>> cachedFileInfos = {};
   std::list<std::shared_ptr<FileInfo>> cachedFiles = {};
-  std::unordered_map<uint32_t, std::weak_ptr<SequenceFile>> openedFiles = {};
+  std::unordered_map<uint32_t, OpenedFile> openedFiles = {};
 
   static DiskCache* GetInstance();
 
@@ -93,7 +136,7 @@ class DiskCache {
   void changeToTemporary(uint32_t fileID);
   std::string fileIDToPath(uint32_t fileID);
   uint32_t filePathToID(const std::string& path);
-  void notifyFileClosed(uint32_t fileID);
+  void notifyFileClosed(uint32_t fileID, const std::shared_ptr<SequenceFileHandle>& handle);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
 
   /**
@@ -105,7 +148,8 @@ class DiskCache {
   static void WriteConfigTask(const std::string& path, const std::string& tempPath,
                               std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion);
 
-  static void CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id);
+  static void CloseFileTask(std::shared_ptr<SequenceFileHandle> handle, DiskCache* cache,
+                            uint32_t id);
 
   /**
    * Version counter for saveConfig(). Incremented on each call to allow coalescing multiple

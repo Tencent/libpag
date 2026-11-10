@@ -173,7 +173,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   auto fileID = getFileID(key);
   auto result = openedFiles.find(fileID);
   if (result != openedFiles.end()) {
-    auto sequenceFile = result->second.lock();
+    auto sequenceFile = result->second.sequenceFile.lock();
     if (sequenceFile != nullptr) {
       if (sequenceFile->compatible(info, frameCount, frameRate, staticTimeRanges)) {
         moveToFront(cachedFileInfos[fileID]);
@@ -181,6 +181,16 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
       }
       changeToTemporary(fileID);
       fileID = getFileID(key);
+    } else {
+      // The previous SequenceFile is already released, but its handle may still be waiting to be
+      // closed on the DiskIOWorker. Finish that close before reopening the file: otherwise this
+      // open would read the data that has not been flushed yet, and the pending close would also
+      // drop the registration added below. No deadlock risk here because the close task acquires
+      // DiskCache::locker only after it has released the handle.
+      auto& handle = result->second.handle;
+      if (handle != nullptr) {
+        handle->closeOnce();
+      }
     }
   }
   auto filePath = fileIDToPath(fileID);
@@ -190,7 +200,9 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   }
   sequenceFile->diskCache = this;
   sequenceFile->fileID = fileID;
-  openedFiles[fileID] = sequenceFile;
+  auto& openedFile = openedFiles[fileID];
+  openedFile.sequenceFile = sequenceFile;
+  openedFile.handle = sequenceFile->handle;
   if (!key.empty()) {
     auto oldFileInfo = cachedFileInfos[fileID];
     if (oldFileInfo) {
@@ -438,12 +450,13 @@ void DiskCache::WriteConfigTask(const std::string& path, const std::string& temp
   }
 }
 
-void DiskCache::CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id) {
-  if (fileToClose != nullptr) {
-    fclose(fileToClose);
+void DiskCache::CloseFileTask(std::shared_ptr<SequenceFileHandle> handle, DiskCache* cache,
+                              uint32_t id) {
+  if (handle != nullptr) {
+    handle->closeOnce();
   }
   if (cache != nullptr) {
-    cache->notifyFileClosed(id);
+    cache->notifyFileClosed(id, handle);
   }
 }
 
@@ -484,9 +497,16 @@ uint32_t DiskCache::filePathToID(const std::string& path) {
   return static_cast<uint32_t>(std::stoull(fileName));
 }
 
-void DiskCache::notifyFileClosed(uint32_t fileID) {
+void DiskCache::notifyFileClosed(uint32_t fileID,
+                                 const std::shared_ptr<SequenceFileHandle>& handle) {
   std::lock_guard<std::mutex> autoLock(locker);
-  openedFiles.erase(fileID);
+  auto opened = openedFiles.find(fileID);
+  if (opened == openedFiles.end() || opened->second.handle != handle) {
+    // The file under this id has been reopened by a newer SequenceFile after this close was
+    // requested, so the stale notification must not touch the current registration or its file.
+    return;
+  }
+  openedFiles.erase(opened);
   auto result = cachedFileInfos.find(fileID);
   if (result == cachedFileInfos.end()) {
     auto filePath = fileIDToPath(fileID);

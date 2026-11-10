@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -30,6 +31,7 @@
 
 namespace pag {
 class DiskCache;
+class SequenceFileHandle;
 
 struct FrameLocation {
   size_t offset = 0;
@@ -117,6 +119,7 @@ class SequenceFile {
   DiskCache* diskCache = nullptr;
   uint32_t fileID = 0;
   FILE* file = nullptr;
+  std::shared_ptr<SequenceFileHandle> handle = nullptr;
   size_t _fileSize = 0;
   CompressionType compressionType = CompressionType::LZ4;
   tgfx::ImageInfo _info = {};
