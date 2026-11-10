@@ -1538,7 +1538,9 @@ PAG_TEST(PAGXHTML3DTest, AngleUnitsAreConvertedCaseInsensitively) {
  * (`rotate(45px)` and `rotate(45)` are both invalid; a bare `0` is allowed).
  */
 PAG_TEST(PAGXHTML3DTest, InvalidAngleUnitsDropTheTransform) {
-  const char* invalid[] = {"rotate(45px)", "rotate(45)", "skewX(1foo)", "rotate3d(0, 0, 1, 30px)"};
+  const char* invalid[] = {"rotate(45px)",   "rotate(45)",
+                           "skewX(1foo)",    "rotate3d(0, 0, 1, 30px)",
+                           "rotate(45 deg)", "rotate(100 grad)"};
   for (const char* value : invalid) {
     std::string html = R"HTML(
       <html><body style="width:200px;height:120px">

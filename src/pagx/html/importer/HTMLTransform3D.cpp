@@ -156,7 +156,9 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
   if (end == trimmed.c_str() || !std::isfinite(value)) {
     return false;
   }
-  const std::string suffix = Trim(std::string(end));
+  // The unit has to follow the number directly. CSS has no whitespace inside a dimension, so
+  // `rotate(45 deg)` is an invalid declaration rather than a 45 degree rotation.
+  const std::string suffix = std::string(end);
   if (suffix.empty()) {
     if (value != 0.0f) {
       return false;
@@ -169,7 +171,7 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
   } else if (suffix == "grad") {
     out = value * 0.9f;
   } else if (suffix == "rad") {
-    out = value * 180.0f / 3.14159265358979323846f;
+    out = static_cast<float>(value * RADIANS_TO_DEGREES);
   } else if (suffix == "turn") {
     out = value * 360.0f;
   } else {
