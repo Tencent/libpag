@@ -36,6 +36,7 @@ class PAGAnimation;
 class PAGScene;
 class PAGSurface;
 class PAGXDocument;
+class VideoExportState;
 
 /**
  * Export options for VideoExporter.
@@ -90,6 +91,66 @@ struct VideoExportOptions {
    * container must request it. Defaults to false, which keeps `ceil(documentSize * scale)`.
    */
   bool alignToEvenSize = false;
+};
+
+/** Result of attempting to start an asynchronous frame. */
+enum class VideoExportStartStatus {
+  FrameStarted,
+  Busy,
+  End,
+  Failed,
+};
+
+/** Current state of an asynchronous export frame. */
+enum class VideoExportFrameStatus {
+  Pending,
+  Ready,
+  Failed,
+};
+
+class VideoExportFrameImpl;
+
+/**
+ * A single frame started by VideoExporter::startNextFrame(). Frames may be backed by an
+ * asynchronous GPU readback or a cached static CPU image. All operations must run on the thread
+ * that owns the exporter's GPU device.
+ */
+class VideoExportFrame {
+ public:
+  ~VideoExportFrame();
+
+  VideoExportFrame(const VideoExportFrame&) = delete;
+  VideoExportFrame& operator=(const VideoExportFrame&) = delete;
+
+  /** The sequential frame index, fixed when the frame is started. */
+  int64_t index() const;
+
+  /** Returns the current state without waiting for the GPU. Consumed frames remain Ready. */
+  VideoExportFrameStatus status();
+
+  /** Returns the failure reason, or an empty string when the frame has not failed. */
+  std::string error() const;
+
+  /**
+   * Copies premultiplied RGBA_8888 pixels to the caller's buffer. dstRowBytes must be at least
+   * width * 4. The first successful call consumes the frame and commits its index to the exporter.
+   * Returns false while Pending, after consumption, or on failure. No index is committed twice.
+   */
+  bool readPixels(void* dstPixels, size_t dstRowBytes);
+
+ private:
+  explicit VideoExportFrame(std::shared_ptr<VideoExportFrameImpl> impl);
+
+  std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
+
+  friend class VideoExporter;
+};
+
+/** The explicit result of VideoExporter::startNextFrame(). */
+struct VideoExportStartResult {
+  VideoExportStartStatus status = VideoExportStartStatus::Failed;
+  std::shared_ptr<VideoExportFrame> frame = nullptr;
+  std::string error = {};
 };
 
 /**
@@ -176,6 +237,22 @@ class VideoExporter {
   bool nextFrame();
 
   /**
+   * Advances, draws and starts reading the next frame without waiting for GPU readback. The first
+   * successful use of nextFrame() or startNextFrame() fixes the exporter's mode; mixing modes is
+   * a terminal usage error. Only one uncommitted frame may exist at a time.
+   */
+  VideoExportStartResult startNextFrame();
+
+  /**
+   * Cancels the sequence and abandons any pending frame. This is terminal: later asynchronous
+   * starts return Failed with "cancelled". Must run on the device-owning thread.
+   */
+  void cancel();
+
+  /** Returns the terminal error or the last synchronous read error, if any. */
+  std::string error() const;
+
+  /**
    * Returns the pixels of the most recently rendered frame as RGBA8888, premultiplied. The buffer
    * is owned by the exporter and stays valid only until the next nextFrame() call, so the host
    * must consume it (write to a pipe, wrap in a VideoFrame) before advancing.
@@ -191,6 +268,10 @@ class VideoExporter {
  private:
   VideoExporter();
 
+  bool drawNextFrame(std::string* errorMsg);
+
+  std::shared_ptr<VideoExportState> state = {};
+  std::shared_ptr<VideoExportFrame> pendingFrame = {};
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
   std::vector<std::shared_ptr<PAGAnimation>> animations = {};
@@ -200,7 +281,6 @@ class VideoExporter {
   int height_ = 0;
   int frameRate_ = 60;
   int64_t frameCount_ = 0;
-  int64_t currentFrame_ = 0;
   int64_t previousTimeUs_ = 0;
   bool reuseStaticFrame_ = false;
 };

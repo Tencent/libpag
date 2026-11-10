@@ -27,6 +27,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/VideoExportFrame.h"
 #include "pagx/nodes/Animation.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
@@ -248,6 +249,7 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   }
 
   auto exporter = std::shared_ptr<VideoExporter>(new VideoExporter());
+  exporter->state = std::make_shared<VideoExportState>();
   exporter->scene = std::move(scene);
   exporter->surface = std::move(surface);
   exporter->animations = std::move(animations);
@@ -278,19 +280,17 @@ int64_t VideoExporter::frameCount() const {
 }
 
 int64_t VideoExporter::currentFrame() const {
-  return currentFrame_;
+  return state != nullptr ? state->currentFrame : 0;
 }
 
-bool VideoExporter::nextFrame() {
-  if (scene == nullptr || currentFrame_ >= frameCount_) {
-    return false;
-  }
-  if (reuseStaticFrame_ && currentFrame_ > 0) {
-    currentFrame_++;
-    return true;
-  }
-  auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(currentFrame_) * 1000000.0 /
-                                                  static_cast<double>(frameRate_)));
+std::string VideoExporter::error() const {
+  return state != nullptr ? state->error : "";
+}
+
+bool VideoExporter::drawNextFrame(std::string* errorMsg) {
+  auto frameIndex = state->currentFrame;
+  auto timeUs = static_cast<int64_t>(
+      std::llround(static_cast<double>(frameIndex) * 1000000.0 / static_cast<double>(frameRate_)));
   for (const auto& animation : animations) {
     animation->setCurrentTime(timeUs);
     animation->apply(1.0f);
@@ -301,13 +301,98 @@ bool VideoExporter::nextFrame() {
   scene->advanceAndApply(timeUs - previousTimeUs_);
   previousTimeUs_ = timeUs;
   if (!scene->draw(surface)) {
+    SetError(errorMsg, "failed to draw the export frame");
+    return false;
+  }
+  return true;
+}
+
+bool VideoExporter::nextFrame() {
+  if (scene == nullptr || state->failed || state->cancelled || state->currentFrame >= frameCount_) {
+    return false;
+  }
+  if (state->mode == VideoExportMode::Async) {
+    state->failed = true;
+    state->error = "mixed_mode";
+    if (pendingFrame != nullptr) {
+      pendingFrame->impl->fail(state->error);
+    }
+    return false;
+  }
+  state->mode = VideoExportMode::Sync;
+  if (reuseStaticFrame_ && state->currentFrame > 0) {
+    state->currentFrame++;
+    state->error.clear();
+    return true;
+  }
+  std::string renderError = {};
+  if (!drawNextFrame(&renderError)) {
+    state->error = renderError;
     return false;
   }
   if (!surface->readPixels(pixmap->writablePixels(), pixmap->rowBytes())) {
+    state->error = "failed to read the export frame pixels";
     return false;
   }
-  currentFrame_++;
+  state->currentFrame++;
+  state->error.clear();
   return true;
+}
+
+VideoExportStartResult VideoExporter::startNextFrame() {
+  if (state->failed || state->cancelled) {
+    return {VideoExportStartStatus::Failed, nullptr, state->error};
+  }
+  if (state->mode == VideoExportMode::Sync) {
+    state->failed = true;
+    state->error = "mixed_mode";
+    return {VideoExportStartStatus::Failed, nullptr, state->error};
+  }
+  if (pendingFrame != nullptr) {
+    if (pendingFrame->impl->consumed) {
+      pendingFrame = nullptr;
+    } else {
+      return {VideoExportStartStatus::Busy, nullptr, ""};
+    }
+  }
+  if (state->currentFrame >= frameCount_) {
+    return {VideoExportStartStatus::End, nullptr, ""};
+  }
+  state->mode = VideoExportMode::Async;
+  auto frameIndex = state->currentFrame;
+  std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
+  if (reuseStaticFrame_ && frameIndex > 0) {
+    impl = VideoExportFrameImpl::MakeCPU(state, frameIndex, bitmap);
+  } else {
+    std::string renderError = {};
+    if (!drawNextFrame(&renderError)) {
+      state->failed = true;
+      state->error = renderError;
+      return {VideoExportStartStatus::Failed, nullptr, renderError};
+    }
+    impl = VideoExportFrameImpl::MakeGPU(state, frameIndex, surface,
+                                         reuseStaticFrame_ ? bitmap : nullptr, &renderError);
+    if (impl == nullptr) {
+      state->failed = true;
+      state->error = renderError;
+      return {VideoExportStartStatus::Failed, nullptr, renderError};
+    }
+  }
+  auto frame = std::shared_ptr<VideoExportFrame>(new VideoExportFrame(std::move(impl)));
+  pendingFrame = frame;
+  return {VideoExportStartStatus::FrameStarted, std::move(frame), ""};
+}
+
+void VideoExporter::cancel() {
+  if (state->failed || state->cancelled) {
+    return;
+  }
+  state->cancelled = true;
+  state->error = "cancelled";
+  if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
+    pendingFrame->impl->fail(state->error);
+  }
+  pendingFrame = nullptr;
 }
 
 const uint8_t* VideoExporter::pixels() const {
