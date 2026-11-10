@@ -525,6 +525,12 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 
 其中 ST31 需要把两个 `glyphPaths` / `glyphImages` 容器合并成带序号的单一列表，改动会波及 `TextUtils`；其余多为局部修正。
 
+ST8 进度：带 `GlyphRun` 的 run 在两条路径上都改为输出轮廓 `<g>`（行内 `<text>` 关闭后按行输出；无行信息时按 run 顺序输出），只有在没有任何可用轮廓时才告警。`TextLayout` 对所有 Text 都带内嵌 `GlyphRun` 的 TextBox 只算 bounds、不产出行，因此行布局分支对内嵌 run 实际不可达，已由兜底分支直接覆盖（`SVGExport_TextBoxGlyphRunEmitsOutlines`）；混合 run 的 TextBox 里未被行消费的内嵌 run 在行循环之后补发，不再静默丢弃。多 Painter 由 `CollectRichTextRuns` 配对，per-run transform / alpha 与 foreground 双遍仍未表达。
+
+ST9 / ST10 / ST18 / ST29 / ST31 已收口：`writeTextAsFont` 走字形 advance（无 positions / xOffsets 时按字宽推进）、要求单一 Font 且无旋转（旋转轴心与 anchor 无法在 `<text>` 表达），否则回落到轮廓；`<text>` 的 x 列表因此与 `WalkGlyphs` 的笔位一致。字形 `<g>` 的 fill / stroke opacity 携带累计 alpha，位图字形单独补 `opacity`。fauxBold / fauxItalic 在 WOFF2 与原生 `<text>` 两条路径都输出 `font-weight` / `font-style`。`overflow="hidden"` 丢光所有行时不再由兜底分支重画。字形改由 `ComputeGlyphDrawItems` 按 glyph 顺序返回，vector / bitmap 混排不再先画全部 path 再画 image。
+
+ST20 / ST21 / ST22 依赖 ModifierResolver 对 RangeSelector / TextModifier / TextPath 的解析产物，向量语义尚未补齐；默认 `bakeUnsupported=true` 时这些图层仍以 PNG 补丁保真。ST28 所述 Native 模式在本仓库 `TextBox` 上不存在（仅有 width / height / wordWrap / overflow），无对应改动入口。
+
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
 ### 4.4 后续实现时的构建与基准规则
