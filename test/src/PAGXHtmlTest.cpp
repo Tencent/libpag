@@ -3892,6 +3892,49 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
 // A RangeSelector `start` channel moves which glyphs the TextModifier reaches, so every glyph gets
 // its own rule. With linear keys the rampUp factor of a glyph is a rational function of time, so
 // each monotonic piece is one stop pair with a fitted cubic-bezier instead of per-frame stops.
+// One CSS stop carries one timing function for every property in its rule, so a bezier-eased channel
+// and a linear one cannot share a stop: the rule is rewritten as evenly spaced linear pieces, which
+// keeps the eased channel sampled and the linear one exact.
+CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="splitBox" x="40" y="60" width="80" height="80">
+      <Polystar type="polygon" pointCount="8" outerRadius="42" position="40,40"/>
+      <Fill color="#475569"/>
+    </Layer>
+    <Animations>
+      <Animation id="splitChannels" duration="60" frameRate="60" loop="once">
+        <Object target="splitBox">
+          <Channel name="alpha" type="float">
+            <Key time="0" value="0.2" interpolation="bezier" bezierOut="0.42,0"/>
+            <Key time="60" value="1" bezierIn="0.58,1"/>
+          </Channel>
+          <Channel name="x" type="float">
+            <Key time="0" value="40" interpolation="linear"/>
+            <Key time="30" value="160" interpolation="linear"/>
+            <Key time="60" value="240" interpolation="linear"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"splitBox\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
+  ASSERT_FALSE(rule.empty()) << html;
+  // No stop may carry the bezier: it would drag the linear translation along with it.
+  EXPECT_EQ(rule.find("animation-timing-function"), std::string::npos) << rule;
+  EXPECT_GT(CountOccurrences(rule, "transform:"), 4u) << rule;
+  // At 25% the eased channel is at its bezier value (0.3033, not the linear 0.4) while the
+  // translation is exactly the linear one (40 -> 160 is a third of the way at 25%: 60px).
+  EXPECT_NE(rule.find("opacity: 0.3033"), std::string::npos) << rule;
+  EXPECT_NE(rule.find("translate(60px, 0px)"), std::string::npos) << rule;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">

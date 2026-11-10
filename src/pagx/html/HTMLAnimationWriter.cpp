@@ -237,7 +237,8 @@ struct SegmentEasing {
 
 template <typename T>
 void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::set<Frame>& timesOut,
-                                   std::unordered_map<Frame, SegmentEasing>& easingOut) {
+                                   std::unordered_map<Frame, SegmentEasing>& easingOut,
+                                   std::set<Frame>& mixedOut) {
   for (size_t i = 0; i < keys.size(); ++i) {
     const auto& k = keys[i];
     timesOut.insert(k.time);
@@ -260,52 +261,62 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
         seg.p1 = outPt;
         seg.p2 = inPt;
       }
-      // Prefer non-linear easing if multiple channels share a timestamp.
+      // A CSS stop's timing function drives every property in the rule, so two channels with
+      // different curves on the same segment cannot share one stop: remember the time and split the
+      // segment into linear sub-stops instead (see EmitBundleKeyframeStops).
       auto it = easingOut.find(k.time);
       if (it == easingOut.end() || it->second.type == KeyframeInterpolationType::Linear) {
         easingOut[k.time] = seg;
+      } else if (it->second != seg && it->second.type != KeyframeInterpolationType::Hold &&
+                 seg.type != KeyframeInterpolationType::Hold &&
+                 it->second.type != KeyframeInterpolationType::None &&
+                 seg.type != KeyframeInterpolationType::None) {
+        // Only a curve conflict is split; a hold key already needs `steps(1, end)`, which the dense
+        // sampling below cannot reproduce.
+        mixedOut.insert(k.time);
       }
     }
   }
 }
 
 void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
-                                  std::unordered_map<Frame, SegmentEasing>& easingOut) {
+                                  std::unordered_map<Frame, SegmentEasing>& easingOut,
+                                  std::set<Frame>& mixedOut) {
   if (ch == nullptr) {
     return;
   }
   switch (ch->valueType()) {
     case ChannelValueType::Float:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<float>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::Color:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Color>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::Matrix:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Matrix>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::Bool:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<bool>*>(ch)->keyframes, timesOut,
-                                    easingOut);
+                                    easingOut, mixedOut);
       break;
     case ChannelValueType::Int:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<int>*>(ch)->keyframes, timesOut,
-                                    easingOut);
+                                    easingOut, mixedOut);
       break;
     case ChannelValueType::String:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<std::string>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::ImageRef:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<ImageRef>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::Matrix3D:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Matrix3D>*>(ch)->keyframes,
-                                    timesOut, easingOut);
+                                    timesOut, easingOut, mixedOut);
       break;
     case ChannelValueType::PAGImage:
       // An image reference has no CSS animation channel.
@@ -1061,6 +1072,9 @@ struct BundleChannelSet {
 
   std::set<Frame> keyTimes = {};
   std::unordered_map<Frame, SegmentEasing> stopEasings = {};
+  // Times where two channels of the same rule want different timing functions. The stop there must
+  // be split into linear sub-stops, because one stop's easing drives every property in the rule.
+  std::set<Frame> mixedEasingTimes = {};
 };
 
 struct BundleTimingInfo {
@@ -1473,7 +1487,8 @@ BundleChannelSet CollectBundleChannels(
       // An unbound channel has no CSS property to drive, so its keys must not split the bound
       // channels' keyframes or override their easing.
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
-        ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings);
+        ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings,
+                                     result.mixedEasingTimes);
       }
     }
   }
@@ -2402,8 +2417,11 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "clip-path", "path(\"" + dStr + "\")");
   }
 
+  // A stop's timing function drives every property in its rule. When the channels behind this rule
+  // disagree on the curve the stop is split into linear pieces instead (see the mixedEasingTimes
+  // handling in EmitBundleKeyframeStops), so no easing goes here.
   auto easeIt = chSet.stopEasings.find(t);
-  if (easeIt != chSet.stopEasings.end() &&
+  if (easeIt != chSet.stopEasings.end() && chSet.mixedEasingTimes.empty() &&
       (easeIt->second.type != KeyframeInterpolationType::Linear || !timing.uniformEasing)) {
     AppendCssDecl(decls, "animation-timing-function", easeIt->second.toCss());
   }
@@ -3154,6 +3172,45 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
   }
   stopTimes.insert(windowStart);
   stopTimes.insert(windowEnd);
+  if (!chSet.mixedEasingTimes.empty() && windowEnd > windowStart) {
+    // Two channels in this rule want different curves (say opacity eased and a translation linear).
+    // A CSS stop carries one timing function for every property in the rule, so the whole window is
+    // rewritten as evenly spaced linear pieces: the eased channel is sampled, the linear ones stay
+    // exact. Key times inside the window remain stops, they just carry no easing of their own.
+    Frame span = windowEnd - windowStart;
+    int count = 2;
+    for (Frame mixed : chSet.mixedEasingTimes) {
+      auto easeIt = chSet.stopEasings.find(mixed);
+      if (easeIt == chSet.stopEasings.end() ||
+          easeIt->second.type != KeyframeInterpolationType::Bezier) {
+        continue;
+      }
+      const SegmentEasing& easing = easeIt->second;
+      for (int candidate = 2; candidate <= 32; candidate *= 2) {
+        count = std::max(count, candidate);
+        double worst = 0.0;
+        for (int i = 1; i < 32; ++i) {
+          double u = static_cast<double>(i) / 32.0;
+          double x = u * candidate;
+          int cell = static_cast<int>(x);
+          double frac = x - cell;
+          double low = CubicBezierEase(easing.p1.x, easing.p1.y, easing.p2.x, easing.p2.y,
+                                       static_cast<double>(cell) / candidate);
+          double high = CubicBezierEase(easing.p1.x, easing.p1.y, easing.p2.x, easing.p2.y,
+                                        static_cast<double>(cell + 1) / candidate);
+          double actual = CubicBezierEase(easing.p1.x, easing.p1.y, easing.p2.x, easing.p2.y, u);
+          worst = std::max(worst, std::abs(actual - (low + (high - low) * frac)));
+        }
+        if (worst <= 0.004) {
+          break;
+        }
+      }
+    }
+    for (int k = 1; k < count; ++k) {
+      stopTimes.insert(windowStart +
+                       static_cast<Frame>(std::llround(static_cast<double>(span) * k / count)));
+    }
+  }
   for (Frame t : stopTimes) {
     if (chSet.alphaCh != nullptr && chSet.alphaCh->valueType() == ChannelValueType::Float &&
         t > timing.bundleShiftFrames && timing.effectiveDuration > 0) {
