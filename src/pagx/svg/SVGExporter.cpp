@@ -3164,19 +3164,6 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   if (runs.empty()) {
     return;
   }
-  // A TextBox line is one <text> whose runs flow through <tspan>; a run with pre-shaped GlyphRun
-  // data cannot keep it there, so the viewer re-shapes the characters and may pick different
-  // glyphs. Reported here rather than next to the run loop because the no-line-info fallback below
-  // returns before that point.
-  for (const auto& run : runs) {
-    if (run.text != nullptr && !run.text->glyphRuns.empty()) {
-      addWarning("TextBox '" + textBox->id +
-                 "' contains a run with GlyphRun data; runs inside a TextBox are re-shaped from "
-                 "their text, so the pre-shaped glyphs and per-run transforms are not preserved.");
-      break;
-    }
-  }
-
   std::vector<Text*> mutableTexts;
   mutableTexts.reserve(runs.size());
   for (const auto& run : runs) {
@@ -3226,18 +3213,13 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
       runFs.textBox = textBox;
       if (!run.text->glyphRuns.empty()) {
-        // The layout reports the run's origin through its glyph positions when available; the
-        // authored x/y is subtracted because ComputeGlyphPathsAndImages adds it back internally.
+        // GlyphRun positions are offsets from the run origin, which the outline walker re-adds,
+        // so the Text's own position is the origin to pass in.
+        FillStrokeInfo runFs = {};
+        runFs.fill = run.fill ? run.fill : topLevelFs.fill;
+        runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
+        runFs.textBox = textBox;
         auto origin = run.text->renderPosition();
-        auto* layoutRuns = layoutResult.getGlyphRuns(const_cast<Text*>(run.text));
-        if (layoutRuns != nullptr && !layoutRuns->empty() && !(*layoutRuns)[0].positions.empty()) {
-          origin.x = (*layoutRuns)[0].positions[0].x;
-          origin.y = (*layoutRuns)[0].positions[0].y;
-        }
-        if (run.text->glyphRuns.size() == 1) {
-          origin.x -= run.text->glyphRuns[0]->x;
-          origin.y -= run.text->glyphRuns[0]->y;
-        }
         if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha,
                                MatrixToSVGTransform(transform))) {
           continue;
@@ -3280,6 +3262,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
 
   // Group entries by visual line (matching baselineY) and emit one <text>
   // per line with <tspan> children for each run fragment.
+  std::vector<bool> embeddedEmitted(runs.size(), false);
   size_t i = 0;
   while (i < lineEntries.size()) {
     float baseline = lineEntries[i].baselineY;
@@ -3325,22 +3308,21 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       runFs.fill = effectiveFill;
       runFs.stroke = effectiveStroke;
       if (!run.text->glyphRuns.empty()) {
-        // The layout reports the run's own origin through its glyph positions; the authored x/y is
-        // subtracted because ComputeGlyphPathsAndImages adds it back internally.
+        // An embedded run carries its own absolute glyph positions, so the line origin does not
+        // apply; the layout positions are used when this Text was also shaped here.
+        embeddedEmitted[entry.runIndex] = true;
         SVGGlyphRunEmission emission = {};
         emission.text = run.text;
         emission.fill = effectiveFill;
         emission.stroke = effectiveStroke;
-        emission.originX = entry.startX;
-        emission.originY = entry.baselineY;
+        auto origin = run.text->renderPosition();
         auto* layoutRuns = layoutResult.getGlyphRuns(const_cast<Text*>(run.text));
         if (layoutRuns != nullptr && !layoutRuns->empty() && !(*layoutRuns)[0].positions.empty()) {
-          emission.originX = (*layoutRuns)[0].positions[0].x;
+          origin.x = (*layoutRuns)[0].positions[0].x;
+          origin.y = (*layoutRuns)[0].positions[0].y;
         }
-        if (run.text->glyphRuns.size() == 1) {
-          emission.originX -= run.text->glyphRuns[0]->x;
-          emission.originY -= run.text->glyphRuns[0]->y;
-        }
+        emission.originX = origin.x;
+        emission.originY = origin.y;
         glyphRunsOnLine.push_back(emission);
         ++i;
         continue;
@@ -3369,6 +3351,23 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
                    "' has a run with GlyphRun data but no usable glyph outline; the run is "
                    "dropped.");
       }
+    }
+  }
+
+  // An embedded run whose Text has no characters contributes no line entry, so emit the ones no
+  // line consumed instead of dropping them.
+  for (size_t r = 0; r < runs.size(); ++r) {
+    if (embeddedEmitted[r] || runs[r].text->glyphRuns.empty()) {
+      continue;
+    }
+    FillStrokeInfo runFs = {};
+    runFs.fill = runs[r].fill ? runs[r].fill : topLevelFs.fill;
+    runFs.stroke = runs[r].stroke ? runs[r].stroke : topLevelFs.stroke;
+    auto origin = runs[r].text->renderPosition();
+    if (!WriteGlyphGeometry(out, runs[r].text, origin.x, origin.y, runFs, alpha, svgTransform)) {
+      addWarning("TextBox '" + textBox->id +
+                 "' has a run with GlyphRun data but no usable glyph outline; the run is "
+                 "dropped.");
     }
   }
 }

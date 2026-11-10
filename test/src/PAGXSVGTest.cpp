@@ -5497,10 +5497,10 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BackdropStylesAreReported) {
   EXPECT_EQ(reported, 2u);
 }
 
-// ST8: a TextBox run that carries pre-shaped GlyphRun data is re-shaped from its characters on the
-// <tspan> path, so the loss has to be reported. The warning has to survive the no-line-info
-// fallback, which returns before the run loop.
-PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunRunWarns) {
+// ST8: a TextBox run whose GlyphRun data yields no outline (here: no Font) is dropped, and the
+// loss has to be reported. The warning has to survive the no-line-info fallback, which returns
+// before the <tspan> path.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunWithoutOutlinesWarns) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("layer");
   auto* box = doc->makeNode<pagx::TextBox>("box");
@@ -5521,7 +5521,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunRunWarns) {
   EXPECT_FALSE(svg.empty());
   bool warned = false;
   for (const auto& warning : warnings) {
-    warned = warned || warning.find("GlyphRun data") != std::string::npos;
+    warned = warned || warning.find("no usable glyph outline") != std::string::npos;
   }
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
