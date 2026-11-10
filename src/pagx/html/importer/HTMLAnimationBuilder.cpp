@@ -1503,11 +1503,11 @@ bool HTMLAnimationBuilder::buildForElement(
     // non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
     // Collapsing the linear block to a tiny uniform scale keeps the element as invisible as
     // `scale(0)` renders while staying valid; the translation column is preserved.
-    constexpr float kCollapsedScale = 1e-4f;
+    constexpr float collapsedScale = 1e-4f;
     Matrix3D collapsed = {};
-    collapsed.setRowColumn(0, 0, kCollapsedScale);
-    collapsed.setRowColumn(1, 1, kCollapsedScale);
-    collapsed.setRowColumn(2, 2, kCollapsedScale);
+    collapsed.setRowColumn(0, 0, collapsedScale);
+    collapsed.setRowColumn(1, 1, collapsedScale);
+    collapsed.setRowColumn(2, 2, collapsedScale);
     for (int row = 0; row < 3; ++row) {
       collapsed.setRowColumn(row, 3, matrix3DChannelBaseline.getRowColumn(row, 3));
     }

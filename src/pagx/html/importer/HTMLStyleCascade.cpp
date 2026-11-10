@@ -841,8 +841,7 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   if (!origin.valid) {
     _diagnostics.warn("html: transform-origin '" + originValue + "' on <" + elementName +
                       "> is not a valid CSS position; using the default 50% 50%");
-  }
-  if (!origin.resolved && !IsLinearIdentity(pose)) {
+  } else if (!origin.resolved && !IsLinearIdentity(pose)) {
     const std::string authored =
         originValue.empty() ? std::string("50% 50% (default)") : originValue;
     _diagnostics.warn("html: transform-origin '" + authored + "' on <" + elementName +
