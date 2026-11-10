@@ -2114,6 +2114,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   std::vector<BezierControlPoints> splines = {};
   if (calcMode == "discrete") {
     interpolation = KeyframeInterpolationType::Hold;
+    if (keyTimesStr.empty()) {
+      // Each discrete value owns one equal slot. The linear default (i / (n - 1)) would show the
+      // last value only at the very end of the animation instead of for the last 1/n of it.
+      for (size_t i = 0; i < keyTimes.size(); ++i) {
+        keyTimes[i] = static_cast<double>(i) / static_cast<double>(keyTimes.size());
+      }
+    }
   } else if (calcMode == "spline") {
     interpolation = KeyframeInterpolationType::Bezier;
     splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
