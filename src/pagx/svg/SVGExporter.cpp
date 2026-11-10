@@ -3674,8 +3674,9 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         } else {
           // Native text-box rendering: container TextBox owns its own paragraph
           // shaping and fill/stroke pairing. Don't add its child Text into the
-          // surrounding accumulator.
-          writeTextBoxGroup(out, tb, tb->elements, tbMatrix, tbAlpha);
+          // surrounding accumulator. Resolve text modifiers nested inside the box first.
+          const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
+          writeTextBoxGroup(out, tb, innerWalked, tbMatrix, tbAlpha);
         }
         break;
       }
@@ -3747,6 +3748,11 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // BackgroundBlurStyle and GlassStyle, which SVG has no portable primitive for) are handled
   // separately by the explicit skip in writeStyleList / writeFilterAndStyleDefs.
   auto features = ProbeLayerFeaturesForSVG(layer);
+  // TextModifier is resolvable when every target Text carries full GlyphRun channels: the resolver
+  // bakes the per-character transform into the glyphs, so the layer can stay vector.
+  if (features.hasTextModifier && _resolver.CanBakeTextModifiers(layer->contents)) {
+    features.hasTextModifier = false;
+  }
   // Rasterizing an animated layer would freeze it into a single frame, so animated layers always
   // stay on the vector path and report the degradation instead.
   if (_bakeUnsupported && !animated) {

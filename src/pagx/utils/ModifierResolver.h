@@ -26,6 +26,8 @@ namespace pagx {
 
 class PathData;
 class RoundCorner;
+class Text;
+class TextModifier;
 class TrimPath;
 
 /**
@@ -59,6 +61,14 @@ class ModifierResolver {
    */
   std::vector<Element*> resolve(const std::vector<Element*>& elements);
 
+  /**
+   * Returns true when every TextModifier inside `elements` can be baked into its target Texts
+   * through GlyphRun channels alone, i.e. resolve() drops them instead of leaving them for a
+   * rasterized fallback. Identity modifiers and modifiers with no target Text count as bakeable.
+   * The walk mirrors resolve(), including nested Group / TextBox element lists.
+   */
+  bool CanBakeTextModifiers(const std::vector<Element*>& elements) const;
+
  private:
   PAGXDocument* _doc;
 
@@ -77,6 +87,12 @@ class ModifierResolver {
                            const TrimPath* trim) const;
 
   Element* applyRoundCornerToElement(Element* shape, const RoundCorner* corner) const;
+
+  /**
+   * Returns a new Text owned by the document with `modifier` baked into its GlyphRun channels, or
+   * nullptr when the modifier cannot be expressed through those channels.
+   */
+  Text* bakeTextModifier(const Text* text, const TextModifier* modifier);
 };
 
 }  // namespace pagx

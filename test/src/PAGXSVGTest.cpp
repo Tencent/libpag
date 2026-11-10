@@ -58,6 +58,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -65,6 +66,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGCoverageLedger.h"
@@ -5765,6 +5767,47 @@ PAGX_TEST(PAGXSVGTest, SVGExport_NativeTextCarriesFauxStyle) {
   EXPECT_NE(svg.find("<text"), std::string::npos);
   EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
   EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+}
+
+// ST20: a TextModifier whose channels fit GlyphRun can be baked by the resolver, so the layer keeps
+// vector output instead of being rasterized into a PNG patch.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierBakesIntoGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* font = doc->makeNode<pagx::Font>("modifierFont");
+  font->unitsPerEm = 1000;
+  for (float advance : {700.0f, 700.0f}) {
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+    glyph->advance = advance;
+    font->glyphs.push_back(glyph);
+  }
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 1000;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 2};
+  run->positions = {{0.0f, 0.0f}, {700.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>("modifier");
+  modifier->position = {0.0f, -100.0f};
+  modifier->selectors = {selector};
+
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0), modifier};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("y=\"-100 0\""), std::string::npos);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
 }
 
 }  // namespace pag

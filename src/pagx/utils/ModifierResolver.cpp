@@ -23,6 +23,7 @@
 #include <vector>
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -31,8 +32,12 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/TextSelectorUtils.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
@@ -562,6 +567,159 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
 // resolve()
 //==============================================================================
 
+//==============================================================================
+// TextModifier -> per-glyph channels.
+//
+// A TextModifier transforms every glyph accumulated before it in the scope. GlyphRun already
+// carries positions / rotations / scales / skews / anchors per glyph, so a modifier whose only
+// channels are geometric maps onto a cloned Text without losing anything. Per-character alpha and
+// paint overrides have no GlyphRun channel, so those modifiers are left in place for the caller's
+// bake path.
+//==============================================================================
+
+static size_t GlyphCount(const Text* text) {
+  size_t count = 0;
+  for (const auto* run : text->glyphRuns) {
+    count += run->glyphs.size();
+  }
+  return count;
+}
+
+static bool HasPaintChannels(const TextModifier* modifier) {
+  return modifier->fillColor.has_value() || modifier->strokeColor.has_value() ||
+         modifier->strokeWidth.has_value() || modifier->alpha < 1.0f;
+}
+
+static bool CanBakeText(const Text* text) {
+  if (text->glyphRuns.empty() || GlyphCount(text) == 0) {
+    return false;
+  }
+  // The clone writes per-glyph offsets, so every run needs an explicit position for each glyph;
+  // otherwise adding one entry would shift the advance-fallback glyphs onto the wrong pen.
+  for (const auto* run : text->glyphRuns) {
+    if (run->positions.size() != run->glyphs.size()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool CanBakeTextModifier(const Text* text, const TextModifier* modifier) {
+  return !HasPaintChannels(modifier) && modifier->skewAxis == 0.0f && CanBakeText(text);
+}
+
+static bool IsIdentityModifier(const TextModifier* modifier) {
+  return modifier->position.x == 0.0f && modifier->position.y == 0.0f &&
+         modifier->rotation == 0.0f && modifier->scale.x == 1.0f && modifier->scale.y == 1.0f &&
+         modifier->skew == 0.0f && modifier->anchor.x == 0.0f && modifier->anchor.y == 0.0f &&
+         !HasPaintChannels(modifier);
+}
+
+Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* modifier) {
+  if (!CanBakeTextModifier(text, modifier)) {
+    return nullptr;
+  }
+  auto* clone = _doc->makeNode<Text>();
+  *clone = *text;
+  // The implicit copy shares the owning glyph cache pointer, which would be freed twice; the clone
+  // rebuilds that cache from the modified runs instead.
+  clone->glyphData = nullptr;
+  clone->glyphRuns.clear();
+  TextSelectorEvaluator evaluator(modifier->selectors, GlyphCount(text));
+  bool touchesRotation = modifier->rotation != 0.0f;
+  bool touchesSkew = modifier->skew != 0.0f;
+  bool touchesScale = modifier->scale.x != 1.0f || modifier->scale.y != 1.0f;
+  bool touchesAnchor = modifier->anchor.x != 0.0f || modifier->anchor.y != 0.0f;
+  size_t index = 0;
+  for (const auto* run : text->glyphRuns) {
+    auto* runClone = _doc->makeNode<GlyphRun>();
+    *runClone = *run;
+    auto glyphCount = runClone->glyphs.size();
+    // Materialize only the channels the modifier changes: an empty channel means identity
+    // downstream and keeps the run eligible for the native <text> path.
+    if (touchesRotation) {
+      runClone->rotations.resize(glyphCount, 0.0f);
+    }
+    if (touchesSkew) {
+      runClone->skews.resize(glyphCount, 0.0f);
+    }
+    if (touchesScale) {
+      runClone->scales.resize(glyphCount, Point{1.0f, 1.0f});
+    }
+    if (touchesAnchor) {
+      runClone->anchors.resize(glyphCount, Point{0.0f, 0.0f});
+    }
+    for (size_t i = 0; i < glyphCount; ++i) {
+      auto weight = evaluator.weight(index++);
+      if (weight == 0.0f) {
+        continue;
+      }
+      runClone->positions[i].x += modifier->position.x * weight;
+      runClone->positions[i].y += modifier->position.y * weight;
+      if (touchesRotation) {
+        runClone->rotations[i] += modifier->rotation * weight;
+      }
+      if (touchesScale) {
+        runClone->scales[i].x *= 1.0f + (modifier->scale.x - 1.0f) * weight;
+        runClone->scales[i].y *= 1.0f + (modifier->scale.y - 1.0f) * weight;
+      }
+      if (touchesSkew) {
+        runClone->skews[i] += modifier->skew * weight;
+      }
+      if (touchesAnchor) {
+        runClone->anchors[i].x += modifier->anchor.x * weight;
+        runClone->anchors[i].y += modifier->anchor.y * weight;
+      }
+    }
+    clone->glyphRuns.push_back(runClone);
+  }
+  return clone;
+}
+
+bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& elements) const {
+  std::vector<const Text*> texts = {};
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    switch (element->nodeType()) {
+      case NodeType::Text:
+        texts.push_back(static_cast<const Text*>(element));
+        break;
+      case NodeType::TextModifier: {
+        auto* modifier = static_cast<const TextModifier*>(element);
+        if (IsIdentityModifier(modifier)) {
+          break;
+        }
+        if (HasPaintChannels(modifier) || modifier->skewAxis != 0.0f) {
+          return false;
+        }
+        for (const auto* text : texts) {
+          if (!CanBakeText(text)) {
+            return false;
+          }
+        }
+        break;
+      }
+      case NodeType::Group:
+        if (!CanBakeTextModifiers(static_cast<const Group*>(element)->elements)) {
+          return false;
+        }
+        break;
+      case NodeType::TextBox: {
+        auto* box = static_cast<const TextBox*>(element);
+        if (!box->elements.empty() && !CanBakeTextModifiers(box->elements)) {
+          return false;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
 std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& elements) {
   std::vector<Element*> output;
   output.reserve(elements.size());
@@ -721,10 +879,35 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         shapeSlots.clear();
         break;
       }
+      case NodeType::TextModifier: {
+        auto* modifier = static_cast<const TextModifier*>(element);
+        if (IsIdentityModifier(modifier)) {
+          break;
+        }
+        // A modifier transforms every Text accumulated before it in this scope. Bake into a clone
+        // so the authored document stays untouched; a target that cannot be expressed through
+        // GlyphRun channels keeps the modifier in the output for the caller's bake path.
+        bool bakedAll = true;
+        for (auto*& slot : output) {
+          if (slot->nodeType() != NodeType::Text) {
+            continue;
+          }
+          auto* baked = bakeTextModifier(static_cast<const Text*>(slot), modifier);
+          if (baked == nullptr) {
+            bakedAll = false;
+            continue;
+          }
+          slot = baked;
+        }
+        if (!bakedAll) {
+          output.push_back(element);
+        }
+        break;
+      }
       default:
-        // Fill, Stroke, Text, TextBox, TextPath, TextModifier, RangeSelector,
-        // and any other element pass through unchanged. They are written by
-        // dedicated writers downstream.
+        // Fill, Stroke, Text, TextBox, TextPath, RangeSelector, and any other
+        // element pass through unchanged. They are written by dedicated writers
+        // downstream.
         output.push_back(element);
         break;
     }

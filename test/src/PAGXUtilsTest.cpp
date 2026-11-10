@@ -32,6 +32,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -45,8 +46,10 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -2948,6 +2951,102 @@ PAGX_TEST(PAGXUtilsTest, ComputeGlyphDrawItems_PreservesGlyphOrder) {
   EXPECT_NE(items[1].image, nullptr);
   EXPECT_EQ(items[1].pathData, nullptr);
   EXPECT_NE(items[2].pathData, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// TextSelectorEvaluator
+// ---------------------------------------------------------------------------
+
+// Index units address characters directly: [1, 3) selects the middle two of four.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_IndexRange) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 1.0f;
+  selector->end = 3.0f;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(2), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(3), 0.0f);
+}
+
+// The offset shifts both ends before the range is normalized, so [0, 2) + 2 covers characters 2-3.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_IndexRangeWithOffset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 2.0f;
+  selector->offset = 2.0f;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(2), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(3), 1.0f);
+}
+
+// RampUp weights each character by its center's position inside the range.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_RampUpUsesCharacterCenter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Percentage;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  selector->shape = pagx::SelectorShape::RampUp;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_NEAR(evaluator.weight(0), 0.125f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(1), 0.375f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(2), 0.625f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(3), 0.875f, 1e-5f);
+}
+
+// The first selector seeds the result: Subtract starts from 1 instead of taking its factor as is.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_FirstSubtractInverts) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Percentage;
+  selector->mode = pagx::SelectorMode::Subtract;
+  pagx::TextSelectorEvaluator evaluator({selector}, 2);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 0.0f);
+}
+
+// A transform-only TextModifier is baked into the GlyphRun channels of a cloned Text and dropped
+// from the scope, so later writers no longer need a rasterized fallback.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_BakesTextModifier) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 1};
+  run->positions = {{0.0f, 0.0f}, {700.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->position = {0.0f, -100.0f};
+  modifier->selectors = {selector};
+
+  std::vector<pagx::Element*> elements = {text, modifier};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 1u);
+  ASSERT_EQ(resolved[0]->nodeType(), pagx::NodeType::Text);
+  auto* baked = static_cast<pagx::Text*>(resolved[0]);
+  ASSERT_EQ(baked->glyphRuns.size(), 1u);
+  EXPECT_FLOAT_EQ(baked->glyphRuns[0]->positions[0].y, -100.0f);
+  EXPECT_FLOAT_EQ(baked->glyphRuns[0]->positions[1].y, 0.0f);
 }
 
 }  // namespace pag
