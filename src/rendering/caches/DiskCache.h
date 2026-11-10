@@ -92,7 +92,7 @@ class DiskCache {
   uint32_t getFileID(const std::string& key);
   void changeToTemporary(uint32_t fileID);
   std::string fileIDToPath(uint32_t fileID);
-  uint32_t filePathToID(const std::string& path);
+  static bool ParseFileID(const std::string& fileName, uint32_t* fileID);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
 

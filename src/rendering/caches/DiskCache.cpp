@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
+#include <cstdint>
 #ifdef _WIN32
 #include <process.h>
 #define getpid _getpid
@@ -149,7 +150,10 @@ void DiskCache::removeAll() {
     return;
   }
   Directory::VisitFiles(cacheFolder, [&](const std::string& path, size_t) {
-    auto fileID = filePathToID(path);
+    uint32_t fileID = 0;
+    if (!ParseFileID(Directory::GetFileName(path), &fileID)) {
+      return;
+    }
     if (openedFiles.count(fileID) > 0) {
       return;
     }
@@ -349,7 +353,10 @@ bool DiskCache::readConfig() {
     cachedFileIDs[cacheKey] = fileID;
   }
   Directory::VisitFiles(cacheFolder, [&](const std::string& path, size_t fileSize) {
-    auto fileID = filePathToID(path);
+    uint32_t fileID = 0;
+    if (!ParseFileID(Directory::GetFileName(path), &fileID)) {
+      return;
+    }
     auto result = cachedFileInfos.find(fileID);
     if (result == cachedFileInfos.end()) {
       RemoveFileAsync(path);
@@ -476,12 +483,22 @@ std::string DiskCache::fileIDToPath(uint32_t fileID) {
   return Directory::JoinPath(cacheFolder, std::to_string(fileID) + ".bin");
 }
 
-uint32_t DiskCache::filePathToID(const std::string& path) {
-  auto fileName = Directory::GetFileName(path);
-  if (fileName.empty()) {
-    return 0;
+bool DiskCache::ParseFileID(const std::string& fileName, uint32_t* fileID) {
+  if (fileName.empty() || fileID == nullptr) {
+    return false;
   }
-  return static_cast<uint32_t>(std::stoull(fileName));
+  uint64_t value = 0;
+  for (auto ch : fileName) {
+    if (ch < '0' || ch > '9') {
+      return false;
+    }
+    value = value * 10 + static_cast<uint64_t>(ch - '0');
+    if (value > UINT32_MAX) {
+      return false;
+    }
+  }
+  *fileID = static_cast<uint32_t>(value);
+  return true;
 }
 
 void DiskCache::notifyFileClosed(uint32_t fileID) {

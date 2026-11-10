@@ -20,6 +20,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <thread>
 #include <vector>
 #include "pag/pag.h"
@@ -617,6 +618,56 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
   EXPECT_EQ(data->size(), cacheData->size());
   EXPECT_TRUE(memcmp(data->bytes(), cacheData->bytes(), data->size()) == 0);
   pag::PAGDiskCache::RemoveAll();
+}
+
+/**
+ * Regression test for issue #3827: other SDKs sharing the same cache directory may drop their own
+ * files and sub-directories into the SDK-owned folder. Scanning such entries used to throw an
+ * uncaught std::invalid_argument from std::stoull and abort the whole process. They must be
+ * skipped and left untouched instead.
+ */
+PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  ScopedDiskCacheCleanup cleanup;
+  DiskIOWorker::GetInstance()->waitAll();
+  PAGDiskCache::RemoveAll();
+  DiskIOWorker::GetInstance()->waitAll();
+  auto data = ReadFile("resources/apitest/polygon.pag");
+  ASSERT_TRUE(data != nullptr);
+  auto cacheKey = "https://pag.io/resources/apitest/polygon.pag";
+  ASSERT_TRUE(DiskCache::WriteFile(cacheKey, data));
+  DiskIOWorker::GetInstance()->waitAll();
+  auto folder = cacheDir + "/files";
+  auto foreignFile = folder + "/foreign.db";
+  std::ofstream stream(foreignFile);
+  ASSERT_TRUE(stream.is_open());
+  stream << "foreign data";
+  stream.close();
+  ASSERT_TRUE(std::filesystem::create_directory(folder + "/subdir"));
+  auto diskCache = DiskCache::GetInstance();
+  uint32_t cacheFileID = 0;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFileIDs.count(cacheKey), 1u);
+    cacheFileID = diskCache->cachedFileIDs[cacheKey];
+  }
+  std::vector<std::string> visitedFiles = {};
+  Directory::VisitFiles(folder,
+                        [&](const std::string& path, size_t) { visitedFiles.push_back(path); });
+  ASSERT_EQ(visitedFiles.size(), 2u);
+  for (const auto& path : visitedFiles) {
+    EXPECT_EQ(path.find("subdir"), std::string::npos);
+  }
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->readConfig());
+  }
+  EXPECT_EQ(diskCache->cachedFileInfos.size(), 1u);
+  EXPECT_TRUE(std::filesystem::exists(folder + "/" + std::to_string(cacheFileID) + ".bin"));
+  EXPECT_TRUE(std::filesystem::exists(foreignFile));
+  EXPECT_TRUE(std::filesystem::exists(folder + "/subdir"));
+  std::filesystem::remove(foreignFile);
+  std::filesystem::remove(folder + "/subdir");
 }
 
 /**

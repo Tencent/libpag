@@ -104,7 +104,10 @@ void Directory::VisitFiles(const std::string& folder,
     auto path = folder + PathSeparator;
     path.append(str);
     size_t fileSize = 0;
-    if (!stat(path.c_str(), &stats)) {
+    if (stat(path.c_str(), &stats) == 0) {
+      if (S_ISDIR(stats.st_mode)) {
+        continue;
+      }
       fileSize = static_cast<size_t>(stats.st_size);
     }
     callback(path, fileSize);
@@ -115,22 +118,32 @@ void Directory::VisitFiles(const std::string& folder,
 #else
 
 bool Directory::CreateRecursively(const std::string& folder) {
-  return std::filesystem::create_directories(folder);
+  std::error_code error = {};
+  return std::filesystem::create_directories(folder, error) && !error;
 }
 
 void Directory::VisitFiles(const std::string& folder,
                            std::function<void(const std::string&, size_t)> callback) {
-  if (!std::filesystem::exists(folder)) {
+  std::error_code error = {};
+  if (!std::filesystem::exists(folder, error)) {
     Directory::CreateRecursively(folder);
   }
-  for (const auto& entry : std::filesystem::directory_iterator(folder)) {
-    if (entry.is_regular_file()) {
-      std::string str = entry.path().filename().string();
-      if (str == "." || str == "..") {
-        continue;
+  std::filesystem::directory_iterator iterator(folder, error);
+  if (error) {
+    return;
+  }
+  const std::filesystem::directory_iterator end = {};
+  while (iterator != end) {
+    std::error_code entryError = {};
+    if (iterator->is_regular_file(entryError) && !entryError) {
+      auto fileSize = iterator->file_size(entryError);
+      if (!entryError) {
+        callback(iterator->path().string(), static_cast<size_t>(fileSize));
       }
-      auto fileSize = static_cast<size_t>(entry.file_size());
-      callback(entry.path().string(), fileSize);
+    }
+    iterator.increment(error);
+    if (error) {
+      return;
     }
   }
 }
