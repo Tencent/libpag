@@ -42,6 +42,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 #include "pagx/utils/LayerTransformUtils.h"
@@ -1315,6 +1316,36 @@ PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsNotLiftedIntoMatrix3D) {
     EXPECT_GT(std::fabs(key.value.getRowColumn(0, 0)), 1e-6f) << "time " << key.time;
     EXPECT_GT(std::fabs(key.value.getRowColumn(1, 1)), 1e-6f) << "time " << key.time;
   }
+}
+
+/**
+ * Test case: a singular static pose (`scale(0)`) under a 3D keyframe track. The fill-mode holds
+ * cannot carry an all-zero `matrix3D` (PAGX rejects non-invertible keyframes and a re-import would
+ * read the identity), so they collapse to a tiny invertible scale instead of breaking the file.
+ */
+PAG_TEST(PAGXHTML3DTest, SingularStaticPoseKeepsTheFillHoldsInvertible) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:scale(0);
+           animation:k 1s linear 0.5s 1"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 4u) << "delay + once needs a hold on both sides";
+  for (const auto& key : channel->keyframes) {
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(key.value)) << "time " << key.time;
+  }
+  // `scale(0)` renders nothing; the holds keep that by collapsing the linear block.
+  EXPECT_LT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-3f);
+  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-6f);
 }
 
 /**
