@@ -1264,15 +1264,44 @@ BundleChannelSet CollectBundleChannels(
       }
     }
   }
-  if (result.hasPolystarGeometry && !result.keyTimes.empty()) {
-    // A polystar outline is rebuilt per frame, and CSS interpolates the two path() strings it gets
-    // by walking the points, which is not how a rotation or a point-count step moves them. Sampling
-    // the channel every few frames keeps each interpolated segment short enough to stay under a
-    // pixel instead of baking every frame.
-    constexpr Frame kPolystarStep = 3;
+  if (result.starPointCountCh != nullptr &&
+      result.starPointCountCh->valueType() == ChannelValueType::Float) {
+    // Everything else about a polystar is linear in the path's coordinates (position and rotation
+    // ride on `transform`), but a point count step changes how many points the outline has, which
+    // CSS cannot interpolate. Stop on both sides of every integer the channel crosses.
+    const auto& keys = static_cast<const TypedChannel<float>*>(result.starPointCountCh)->keyframes;
+    constexpr Frame kCrossingEpsilon = 1;
+    if (!keys.empty()) {
+      // A count that lands on an integer at the end must not be reached by morphing the whole last
+      // segment: hold the previous count until the frame before the final key.
+      result.keyTimes.insert(keys.back().time - kCrossingEpsilon);
+    }
+    for (size_t k = 0; k + 1 < keys.size(); ++k) {
+      double v0 = keys[k].value;
+      double v1 = keys[k + 1].value;
+      if (v1 == v0) {
+        continue;
+      }
+      double lo = std::min(v0, v1);
+      double hi = std::max(v0, v1);
+      for (double boundary = std::floor(lo) + 1.0; boundary < hi; boundary += 1.0) {
+        double ratio = (boundary - v0) / (v1 - v0);
+        Frame crossing =
+            keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
+        // Hold the old point count up to the crossing, then switch: CSS would otherwise morph the
+        // two outlines into each other across the whole interval.
+        result.keyTimes.insert(crossing - kCrossingEpsilon);
+        result.keyTimes.insert(crossing + kCrossingEpsilon);
+      }
+    }
+  }
+  if (result.starOuterRoundnessCh != nullptr || result.starInnerRoundnessCh != nullptr) {
+    // Roundness bends the outline through bezier handles, so the path coordinates are not linear in
+    // it; sampling every few frames keeps each segment straight enough to interpolate.
+    constexpr Frame kRoundnessStep = 4;
     Frame first = *result.keyTimes.begin();
     Frame last = *result.keyTimes.rbegin();
-    for (Frame t = first; t <= last; t += kPolystarStep) {
+    for (Frame t = first; t <= last; t += kRoundnessStep) {
       result.keyTimes.insert(t);
     }
   }
@@ -1839,7 +1868,8 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
 }
 
 void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
-                            const std::string& tagName, Frame t, std::string& decls) {
+                            const std::string& tagName, Frame t, std::string& decls,
+                            bool& needsZeroOrigin) {
   if (bundle.primaryHost == nullptr) {
     return;
   }
@@ -1891,6 +1921,31 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
       // from renderPosition() (which folds in the layout slot), so the frame applies the delta.
       values.centerX += EvalFloatChannel(chSet.starPosXCh, t, star->position.x) - star->position.x;
       values.centerY += EvalFloatChannel(chSet.starPosYCh, t, star->position.y) - star->position.y;
+      // Position and rotation are a rigid move of the whole outline, so they ride on `transform`
+      // and leave `d` untouched: two stops then describe a linear slide exactly, instead of the
+      // sampled per-point path rewrite a baked outline would need.
+      double centerX = values.centerX;
+      double centerY = values.centerY;
+      double rotation = values.rotation;
+      values.centerX = 0.0f;
+      values.centerY = 0.0f;
+      values.rotation = 0.0f;
+      std::string transform;
+      if (!FloatNearlyZero(static_cast<float>(centerX)) ||
+          !FloatNearlyZero(static_cast<float>(centerY))) {
+        transform = "translate(" + CssFloatToString(static_cast<float>(centerX)) + "px, " +
+                    CssFloatToString(static_cast<float>(centerY)) + "px)";
+      }
+      if (!FloatNearlyZero(static_cast<float>(rotation))) {
+        if (!transform.empty()) {
+          transform += ' ';
+        }
+        transform += "rotate(" + CssFloatToString(static_cast<float>(rotation)) + "deg)";
+      }
+      if (!transform.empty()) {
+        AppendCssDecl(decls, "transform", transform);
+        needsZeroOrigin = true;
+      }
       std::string d = BuildPolystarPath(star, values);
       if (!d.empty()) {
         AppendCssDecl(decls, "d", "path(\"" + d + "\")");
@@ -1974,7 +2029,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "visibility", visible ? "visible" : "hidden");
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
-  EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls);
+  EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
   if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr) && chSet.trimTarget != nullptr) {
     // The visible run is [start, end]; pathLength="1" keeps both in path fractions.
     float start = EvalFloatChannel(chSet.trimStartCh, t, chSet.trimTarget->start);
