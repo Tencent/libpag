@@ -413,14 +413,15 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       return false;
     }
     // The axis is normalized in double precision: `rotate3d(1e20, 0, 0, 45deg)` squares to infinity
-    // in float, which slips past the zero-vector check and collapses the rotation to `cos * I`. A
-    // length that is still infinite in double (or NaN) is a degenerate axis and is rejected.
+    // in float, which used to slip past the zero-vector check and collapse the rotation to `cos * I`.
+    // Inputs beyond the float range never get here (the argument parser rejects them as non-numeric),
+    // so a zero-length vector is the only degenerate case left to catch.
     const double axisX = static_cast<double>(x);
     const double axisY = static_cast<double>(y);
     const double axisZ = static_cast<double>(z);
     const double length = std::sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-    if (!std::isfinite(length) || !(length > 1e-6)) {
-      diagnostics.warn("html: rotate3d axis is a zero or non-finite vector; ignored");
+    if (!(length > 1e-6)) {
+      diagnostics.warn("html: rotate3d axis is a zero vector; ignored");
       return false;
     }
     *out = MakeRotationAxis(static_cast<float>(axisX / length), static_cast<float>(axisY / length),
@@ -750,10 +751,10 @@ Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, fl
 }
 
 PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
-                        float parentPerspectiveOriginX, float parentPerspectiveOriginY) {
+                        float localPerspectiveOriginX, float localPerspectiveOriginY) {
   PosePlacement placement = {};
-  placement.pose = PushPerspective(pose, parentPerspectivePx, parentPerspectiveOriginX,
-                                   parentPerspectiveOriginY);
+  placement.pose =
+      PushPerspective(pose, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY);
   placement.flat = IsFlatTransform(placement.pose);
   // PAGX requires a 3D pose to be invertible; a flat pose has no such constraint, because a zero
   // scale is a valid (if empty) 2D transform.

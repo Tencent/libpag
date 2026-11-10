@@ -5312,6 +5312,17 @@ function snapshotMainImpl(opts) {
   if (bodyBgImage) {
     bodyStyle.push(`background-image: ${bodyBgImage}`);
   }
+  // A camera declared on `<body>` projects its direct children. The snapshot's `<body>` otherwise only
+  // carries sizing + background, so the camera has to be forwarded here or the whole page renders
+  // without perspective.
+  const bodyPerspective = bodyComputed.getPropertyValue('perspective').trim();
+  if (bodyPerspective && bodyPerspective !== 'none') {
+    bodyStyle.push(`perspective: ${bodyPerspective}`);
+    const bodyPerspectiveOrigin = bodyComputed.getPropertyValue('perspective-origin').trim();
+    if (bodyPerspectiveOrigin) {
+      bodyStyle.push(`perspective-origin: ${bodyPerspectiveOrigin}`);
+    }
+  }
 
   // The <style> block centralises four rendering invariants that the
   // user-agent doesn't supply by default — without them, opening the
