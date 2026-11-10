@@ -612,7 +612,7 @@ class SVGWriter {
                       ShadowAggregate& agg);
   void writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource);
   std::string writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
-                                      const std::vector<LayerStyle*>& styles);
+                                      const std::vector<LayerStyle*>& styles, const Layer* owner);
 
   // Mask / clip-path defs
   using ContentWriter = void (SVGWriter::*)(SVGBuilder&, const Layer*);
@@ -1734,7 +1734,8 @@ void SVGWriter::writeShadowMerge(const ShadowAggregate& agg, const std::string& 
 }
 
 std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& filters,
-                                               const std::vector<LayerStyle*>& styles) {
+                                               const std::vector<LayerStyle*>& styles,
+                                               const Layer* owner) {
   if (filters.empty() && styles.empty()) {
     return {};
   }
@@ -1802,21 +1803,29 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   for (const auto* style : styles) {
     if (style->nodeType() == NodeType::DropShadowStyle) {
       auto shadow = static_cast<const DropShadowStyle*>(style);
-      float ex = shadow->blurX * BLUR_MULTIPLIER;
-      float ey = shadow->blurY * BLUR_MULTIPLIER;
-      marginLeft = std::max(marginLeft, ex + std::max(0.0f, -shadow->offsetX));
-      marginRight = std::max(marginRight, ex + std::max(0.0f, shadow->offsetX));
-      marginTop = std::max(marginTop, ey + std::max(0.0f, -shadow->offsetY));
-      marginBottom = std::max(marginBottom, ey + std::max(0.0f, shadow->offsetY));
+      float ex = _animWriter.MaxChannelValue(shadow, "blurX", shadow->blurX) * BLUR_MULTIPLIER;
+      float ey = _animWriter.MaxChannelValue(shadow, "blurY", shadow->blurY) * BLUR_MULTIPLIER;
+      float offsetX = _animWriter.MaxChannelMagnitude(shadow, "offsetX", shadow->offsetX);
+      float offsetY = _animWriter.MaxChannelMagnitude(shadow, "offsetY", shadow->offsetY);
+      marginLeft = std::max(marginLeft, ex + offsetX);
+      marginRight = std::max(marginRight, ex + offsetX);
+      marginTop = std::max(marginTop, ey + offsetY);
+      marginBottom = std::max(marginBottom, ey + offsetY);
     }
   }
 
-  // Convert pixel margins to percentages, with a minimum of 50% per side to
-  // handle arbitrary element sizes gracefully.
-  float pctLeft = std::max(50.0f, std::ceil(marginLeft));
-  float pctRight = std::max(50.0f, std::ceil(marginRight));
-  float pctTop = std::max(50.0f, std::ceil(marginTop));
-  float pctBottom = std::max(50.0f, std::ceil(marginBottom));
+  // The margins above are pixels, while the SVG filter region is expressed as a percentage of the
+  // layer bounds. Convert with the actual box size so a small element with a large blur is not
+  // clipped; 50% stays as the floor for the common case.
+  Rect ownerBounds = owner != nullptr ? owner->layoutBounds() : Rect{};
+  float boxWidth = ownerBounds.width;
+  float boxHeight = ownerBounds.height;
+  float pctLeft = boxWidth > 0 ? std::max(50.0f, std::ceil(marginLeft / boxWidth * 100.0f)) : 50.0f;
+  float pctRight =
+      boxWidth > 0 ? std::max(50.0f, std::ceil(marginRight / boxWidth * 100.0f)) : 50.0f;
+  float pctTop = boxHeight > 0 ? std::max(50.0f, std::ceil(marginTop / boxHeight * 100.0f)) : 50.0f;
+  float pctBottom =
+      boxHeight > 0 ? std::max(50.0f, std::ceil(marginBottom / boxHeight * 100.0f)) : 50.0f;
 
   std::string filterId = generateId("filter");
   _defs->openElement("filter");
@@ -3744,7 +3753,7 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   }
 
   if (!layer->filters.empty() || !layer->styles.empty()) {
-    auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles);
+    auto filterId = writeFilterAndStyleDefs(layer->filters, layer->styles, layer);
     if (!filterId.empty()) {
       out.addAttribute("filter", "url(#" + filterId + ")");
     }

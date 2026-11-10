@@ -5330,4 +5330,30 @@ PAGX_TEST(PAGXSVGTest, SVGExport_IsolatedLayerUsesGroupAlpha) {
   EXPECT_EQ(svg.find("fill-opacity=\"0.5\""), std::string::npos);
 }
 
+// ST6: the filter region margins are pixels but the region itself is a percentage of the bounds.
+// A small element with a large blur must therefore get a proportionally larger region.
+PAGX_TEST(PAGXSVGTest, SVGExport_FilterRegionScalesWithBounds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("small");
+  layer->width = 40.0f;
+  layer->height = 40.0f;
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 20.0f;
+  blur->blurY = 20.0f;
+  layer->filters.push_back(blur);
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {20, 20};
+  rect->size = {40, 40};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // 3 * 20px blur = 60px, which is 150% of the 40px box.
+  EXPECT_NE(svg.find("x=\"-150%\""), std::string::npos);
+  EXPECT_NE(svg.find("width=\"400%\""), std::string::npos);
+}
+
 }  // namespace pag
