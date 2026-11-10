@@ -3226,6 +3226,23 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   }
 
   if (!useLineLayout) {
+    // overflow="hidden" drops lines that do not fit, so an empty line list means every line was
+    // clipped away. The fallback below re-emits the whole run, which would draw exactly the lines
+    // the layout discarded, so skip the box instead.
+    if (textBox->writingMode != WritingMode::Vertical && textBox->overflow == Overflow::Hidden &&
+        !std::isnan(EffectiveTextBoxHeight(textBox))) {
+      bool hasText = false;
+      bool hasEmbedded = false;
+      for (const auto& run : runs) {
+        hasText = hasText || !run.text->text.empty();
+        hasEmbedded = hasEmbedded || !run.text->glyphRuns.empty();
+      }
+      if (hasText && !hasEmbedded) {
+        addWarning("TextBox '" + textBox->id +
+                   "' overflow is hidden and every line exceeds its height; nothing is drawn.");
+        return;
+      }
+    }
     // Fallback: vertical writing mode or missing line info — emit per-run independent elements.
     // TextLayout never reports lines for a Text carrying embedded GlyphRuns, so this is the only
     // path such a run can take; emit its outlines here instead of re-shaping its characters.
@@ -3240,10 +3257,6 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       if (!run.text->glyphRuns.empty()) {
         // GlyphRun positions are offsets from the run origin, which the outline walker re-adds,
         // so the Text's own position is the origin to pass in.
-        FillStrokeInfo runFs = {};
-        runFs.fill = run.fill ? run.fill : topLevelFs.fill;
-        runFs.stroke = run.stroke ? run.stroke : topLevelFs.stroke;
-        runFs.textBox = textBox;
         auto origin = run.text->renderPosition();
         if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha,
                                MatrixToSVGTransform(transform))) {

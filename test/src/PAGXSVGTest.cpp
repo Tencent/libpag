@@ -5691,4 +5691,30 @@ PAGX_TEST(PAGXSVGTest, SVGExport_GlyphOutlinesCarryGroupAlpha) {
   EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
 }
 
+// ST29: overflow="hidden" discards every line that does not fit. With no fitting line left the
+// exporter must not fall back to re-emitting the whole run, which would paint the dropped lines.
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowDropsAllLines) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 20;
+  box->overflow = pagx::Overflow::Hidden;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "One Two Three";
+  text->fontSize = 40;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("nothing is drawn") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 }  // namespace pag
