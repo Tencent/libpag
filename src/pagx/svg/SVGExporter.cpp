@@ -438,12 +438,12 @@ class SVGWriter {
   SVGWriter(SVGBuilder* defs, SVGWriterContext* context, int indentSpaces = 2,
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
-            bool resolveModifiers = true, std::vector<std::string>* warnings = nullptr,
+            std::vector<std::string>* warnings = nullptr,
             const SVGAnimationPlan* animation = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rasterScale(rasterScale), _resolveModifiers(resolveModifiers), _warnings(warnings),
-        _layoutContext(layoutContext), _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
+        _rasterScale(rasterScale), _warnings(warnings), _layoutContext(layoutContext),
+        _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -455,7 +455,6 @@ class SVGWriter {
   bool _convertTextToPath = true;
   bool _bakeUnsupported = true;
   float _rasterScale = 2.0f;
-  bool _resolveModifiers = true;
   std::vector<std::string>* _warnings = nullptr;
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
@@ -493,10 +492,10 @@ class SVGWriter {
   }
 
   std::vector<Element*> resolveIfEnabled(const std::vector<Element*>& elements) {
-    if (_resolveModifiers) {
-      return _resolver.resolve(elements);
-    }
-    return elements;
+    // Modifiers are always resolved. Skipping them does not keep the content editable: Polystar,
+    // TrimPath and Repeater have no SVG counterpart, so the shapes simply disappear from the
+    // output. A wrong picture is worse than a baked one.
+    return _resolver.resolve(elements);
   }
 
   const LayerBuildResult& ensureBuildResult();
@@ -3919,9 +3918,14 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
     }
   }
 
+  if (!options.resolveModifiers && warnings != nullptr) {
+    warnings->push_back(
+        "resolveModifiers=false is ignored: SVG export always resolves path modifiers, because "
+        "dropping them removes Polystar / TrimPath / Repeater content from the output.");
+  }
+
   SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
-                   &doc, options.bakeUnsupported, safeRasterScale, options.resolveModifiers,
-                   warnings, animationPlan.get());
+                   &doc, options.bakeUnsupported, safeRasterScale, warnings, animationPlan.get());
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

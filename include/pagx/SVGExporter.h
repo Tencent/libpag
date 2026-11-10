@@ -60,11 +60,10 @@ struct SVGExportOptions {
   FontConfig* fontConfig = nullptr;
 
   /**
-   * Whether to resolve path-modifier elements (TrimPath, RoundCorner, MergePath, Polystar) into
-   * editable geometry by applying the modifier through tgfx::Path operations and emitting the
-   * resulting path as a regular <path>. When disabled, modifiers are dropped on the floor. When
-   * enabled, the modifier itself is no longer live but the resulting shape remains a fully editable
-   * SVG path. Naming is aligned with PPTExportOptions::resolveModifiers. The default value is true.
+   * Deprecated and ignored: the exporter always resolves path modifiers (TrimPath, RoundCorner,
+   * MergePath, Polystar). Skipping them does not keep the content editable — those shapes have no
+   * SVG counterpart and would simply disappear from the output — so a false value only produces a
+   * warning. The field is kept so existing callers keep compiling.
    */
   bool resolveModifiers = true;
 

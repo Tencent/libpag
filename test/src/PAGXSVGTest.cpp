@@ -5390,4 +5390,32 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AntiAliasFalseUsesCrispEdges) {
   EXPECT_EQ(smoothSvg.find("shape-rendering"), std::string::npos);
 }
 
+// ST43: resolveModifiers=false used to drop Polystar / TrimPath / Repeater content silently. The
+// option is now ignored: modifiers are always resolved, and a false value only warns.
+PAGX_TEST(PAGXSVGTest, SVGExport_ResolveModifiersFalseIsIgnored) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>();
+  star->position = {100, 100};
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExporter::Options options;
+  options.resolveModifiers = false;
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options, &warnings);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("resolveModifiers=false is ignored") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 }  // namespace pag

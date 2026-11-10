@@ -503,6 +503,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST7 部分（2026-11-10） | 阴影 `spread` 用 `feMorphology`（正 dilate / 负 erode）实现，不再丢弃并告警；区域边距把 spread 计入；`PAGXSVGTest` 183 / 183 | Glass / backdrop 仍是 B 类；ST40 BlendFilter 的额外 alpha clip 未动 |
 | 本轮 ST40 部分（2026-11-10） | 没有 feBlend 对应物的 blend mode（plus-lighter / plus-darker）改为显式告警，不再静默按 normal 渲染；`PAGXSVGTest` 184 / 184 | BlendFilter 的 source/dest alpha 组合与透明洞仍未逐 mode 验证；Glass / backdrop 仍是 B 类 |
 | 本轮 ST17（2026-11-10） | `antiAlias=false` 的层输出 `shape-rendering="crispEdges"` 并强制成组，默认值不改变输出；`PAGXSVGTest` 185 / 185 | 斜边 / 旋转 / clip 下的 AA 仍无像素级验证 |
+| 本轮 ST43（2026-11-10） | `resolveModifiers` 不再作为「关闭就丢效果」的开关，修饰器一律解析，false 只产生告警；`PAGXSVGTest` 186 / 186 | — |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
