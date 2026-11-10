@@ -48,7 +48,11 @@ struct HTMLTransformReference {
 struct HTMLTransformOrigin {
   Point point = {};
   float z = 0.0f;
+  // The value parsed and every component resolved against the box.
   bool resolved = false;
+  // The authored value is not a valid CSS `<position>` (e.g. `top 20px`), so the declaration is
+  // dropped and the initial `50% 50%` applies. `point` already carries that fallback.
+  bool valid = true;
 };
 
 /**

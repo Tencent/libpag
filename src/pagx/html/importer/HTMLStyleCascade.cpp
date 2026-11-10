@@ -799,6 +799,10 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     const std::string origin = authored.empty() ? std::string("50% 50%") : authored;
     const auto resolved =
         ResolveTransformOrigin(origin, reference.widthPx, reference.heightPx, _valueParser);
+    if (!resolved.valid) {
+      _diagnostics.warn("html: perspective-origin '" + origin + "' on <" + elementName +
+                        "> is not a valid CSS position; using the default 50% 50%");
+    }
     if (resolved.resolved) {
       box.perspectiveOriginX = resolved.point.x;
       box.perspectiveOriginY = resolved.point.y;
@@ -841,6 +845,10 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   parsed.originResolved = origin.resolved;
   // The pivot only matters for a pose with a non-identity linear part: a pure translation or a pure
   // projection is unchanged by it, so an unresolved origin is not worth a diagnostic there.
+  if (!origin.valid) {
+    _diagnostics.warn("html: transform-origin '" + originValue + "' on <" + elementName +
+                      "> is not a valid CSS position; using the default 50% 50%");
+  }
   if (!origin.resolved && !IsLinearIdentity(pose)) {
     const std::string authored =
         originValue.empty() ? std::string("50% 50% (default)") : originValue;
