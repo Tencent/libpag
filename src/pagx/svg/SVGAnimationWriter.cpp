@@ -114,54 +114,67 @@ std::string FormatColorValue(const Color& color) {
   return buffer;
 }
 
-// Clamps keyframes into the animation span, collapses duplicate timestamps, and pads both ends so
-// the emitted keyTimes starts at 0 and ends at 1. Padding with the boundary value mirrors the
-// runtime's clamp-to-end policy in EvaluateKeyframeSequence.
+// Frames the emitted track must carry: both animation boundaries plus every keyframe inside the
+// span. Keyframes outside [0, duration] shape the value at the boundary through Channel::evaluateAt
+// (clamped when no key straddles it, interpolated when one does) instead of being clamped into a
+// different track shape.
 template <typename T>
-bool NormalizeKeyframes(const std::vector<Keyframe<T>>& keyframes, Frame duration,
-                        std::vector<double>* times, std::vector<T>* values,
-                        std::vector<KeyframeInterpolationType>* types,
-                        std::vector<Point>* bezierOuts, std::vector<Point>* bezierIns) {
-  if (keyframes.empty() || duration <= 0) {
+void CollectTrackFrames(const Channel* channel, Frame duration, std::vector<double>* times) {
+  auto span = static_cast<double>(duration);
+  times->push_back(0.0);
+  times->push_back(1.0);
+  const auto* typed = static_cast<const TypedChannel<T>*>(channel);
+  for (const auto& keyframe : typed->keyframes) {
+    if (keyframe.time >= 0 && keyframe.time <= duration) {
+      times->push_back(static_cast<double>(keyframe.time) / span);
+    }
+  }
+  std::sort(times->begin(), times->end());
+  times->erase(std::unique(times->begin(), times->end()), times->end());
+}
+
+template <typename T>
+const Keyframe<T>* FindKeyframeAtTime(const Channel* channel, Frame frame) {
+  const auto* typed = static_cast<const TypedChannel<T>*>(channel);
+  for (const auto& keyframe : typed->keyframes) {
+    if (keyframe.time == frame) {
+      return &keyframe;
+    }
+  }
+  return nullptr;
+}
+
+// Samples the channel at every track frame. Values come from the runtime evaluator, so a boundary
+// frame that falls inside a keyframe segment reports the interpolated value rather than a clamped
+// endpoint. Interpolation metadata is taken from the keyframe sitting exactly on that frame; a
+// synthetic boundary frame has no segment of its own and uses linear.
+template <typename T>
+bool BuildTypedTrack(const Channel* channel, Frame duration, std::vector<double>* times,
+                     std::vector<T>* values, std::vector<KeyframeInterpolationType>* types,
+                     std::vector<Point>* bezierOuts, std::vector<Point>* bezierIns) {
+  if (channel == nullptr || duration <= 0) {
+    return false;
+  }
+  CollectTrackFrames<T>(channel, duration, times);
+  if (times->size() < 2) {
     return false;
   }
   auto span = static_cast<double>(duration);
-  for (const auto& keyframe : keyframes) {
-    double time = std::clamp(static_cast<double>(keyframe.time) / span, 0.0, 1.0);
-    if (!times->empty() && time < times->back()) {
-      continue;
+  for (auto time : *times) {
+    auto frame = static_cast<Frame>(std::llround(time * span));
+    values->push_back(std::get<T>(channel->evaluateAt(frame)));
+    const Keyframe<T>* keyframe = FindKeyframeAtTime<T>(channel, frame);
+    if (keyframe != nullptr) {
+      types->push_back(keyframe->interpolation);
+      bezierOuts->push_back(keyframe->bezierOut);
+      bezierIns->push_back(keyframe->bezierIn);
+    } else {
+      types->push_back(KeyframeInterpolationType::Linear);
+      bezierOuts->push_back(Point{});
+      bezierIns->push_back(Point{});
     }
-    if (!times->empty() && time == times->back()) {
-      values->back() = keyframe.value;
-      types->back() = keyframe.interpolation;
-      bezierOuts->back() = keyframe.bezierOut;
-      bezierIns->back() = keyframe.bezierIn;
-      continue;
-    }
-    times->push_back(time);
-    values->push_back(keyframe.value);
-    types->push_back(keyframe.interpolation);
-    bezierOuts->push_back(keyframe.bezierOut);
-    bezierIns->push_back(keyframe.bezierIn);
   }
-  if (times->empty()) {
-    return false;
-  }
-  if (times->front() > 0) {
-    times->insert(times->begin(), 0.0);
-    values->insert(values->begin(), values->front());
-    types->insert(types->begin(), KeyframeInterpolationType::Linear);
-    bezierOuts->insert(bezierOuts->begin(), Point{});
-    bezierIns->insert(bezierIns->begin(), Point{});
-  }
-  if (times->back() < 1.0) {
-    times->push_back(1.0);
-    values->push_back(values->back());
-    types->push_back(KeyframeInterpolationType::Linear);
-    bezierOuts->push_back(Point{});
-    bezierIns->push_back(Point{});
-  }
-  return times->size() >= 2;
+  return true;
 }
 
 // Expands the normalized keyframes into a flat list of (time, value, incoming spline) entries.
@@ -213,8 +226,10 @@ void FlattenKeyframes(const std::vector<double>& times, const std::vector<T>& va
 }
 
 // A LoopMode::PingPong animation is emitted as one mirrored sequence: forward then backward, with
-// each segment's easing reversed. Other loop modes just repeat the forward sequence.
-void ApplyPingPong(SmilSequence* sequence, double* durationSeconds) {
+// each segment's easing reversed. Other loop modes just repeat the forward sequence. The caller
+// doubles SmilTiming::durationSeconds exactly once per emitted element, because every track of that
+// element must share one dur; doubling here would compound per track.
+void ApplyPingPong(SmilSequence* sequence) {
   if (sequence->values.size() < 2) {
     return;
   }
@@ -234,7 +249,6 @@ void ApplyPingPong(SmilSequence* sequence, double* durationSeconds) {
   for (auto& time : sequence->keyTimes) {
     time *= 0.5;
   }
-  *durationSeconds *= 2.0;
 }
 
 bool ResolveTiming(const Animation* animation, const AnimationTimeline* timeline,
@@ -326,14 +340,15 @@ void AppendFloatSequence(const std::vector<double>& flatTimes, const std::vector
   }
 }
 
-bool BuildFloatSequence(const std::vector<Keyframe<float>>& keyframes, Frame duration, float scale,
+bool BuildFloatSequence(const Channel* channel, Frame duration, float scale,
                         SmilSequence* sequence) {
   std::vector<double> times;
   std::vector<float> values;
   std::vector<KeyframeInterpolationType> types;
   std::vector<Point> bezierOuts;
   std::vector<Point> bezierIns;
-  if (!NormalizeKeyframes(keyframes, duration, &times, &values, &types, &bezierOuts, &bezierIns)) {
+  if (!BuildTypedTrack<float>(channel, duration, &times, &values, &types, &bezierOuts,
+                              &bezierIns)) {
     return false;
   }
   bool discrete = true;
@@ -365,15 +380,15 @@ bool BuildFloatSequence(const std::vector<Keyframe<float>>& keyframes, Frame dur
   return true;
 }
 
-bool BuildColorSequences(const std::vector<Keyframe<Color>>& keyframes, Frame duration,
-                         float alphaScale, SmilSequence* colorSequence,
-                         SmilSequence* alphaSequence) {
+bool BuildColorSequences(const Channel* channel, Frame duration, float alphaScale,
+                         SmilSequence* colorSequence, SmilSequence* alphaSequence) {
   std::vector<double> times;
   std::vector<Color> values;
   std::vector<KeyframeInterpolationType> types;
   std::vector<Point> bezierOuts;
   std::vector<Point> bezierIns;
-  if (!NormalizeKeyframes(keyframes, duration, &times, &values, &types, &bezierOuts, &bezierIns)) {
+  if (!BuildTypedTrack<Color>(channel, duration, &times, &values, &types, &bezierOuts,
+                              &bezierIns)) {
     return false;
   }
   std::vector<double> flatTimes;
@@ -409,20 +424,38 @@ Matrix EvaluateChannelMatrix(const Channel* channel, Frame frame) {
   return result != nullptr ? *result : Matrix::Identity();
 }
 
-void AppendKeyframeTimes(const Channel* channel, std::vector<Frame>* frames) {
-  if (channel == nullptr) {
+// Appends the animation boundaries plus every keyframe inside the span. Keyframes outside
+// [0, duration] are left to Channel::evaluateAt at the boundary frames so a segment that straddles
+// the start still reports its interpolated value there.
+void AppendTrackFrames(const Channel* channel, Frame duration, std::vector<Frame>* frames) {
+  if (channel == nullptr || duration <= 0) {
     return;
   }
+  frames->push_back(0);
+  frames->push_back(duration);
   if (channel->valueType() == ChannelValueType::Matrix) {
     const auto* typed = static_cast<const TypedChannel<Matrix>*>(channel);
     for (const auto& keyframe : typed->keyframes) {
-      frames->push_back(keyframe.time);
+      if (keyframe.time >= 0 && keyframe.time <= duration) {
+        frames->push_back(keyframe.time);
+      }
+    }
+    return;
+  }
+  if (channel->valueType() == ChannelValueType::Bool) {
+    const auto* typed = static_cast<const TypedChannel<bool>*>(channel);
+    for (const auto& keyframe : typed->keyframes) {
+      if (keyframe.time >= 0 && keyframe.time <= duration) {
+        frames->push_back(keyframe.time);
+      }
     }
     return;
   }
   const auto* typed = static_cast<const TypedChannel<float>*>(channel);
   for (const auto& keyframe : typed->keyframes) {
-    frames->push_back(keyframe.time);
+    if (keyframe.time >= 0 && keyframe.time <= duration) {
+      frames->push_back(keyframe.time);
+    }
   }
 }
 
@@ -501,7 +534,7 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
   }
   *durationFrames = binding->animation->duration;
 
-  AppendKeyframeTimes(binding->channel, frames);
+  AppendTrackFrames(binding->channel, *durationFrames, frames);
   if (frames->size() < 2) {
     return false;
   }
@@ -597,11 +630,10 @@ bool WriteTransformTracks(XMLBuilder& out, const std::vector<Matrix>& matrices,
     }
   }
   if (timing.mirror) {
-    double mirrored = timing.durationSeconds;
     for (int t = 0; t < 4; ++t) {
-      ApplyPingPong(tracks[t], &mirrored);
+      ApplyPingPong(tracks[t]);
     }
-    timing.durationSeconds = mirrored;
+    timing.durationSeconds *= 2.0;
   }
 
   bool wrote = false;
@@ -792,7 +824,7 @@ bool SVGAnimationWriter::WriteElementOpacityAnimates(XMLBuilder& out,
     } else if (animation != binding->animation) {
       return false;
     }
-    AppendKeyframeTimes(binding->channel, &frames);
+    AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
   }
   if (animation == nullptr || frames.empty()) {
     return false;
@@ -841,7 +873,8 @@ bool SVGAnimationWriter::WriteElementOpacityAnimates(XMLBuilder& out,
     return false;
   }
   if (timing.mirror) {
-    ApplyPingPong(&sequence, &timing.durationSeconds);
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
   }
   WriteAnimateElement(out, attributeName, nullptr, false, sequence, timing, nullptr, nullptr);
   return true;
@@ -887,7 +920,8 @@ void EmitFloatTrack(XMLBuilder& out, const char* attributeName, const std::vecto
     return;
   }
   if (timing.mirror) {
-    ApplyPingPong(&sequence, &timing.durationSeconds);
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
   }
   WriteAnimateElement(out, attributeName, nullptr, false, sequence, timing, nullptr, nullptr);
 }
@@ -922,7 +956,7 @@ bool SVGAnimationWriter::WriteShapeGeometryAnimates(XMLBuilder& out, const Node*
     } else if (animation != binding->animation) {
       return false;
     }
-    AppendKeyframeTimes(binding->channel, &frames);
+    AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
   }
   if (animation == nullptr || frames.size() < 2) {
     return false;
@@ -1070,7 +1104,7 @@ bool SVGAnimationWriter::WriteElementTransformAnimates(XMLBuilder& out,
       } else if (animation != binding->animation) {
         return false;
       }
-      AppendKeyframeTimes(binding->channel, &frames);
+      AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
     }
   }
   if (animation == nullptr) {
@@ -1180,30 +1214,19 @@ bool SVGAnimationWriter::WriteVisibilityAnimate(XMLBuilder& out, const Node* tar
   if (!ResolveTiming(binding->animation, binding->timeline, &timing)) {
     return false;
   }
-  const auto* channel = static_cast<const TypedChannel<bool>*>(binding->channel);
-  if (channel->keyframes.empty()) {
-    return false;
-  }
   SmilSequence sequence;
-  auto span = static_cast<double>(binding->animation->duration);
-  for (const auto& keyframe : channel->keyframes) {
-    double time = std::clamp(static_cast<double>(keyframe.time) / span, 0.0, 1.0);
-    if (!sequence.keyTimes.empty() && time < sequence.keyTimes.back()) {
-      continue;
-    }
-    sequence.values.push_back(keyframe.value ? "visible" : "hidden");
-    sequence.keyTimes.push_back(time);
-  }
-  if (sequence.keyTimes.empty()) {
+  std::vector<double> times;
+  std::vector<bool> values;
+  std::vector<KeyframeInterpolationType> types;
+  std::vector<Point> bezierOuts;
+  std::vector<Point> bezierIns;
+  if (!BuildTypedTrack<bool>(binding->channel, binding->animation->duration, &times, &values,
+                             &types, &bezierOuts, &bezierIns)) {
     return false;
   }
-  if (sequence.keyTimes.front() > 0) {
-    sequence.values.insert(sequence.values.begin(), sequence.values.front());
-    sequence.keyTimes.insert(sequence.keyTimes.begin(), 0.0);
-  }
-  if (sequence.keyTimes.back() < 1) {
-    sequence.values.push_back(sequence.values.back());
-    sequence.keyTimes.push_back(1.0);
+  for (size_t i = 0; i < times.size(); ++i) {
+    sequence.values.push_back(values[i] ? "visible" : "hidden");
+    sequence.keyTimes.push_back(times[i]);
   }
   if (sequence.values.size() < 2) {
     return false;
@@ -1225,11 +1248,12 @@ bool SVGAnimationWriter::WriteChannelAnimate(XMLBuilder& out, const Node* target
   }
   const auto* channel = static_cast<const TypedChannel<float>*>(binding->channel);
   SmilSequence sequence;
-  if (!BuildFloatSequence(channel->keyframes, binding->animation->duration, 1.0f, &sequence)) {
+  if (!BuildFloatSequence(channel, binding->animation->duration, 1.0f, &sequence)) {
     return false;
   }
   if (timing.mirror) {
-    ApplyPingPong(&sequence, &timing.durationSeconds);
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
   }
   WriteAnimateElement(out, attributeName, nullptr, false, sequence, timing, nullptr, nullptr);
   return true;
@@ -1277,13 +1301,12 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
       const auto* channel = static_cast<const TypedChannel<Color>*>(colorBinding->channel);
       SmilSequence colorSequence;
       SmilSequence alphaSequence;
-      if (BuildColorSequences(channel->keyframes, colorBinding->animation->duration,
+      if (BuildColorSequences(channel, colorBinding->animation->duration,
                               painterAlpha * alphaMultiplier, &colorSequence, &alphaSequence)) {
         if (timing.mirror) {
-          double mirrored = timing.durationSeconds;
-          ApplyPingPong(&colorSequence, &mirrored);
-          ApplyPingPong(&alphaSequence, &mirrored);
-          timing.durationSeconds = mirrored;
+          ApplyPingPong(&colorSequence);
+          ApplyPingPong(&alphaSequence);
+          timing.durationSeconds *= 2.0;
         }
         WriteAnimateElement(out, paintAttribute, nullptr, false, colorSequence, timing, nullptr,
                             nullptr);
@@ -1308,10 +1331,11 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
     if (ResolveTiming(alphaBinding->animation, alphaBinding->timeline, &timing)) {
       const auto* channel = static_cast<const TypedChannel<float>*>(alphaBinding->channel);
       SmilSequence sequence;
-      if (BuildFloatSequence(channel->keyframes, alphaBinding->animation->duration,
+      if (BuildFloatSequence(channel, alphaBinding->animation->duration,
                              colorAlpha * alphaMultiplier, &sequence)) {
         if (timing.mirror) {
-          ApplyPingPong(&sequence, &timing.durationSeconds);
+          ApplyPingPong(&sequence);
+          timing.durationSeconds *= 2.0;
         }
         std::string opacityAttribute = std::string(paintAttribute) + "-opacity";
         WriteAnimateElement(out, opacityAttribute.c_str(), nullptr, false, sequence, timing,

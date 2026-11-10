@@ -157,7 +157,10 @@ Matrix BuildGroupMatrix(const Group* group, const GroupChannelOverride* override
   float skewAxis =
       override != nullptr && override->skewAxis != nullptr ? *override->skewAxis : group->skewAxis;
   bool hasAnchor = !FloatNearlyZero(anchor.x) || !FloatNearlyZero(anchor.y);
-  bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y);
+  // An animated position must count even when the authored one is zero, otherwise the early-out
+  // below returns an empty matrix and the track never moves.
+  bool hasPosition = !FloatNearlyZero(renderPos.x) || !FloatNearlyZero(renderPos.y) ||
+                     (override != nullptr && override->position != nullptr);
   bool hasRotation = !FloatNearlyZero(rotation);
   bool hasScale = !FloatNearlyZero(scale.x - 1.0f) || !FloatNearlyZero(scale.y - 1.0f);
   bool hasSkew = !FloatNearlyZero(skew);

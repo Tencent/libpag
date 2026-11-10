@@ -3427,10 +3427,12 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
                     layer->mask != nullptr || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect || animated;
 
-  // An animated alpha forces the group form: distributing it to every descendant would multiply the
-  // same curve into each child element.
+  // Only an animated alpha forces the group form; a transform-only animation must keep the static
+  // per-child distribution so overlapping children keep compositing exactly as before.
+  bool alphaAnimated =
+      _animWriter.plan() != nullptr && _animWriter.plan()->HasAlphaAnimation(layer);
   float perChildAlpha =
-      (!layer->groupOpacity && layer->alpha < 1.0f && !animated) ? layer->alpha : 1.0f;
+      (!layer->groupOpacity && layer->alpha < 1.0f && !alphaAnimated) ? layer->alpha : 1.0f;
 
   if (!needsGroup) {
     writeLayerBody(out, layer, perChildAlpha);

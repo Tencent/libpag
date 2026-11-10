@@ -4864,4 +4864,94 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimCircleRadius) {
   EXPECT_NE(svg.find("values=\"40;60\""), std::string::npos);
 }
 
+//==============================================================================
+// Regression cases for the defects listed in docs/pagx-svg-export-development-plan.md (F3/F5/F9/A08)
+//==============================================================================
+
+// F3: every track of one element must share a single doubled duration under PingPong. Mirroring and
+// doubling used to happen together, so a four-track transform produced 2^4 times the duration.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPingPongTransformSharesOneDuration) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"4s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"8s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"16s\""), std::string::npos);
+}
+
+// F5: a Group whose authored position is zero must still expose the animated position, otherwise
+// BuildGroupMatrix takes the early-out and every frame reports an identity transform.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupPositionFromZero) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "position.x");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0 0;100 0\""), std::string::npos);
+}
+
+// F9: only an alpha animation forces the group-opacity form. A transform-only animation must keep
+// the static per-child alpha distribution.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTransformKeepsPerChildAlpha) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->groupOpacity = false;
+  doc->layers[0]->alpha = 0.5f;
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The alpha stays distributed to the painters instead of moving onto the <g>.
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find(" opacity=\"0.5\""), std::string::npos);
+}
+
+// A08: a keyframe before the timeline origin must not be clamped into a different track shape. With
+// keys at (-10, 0) and (10, 1) across a 100-frame animation the runtime reports 0.5 at t=0.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimKeyframeBeforeOriginKeepsInterpolatedStart) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 100, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({-10, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({10, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0.5;1;1\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;0.1;1\""), std::string::npos);
+}
+
 }  // namespace pag

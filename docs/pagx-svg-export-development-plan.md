@@ -3,6 +3,7 @@
 > 初稿：2026-11-09；本轮重组与语义核查：2026-11-10。评审分支：`feature/lifengdy_svg_export`。
 > 源码基点：`847116b92`。源码定位相对于 `/Users/lifengdy/Desktop/project/libpag`，均使用 `file:line`。
 > 本轮仅修改本文档，没有源码实现、构建、测试或像素验证；所有推荐决策仍待确认。
+> **2026-11-10 补**：新增 1.4 执行分层、4.6 接口迁移、4.7 可用性基线；H0 热修批次（F3 / F5 / F9 / A08）已落地并各带一个回归用例。
 
 ## 1. 总览、范围与待确认决策
 
@@ -43,6 +44,24 @@
 | D8 | 可选 MB 输出模式 | 是否允许显式有限场景烘焙：时间窗、初态、事件、资源、分辨率、采样与尾帧 / repeat 必须确定；未同意前 B 类 Strict 拒绝，不是已保真；开放宿主历史仍为 U |
 
 D1—D8 均未擅自确认。推荐数值不是已通过门禁；MB 不是默认开启、已实现或原生矢量能力。
+
+### 1.4 执行分层与首轮交付子集
+
+正文的 S0—S6 / M0—M6 是全量契约，不是一次性交付范围。按「可独立验收 + 可独立回滚」拆三层，避免全量门禁把已交付能力一起卡住。
+
+| 层 | 范围 | 退出条件 |
+|---|---|---|
+| **H0 热修** | 已定位、改动局部、当前就在污染输出的缺陷：F3（PingPong 时长翻倍）、F5（Group 位置 override 丢失）、F9（任意动画改变 per-child alpha）、A08（跨 duration 关键帧被 clamp） | 每条一个一对一回归用例；`PAGXSVGTest` 全绿；不引入新决策 |
+| **R1 首轮** | 静态：ST1、ST2、ST4、ST5、ST6、ST7、ST33、ST34、ST35、ST39、ST40；动效：F1、F2、F4、F6、F7、F8；外加 P1（滤镜参数）、P2（渐变与 stop）两个增量能力 | 只对上面列出的编号建门禁；其余编号保持现状告警，不阻断合入 |
+| **R2 后续** | 其余 ST / F；M3 的连续误差证明；M5 的 `d` / 文本 / Selector；MB | R1 收口后重新排期并重估 |
+
+R1 的取舍依据：
+
+- **只做会改变像素或结构的**。ST8—ST31 多为文字与几何的精细语义，缺陷存在但不影响主流文档；先记录，不先修。
+- **动效只修契约层的**。F1/F2 是「根入口选错 / 实例作用域错」，F4 是「初态错」，F6/F7/F8 是「插值与 alpha 乘积错」——都会让输出明显不对；M3 的误差证明与 M5 的拓扑展开留到 R2。
+- **P1/P2 与任何待定决策无关**，不需要等 D1—D8。
+
+推迟的编号在文档里保留分类，不进入本轮门禁；`classified` 与 `supported` 的区分照旧成立。
 
 ## 2. 静态导出：契约、补齐与阶段
 
@@ -457,6 +476,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 历史 SVG stderr | 三次 PNG 解码错误但断言仍通过，尚未定位 | 无日志异常或图片资源正确 |
 | 当前 source 声明核查 | 166 个 SVG 用例、16 个 SVGExport_Anim、0 处显式 exportAnimation=false 选项 | “166 all passed”；声明数与历史 binary 结果必须分开 |
 | 本轮文档重组 | 仅只读源码 / 声明语义核查与文档编辑 | 任何新构建、修复、测试、像素或跨浏览器认证 |
+| 本轮 H0 热修（2026-11-10） | F3 / F5 / F9 / A08 已修，各带一个回归用例；`PAGXSVGTest` 170 / 170 通过（本机 SwiftShader） | 其余 F / ST 编号、像素门禁与跨浏览器结果 |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
@@ -485,8 +505,34 @@ cmake --build cmake-build-debug --target HTMLTest
 - [ ] 同输入重复导出与 ID / 资源稳定，无模板污染 / 无界 nodes；失败和全部写失败保旧文件按承诺测试，warnings sink 不改变成功。
 - [ ] 共用工具、PAGX runtime、静态 SVG、PPT / HTML、全量与目标浏览器门禁通过；能力文档区分 classified、supported、approximate、B/MB 和 U。
 
-## 5. 完整附录与唯一核查目录
+### 4.6 对外接口迁移（新增）
 
+`SVGExporter.h` 位于 `include/pagx/`，是公开 SDK 头文件。2.3 节的收口——`bakeUnsupported → staticPolicy`、`convertTextToPath → textMode`、移除 `resolveModifiers`——属于破坏性变更，需要先定迁移方式再动代码。
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| A. 保留旧字段并标记 deprecated | 旧字段映射到新策略：`bakeUnsupported=true → PreserveAppearance`、`false → VectorOnly`；`convertTextToPath=true → Fidelity`、`false → Native`；`resolveModifiers` 恒视为 true 并告警 | 字段冗余，但零迁移成本 |
+| B. 一次性替换 + 升主版本 | 删除旧字段，同步全部调用方与对外文档 | 需要 libpag 主版本号变更 |
+| C. 双轨 + 编译期开关（`PAGX_SVG_EXPORT_API_V2`） | 同时维护两套入口 | 两套分支长期共存，不推荐 |
+
+**建议 A**，等下一个主版本再删除旧字段。唯一例外是 `resolveModifiers=false`：它当前会让 Polystar / TextPath 直接消失，本身是错误输出，可以立即改为「忽略该字段并告警」，不必等主版本。
+
+### 4.7 默认策略可用性基线（新增）
+
+D3 推荐 Strict、D4 推荐 PreserveAppearance/VectorOnly；这组默认值会让一部分真实文档直接拒绝导出。上线前需要一条基线，避免「保真度拉满但没有文档导得出来」。
+
+在 `resources/**/*.pagx` 上按三套静态策略各跑一遍导出，统计：
+
+| 指标 | 含义 |
+|---|---|
+| native 比例 | 全部内容走原生矢量，无烘焙 |
+| bake 比例 | 至少触发一次完整上下文烘焙 |
+| reject 比例 | 按策略拒绝导出 |
+| 首因分布 | 拒绝的首要原因：conic / diamond / TextPath / TextModifier / 透视 / 预算 |
+
+基线结果写入独立文件（例如 `docs/svg-policy-baseline.md`），不进入像素门禁；策略调整时重跑并更新。若 Strict 的 reject 比例过高，先回看 D4 的默认值，而不是放宽误差阈值。
+
+## 5. 完整附录与唯一核查目录
 ### A. 完整模型、辅助结构与值数据
 
 #### A.1 继承基类、附属结构与派生字段（31 类 / 111 项）
