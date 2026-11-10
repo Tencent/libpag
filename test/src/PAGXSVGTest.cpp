@@ -5418,4 +5418,23 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ResolveModifiersFalseIsIgnored) {
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// ST6: filters form a chain. A blur placed after a drop shadow must consume the merged shadow
+// output; before this fix it read SourceGraphic and the shadow was left un-blurred.
+PAGX_TEST(PAGXSVGTest, SVGExport_FilterChainAdvancesAfterDropShadow) {
+  auto doc = MakeRectDocument();
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>("shadow");
+  shadow->blurX = 4.0f;
+  shadow->blurY = 4.0f;
+  shadow->offsetX = 2.0f;
+  shadow->offsetY = 2.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 3.0f;
+  blur->blurY = 3.0f;
+  doc->layers[0]->filters = {shadow, blur};
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("in=\"shadow0Over\""), std::string::npos);
+}
+
 }  // namespace pag

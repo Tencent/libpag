@@ -590,6 +590,10 @@ class SVGWriter {
   void writeColorMatrixFilter(const ColorMatrixFilter* cm, int& colorMatrixIndex,
                               std::string& currentSource);
   void writeBlendFilter(const BlendFilter* blend, int& shadowIndex, std::string& currentSource);
+
+  // Emits an inline feMerge so a shadow filter's output becomes the chain input for later filters.
+  std::string mergeShadowIntoChain(const std::string& shadowResult, const std::string& source,
+                                   bool shadowOnly);
   std::string writeNoiseTurbulence(float size, float seed, const std::string& resultName);
   std::string writeNoiseBand(float size, float density, float seed, bool isDark,
                              const std::string& label);
@@ -608,7 +612,7 @@ class SVGWriter {
   };
   std::string writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleIndex);
   void writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                       ShadowAggregate& agg, std::string& currentSource);
+                       std::string& currentSource);
   void writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
                       ShadowAggregate& agg);
   void writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource);
@@ -1569,7 +1573,7 @@ void SVGWriter::writeNoiseStyleClip(const std::string& noiseResult, const std::s
 }
 
 void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& shadowIndex,
-                                ShadowAggregate& agg, std::string& currentSource) {
+                                std::string& currentSource) {
   int colorMatrixIndex = 0;
   int blurIndex = 0;
   int noiseIndex = 0;
@@ -1594,22 +1598,20 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
       }
       case NodeType::DropShadowFilter: {
         auto shadow = static_cast<const DropShadowFilter*>(filter);
-        agg.dropShadowResults.push_back(
+        // Filters chain: the shadow becomes the new input for whatever follows, so a blur after a
+        // drop shadow blurs the shadow too instead of reading the pre-shadow source.
+        std::string shadowResult =
             writeDropShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                    shadow->color, shadowIndex++, filter, 0.0f));
-        if (!shadow->shadowOnly) {
-          agg.needSourceGraphic = true;
-        }
+                                    shadow->color, shadowIndex++, filter, 0.0f);
+        currentSource = mergeShadowIntoChain(shadowResult, currentSource, shadow->shadowOnly);
         break;
       }
       case NodeType::InnerShadowFilter: {
         auto shadow = static_cast<const InnerShadowFilter*>(filter);
-        agg.innerShadowResults.push_back(
+        std::string shadowResult =
             writeInnerShadowFragment(shadow->blurX, shadow->blurY, shadow->offsetX, shadow->offsetY,
-                                     shadow->color, shadowIndex++, filter, 0.0f));
-        if (!shadow->shadowOnly) {
-          agg.needSourceGraphic = true;
-        }
+                                     shadow->color, shadowIndex++, filter, 0.0f);
+        currentSource = mergeShadowIntoChain(shadowResult, currentSource, shadow->shadowOnly);
         break;
       }
       case NodeType::ColorMatrixFilter:
@@ -1697,6 +1699,25 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
         break;
     }
   }
+}
+
+std::string SVGWriter::mergeShadowIntoChain(const std::string& shadowResult,
+                                            const std::string& source, bool shadowOnly) {
+  if (shadowOnly) {
+    return shadowResult;
+  }
+  std::string merged = shadowResult + "Over";
+  _defs->openElement("feMerge");
+  _defs->addAttribute("result", merged);
+  _defs->closeElementStart();
+  _defs->openElement("feMergeNode");
+  _defs->addAttribute("in", shadowResult);
+  _defs->closeElementSelfClosing();
+  _defs->openElement("feMergeNode");
+  _defs->addAttribute("in", source);
+  _defs->closeElementSelfClosing();
+  _defs->closeElement();
+  return merged;
 }
 
 void SVGWriter::writeShadowMerge(const ShadowAggregate& agg, const std::string& currentSource) {
@@ -1855,7 +1876,7 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
   int shadowIndex = 0;
   ShadowAggregate agg;
   std::string currentSource = "SourceGraphic";
-  writeFilterList(filters, shadowIndex, agg, currentSource);
+  writeFilterList(filters, shadowIndex, currentSource);
   writeStyleList(styles, shadowIndex, agg);
   writeShadowMerge(agg, currentSource);
 
