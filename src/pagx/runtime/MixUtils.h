@@ -31,6 +31,30 @@ inline float MixFloat(float current, float target, float mix) {
   return current + (target - current) * mix;
 }
 
+// Mixes two perspective distances in the space the projection itself uses, the coefficient -1/d,
+// instead of the distances. The projection tightens at a constant rate in the matrix that way, which
+// is also how a browser interpolates the perspective() transform function: a distance from 1000 to
+// 200 passes through 333 at the midpoint instead of 600.
+//
+// A distance of 0 means no projection, which is the coefficient 0, i.e. the d -> infinity end of
+// that space. Folding it in keeps a segment touching 0 continuous: blending 0 with 200 halfway
+// yields 400, not the near camera a linear distance blend would snap to on the first frame.
+//
+// Both distances are expected to be valid, i.e. non-negative; a negative one folds into the same
+// "no projection" end, so callers that accept a distance from outside must reject it themselves
+// before mixing.
+inline float MixPerspectiveDistance(float current, float target, float mix) {
+  double currentCoefficient = current > 0.0f ? 1.0 / static_cast<double>(current) : 0.0;
+  double targetCoefficient = target > 0.0f ? 1.0 / static_cast<double>(target) : 0.0;
+  double coefficient = currentCoefficient + (targetCoefficient - currentCoefficient) * mix;
+  // A mix beyond either end (an overshooting easing) can push the coefficient past infinity; clamp
+  // to no projection rather than continue into a negative, i.e. behind-the-camera, distance.
+  if (!(coefficient > 0.0)) {
+    return 0.0f;
+  }
+  return static_cast<float>(1.0 / coefficient);
+}
+
 inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& target, float mix) {
   tgfx::Color result = current;
   result.red = MixFloat(current.red, target.red, mix);
