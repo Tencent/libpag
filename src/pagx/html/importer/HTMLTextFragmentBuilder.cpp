@@ -183,8 +183,8 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
 Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
                                                     const HTMLInheritedStyle& inherited,
                                                     float parentPerspectivePx,
-                                                    float parentPerspectiveOriginX,
-                                                    float parentPerspectiveOriginY) {
+                                                    float localPerspectiveOriginX,
+                                                    float localPerspectiveOriginY) {
   // The generator emits glyph <span>s as direct children of the host container; the first one
   // carries the style (font size / colour) of the first rendered glyph.
   std::shared_ptr<DOMNode> firstSpan;
@@ -224,8 +224,8 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // The values already arrive in this element's local coordinates (the caller resolved them), so
   // they are assigned verbatim instead of being offset again.
   containerBox.parentPerspectivePx = parentPerspectivePx;
-  containerBox.localPerspectiveOriginX = parentPerspectiveOriginX;
-  containerBox.localPerspectiveOriginY = parentPerspectiveOriginY;
+  containerBox.localPerspectiveOriginX = localPerspectiveOriginX;
+  containerBox.localPerspectiveOriginY = localPerspectiveOriginY;
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
     HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);

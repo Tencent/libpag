@@ -1068,7 +1068,7 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 bool HTMLAnimationBuilder::buildForElement(
     const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
     const HTMLTransformReference& reference, float parentPerspectivePx,
-    float parentPerspectiveOriginX, float parentPerspectiveOriginY) {
+    float localPerspectiveOriginX, float localPerspectiveOriginY) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
 
   // Gather the animation spec from the shorthand and/or longhands.
@@ -1247,7 +1247,7 @@ bool HTMLAnimationBuilder::buildForElement(
           // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
           // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop.
           const PosePlacement placement = PlacePose(
-              pose, parentPerspectivePx, parentPerspectiveOriginX, parentPerspectiveOriginY);
+              pose, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY);
           if (!placement.valid) {
             if (!warnedTransform) {
               _diagnostics.warn(
