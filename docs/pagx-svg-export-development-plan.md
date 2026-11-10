@@ -63,8 +63,22 @@ R1 的取舍依据：
 
 推迟的编号在文档里保留分类，不进入本轮门禁；`classified` 与 `supported` 的区分照旧成立。
 
-## 2. 静态导出：契约、补齐与阶段
+### 1.5 已采纳的 D 决策
 
+按 1.3 的推荐值执行，不再逐项等待确认；若后续要改，必须重跑对应门禁并把差异写回本节。
+
+| ID | 采纳值 | 当前落地状态 |
+|---|---|---|
+| D1 | Default：`getDefaultTimeline` 首项 | `SVGAnimationPlan` 只遍历 `Layer::timelines`，等价于「实际挂载的驱动」；Named / All 尚未实现（M1） |
+| D2 | 几何 0.25 文档像素 / alpha 1/255 | 误差计算未实现，作为 M3 的验收阈值 |
+| D3 | 默认 Strict | 现为「告警 + 降级」，属 BestEffort；切换 Strict 需先补拒绝路径（M6） |
+| D4 | PreserveAppearance | 等价于现有 `bakeUnsupported = true` |
+| D5 | Fidelity | 等价于 `convertTextToPath = false` + `embedFontsAsWoff2 = true` |
+| D6 | 固定 Chromium + 固定画布 / 背景 / 缩放 / 容差 | 未落地，随浏览器门禁一起做（P7） |
+| D7 | TemplateStatic | 已落地：`ToSVG` 只读模板字段，不执行动画、StateMachine 或默认 DataBind |
+| D8 | 不启用 MB | B 类保持拒绝与告警，不引入有限场景烘焙 |
+
+## 2. 静态导出：契约、补齐与阶段
 ### 2.1 范围与能力摘要
 
 静态指无动画文档，或 `exportAnimation=false` 的 TemplateStatic；它既不是动画 t=0，也不是 scene 首次 draw。line / polyline / polygon 可用等价 Path，use / symbol / marker 可已展开为 Layer；依据 `src/pagx/svg/SVGImporter.cpp:446`、`src/pagx/svg/SVGImporter.cpp:490`。RadialGradient 没有独立 focus，Gradient 没有 spreadMethod，不能还原未保留参数（`include/pagx/nodes/RadialGradient.h:31`、`include/pagx/nodes/Gradient.h:33`）。
@@ -478,6 +492,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮文档重组 | 仅只读源码 / 声明语义核查与文档编辑 | 任何新构建、修复、测试、像素或跨浏览器认证 |
 | 本轮 H0 热修（2026-11-10） | F3 / F5 / F9 / A08 已修，各带一个回归用例；`PAGXSVGTest` 170 / 170 通过（本机 SwiftShader） | 其余 F / ST 编号、像素门禁与跨浏览器结果 |
 | 本轮 P1 增量（2026-11-10） | `BlurFilter` blurX/blurY、`DropShadowFilter` / `InnerShadowFilter` 的 offset + blur、`BlendFilter.color` 已可动画；滤镜区域改为按通道最大绝对值扩大；`PAGXSVGTest` 173 / 173 | 阴影 `color`（烘焙在 feColorMatrix 常量列）、Noise 参数、像素门禁 |
+| 本轮 S0 部分（2026-11-10） | 通道账本（30 类 / 175 条）与双向门禁；退化动画改为显式告警；`ToFile` 改为同目录临时文件 + 原子替换；D1—D8 按推荐值采纳并记录；`PAGXSVGTest` 176 / 176 | S0 剩余项（D6 门禁、预算入口）、S1—S6、M0—M6 |
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 

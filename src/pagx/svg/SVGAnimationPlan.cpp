@@ -155,8 +155,12 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
       continue;
     }
     if (animation->duration <= 0 || animation->frameRate <= 0.0f) {
+      plan->_skippedAnimations++;
+      AddWarning(warnings, "animation '" + animation->id +
+                               "' has a non-positive duration or frame rate; no track is emitted.");
       continue;
     }
+    const size_t bindingsBefore = plan->_bindingCount;
     for (const auto* object : animation->objects) {
       if (object == nullptr) {
         continue;
@@ -201,8 +205,15 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
         }
         if (!replaced) {
           list.push_back({channel, animation, timeline});
+          plan->_bindingCount++;
         }
       }
+    }
+    if (plan->_bindingCount == bindingsBefore) {
+      plan->_skippedAnimations++;
+      AddWarning(warnings, "animation '" + animation->id +
+                               "' has no channel the SVG exporter can express; nothing is emitted "
+                               "for it.");
     }
   }
   return plan;

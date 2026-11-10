@@ -5115,4 +5115,49 @@ PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
   }
 }
 
+// An animation that cannot produce a track must be reported, not silently treated as animated.
+PAGX_TEST(PAGXSVGTest, SVGExport_DegenerateAnimationIsReported) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 0, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("non-positive duration") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ToFile writes through a sibling temporary file: a successful write leaves no temp behind and a
+// failed write must not create or truncate the target.
+PAGX_TEST(PAGXSVGTest, SVGExport_ToFileIsAtomic) {
+  auto dir = ProjectPath::Absolute("test/out/PAGXSVGTest");
+  std::filesystem::create_directories(dir);
+  auto path = dir + "/atomic_write.svg";
+  auto tempPath = path + ".tmp";
+  std::filesystem::remove(path);
+  std::filesystem::remove(tempPath);
+
+  auto doc = MakeRectDocument();
+  ASSERT_TRUE(pagx::SVGExporter::ToFile(*doc, path));
+  ASSERT_TRUE(std::filesystem::exists(path));
+  auto firstSize = std::filesystem::file_size(path);
+  EXPECT_FALSE(std::filesystem::exists(tempPath));
+
+  auto other = pagx::PAGXDocument::Make(100, 50);
+  ASSERT_TRUE(pagx::SVGExporter::ToFile(*other, path));
+  EXPECT_NE(std::filesystem::file_size(path), firstSize);
+  EXPECT_FALSE(std::filesystem::exists(tempPath));
+
+  auto missing = dir + "/missing_dir_xyz/out.svg";
+  EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, missing));
+  EXPECT_FALSE(std::filesystem::exists(missing));
+}
+
 }  // namespace pag

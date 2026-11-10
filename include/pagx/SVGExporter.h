@@ -113,6 +113,10 @@ struct SVGExportOptions {
    * byte-identical output either way, because the exporter only changes structure for elements that
    * actually carry an exportable channel. Channels without a native SMIL equivalent (text content,
    * blend modes, path data) are reported through the warnings sink and dropped.
+   *
+   * The export is template-static: it reads the document's authored state and serializes tracks, but
+   * never advances a timeline, evaluates a StateMachine, or applies a default DataBind. State that
+   * only exists at runtime (host input history, a scene snapshot) cannot be recovered here.
    * The default value is true.
    */
   bool exportAnimation = true;
@@ -148,7 +152,9 @@ class SVGExporter {
    * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
    *        on first use to resolve renderPosition() for layers and groups.
    * @param warnings same semantics as ToSVG(); see that method for details.
-   * @return true on success.
+   * @return true on success. The file is written through a sibling temporary file and renamed into
+   *         place, so a failed export leaves an existing file untouched. This is not a crash
+   *         durability guarantee.
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {}, std::vector<std::string>* warnings = nullptr);

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -3838,12 +3839,34 @@ bool SVGExporter::ToFile(PAGXDocument& document, const std::string& filePath,
   if (svgContent.empty()) {
     return false;
   }
-  std::ofstream file(filePath, std::ios::binary);
-  if (!file) {
+  // Write to a sibling temporary file and rename it into place, so a failed write never truncates
+  // an existing output. The contract stops here: it does not promise crash durability.
+  std::error_code error = {};
+  auto target = std::filesystem::path(filePath);
+  auto directory = target.parent_path();
+  if (directory.empty()) {
+    directory = ".";
+  }
+  auto tempPath = directory / (target.filename().string() + ".tmp");
+  {
+    std::ofstream file(tempPath, std::ios::binary | std::ios::trunc);
+    if (!file) {
+      return false;
+    }
+    file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
+    file.flush();
+    if (!file.good()) {
+      file.close();
+      std::filesystem::remove(tempPath, error);
+      return false;
+    }
+  }
+  std::filesystem::rename(tempPath, target, error);
+  if (error) {
+    std::filesystem::remove(tempPath, error);
     return false;
   }
-  file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
-  return file.good();
+  return true;
 }
 
 }  // namespace pagx

@@ -67,6 +67,15 @@ class SVGAnimationPlan {
   }
 
   /**
+   * Number of animations that were dropped before producing a single track: non-positive duration
+   * or frame rate, or no channel the exporter can express. Used by the coverage tests to prove a
+   * document is not silently reported as animated when nothing was emitted.
+   */
+  size_t SkippedAnimationCount() const {
+    return _skippedAnimations;
+  }
+
+  /**
    * Returns every binding that targets `node`, or nullptr when the node is not animated.
    */
   const std::vector<SVGAnimationBinding>* BindingsFor(const Node* node) const;
@@ -103,6 +112,8 @@ class SVGAnimationPlan {
   SVGAnimationPlan() = default;
 
   std::unordered_map<const Node*, std::vector<SVGAnimationBinding>> _bindings = {};
+  size_t _bindingCount = 0;
+  size_t _skippedAnimations = 0;
 };
 
 }  // namespace pagx
