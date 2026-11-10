@@ -3128,8 +3128,7 @@ struct SVGLineEntry {
   size_t runIndex = 0;
   // The visual line's start x in TextBox coordinates, already alignment-adjusted by the layout.
   // TextLayout records the same value for every Text sharing a line, so this is NOT a per-run
-  // advance. A run rendered as glyphs must take its origin from TextLayoutResult::getGlyphRuns()
-  // positions instead.
+  // advance; a run rendered as glyphs takes its origin from getGlyphRuns() positions instead.
   float startX = 0;
   float baselineY = 0;
   float lineWidth = 0;
@@ -3139,8 +3138,7 @@ struct SVGLineEntry {
 
 }  // namespace
 
-void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
-                                  const std::vector<Element*>& elements, const Matrix& transform,
+void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,                                  const std::vector<Element*>& elements, const Matrix& transform,
                                   float alpha) {
   auto topLevelFs = CollectFillStroke(elements);
   std::vector<SVGRichTextRun> runs;
