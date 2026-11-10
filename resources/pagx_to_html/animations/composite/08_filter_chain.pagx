@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Two filters on one layer animate at once: the blur grows on both axes while the drop shadow moves,
+     blurs and re-tints. The two filter functions have to stay in one ordered chain per frame.
+     Target: Composite  Channel: blurX,blurY,offsetX,offsetY,color  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="150,100" size="150,110" roundness="16"/>
+    <Fill color="#15803D"/>
+    <BlurFilter id="chainBlur" blurX="0" blurY="0"/>
+    <DropShadowFilter id="chainShadow" offsetX="0" offsetY="0" blurX="0" blurY="0" color="#0F172A"/>
+    <BlendFilter id="chainBlend" color="#15803D" blendMode="multiply"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="chainBlur">
+        <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="6"/>
+          <Key time="60" value="12"/>
+        </Channel>
+        <Channel name="blurY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="45" value="10"/>
+          <Key time="60" value="4"/>
+        </Channel>
+      </Object>
+      <Object target="chainShadow">
+        <Channel name="offsetX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="26"/>
+        </Channel>
+        <Channel name="offsetY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="40" value="18"/>
+          <Key time="60" value="6"/>
+        </Channel>
+        <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="14"/>
+        </Channel>
+        <Channel name="blurY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="10"/>
+        </Channel>
+        <Channel name="color" type="color">
+          <Key time="0" value="#0F172A" interpolation="linear"/>
+          <Key time="60" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

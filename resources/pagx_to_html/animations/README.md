@@ -3,7 +3,7 @@
 本目录是**动画导出**的回归语料：一个 `.pagx` 只验证一个语义点，参考实现是 `pagx render --time`
 （PAGX 运行时求值后渲染），被测实现是 `pagx export --format html` 产出的 CSS `@keyframes`。
 
-**184 个可动画通道 / 31 种节点类型 / 190 个用例。** 下面两张表分别回答"是否全面"和"是否精简"，
+**184 个可动画通道 / 31 种节点类型 / 203 个用例**（190 个单通道 + 13 个复合）。 下面两张表分别回答"是否全面"和"是否精简"，
 表格由 `tools/anim_coverage.py` 从源码与语料生成，可当场复核。
 
 ## 0. 判定标准与复核
@@ -290,6 +290,35 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 **已知映射问题**：`{SolidColor, "alpha"}` 与 `{DropShadowFilter, "alpha"}` 指向不存在的通道，`--check`
 报 WARN。
 
+**复合用例（`composite/`）**：每个文件把一个耦合组里所有已实现通道绑在同一个元素上，key 时间故意错开、
+插值方式混用（linear / bezier / hold），用来验证"通道之间"的合成而不是单通道映射。`--check` 会强制
+"每个 supported 通道都出现在某个复合用例里"。
+
+当前逐帧最小 SSIM（`--samples 8`）：
+
+| 复合用例 | min SSIM | 结论 |
+|----------|----------|------|
+| `12_layer_state` | 0.9999 | 通过 |
+| `11_multiple_timelines` | 0.9999 | 通过 |
+| `13_mask_path` | 0.9996 | 通过 |
+| `10_repeater` | 0.9995 | 通过 |
+| `04_nested_chain` | 0.9992 | 通过 |
+| `01_layer_2d_transform` | 0.9911 | 通过 |
+| `07_gradient` | 0.9765 | 待查（端点 + stop 色同时动） |
+| `05_geometry` | 0.9728 | 待查（pointCount 跳变与半径同帧） |
+| `08_filter_chain` | 0.9192 | 待查（blur 与 drop shadow 同链） |
+| `06_painter` | 0.8228 | 已定位：`TrimPath.start/end` 与 dash/width 同帧时偏差最大 |
+| `02_layer_3d` | 0.7825 | 待查（anchor.z 与 rotation 同帧） |
+| `03_transform_override` | 0.3140 | 已定位：`matrix` 与 `x/y` 同时动画时导出把平移加了两次；静态 `matrix3D` 未屏蔽分量通道 |
+| `09_text` | 0.3092 | 已定位：带 `TextModifier` 时 `Text.fontSize`/`letterSpacing` 不产出动画（变体只剩文本通道时报告 `export-static`） |
+
+排查工具：`python3 tools/anim_bisect.py <case.pagx>` —— 逐个删掉一个 channel 重跑评测，哪个通道删掉后
+分数回到阈值以上，哪个就是（一部分）元凶。上面的"已定位"结论就是它给出的。
+
+复合用例的阈值建议：先按 **min SSIM ≥ 0.99** 卡，把上表 6 个未达标项列为已知缺陷（随导出器修复逐条
+删除），而不是放宽阈值——这些低分指向的都是真实的合成 bug。
+
+
 ## 5. 用例族与 fixture
 
 | 族 | 用例数 | 强调色 | 主体 | 独有维度 |
@@ -315,6 +344,7 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 | `text` | 22 | `#BE123C` | 72px 粗体文本 | 文本与文本修改器参数 |
 | `style` | 21 | `#4338CA` | 白色卡片（模糊类带背板） | 图层样式参数 |
 
+| `composite` | 13 | 按耦合组 | 每个耦合组一个文件（Layer 2D/3D、覆盖语义、嵌套链、几何、绘制器、渐变、滤镜、文本、Repeater、多时间线、图层开关、遮罩） | 同一元素的多个 channel 合成 |
 约束：320×200、`#F8FAFC` 背景（`boundary/03` 为 400×160）；每族一个剪影，跨族不重复；旋转类形状不得有
 旋转对称（4 点多边形每 90° 重复，会掩盖错路径样本）；`matrix`/`matrix3D` 通道会替换 `x`/`y` 平移，
 关键帧必须自带 translate。

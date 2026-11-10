@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: One contour mask whose four corners all move at once, so the clip path has to be rebuilt from
+     four animated point channels per frame while the masked content stays static.
+     Target: Path  Channel: point1.x,point2.x,point3.y,point4.y  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Layer id="quadMask" visible="false">
+      <Path id="quadPath" data="M 40 20 L 280 20 L 280 180 L 40 180 Z"/>
+      <Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer mask="@quadMask" maskType="contour">
+      <Rectangle position="160,100" size="280,180" roundness="12"/>
+      <Fill color="#B91C1C"/>
+    </Layer>
+  </Layer>
+  <Animations>
+    <Animation id="quadWarp" duration="60" frameRate="60" loop="once">
+      <Object target="quadPath">
+        <Channel name="point1.x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="110"/>
+        </Channel>
+        <Channel name="point2.x" type="float">
+          <Key time="0" value="280" interpolation="linear"/>
+          <Key time="60" value="210"/>
+        </Channel>
+        <Channel name="point3.y" type="float">
+          <Key time="0" value="180" interpolation="linear"/>
+          <Key time="40" value="120"/>
+          <Key time="60" value="180"/>
+        </Channel>
+        <Channel name="point4.y" type="float">
+          <Key time="0" value="180" interpolation="linear"/>
+          <Key time="60" value="110"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

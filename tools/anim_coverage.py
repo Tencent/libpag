@@ -298,6 +298,22 @@ def check(anim, exported, index, cases):
     for node in sorted(set(anim) - set(NODE_ORDER) - set(NODE_EXEMPTIONS)):
         failures.append("node type missing from NODE_ORDER: %s" % node)
 
+    # Every channel the exporter implements has to appear in a composite case: single-channel cases
+    # prove the mapping, composites prove the channels compose. The match is by channel name, which
+    # is enough to catch omissions (a channel that no composite drives) without re-declaring the node
+    # type per channel here.
+    composites = [c for c in cases if c["family"] == "composite"]
+    composed = set()
+    for case in composites:
+        composed.update(case["channels"])
+    supported = set()
+    for case in cases:
+        if case["expect"] != "supported" or case["family"] == "composite":
+            continue
+        supported.update(case["channels"])
+    for channel in sorted(supported - composed):
+        failures.append("supported channel missing from a composite case: " + channel)
+
     for node, channels in exported.items():
         for channel in channels:
             if node == "Path" or (node, channel) in index:

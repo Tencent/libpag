@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: The text pipeline moves at once: the RangeSelector shifts its window (start / end / offset) while its
+     falloff curve changes (easeIn / easeOut / weight), so the per-glyph factor has to be recomputed from
+     four selector channels in the same frame.
+     Target: Composite  Channel: start,end,offset,easeIn,easeOut,weight,fontSize,letterSpacing  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="textBody" text="COMPOSITE" fontFamily="Arial" fontStyle="Bold" fontSize="34"
+          letterSpacing="0" position="24,110"/>
+    <TextModifier id="textMod" position="0,-14">
+      <RangeSelector id="textSelector" start="0" end="1" offset="0" unit="percentage" shape="triangle"
+                     easeIn="0" easeOut="0" weight="1"/>
+    </TextModifier>
+    <Fill id="textFill" color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="textSelector">
+        <Channel name="start" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.35"/>
+        </Channel>
+        <Channel name="end" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+        <Channel name="offset" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.2"/>
+        </Channel>
+        <Channel name="easeIn" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.9"/>
+        </Channel>
+        <Channel name="easeOut" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.7"/>
+        </Channel>
+        <Channel name="weight" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.45"/>
+        </Channel>
+      </Object>
+      <Object target="textBody">
+        <Channel name="fontSize" type="float">
+          <Key time="0" value="34" interpolation="linear"/>
+          <Key time="60" value="42"/>
+        </Channel>
+        <Channel name="letterSpacing" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="3"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

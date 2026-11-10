@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: One Layer carrying every 2D transform channel at once: x / y / rotation.z / scale.x / scale.y /
+     skew.x / skew.y / anchor.x / anchor.y / alpha. The keys are staggered so the exporter has to merge
+     nine channels into one transform and one opacity track instead of replaying a single curve.
+     Target: Composite  Channel: x,y,rotation.z,scale.x,scale.y,skew.x,skew.y,anchor.x,anchor.y,alpha  Type: mixed
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="spinner" x="100" y="50" width="120" height="100">
+    <Rectangle position="60,50" size="120,100" roundness="12"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="spinner">
+        <Channel name="x" type="float">
+          <Key time="0" value="100" interpolation="linear"/>
+          <Key time="60" value="170"/>
+        </Channel>
+        <Channel name="y" type="float">
+          <Key time="0" value="50" interpolation="linear"/>
+          <Key time="40" value="80"/>
+          <Key time="60" value="60"/>
+        </Channel>
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="25" interpolation="bezier"/>
+          <Key time="60" value="8"/>
+        </Channel>
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="20" value="1.15"/>
+          <Key time="60" value="0.9"/>
+        </Channel>
+        <Channel name="scale.y" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="50" value="0.85"/>
+          <Key time="60" value="1.05"/>
+        </Channel>
+        <Channel name="skew.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="35" value="12"/>
+          <Key time="60" value="4"/>
+        </Channel>
+        <Channel name="skew.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="45" value="8"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="20"/>
+          <Key time="60" value="10"/>
+        </Channel>
+        <Channel name="anchor.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="40" value="15"/>
+          <Key time="60" value="5"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.55"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
