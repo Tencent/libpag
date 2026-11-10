@@ -3,7 +3,7 @@
 本目录是**动画导出**的回归语料：一个 `.pagx` 只验证一个语义点，参考实现是 `pagx render --time`
 （PAGX 运行时求值后渲染），被测实现是 `pagx export --format html` 产出的 CSS `@keyframes`。
 
-**194 个可动画通道 / 32 种节点类型 / 216 个用例。** 下面两张表分别回答"是否全面"和"是否精简"，
+**184 个可动画通道 / 31 种节点类型 / 190 个用例。** 下面两张表分别回答"是否全面"和"是否精简"，
 表格由 `tools/anim_coverage.py` 从源码与语料生成，可当场复核。
 
 ## 0. 判定标准与复核
@@ -20,15 +20,14 @@
 python3 tools/anim_coverage.py --check
 ```
 
-它会同时校验：① 导出映射表中的每个通道都有用例；② 注册表中的**每个可动画通道**都有直接驱动它的用例
-（例外见脚本中的 `CHANNEL_EXEMPTIONS`：数学上不可见的 `Layer.scale.z`，以及渲染器尚未写入的
-`TextPath` 全部通道）；
-③ 每个用例头部 `Expect` 与实际导出结果一致；④ 语料中不存在"仅 id 不同"的重复文档。
+它会同时校验：① 导出映射表中的每个通道都有用例；② 注册表中的**每个可动画通道**都有直接驱动它的用例，
+豁免项必须同时登记在脚本的 `CHANNEL_EXEMPTIONS` / `NODE_EXEMPTIONS` 里（逐条理由见 §4）；
+③ 注册表里出现 `NODE_ORDER` 未登记的节点类型会直接失败，避免新增节点被静默漏检；
+④ 每个用例头部 `Expect` 与实际导出结果一致；⑤ 语料中不存在"仅 id 不同"的重复文档。
 
 ## 1. 主表：可动画通道 → 导出 → 用例
 
 `导出` 以 `src/pagx/html/HTMLAnimationWriter.cpp` 的通道映射表为准；`用例` 只在这里没有单独用例时留空。
-用例列里 `family/*（n）` 表示该族贡献了 n 条。
 
 | 节点 | 可动画通道 | 导出 | 用例 |
 |------|------------|------|------|
@@ -172,8 +171,7 @@ python3 tools/anim_coverage.py --check
 | GlassStyle | `lightIntensity` | ✘ | `style/21` |
 | GlassStyle | `refraction` | ✘ | `style/04` |
 | GlassStyle | `splay` | ✘ | `style/22` |
-| NoiseStyle | `color` `density` `firstColor` `secondColor` `seed` `size` | ✘ | — |
-| NoiseStyle | `opacity` | ✘ | `style/26` |
+| NoiseStyle | `color` `density` `firstColor` `opacity` `secondColor` `seed` `size` | ✘ | — |
 | BlurFilter | `blurX` | ✔ | `filter/01` |
 | BlurFilter | `blurY` | ✔ | `filter/02` |
 | DropShadowFilter | `blurX` `blurY` | ✔ | `filter/05` |
@@ -211,9 +209,6 @@ python3 tools/anim_coverage.py --check
 | `TrimPath.end` | 2 | `geometry/04`、`stroke/06` |
 | `SolidColor.color` | 4 | `sharing/01`、`solid_color/01`、`timing/04·06` |
 
-`Layer.alpha` 是最典型的例子：`layer/01` 是通道基准，`interpolation/*` 变插值方式，`boundary/*` 变关键帧
-边界，`timing/*` 变循环与 `evaluationOffset`，`combo/02·03` 变"与其他通道共享同一组 keyframe stop"。
-
 ## 3. 时间线语义（与通道无关的维度）
 
 | 语义 | 用例 |
@@ -229,7 +224,7 @@ python3 tools/anim_coverage.py --check
 
 ## 4. 缺口与已知问题
 
-**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
+**未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 42 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
 
 **两套"缓动"不要混为一谈**：
@@ -304,20 +299,21 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 | `textbox` | 10 | `#7C3AED` | 文本 "AB" | TextBox 布局与变换通道 |
 | `fill` | 6 | `#DB2777` | 胶囊 / 文本 / 渐变三角 | 绘制器颜色与透明度承载 |
 | `stroke` | 6 | `#0E7490` | 椭圆描边环 / 五角星 | 描边参数 |
-| `filter` | 21 | `#15803D` | 六边形 + 深色阴影 | 滤镜参数 |
+| `filter` | 8 | `#15803D` | 六边形 + 深色阴影 | 滤镜参数 |
 | `geometry` | 20 | `#B45309` | 矩形 / 椭圆 / 五角星 | 几何尺寸与圆角 |
 | `mask` | 4 | `#B91C1C` | 被遮罩内容 | 遮罩路径逐点变形 |
 | `timing` | 8 | `#0284C7` | 圆形 | 循环、帧率、`evaluationOffset`、挂载 |
 | `boundary` | 6 | `#0F766E` | 五角星 | 关键帧边界 |
 | `interpolation` | 4 | `#C026D3` | 弧形 | 插值方式 |
-| `combo` | 4 | `#475569` | 八边形 | 多通道共享 keyframe |
+| `easing` | 3 | `#BE123C` | 文本 "WAVE"（与 `text` 共用夹具） | 选区衰减曲线：`easeIn` / `easeOut` / `weight` |
+| `combo` | 6 | `#475569` | 八边形 | 多通道共享 keyframe |
 | `sharing` | 3 | `#9A3412` | 圆形 / 圆形与文本 | 资源与绘制器共享 |
 | `solid_color` | 1 | `#65A30D` | 圆形 | 颜色源 |
 | `anchor` | 9 | `#C2410C` | 长条 + 支点圆点 / 卡片 | 局部变换支点（含 `anchor.z` 深度）与 3D 耦合 |
-| `gradient` | 16 | `#0891B2` | 椭圆 | 渐变色源参数 |
-| `modifier` | 19 | `#9333EA` | 五边形 / 五角星描边 / 方块阵列 | 修改器参数 |
+| `gradient` | 8 | `#0891B2` | 椭圆 | 渐变色源参数 |
+| `modifier` | 16 | `#9333EA` | 五边形 / 五角星描边 / 方块阵列 | 修改器参数 |
 | `text` | 22 | `#BE123C` | 72px 粗体文本 | 文本与文本修改器参数 |
-| `style` | 28 | `#4338CA` | 白色卡片（模糊类带背板） | 图层样式参数 |
+| `style` | 21 | `#4338CA` | 白色卡片（模糊类带背板） | 图层样式参数 |
 
 约束：320×200、`#F8FAFC` 背景（`boundary/03` 为 400×160）；每族一个剪影，跨族不重复；旋转类形状不得有
 旋转对称（4 点多边形每 90° 重复，会掩盖错路径样本）；`matrix`/`matrix3D` 通道会替换 `x`/`y` 平移，

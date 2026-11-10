@@ -92,6 +92,12 @@ def load_registry():
     for i in range(1, len(funcs), 2):
         name, body = funcs[i], funcs[i + 1]
         for m in re.finditer(r'FIELD_\w+\((\w+), "([^"]+)", \w+, (?:Anim|AnimLayout)\)', body):
+            # `AppendGroupCommonFields<T>` writes its rows with the template parameter as the node, so
+            # `T` is not a node type: those rows are attached to Group / TextBox / TextPath below.
+            # Keeping them under `T` inflated the channel total by ten and hid them from --check,
+            # because check() only walks NODE_ORDER.
+            if m.group(1) == "T":
+                continue
             anim.setdefault(m.group(1), set()).add(m.group(2))
         if re.search(r'\{"color", Anim,', body):
             node = "Fill" if name == "BuildFillFields" else "Stroke"
@@ -286,6 +292,11 @@ def check(anim, exported, index, cases):
             if (node, channel) in CHANNEL_EXEMPTIONS:
                 continue
             failures.append("animatable channel without a case: %s.%s" % (node, channel))
+
+    # A node the registry produces that NODE_ORDER does not list would be skipped by every loop
+    # below, which is exactly how the `T` template parameter stayed invisible.
+    for node in sorted(set(anim) - set(NODE_ORDER) - set(NODE_EXEMPTIONS)):
+        failures.append("node type missing from NODE_ORDER: %s" % node)
 
     for node, channels in exported.items():
         for channel in channels:
