@@ -1630,6 +1630,9 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
         // unique across instances, otherwise mask="@..." can resolve to the wrong one.
         maskLayer->id = maskLayer->id + "_" + std::to_string(++_maskInstanceSeq);
         maskLayer->name = maskLayer->id;
+        // The mask geometry is authored in the referenced element's space, so it has to carry the
+        // instance mapping too; otherwise the clip stays at the defs origin while the content moves.
+        maskLayer->matrix = contentMatrix * maskLayer->matrix;
         group->mask = maskLayer;
         group->maskType = (getAttribute(maskIt->second, "mask-type") == "alpha")
                               ? MaskType::Alpha
@@ -1646,6 +1649,7 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
       auto* clipLayer = convertMaskElement(clipIt->second, refStyle);
       if (clipLayer) {
         EnsureOpaqueClipMaskFill(_document, clipLayer);
+        clipLayer->matrix = contentMatrix * clipLayer->matrix;
         if (group->mask != nullptr) {
           // Both mask and clip-path are present: clip-path goes on the outer layer and the
           // mask stays on the inner one.
@@ -3538,6 +3542,18 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
     return;
   }
 
+  // Merging replaces both layers with a new node that only copies the id, so any animation bound to
+  // the original target would resolve against a node that is no longer in the tree. Keep such
+  // layers intact.
+  std::unordered_set<const Layer*> animatedTargets = {};
+  for (const auto& entry : _animatedNodeMap) {
+    for (const auto& info : entry.second) {
+      if (info.targetLayer != nullptr) {
+        animatedTargets.insert(info.targetLayer);
+      }
+    }
+  }
+
   std::vector<Layer*> merged;
   size_t i = 0;
 
@@ -3551,7 +3567,8 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
         const Element* geomB = nullptr;
         const Element* painterB = nullptr;
 
-        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) && isSameGeometry(geomA, geomB)) {
+        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) && isSameGeometry(geomA, geomB) &&
+            animatedTargets.count(layers[i]) == 0 && animatedTargets.count(layers[i + 1]) == 0) {
           // Merge: one has Fill, the other has Stroke.
           bool aHasFill = (painterA->nodeType() == NodeType::Fill);
           bool bHasFill = (painterB->nodeType() == NodeType::Fill);
