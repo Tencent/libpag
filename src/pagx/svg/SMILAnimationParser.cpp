@@ -395,14 +395,21 @@ static SyncBaseRef ParseSyncBase(const std::string& token) {
   auto last = s.find_last_not_of(" \t");
   s = s.substr(first, last - first + 1);
 
-  // Split the trailing +/- clock offset, if any.
+  // Split the trailing +/- clock offset, if any. The sign must follow the event suffix and be
+  // followed by a clock value: a hyphen inside a legal id ("fade-in.end") is part of the id.
   double offset = 0;
-  for (size_t i = 1; i < s.size(); ++i) {
-    if (s[i] == '+' || s[i] == '-') {
-      offset = SMILAnimationParser::parseSMILClockValue(s.substr(i));
-      s = s.substr(0, i);
-      break;
+  const auto suffixDot = s.rfind('.');
+  const size_t offsetSearchStart = suffixDot == std::string::npos ? 1 : suffixDot + 1;
+  for (size_t i = offsetSearchStart; i < s.size(); ++i) {
+    if (s[i] != '+' && s[i] != '-') {
+      continue;
     }
+    if (!IsClockToken(s.substr(i + 1))) {
+      continue;
+    }
+    offset = SMILAnimationParser::parseSMILClockValue(s.substr(i));
+    s = s.substr(0, i);
+    break;
   }
   auto dot = s.rfind('.');
   if (dot == std::string::npos || dot == 0 || dot + 1 >= s.size()) {
