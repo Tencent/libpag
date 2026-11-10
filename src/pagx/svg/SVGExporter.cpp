@@ -3126,9 +3126,10 @@ struct SVGRichTextRun {
 
 struct SVGLineEntry {
   size_t runIndex = 0;
-  // The run's own x origin within the TextBox, taken from the layout's alignment-adjusted startX.
-  // Each run is a separate Text, so this is the per-run advance anchor that a run rendered as
-  // glyphs (instead of <tspan> characters) has to be placed at.
+  // The visual line's start x in TextBox coordinates, already alignment-adjusted by the layout.
+  // TextLayout records the same value for every Text sharing a line, so this is NOT a per-run
+  // advance. A run rendered as glyphs must take its origin from TextLayoutResult::getGlyphRuns()
+  // positions instead.
   float startX = 0;
   float baselineY = 0;
   float lineWidth = 0;
